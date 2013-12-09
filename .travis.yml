@@ -4,6 +4,8 @@ python:
   - "2.7"
   - "3.2"
   - "3.3"
-install: pip install nose==1.3.0
+install:
+ - python setup.py install
+ - pip install nose==1.3.0
 script: nosetests
 
