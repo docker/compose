@@ -1,29 +1,5 @@
-from unittest import TestCase
-from docker import Client
 from plum import Service
-import os
-
-
-if os.environ.get('DOCKER_URL'):
-    client = Client(os.environ['DOCKER_URL'])
-else:
-    client = Client()
-client.pull('ubuntu')
-
-
-class ServiceTestCase(TestCase):
-    def setUp(self):
-        for c in client.containers(all=True):
-            client.kill(c['Id'])
-            client.remove_container(c['Id'])
-
-    def create_service(self, name):
-        return Service(
-            name=name,
-            client=client,
-            image="ubuntu",
-            command=["/bin/sleep", "300"],
-        )
+from .testcases import ServiceTestCase
 
 
 class NameTestCase(ServiceTestCase):

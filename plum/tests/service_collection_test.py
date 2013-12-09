@@ -1,9 +1,9 @@
 from plum.service import Service
 from plum.service_collection import ServiceCollection
-from unittest import TestCase
+from .testcases import ServiceTestCase
 
 
-class ServiceCollectionTest(TestCase):
+class ServiceCollectionTest(ServiceTestCase):
     def test_from_dict(self):
         collection = ServiceCollection.from_dicts(None, [
             {
@@ -38,7 +38,3 @@ class ServiceCollectionTest(TestCase):
         
         self.assertEqual(collection[0].name, 'db')
         self.assertEqual(collection[1].name, 'web')
-
-
-
-
