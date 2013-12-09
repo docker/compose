@@ -4,19 +4,19 @@ Plum
 Plum is tool for defining and running apps with Docker. It uses a simple, version-controllable YAML configuration file that looks something like this:
 
 ```yaml
-    db:
-      image: orchardup/postgresql
+db:
+  image: orchardup/postgresql
 
-    web:
-      build: web/
-      link: db
+web:
+  build: web/
+  link: db
 ```
 
 Installing
 ----------
 
 ```bash
-    $ sudo pip install plum
+$ sudo pip install plum
 ```
 
 Defining your app
@@ -27,24 +27,24 @@ Put a `plum.yml` in your app's directory. Each top-level key defines a "service"
 The way to get started is to just give it an image name:
 
 ```yaml
-    db:
-      image: orchardup/postgresql
+db:
+  image: orchardup/postgresql
 ```
 
 Alternatively, you can give it the location of a directory with a Dockerfile (or a Git URL, as per the `docker build` command), and it'll automatically build the image for you:
 
 ```yaml
-    db:
-      build: /path/to/postgresql/build/directory
+db:
+  build: /path/to/postgresql/build/directory
 ```
 
 You've now given Plum the minimal amount of configuration it needs to run:
 
 ```bash
-    $ plum up
-    Building db... done
-    db is running at 127.0.0.1:45678
-    <...output from postgresql server...>
+$ plum up
+Building db... done
+db is running at 127.0.0.1:45678
+<...output from postgresql server...>
 ```
 
 For each service you've defined, Plum will start a Docker container with the specified image, building or pulling it if necessary. You now have a PostgreSQL server running at `127.0.0.1:45678`.
@@ -52,13 +52,13 @@ For each service you've defined, Plum will start a Docker container with the spe
 By default, `plum up` will run until each container has shut down, and relay their output to the terminal. To run in the background instead, pass the `-d` flag:
 
 ```bash
-    $ plum run -d
-    Building db... done
-    db is running at 127.0.0.1:45678
+$ plum run -d
+Building db... done
+db is running at 127.0.0.1:45678
 
-    $ plum ps
-    SERVICE  STATE  PORT
-    db       up     45678
+$ plum ps
+SERVICE  STATE  PORT
+db       up     45678
 ```
 
 
@@ -69,15 +69,15 @@ Some services may include your own code. To get that code into the container, AD
 `plum.yml`:
 
 ```yaml
-    web:
-      build: web/
+web:
+  build: web/
 ```
 
 `web/Dockerfile`:
 
-    FROM orchardup/rails
-    ADD . /code
-    CMD: bundle exec rackup
+FROM orchardup/rails
+ADD . /code
+CMD: bundle exec rackup
 
 
 ### Communicating between containers
@@ -85,12 +85,12 @@ Some services may include your own code. To get that code into the container, AD
 Your web app will probably need to talk to your database. You can use [Docker links] to enable containers to communicatecommunicate, pass in the right IP address and port via environment variables:
 
 ```yaml
-    db:
-      image: orchardup/postgresql
+db:
+  image: orchardup/postgresql
 
-    web:
-      build: web/
-      link: db
+web:
+  build: web/
+  link: db
 ```
 
 This will pass an environment variable called DB_PORT into the web container, whose value will look like `tcp://172.17.0.4:45678`. Your web app's code can then use that to connect to the database.
@@ -98,10 +98,10 @@ This will pass an environment variable called DB_PORT into the web container, wh
 You can pass in multiple links, too:
 
 ```yaml
-    link:
-      - db
-      - memcached
-      - redis
+link:
+ - db
+ - memcached
+ - redis
 ```
 
 
@@ -113,21 +113,21 @@ In each case, the resulting environment variable will begin with the uppercased 
 You can pass extra configuration options to a container, much like with `docker run`:
 
 ```yaml
-    web:
-      build: web/
+web:
+  build: web/
 
-      -- override the default run command
-      run: bundle exec thin -p 3000
+-- override the default run command
+run: bundle exec thin -p 3000
 
-      -- expose ports - can also be an array
-      ports: 3000
+-- expose ports - can also be an array
+ports: 3000
 
-      -- map volumes - can also be an array
-      volumes: /tmp/cache
+-- map volumes - can also be an array
+volumes: /tmp/cache
 
-      -- add environment variables - can also be a dictionary
-      environment:
-        - RACK_ENV=development
+-- add environment variables - can also be a dictionary
+environment:
+ - RACK_ENV=development
 ```
 
 
@@ -136,9 +136,11 @@ Running a one-off command
 
 If you want to run a management command, use `plum run` to start a one-off container:
 
-    $ plum run db createdb myapp_development
-    $ plum run web rake db:migrate
-    $ plum run web bash
+```bash
+$ plum run db createdb myapp_development
+$ plum run web rake db:migrate
+$ plum run web bash
+```
 
 
 Running more than one container for a service
@@ -146,14 +148,13 @@ Running more than one container for a service
 
 You can set the number of containers to run for each service with `plum scale`:
 
-    $ plum up -d
-    db is running at 127.0.0.1:45678
-    web is running at 127.0.0.1:45679
+```bash
+$ plum up -d
+db is running at 127.0.0.1:45678
+web is running at 127.0.0.1:45679
 
-    $ plum scale db=0,web=3
-    Stopped db (127.0.0.1:45678)
-    Started web (127.0.0.1:45680)
-    Started web (127.0.0.1:45681)
-
-
-
+$ plum scale db=0,web=3
+Stopped db (127.0.0.1:45678)
+Started web (127.0.0.1:45680)
+Started web (127.0.0.1:45681)
+```
