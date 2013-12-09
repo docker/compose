@@ -1,6 +1,8 @@
 Plum
 ====
 
+**WARNING**: This is a work in progress and probably won't work yet. Feedback welcome.
+
 Plum is tool for defining and running apps with Docker. It uses a simple, version-controllable YAML configuration file that looks something like this:
 
 ```yaml
