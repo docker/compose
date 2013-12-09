@@ -77,9 +77,9 @@ web:
 
 `web/Dockerfile`:
 
-FROM orchardup/rails
-ADD . /code
-CMD: bundle exec rackup
+    FROM orchardup/rails
+    ADD . /code
+    CMD: bundle exec rackup
 
 
 ### Communicating between containers
