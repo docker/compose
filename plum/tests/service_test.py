@@ -39,6 +39,22 @@ class NameTestCase(ServiceTestCase):
         Service('_____')
 
 
+class ContainersTestCase(ServiceTestCase):
+    def test_containers(self):
+        foo = self.create_service('foo')
+        bar = self.create_service('bar')
+
+        foo.start()
+
+        self.assertEqual(len(foo.containers), 1)
+        self.assertEqual(len(bar.containers), 0)
+
+        bar.scale(2)
+
+        self.assertEqual(len(foo.containers), 1)
+        self.assertEqual(len(bar.containers), 2)
+
+
 class ScalingTestCase(ServiceTestCase):
     def setUp(self):
         super(ServiceTestCase, self).setUp()
