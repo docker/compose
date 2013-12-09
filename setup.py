@@ -32,12 +32,7 @@ setup(
     packages=['plum'],
     package_data={},
     include_package_data=True,
-    install_requires=[
-        'docopt==0.6.1',
-        'docker-py==0.2.2',
-        'requests==2.0.1',
-        'texttable==0.8.1',
-    ],
+    install_requires=[],
     dependency_links=[],
     entry_points="""
     [console_scripts]

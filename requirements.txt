@@ -1,0 +1,1 @@
+git+git://github.com/dotcloud/docker-py.git@4fde1a242e1853cbf83e5a36371d8b4a49501c52
