@@ -2,7 +2,7 @@ import re
 
 
 class Service(object):
-    def __init__(self, name, client=None, image=None, command=None):
+    def __init__(self, name, client=None, image=None, command=None, links=None):
         if not re.match('^[a-zA-Z0-9_]+$', name):
             raise ValueError('Invalid name: %s' % name)
 
@@ -10,6 +10,7 @@ class Service(object):
         self.client = client
         self.image = image
         self.command = command
+        self.links = links or []
 
     @property
     def containers(self):
