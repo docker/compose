@@ -82,7 +82,7 @@ CMD: bundle exec rackup
 
 ### Communicating between containers
 
-Your web app will probably need to talk to your database. You can use [Docker links] to enable containers to communicatecommunicate, pass in the right IP address and port via environment variables:
+Your web app will probably need to talk to your database. You can use [Docker links] to enable containers to communicate, pass in the right IP address and port via environment variables:
 
 ```yaml
 db:
