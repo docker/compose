@@ -1,9 +1,13 @@
 from unittest import TestCase
 from docker import Client
 from plum import Service
+import os
 
 
-client = Client('http://127.0.0.1:4243')
+if os.environ.get('DOCKER_URL'):
+    client = Client(os.environ['DOCKER_URL'])
+else:
+    client = Client()
 client.pull('ubuntu')
 
 
