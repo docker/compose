@@ -18,12 +18,13 @@ class ServiceTestCase(TestCase):
             self.client.kill(c['Id'])
             self.client.remove_container(c['Id'])
 
-    def create_service(self, name):
+    def create_service(self, name, **kwargs):
         return Service(
             name=name,
             client=self.client,
             image="ubuntu",
             command=["/bin/sleep", "300"],
+            **kwargs
         )
 
 

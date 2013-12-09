@@ -34,7 +34,10 @@ class Service(object):
         number = self.next_container_number()
         name = make_name(self.name, number)
         container = self.client.create_container(self.image, self.command, name=name)
-        self.client.start(container['Id'])
+        self.client.start(
+            container['Id'],
+            links=self._get_links(),
+        )
 
     def stop_container(self):
         self.client.kill(self.containers[0]['Id'])
@@ -46,6 +49,20 @@ class Service(object):
             return 1
         else:
             return max(numbers) + 1
+
+    def get_names(self):
+        return [get_container_name(c) for c in self.containers]
+
+    def inspect(self):
+        return [self.client.inspect_container(c['Id']) for c in self.containers]
+
+    def _get_links(self):
+        links = {}
+        for service in self.links:
+            for name in service.get_names():
+                links[name] = name
+        return links
+
 
 
 def make_name(prefix, number):

@@ -65,3 +65,16 @@ class ScalingTestCase(ServiceTestCase):
 
         self.service.stop()
         self.assertEqual(len(self.service.containers), 0)
+
+
+class LinksTestCase(ServiceTestCase):
+    def test_links_are_created_when_starting(self):
+        db = self.create_service('db')
+        web = self.create_service('web', links=[db])
+        db.start()
+        web.start()
+        self.assertIn('/web_1/db_1', db.containers[0]['Names'])
+        db.stop()
+        web.stop()
+
+
