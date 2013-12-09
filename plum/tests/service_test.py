@@ -27,12 +27,17 @@ class ContainersTestCase(ServiceTestCase):
         foo.start()
 
         self.assertEqual(len(foo.containers), 1)
+        self.assertEqual(foo.containers[0]['Names'], ['/foo_1'])
         self.assertEqual(len(bar.containers), 0)
 
         bar.scale(2)
 
         self.assertEqual(len(foo.containers), 1)
         self.assertEqual(len(bar.containers), 2)
+
+        names = [c['Names'] for c in bar.containers]
+        self.assertIn(['/bar_1'], names)
+        self.assertIn(['/bar_2'], names)
 
 
 class ScalingTestCase(ServiceTestCase):
