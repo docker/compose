@@ -1,5 +1,12 @@
+import re
+
+
 class Service(object):
-    def __init__(self, client, image, command):
+    def __init__(self, name, client=None, image=None, command=None):
+        if not re.match('^[a-zA-Z0-9_]+$', name):
+            raise ValueError('Invalid name: %s' % name)
+
+        self.name = name
         self.client = client
         self.image = image
         self.command = command

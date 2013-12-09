@@ -3,7 +3,24 @@ from docker import Client
 from plum import Service
 
 
-class ServiceTestCase(TestCase):
+class NameTestCase(TestCase):
+    def test_name_validations(self):
+        self.assertRaises(ValueError, lambda: Service(name=''))
+
+        self.assertRaises(ValueError, lambda: Service(name=' '))
+        self.assertRaises(ValueError, lambda: Service(name='/'))
+        self.assertRaises(ValueError, lambda: Service(name='!'))
+        self.assertRaises(ValueError, lambda: Service(name='\xe2'))
+
+        Service('a')
+        Service('foo')
+        Service('foo_bar')
+        Service('__foo_bar__')
+        Service('_')
+        Service('_____')
+
+
+class ScalingTestCase(TestCase):
     def setUp(self):
         self.client = Client('http://127.0.0.1:4243')
         self.client.pull('ubuntu')
@@ -13,6 +30,7 @@ class ServiceTestCase(TestCase):
             self.client.remove_container(c['Id'])
 
         self.service = Service(
+            name="test",
             client=self.client,
             image="ubuntu",
             command=["/bin/sleep", "300"],
