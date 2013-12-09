@@ -8,8 +8,9 @@ class ServiceTestCase(TestCase):
         self.client = Client('http://127.0.0.1:4243')
         self.client.pull('ubuntu')
 
-        for c in self.client.containers():
+        for c in self.client.containers(all=True):
             self.client.kill(c['Id'])
+            self.client.remove_container(c['Id'])
 
         self.service = Service(
             client=self.client,
