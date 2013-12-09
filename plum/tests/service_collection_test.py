@@ -38,3 +38,21 @@ class ServiceCollectionTest(ServiceTestCase):
         
         self.assertEqual(collection[0].name, 'db')
         self.assertEqual(collection[1].name, 'web')
+
+    def test_start_stop(self):
+        collection = ServiceCollection([
+            self.create_service('web'),
+            self.create_service('db'),
+        ])
+
+        collection.start()
+
+        self.assertEqual(len(collection[0].containers), 1)
+        self.assertEqual(len(collection[1].containers), 1)
+
+        collection.stop()
+
+        self.assertEqual(len(collection[0].containers), 0)
+        self.assertEqual(len(collection[1].containers), 0)
+
+

@@ -34,4 +34,13 @@ class ServiceCollection(list):
             if service.name == name:
                 return service
 
+    def start(self):
+        for container in self:
+            container.start()
+
+    def stop(self):
+        for container in self:
+            container.stop()
+
+
 
