@@ -59,11 +59,16 @@ class NameTestCase(DockerClientTestCase):
         service.stop()
         self.assertEqual(len(service.containers), 0)
 
-    def test_links_are_created_when_starting(self):
+    def test_start_container_passes_through_options(self):
+        db = self.create_service('db', environment={'FOO': 'BAR'})
+        db.start_container()
+        self.assertEqual(db.inspect()[0]['Config']['Env'], ['FOO=BAR'])
+
+    def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[db])
-        db.start()
-        web.start()
+        db.start_container()
+        web.start_container()
         self.assertIn('/web_1/db_1', db.containers[0]['Names'])
         db.stop()
         web.stop()

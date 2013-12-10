@@ -17,9 +17,9 @@ class ServiceCollectionTest(DockerClientTestCase):
         ])
         self.assertEqual(len(collection), 2)
         self.assertEqual(collection.get('web').name, 'web')
-        self.assertEqual(collection.get('web').image, 'ubuntu')
+        self.assertEqual(collection.get('web').options['image'], 'ubuntu')
         self.assertEqual(collection.get('db').name, 'db')
-        self.assertEqual(collection.get('db').image, 'ubuntu')
+        self.assertEqual(collection.get('db').options['image'], 'ubuntu')
 
     def test_from_dict_sorts_in_dependency_order(self):
         collection = ServiceCollection.from_dicts(None, [
