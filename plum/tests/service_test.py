@@ -60,6 +60,11 @@ class NameTestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers), 0)
 
     def test_start_container_passes_through_options(self):
+        db = self.create_service('db')
+        db.start_container(environment={'FOO': 'BAR'})
+        self.assertEqual(db.inspect()[0]['Config']['Env'], ['FOO=BAR'])
+
+    def test_start_container_inherits_options_from_constructor(self):
         db = self.create_service('db', environment={'FOO': 'BAR'})
         db.start_container()
         self.assertEqual(db.inspect()[0]['Config']['Env'], ['FOO=BAR'])

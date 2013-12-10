@@ -29,10 +29,12 @@ class Service(object):
         while len(self.containers) > num:
             self.stop_container()
 
-    def start_container(self):
+    def start_container(self, **override_options):
+        options = dict(self.options)
+        options.update(override_options)
         number = self.next_container_number()
         name = make_name(self.name, number)
-        container = self.client.create_container(name=name, **self.options)
+        container = self.client.create_container(name=name, **options)
         self.client.start(
             container['Id'],
             links=self._get_links(),
