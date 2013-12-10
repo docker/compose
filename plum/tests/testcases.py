@@ -4,7 +4,7 @@ import os
 from unittest import TestCase
 
 
-class ServiceTestCase(TestCase):
+class DockerClientTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
         if os.environ.get('DOCKER_URL'):

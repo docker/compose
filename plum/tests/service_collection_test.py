@@ -1,9 +1,9 @@
 from plum.service import Service
 from plum.service_collection import ServiceCollection
-from .testcases import ServiceTestCase
+from .testcases import DockerClientTestCase
 
 
-class ServiceCollectionTest(ServiceTestCase):
+class ServiceCollectionTest(DockerClientTestCase):
     def test_from_dict(self):
         collection = ServiceCollection.from_dicts(None, [
             {
