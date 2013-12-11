@@ -26,7 +26,7 @@ setup(
     name='plum',
     version=find_version("plum", "__init__.py"),
     description='',
-    url='https://github.com/orchardup.plum',
+    url='https://github.com/orchardup/plum',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
     packages=['plum'],
