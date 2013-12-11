@@ -36,6 +36,6 @@ setup(
     dependency_links=[],
     entry_points="""
     [console_scripts]
-    plum=plum:main
+    plum=plum.cli.main:main
     """,
 )

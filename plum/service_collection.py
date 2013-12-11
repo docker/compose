@@ -29,6 +29,14 @@ class ServiceCollection(list):
             collection.append(Service(client=client, links=links, **service_dict))
         return collection
 
+    @classmethod
+    def from_config(cls, client, config):
+        dicts = []
+        for name, service in config.items():
+            service['name'] = name
+            dicts.append(service)
+        return cls.from_dicts(client, dicts)
+
     def get(self, name):
         for service in self:
             if service.name == name:
