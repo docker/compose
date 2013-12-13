@@ -64,6 +64,7 @@ class TopLevelCommand(Command):
 
     Commands:
       ps        List services and containers
+      run       Run a one-off command
       start     Start services
       stop      Stop services
 
@@ -77,6 +78,15 @@ class TopLevelCommand(Command):
         for service in self.service_collection:
             for container in service.containers:
                 print container['Names'][0]
+
+    def run(self, options):
+        """
+        Run a one-off command.
+
+        Usage: run SERVICE COMMAND [ARGS...]
+        """
+        service = self.service_collection.get(options['SERVICE'])
+        service.start_container(command=[options['COMMAND']] + options['ARGS'])
 
     def start(self, options):
         """
