@@ -78,4 +78,14 @@ class NameTestCase(DockerClientTestCase):
         db.stop()
         web.stop()
 
+    def test_start_container_builds_images(self):
+        service = Service(
+            name='test',
+            client=self.client,
+            build='plum/tests/fixtures/simple-dockerfile',
+        )
+        container = service.start()
+        self.client.wait(container)
+        self.assertIn('success', self.client.logs(container))
+        
 
