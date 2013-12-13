@@ -118,18 +118,18 @@ You can pass extra configuration options to a container, much like with `docker 
 web:
   build: web/
 
--- override the default run command
-run: bundle exec thin -p 3000
+  -- override the default run command
+  run: bundle exec thin -p 3000
 
--- expose ports - can also be an array
-ports: 3000
+  -- expose ports - can also be an array
+  ports: 3000
 
--- map volumes - can also be an array
-volumes: /tmp/cache
+  -- map volumes - can also be an array
+  volumes: /tmp/cache
 
--- add environment variables - can also be a dictionary
-environment:
- - RACK_ENV=development
+  -- add environment variables - can also be a dictionary
+  environment:
+   RACK_ENV: development
 ```
 
 
