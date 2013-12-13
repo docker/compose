@@ -64,6 +64,8 @@ class TopLevelCommand(Command):
 
     Commands:
       ps        List services and containers
+      start     Start services
+      stop      Stop services
 
     """
     def ps(self, options):
