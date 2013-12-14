@@ -79,7 +79,7 @@ web:
 
     FROM orchardup/rails
     ADD . /code
-    CMD: bundle exec rackup
+    CMD bundle exec rackup
 
 
 ### Communicating between containers
