@@ -82,7 +82,7 @@ class NameTestCase(DockerClientTestCase):
         service = Service(
             name='test',
             client=self.client,
-            build='plum/tests/fixtures/simple-dockerfile',
+            build='tests/fixtures/simple-dockerfile',
         )
         container = service.start()
         self.client.wait(container)
