@@ -34,10 +34,15 @@ class Service(object):
             self.stop_container()
 
     def start_container(self, **override_options):
-        container = self.client.create_container(**self._get_container_options(override_options))
+        container_options = self._get_container_options(override_options)
+        container = self.client.create_container(**container_options)
+        port_bindings = {}
+        for port in container_options.get('ports', []):
+            port_bindings[port] = None
         self.client.start(
             container['Id'],
             links=self._get_links(),
+            port_bindings=port_bindings,
         )
         return container['Id']
 
