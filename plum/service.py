@@ -1,5 +1,7 @@
+import logging
 import re
 
+log = logging.getLogger(__name__)
 
 class Service(object):
     def __init__(self, name, client=None, links=[], **options):
@@ -72,6 +74,7 @@ class Service(object):
         container_options['name'] = make_name(self.name, number)
 
         if 'build' in self.options:
+            log.info('Building %s from %s...' % (self.name, self.options['build']))
             container_options['image'] = self.client.build(self.options['build'])[0]
 
         return container_options
