@@ -87,7 +87,16 @@ class TopLevelCommand(Command):
         Usage: run SERVICE COMMAND [ARGS...]
         """
         service = self.service_collection.get(options['SERVICE'])
-        service.start_container(command=[options['COMMAND']] + options['ARGS'])
+        container_options = {
+            'command': [options['COMMAND']] + options['ARGS'],
+        }
+        container = service.create_container(**container_options)
+        stream = self.client.logs(container, stream=True)
+        service.start_container(container, **container_options)
+        for data in stream:
+            if data is None:
+                break
+            print data
 
     def start(self, options):
         """
