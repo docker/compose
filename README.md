@@ -43,7 +43,7 @@ db:
 You've now given Plum the minimal amount of configuration it needs to run:
 
 ```bash
-$ plum up
+$ plum start
 Building db... done
 db is running at 127.0.0.1:45678
 <...output from postgresql server...>
@@ -51,10 +51,10 @@ db is running at 127.0.0.1:45678
 
 For each service you've defined, Plum will start a Docker container with the specified image, building or pulling it if necessary. You now have a PostgreSQL server running at `127.0.0.1:45678`.
 
-By default, `plum up` will run until each container has shut down, and relay their output to the terminal. To run in the background instead, pass the `-d` flag:
+By default, `plum start` will run until each container has shut down, and relay their output to the terminal. To run in the background instead, pass the `-d` flag:
 
 ```bash
-$ plum run -d
+$ plum start -d
 Building db... done
 db is running at 127.0.0.1:45678
 
@@ -151,7 +151,7 @@ Running more than one container for a service
 You can set the number of containers to run for each service with `plum scale`:
 
 ```bash
-$ plum up -d
+$ plum start -d
 db is running at 127.0.0.1:45678
 web is running at 127.0.0.1:45679
 
