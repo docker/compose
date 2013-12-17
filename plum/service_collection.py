@@ -43,12 +43,12 @@ class ServiceCollection(list):
                 return service
 
     def start(self):
-        for container in self:
-            container.start()
+        for service in self:
+            service.start()
 
     def stop(self):
-        for container in self:
-            container.stop()
+        for service in self:
+            service.stop()
 
 
 
