@@ -103,4 +103,6 @@ def parse_name(name):
 
 
 def get_container_name(container):
-    return container['Names'][0][1:]
+    for name in container['Names']:
+        if len(name.split('/')) == 2:
+            return name[1:]

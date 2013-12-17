@@ -8,6 +8,7 @@ from docopt import docopt
 from inspect import getdoc
 
 from .. import __version__
+from ..service import get_container_name
 from ..service_collection import ServiceCollection
 from .command import Command
 
@@ -77,7 +78,7 @@ class TopLevelCommand(Command):
         """
         for service in self.service_collection:
             for container in service.containers:
-                print container['Names'][0]
+                print get_container_name(container)
 
     def run(self, options):
         """
