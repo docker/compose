@@ -47,7 +47,9 @@ class Service(object):
         return container['Id']
 
     def stop_container(self):
-        self.client.kill(self.containers[0]['Id'])
+        container_id = self.containers[-1]['Id']
+        self.client.kill(container_id)
+        self.client.remove_container(container_id)
 
     def next_container_number(self):
         numbers = [parse_name(get_container_name(c))[1] for c in self.containers]
