@@ -17,7 +17,7 @@ class Service(object):
 
     @property
     def containers(self):
-        return [c for c in self.client.containers() if parse_name(get_container_name(c))[0] == self.name]
+        return [c for c in self.client.containers(all=True) if parse_name(get_container_name(c))[0] == self.name]
 
     def start(self):
         if len(self.containers) == 0:
