@@ -4,6 +4,11 @@ import re
 
 log = logging.getLogger(__name__)
 
+
+class BuildError(Exception):
+    pass
+
+
 class Service(object):
     def __init__(self, name, client=None, links=[], **options):
         if not re.match('^[a-zA-Z0-9_]+$', name):
@@ -50,7 +55,6 @@ class Service(object):
             raise
 
     def start_container(self, container=None, **override_options):
-        container_options = self._get_container_options(override_options)
         if container is None:
             container = self.create_container(**override_options)
         port_bindings = {}
@@ -61,7 +65,7 @@ class Service(object):
                 port_bindings[int(internal_port)] = int(external_port)
             else:
                 port_bindings[int(port)] = None
-        log.info("Starting %s..." % container_options['name'])
+        log.info("Starting %s..." % container['Id'])
         self.client.start(
             container['Id'],
             links=self._get_links(),
@@ -108,10 +112,28 @@ class Service(object):
             container_options['ports'] = [unicode(p).split(':')[0] for p in container_options['ports']]
 
         if 'build' in self.options:
-            log.info('Building %s from %s...' % (self.name, self.options['build']))
-            container_options['image'] = self.client.build(self.options['build'])[0]
+            container_options['image'] = self.build()
 
         return container_options
+
+    def build(self):
+        log.info('Building %s from %s...' % (self.name, self.options['build']))
+
+        build_output = self.client.build(self.options['build'], stream=True)
+
+        image_id = None
+
+        for line in build_output:
+            if line:
+                match = re.search(r'Successfully built ([0-9a-f]+)', line)
+                if match:
+                    image_id = match.group(1)
+            print line
+
+        if image_id is None:
+            raise BuildError()
+
+        return image_id
 
 
 def make_name(prefix, number):
@@ -130,6 +152,10 @@ def parse_name(name):
 
 
 def get_container_name(container):
+    # inspect
+    if 'Name' in container:
+        return container['Name']
+    # ps
     for name in container['Names']:
         if len(name.split('/')) == 2:
             return name[1:]
