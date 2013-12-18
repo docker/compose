@@ -11,6 +11,7 @@ from .. import __version__
 from ..service import get_container_name
 from ..service_collection import ServiceCollection
 from .command import Command
+from .log_printer import LogPrinter
 
 from .errors import UserError
 from .docopt_command import NoSuchCommand
@@ -113,3 +114,15 @@ class TopLevelCommand(Command):
         """
         self.service_collection.stop()
 
+    def logs(self, options):
+        """
+        View containers' output
+
+        Usage: logs
+        """
+        containers = self._get_containers(all=False)
+        print "Attaching to", ", ".join(get_container_name(c) for c in containers)
+        LogPrinter(client=self.client).attach(containers)
+
+    def _get_containers(self, all):
+        return [c for s in self.service_collection for c in s.get_containers(all=all)]
