@@ -120,7 +120,7 @@ def parse_name(name):
     match = re.match('^(.+)_(\d+)$', name)
 
     if match is None:
-        raise ValueError("Invalid name: %s" % name)
+        return (None, None)
 
     (service_name, suffix) = match.groups()
 
