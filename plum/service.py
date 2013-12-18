@@ -61,6 +61,7 @@ class Service(object):
                 port_bindings[int(internal_port)] = int(external_port)
             else:
                 port_bindings[int(port)] = None
+        log.info("Starting %s..." % container_options['name'])
         self.client.start(
             container['Id'],
             links=self._get_links(),
@@ -69,9 +70,10 @@ class Service(object):
         return container
 
     def stop_container(self):
-        container_id = self.containers[-1]['Id']
-        self.client.kill(container_id)
-        self.client.remove_container(container_id)
+        container = self.containers[-1]
+        log.info("Stopping and removing %s..." % get_container_name(container))
+        self.client.kill(container)
+        self.client.remove_container(container)
 
     def next_container_number(self):
         numbers = [parse_name(get_container_name(c))[1] for c in self.containers]
