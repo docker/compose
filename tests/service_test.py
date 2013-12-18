@@ -24,57 +24,57 @@ class ServiceTest(DockerClientTestCase):
 
         foo.start()
 
-        self.assertEqual(len(foo.containers), 1)
-        self.assertEqual(foo.containers[0]['Names'], ['/foo_1'])
-        self.assertEqual(len(bar.containers), 0)
+        self.assertEqual(len(foo.containers()), 1)
+        self.assertEqual(foo.containers()[0].name, '/foo_1')
+        self.assertEqual(len(bar.containers()), 0)
 
         bar.scale(2)
 
-        self.assertEqual(len(foo.containers), 1)
-        self.assertEqual(len(bar.containers), 2)
+        self.assertEqual(len(foo.containers()), 1)
+        self.assertEqual(len(bar.containers()), 2)
 
-        names = [c['Names'] for c in bar.containers]
-        self.assertIn(['/bar_1'], names)
-        self.assertIn(['/bar_2'], names)
+        names = [c.name for c in bar.containers()]
+        self.assertIn('/bar_1', names)
+        self.assertIn('/bar_2', names)
 
     def test_up_scale_down(self):
         service = self.create_service('scaling_test')
-        self.assertEqual(len(service.containers), 0)
+        self.assertEqual(len(service.containers()), 0)
 
         service.start()
-        self.assertEqual(len(service.containers), 1)
+        self.assertEqual(len(service.containers()), 1)
 
         service.start()
-        self.assertEqual(len(service.containers), 1)
+        self.assertEqual(len(service.containers()), 1)
 
         service.scale(2)
-        self.assertEqual(len(service.containers), 2)
+        self.assertEqual(len(service.containers()), 2)
 
         service.scale(1)
-        self.assertEqual(len(service.containers), 1)
+        self.assertEqual(len(service.containers()), 1)
 
         service.stop()
-        self.assertEqual(len(service.containers), 0)
+        self.assertEqual(len(service.containers()), 0)
 
         service.stop()
-        self.assertEqual(len(service.containers), 0)
+        self.assertEqual(len(service.containers()), 0)
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         db.start_container(environment={'FOO': 'BAR'})
-        self.assertEqual(db.inspect()[0]['Config']['Env'], ['FOO=BAR'])
+        self.assertEqual(db.containers()[0].environment['FOO'], 'BAR')
 
     def test_start_container_inherits_options_from_constructor(self):
         db = self.create_service('db', environment={'FOO': 'BAR'})
         db.start_container()
-        self.assertEqual(db.inspect()[0]['Config']['Env'], ['FOO=BAR'])
+        self.assertEqual(db.containers()[0].environment['FOO'], 'BAR')
 
     def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[db])
         db.start_container()
         web.start_container()
-        self.assertIn('/web_1/db_1', db.containers[0]['Names'])
+        self.assertIn('db_1', web.containers()[0].links())
         db.stop()
         web.stop()
 
@@ -85,20 +85,18 @@ class ServiceTest(DockerClientTestCase):
             build='tests/fixtures/simple-dockerfile',
         )
         container = service.start()
-        self.client.wait(container)
-        self.assertIn('success', self.client.logs(container))
+        container.wait()
+        self.assertIn('success', container.logs())
 
     def test_start_container_creates_ports(self):
         service = self.create_service('web', ports=[8000])
-        service.start_container()
-        container = service.inspect()[0]
+        container = service.start_container().inspect()
         self.assertIn('8000/tcp', container['HostConfig']['PortBindings'])
         self.assertNotEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
 
     def test_start_container_creates_fixed_external_ports(self):
         service = self.create_service('web', ports=['8000:8000'])
-        service.start_container()
-        container = service.inspect()[0]
+        container = service.start_container().inspect()
         self.assertIn('8000/tcp', container['HostConfig']['PortBindings'])
         self.assertEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
 

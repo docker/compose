@@ -50,13 +50,13 @@ class ServiceCollectionTest(DockerClientTestCase):
 
         collection.start()
 
-        self.assertEqual(len(collection[0].containers), 1)
-        self.assertEqual(len(collection[1].containers), 1)
+        self.assertEqual(len(collection[0].containers()), 1)
+        self.assertEqual(len(collection[1].containers()), 1)
 
         collection.stop()
 
-        self.assertEqual(len(collection[0].containers), 0)
-        self.assertEqual(len(collection[1].containers), 0)
+        self.assertEqual(len(collection[0].containers()), 0)
+        self.assertEqual(len(collection[1].containers()), 0)
 
 
 

@@ -1,6 +1,7 @@
 from docker.client import APIError
 import logging
 import re
+from .container import Container
 
 log = logging.getLogger(__name__)
 
@@ -21,28 +22,26 @@ class Service(object):
         self.links = links or []
         self.options = options
 
-    @property
-    def containers(self):
-        return list(self.get_containers(all=True))
-
-    def get_containers(self, all):
+    def containers(self, all=False):
+        l = []
         for container in self.client.containers(all=all):
             name = get_container_name(container)
             if is_valid_name(name) and parse_name(name)[0] == self.name:
-                yield container
+                l.append(Container.from_ps(self.client, container))
+        return l
 
     def start(self):
-        if len(self.containers) == 0:
+        if len(self.containers()) == 0:
             return self.start_container()
 
     def stop(self):
         self.scale(0)
 
     def scale(self, num):
-        while len(self.containers) < num:
+        while len(self.containers()) < num:
             self.start_container()
 
-        while len(self.containers) > num:
+        while len(self.containers()) > num:
             self.stop_container()
 
     def create_container(self, **override_options):
@@ -52,12 +51,12 @@ class Service(object):
         """
         container_options = self._get_container_options(override_options)
         try:
-            return self.client.create_container(**container_options)
+            return Container.create(self.client, **container_options)
         except APIError, e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in e.explanation:
                 log.info('Pulling image %s...' % container_options['image'])
                 self.client.pull(container_options['image'])
-                return self.client.create_container(**container_options)
+                return Container.create(self.client, **container_options)
             raise
 
     def start_container(self, container=None, **override_options):
@@ -71,39 +70,32 @@ class Service(object):
                 port_bindings[int(internal_port)] = int(external_port)
             else:
                 port_bindings[int(port)] = None
-        log.info("Starting %s..." % container['Id'])
-        self.client.start(
-            container['Id'],
+        log.info("Starting %s..." % container.name)
+        container.start(
             links=self._get_links(),
             port_bindings=port_bindings,
         )
         return container
 
     def stop_container(self):
-        container = self.containers[-1]
-        log.info("Stopping and removing %s..." % get_container_name(container))
-        self.client.kill(container)
-        self.client.remove_container(container)
+        container = self.containers()[-1]
+        log.info("Stopping and removing %s..." % container.name)
+        container.kill()
+        container.remove()
 
     def next_container_number(self):
-        numbers = [parse_name(get_container_name(c))[1] for c in self.containers]
+        numbers = [parse_name(c.name)[1] for c in self.containers(all=True)]
 
         if len(numbers) == 0:
             return 1
         else:
             return max(numbers) + 1
 
-    def get_names(self):
-        return [get_container_name(c) for c in self.containers]
-
-    def inspect(self):
-        return [self.client.inspect_container(c['Id']) for c in self.containers]
-
     def _get_links(self):
         links = {}
         for service in self.links:
-            for name in service.get_names():
-                links[name] = name
+            for container in service.containers():
+                links[container.name[1:]] = container.name[1:]
         return links
 
     def _get_container_options(self, override_options):

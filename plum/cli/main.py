@@ -78,7 +78,7 @@ class TopLevelCommand(Command):
         Usage: ps
         """
         for container in self._get_containers(all=False):
-            print get_container_name(container)
+            print container.name
 
     def run(self, options):
         """
@@ -126,4 +126,4 @@ class TopLevelCommand(Command):
         LogPrinter(client=self.client).attach(containers)
 
     def _get_containers(self, all):
-        return [c for s in self.service_collection for c in s.get_containers(all=all)]
+        return [c for s in self.service_collection for c in s.containers(all=all)]
