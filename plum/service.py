@@ -23,7 +23,13 @@ class Service(object):
 
     @property
     def containers(self):
-        return [c for c in self.client.containers(all=True) if parse_name(get_container_name(c))[0] == self.name]
+        return list(self.get_containers(all=True))
+
+    def get_containers(self, all):
+        for container in self.client.containers(all=all):
+            name = get_container_name(container)
+            if is_valid_name(name) and parse_name(name)[0] == self.name:
+                yield container
 
     def start(self):
         if len(self.containers) == 0:
@@ -136,18 +142,20 @@ class Service(object):
         return image_id
 
 
+name_regex = '^(.+)_(\d+)$'
+
+
 def make_name(prefix, number):
     return '%s_%s' % (prefix, number)
 
 
+def is_valid_name(name):
+    return (re.match(name_regex, name) is not None)
+
+
 def parse_name(name):
-    match = re.match('^(.+)_(\d+)$', name)
-
-    if match is None:
-        return (None, None)
-
+    match = re.match(name_regex, name)
     (service_name, suffix) = match.groups()
-
     return (service_name, int(suffix))
 
 
