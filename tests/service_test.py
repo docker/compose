@@ -2,7 +2,7 @@ from plum import Service
 from .testcases import DockerClientTestCase
 
 
-class NameTestCase(DockerClientTestCase):
+class ServiceTest(DockerClientTestCase):
     def test_name_validations(self):
         self.assertRaises(ValueError, lambda: Service(name=''))
 
