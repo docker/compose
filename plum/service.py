@@ -1,3 +1,4 @@
+from docker.client import APIError
 import logging
 import re
 
@@ -34,8 +35,19 @@ class Service(object):
             self.stop_container()
 
     def create_container(self, **override_options):
+        """
+        Create a container for this service. If the image doesn't exist, attempt to pull
+        it.
+        """
         container_options = self._get_container_options(override_options)
-        return self.client.create_container(**container_options)
+        try:
+            return self.client.create_container(**container_options)
+        except APIError, e:
+            if e.response.status_code == 404 and e.explanation and 'No such image' in e.explanation:
+                log.info('Pulling image %s...' % container_options['image'])
+                self.client.pull(container_options['image'])
+                return self.client.create_container(**container_options)
+            raise
 
     def start_container(self, container=None, **override_options):
         container_options = self._get_container_options(override_options)
