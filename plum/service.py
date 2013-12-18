@@ -116,7 +116,7 @@ class Service(object):
         return container_options
 
     def build(self):
-        log.info('Building %s from "%s"...' % (self.name, self.options['build']))
+        log.info('Building %s...' % self.name)
 
         build_output = self.client.build(self.options['build'], stream=True)
 
