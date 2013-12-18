@@ -1,6 +1,7 @@
 from docker.client import APIError
 import logging
 import re
+import sys
 from .container import Container
 
 log = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ class Service(object):
                 match = re.search(r'Successfully built ([0-9a-f]+)', line)
                 if match:
                     image_id = match.group(1)
-            print line
+            sys.stdout.write(line)
 
         if image_id is None:
             raise BuildError()
