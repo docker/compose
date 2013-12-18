@@ -77,9 +77,8 @@ class TopLevelCommand(Command):
 
         Usage: ps
         """
-        for service in self.service_collection:
-            for container in service.containers:
-                print get_container_name(container)
+        for container in self._get_containers(all=False):
+            print get_container_name(container)
 
     def run(self, options):
         """
