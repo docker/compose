@@ -87,6 +87,8 @@ class TopLevelCommand(Command):
         Usage: run SERVICE COMMAND [ARGS...]
         """
         service = self.service_collection.get(options['SERVICE'])
+        if service is None:
+            raise UserError("No such service: %s" % options['SERVICE'])
         container_options = {
             'command': [options['COMMAND']] + options['ARGS'],
         }
