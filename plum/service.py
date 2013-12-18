@@ -8,7 +8,7 @@ class Service(object):
         if not re.match('^[a-zA-Z0-9_]+$', name):
             raise ValueError('Invalid name: %s' % name)
         if 'image' in options and 'build' in options:
-            raise ValueError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.')
+            raise ValueError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
         self.name = name
         self.client = client
