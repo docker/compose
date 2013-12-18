@@ -87,5 +87,19 @@ class NameTestCase(DockerClientTestCase):
         container = service.start()
         self.client.wait(container)
         self.assertIn('success', self.client.logs(container))
-        
+
+    def test_start_container_creates_ports(self):
+        service = self.create_service('web', ports=[8000])
+        service.start_container()
+        container = service.inspect()[0]
+        self.assertIn('8000/tcp', container['HostConfig']['PortBindings'])
+        self.assertNotEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
+
+    def test_start_container_creates_fixed_external_ports(self):
+        service = self.create_service('web', ports=['8000:8000'])
+        service.start_container()
+        container = service.inspect()[0]
+        self.assertIn('8000/tcp', container['HostConfig']['PortBindings'])
+        self.assertEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
+
 

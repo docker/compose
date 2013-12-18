@@ -42,8 +42,13 @@ class Service(object):
         if container is None:
             container = self.create_container(**override_options)
         port_bindings = {}
-        for port in container_options.get('ports', []):
-            port_bindings[port] = None
+        for port in self.options.get('ports', []):
+            port = unicode(port)
+            if ':' in port:
+                internal_port, external_port = port.split(':', 1)
+                port_bindings[int(internal_port)] = int(external_port)
+            else:
+                port_bindings[int(port)] = None
         self.client.start(
             container['Id'],
             links=self._get_links(),
@@ -84,6 +89,9 @@ class Service(object):
 
         number = self.next_container_number()
         container_options['name'] = make_name(self.name, number)
+
+        if 'ports' in container_options:
+            container_options['ports'] = [unicode(p).split(':')[0] for p in container_options['ports']]
 
         if 'build' in self.options:
             log.info('Building %s from %s...' % (self.name, self.options['build']))
