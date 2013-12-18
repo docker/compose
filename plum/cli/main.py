@@ -8,7 +8,6 @@ from docopt import docopt
 from inspect import getdoc
 
 from .. import __version__
-from ..service import get_container_name
 from ..service_collection import ServiceCollection
 from .command import Command
 from .log_printer import LogPrinter
@@ -103,9 +102,30 @@ class TopLevelCommand(Command):
         """
         Start all services
 
-        Usage: start
+        Usage: start [-d]
         """
-        self.service_collection.start()
+        if options['-d']:
+            self.service_collection.start()
+            return
+
+        running = []
+        unstarted = []
+
+        for s in self.service_collection:
+            if len(s.containers()) == 0:
+                unstarted.append((s, s.create_container()))
+            else:
+                running += s.get_containers(all=False)
+
+        log_printer = LogPrinter(running + [c for (s, c) in unstarted])
+
+        for (s, c) in unstarted:
+            s.start_container(c)
+
+        try:
+            log_printer.run()
+        finally:
+            self.service_collection.stop()
 
     def stop(self, options):
         """
@@ -122,8 +142,12 @@ class TopLevelCommand(Command):
         Usage: logs
         """
         containers = self._get_containers(all=False)
-        print "Attaching to", ", ".join(get_container_name(c) for c in containers)
-        LogPrinter(client=self.client).attach(containers)
+        print "Attaching to", list_containers(containers)
+        LogPrinter(containers, attach_params={'logs': True}).run()
 
     def _get_containers(self, all):
         return [c for s in self.service_collection for c in s.containers(all=all)]
+
+
+def list_containers(containers):
+    return ", ".join(c.name for c in containers)

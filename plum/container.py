@@ -84,3 +84,6 @@ class Container(object):
                 if len(bits) > 2 and bits[1] == self.name[1:]:
                     links.append(bits[2])
         return links
+
+    def attach_socket(self, **kwargs):
+        return self.client.attach_socket(self.id, **kwargs)
