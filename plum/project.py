@@ -31,8 +31,8 @@ class Project(object):
             # Reference links by object
             links = []
             if 'links' in service_dict:
-                for name in service_dict.get('links', []):
-                    links.append(project.get_service(name))
+                for service_name in service_dict.get('links', []):
+                    links.append(project.get_service(service_name))
                 del service_dict['links']
             project.services.append(Service(client=client, project=name, links=links, **service_dict))
         return project
@@ -40,8 +40,8 @@ class Project(object):
     @classmethod
     def from_config(cls, name, config, client):
         dicts = []
-        for name, service in config.items():
-            service['name'] = name
+        for service_name, service in config.items():
+            service['name'] = service_name
             dicts.append(service)
         return cls.from_dicts(name, dicts, client)
 
