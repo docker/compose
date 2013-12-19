@@ -92,7 +92,8 @@ class TopLevelCommand(Command):
             'command': [options['COMMAND']] + options['ARGS'],
         }
         container = service.create_container(**container_options)
-        stream = self.client.logs(container, stream=True)
+        stream = container.logs(stream=True)
+        service.start_container(container)
         for data in stream:
             if data is None:
                 break
