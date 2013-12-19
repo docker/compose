@@ -10,13 +10,13 @@ class ServiceTest(DockerClientTestCase):
         self.assertRaises(ValueError, lambda: Service(name='/'))
         self.assertRaises(ValueError, lambda: Service(name='!'))
         self.assertRaises(ValueError, lambda: Service(name='\xe2'))
+        self.assertRaises(ValueError, lambda: Service(name='_'))
+        self.assertRaises(ValueError, lambda: Service(name='____'))
+        self.assertRaises(ValueError, lambda: Service(name='foo_bar'))
+        self.assertRaises(ValueError, lambda: Service(name='__foo_bar__'))
 
         Service('a')
         Service('foo')
-        Service('foo_bar')
-        Service('__foo_bar__')
-        Service('_')
-        Service('_____')
 
     def test_containers(self):
         foo = self.create_service('foo')
@@ -38,7 +38,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('/bar_2', names)
 
     def test_up_scale_down(self):
-        service = self.create_service('scaling_test')
+        service = self.create_service('scalingtest')
         self.assertEqual(len(service.containers()), 0)
 
         service.start()

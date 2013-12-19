@@ -13,7 +13,7 @@ class BuildError(Exception):
 
 class Service(object):
     def __init__(self, name, client=None, links=[], **options):
-        if not re.match('^[a-zA-Z0-9_]+$', name):
+        if not re.match('^[a-zA-Z0-9]+$', name):
             raise ValueError('Invalid name: %s' % name)
         if 'image' in options and 'build' in options:
             raise ValueError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
