@@ -120,7 +120,7 @@ class TopLevelCommand(Command):
             if len(s.containers()) == 0:
                 unstarted.append((s, s.create_container()))
             else:
-                running += s.get_containers(all=False)
+                running += s.containers(all=False)
 
         log_printer = LogPrinter(running + [c for (s, c) in unstarted])
 
