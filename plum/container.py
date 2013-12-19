@@ -38,8 +38,39 @@ class Container(object):
         return self.dictionary['ID']
 
     @property
+    def short_id(self):
+        return self.id[:10]
+
+    @property
     def name(self):
         return self.dictionary['Name']
+
+    @property
+    def human_readable_ports(self):
+        self.inspect_if_not_inspected()
+        if not self.dictionary['NetworkSettings']['Ports']:
+            return ''
+        ports = []
+        for private, public in self.dictionary['NetworkSettings']['Ports'].items():
+            if public:
+                ports.append('%s->%s' % (public[0]['HostPort'], private))
+        return ', '.join(ports)
+
+    @property
+    def human_readable_state(self):
+        self.inspect_if_not_inspected()
+        if self.dictionary['State']['Running']:
+            if self.dictionary['State']['Ghost']:
+                return 'Ghost'
+            else:
+                return 'Up'
+        else:
+            return 'Exit %s' % self.dictionary['State']['ExitCode']
+
+    @property
+    def human_readable_command(self):
+        self.inspect_if_not_inspected()
+        return ' '.join(self.dictionary['Config']['Cmd'])
 
     @property
     def environment(self):

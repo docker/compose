@@ -50,5 +50,11 @@ class ServiceCollection(list):
         for service in self:
             service.stop()
 
+    def containers(self, *args, **kwargs):
+        l = []
+        for service in self:
+            for container in service.containers(*args, **kwargs):
+                l.append(container)
+        return l
 
 
