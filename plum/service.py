@@ -92,7 +92,6 @@ class Service(object):
                 external_dir, internal_dir = volume.split(':')
                 volume_bindings[os.path.abspath(external_dir)] = internal_dir
 
-        log.info("Starting %s..." % container.name)
         container.start(
             links=self._get_links(),
             port_bindings=port_bindings,
@@ -102,7 +101,6 @@ class Service(object):
 
     def stop_container(self):
         container = self.containers()[-1]
-        log.info("Stopping and removing %s..." % container.name)
         container.kill()
         container.remove()
 

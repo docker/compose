@@ -1,4 +1,6 @@
+import logging
 
+log = logging.getLogger(__name__)
 
 class Container(object):
     """
@@ -82,15 +84,19 @@ class Container(object):
         return out
 
     def start(self, **options):
+        log.info("Starting %s..." % self.name)
         return self.client.start(self.id, **options)
 
     def stop(self):
+        log.info("Stopping %s..." % self.name)
         return self.client.stop(self.id)
 
     def kill(self):
+        log.info("Killing %s..." % self.name)
         return self.client.kill(self.id)
 
     def remove(self):
+        log.info("Removing %s..." % self.name)
         return self.client.remove_container(self.id)
 
     def inspect_if_not_inspected(self):
