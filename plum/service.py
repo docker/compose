@@ -12,14 +12,17 @@ class BuildError(Exception):
 
 
 class Service(object):
-    def __init__(self, name, client=None, links=[], **options):
+    def __init__(self, name, client=None, project='default', links=[], **options):
         if not re.match('^[a-zA-Z0-9]+$', name):
             raise ValueError('Invalid name: %s' % name)
+        if not re.match('^[a-zA-Z0-9]+$', project):
+            raise ValueError('Invalid project: %s' % project)
         if 'image' in options and 'build' in options:
             raise ValueError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
         self.name = name
         self.client = client
+        self.project = project
         self.links = links or []
         self.options = options
 
@@ -27,7 +30,10 @@ class Service(object):
         l = []
         for container in self.client.containers(all=all):
             name = get_container_name(container)
-            if is_valid_name(name) and parse_name(name)[0] == self.name:
+            if not is_valid_name(name):
+                continue
+            project, name, number = parse_name(name)
+            if project == self.project and name == self.name:
                 l.append(Container.from_ps(self.client, container))
         return l
 
@@ -91,8 +97,11 @@ class Service(object):
         container.kill()
         container.remove()
 
+    def next_container_name(self):
+        return '%s_%s_%s' % (self.project, self.name, self.next_container_number())
+
     def next_container_number(self):
-        numbers = [parse_name(c.name)[1] for c in self.containers(all=True)]
+        numbers = [parse_name(c.name)[2] for c in self.containers(all=True)]
 
         if len(numbers) == 0:
             return 1
@@ -111,8 +120,7 @@ class Service(object):
         container_options = dict((k, self.options[k]) for k in keys if k in self.options)
         container_options.update(override_options)
 
-        number = self.next_container_number()
-        container_options['name'] = make_name(self.name, number)
+        container_options['name'] = self.next_container_name()
 
         if 'ports' in container_options:
             container_options['ports'] = [unicode(p).split(':')[0] for p in container_options['ports']]
@@ -142,11 +150,7 @@ class Service(object):
         return image_id
 
 
-name_regex = '^(.+)_(\d+)$'
-
-
-def make_name(prefix, number):
-    return '%s_%s' % (prefix, number)
+name_regex = '^([^_]+)_([^_]+)_(\d+)$'
 
 
 def is_valid_name(name):
@@ -155,8 +159,8 @@ def is_valid_name(name):
 
 def parse_name(name):
     match = re.match(name_regex, name)
-    (service_name, suffix) = match.groups()
-    return (service_name, int(suffix))
+    (project, service_name, suffix) = match.groups()
+    return (project, service_name, int(suffix))
 
 
 def get_container_name(container):

@@ -18,6 +18,10 @@ class ServiceTest(DockerClientTestCase):
         Service('a')
         Service('foo')
 
+    def test_project_validation(self):
+        self.assertRaises(ValueError, lambda: Service(name='foo', project='_'))
+        Service(name='foo', project='bar')
+
     def test_containers(self):
         foo = self.create_service('foo')
         bar = self.create_service('bar')
@@ -25,7 +29,7 @@ class ServiceTest(DockerClientTestCase):
         foo.start()
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, '/foo_1')
+        self.assertEqual(foo.containers()[0].name, '/default_foo_1')
         self.assertEqual(len(bar.containers()), 0)
 
         bar.scale(2)
@@ -34,8 +38,13 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(bar.containers()), 2)
 
         names = [c.name for c in bar.containers()]
-        self.assertIn('/bar_1', names)
-        self.assertIn('/bar_2', names)
+        self.assertIn('/default_bar_1', names)
+        self.assertIn('/default_bar_2', names)
+
+    def test_project_is_added_to_container_name(self):
+        service = self.create_service('web', project='myproject')
+        service.start()
+        self.assertEqual(service.containers()[0].name, '/myproject_web_1')
 
     def test_up_scale_down(self):
         service = self.create_service('scalingtest')
@@ -74,7 +83,7 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web', links=[db])
         db.start_container()
         web.start_container()
-        self.assertIn('db_1', web.containers()[0].links())
+        self.assertIn('default_db_1', web.containers()[0].links())
         db.stop()
         web.stop()
 
