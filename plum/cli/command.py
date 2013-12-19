@@ -1,6 +1,7 @@
 from docker import Client
 import logging
 import os
+import re
 import yaml
 
 from ..service_collection import ServiceCollection
@@ -21,7 +22,19 @@ class Command(DocoptCommand):
     @cached_property
     def service_collection(self):
         config = yaml.load(open('plum.yml'))
-        return ServiceCollection.from_config(self.client, config)
+        return ServiceCollection.from_config(
+            config,
+            client=self.client,
+            project=self.project
+        )
+
+    @cached_property
+    def project(self):
+        project = os.path.basename(os.getcwd())
+        project = re.sub(r'[^a-zA-Z0-9]', '', project)
+        if not project:
+            project = 'default'
+        return project
 
     @cached_property
     def formatter(self):

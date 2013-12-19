@@ -14,7 +14,7 @@ def sort_service_dicts(services):
 
 class ServiceCollection(list):
     @classmethod
-    def from_dicts(cls, client, service_dicts):
+    def from_dicts(cls, service_dicts, client, project='default'):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
@@ -26,16 +26,16 @@ class ServiceCollection(list):
                 for name in service_dict.get('links', []):
                     links.append(collection.get(name))
                 del service_dict['links']
-            collection.append(Service(client=client, links=links, **service_dict))
+            collection.append(Service(client=client, project=project, links=links, **service_dict))
         return collection
 
     @classmethod
-    def from_config(cls, client, config):
+    def from_config(cls, config, client, project='default'):
         dicts = []
         for name, service in config.items():
             service['name'] = name
             dicts.append(service)
-        return cls.from_dicts(client, dicts)
+        return cls.from_dicts(dicts, client, project)
 
     def get(self, name):
         for service in self:
