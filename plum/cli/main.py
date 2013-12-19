@@ -1,14 +1,9 @@
-import datetime
 import logging
-import sys
-import os
 import re
 
-from docopt import docopt
 from inspect import getdoc
 
 from .. import __version__
-from ..service_collection import ServiceCollection
 from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
