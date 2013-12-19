@@ -160,15 +160,15 @@ class Service(object):
         return image_id
 
 
-name_regex = '^([^_]+)_([^_]+)_(\d+)$'
+NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(\d+)$')
 
 
 def is_valid_name(name):
-    return (re.match(name_regex, name) is not None)
+    return (NAME_RE.match(name) is not None)
 
 
 def parse_name(name):
-    match = re.match(name_regex, name)
+    match = NAME_RE.match(name)
     (project, service_name, suffix) = match.groups()
     return (project, service_name, int(suffix))
 
