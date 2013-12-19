@@ -12,6 +12,7 @@ from ..service_collection import ServiceCollection
 from .command import Command
 from .log_printer import LogPrinter
 
+from docker.client import APIError
 from .errors import UserError
 from .docopt_command import NoSuchCommand
 
@@ -42,6 +43,9 @@ def main():
         log.error("No such command: %s", e.command)
         log.error("")
         log.error("\n".join(parse_doc_section("commands:", getdoc(e.supercommand))))
+        exit(1)
+    except APIError, e:
+        log.error(e.explanation)
         exit(1)
 
 
