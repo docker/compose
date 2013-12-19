@@ -63,14 +63,21 @@ class Service(object):
     def start_container(self, container=None, **override_options):
         if container is None:
             container = self.create_container(**override_options)
+
+        options = self.options.copy()
+        options.update(override_options)
+
         port_bindings = {}
-        for port in self.options.get('ports', []):
-            port = unicode(port)
-            if ':' in port:
-                internal_port, external_port = port.split(':', 1)
-                port_bindings[int(internal_port)] = int(external_port)
-            else:
-                port_bindings[int(port)] = None
+
+        if options.get('ports', None) is not None:
+            for port in options['ports']:
+                port = unicode(port)
+                if ':' in port:
+                    internal_port, external_port = port.split(':', 1)
+                    port_bindings[int(internal_port)] = int(external_port)
+                else:
+                    port_bindings[int(port)] = None
+
         log.info("Starting %s..." % container.name)
         container.start(
             links=self._get_links(),
