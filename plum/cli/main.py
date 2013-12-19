@@ -1,4 +1,5 @@
 import logging
+import sys
 import re
 
 from inspect import getdoc
@@ -70,6 +71,11 @@ class TopLevelCommand(Command):
       stop      Stop services
 
     """
+    def docopt_options(self):
+        options = super(TopLevelCommand, self).docopt_options()
+        options['version'] = "plum %s" % __version__
+        return options
+
     def ps(self, options):
         """
         List services and containers.

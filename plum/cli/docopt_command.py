@@ -12,6 +12,9 @@ def docopt_full_help(docstring, *args, **kwargs):
 
 
 class DocoptCommand(object):
+    def docopt_options(self):
+        return {'options_first': True}
+
     def sys_dispatch(self):
         self.dispatch(sys.argv[1:], None)
 
@@ -22,7 +25,7 @@ class DocoptCommand(object):
         handler(command_options)
 
     def parse(self, argv, global_options):
-        options = docopt_full_help(getdoc(self), argv, options_first=True)
+        options = docopt_full_help(getdoc(self), argv, **self.docopt_options())
         command = options['COMMAND']
 
         if not hasattr(self, command):
