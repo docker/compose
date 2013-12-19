@@ -86,7 +86,7 @@ class TopLevelCommand(Command):
             -q    Only display IDs
         """
         if options['-q']:
-            for container in self.service_collection.containers(all=True):
+            for container in self.project.containers(all=True):
                 print container.id
         else:
             headers = [
@@ -96,7 +96,7 @@ class TopLevelCommand(Command):
                 'Ports',
             ]
             rows = []
-            for container in self.service_collection.containers(all=True):
+            for container in self.project.containers(all=True):
                 rows.append([
                     container.name,
                     container.human_readable_command,
@@ -111,7 +111,7 @@ class TopLevelCommand(Command):
 
         Usage: run SERVICE COMMAND [ARGS...]
         """
-        service = self.service_collection.get(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         if service is None:
             raise UserError("No such service: %s" % options['SERVICE'])
         container_options = {
@@ -132,13 +132,13 @@ class TopLevelCommand(Command):
         Usage: start [-d]
         """
         if options['-d']:
-            self.service_collection.start()
+            self.project.start()
             return
 
         running = []
         unstarted = []
 
-        for s in self.service_collection:
+        for s in self.project.services:
             if len(s.containers()) == 0:
                 unstarted.append((s, s.create_container()))
             else:
@@ -152,7 +152,7 @@ class TopLevelCommand(Command):
         try:
             log_printer.run()
         finally:
-            self.service_collection.stop()
+            self.project.stop()
 
     def stop(self, options):
         """
@@ -160,7 +160,7 @@ class TopLevelCommand(Command):
 
         Usage: stop
         """
-        self.service_collection.stop()
+        self.project.stop()
 
     def logs(self, options):
         """
@@ -168,7 +168,7 @@ class TopLevelCommand(Command):
 
         Usage: logs
         """
-        containers = self.service_collection.containers(all=False)
+        containers = self.project.containers(all=False)
         print "Attaching to", list_containers(containers)
         LogPrinter(containers, attach_params={'logs': True}).run()
 

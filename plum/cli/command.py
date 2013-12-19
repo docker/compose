@@ -4,7 +4,7 @@ import os
 import re
 import yaml
 
-from ..service_collection import ServiceCollection
+from ..project import Project
 from .docopt_command import DocoptCommand
 from .formatter import Formatter
 from .utils import cached_property, mkdir
@@ -20,16 +20,12 @@ class Command(DocoptCommand):
             return Client()
 
     @cached_property
-    def service_collection(self):
+    def project(self):
         config = yaml.load(open('plum.yml'))
-        return ServiceCollection.from_config(
-            config,
-            client=self.client,
-            project=self.project
-        )
+        return Project.from_config(self.project_name, config, self.client)
 
     @cached_property
-    def project(self):
+    def project_name(self):
         project = os.path.basename(os.getcwd())
         project = re.sub(r'[^a-zA-Z0-9]', '', project)
         if not project:
