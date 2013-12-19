@@ -1,6 +1,7 @@
 from docker.client import APIError
 import logging
 import re
+import os
 import sys
 from .container import Container
 
@@ -84,10 +85,18 @@ class Service(object):
                 else:
                     port_bindings[int(port)] = None
 
+        volume_bindings = {}
+
+        if options.get('volumes', None) is not None:
+            for volume in options['volumes']:
+                external_dir, internal_dir = volume.split(':')
+                volume_bindings[os.path.abspath(external_dir)] = internal_dir
+
         log.info("Starting %s..." % container.name)
         container.start(
             links=self._get_links(),
             port_bindings=port_bindings,
+            binds=volume_bindings,
         )
         return container
 
@@ -124,6 +133,9 @@ class Service(object):
 
         if 'ports' in container_options:
             container_options['ports'] = [unicode(p).split(':')[0] for p in container_options['ports']]
+
+        if 'volumes' in container_options:
+            container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])
 
         if 'build' in self.options:
             container_options['image'] = self.build()
