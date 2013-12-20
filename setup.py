@@ -24,14 +24,10 @@ def find_version(*file_paths):
 with open('requirements.txt') as f:
     install_requires = f.read().splitlines()
 
-with open('README.md') as f:
-    long_description = f.read()
-
 setup(
     name='fig',
     version=find_version("fig", "__init__.py"),
     description='Punctual, lightweight development environments using Docker',
-    long_description=long_description,
     url='https://github.com/orchardup/fig',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
