@@ -65,6 +65,7 @@ class TopLevelCommand(Command):
       --version            Print version and exit
 
     Commands:
+      logs      View output from containers
       ps        List services and containers
       run       Run a one-off command
       start     Start services
@@ -176,7 +177,7 @@ class TopLevelCommand(Command):
 
     def logs(self, options):
         """
-        View containers' output
+        View output from containers
 
         Usage: logs
         """
