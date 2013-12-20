@@ -29,7 +29,8 @@ class LogPrinter(object):
 
     def _make_log_generator(self, container, color_fn):
         prefix = color_fn(container.name + " | ")
-        return (prefix + line for line in self._readlines(self._attach(container)))
+        websocket = self._attach(container)
+        return (prefix + line for line in split_buffer(read_websocket(websocket), '\n'))
 
     def _attach(self, container):
         params = {
@@ -41,13 +42,25 @@ class LogPrinter(object):
         }
         params.update(self.attach_params)
         params = dict((name, 1 if value else 0) for (name, value) in params.items())
-        return container.attach_socket(params=params)
+        return container.attach_socket(params=params, ws=True)
 
-    def _readlines(self, socket):
-        for line in iter(socket.makefile().readline, b''):
-            if not line.endswith('\n'):
-                line += '\n'
+def read_websocket(websocket):
+    while True:
+        data = websocket.recv()
+        if data:
+            yield data
+        else:
+            break
 
-            yield line
+def split_buffer(reader, separator):
+    buffered = ''
 
-        socket.close()
+    for data in reader:
+        lines = (buffered + data).split(separator)
+        for line in lines[:-1]:
+            yield line + separator
+        if len(lines) > 1:
+            buffered = lines[-1]
+
+    if len(buffered) > 0:
+        yield buffered
