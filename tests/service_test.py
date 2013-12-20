@@ -29,7 +29,7 @@ class ServiceTest(DockerClientTestCase):
         foo.start_container()
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, '/default_foo_1')
+        self.assertEqual(foo.containers()[0].name, 'default_foo_1')
         self.assertEqual(len(bar.containers()), 0)
 
         bar.start_container()
@@ -39,8 +39,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(bar.containers()), 2)
 
         names = [c.name for c in bar.containers()]
-        self.assertIn('/default_bar_1', names)
-        self.assertIn('/default_bar_2', names)
+        self.assertIn('default_bar_1', names)
+        self.assertIn('default_bar_2', names)
 
     def test_containers_one_off(self):
         db = self.create_service('db')
@@ -51,7 +51,7 @@ class ServiceTest(DockerClientTestCase):
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web', project='myproject')
         service.start_container()
-        self.assertEqual(service.containers()[0].name, '/myproject_web_1')
+        self.assertEqual(service.containers()[0].name, 'myproject_web_1')
 
     def test_start_stop(self):
         service = self.create_service('scalingtest')
@@ -92,13 +92,13 @@ class ServiceTest(DockerClientTestCase):
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, '/default_db_run_1')
+        self.assertEqual(container.name, 'default_db_run_1')
 
     def test_create_container_with_one_off_when_existing_container_is_running(self):
         db = self.create_service('db')
         db.start()
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, '/default_db_run_1')
+        self.assertEqual(container.name, 'default_db_run_1')
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')

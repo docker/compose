@@ -45,7 +45,7 @@ class Container(object):
 
     @property
     def name(self):
-        return self.dictionary['Name']
+        return self.dictionary['Name'][1:]
 
     @property
     def human_readable_ports(self):
@@ -123,7 +123,7 @@ class Container(object):
         for container in self.client.containers():
             for name in container['Names']:
                 bits = name.split('/')
-                if len(bits) > 2 and bits[1] == self.name[1:]:
+                if len(bits) > 2 and bits[1] == self.name:
                     links.append(bits[2])
         return links
 
