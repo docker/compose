@@ -70,8 +70,9 @@ class TopLevelCommand(Command):
       --version            Print version and exit
 
     Commands:
+      up        Create and start containers
       logs      View output from containers
-      ps        List services and containers
+      ps        List containers
       run       Run a one-off command
       start     Start services
       stop      Stop services
@@ -86,7 +87,7 @@ class TopLevelCommand(Command):
 
     def ps(self, options):
         """
-        List services and containers.
+        List containers.
 
         Usage: ps [options] [SERVICE...]
 
@@ -146,7 +147,7 @@ class TopLevelCommand(Command):
 
     def up(self, options):
         """
-        Create and start containers
+        Create and start containers.
 
         Usage: up [options] [SERVICE...]
 
@@ -176,7 +177,7 @@ class TopLevelCommand(Command):
 
     def start(self, options):
         """
-        Start all services
+        Start existing containers.
 
         Usage: start [SERVICE...]
         """
@@ -184,7 +185,7 @@ class TopLevelCommand(Command):
 
     def stop(self, options):
         """
-        Stop all services
+        Stop running containers.
 
         Usage: stop [SERVICE...]
         """
@@ -192,7 +193,7 @@ class TopLevelCommand(Command):
 
     def kill(self, options):
         """
-        Kill all containers
+        Kill containers.
 
         Usage: kill [SERVICE...]
         """
@@ -200,7 +201,7 @@ class TopLevelCommand(Command):
 
     def rm(self, options):
         """
-        Remove all stopped containers
+        Remove stopped containers
 
         Usage: rm [SERVICE...]
         """
@@ -208,7 +209,7 @@ class TopLevelCommand(Command):
 
     def logs(self, options):
         """
-        View output from containers
+        View output from containers.
 
         Usage: logs [SERVICE...]
         """
