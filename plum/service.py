@@ -31,7 +31,7 @@ class Service(object):
         l = []
         for container in self.client.containers(all=stopped):
             name = get_container_name(container)
-            if not is_valid_name(name, one_off):
+            if not name or not is_valid_name(name, one_off):
                 continue
             project, name, number = parse_name(name)
             if project == self.project and name == self.name:
@@ -183,6 +183,8 @@ def parse_name(name, one_off=False):
 
 
 def get_container_name(container):
+    if not container.get('Name') and not container.get('Names'):
+        return None
     # inspect
     if 'Name' in container:
         return container['Name']
