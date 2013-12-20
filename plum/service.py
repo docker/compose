@@ -108,10 +108,10 @@ class Service(object):
         bits = [self.project, self.name]
         if one_off:
             bits.append('run')
-        return '_'.join(bits + [unicode(self.next_container_number())])
+        return '_'.join(bits + [unicode(self.next_container_number(one_off=one_off))])
 
-    def next_container_number(self):
-        numbers = [parse_name(c.name)[2] for c in self.containers(stopped=True)]
+    def next_container_number(self, one_off=False):
+        numbers = [parse_name(c.name)[2] for c in self.containers(stopped=True, one_off=one_off)]
 
         if len(numbers) == 0:
             return 1

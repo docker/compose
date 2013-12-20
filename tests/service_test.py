@@ -79,6 +79,12 @@ class ServiceTest(DockerClientTestCase):
         container = db.create_container(one_off=True)
         self.assertEqual(container.name, '/default_db_run_1')
 
+    def test_create_container_with_one_off_when_existing_container_is_running(self):
+        db = self.create_service('db')
+        db.start()
+        container = db.create_container(one_off=True)
+        self.assertEqual(container.name, '/default_db_run_1')
+
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         db.start_container(environment={'FOO': 'BAR'})
