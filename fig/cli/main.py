@@ -62,8 +62,8 @@ class TopLevelCommand(Command):
     """.
 
     Usage:
-      plum [options] [COMMAND] [ARGS...]
-      plum -h|--help
+      fig [options] [COMMAND] [ARGS...]
+      fig -h|--help
 
     Options:
       --verbose            Show more output
@@ -82,7 +82,7 @@ class TopLevelCommand(Command):
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = "plum %s" % __version__
+        options['version'] = "fig %s" % __version__
         return options
 
     def ps(self, options):

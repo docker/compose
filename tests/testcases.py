@@ -1,5 +1,5 @@
 from docker import Client
-from plum.service import Service
+from fig.service import Service
 import os
 from unittest import TestCase
 

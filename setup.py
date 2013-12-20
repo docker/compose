@@ -23,19 +23,19 @@ def find_version(*file_paths):
 
 
 setup(
-    name='plum',
-    version=find_version("plum", "__init__.py"),
+    name='fig',
+    version=find_version("fig", "__init__.py"),
     description='',
-    url='https://github.com/orchardup/plum',
+    url='https://github.com/orchardup/fig',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
-    packages=['plum'],
+    packages=['fig'],
     package_data={},
     include_package_data=True,
     install_requires=[],
     dependency_links=[],
     entry_points="""
     [console_scripts]
-    plum=plum.cli.main:main
+    fig=fig.cli.main:main
     """,
 )

@@ -21,7 +21,7 @@ class Command(DocoptCommand):
 
     @cached_property
     def project(self):
-        config = yaml.load(open('plum.yml'))
+        config = yaml.load(open('fig.yml'))
         return Project.from_config(self.project_name, config, self.client)
 
     @cached_property

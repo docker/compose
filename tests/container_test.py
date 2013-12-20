@@ -1,5 +1,5 @@
 from .testcases import DockerClientTestCase
-from plum.container import Container
+from fig.container import Container
 
 class ContainerTest(DockerClientTestCase):
     def test_from_ps(self):

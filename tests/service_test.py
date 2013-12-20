@@ -1,4 +1,4 @@
-from plum import Service
+from fig import Service
 from .testcases import DockerClientTestCase
 
 

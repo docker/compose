@@ -1,5 +1,5 @@
-from plum.project import Project
-from plum.service import Service
+from fig.project import Project
+from fig.service import Service
 from .testcases import DockerClientTestCase
 
 
