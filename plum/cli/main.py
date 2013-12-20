@@ -88,12 +88,12 @@ class TopLevelCommand(Command):
         """
         List services and containers.
 
-        Usage: ps [options]
+        Usage: ps [options] [SERVICE...]
 
         Options:
             -q    Only display IDs
         """
-        containers = self.project.containers(stopped=True) + self.project.containers(one_off=True)
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=True) + self.project.containers(service_names=options['SERVICE'], one_off=True)
 
         if options['-q']:
             for container in containers:
@@ -210,9 +210,9 @@ class TopLevelCommand(Command):
         """
         View output from containers
 
-        Usage: logs
+        Usage: logs [SERVICE...]
         """
-        containers = self.project.containers(stopped=False)
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=False)
         print "Attaching to", list_containers(containers)
         LogPrinter(containers, attach_params={'logs': True}).run()
 
