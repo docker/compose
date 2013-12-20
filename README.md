@@ -1,9 +1,9 @@
 Fig
 ====
 
-**WARNING**: This is a work in progress and probably won't work yet. Feedback welcome.
+Punctual, lightweight development environments using Docker.
 
-Fig is tool for defining and running application environments with Docker. It uses a simple, version-controllable YAML configuration file that looks something like this:
+Fig is tool for defining and running isolated application environments. It uses a simple, version-controllable YAML configuration file that looks something like this:
 
 ```yaml
 web:
