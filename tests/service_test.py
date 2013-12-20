@@ -137,7 +137,7 @@ class ServiceTest(DockerClientTestCase):
             client=self.client,
             build='this/does/not/exist/and/will/throw/error',
         )
-        container = service.start()
+        container = service.start_container()
         container.wait()
         self.assertIn('success', container.logs())
 
