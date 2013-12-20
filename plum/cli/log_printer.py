@@ -28,8 +28,8 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        format = lambda line: color_fn(container.name + " | ") + line
-        return (format(line) for line in self._readlines(self._attach(container)))
+        prefix = color_fn(container.name + " | ")
+        return (prefix + line for line in self._readlines(self._attach(container)))
 
     def _attach(self, container):
         params = {
