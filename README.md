@@ -72,7 +72,7 @@ This example will build an image with `app.py` inside it:
 print "Hello world!"
 ```
 
-#### plum.yaml
+#### plum.yml
 
 ```yaml
 web:
@@ -103,7 +103,7 @@ web:
 
 ### Communicating between containers
 
-Your dweb app will probably need to talk to your database. You can use [Docker links](http://docs.docker.io/en/latest/use/port_redirection/#linking-a-container) to enable containers to communicate, pass in the right IP address and port via environment variables:
+Your web app will probably need to talk to your database. You can use [Docker links](http://docs.docker.io/en/latest/use/port_redirection/#linking-a-container) to enable containers to communicate, pass in the right IP address and port via environment variables:
 
 ```yaml
 db:
