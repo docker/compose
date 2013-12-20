@@ -28,6 +28,9 @@ class DocoptCommand(object):
         options = docopt_full_help(getdoc(self), argv, **self.docopt_options())
         command = options['COMMAND']
 
+        if command is None:
+            raise SystemExit(getdoc(self))
+
         if not hasattr(self, command):
             raise NoSuchCommand(command, self)
 
