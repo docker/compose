@@ -111,7 +111,10 @@ class TopLevelCommand(Command):
         """
         Run a one-off command.
 
-        Usage: run SERVICE COMMAND [ARGS...]
+        Usage: run [options] SERVICE COMMAND [ARGS...]
+
+        Options:
+            -d    Detached mode: Run container in the background, print new container name
         """
         service = self.project.get_service(options['SERVICE'])
         if service is None:
@@ -120,18 +123,25 @@ class TopLevelCommand(Command):
             'command': [options['COMMAND']] + options['ARGS'],
         }
         container = service.create_container(one_off=True, **container_options)
-        stream = container.logs(stream=True)
-        service.start_container(container, ports=None)
-        for data in stream:
-            if data is None:
-                break
-            print data
+        if options['-d']:
+            service.start_container(container, ports=None)
+            print container.name
+        else:
+            stream = container.logs(stream=True)
+            service.start_container(container, ports=None)
+            for data in stream:
+                if data is None:
+                    break
+                print data
 
     def start(self, options):
         """
         Start all services
 
-        Usage: start [-d]
+        Usage: start [options]
+
+        Options:
+            -d    Detached mode: Run containers in the background, print new container names
         """
         if options['-d']:
             self.project.start()
