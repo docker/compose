@@ -46,17 +46,40 @@ class Project(object):
         return cls.from_dicts(name, dicts, client)
 
     def get_service(self, name):
+        """
+        Retrieve a service by name. Raises NoSuchService
+        if the named service does not exist.
+        """
         for service in self.services:
             if service.name == name:
                 return service
 
-    def create_containers(self):
+        raise NoSuchService(name)
+
+    def get_services(self, service_names=None):
+        """
+        Returns a list of this project's services filtered
+        by the provided list of names, or all services if
+        service_names is None or [].
+
+        Preserves the original order of self.services.
+
+        Raises NoSuchService if any of the named services
+        do not exist.
+        """
+        if service_names is None or len(service_names) == 0:
+            return self.services
+        else:
+            unsorted = [self.get_service(name) for name in service_names]
+            return [s for s in self.services if s in unsorted]
+
+    def create_containers(self, service_names=None):
         """
         Returns a list of (service, container) tuples,
         one for each service with no running containers.
         """
         containers = []
-        for service in self.services:
+        for service in self.get_services(service_names):
             if len(service.containers()) == 0:
                 containers.append((service, service.create_container()))
         return containers
@@ -66,27 +89,34 @@ class Project(object):
             container.kill()
             container.remove()
 
-    def start(self, **options):
-        for service in self.services:
+    def start(self, service_names=None, **options):
+        for service in self.get_services(service_names):
             service.start(**options)
 
-    def stop(self, **options):
-        for service in self.services:
+    def stop(self, service_names=None, **options):
+        for service in self.get_services(service_names):
             service.stop(**options)
 
-    def kill(self, **options):
-        for service in self.services:
+    def kill(self, service_names=None, **options):
+        for service in self.get_services(service_names):
             service.kill(**options)
 
-    def remove_stopped(self, **options):
-        for service in self.services:
+    def remove_stopped(self, service_names=None, **options):
+        for service in self.get_services(service_names):
             service.remove_stopped(**options)
 
-    def containers(self, *args, **kwargs):
+    def containers(self, service_names=None, *args, **kwargs):
         l = []
-        for service in self.services:
+        for service in self.get_services(service_names):
             for container in service.containers(*args, **kwargs):
                 l.append(container)
         return l
 
 
+class NoSuchService(Exception):
+    def __init__(self, name):
+        self.name = name
+        self.msg = "No such service: %s" % self.name
+
+    def __str__(self):
+        return self.msg

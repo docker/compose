@@ -5,6 +5,7 @@ import re
 from inspect import getdoc
 
 from .. import __version__
+from ..project import NoSuchService
 from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
@@ -35,6 +36,9 @@ def main():
         log.error("\nAborting.")
         exit(1)
     except UserError, e:
+        log.error(e.msg)
+        exit(1)
+    except NoSuchService, e:
         log.error(e.msg)
         exit(1)
     except NoSuchCommand, e:
@@ -121,8 +125,6 @@ class TopLevelCommand(Command):
             -d    Detached mode: Run container in the background, print new container name
         """
         service = self.project.get_service(options['SERVICE'])
-        if service is None:
-            raise UserError("No such service: %s" % options['SERVICE'])
         container_options = {
             'command': [options['COMMAND']] + options['ARGS'],
             'tty': not options['-d'],
@@ -146,17 +148,17 @@ class TopLevelCommand(Command):
         """
         Create and start containers
 
-        Usage: up [options]
+        Usage: up [options] [SERVICE...]
 
         Options:
             -d    Detached mode: Run containers in the background, print new container names
         """
         detached = options['-d']
 
-        unstarted = self.project.create_containers()
+        unstarted = self.project.create_containers(service_names=options['SERVICE'])
 
         if not detached:
-            to_attach = self.project.containers() + [c for (s, c) in unstarted]
+            to_attach = self.project.containers(service_names=options['SERVICE']) + [c for (s, c) in unstarted]
             print "Attaching to", list_containers(to_attach)
             log_printer = LogPrinter(to_attach, attach_params={'logs': True})
 
@@ -176,33 +178,33 @@ class TopLevelCommand(Command):
         """
         Start all services
 
-        Usage: start
+        Usage: start [SERVICE...]
         """
-        self.project.start()
+        self.project.start(service_names=options['SERVICE'])
 
     def stop(self, options):
         """
         Stop all services
 
-        Usage: stop
+        Usage: stop [SERVICE...]
         """
-        self.project.stop()
+        self.project.stop(service_names=options['SERVICE'])
 
     def kill(self, options):
         """
         Kill all containers
 
-        Usage: kill
+        Usage: kill [SERVICE...]
         """
-        self.project.kill()
+        self.project.kill(service_names=options['SERVICE'])
 
     def rm(self, options):
         """
         Remove all stopped containers
 
-        Usage: rm
+        Usage: rm [SERVICE...]
         """
-        self.project.remove_stopped()
+        self.project.remove_stopped(service_names=options['SERVICE'])
 
     def logs(self, options):
         """
