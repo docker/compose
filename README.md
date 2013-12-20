@@ -38,7 +38,7 @@ db:
 You've now given Fig the minimal amount of configuration it needs to run:
 
 ```bash
-$ fig start
+$ fig up
 Pulling image orchardup/postgresql...
 Starting myapp_db_1...
 myapp_db_1 is running at 127.0.0.1:45678
@@ -47,10 +47,10 @@ myapp_db_1 is running at 127.0.0.1:45678
 
 For each service you've defined, Fig will start a Docker container with the specified image, building or pulling it if necessary. You now have a PostgreSQL server running at `127.0.0.1:45678`.
 
-By default, `fig start` will run until each container has shut down, and relay their output to the terminal. To run in the background instead, pass the `-d` flag:
+By default, `fig up` will run until each container has shut down, and relay their output to the terminal. To run in the background instead, pass the `-d` flag:
 
 ```bash
-$ fig start -d
+$ fig up -d
 Starting myapp_db_1... done
 myapp_db_1 is running at 127.0.0.1:45678
 
@@ -118,7 +118,7 @@ web:
 This will pass an environment variable called `MYAPP_DB_1_PORT` into the web container, whose value will look like `tcp://172.17.0.4:45678`. Your web app's code can use that to connect to the database. To see all of the environment variables available, run `env` inside a container:
 
 ```bash
-$ fig start -d db
+$ fig up -d db
 $ fig run web env
 ```
 
