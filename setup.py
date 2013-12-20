@@ -21,6 +21,8 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
+with open('requirements.txt') as f:
+    install_requires = f.read().splitlines()
 
 setup(
     name='fig',
@@ -32,8 +34,7 @@ setup(
     packages=['fig'],
     package_data={},
     include_package_data=True,
-    install_requires=[],
-    dependency_links=[],
+    install_requires=install_requires,
     entry_points="""
     [console_scripts]
     fig=fig.cli.main:main
