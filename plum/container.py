@@ -124,3 +124,11 @@ class Container(object):
 
     def attach_socket(self, **kwargs):
         return self.client.attach_socket(self.id, **kwargs)
+
+    def __repr__(self):
+        return '<Container: %s>' % self.name
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        return self.id == other.id

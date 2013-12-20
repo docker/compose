@@ -85,8 +85,10 @@ class TopLevelCommand(Command):
         Options:
             -q    Only display IDs
         """
+        containers = self.project.containers(stopped=True) + self.project.containers(one_off=True)
+
         if options['-q']:
-            for container in self.project.containers(all=True):
+            for container in containers:
                 print container.id
         else:
             headers = [
@@ -96,7 +98,7 @@ class TopLevelCommand(Command):
                 'Ports',
             ]
             rows = []
-            for container in self.project.containers(all=True):
+            for container in containers:
                 rows.append([
                     container.name,
                     container.human_readable_command,
@@ -117,7 +119,7 @@ class TopLevelCommand(Command):
         container_options = {
             'command': [options['COMMAND']] + options['ARGS'],
         }
-        container = service.create_container(**container_options)
+        container = service.create_container(one_off=True, **container_options)
         stream = container.logs(stream=True)
         service.start_container(container, ports=None)
         for data in stream:
@@ -142,7 +144,7 @@ class TopLevelCommand(Command):
             if len(s.containers()) == 0:
                 unstarted.append((s, s.create_container()))
             else:
-                running += s.containers(all=False)
+                running += s.containers(stopped=False)
 
         log_printer = LogPrinter(running + [c for (s, c) in unstarted])
 
@@ -168,7 +170,7 @@ class TopLevelCommand(Command):
 
         Usage: logs
         """
-        containers = self.project.containers(all=False)
+        containers = self.project.containers(stopped=False)
         print "Attaching to", list_containers(containers)
         LogPrinter(containers, attach_params={'logs': True}).run()
 

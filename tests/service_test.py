@@ -41,6 +41,12 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('/default_bar_1', names)
         self.assertIn('/default_bar_2', names)
 
+    def test_containers_one_off(self):
+        db = self.create_service('db')
+        container = db.create_container(one_off=True)
+        self.assertEqual(db.containers(stopped=True), [])
+        self.assertEqual(db.containers(one_off=True, stopped=True), [container])
+
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web', project='myproject')
         service.start()
@@ -67,6 +73,11 @@ class ServiceTest(DockerClientTestCase):
 
         service.stop()
         self.assertEqual(len(service.containers()), 0)
+
+    def test_create_container_with_one_off(self):
+        db = self.create_service('db')
+        container = db.create_container(one_off=True)
+        self.assertEqual(container.name, '/default_db_run_1')
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')

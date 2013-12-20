@@ -27,11 +27,11 @@ class Service(object):
         self.links = links or []
         self.options = options
 
-    def containers(self, all=False):
+    def containers(self, stopped=False, one_off=False):
         l = []
-        for container in self.client.containers(all=all):
+        for container in self.client.containers(all=stopped):
             name = get_container_name(container)
-            if not is_valid_name(name):
+            if not is_valid_name(name, one_off):
                 continue
             project, name, number = parse_name(name)
             if project == self.project and name == self.name:
@@ -52,12 +52,12 @@ class Service(object):
         while len(self.containers()) > num:
             self.stop_container()
 
-    def create_container(self, **override_options):
+    def create_container(self, one_off=False, **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        container_options = self._get_container_options(override_options)
+        container_options = self._get_container_options(override_options, one_off=one_off)
         try:
             return Container.create(self.client, **container_options)
         except APIError, e:
@@ -104,11 +104,14 @@ class Service(object):
         container.kill()
         container.remove()
 
-    def next_container_name(self):
-        return '%s_%s_%s' % (self.project, self.name, self.next_container_number())
+    def next_container_name(self, one_off=False):
+        bits = [self.project, self.name]
+        if one_off:
+            bits.append('run')
+        return '_'.join(bits + [unicode(self.next_container_number())])
 
     def next_container_number(self):
-        numbers = [parse_name(c.name)[2] for c in self.containers(all=True)]
+        numbers = [parse_name(c.name)[2] for c in self.containers(stopped=True)]
 
         if len(numbers) == 0:
             return 1
@@ -122,12 +125,12 @@ class Service(object):
                 links[container.name[1:]] = container.name[1:]
         return links
 
-    def _get_container_options(self, override_options):
+    def _get_container_options(self, override_options, one_off=False):
         keys = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from']
         container_options = dict((k, self.options[k]) for k in keys if k in self.options)
         container_options.update(override_options)
 
-        container_options['name'] = self.next_container_name()
+        container_options['name'] = self.next_container_name(one_off)
 
         if 'ports' in container_options:
             container_options['ports'] = [unicode(p).split(':')[0] for p in container_options['ports']]
@@ -160,16 +163,22 @@ class Service(object):
         return image_id
 
 
-NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(\d+)$')
+NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
 
 
-def is_valid_name(name):
-    return (NAME_RE.match(name) is not None)
-
-
-def parse_name(name):
+def is_valid_name(name, one_off=False):
     match = NAME_RE.match(name)
-    (project, service_name, suffix) = match.groups()
+    if match is None:
+        return False
+    if one_off:
+        return match.group(3) == 'run_'
+    else:
+        return match.group(3) is None
+
+
+def parse_name(name, one_off=False):
+    match = NAME_RE.match(name)
+    (project, service_name, _, suffix) = match.groups()
     return (project, service_name, int(suffix))
 
 
