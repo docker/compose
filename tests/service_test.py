@@ -26,13 +26,14 @@ class ServiceTest(DockerClientTestCase):
         foo = self.create_service('foo')
         bar = self.create_service('bar')
 
-        foo.start()
+        foo.start_container()
 
         self.assertEqual(len(foo.containers()), 1)
         self.assertEqual(foo.containers()[0].name, '/default_foo_1')
         self.assertEqual(len(bar.containers()), 0)
 
-        bar.scale(2)
+        bar.start_container()
+        bar.start_container()
 
         self.assertEqual(len(foo.containers()), 1)
         self.assertEqual(len(bar.containers()), 2)
@@ -49,30 +50,28 @@ class ServiceTest(DockerClientTestCase):
 
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web', project='myproject')
-        service.start()
+        service.start_container()
         self.assertEqual(service.containers()[0].name, '/myproject_web_1')
 
-    def test_up_scale_down(self):
+    def test_start_stop(self):
         service = self.create_service('scalingtest')
+        self.assertEqual(len(service.containers(stopped=True)), 0)
+
+        service.create_container()
         self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
 
         service.start()
         self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
 
-        service.start()
-        self.assertEqual(len(service.containers()), 1)
-
-        service.scale(2)
-        self.assertEqual(len(service.containers()), 2)
-
-        service.scale(1)
-        self.assertEqual(len(service.containers()), 1)
-
-        service.stop()
+        service.stop(timeout=1)
         self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
 
-        service.stop()
+        service.stop(timeout=1)
         self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
 
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
@@ -101,8 +100,8 @@ class ServiceTest(DockerClientTestCase):
         db.start_container()
         web.start_container()
         self.assertIn('default_db_1', web.containers()[0].links())
-        db.stop()
-        web.stop()
+        db.stop(timeout=1)
+        web.stop(timeout=1)
 
     def test_start_container_builds_images(self):
         service = Service(
@@ -110,7 +109,7 @@ class ServiceTest(DockerClientTestCase):
             client=self.client,
             build='tests/fixtures/simple-dockerfile',
         )
-        container = service.start()
+        container = service.start_container()
         container.wait()
         self.assertIn('success', container.logs())
         self.assertEqual(len(self.client.images(name='default_test')), 1)

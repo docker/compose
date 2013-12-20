@@ -38,19 +38,14 @@ class Service(object):
                 l.append(Container.from_ps(self.client, container))
         return l
 
-    def start(self):
-        if len(self.containers()) == 0:
-            return self.start_container()
+    def start(self, **options):
+        for c in self.containers(stopped=True):
+            if not c.is_running:
+                self.start_container(c, **options)
 
-    def stop(self):
-        self.scale(0)
-
-    def scale(self, num):
-        while len(self.containers()) < num:
-            self.start_container()
-
-        while len(self.containers()) > num:
-            self.stop_container()
+    def stop(self, **options):
+        for c in self.containers():
+            c.stop(**options)
 
     def create_container(self, one_off=False, **override_options):
         """
@@ -98,11 +93,6 @@ class Service(object):
             binds=volume_bindings,
         )
         return container
-
-    def stop_container(self):
-        container = self.containers()[-1]
-        container.kill()
-        container.remove()
 
     def next_container_name(self, one_off=False):
         bits = [self.project, self.name]

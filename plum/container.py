@@ -83,13 +83,18 @@ class Container(object):
             out[k] = v
         return out
 
+    @property
+    def is_running(self):
+        self.inspect_if_not_inspected()
+        return self.dictionary['State']['Running']
+
     def start(self, **options):
         log.info("Starting %s..." % self.name)
         return self.client.start(self.id, **options)
 
-    def stop(self):
+    def stop(self, **options):
         log.info("Stopping %s..." % self.name)
-        return self.client.stop(self.id)
+        return self.client.stop(self.id, **options)
 
     def kill(self):
         log.info("Killing %s..." % self.name)

@@ -140,37 +140,43 @@ class TopLevelCommand(Command):
                 service.start_container(container, ports=None)
                 c.run()
 
-    def start(self, options):
+    def up(self, options):
         """
-        Start all services
+        Create and start containers
 
-        Usage: start [options]
+        Usage: up [options]
 
         Options:
             -d    Detached mode: Run containers in the background, print new container names
         """
-        if options['-d']:
-            self.project.start()
-            return
+        detached = options['-d']
 
-        running = []
-        unstarted = []
+        unstarted = self.project.create_containers()
 
-        for s in self.project.services:
-            if len(s.containers()) == 0:
-                unstarted.append((s, s.create_container()))
-            else:
-                running += s.containers(stopped=False)
-
-        log_printer = LogPrinter(running + [c for (s, c) in unstarted])
+        if not detached:
+            to_attach = self.project.containers() + [c for (s, c) in unstarted]
+            print "Attaching to", list_containers(to_attach)
+            log_printer = LogPrinter(to_attach, attach_params={'logs': True})
 
         for (s, c) in unstarted:
             s.start_container(c)
 
-        try:
-            log_printer.run()
-        finally:
-            self.project.stop()
+        if detached:
+            for (s, c) in unstarted:
+                print c.name
+        else:
+            try:
+                log_printer.run()
+            finally:
+                self.project.kill_and_remove(unstarted)
+
+    def start(self, options):
+        """
+        Start all services
+
+        Usage: start
+        """
+        self.project.start()
 
     def stop(self, options):
         """

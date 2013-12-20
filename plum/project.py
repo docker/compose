@@ -50,13 +50,29 @@ class Project(object):
             if service.name == name:
                 return service
 
-    def start(self):
+    def create_containers(self):
+        """
+        Returns a list of (service, container) tuples,
+        one for each service with no running containers.
+        """
+        containers = []
         for service in self.services:
-            service.start()
+            if len(service.containers()) == 0:
+                containers.append((service, service.create_container()))
+        return containers
 
-    def stop(self):
+    def kill_and_remove(self, tuples):
+        for (service, container) in tuples:
+            container.kill()
+            container.remove()
+
+    def start(self, **options):
         for service in self.services:
-            service.stop()
+            service.start(**options)
+
+    def stop(self, **options):
+        for service in self.services:
+            service.stop(**options)
 
     def containers(self, *args, **kwargs):
         l = []
