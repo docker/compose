@@ -12,6 +12,7 @@ from .log_printer import LogPrinter
 from docker.client import APIError
 from .errors import UserError
 from .docopt_command import NoSuchCommand
+from .socketclient import SocketClient
 
 log = logging.getLogger(__name__)
 
@@ -122,18 +123,22 @@ class TopLevelCommand(Command):
             raise UserError("No such service: %s" % options['SERVICE'])
         container_options = {
             'command': [options['COMMAND']] + options['ARGS'],
+            'tty': not options['-d'],
+            'stdin_open': not options['-d'],
         }
         container = service.create_container(one_off=True, **container_options)
         if options['-d']:
             service.start_container(container, ports=None)
             print container.name
         else:
-            stream = container.logs(stream=True)
-            service.start_container(container, ports=None)
-            for data in stream:
-                if data is None:
-                    break
-                print data
+            with self._attach_to_container(
+                container.id,
+                interactive=True,
+                logs=True,
+                raw=True
+            ) as c:
+                service.start_container(container, ports=None)
+                c.run()
 
     def start(self, options):
         """
@@ -185,6 +190,37 @@ class TopLevelCommand(Command):
         print "Attaching to", list_containers(containers)
         LogPrinter(containers, attach_params={'logs': True}).run()
 
+    def _attach_to_container(self, container_id, interactive, logs=False, stream=True, raw=False):
+        stdio = self.client.attach_socket(
+            container_id,
+            params={
+                'stdin': 1 if interactive else 0,
+                'stdout': 1,
+                'stderr': 0,
+                'logs': 1 if logs else 0,
+                'stream': 1 if stream else 0
+            },
+            ws=True,
+        )
+
+        stderr = self.client.attach_socket(
+            container_id,
+            params={
+                'stdin': 0,
+                'stdout': 0,
+                'stderr': 1,
+                'logs': 1 if logs else 0,
+                'stream': 1 if stream else 0
+            },
+            ws=True,
+        )
+
+        return SocketClient(
+            socket_in=stdio,
+            socket_out=stdio,
+            socket_err=stderr,
+            raw=raw,
+        )
 
 def list_containers(containers):
     return ", ".join(c.name for c in containers)
