@@ -113,6 +113,18 @@ class ServiceTest(DockerClientTestCase):
         container = service.start()
         container.wait()
         self.assertIn('success', container.logs())
+        self.assertEqual(len(self.client.images(name='default_test')), 1)
+
+    def test_start_container_uses_tagged_image_if_it_exists(self):
+        self.client.build('tests/fixtures/simple-dockerfile', tag='default_test')
+        service = Service(
+            name='test',
+            client=self.client,
+            build='this/does/not/exist/and/will/throw/error',
+        )
+        container = service.start()
+        container.wait()
+        self.assertIn('success', container.logs())
 
     def test_start_container_creates_ports(self):
         service = self.create_service('web', ports=[8000])

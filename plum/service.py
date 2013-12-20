@@ -139,14 +139,20 @@ class Service(object):
             container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])
 
         if 'build' in self.options:
-            container_options['image'] = self.build()
+            if len(self.client.images(name=self._build_tag_name())) == 0:
+                self.build()
+            container_options['image'] = self._build_tag_name()
 
         return container_options
 
     def build(self):
         log.info('Building %s...' % self.name)
 
-        build_output = self.client.build(self.options['build'], stream=True)
+        build_output = self.client.build(
+            self.options['build'],
+            tag=self._build_tag_name(),
+            stream=True
+        )
 
         image_id = None
 
@@ -161,6 +167,12 @@ class Service(object):
             raise BuildError()
 
         return image_id
+
+    def _build_tag_name(self):
+        """
+        The tag to give to images built for this service.
+        """
+        return '%s_%s' % (self.project, self.name)
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
