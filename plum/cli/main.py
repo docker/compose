@@ -71,6 +71,8 @@ class TopLevelCommand(Command):
       run       Run a one-off command
       start     Start services
       stop      Stop services
+      kill      Kill containers
+      rm        Remove stopped containers
 
     """
     def docopt_options(self):
@@ -185,6 +187,22 @@ class TopLevelCommand(Command):
         Usage: stop
         """
         self.project.stop()
+
+    def kill(self, options):
+        """
+        Kill all containers
+
+        Usage: kill
+        """
+        self.project.kill()
+
+    def rm(self, options):
+        """
+        Remove all stopped containers
+
+        Usage: rm
+        """
+        self.project.remove_stopped()
 
     def logs(self, options):
         """

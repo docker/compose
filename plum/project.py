@@ -74,6 +74,14 @@ class Project(object):
         for service in self.services:
             service.stop(**options)
 
+    def kill(self, **options):
+        for service in self.services:
+            service.kill(**options)
+
+    def remove_stopped(self, **options):
+        for service in self.services:
+            service.remove_stopped(**options)
+
     def containers(self, *args, **kwargs):
         l = []
         for service in self.services:

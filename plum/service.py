@@ -47,6 +47,15 @@ class Service(object):
         for c in self.containers():
             c.stop(**options)
 
+    def kill(self, **options):
+        for c in self.containers():
+            c.kill(**options)
+
+    def remove_stopped(self, **options):
+        for c in self.containers(stopped=True):
+            if not c.is_running:
+                c.remove(**options)
+
     def create_container(self, one_off=False, **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull

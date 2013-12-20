@@ -73,6 +73,22 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 0)
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
+    def test_kill_remove(self):
+        service = self.create_service('scalingtest')
+
+        service.start_container()
+        self.assertEqual(len(service.containers()), 1)
+
+        service.remove_stopped()
+        self.assertEqual(len(service.containers()), 1)
+
+        service.kill()
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        service.remove_stopped()
+        self.assertEqual(len(service.containers(stopped=True)), 0)
+
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
