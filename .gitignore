@@ -1,3 +1,4 @@
 *.egg-info
 *.pyc
 /dist
+/_site
