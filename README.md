@@ -3,7 +3,7 @@ Fig
 
 Punctual, lightweight development environments using Docker.
 
-Fig is a tool for defining and running isolated application environments. It uses simple, version-controllable YAML configuration files that look something like this:
+Fig is a tool for defining and running isolated application environments. You define the services which comprise your app in a simple, version-controllable YAML configuration file that looks like this:
 
 ```yaml
 web:
@@ -16,6 +16,15 @@ db:
   image: orchardup/postgresql
 ```
 
+Then type `fig up`, and Fig will start and run your entire app.
+
+There are commands to:
+
+ - start, stop and rebuild services
+ - view the status of running services
+ - tail running services' log output
+ - run a one-off command on a service
+
 Installing
 ----------
 
@@ -26,7 +35,7 @@ $ sudo pip install fig
 Defining your app
 -----------------
 
-Put a `fig.yml` in your app's directory. Each top-level key defines a "service", such as a web app, database or cache. For each service, Fig will start a Docker container, so at minimum it needs to know what image to use.
+Put a `fig.yml` in your app's directory. Each top-level key defines a service, such as a web app, database or cache. For each service, Fig will start a Docker container, so at minimum it needs to know what image to use.
 
 The simplest way to get started is to just give it an image name:
 
