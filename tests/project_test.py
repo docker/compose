@@ -1,5 +1,4 @@
 from fig.project import Project
-from fig.service import Service
 from .testcases import DockerClientTestCase
 
 
@@ -57,7 +56,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(unstarted), 2)
         self.assertEqual(unstarted[0][0], web)
         self.assertEqual(unstarted[1][0], db)
-        self.assertEqual(len(web.containers(stopped=True)), 2)
+        self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 1)
 
     def test_up(self):

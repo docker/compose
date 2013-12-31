@@ -1,5 +1,7 @@
 import datetime
 import os
+import socket
+from .errors import UserError
 
 
 def cached_property(f):
@@ -74,3 +76,28 @@ def mkdir(path, permissions=0700):
     os.chmod(path, permissions)
 
     return path
+
+
+def docker_url():
+    if os.environ.get('DOCKER_URL'):
+        return os.environ['DOCKER_URL']
+
+    socket_path = '/var/run/docker.sock'
+    tcp_host = '127.0.0.1'
+    tcp_port = 4243
+
+    if os.path.exists(socket_path):
+        return 'unix://%s' % socket_path
+
+    try:
+        s = socket.socket()
+        s.connect((tcp_host, tcp_port))
+        s.close()
+        return 'http://%s:%s' % (tcp_host, tcp_port)
+    except:
+        pass
+
+    raise UserError("""
+    Couldn't find Docker daemon - tried %s and %s:%s.
+    If it's running elsewhere, specify a url with DOCKER_URL.
+    """ % (socket_path, tcp_host, tcp_port))

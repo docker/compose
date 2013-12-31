@@ -1,16 +1,13 @@
 from docker import Client
 from fig.service import Service
-import os
+from fig.cli.utils import docker_url
 from unittest import TestCase
 
 
 class DockerClientTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
-        if os.environ.get('DOCKER_URL'):
-            cls.client = Client(os.environ['DOCKER_URL'])
-        else:
-            cls.client = Client()
+        cls.client = Client(docker_url())
         cls.client.pull('ubuntu')
 
     def setUp(self):
