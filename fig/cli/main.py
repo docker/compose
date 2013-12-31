@@ -71,20 +71,38 @@ class TopLevelCommand(Command):
       --version            Print version and exit
 
     Commands:
-      up        Create and start containers
+      kill      Kill containers
       logs      View output from containers
       ps        List containers
+      rm        Remove stopped containers
       run       Run a one-off command
       start     Start services
       stop      Stop services
-      kill      Kill containers
-      rm        Remove stopped containers
+      up        Create and start containers
 
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
         options['version'] = "fig %s" % __version__
         return options
+
+    def kill(self, options):
+        """
+        Kill containers.
+
+        Usage: kill [SERVICE...]
+        """
+        self.project.kill(service_names=options['SERVICE'])
+
+    def logs(self, options):
+        """
+        View output from containers.
+
+        Usage: logs [SERVICE...]
+        """
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=False)
+        print "Attaching to", list_containers(containers)
+        LogPrinter(containers, attach_params={'logs': True}).run()
 
     def ps(self, options):
         """
@@ -117,6 +135,22 @@ class TopLevelCommand(Command):
                 ])
             print Formatter().table(headers, rows)
 
+    def rm(self, options):
+        """
+        Remove stopped containers
+
+        Usage: rm [SERVICE...]
+        """
+        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        stopped_containers = [c for c in all_containers if not c.is_running]
+
+        if len(stopped_containers) > 0:
+            print "Going to remove", list_containers(stopped_containers)
+            if yesno("Are you sure? [yN] ", default=False):
+                self.project.remove_stopped(service_names=options['SERVICE'])
+        else:
+            print "No stopped containers"
+
     def run(self, options):
         """
         Run a one-off command.
@@ -146,6 +180,22 @@ class TopLevelCommand(Command):
                 service.start_container(container, ports=None)
                 c.run()
 
+    def start(self, options):
+        """
+        Start existing containers.
+
+        Usage: start [SERVICE...]
+        """
+        self.project.start(service_names=options['SERVICE'])
+
+    def stop(self, options):
+        """
+        Stop running containers.
+
+        Usage: stop [SERVICE...]
+        """
+        self.project.stop(service_names=options['SERVICE'])
+
     def up(self, options):
         """
         Create and start containers.
@@ -171,56 +221,6 @@ class TopLevelCommand(Command):
                 log_printer.run()
             finally:
                 self.project.kill(service_names=options['SERVICE'])
-
-    def start(self, options):
-        """
-        Start existing containers.
-
-        Usage: start [SERVICE...]
-        """
-        self.project.start(service_names=options['SERVICE'])
-
-    def stop(self, options):
-        """
-        Stop running containers.
-
-        Usage: stop [SERVICE...]
-        """
-        self.project.stop(service_names=options['SERVICE'])
-
-    def kill(self, options):
-        """
-        Kill containers.
-
-        Usage: kill [SERVICE...]
-        """
-        self.project.kill(service_names=options['SERVICE'])
-
-    def rm(self, options):
-        """
-        Remove stopped containers
-
-        Usage: rm [SERVICE...]
-        """
-        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
-        stopped_containers = [c for c in all_containers if not c.is_running]
-
-        if len(stopped_containers) > 0:
-            print "Going to remove", list_containers(stopped_containers)
-            if yesno("Are you sure? [yN] ", default=False):
-                self.project.remove_stopped(service_names=options['SERVICE'])
-        else:
-            print "No stopped containers"
-
-    def logs(self, options):
-        """
-        View output from containers.
-
-        Usage: logs [SERVICE...]
-        """
-        containers = self.project.containers(service_names=options['SERVICE'], stopped=False)
-        print "Attaching to", list_containers(containers)
-        LogPrinter(containers, attach_params={'logs': True}).run()
 
     def _attach_to_container(self, container_id, interactive, logs=False, stream=True, raw=False):
         stdio = self.client.attach_socket(
