@@ -7,7 +7,7 @@ import yaml
 from ..project import Project
 from .docopt_command import DocoptCommand
 from .formatter import Formatter
-from .utils import cached_property, mkdir
+from .utils import cached_property
 
 log = logging.getLogger(__name__)
 
