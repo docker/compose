@@ -9,6 +9,7 @@ from ..project import NoSuchService
 from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
+from .utils import yesno
 
 from docker.client import APIError
 from .errors import UserError
@@ -201,7 +202,15 @@ class TopLevelCommand(Command):
 
         Usage: rm [SERVICE...]
         """
-        self.project.remove_stopped(service_names=options['SERVICE'])
+        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        stopped_containers = [c for c in all_containers if not c.is_running]
+
+        if len(stopped_containers) > 0:
+            print "Going to remove", list_containers(stopped_containers)
+            if yesno("Are you sure? [yN] ", default=False):
+                self.project.remove_stopped(service_names=options['SERVICE'])
+        else:
+            print "No stopped containers"
 
     def logs(self, options):
         """
