@@ -75,19 +75,11 @@ class Project(object):
 
     def create_containers(self, service_names=None):
         """
-        Returns a list of (service, container) tuples,
-        one for each service with no running containers.
+        For each service, creates a container if there are none.
         """
-        containers = []
         for service in self.get_services(service_names):
-            if len(service.containers()) == 0:
-                containers.append((service, service.create_container()))
-        return containers
-
-    def kill_and_remove(self, tuples):
-        for (service, container) in tuples:
-            container.kill()
-            container.remove()
+            if len(service.containers(stopped=True)) == 0:
+                service.create_container()
 
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):

@@ -46,48 +46,13 @@ class ProjectTest(DockerClientTestCase):
         db = self.create_service('db')
         project = Project('test', [web, db], self.client)
 
-        unstarted = project.create_containers(service_names=['web'])
-        self.assertEqual(len(unstarted), 1)
-        self.assertEqual(unstarted[0][0], web)
+        project.create_containers(service_names=['web'])
         self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 0)
 
-        unstarted = project.create_containers()
-        self.assertEqual(len(unstarted), 2)
-        self.assertEqual(unstarted[0][0], web)
-        self.assertEqual(unstarted[1][0], db)
+        project.create_containers()
         self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 1)
-
-    def test_up(self):
-        web = self.create_service('web')
-        db = self.create_service('db')
-        other = self.create_service('other')
-        project = Project('test', [web, db, other], self.client)
-
-        web.create_container()
-
-        self.assertEqual(len(web.containers()), 0)
-        self.assertEqual(len(db.containers()), 0)
-        self.assertEqual(len(web.containers(stopped=True)), 1)
-        self.assertEqual(len(db.containers(stopped=True)), 0)
-
-        unstarted = project.create_containers(service_names=['web', 'db'])
-        self.assertEqual(len(unstarted), 2)
-        self.assertEqual(unstarted[0][0], web)
-        self.assertEqual(unstarted[1][0], db)
-
-        self.assertEqual(len(web.containers()), 0)
-        self.assertEqual(len(db.containers()), 0)
-        self.assertEqual(len(web.containers(stopped=True)), 2)
-        self.assertEqual(len(db.containers(stopped=True)), 1)
-
-        project.kill_and_remove(unstarted)
-
-        self.assertEqual(len(web.containers()), 0)
-        self.assertEqual(len(db.containers()), 0)
-        self.assertEqual(len(web.containers(stopped=True)), 1)
-        self.assertEqual(len(db.containers(stopped=True)), 0)
 
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')

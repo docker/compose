@@ -156,24 +156,20 @@ class TopLevelCommand(Command):
         """
         detached = options['-d']
 
-        unstarted = self.project.create_containers(service_names=options['SERVICE'])
+        self.project.create_containers(service_names=options['SERVICE'])
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
         if not detached:
-            to_attach = self.project.containers(service_names=options['SERVICE']) + [c for (s, c) in unstarted]
-            print "Attaching to", list_containers(to_attach)
-            log_printer = LogPrinter(to_attach, attach_params={'logs': True})
+            print "Attaching to", list_containers(containers)
+            log_printer = LogPrinter(containers)
 
-        for (s, c) in unstarted:
-            s.start_container(c)
+        self.project.start(service_names=options['SERVICE'])
 
-        if detached:
-            for (s, c) in unstarted:
-                print c.name
-        else:
+        if not detached:
             try:
                 log_printer.run()
             finally:
-                self.project.kill_and_remove(unstarted)
+                self.project.kill(service_names=options['SERVICE'])
 
     def start(self, options):
         """
