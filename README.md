@@ -204,7 +204,7 @@ Run `fig [COMMAND] --help` for full usage.
 
 Build or rebuild services.
 
-Services are built once and then tagged as `project_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it.
+Services are built once and then tagged as `project_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it, then run `fig rm` to make `fig up` recreate your containers.
 
 #### kill
 
@@ -241,8 +241,9 @@ Stop running containers without removing them. They can be started again with `f
 
 #### up
 
-Build, create, start and attach to containers for a service.
+Build, create, start and attach to containers for a service. 
 
+If there are stopped containers for a service, `fig up` will start those again instead of creating new containers. When it exits, the containers it started will be stopped. This means if you want to recreate containers, you will need to explicitly run `fig rm`.
 
 ### Environment variables
 
