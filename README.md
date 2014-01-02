@@ -123,7 +123,7 @@ web:
 
 ### Communicating between containers
 
-Your web app will probably need to talk to your database. You can use [Docker links](http://docs.docker.io/en/latest/use/port_redirection/#linking-a-container) to enable containers to communicate, pass in the right IP address and port via environment variables:
+Your web app will probably need to talk to your database. You can use [Docker links] to enable containers to communicate, pass in the right IP address and port via environment variables:
 
 ```yaml
 db:
@@ -135,39 +135,17 @@ web:
    - db
 ```
 
-This will pass an environment variable called `MYAPP_DB_1_PORT` into the web container, whose value will look like `tcp://172.17.0.4:45678`. Your web app's code can use that to connect to the database. To see all of the environment variables available, run `env` inside a container:
+This will pass an environment variable called `MYAPP_DB_1_PORT` into the web container (where MYAPP is the name of the current directory). Your web app's code can use that to connect to the database.
 
 ```bash
 $ fig up -d db
 $ fig run web env
+...
+MYAPP_DB_1_PORT=tcp://172.17.0.5:5432
+...
 ```
 
-
-### Container configuration options
-
-You can pass extra configuration options to a container, much like with `docker run`:
-
-```yaml
-web:
-  build: .
-
-  -- override the default command
-  command: bundle exec thin -p 3000
-
-  -- expose ports, optionally specifying both host and container ports (a random host port will be chosen otherwise)
-  ports:
-   - 3000
-   - 8000:8000
-
-  -- map volumes
-  volumes:
-   - cache/:/tmp/cache
-
-  -- add environment variables
-  environment:
-   RACK_ENV: development
-```
-
+The full set of environment variables is documented in the Reference section.
 
 Running a one-off command
 -------------------------
@@ -180,4 +158,67 @@ $ fig run web rake db:migrate
 $ fig run web bash
 ```
 
+Reference
+---------
 
+### fig.yml
+
+Each service defined in `fig.yml` must specify exactly one of `image` or `build`. Other keys are optional, and are analogous to their `docker run` command-line counterparts.
+
+As with `docker run`, options specified in the Dockerfile (e.g. `CMD`, `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to specify them again in `fig.yml`.
+
+```yaml
+-- Tag or partial image ID. Can be local or remote - Fig will attempt to pull if it doesn't exist locally.
+image: ubuntu
+image: orchardup/postgresql
+image: a4bc65fd
+
+-- Path to a directory containing a Dockerfile. Fig will build and tag it with a generated name, and use that image thereafter.
+build: /path/to/build/dir
+
+-- Override the default command.
+command: bundle exec thin -p 3000
+
+-- Link to containers in another service (see "Communicating between containers").
+links:
+ - db
+ - redis
+
+-- Expose ports. Either specify both ports (HOST:CONTAINER), or just the container port (a random host port will be chosen).
+ports:
+ - 3000
+ - 8000:8000
+
+-- Map volumes from the host machine (HOST:CONTAINER).
+volumes:
+ - cache/:/tmp/cache
+
+-- Add environment variables.
+environment:
+  RACK_ENV: development
+```
+
+### Environment variables
+
+Fig uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
+
+<b><i>name</i>\_PORT</b><br>
+Full URL, e.g. `MYAPP_DB_1_PORT=tcp://172.17.0.5:5432`
+
+<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i></b><br>
+Full URL, e.g. `MYAPP_DB_1_PORT_5432_TCP=tcp://172.17.0.5:5432`
+
+<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i>\_ADDR</b><br>
+Container's IP address, e.g. `MYAPP_DB_1_PORT_5432_TCP_ADDR=172.17.0.5`
+
+<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i>\_PORT</b><br>
+Exposed port number, e.g. `MYAPP_DB_1_PORT_5432_TCP_PORT=5432`
+
+<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i>\_PROTO</b><br>
+Protocol (tcp or udp), e.g. `MYAPP_DB_1_PORT_5432_TCP_PROTO=tcp`
+
+<b><i>name</i>\_NAME</b><br>
+Fully qualified container name, e.g. `MYAPP_DB_1_NAME=/myapp_web_1/myapp_db_1`
+
+
+[Docker links]: http://docs.docker.io/en/latest/use/port_redirection/#linking-a-container
