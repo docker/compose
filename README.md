@@ -36,127 +36,118 @@ There are commands to:
 Fig is a project from [Orchard](https://orchardup.com), a Docker hosting service. [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
 
 
-Installing
-----------
+Getting started
+---------------
 
-```bash
-$ sudo pip install fig
-```
+Let's get a basic Python web app running on Fig. It assumes a little knowledge of Python, but the concepts should be clear if you're not familiar with it.
 
-Defining your app
------------------
+First, install Docker. If you're on OS X, you can use [docker-osx](https://github.com/noplay/docker-osx):
 
-Put a `fig.yml` in your app's directory. Each top-level key defines a service, such as a web app, database or cache. For each service, Fig will start a Docker container, so at minimum it needs to know what image to use.
+    $ curl https://raw.github.com/noplay/docker-osx/master/docker > /usr/local/bin/docker
+    $ chmod +x /usr/local/bin/docker
+    $ docker version
 
-The simplest way to get started is to just give it an image name:
+Docker has guides for [Ubuntu](http://docs.docker.io/en/latest/installation/ubuntulinux/) and [other platforms](http://docs.docker.io/en/latest/installation/) in their documentation.
 
-```yaml
-db:
-  image: orchardup/postgresql
-```
+Next, install Fig:
 
-You've now given Fig the minimal amount of configuration it needs to run:
+    $ sudo pip install fig
 
-```bash
-$ fig up
-Pulling image orchardup/postgresql...
-Starting myapp_db_1...
-myapp_db_1 is running at 127.0.0.1:45678
-<...output from postgresql server...>
-```
+You'll want to make a directory for the project:
 
-For each service you've defined, Fig will start a Docker container with the specified image, building or pulling it if necessary. You now have a PostgreSQL server running at `127.0.0.1:45678`.
+    $ mkdir figtest
+    $ cd figtest
 
-By default, `fig up` will run until each container has shut down, and relay their output to the terminal. To run in the background instead, pass the `-d` flag:
-
-```bash
-$ fig up -d
-Starting myapp_db_1... done
-myapp_db_1 is running at 127.0.0.1:45678
-
-$ fig ps
-Name         State  Ports
-------------------------------------
-myapp_db_1   Up     5432->45678/tcp
-```
-
-### Building services
-
-Fig can automatically build images for you if your service specifies a directory with a `Dockerfile` in it (or a Git URL, as per the `docker build` command).
-
-This example will build an image with `app.py` inside it:
-
-#### app.py
+Inside this directory, create `app.py`, a simple web app that uses the Flask framework and increments a value in Redis:
 
 ```python
-print "Hello world!"
-```
+from flask import Flask
+from redis import Redis
+import os
+app = Flask(__name__)
+redis = Redis(
+    host=os.environ.get('FIGTEST_REDIS_1_PORT_6379_TCP_ADDR'),
+    port=int(os.environ.get('FIGTEST_REDIS_1_PORT_6379_TCP_PORT'))
+)
 
-#### fig.yml
+@app.route('/')
+def hello():
+    redis.incr('hits')
+    return 'Hello World! I have been seen %s times.' % redis.get('hits')
 
-```yaml
-web:
-  build: .
-```
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=True)```
 
-#### Dockerfile
+We define our Python dependencies in a file called `requirements.txt`:
 
-    FROM ubuntu:12.04
-    RUN apt-get install python
-    ADD . /opt
-    WORKDIR /opt
+    flask
+    redis
+
+And we define how to build this into a Docker image using a file called `Dockerfile`:
+
+    FROM stackbrew/ubuntu:13.10
+    RUN apt-get -qq update
+    RUN apt-get install -y python python-pip
+    ADD . /code
+    WORKDIR /code
+    RUN pip install -r requirements.txt
+    EXPOSE 5000
     CMD python app.py
 
+That tells Docker to create an image with Python and Flask installed on it, run the command `python app.py`, and open port 5000 (the port that Flask listens on).
+
+We then define a set of services using `fig.yml`:
+
+    web:
+      build: .
+      ports:
+       - 5000:5000
+      volumes:
+       - .:/code
+      links:
+       - redis
+    redis:
+      image: orchardup/redis
+
+This defines two services:
+
+ - `web`, which is built from `Dockerfile` in the current directory. It also says to forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the `redis` service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
+ - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/). 
+
+Now if we run `fig up`, it'll pull a Redis image, build an image for our own app, and start everything up:
+
+    $ fig up
+    Pulling image orchardup/redis...
+    Building web...
+    Starting figtest_redis_1...
+    Starting figtest_web_1...
+    figtest_redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
+    figtest_web_1 |  * Running on http://0.0.0.0:5000/
+
+Open up [http://localhost:5000](http://localhost:5000) in your browser (or [http://localdocker:5000](http://localdocker:5000) if you're using [docker-osx](https://github.com/noplay/docker-osx)). That's it!
+
+You can also pass the `-d` flag to `fig up` to run your services in the background, and use `fig ps` to see what is currently running:
+
+    $ fig up -d
+    Starting figtest_redis_1...
+    Starting figtest_web_1...
+    $ fig ps
+            Name                 Command            State       Ports
+    -------------------------------------------------------------------
+    figtest_redis_1   /usr/local/bin/run         Up
+    figtest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
+
+`fig run` allows you to run one-off commands for your services. For example, to see what environment variables are available to the `web` service:
+
+    $ fig run web env
 
 
-### Getting your code in
+Run `fig --help` to see what other commands are available. You'll probably want to stop them when you've finished:
 
-If you want to work on an application being run by Fig, you probably don't want to have to rebuild your image every time you make a change. To solve this, you can share the directory with the container using a volume so the changes are reflected immediately:
+    $ fig stop
 
-```yaml
-web:
-  build: .
-  volumes:
-   - .:/opt
-```
+That's more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables.
 
-
-### Communicating between containers
-
-Your web app will probably need to talk to your database. You can use [Docker links] to enable containers to communicate, pass in the right IP address and port via environment variables:
-
-```yaml
-db:
-  image: orchardup/postgresql
-
-web:
-  build: .
-  links:
-   - db
-```
-
-This will pass an environment variable called `MYAPP_DB_1_PORT` into the web container (where MYAPP is the name of the current directory). Your web app's code can use that to connect to the database.
-
-```bash
-$ fig up -d db
-$ fig run web env
-...
-MYAPP_DB_1_PORT=tcp://172.17.0.5:5432
-...
-```
-
-The full set of environment variables is documented in the Reference section.
-
-Running a one-off command
--------------------------
-
-If you want to run a management command, use `fig run` to start a one-off container:
-
-```bash
-$ fig run db createdb myapp_development
-$ fig run web rake db:migrate
-$ fig run web bash
-```
 
 Reference
 ---------
