@@ -12,11 +12,13 @@ class DockerClientTestCase(TestCase):
 
     def setUp(self):
         for c in self.client.containers(all=True):
-            self.client.kill(c['Id'])
-            self.client.remove_container(c['Id'])
+            if c['Names'] and 'figtest' in c['Names'][0]:
+                self.client.kill(c['Id'])
+                self.client.remove_container(c['Id'])
 
     def create_service(self, name, **kwargs):
         return Service(
+            project='figtest',
             name=name,
             client=self.client,
             image="ubuntu",

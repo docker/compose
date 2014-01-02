@@ -4,7 +4,7 @@ from .testcases import DockerClientTestCase
 
 class ProjectTest(DockerClientTestCase):
     def test_from_dict(self):
-        project = Project.from_dicts('test', [
+        project = Project.from_dicts('figtest', [
             {
                 'name': 'web',
                 'image': 'ubuntu'
@@ -21,7 +21,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(project.get_service('db').options['image'], 'ubuntu')
 
     def test_from_dict_sorts_in_dependency_order(self):
-        project = Project.from_dicts('test', [
+        project = Project.from_dicts('figtest', [
             {
                 'name': 'web',
                 'image': 'ubuntu',
@@ -57,7 +57,7 @@ class ProjectTest(DockerClientTestCase):
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
-        project = Project('test', [web, db], self.client)
+        project = Project('figtest', [web, db], self.client)
 
         project.start()
 

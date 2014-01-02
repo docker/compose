@@ -29,7 +29,7 @@ class ServiceTest(DockerClientTestCase):
         foo.start_container()
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, 'default_foo_1')
+        self.assertEqual(foo.containers()[0].name, 'figtest_foo_1')
         self.assertEqual(len(bar.containers()), 0)
 
         bar.start_container()
@@ -39,8 +39,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(bar.containers()), 2)
 
         names = [c.name for c in bar.containers()]
-        self.assertIn('default_bar_1', names)
-        self.assertIn('default_bar_2', names)
+        self.assertIn('figtest_bar_1', names)
+        self.assertIn('figtest_bar_2', names)
 
     def test_containers_one_off(self):
         db = self.create_service('db')
@@ -49,9 +49,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(db.containers(one_off=True, stopped=True), [container])
 
     def test_project_is_added_to_container_name(self):
-        service = self.create_service('web', project='myproject')
+        service = self.create_service('web')
         service.start_container()
-        self.assertEqual(service.containers()[0].name, 'myproject_web_1')
+        self.assertEqual(service.containers()[0].name, 'figtest_web_1')
 
     def test_start_stop(self):
         service = self.create_service('scalingtest')
@@ -92,13 +92,13 @@ class ServiceTest(DockerClientTestCase):
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'default_db_run_1')
+        self.assertEqual(container.name, 'figtest_db_run_1')
 
     def test_create_container_with_one_off_when_existing_container_is_running(self):
         db = self.create_service('db')
         db.start()
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'default_db_run_1')
+        self.assertEqual(container.name, 'figtest_db_run_1')
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
@@ -115,7 +115,7 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web', links=[db])
         db.start_container()
         web.start_container()
-        self.assertIn('default_db_1', web.containers()[0].links())
+        self.assertIn('figtest_db_1', web.containers()[0].links())
         db.stop(timeout=1)
         web.stop(timeout=1)
 
@@ -124,18 +124,20 @@ class ServiceTest(DockerClientTestCase):
             name='test',
             client=self.client,
             build='tests/fixtures/simple-dockerfile',
+            project='figtest',
         )
         container = service.start_container()
         container.wait()
         self.assertIn('success', container.logs())
-        self.assertEqual(len(self.client.images(name='default_test')), 1)
+        self.assertEqual(len(self.client.images(name='figtest_test')), 1)
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
-        self.client.build('tests/fixtures/simple-dockerfile', tag='default_test')
+        self.client.build('tests/fixtures/simple-dockerfile', tag='figtest_test')
         service = Service(
             name='test',
             client=self.client,
             build='this/does/not/exist/and/will/throw/error',
+            project='figtest',
         )
         container = service.start_container()
         container.wait()
