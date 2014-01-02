@@ -16,7 +16,15 @@ db:
   image: orchardup/postgresql
 ```
 
-Then type `fig up`, and Fig will start and run your entire app.
+Then type `fig up`, and Fig will start and run your entire app:
+
+    $ fig up
+    Pulling image orchardup/postgresql...
+    Building web...
+    Starting example_db_1...
+    Starting example_web_1...
+    example_db_1 | 2014-01-02 14:47:18 UTC LOG:  database system is ready to accept connections
+    example_web_1 |  * Running on http://0.0.0.0:5000/
 
 There are commands to:
 
@@ -24,6 +32,9 @@ There are commands to:
  - view the status of running services
  - tail running services' log output
  - run a one-off command on a service
+
+Fig is a project from [Orchard](https://orchardup.com), a Docker hosting service. [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
+
 
 Installing
 ----------
