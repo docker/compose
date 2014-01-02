@@ -1,6 +1,8 @@
 import logging
 import sys
 import re
+import signal
+import sys
 
 from inspect import getdoc
 
@@ -229,7 +231,13 @@ class TopLevelCommand(Command):
             try:
                 log_printer.run()
             finally:
-                self.project.kill(service_names=options['SERVICE'])
+                def handler(signal, frame):
+                    self.project.kill(service_names=options['SERVICE'])
+                    sys.exit(0)
+                signal.signal(signal.SIGINT, handler)
+
+                print "Gracefully stopping... (press Ctrl+C again to force)"
+                self.project.stop(service_names=options['SERVICE'])
 
     def _attach_to_container(self, container_id, interactive, logs=False, stream=True, raw=False):
         stdio = self.client.attach_socket(
