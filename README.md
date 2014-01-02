@@ -202,7 +202,7 @@ Most commands are run against one or more services. If the service is omitted, i
 
 Build or rebuild services.
 
-Services are built once and then tagged as `project\_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it.
+Services are built once and then tagged as `project_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it.
 
 #### `kill [SERVICE...]`
 
