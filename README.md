@@ -198,44 +198,48 @@ environment:
 
 Most commands are run against one or more services. If the service is omitted, it will apply to all services.
 
-#### `build [SERVICE...]`
+Run `fig [COMMAND] --help` for full usage.
+
+#### build
 
 Build or rebuild services.
 
 Services are built once and then tagged as `project_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it.
 
-#### `kill [SERVICE...]`
+#### kill
 
 Force stop service containers.
 
-#### `logs [SERVICE...]`
+#### logs
 
 View output from services.
 
-#### `ps`
+#### ps
 
 List running containers.
 
-#### `rm [SERVICE...]`
+#### rm
 
 Remove stopped service containers.
 
 
-#### `run SERVICE COMMAND [ARGS...]`
+#### run
 
-Run a one-off command for a service.
+Run a one-off command for a service. E.g.:
+
+    $ fig run web python manage.py shell
 
 Note that this will not start any services that the command's service links to. So if, for example, your one-off command talks to your database, you will need to run `fig up -d db` first.
 
-#### `start [SERVICE...]`
+#### start
 
 Start existing containers for a service.
 
-#### `stop [SERVICE...]`
+#### stop
 
 Stop running containers without removing them. They can be started again with `fig start`.
 
-#### `up [SERVICE...]`
+#### up
 
 Build, create, start and attach to containers for a service.
 
