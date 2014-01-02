@@ -53,6 +53,8 @@ Next, install Fig:
 
     $ sudo pip install fig
 
+(If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`.)
+
 You'll want to make a directory for the project:
 
     $ mkdir figtest
@@ -112,10 +114,10 @@ We then define a set of services using `fig.yml`:
 
 This defines two services:
 
- - `web`, which is built from `Dockerfile` in the current directory. It also says to forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the `redis` service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
+ - `web`, which is built from `Dockerfile` in the current directory. It also says to forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
  - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/). 
 
-Now if we run `fig up`, it'll pull a Redis image, build an image for our own app, and start everything up:
+Now if we run `fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
 
     $ fig up
     Pulling image orchardup/redis...
@@ -125,9 +127,9 @@ Now if we run `fig up`, it'll pull a Redis image, build an image for our own app
     figtest_redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     figtest_web_1 |  * Running on http://0.0.0.0:5000/
 
-Open up [http://localhost:5000](http://localhost:5000) in your browser (or [http://localdocker:5000](http://localdocker:5000) if you're using [docker-osx](https://github.com/noplay/docker-osx)). That's it!
+Open up [http://localhost:5000](http://localhost:5000) in your browser (or [http://localdocker:5000](http://localdocker:5000) if you're using [docker-osx](https://github.com/noplay/docker-osx)) and you should see it running!
 
-You can also pass the `-d` flag to `fig up` to run your services in the background, and use `fig ps` to see what is currently running:
+If you want to run your services in the background, you can pass the `-d` flag to `fig up` and use `fig ps` to see what is currently running:
 
     $ fig up -d
     Starting figtest_redis_1...
@@ -143,11 +145,13 @@ You can also pass the `-d` flag to `fig up` to run your services in the backgrou
     $ fig run web env
 
 
-Run `fig --help` to see what other commands are available. You'll probably want to stop them when you've finished:
+See `fig --help` other commands that are available.
+
+You'll probably want to stop your services when you've finished with them:
 
     $ fig stop
 
-That's more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables.
+That's more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/orchardup/fig) or [email us](mailto:hello@orchardup.com).
 
 
 Reference
