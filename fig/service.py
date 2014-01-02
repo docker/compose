@@ -137,7 +137,7 @@ class Service(object):
         if 'volumes' in container_options:
             container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])
 
-        if 'build' in self.options:
+        if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
                 self.build()
             container_options['image'] = self._build_tag_name()
@@ -166,6 +166,9 @@ class Service(object):
             raise BuildError()
 
         return image_id
+
+    def can_be_built(self):
+        return 'build' in self.options
 
     def _build_tag_name(self):
         """

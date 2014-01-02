@@ -93,6 +93,13 @@ class Project(object):
         for service in self.get_services(service_names):
             service.kill(**options)
 
+    def build(self, service_names=None, **options):
+        for service in self.get_services(service_names):
+            if service.can_be_built():
+                service.build(**options)
+            else:
+                log.info('%s uses an image, skipping')
+
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.remove_stopped(**options)

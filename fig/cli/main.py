@@ -71,6 +71,7 @@ class TopLevelCommand(Command):
       --version            Print version and exit
 
     Commands:
+      build     Build or rebuild services
       kill      Kill containers
       logs      View output from containers
       ps        List containers
@@ -85,6 +86,14 @@ class TopLevelCommand(Command):
         options = super(TopLevelCommand, self).docopt_options()
         options['version'] = "fig %s" % __version__
         return options
+
+    def build(self, options):
+        """
+        Build or rebuild services.
+
+        Usage: build [SERVICE...]
+        """
+        self.project.build(service_names=options['SERVICE'])
 
     def kill(self, options):
         """
