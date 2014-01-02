@@ -1,4 +1,7 @@
+import logging
 from .service import Service
+
+log = logging.getLogger(__name__)
 
 def sort_service_dicts(services):
     # Sort in dependency order
