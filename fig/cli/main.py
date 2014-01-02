@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 
 def main():
-    console_handler = logging.StreamHandler()
+    console_handler = logging.StreamHandler(stream=sys.stderr)
     console_handler.setFormatter(logging.Formatter())
     console_handler.setLevel(logging.INFO)
     root_logger = logging.getLogger()
