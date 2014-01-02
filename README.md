@@ -194,6 +194,52 @@ environment:
   RACK_ENV: development
 ```
 
+### Commands
+
+Most commands are run against one or more services. If the service is omitted, it will apply to all services.
+
+#### `build [SERVICE...]`
+
+Build or rebuild services.
+
+Services are built once and then tagged as `project\_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it.
+
+#### `kill [SERVICE...]`
+
+Force stop service containers.
+
+#### `logs [SERVICE...]`
+
+View output from services.
+
+#### `ps`
+
+List running containers.
+
+#### `rm [SERVICE...]`
+
+Remove stopped service containers.
+
+
+#### `run SERVICE COMMAND [ARGS...]`
+
+Run a one-off command for a service.
+
+Note that this will not start any services that the command's service links to. So if, for example, your one-off command talks to your database, you will need to run `fig up -d db` first.
+
+#### `start [SERVICE...]`
+
+Start existing containers for a service.
+
+#### `stop [SERVICE...]`
+
+Stop running containers without removing them. They can be started again with `fig start`.
+
+#### `up [SERVICE...]`
+
+Build, create, start and attach to containers for a service.
+
+
 ### Environment variables
 
 Fig uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
