@@ -101,7 +101,7 @@ class Project(object):
             if service.can_be_built():
                 service.build(**options)
             else:
-                log.info('%s uses an image, skipping')
+                log.info('%s uses an image, skipping' % service.name)
 
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):
