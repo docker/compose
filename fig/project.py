@@ -87,6 +87,13 @@ class Project(object):
             if len(service.containers(stopped=True)) == 0:
                 service.create_container()
 
+    def recreate_containers(self, service_names):
+        """
+        For each service, create or recreate their containers.
+        """
+        for service in self.get_services(service_names):
+            service.recreate_containers()
+
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.start(**options)

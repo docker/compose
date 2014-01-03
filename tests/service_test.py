@@ -102,6 +102,13 @@ class ServiceTest(DockerClientTestCase):
         container = db.create_container(one_off=True)
         self.assertEqual(container.name, 'figtest_db_run_1')
 
+    def test_recreate_containers(self):
+        service = self.create_service('db')
+        container = service.create_container()
+        new_container = service.recreate_containers()[0]
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertNotEqual(container.id, new_container.id)
+
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         db.start_container(environment={'FOO': 'BAR'})
