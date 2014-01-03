@@ -1,4 +1,5 @@
 from docker import Client
+import errno
 import logging
 import os
 import re
@@ -18,7 +19,16 @@ class Command(DocoptCommand):
 
     @cached_property
     def project(self):
-        config = yaml.load(open('fig.yml'))
+        try:
+            config = yaml.load(open('fig.yml'))
+        except IOError, e:
+            if e.errno == errno.ENOENT:
+                log.error("Can't find %s. Are you in the right directory?", e.filename)
+            else:
+                log.error(e)
+
+            exit(1)
+
         return Project.from_config(self.project_name, config, self.client)
 
     @cached_property
