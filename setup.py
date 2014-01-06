@@ -22,6 +22,11 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
+with open('requirements.txt') as f:
+    install_requires = f.read().splitlines()
+
+with open('requirements-dev.txt') as f:
+    tests_require = f.read().splitlines()
 
 setup(
     name='fig',
@@ -33,17 +38,8 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     test_suite='nose.collector',
-    install_requires=[
-        'docker-py==0.2.3',
-        'docopt==0.6.1',
-        'PyYAML==3.10',
-        # unfortunately `docker` requires six ==1.3.0
-        'six==1.3.0',
-    ],
-    tests_require=[
-        'nose==1.3.0',
-        'unittest2==0.5.1'
-    ],
+    install_requires=install_requires,
+    tests_require=tests_require,
     entry_points="""
     [console_scripts]
     fig=fig.cli.main:main
