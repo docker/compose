@@ -67,7 +67,7 @@ class Service(object):
         try:
             return Container.create(self.client, **container_options)
         except APIError as e:
-            if e.response.status_code == 404 and e.explanation and 'No such image' in e.explanation:
+            if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 log.info('Pulling image %s...' % container_options['image'])
                 self.client.pull(container_options['image'])
                 return Container.create(self.client, **container_options)
