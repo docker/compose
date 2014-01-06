@@ -112,7 +112,7 @@ class TopLevelCommand(Command):
         Usage: logs [SERVICE...]
         """
         containers = self.project.containers(service_names=options['SERVICE'], stopped=False)
-        print "Attaching to", list_containers(containers)
+        print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}).run()
 
     def ps(self, options):
@@ -128,7 +128,7 @@ class TopLevelCommand(Command):
 
         if options['-q']:
             for container in containers:
-                print container.id
+                print(container.id)
         else:
             headers = [
                 'Name',
@@ -144,7 +144,7 @@ class TopLevelCommand(Command):
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
-            print Formatter().table(headers, rows)
+            print(Formatter().table(headers, rows))
 
     def rm(self, options):
         """
@@ -156,11 +156,11 @@ class TopLevelCommand(Command):
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
-            print "Going to remove", list_containers(stopped_containers)
+            print("Going to remove", list_containers(stopped_containers))
             if yesno("Are you sure? [yN] ", default=False):
                 self.project.remove_stopped(service_names=options['SERVICE'])
         else:
-            print "No stopped containers"
+            print("No stopped containers")
 
     def run(self, options):
         """
@@ -180,7 +180,7 @@ class TopLevelCommand(Command):
         container = service.create_container(one_off=True, **container_options)
         if options['-d']:
             service.start_container(container, ports=None)
-            print container.name
+            print(container.name)
         else:
             with self._attach_to_container(
                 container.id,
@@ -222,7 +222,7 @@ class TopLevelCommand(Command):
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
         if not detached:
-            print "Attaching to", list_containers(containers)
+            print("Attaching to", list_containers(containers))
             log_printer = LogPrinter(containers)
 
         self.project.start(service_names=options['SERVICE'])
@@ -236,7 +236,7 @@ class TopLevelCommand(Command):
                     sys.exit(0)
                 signal.signal(signal.SIGINT, handler)
 
-                print "Gracefully stopping... (press Ctrl+C again to force)"
+                print("Gracefully stopping... (press Ctrl+C again to force)")
                 self.project.stop(service_names=options['SERVICE'])
 
     def _attach_to_container(self, container_id, interactive, logs=False, stream=True, raw=False):

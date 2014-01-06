@@ -123,7 +123,7 @@ if __name__ == '__main__':
     url = sys.argv[1]
     socket = websocket.create_connection(url)
 
-    print "connected\r"
+    print("connected\r")
 
     with SocketClient(socket, interactive=True) as client:
         client.run()
