@@ -1,3 +1,5 @@
 include LICENSE
 include *.md
-include requirements.txt
+recursive-include tests *
+global-exclude *.pyc
+global-exclode *.pyo

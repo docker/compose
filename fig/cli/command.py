@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 from docker import Client
 import errno
 import logging
@@ -21,7 +23,7 @@ class Command(DocoptCommand):
     def project(self):
         try:
             config = yaml.load(open('fig.yml'))
-        except IOError, e:
+        except IOError as e:
             if e.errno == errno.ENOENT:
                 log.error("Can't find %s. Are you in the right directory?", e.filename)
             else:

@@ -1,4 +1,0 @@
-docker-py==0.2.3
-docopt==0.6.1
-PyYAML==3.10
-texttable==0.8.1

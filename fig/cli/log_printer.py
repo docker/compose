@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 import sys
 
 from itertools import cycle
@@ -41,7 +43,7 @@ class LogPrinter(object):
             'stream': True,
         }
         params.update(self.attach_params)
-        params = dict((name, 1 if value else 0) for (name, value) in params.items())
+        params = dict((name, 1 if value else 0) for (name, value) in list(params.items()))
         return container.attach_socket(params=params, ws=True)
 
 def read_websocket(websocket):

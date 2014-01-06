@@ -1,3 +1,4 @@
+from __future__ import print_function
 # Adapted from https://github.com/benthor/remotty/blob/master/socketclient.py
 
 from select import select
@@ -85,7 +86,7 @@ class SocketClient:
                     stream.flush()
                 else:
                     break
-        except Exception, e:
+        except Exception as e:
             log.debug(e)
 
     def send_ws(self, socket, stream):
@@ -101,7 +102,7 @@ class SocketClient:
                 else:
                     try:
                         socket.send(chunk)
-                    except Exception, e:
+                    except Exception as e:
                         if hasattr(e, 'errno') and e.errno == errno.EPIPE:
                             break
                         else:
@@ -123,7 +124,7 @@ if __name__ == '__main__':
     url = sys.argv[1]
     socket = websocket.create_connection(url)
 
-    print "connected\r"
+    print("connected\r")
 
     with SocketClient(socket, interactive=True) as client:
         client.run()

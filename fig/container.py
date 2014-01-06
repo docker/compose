@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 import logging
 
 log = logging.getLogger(__name__)
@@ -53,7 +55,7 @@ class Container(object):
         if not self.dictionary['NetworkSettings']['Ports']:
             return ''
         ports = []
-        for private, public in self.dictionary['NetworkSettings']['Ports'].items():
+        for private, public in list(self.dictionary['NetworkSettings']['Ports'].items()):
             if public:
                 ports.append('%s->%s' % (public[0]['HostPort'], private))
         return ', '.join(ports)
