@@ -66,6 +66,9 @@ Result:
     ijkl   0.000    5.000e-78   89    0.000
     mnop   0.023    5.000e+78   92    1.280e+22
 """
+from __future__ import division
+from __future__ import print_function
+from functools import reduce
 
 __all__ = ["Texttable", "ArraySizeError"]
 
