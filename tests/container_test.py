@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 from .testcases import DockerClientTestCase
 from fig.container import Container
 

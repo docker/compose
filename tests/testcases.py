@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 from docker import Client
 from fig.service import Service
 from fig.cli.utils import docker_url

@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 from fig import Service
 from .testcases import DockerClientTestCase
 

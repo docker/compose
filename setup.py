@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-from setuptools import setup
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from setuptools import setup, find_packages
 import re
 import os
 import codecs
 
 
-# Borrowed from
-# https://github.com/jezdez/django_compressor/blob/develop/setup.py
 def read(*parts):
-    return codecs.open(os.path.join(os.path.dirname(__file__), *parts)).read()
+    path = os.path.join(os.path.dirname(__file__), *parts)
+    with codecs.open(path, encoding='utf-8') as fobj:
+        return fobj.read()
 
 
 def find_version(*file_paths):
@@ -21,8 +22,6 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
-with open('requirements.txt') as f:
-    install_requires = f.read().splitlines()
 
 setup(
     name='fig',
@@ -31,10 +30,21 @@ setup(
     url='https://github.com/orchardup/fig',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
-    packages=['fig', 'fig.cli'],
-    package_data={},
+    packages=find_packages(),
     include_package_data=True,
-    install_requires=install_requires,
+    test_suite='nose.collector',
+    install_requires=[
+        'docker-py==0.2.3',
+        'docopt==0.6.1',
+        'PyYAML==3.10',
+        'texttable==0.8.1',
+        # unfortunately `docker` requires six ==1.3.0
+        'six==1.3.0',
+    ],
+    tests_require=[
+        'nose==1.3.0',
+        'unittest2==0.5.1'
+    ],
     entry_points="""
     [console_scripts]
     fig=fig.cli.main:main
