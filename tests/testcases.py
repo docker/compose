@@ -1,7 +1,7 @@
 from docker import Client
 from fig.service import Service
 from fig.cli.utils import docker_url
-from unittest import TestCase
+from unittest2 import TestCase
 
 
 class DockerClientTestCase(TestCase):
