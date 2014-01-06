@@ -45,7 +45,7 @@ setup(
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
     packages=find_packages(),
-    tests_require=['nose'],
+    tests_require=['unittest2>=0.5.1', 'nose'],
     include_package_data=True,
     test_suite='nose.collector',
     install_requires=install_requires,
