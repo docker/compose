@@ -38,18 +38,18 @@ def main():
     except KeyboardInterrupt:
         log.error("\nAborting.")
         exit(1)
-    except UserError, e:
+    except UserError as e:
         log.error(e.msg)
         exit(1)
-    except NoSuchService, e:
+    except NoSuchService as e:
         log.error(e.msg)
         exit(1)
-    except NoSuchCommand, e:
+    except NoSuchCommand as e:
         log.error("No such command: %s", e.command)
         log.error("")
         log.error("\n".join(parse_doc_section("commands:", getdoc(e.supercommand))))
         exit(1)
-    except APIError, e:
+    except APIError as e:
         log.error(e.explanation)
         exit(1)
 
