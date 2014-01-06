@@ -37,7 +37,6 @@ setup(
         'docker-py==0.2.3',
         'docopt==0.6.1',
         'PyYAML==3.10',
-        'texttable==0.8.1',
         # unfortunately `docker` requires six ==1.3.0
         'six==1.3.0',
     ],
