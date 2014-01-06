@@ -1,4 +1,4 @@
-Fig
+Fig [![Build Status](https://travis-ci.org/orchardup/fig.png?branch=master)](https://travis-ci.org/orchardup/fig)
 ====
 
 Punctual, lightweight development environments using Docker.
