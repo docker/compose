@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 from docker.client import APIError
 import logging
 import re
@@ -64,7 +66,7 @@ class Service(object):
         container_options = self._get_container_options(override_options, one_off=one_off)
         try:
             return Container.create(self.client, **container_options)
-        except APIError, e:
+        except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in e.explanation:
                 log.info('Pulling image %s...' % container_options['image'])
                 self.client.pull(container_options['image'])
@@ -82,7 +84,7 @@ class Service(object):
 
         if options.get('ports', None) is not None:
             for port in options['ports']:
-                port = unicode(port)
+                port = str(port)
                 if ':' in port:
                     internal_port, external_port = port.split(':', 1)
                     port_bindings[int(internal_port)] = int(external_port)
@@ -107,7 +109,7 @@ class Service(object):
         bits = [self.project, self.name]
         if one_off:
             bits.append('run')
-        return '_'.join(bits + [unicode(self.next_container_number(one_off=one_off))])
+        return '_'.join(bits + [str(self.next_container_number(one_off=one_off))])
 
     def next_container_number(self, one_off=False):
         numbers = [parse_name(c.name)[2] for c in self.containers(stopped=True, one_off=one_off)]
@@ -132,7 +134,7 @@ class Service(object):
         container_options['name'] = self.next_container_name(one_off)
 
         if 'ports' in container_options:
-            container_options['ports'] = [unicode(p).split(':')[0] for p in container_options['ports']]
+            container_options['ports'] = [str(p).split(':')[0] for p in container_options['ports']]
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])

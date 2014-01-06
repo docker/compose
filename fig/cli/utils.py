@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 import datetime
 import os
 import socket
@@ -69,7 +71,7 @@ def prettydate(d):
         return '{0} hours ago'.format(s/3600)
 
 
-def mkdir(path, permissions=0700):
+def mkdir(path, permissions=0o700):
     if not os.path.exists(path):
         os.mkdir(path)
 

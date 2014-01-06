@@ -1,5 +1,8 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 import logging
 from .service import Service
+from .compat import cmp_to_key
 
 log = logging.getLogger(__name__)
 
@@ -13,7 +16,7 @@ def sort_service_dicts(services):
         elif y_deps_x and not x_deps_y:
             return -1
         return 0
-    return sorted(services, cmp=cmp)
+    return sorted(services, key=cmp_to_key(cmp))
 
 class Project(object):
     """
@@ -43,7 +46,7 @@ class Project(object):
     @classmethod
     def from_config(cls, name, config, client):
         dicts = []
-        for service_name, service in config.items():
+        for service_name, service in list(config.items()):
             service['name'] = service_name
             dicts.append(service)
         return cls.from_dicts(name, dicts, client)
