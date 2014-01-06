@@ -5,6 +5,11 @@ python:
   - "3.2"
   - "3.3"
 
+matrix:
+  allow_failures:
+    - python: "3.2"
+    - python: "3.3"
+
 install: script/travis-install
 
 script:
