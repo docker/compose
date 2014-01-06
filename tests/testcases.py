@@ -1,10 +1,10 @@
 from docker import Client
 from fig.service import Service
 from fig.cli.utils import docker_url
-from unittest2 import TestCase
+from . import unittest
 
 
-class DockerClientTestCase(TestCase):
+class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = Client(docker_url())
