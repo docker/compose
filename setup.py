@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-
 from __future__ import unicode_literals
-
 from __future__ import absolute_import
-from setuptools import setup
+from setuptools import setup, find_packages
 import re
 import os
 import codecs
@@ -31,7 +28,8 @@ install_requires = [
     'docopt==0.6.1',
     'PyYAML==3.10',
     'texttable==0.8.1',
-    'six',
+    # unfortunately `docker` requires six ==1.3.0
+    'six==1.3.0',
 ]
 
 
@@ -47,8 +45,7 @@ setup(
     url='https://github.com/orchardup/fig',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
-    packages=['fig', 'fig.cli'],
-    package_data={},
+    packages=find_packages(),
     tests_require=['nose'],
     include_package_data=True,
     test_suite='nose.collector',

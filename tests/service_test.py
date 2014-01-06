@@ -41,8 +41,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(bar.containers()), 2)
 
         names = [c.name for c in bar.containers()]
-        self.assertIn('figtest_bar_1', names)
-        self.assertIn('figtest_bar_2', names)
+        self.assertTrue('figtest_bar_1' in names)
+        self.assertTrue('figtest_bar_2' in names)
 
     def test_containers_one_off(self):
         db = self.create_service('db')
@@ -117,7 +117,7 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web', links=[db])
         db.start_container()
         web.start_container()
-        self.assertIn('figtest_db_1', web.containers()[0].links())
+        self.assertTrue('figtest_db_1' in web.containers()[0].links())
         db.stop(timeout=1)
         web.stop(timeout=1)
 
@@ -130,7 +130,7 @@ class ServiceTest(DockerClientTestCase):
         )
         container = service.start_container()
         container.wait()
-        self.assertIn('success', container.logs())
+        self.assertTrue('success' in container.logs())
         self.assertEqual(len(self.client.images(name='figtest_test')), 1)
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
@@ -143,18 +143,18 @@ class ServiceTest(DockerClientTestCase):
         )
         container = service.start_container()
         container.wait()
-        self.assertIn('success', container.logs())
+        self.assertTrue('success' in container.logs())
 
     def test_start_container_creates_ports(self):
         service = self.create_service('web', ports=[8000])
         container = service.start_container().inspect()
-        self.assertIn('8000/tcp', container['HostConfig']['PortBindings'])
+        self.assertTrue('8000/tcp' in container['HostConfig']['PortBindings'])
         self.assertNotEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
 
     def test_start_container_creates_fixed_external_ports(self):
         service = self.create_service('web', ports=['8000:8000'])
         container = service.start_container().inspect()
-        self.assertIn('8000/tcp', container['HostConfig']['PortBindings'])
+        self.assertTrue('8000/tcp' in container['HostConfig']['PortBindings'])
         self.assertEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
 
 
