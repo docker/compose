@@ -85,7 +85,7 @@ class SocketClient:
                     stream.flush()
                 else:
                     break
-        except Exception, e:
+        except Exception as e:
             log.debug(e)
 
     def send_ws(self, socket, stream):
@@ -101,7 +101,7 @@ class SocketClient:
                 else:
                     try:
                         socket.send(chunk)
-                    except Exception, e:
+                    except Exception as e:
                         if hasattr(e, 'errno') and e.errno == errno.EPIPE:
                             break
                         else:
