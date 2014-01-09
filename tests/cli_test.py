@@ -10,3 +10,6 @@ class CLITestCase(unittest.TestCase):
 
     def test_help(self):
         self.assertRaises(SystemExit, lambda: self.command.dispatch(['-h'], None))
+
+    def test_ps(self):
+        self.command.dispatch(['ps'], None)
