@@ -55,10 +55,15 @@ def read_websocket(websocket):
             break
 
 def split_buffer(reader, separator):
+    """
+    Given a generator which yields strings and a separator string,
+    joins all input, splits on the separator and yields each chunk.
+    Requires that each input string is decodable as UTF-8.
+    """
     buffered = ''
 
     for data in reader:
-        lines = (buffered + data).split(separator)
+        lines = (buffered + data.decode('utf-8')).split(separator)
         for line in lines[:-1]:
             yield line + separator
         if len(lines) > 1:
