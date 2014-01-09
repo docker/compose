@@ -15,6 +15,8 @@ from .utils import cached_property, docker_url
 log = logging.getLogger(__name__)
 
 class Command(DocoptCommand):
+    base_dir = '.'
+
     @cached_property
     def client(self):
         return Client(docker_url())
@@ -22,10 +24,11 @@ class Command(DocoptCommand):
     @cached_property
     def project(self):
         try:
-            config = yaml.load(open('fig.yml'))
+            yaml_path = os.path.join(self.base_dir, 'fig.yml')
+            config = yaml.load(open(yaml_path))
         except IOError as e:
             if e.errno == errno.ENOENT:
-                log.error("Can't find %s. Are you in the right directory?", e.filename)
+                log.error("Can't find %s. Are you in the right directory?", os.path.basename(e.filename))
             else:
                 log.error(e)
 
