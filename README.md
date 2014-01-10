@@ -18,13 +18,7 @@ db:
 
 Then type `fig up`, and Fig will start and run your entire app:
 
-    $ fig up
-    Pulling image orchardup/postgresql...
-    Building web...
-    Starting example_db_1...
-    Starting example_web_1...
-    example_db_1 | 2014-01-02 14:47:18 UTC LOG:  database system is ready to accept connections
-    example_web_1 |  * Running on http://0.0.0.0:5000/
+![example fig run](https://orchardup.com/static/images/fig-example.5807d0d2dbe6.gif)
 
 There are commands to:
 
