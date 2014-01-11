@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Exit on first error
-set -e
+set -ex
 
 export PYTHON_EGG_CACHE="/tmp/.python-eggs"
 
