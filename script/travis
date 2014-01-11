@@ -3,6 +3,8 @@
 # Exit on first error
 set -e
 
+export PYTHON_EGG_CACHE="/tmp/.python-eggs"
+
 TRAVIS_PYTHON_VERSION=$1
 source /home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/activate
 env
