@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import logging
 from .service import Service
-from .compat import cmp_to_key
+from .compat.functools import cmp_to_key
 
 log = logging.getLogger(__name__)
 
