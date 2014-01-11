@@ -7,7 +7,7 @@ sudo sh -c "echo deb http://get.docker.io/ubuntu docker main > /etc/apt/sources.
 sudo apt-get update
 echo exit 101 | sudo tee /usr/sbin/policy-rc.d
 sudo chmod +x /usr/sbin/policy-rc.d
-sudo apt-get install -qy slirp lxc lxc-docker=0.7.3
+sudo apt-get install -qy slirp lxc lxc-docker-0.7.4
 git clone git://github.com/jpetazzo/sekexe
 python setup.py install
 pip install -r requirements-dev.txt
