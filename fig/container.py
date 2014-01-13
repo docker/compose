@@ -122,6 +122,9 @@ class Container(object):
                     links.append(bits[2])
         return links
 
+    def attach(self, *args, **kwargs):
+        return self.client.attach(self.id, *args, **kwargs)
+
     def attach_socket(self, **kwargs):
         return self.client.attach_socket(self.id, **kwargs)
 

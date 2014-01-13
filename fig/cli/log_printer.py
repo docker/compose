@@ -31,28 +31,18 @@ class LogPrinter(object):
 
     def _make_log_generator(self, container, color_fn):
         prefix = color_fn(container.name + " | ")
-        websocket = self._attach(container)
-        return (prefix + line for line in split_buffer(read_websocket(websocket), '\n'))
+        for line in split_buffer(self._attach(container), '\n'):
+            yield prefix + line
 
     def _attach(self, container):
         params = {
-            'stdin': False,
             'stdout': True,
             'stderr': True,
-            'logs': False,
             'stream': True,
         }
         params.update(self.attach_params)
         params = dict((name, 1 if value else 0) for (name, value) in list(params.items()))
-        return container.attach_socket(params=params, ws=True)
-
-def read_websocket(websocket):
-    while True:
-        data = websocket.recv()
-        if data:
-            yield data
-        else:
-            break
+        return container.attach(**params)
 
 def split_buffer(reader, separator):
     """
