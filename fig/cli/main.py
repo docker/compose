@@ -113,7 +113,7 @@ class TopLevelCommand(Command):
 
         Usage: logs [SERVICE...]
         """
-        containers = self.project.containers(service_names=options['SERVICE'], stopped=False)
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}).run()
 
