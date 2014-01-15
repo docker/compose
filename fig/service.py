@@ -80,7 +80,7 @@ class Service(object):
         """
         old_containers = self.containers(stopped=True)
         if len(old_containers) == 0:
-            return [self.create_container(**override_options)]
+            return ([], [self.create_container(**override_options)])
         else:
             new_containers = []
             for old_container in old_containers:

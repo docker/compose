@@ -79,20 +79,22 @@ class Project(object):
             unsorted = [self.get_service(name) for name in service_names]
             return [s for s in self.services if s in unsorted]
 
-    def create_containers(self, service_names=None):
-        """
-        For each service, creates a container if there are none.
-        """
-        for service in self.get_services(service_names):
-            if len(service.containers(stopped=True)) == 0:
-                service.create_container()
-
-    def recreate_containers(self, service_names):
+    def recreate_containers(self, service_names=None):
         """
         For each service, create or recreate their containers.
+        Returns a tuple with two lists. The first is a list of
+        (service, old_container) tuples; the second is a list
+        of (service, new_container) tuples.
         """
+        old = []
+        new = []
+
         for service in self.get_services(service_names):
-            service.recreate_containers()
+            (s_old, s_new) = service.recreate_containers()
+            old += [(service, container) for container in s_old]
+            new += [(service, container) for container in s_new]
+
+        return (old, new)
 
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
