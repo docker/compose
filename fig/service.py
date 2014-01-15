@@ -97,10 +97,21 @@ class Service(object):
         if container.is_running:
             container.stop(timeout=1)
 
-        options = dict(override_options)
-        options['volumes_from'] = container.id
+        intermediate_container = Container.create(
+            self.client,
+            image='ubuntu',
+            command='echo',
+            volumes_from=container.id,
+        )
+        intermediate_container.start()
+        intermediate_container.wait()
+        container.remove()
 
-        return (container, self.create_container(**options))
+        options = dict(override_options)
+        options['volumes_from'] = intermediate_container.id
+        new_container = self.create_container(**options)
+
+        return (intermediate_container, new_container)
 
     def start_container(self, container=None, **override_options):
         if container is None:
