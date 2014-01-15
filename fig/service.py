@@ -85,7 +85,7 @@ class Service(object):
             new_containers = []
             for old_container in old_containers:
                 if old_container.is_running:
-                    old_container.stop()
+                    old_container.stop(timeout=1)
                 options = dict(override_options)
                 options['volumes_from'] = old_container.id
                 new_containers.append(self.create_container(**options))
