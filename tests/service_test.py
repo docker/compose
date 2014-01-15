@@ -103,9 +103,14 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.name, 'figtest_db_run_1')
 
     def test_recreate_containers(self):
-        service = self.create_service('db')
+        service = self.create_service('db', environment={'FOO': '1'})
         container = service.create_container()
+        self.assertEqual(container.dictionary['Config']['Env'], ['FOO=1'])
+
+        service.options['environment']['FOO'] = '2'
         new_container = service.recreate_containers()[0]
+        self.assertEqual(new_container.dictionary['Config']['Env'], ['FOO=2'])
+
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertNotEqual(container.id, new_container.id)
 
