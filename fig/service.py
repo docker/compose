@@ -43,19 +43,23 @@ class Service(object):
     def start(self, **options):
         for c in self.containers(stopped=True):
             if not c.is_running:
+                log.info("Starting %s..." % c.name)
                 self.start_container(c, **options)
 
     def stop(self, **options):
         for c in self.containers():
+            log.info("Stopping %s..." % c.name)
             c.stop(**options)
 
     def kill(self, **options):
         for c in self.containers():
+            log.info("Killing %s..." % c.name)
             c.kill(**options)
 
     def remove_stopped(self, **options):
         for c in self.containers(stopped=True):
             if not c.is_running:
+                log.info("Removing %s..." % c.name)
                 c.remove(**options)
 
     def create_container(self, one_off=False, **override_options):
@@ -81,12 +85,14 @@ class Service(object):
         containers = self.containers(stopped=True)
 
         if len(containers) == 0:
+            log.info("Creating %s..." % self.next_container_name())
             return ([], [self.create_container(**override_options)])
         else:
             old_containers = []
             new_containers = []
 
             for c in containers:
+                log.info("Recreating %s..." % c.name)
                 (old_container, new_container) = self.recreate_container(c, **override_options)
                 old_containers.append(old_container)
                 new_containers.append(new_container)
