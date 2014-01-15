@@ -76,21 +76,20 @@ class Service(object):
     def recreate_containers(self, **override_options):
         """
         If a container for this service doesn't exist, create one. If there are
-        any, stop, remove and recreate them.
+        any, stop them and create new ones. Does not remove the old containers.
         """
-        containers = self.containers(stopped=True)
-        if len(containers) == 0:
+        old_containers = self.containers(stopped=True)
+        if len(old_containers) == 0:
             return [self.create_container(**override_options)]
         else:
             new_containers = []
-            for old_container in containers:
+            for old_container in old_containers:
                 if old_container.is_running:
                     old_container.stop()
                 options = dict(override_options)
                 options['volumes_from'] = old_container.id
                 new_containers.append(self.create_container(**options))
-                old_container.remove()
-            return new_containers
+            return (old_containers, new_containers)
 
     def start_container(self, container=None, **override_options):
         if container is None:
