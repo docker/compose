@@ -102,6 +102,12 @@ class ServiceTest(DockerClientTestCase):
         container = db.create_container(one_off=True)
         self.assertEqual(container.name, 'figtest_db_run_1')
 
+    def test_create_container_with_unspecified_volume(self):
+        service = self.create_service('db', volumes=['/var/db'])
+        container = service.create_container()
+        service.start_container(container)
+        self.assertIn('/var/db', container.inspect()['Volumes'])
+
     def test_recreate_containers(self):
         service = self.create_service('db', environment={'FOO': '1'})
         container = service.create_container()

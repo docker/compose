@@ -114,8 +114,9 @@ class Service(object):
 
         if options.get('volumes', None) is not None:
             for volume in options['volumes']:
-                external_dir, internal_dir = volume.split(':')
-                volume_bindings[os.path.abspath(external_dir)] = internal_dir
+                if ':' in volume:
+                    external_dir, internal_dir = volume.split(':')
+                    volume_bindings[os.path.abspath(external_dir)] = internal_dir
 
         container.start(
             links=self._get_links(),
@@ -162,7 +163,7 @@ class Service(object):
             container_options['ports'] = ports
 
         if 'volumes' in container_options:
-            container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])
+            container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -233,3 +234,14 @@ def get_container_name(container):
     for name in container['Names']:
         if len(name.split('/')) == 2:
             return name[1:]
+
+
+def split_volume(v):
+    """
+    If v is of the format EXTERNAL:INTERNAL, returns (EXTERNAL, INTERNAL).
+    If v is of the format INTERNAL, returns (None, INTERNAL).
+    """
+    if ':' in v:
+        return v.split(':', 1)
+    else:
+        return (None, v)
