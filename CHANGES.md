@@ -6,7 +6,7 @@ Change log
 
  - Containers are recreated on each `fig up`, ensuring config is up-to-date with `fig.yml` (#2)
  - Add `fig scale` command (#9)
- - Use DOCKER_HOST environment variable to find Docker daemon (#19)
+ - Use `DOCKER_HOST` environment variable to find Docker daemon, for consistency with the official Docker client (was previously `DOCKER_URL`) (#19)
  - Truncate long commands in `fig ps` (#18)
  - Fill out CLI help banners for commands (#15, #16)
  - Show a friendlier error when `fig.yml` is missing (#4)
