@@ -10,6 +10,7 @@ from inspect import getdoc
 
 from .. import __version__
 from ..project import NoSuchService
+from ..service import CannotBeScaledError
 from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
@@ -82,6 +83,7 @@ class TopLevelCommand(Command):
       ps        List containers
       rm        Remove stopped containers
       run       Run a one-off command
+      scale     Set number of containers for a service
       start     Start services
       stop      Stop services
       up        Create and start containers
@@ -219,6 +221,31 @@ class TopLevelCommand(Command):
             ) as c:
                 service.start_container(container, ports=None)
                 c.run()
+
+    def scale(self, options):
+        """
+        Set number of containers to run for a service.
+
+        Numbers are specified in the form `service=num` as arguments.
+        For example:
+
+            $ fig scale web=2 worker=3
+
+        Usage: scale [SERVICE=NUM...]
+        """
+        for s in options['SERVICE=NUM']:
+            if '=' not in s:
+                raise UserError('Arguments to scale should be in the form service=num')
+            service_name, num = s.split('=', 1)
+            try:
+                num = int(num)
+            except ValueError:
+                raise UserError('Number of containers for service "%s" is not a number' % service)
+            try:
+                self.project.get_service(service_name).scale(num)
+            except CannotBeScaledError:
+                raise UserError('Service "%s" cannot be scaled because it specifies a port on the host. If multiple containers for this service were created, the port would clash.\n\nRemove the ":" from the port definition in fig.yml so Docker can choose a random port for each container.' % service_name)
+
 
     def start(self, options):
         """
