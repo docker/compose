@@ -200,7 +200,7 @@ Run `fig [COMMAND] --help` for full usage.
 
 Build or rebuild services.
 
-Services are built once and then tagged as `project_service`. If you change a service's `Dockerfile` or its configuration in `fig.yml`, you will probably need to run `fig build` to rebuild it, then run `fig rm` to make `fig up` recreate your containers.
+Services are built once and then tagged as `project_service`, e.g. `figtest_db`. If you change a service's `Dockerfile` or the contents of its build directory, you can run `fig build` to rebuild it.
 
 #### kill
 
@@ -237,9 +237,11 @@ Stop running containers without removing them. They can be started again with `f
 
 #### up
 
-Build, create, start and attach to containers for a service. 
+Build, (re)create, start and attach to containers for a service.
 
-If there are stopped containers for a service, `fig up` will start those again instead of creating new containers. When it exits, the containers it started will be stopped. This means if you want to recreate containers, you will need to explicitly run `fig rm`.
+By default, `fig up` will aggregate the output of each container, and when it exits, all containers will be stopped. If you run `fig up -d`, it'll start the containers in the background and leave them running.
+
+If there are existing containers for a service, `fig up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `fig.yml` are picked up.
 
 ### Environment variables
 
@@ -265,3 +267,4 @@ Fully qualified container name, e.g. `MYAPP_DB_1_NAME=/myapp_web_1/myapp_db_1`
 
 
 [Docker links]: http://docs.docker.io/en/latest/use/port_redirection/#linking-a-container
+[volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/

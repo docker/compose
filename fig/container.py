@@ -1,8 +1,5 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import logging
-
-log = logging.getLogger(__name__)
 
 class Container(object):
     """
@@ -91,19 +88,15 @@ class Container(object):
         return self.dictionary['State']['Running']
 
     def start(self, **options):
-        log.info("Starting %s..." % self.name)
         return self.client.start(self.id, **options)
 
     def stop(self, **options):
-        log.info("Stopping %s..." % self.name)
         return self.client.stop(self.id, **options)
 
     def kill(self):
-        log.info("Killing %s..." % self.name)
         return self.client.kill(self.id)
 
     def remove(self):
-        log.info("Removing %s..." % self.name)
         return self.client.remove_container(self.id)
 
     def inspect_if_not_inspected(self):

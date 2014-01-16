@@ -220,14 +220,18 @@ class TopLevelCommand(Command):
         """
         detached = options['-d']
 
-        self.project.create_containers(service_names=options['SERVICE'])
-        containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        (old, new) = self.project.recreate_containers(service_names=options['SERVICE'])
 
         if not detached:
-            print("Attaching to", list_containers(containers))
-            log_printer = LogPrinter(containers)
+            to_attach = [c for (s, c) in new]
+            print("Attaching to", list_containers(to_attach))
+            log_printer = LogPrinter(to_attach)
 
-        self.project.start(service_names=options['SERVICE'])
+        for (service, container) in new:
+            service.start_container(container)
+
+        for (service, container) in old:
+            container.remove()
 
         if not detached:
             try:

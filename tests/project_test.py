@@ -42,16 +42,22 @@ class ProjectTest(DockerClientTestCase):
         project = Project('test', [web], self.client)
         self.assertEqual(project.get_service('web'), web)
 
-    def test_create_containers(self):
+    def test_recreate_containers(self):
         web = self.create_service('web')
         db = self.create_service('db')
         project = Project('test', [web, db], self.client)
 
-        project.create_containers(service_names=['web'])
+        old_web_container = web.create_container()
         self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 0)
 
-        project.create_containers()
+        (old, new) = project.recreate_containers()
+        self.assertEqual(len(old), 1)
+        self.assertEqual(old[0][0], web)
+        self.assertEqual(len(new), 2)
+        self.assertEqual(new[0][0], web)
+        self.assertEqual(new[1][0], db)
+
         self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 1)
 

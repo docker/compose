@@ -43,19 +43,23 @@ class Service(object):
     def start(self, **options):
         for c in self.containers(stopped=True):
             if not c.is_running:
+                log.info("Starting %s..." % c.name)
                 self.start_container(c, **options)
 
     def stop(self, **options):
         for c in self.containers():
+            log.info("Stopping %s..." % c.name)
             c.stop(**options)
 
     def kill(self, **options):
         for c in self.containers():
+            log.info("Killing %s..." % c.name)
             c.kill(**options)
 
     def remove_stopped(self, **options):
         for c in self.containers(stopped=True):
             if not c.is_running:
+                log.info("Removing %s..." % c.name)
                 c.remove(**options)
 
     def create_container(self, one_off=False, **override_options):
@@ -72,6 +76,48 @@ class Service(object):
                 self.client.pull(container_options['image'])
                 return Container.create(self.client, **container_options)
             raise
+
+    def recreate_containers(self, **override_options):
+        """
+        If a container for this service doesn't exist, create one. If there are
+        any, stop them and create new ones. Does not remove the old containers.
+        """
+        containers = self.containers(stopped=True)
+
+        if len(containers) == 0:
+            log.info("Creating %s..." % self.next_container_name())
+            return ([], [self.create_container(**override_options)])
+        else:
+            old_containers = []
+            new_containers = []
+
+            for c in containers:
+                log.info("Recreating %s..." % c.name)
+                (old_container, new_container) = self.recreate_container(c, **override_options)
+                old_containers.append(old_container)
+                new_containers.append(new_container)
+
+            return (old_containers, new_containers)
+
+    def recreate_container(self, container, **override_options):
+        if container.is_running:
+            container.stop(timeout=1)
+
+        intermediate_container = Container.create(
+            self.client,
+            image='ubuntu',
+            command='echo',
+            volumes_from=container.id,
+        )
+        intermediate_container.start()
+        intermediate_container.wait()
+        container.remove()
+
+        options = dict(override_options)
+        options['volumes_from'] = intermediate_container.id
+        new_container = self.create_container(**options)
+
+        return (intermediate_container, new_container)
 
     def start_container(self, container=None, **override_options):
         if container is None:
@@ -95,8 +141,9 @@ class Service(object):
 
         if options.get('volumes', None) is not None:
             for volume in options['volumes']:
-                external_dir, internal_dir = volume.split(':')
-                volume_bindings[os.path.abspath(external_dir)] = internal_dir
+                if ':' in volume:
+                    external_dir, internal_dir = volume.split(':')
+                    volume_bindings[os.path.abspath(external_dir)] = internal_dir
 
         container.start(
             links=self._get_links(),
@@ -143,7 +190,7 @@ class Service(object):
             container_options['ports'] = ports
 
         if 'volumes' in container_options:
-            container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])
+            container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -214,3 +261,14 @@ def get_container_name(container):
     for name in container['Names']:
         if len(name.split('/')) == 2:
             return name[1:]
+
+
+def split_volume(v):
+    """
+    If v is of the format EXTERNAL:INTERNAL, returns (EXTERNAL, INTERNAL).
+    If v is of the format INTERNAL, returns (None, INTERNAL).
+    """
+    if ':' in v:
+        return v.split(':', 1)
+    else:
+        return (None, v)

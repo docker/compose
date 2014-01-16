@@ -102,6 +102,36 @@ class ServiceTest(DockerClientTestCase):
         container = db.create_container(one_off=True)
         self.assertEqual(container.name, 'figtest_db_run_1')
 
+    def test_create_container_with_unspecified_volume(self):
+        service = self.create_service('db', volumes=['/var/db'])
+        container = service.create_container()
+        service.start_container(container)
+        self.assertIn('/var/db', container.inspect()['Volumes'])
+
+    def test_recreate_containers(self):
+        service = self.create_service('db', environment={'FOO': '1'}, volumes=['/var/db'])
+        old_container = service.create_container()
+        self.assertEqual(old_container.dictionary['Config']['Env'], ['FOO=1'])
+        self.assertEqual(old_container.name, 'figtest_db_1')
+        service.start_container(old_container)
+        volume_path = old_container.inspect()['Volumes']['/var/db']
+
+        num_containers_before = len(self.client.containers(all=True))
+
+        service.options['environment']['FOO'] = '2'
+        (old, new) = service.recreate_containers()
+        self.assertEqual(len(old), 1)
+        self.assertEqual(len(new), 1)
+
+        new_container = new[0]
+        self.assertEqual(new_container.dictionary['Config']['Env'], ['FOO=2'])
+        self.assertEqual(new_container.name, 'figtest_db_1')
+        service.start_container(new_container)
+        self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
+
+        self.assertEqual(len(self.client.containers(all=True)), num_containers_before + 1)
+        self.assertNotEqual(old_container.id, new_container.id)
+
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         db.start_container(environment={'FOO': 'BAR'})
