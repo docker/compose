@@ -13,3 +13,11 @@ script:
 - pwd
 - env
 - sekexe/run "`pwd`/script/travis $TRAVIS_PYTHON_VERSION"
+deploy:
+  provider: pypi
+  user: orchard
+  password:
+    secure: M8UMupCLSsB1hV00Zn6ra8Vg81SCFBpbcRsa0nUw9kgXn9hOCESWYVHTqQ1ksWZOa8z6WMaqYtoosPKXGJQNf0wF/kEVDsMUeaZWOF/PqDkx1EwQ1diVfwlbN4/k0iX+Se7SrZfiWnJiAqiIPqToQipvLlJohqf8WwfPcVvILVE=
+  on:
+    tags: true
+    repo: orchardup/fig
