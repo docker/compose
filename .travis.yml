@@ -1,19 +1,15 @@
 language: python
 python:
-  - "2.6"
-  - "2.7"
-  - "3.2"
-  - "3.3"
-
+- '2.6'
+- '2.7'
+- '3.2'
+- '3.3'
 matrix:
   allow_failures:
-    - python: "3.2"
-    - python: "3.3"
-
+  - python: '3.2'
+  - python: '3.3'
 install: script/travis-install
-
 script:
- - pwd
- - env
- - sekexe/run "`pwd`/script/travis $TRAVIS_PYTHON_VERSION"
-
+- pwd
+- env
+- sekexe/run "`pwd`/script/travis $TRAVIS_PYTHON_VERSION"
