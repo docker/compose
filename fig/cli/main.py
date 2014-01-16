@@ -95,13 +95,17 @@ class TopLevelCommand(Command):
         """
         Build or rebuild services.
 
+        Services are built once and then tagged as `project_service`,
+        e.g. `figtest_db`. If you change a service's `Dockerfile` or the
+        contents of its build directory, you can run `fig build` to rebuild it.
+
         Usage: build [SERVICE...]
         """
         self.project.build(service_names=options['SERVICE'])
 
     def kill(self, options):
         """
-        Kill containers.
+        Force stop service containers.
 
         Usage: kill [SERVICE...]
         """
@@ -150,7 +154,7 @@ class TopLevelCommand(Command):
 
     def rm(self, options):
         """
-        Remove stopped containers
+        Remove stopped service containers.
 
         Usage: rm [SERVICE...]
         """
@@ -166,7 +170,15 @@ class TopLevelCommand(Command):
 
     def run(self, options):
         """
-        Run a one-off command.
+        Run a one-off command on a service.
+
+        For example:
+
+            $ fig run web python manage.py shell
+
+        Note that this will not start any services that the command's service
+        links to. So if, for example, your one-off command talks to your
+        database, you will need to run `fig up -d db` first.
 
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
@@ -203,7 +215,9 @@ class TopLevelCommand(Command):
 
     def stop(self, options):
         """
-        Stop running containers.
+        Stop running containers without removing them.
+
+        They can be started again with `fig start`.
 
         Usage: stop [SERVICE...]
         """
@@ -211,12 +225,21 @@ class TopLevelCommand(Command):
 
     def up(self, options):
         """
-        Create and start containers.
+        Build, (re)create, start and attach to containers for a service.
+
+        By default, `fig up` will aggregate the output of each container, and
+        when it exits, all containers will be stopped. If you run `fig up -d`,
+        it'll start the containers in the background and leave them running.
+
+        If there are existing containers for a service, `fig up` will stop
+        and recreate them (preserving mounted volumes with volumes-from),
+        so that changes in `fig.yml` are picked up.
 
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d    Detached mode: Run containers in the background, print new container names
+            -d    Detached mode: Run containers in the background, print new
+                  container names
         """
         detached = options['-d']
 
