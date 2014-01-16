@@ -47,9 +47,9 @@ Docker has guides for [Ubuntu](http://docs.docker.io/en/latest/installation/ubun
 
 Next, install Fig:
 
-    $ sudo pip install fig
+    $ sudo pip install -U fig
 
-(If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`.)
+(If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`. This command also upgrades Fig when we release a new version.)
 
 You'll want to make a directory for the project:
 
