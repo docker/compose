@@ -93,9 +93,6 @@ def docker_url():
     tcp_host = '127.0.0.1'
     tcp_port = 4243
 
-    if os.path.exists(socket_path):
-        return 'unix://%s' % socket_path
-
     for host, port in tcp_hosts:
         try:
             s = socket.create_connection((host, port), timeout=1)
@@ -103,6 +100,9 @@ def docker_url():
             return 'http://%s:%s' % (host, port)
         except:
             pass
+
+    if os.path.exists(socket_path):
+        return 'unix://%s' % socket_path
 
     raise UserError("""
 Couldn't find Docker daemon - tried:
