@@ -3,3 +3,4 @@ include *.md
 recursive-include tests *
 global-exclude *.pyc
 global-exclode *.pyo
+global-exclode *.un~
