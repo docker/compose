@@ -233,6 +233,15 @@ For example:
 
 Note that this will not start any services that the command's service links to. So if, for example, your one-off command talks to your database, you will need to run `fig up -d db` first.
 
+#### scale
+
+Set number of containers to run for a service.
+
+Numbers are specified in the form `service=num` as arguments.
+For example:
+
+    $ fig scale web=2 worker=3
+
 #### start
 
 Start existing containers for a service.

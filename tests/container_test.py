@@ -35,3 +35,17 @@ class ContainerTest(DockerClientTestCase):
             'FOO': 'BAR',
             'BAZ': 'DOGE',
         })
+
+    def test_number(self):
+        container = Container.from_ps(self.client, {
+            "Id":"abc",
+            "Image":"ubuntu:12.04",
+            "Command":"sleep 300",
+            "Created":1387384730,
+            "Status":"Up 8 seconds",
+            "Ports":None,
+            "SizeRw":0,
+            "SizeRootFs":0,
+            "Names":["/db_1"]
+        }, has_been_inspected=True)
+        self.assertEqual(container.number, 1)

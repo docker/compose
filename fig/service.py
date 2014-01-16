@@ -14,6 +14,10 @@ class BuildError(Exception):
     pass
 
 
+class CannotBeScaledError(Exception):
+    pass
+
+
 class Service(object):
     def __init__(self, name, client=None, project='default', links=[], **options):
         if not re.match('^[a-zA-Z0-9]+$', name):
@@ -55,6 +59,40 @@ class Service(object):
         for c in self.containers():
             log.info("Killing %s..." % c.name)
             c.kill(**options)
+
+    def scale(self, desired_num):
+        if not self.can_be_scaled():
+            raise CannotBeScaledError()
+
+        # Create enough containers
+        containers = self.containers(stopped=True)
+        while len(containers) < desired_num:
+            containers.append(self.create_container())
+
+        running_containers = []
+        stopped_containers = []
+        for c in containers:
+            if c.is_running:
+                running_containers.append(c)
+            else:
+                stopped_containers.append(c)
+        running_containers.sort(key=lambda c: c.number)
+        stopped_containers.sort(key=lambda c: c.number)
+
+        # Stop containers
+        while len(running_containers) > desired_num:
+            c = running_containers.pop()
+            log.info("Stopping %s..." % c.name)
+            c.stop(timeout=1)
+            stopped_containers.append(c)
+
+        # Start containers
+        while len(running_containers) < desired_num:
+            c = stopped_containers.pop(0)
+            log.info("Starting %s..." % c.name)
+            c.start()
+            running_containers.append(c)
+
 
     def remove_stopped(self, **options):
         for c in self.containers(stopped=True):
@@ -230,6 +268,12 @@ class Service(object):
         The tag to give to images built for this service.
         """
         return '%s_%s' % (self.project, self.name)
+
+    def can_be_scaled(self):
+        for port in self.options.get('ports', []):
+            if ':' in str(port):
+                return False
+        return True
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')

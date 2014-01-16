@@ -47,6 +47,13 @@ class Container(object):
         return self.dictionary['Name'][1:]
 
     @property
+    def number(self):
+        try:
+            return int(self.name.split('_')[-1])
+        except ValueError:
+            return None
+
+    @property
     def human_readable_ports(self):
         self.inspect_if_not_inspected()
         if not self.dictionary['NetworkSettings']['Ports']:
