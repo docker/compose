@@ -49,7 +49,7 @@ Next, install Fig:
 
     $ sudo pip install -U fig
 
-(If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`. This command also upgrades Fig when we release a new version.)
+(This command also upgrades Fig when we release a new version. If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`.)
 
 You'll want to make a directory for the project:
 
