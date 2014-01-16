@@ -76,6 +76,7 @@ class TopLevelCommand(Command):
 
     Commands:
       build     Build or rebuild services
+      help      Get help on a command
       kill      Kill containers
       logs      View output from containers
       ps        List containers
@@ -102,6 +103,17 @@ class TopLevelCommand(Command):
         Usage: build [SERVICE...]
         """
         self.project.build(service_names=options['SERVICE'])
+
+    def help(self, options):
+        """
+        Get help on a command.
+
+        Usage: help COMMAND
+        """
+        command = options['COMMAND']
+        if not hasattr(self, command):
+            raise NoSuchCommand(command, self)
+        raise SystemExit(getdoc(getattr(self, command)))
 
     def kill(self, options):
         """

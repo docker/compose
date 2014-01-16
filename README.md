@@ -202,6 +202,10 @@ Build or rebuild services.
 
 Services are built once and then tagged as `project_service`, e.g. `figtest_db`. If you change a service's `Dockerfile` or the contents of its build directory, you can run `fig build` to rebuild it.
 
+#### help
+
+Get help on a command.
+
 #### kill
 
 Force stop service containers.
