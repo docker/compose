@@ -52,12 +52,13 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(db.containers(stopped=True)), 0)
 
         (old, new) = project.recreate_containers()
-        self.assertEqual(old, [(web, old_web_container)])
+        self.assertEqual(len(old), 1)
+        self.assertEqual(old[0][0], web)
         self.assertEqual(len(new), 2)
         self.assertEqual(new[0][0], web)
         self.assertEqual(new[1][0], db)
 
-        self.assertEqual(len(web.containers(stopped=True)), 2)
+        self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 1)
 
     def test_start_stop_kill_remove(self):
