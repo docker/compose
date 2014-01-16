@@ -212,7 +212,7 @@ View output from services.
 
 #### ps
 
-List running containers.
+List containers.
 
 #### rm
 
@@ -221,7 +221,9 @@ Remove stopped service containers.
 
 #### run
 
-Run a one-off command for a service. E.g.:
+Run a one-off command on a service.
+
+For example:
 
     $ fig run web python manage.py shell
 
