@@ -1,4 +1,8 @@
+include Dockerfile
 include LICENSE
+include requirements.txt
+include requirements-dev.txt
+tox.ini
 include *.md
 recursive-include tests *
 global-exclude *.pyc
