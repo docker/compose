@@ -1,19 +1,23 @@
 language: python
 python:
-  - "2.6"
-  - "2.7"
-  - "3.2"
-  - "3.3"
-
+- '2.6'
+- '2.7'
+- '3.2'
+- '3.3'
 matrix:
   allow_failures:
-    - python: "3.2"
-    - python: "3.3"
-
+  - python: '3.2'
+  - python: '3.3'
 install: script/travis-install
-
 script:
- - pwd
- - env
- - sekexe/run "`pwd`/script/travis $TRAVIS_PYTHON_VERSION"
-
+- pwd
+- env
+- sekexe/run "`pwd`/script/travis $TRAVIS_PYTHON_VERSION"
+deploy:
+  provider: pypi
+  user: orchard
+  password:
+    secure: M8UMupCLSsB1hV00Zn6ra8Vg81SCFBpbcRsa0nUw9kgXn9hOCESWYVHTqQ1ksWZOa8z6WMaqYtoosPKXGJQNf0wF/kEVDsMUeaZWOF/PqDkx1EwQ1diVfwlbN4/k0iX+Se7SrZfiWnJiAqiIPqToQipvLlJohqf8WwfPcVvILVE=
+  on:
+    tags: true
+    repo: orchardup/fig
