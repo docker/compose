@@ -143,7 +143,7 @@ If you want to run your services in the background, you can pass the `-d` flag t
 
 See `fig --help` other commands that are available.
 
-You'll probably want to stop your services when you've finished with them:
+If you started Fig with `fig up -d`, you'll probably want to stop your services once you've finished with them:
 
     $ fig stop
 
