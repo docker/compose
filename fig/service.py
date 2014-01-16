@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from docker.client import APIError
+from .packages.docker.client import APIError
 import logging
 import re
 import os
