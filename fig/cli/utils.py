@@ -82,33 +82,4 @@ def mkdir(path, permissions=0o700):
 
 
 def docker_url():
-    if os.environ.get('DOCKER_URL'):
-        return os.environ['DOCKER_URL']
-
-    socket_path = '/var/run/docker.sock'
-    tcp_hosts = [
-        ('localdocker', 4243),
-        ('127.0.0.1', 4243),
-    ]
-    tcp_host = '127.0.0.1'
-    tcp_port = 4243
-
-    for host, port in tcp_hosts:
-        try:
-            s = socket.create_connection((host, port), timeout=1)
-            s.close()
-            return 'http://%s:%s' % (host, port)
-        except:
-            pass
-
-    if os.path.exists(socket_path):
-        return 'unix://%s' % socket_path
-
-    raise UserError("""
-Couldn't find Docker daemon - tried:
-
-unix://%s
-%s
-
-If it's running elsewhere, specify a url with DOCKER_URL.
-    """ % (socket_path, '\n'.join('tcp://%s:%s' % h for h in tcp_hosts)))
+    return os.environ.get('DOCKER_HOST')
