@@ -14,6 +14,8 @@ Change log
  - Fix bug where builds would time out if a step took a long time without generating output (#6)
  - Fix bug where streaming container output over the Unix socket raised an error (#7)
 
+Big thanks to @tomstuart, @EnTeQuAk, @schickling, @aronasorman and @GeoffreyPlitt.
+
 0.0.2 (2014-01-02)
 ------------------
 
