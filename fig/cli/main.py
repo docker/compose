@@ -156,9 +156,12 @@ class TopLevelCommand(Command):
             ]
             rows = []
             for container in containers:
+                command = container.human_readable_command
+                if len(command) > 30:
+                    command = '%s ...' % command[:30]
                 rows.append([
                     container.name,
-                    container.human_readable_command,
+                    command,
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
