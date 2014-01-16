@@ -86,7 +86,7 @@ class Service(object):
             for port in options['ports']:
                 port = str(port)
                 if ':' in port:
-                    internal_port, external_port = port.split(':', 1)
+                    external_port, internal_port = port.split(':', 1)
                     port_bindings[int(internal_port)] = int(external_port)
                 else:
                     port_bindings[int(port)] = None
@@ -134,7 +134,13 @@ class Service(object):
         container_options['name'] = self.next_container_name(one_off)
 
         if 'ports' in container_options:
-            container_options['ports'] = [str(p).split(':')[0] for p in container_options['ports']]
+            ports = []
+            for port in container_options['ports']:
+                port = str(port)
+                if ':' in port:
+                    port = port.split(':')[-1]
+                ports.append(port)
+            container_options['ports'] = ports
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict((v.split(':')[1], {}) for v in container_options['volumes'])
