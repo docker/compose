@@ -158,7 +158,7 @@ class TopLevelCommand(Command):
             for container in containers:
                 command = container.human_readable_command
                 if len(command) > 30:
-                    command = '%s ...' % command[:30]
+                    command = '%s ...' % command[:26]
                 rows.append([
                     container.name,
                     command,
