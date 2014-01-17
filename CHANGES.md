@@ -1,6 +1,11 @@
 Change log
 ==========
 
+0.1.1 (2014-01-17)
+------------------
+
+ - Fix bug where ports were not exposed correctly (#29). Thanks @dustinlacewell!
+
 0.1.0 (2014-01-16)
 ------------------
 
