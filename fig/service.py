@@ -224,6 +224,8 @@ class Service(object):
                 port = str(port)
                 if ':' in port:
                     port = port.split(':')[-1]
+                if '/' not in port:
+                    port = "%s/tcp" % port
                 ports.append(port)
             container_options['ports'] = ports
 
