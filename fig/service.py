@@ -212,6 +212,9 @@ class Service(object):
             for container in service.containers():
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
+        for container in self.containers():
+            links.append((container.name, container.name))
+            links.append((container.name, container.name_without_project))
         return links
 
     def _get_container_options(self, override_options, one_off=False):

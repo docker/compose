@@ -155,8 +155,13 @@ class ServiceTest(DockerClientTestCase):
         web.start_container()
         self.assertIn('figtest_db_1', web.containers()[0].links())
         self.assertIn('db_1', web.containers()[0].links())
-        db.stop(timeout=1)
-        web.stop(timeout=1)
+
+    def test_start_container_creates_links_to_its_own_service(self):
+        db1 = self.create_service('db')
+        db2 = self.create_service('db')
+        db1.start_container()
+        db2.start_container()
+        self.assertIn('db_1', db2.containers()[0].links())
 
     def test_start_container_builds_images(self):
         service = Service(
