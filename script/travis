@@ -3,10 +3,13 @@
 # Exit on first error
 set -ex
 
+# Put Python eggs in a writeable directory
 export PYTHON_EGG_CACHE="/tmp/.python-eggs"
 
+# Activate correct virtualenv
 TRAVIS_PYTHON_VERSION=$1
 source /home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/activate
+
 env
 
 # Kill background processes on exit
