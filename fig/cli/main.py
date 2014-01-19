@@ -4,7 +4,6 @@ import logging
 import sys
 import re
 import signal
-import sys
 
 from inspect import getdoc
 
@@ -200,12 +199,20 @@ class TopLevelCommand(Command):
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d    Detached mode: Run container in the background, print new container name
+            -d    Detached mode: Run container in the background, print new
+                  container name
+            -T    Disable pseudo-tty allocation. By default `fig run`
+                  allocates a TTY.
         """
         service = self.project.get_service(options['SERVICE'])
+
+        tty = True
+        if options['-d'] or options['-T'] or not sys.stdin.isatty():
+            tty = False
+
         container_options = {
             'command': [options['COMMAND']] + options['ARGS'],
-            'tty': not options['-d'],
+            'tty': tty,
             'stdin_open': not options['-d'],
         }
         container = service.create_container(one_off=True, **container_options)
@@ -217,7 +224,7 @@ class TopLevelCommand(Command):
                 container.id,
                 interactive=True,
                 logs=True,
-                raw=True
+                raw=tty
             ) as c:
                 service.start_container(container, ports=None)
                 c.run()
