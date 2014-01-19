@@ -13,7 +13,7 @@ source /home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/activate
 env
 
 # Kill background processes on exit
-trap 'kill $(jobs -p)' SIGINT SIGTERM EXIT
+trap 'kill -9 $(jobs -p)' SIGINT SIGTERM EXIT
 
 # Start docker daemon
 docker -d -H unix:///var/run/docker.sock 2>> /dev/null >> /dev/null &
