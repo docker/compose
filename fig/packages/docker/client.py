@@ -122,7 +122,8 @@ class Client(requests.Session):
                           detach=False, stdin_open=False, tty=False,
                           mem_limit=0, ports=None, environment=None, dns=None,
                           volumes=None, volumes_from=None,
-                          network_disabled=False):
+                          network_disabled=False, entrypoint=None,
+                          cpu_shares=None, working_dir=None):
         if isinstance(command, six.string_types):
             command = shlex.split(str(command))
         if isinstance(environment, dict):
@@ -134,15 +135,12 @@ class Client(requests.Session):
             exposed_ports = {}
             for port_definition in ports:
                 port = port_definition
-                proto = None
+                proto = 'tcp'
                 if isinstance(port_definition, tuple):
                     if len(port_definition) == 2:
                         proto = port_definition[1]
                     port = port_definition[0]
-                exposed_ports['{0}{1}'.format(
-                    port,
-                    '/' + proto if proto else ''
-                )] = {}
+                exposed_ports['{0}/{1}'.format(port, proto)] = {}
             ports = exposed_ports
 
         if volumes and isinstance(volumes, list):
@@ -178,7 +176,10 @@ class Client(requests.Session):
             'Image':        image,
             'Volumes':      volumes,
             'VolumesFrom':  volumes_from,
-            'NetworkDisabled': network_disabled
+            'NetworkDisabled': network_disabled,
+            'Entrypoint':   entrypoint,
+            'CpuShares':    cpu_shares,
+            'WorkingDir':    working_dir
         }
 
     def _post_json(self, url, data, **kwargs):
@@ -409,11 +410,13 @@ class Client(requests.Session):
                          detach=False, stdin_open=False, tty=False,
                          mem_limit=0, ports=None, environment=None, dns=None,
                          volumes=None, volumes_from=None,
-                         network_disabled=False, name=None):
+                         network_disabled=False, name=None, entrypoint=None,
+                         cpu_shares=None, working_dir=None):
 
         config = self._container_config(
             image, command, hostname, user, detach, stdin_open, tty, mem_limit,
-            ports, environment, dns, volumes, volumes_from, network_disabled
+            ports, environment, dns, volumes, volumes_from, network_disabled,
+            entrypoint, cpu_shares, working_dir
         )
         return self.create_container_from_config(config, name)
 
@@ -475,27 +478,34 @@ class Client(requests.Session):
             return [x['Id'] for x in res]
         return res
 
-    def import_image(self, src, data=None, repository=None, tag=None):
+    def import_image(self, src=None, repository=None, tag=None, image=None):
         u = self._url("/images/create")
         params = {
             'repo': repository,
             'tag': tag
         }
-        try:
-            # XXX: this is ways not optimal but the only way
-            # for now to import tarballs through the API
-            fic = open(src)
-            data = fic.read()
-            fic.close()
-            src = "-"
-        except IOError:
-            # file does not exists or not a file (URL)
-            data = None
-        if isinstance(src, six.string_types):
-            params['fromSrc'] = src
-            return self._result(self._post(u, data=data, params=params))
 
-        return self._result(self._post(u, data=src, params=params))
+        if src:
+            try:
+                # XXX: this is ways not optimal but the only way
+                # for now to import tarballs through the API
+                fic = open(src)
+                data = fic.read()
+                fic.close()
+                src = "-"
+            except IOError:
+                # file does not exists or not a file (URL)
+                data = None
+            if isinstance(src, six.string_types):
+                params['fromSrc'] = src
+                return self._result(self._post(u, data=data, params=params))
+            return self._result(self._post(u, data=src, params=params))
+
+        if image:
+            params['fromImage'] = image
+            return self._result(self._post(u, data=None, params=params))
+
+        raise Exception("Must specify a src or image")
 
     def info(self):
         return self._result(self._get(self._url("/info")),
@@ -577,13 +587,13 @@ class Client(requests.Session):
         self._raise_for_status(res)
         json_ = res.json()
         s_port = str(private_port)
-        f_port = None
-        if s_port in json_['NetworkSettings']['PortMapping']['Udp']:
-            f_port = json_['NetworkSettings']['PortMapping']['Udp'][s_port]
-        elif s_port in json_['NetworkSettings']['PortMapping']['Tcp']:
-            f_port = json_['NetworkSettings']['PortMapping']['Tcp'][s_port]
+        h_ports = None
 
-        return f_port
+        h_ports = json_['NetworkSettings']['Ports'].get(s_port + '/udp')
+        if h_ports is None:
+            h_ports = json_['NetworkSettings']['Ports'].get(s_port + '/tcp')
+
+        return h_ports
 
     def pull(self, repository, tag=None, stream=False):
         registry, repo_name = auth.resolve_repository_name(repository)
