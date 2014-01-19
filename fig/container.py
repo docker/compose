@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 class Container(object):
     """
-    Represents a Docker container, constructed from the output of 
+    Represents a Docker container, constructed from the output of
     GET /containers/:id:/json.
     """
     def __init__(self, client, dictionary, has_been_inspected=False):
@@ -37,6 +37,10 @@ class Container(object):
     @property
     def id(self):
         return self.dictionary['ID']
+
+    @property
+    def image(self):
+        return self.dictionary['Image']
 
     @property
     def short_id(self):

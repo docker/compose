@@ -141,12 +141,14 @@ class Service(object):
         if container.is_running:
             container.stop(timeout=1)
 
-        intermediate_container = Container.create(
-            self.client,
-            image='ubuntu',
-            command='echo',
-            volumes_from=container.id,
-        )
+        intermediate_container_options = {
+            'image': container.image,
+            'command': 'echo',
+            'volumes_from': container.id,
+            'entrypoint': None
+        }
+        intermediate_container = self.create_container(
+            one_off=True, **intermediate_container_options)
         intermediate_container.start()
         intermediate_container.wait()
         container.remove()
@@ -212,7 +214,7 @@ class Service(object):
         return links
 
     def _get_container_options(self, override_options, one_off=False):
-        keys = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from']
+        keys = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint']
         container_options = dict((k, self.options[k]) for k in keys if k in self.options)
         container_options.update(override_options)
 

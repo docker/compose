@@ -110,8 +110,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('/var/db', container.inspect()['Volumes'])
 
     def test_recreate_containers(self):
-        service = self.create_service('db', environment={'FOO': '1'}, volumes=['/var/db'])
+        service = self.create_service('db', environment={'FOO': '1'}, volumes=['/var/db'], entrypoint=['ps'])
         old_container = service.create_container()
+        self.assertEqual(old_container.dictionary['Config']['Entrypoint'], ['ps'])
         self.assertEqual(old_container.dictionary['Config']['Env'], ['FOO=1'])
         self.assertEqual(old_container.name, 'figtest_db_1')
         service.start_container(old_container)
@@ -120,11 +121,15 @@ class ServiceTest(DockerClientTestCase):
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
-        (old, new) = service.recreate_containers()
-        self.assertEqual(len(old), 1)
+        (intermediate, new) = service.recreate_containers()
+        self.assertEqual(len(intermediate), 1)
         self.assertEqual(len(new), 1)
 
         new_container = new[0]
+        intermediate_container = intermediate[0]
+        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], None)
+
+        self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['ps'])
         self.assertEqual(new_container.dictionary['Config']['Env'], ['FOO=2'])
         self.assertEqual(new_container.name, 'figtest_db_1')
         service.start_container(new_container)
