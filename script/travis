@@ -20,4 +20,4 @@ docker -d -H unix:///var/run/docker.sock 2>> /dev/null >> /dev/null &
 sleep 2
 
 # $init is set by sekexe
-cd $(dirname $init)/.. && nosetests
+cd $(dirname $init)/.. && nosetests -v
