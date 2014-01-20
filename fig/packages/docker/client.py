@@ -152,6 +152,7 @@ class Client(requests.Session):
         attach_stdin = False
         attach_stdout = False
         attach_stderr = False
+        stdin_once = False
 
         if not detach:
             attach_stdout = True
@@ -159,6 +160,7 @@ class Client(requests.Session):
 
             if stdin_open:
                 attach_stdin = True
+                stdin_once = True
 
         return {
             'Hostname':     hostname,
@@ -166,6 +168,7 @@ class Client(requests.Session):
             'User':         user,
             'Tty':          tty,
             'OpenStdin':    stdin_open,
+            'StdinOnce':    stdin_once,
             'Memory':       mem_limit,
             'AttachStdin':  attach_stdin,
             'AttachStdout': attach_stdout,
