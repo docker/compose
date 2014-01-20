@@ -1,7 +1,6 @@
 from __future__ import print_function
 # Adapted from https://github.com/benthor/remotty/blob/master/socketclient.py
 
-from select import select
 import sys
 import tty
 import fcntl
