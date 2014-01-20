@@ -220,12 +220,7 @@ class TopLevelCommand(Command):
             service.start_container(container, ports=None)
             print(container.name)
         else:
-            with self._attach_to_container(
-                container.id,
-                interactive=True,
-                logs=True,
-                raw=tty
-            ) as c:
+            with self._attach_to_container(container.id, raw=tty) as c:
                 service.start_container(container, ports=None)
                 c.run()
 
@@ -317,35 +312,15 @@ class TopLevelCommand(Command):
                 print("Gracefully stopping... (press Ctrl+C again to force)")
                 self.project.stop(service_names=options['SERVICE'])
 
-    def _attach_to_container(self, container_id, interactive, logs=False, stream=True, raw=False):
-        stdio = self.client.attach_socket(
-            container_id,
-            params={
-                'stdin': 1 if interactive else 0,
-                'stdout': 1,
-                'stderr': 0,
-                'logs': 1 if logs else 0,
-                'stream': 1 if stream else 0
-            },
-            ws=True,
-        )
-
-        stderr = self.client.attach_socket(
-            container_id,
-            params={
-                'stdin': 0,
-                'stdout': 0,
-                'stderr': 1,
-                'logs': 1 if logs else 0,
-                'stream': 1 if stream else 0
-            },
-            ws=True,
-        )
+    def _attach_to_container(self, container_id, raw=False):
+        socket_in = self.client.attach_socket(container_id, params={'stdin': 1, 'stream': 1})
+        socket_out = self.client.attach_socket(container_id, params={'stdout': 1, 'logs': 1, 'stream': 1})
+        socket_err = self.client.attach_socket(container_id, params={'stderr': 1, 'logs': 1, 'stream': 1})
 
         return SocketClient(
-            socket_in=stdio,
-            socket_out=stdio,
-            socket_err=stderr,
+            socket_in=socket_in,
+            socket_out=socket_out,
+            socket_err=socket_err,
             raw=raw,
         )
 

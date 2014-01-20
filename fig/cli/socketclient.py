@@ -57,15 +57,15 @@ class SocketClient:
 
     def run(self):
         if self.socket_in is not None:
-            self.start_background_thread(target=self.send_ws, args=(self.socket_in, sys.stdin))
+            self.start_background_thread(target=self.send, args=(self.socket_in, sys.stdin))
 
         recv_threads = []
 
         if self.socket_out is not None:
-            recv_threads.append(self.start_background_thread(target=self.recv_ws, args=(self.socket_out, sys.stdout)))
+            recv_threads.append(self.start_background_thread(target=self.recv, args=(self.socket_out, sys.stdout)))
 
         if self.socket_err is not None:
-            recv_threads.append(self.start_background_thread(target=self.recv_ws, args=(self.socket_err, sys.stderr)))
+            recv_threads.append(self.start_background_thread(target=self.recv, args=(self.socket_err, sys.stderr)))
 
         for t in recv_threads:
             t.join()
@@ -76,10 +76,10 @@ class SocketClient:
         thread.start()
         return thread
 
-    def recv_ws(self, socket, stream):
+    def recv(self, socket, stream):
         try:
             while True:
-                chunk = socket.recv()
+                chunk = socket.recv(4096)
 
                 if chunk:
                     stream.write(chunk)
@@ -89,7 +89,7 @@ class SocketClient:
         except Exception as e:
             log.debug(e)
 
-    def send_ws(self, socket, stream):
+    def send(self, socket, stream):
         while True:
             r, w, e = select([stream.fileno()], [], [])
 
@@ -97,7 +97,7 @@ class SocketClient:
                 chunk = stream.read(1)
 
                 if chunk == '':
-                    socket.send_close()
+                    socket.close()
                     break
                 else:
                     try:
