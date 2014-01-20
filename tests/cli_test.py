@@ -8,6 +8,10 @@ class CLITestCase(unittest.TestCase):
         self.command = TopLevelCommand()
         self.command.base_dir = 'tests/fixtures/simple-figfile'
 
+    def tearDown(self):
+        self.command.project.kill()
+        self.command.project.remove_stopped()
+
     def test_help(self):
         self.assertRaises(SystemExit, lambda: self.command.dispatch(['-h'], None))
 
