@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from . import unittest
+from mock import patch
+from six import StringIO
 from fig.cli.main import TopLevelCommand
 
 class CLITestCase(unittest.TestCase):
@@ -15,8 +17,11 @@ class CLITestCase(unittest.TestCase):
     def test_help(self):
         self.assertRaises(SystemExit, lambda: self.command.dispatch(['-h'], None))
 
-    def test_ps(self):
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_ps(self, mock_stdout):
+        self.command.project.get_service('simple').create_container()
         self.command.dispatch(['ps'], None)
+        self.assertIn('fig_simple_1', mock_stdout.getvalue())
 
     def test_scale(self):
         project = self.command.project
