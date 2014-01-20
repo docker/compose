@@ -141,14 +141,13 @@ class Service(object):
         if container.is_running:
             container.stop(timeout=1)
 
-        intermediate_container_options = {
-            'image': container.image,
-            'command': 'echo',
-            'volumes_from': container.id,
-            'entrypoint': None
-        }
-        intermediate_container = self.create_container(
-            one_off=True, **intermediate_container_options)
+        intermediate_container = Container.create(
+            self.client,
+            image=container.image,
+            command='echo',
+            volumes_from=container.id,
+            entrypoint=None
+        )
         intermediate_container.start()
         intermediate_container.wait()
         container.remove()
