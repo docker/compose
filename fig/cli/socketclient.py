@@ -1,7 +1,6 @@
 from __future__ import print_function
 # Adapted from https://github.com/benthor/remotty/blob/master/socketclient.py
 
-from select import select
 import sys
 import tty
 import fcntl
@@ -91,22 +90,19 @@ class SocketClient:
 
     def send(self, socket, stream):
         while True:
-            r, w, e = select([stream.fileno()], [], [])
+            chunk = stream.read(1)
 
-            if r:
-                chunk = stream.read(1)
-
-                if chunk == '':
-                    socket.close()
-                    break
-                else:
-                    try:
-                        socket.send(chunk)
-                    except Exception as e:
-                        if hasattr(e, 'errno') and e.errno == errno.EPIPE:
-                            break
-                        else:
-                            raise e
+            if chunk == '':
+                socket.close()
+                break
+            else:
+                try:
+                    socket.send(chunk)
+                except Exception as e:
+                    if hasattr(e, 'errno') and e.errno == errno.EPIPE:
+                        break
+                    else:
+                        raise e
 
     def destroy(self):
         if self.settings is not None:
