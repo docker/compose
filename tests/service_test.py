@@ -187,6 +187,11 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container['HostConfig']['PortBindings'].keys(), ['8000/tcp'])
         self.assertNotEqual(container['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort'], '8000')
 
+    def test_start_container_creates_port_with_explicit_protocol(self):
+        service = self.create_service('web', ports=['8000/udp'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['PortBindings'].keys(), ['8000/udp'])
+
     def test_start_container_creates_fixed_external_ports(self):
         service = self.create_service('web', ports=['8000:8000'])
         container = service.start_container().inspect()

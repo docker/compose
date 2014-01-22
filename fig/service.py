@@ -172,9 +172,10 @@ class Service(object):
                 port = str(port)
                 if ':' in port:
                     external_port, internal_port = port.split(':', 1)
-                    port_bindings[int(internal_port)] = int(external_port)
                 else:
-                    port_bindings[int(port)] = None
+                    external_port, internal_port = (None, port)
+
+                port_bindings[internal_port] = external_port
 
         volume_bindings = {}
 
@@ -225,6 +226,8 @@ class Service(object):
                 port = str(port)
                 if ':' in port:
                     port = port.split(':')[-1]
+                if '/' in port:
+                    port = tuple(port.split('/'))
                 ports.append(port)
             container_options['ports'] = ports
 
