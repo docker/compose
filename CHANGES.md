@@ -1,6 +1,13 @@
 Change log
 ==========
 
+0.1.2 (2014-01-22)
+------------------
+
+ - Add `-T` option to `fig run` to disable pseudo-TTY. (#34)
+ - Fix `fig up` requiring the ubuntu image to be pulled to recreate containers. (#33) Thanks @cameronmaske!
+ - Improve reliability, fix arrow keys and fix a race condition in `fig run`. (#34, #39, #40)
+
 0.1.1 (2014-01-17)
 ------------------
 
