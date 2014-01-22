@@ -6,6 +6,7 @@ from itertools import cycle
 
 from .multiplexer import Multiplexer
 from . import colors
+from .utils import split_buffer
 
 
 class LogPrinter(object):
@@ -33,7 +34,7 @@ class LogPrinter(object):
         prefix = color_fn(container.name + " | ")
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
-        return (prefix + line for line in line_generator)
+        return (prefix + line.decode('utf-8') for line in line_generator)
 
     def _attach(self, container):
         params = {
@@ -44,21 +45,3 @@ class LogPrinter(object):
         params.update(self.attach_params)
         params = dict((name, 1 if value else 0) for (name, value) in list(params.items()))
         return container.attach(**params)
-
-def split_buffer(reader, separator):
-    """
-    Given a generator which yields strings and a separator string,
-    joins all input, splits on the separator and yields each chunk.
-    Requires that each input string is decodable as UTF-8.
-    """
-    buffered = ''
-
-    for data in reader:
-        lines = (buffered + data.decode('utf-8')).split(separator)
-        for line in lines[:-1]:
-            yield line + separator
-        if len(lines) > 1:
-            buffered = lines[-1]
-
-    if len(buffered) > 0:
-        yield buffered
