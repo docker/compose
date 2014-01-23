@@ -1,0 +1,103 @@
+from fig.project import sort_service_dicts, DependencyError
+from . import unittest
+
+
+class SortServiceTest(unittest.TestCase):
+    def test_sort_service_dicts_1(self):
+        services = [
+            {
+                'links': ['redis'],
+                'name': 'web'
+            },
+            {
+                'name': 'grunt'
+            },
+            {
+                'name': 'redis'
+            }
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 3)
+        self.assertEqual(sorted_services[0]['name'], 'grunt')
+        self.assertEqual(sorted_services[1]['name'], 'redis')
+        self.assertEqual(sorted_services[2]['name'], 'web')
+
+    def test_sort_service_dicts_2(self):
+        services = [
+            {
+                'links': ['redis', 'postgres'],
+                'name': 'web'
+            },
+            {
+                'name': 'postgres',
+                'links': ['redis']
+            },
+            {
+                'name': 'redis'
+            }
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 3)
+        self.assertEqual(sorted_services[0]['name'], 'redis')
+        self.assertEqual(sorted_services[1]['name'], 'postgres')
+        self.assertEqual(sorted_services[2]['name'], 'web')
+
+    def test_sort_service_dicts_circular_imports(self):
+        services = [
+            {
+                'links': ['redis'],
+                'name': 'web'
+            },
+            {
+                'name': 'redis',
+                'links': ['web']
+            },
+        ]
+
+        try:
+            sort_service_dicts(services)
+        except DependencyError as e:
+            self.assertIn('redis', e.msg)
+            self.assertIn('web', e.msg)
+        else:
+            self.fail('Should have thrown an DependencyError')
+
+    def test_sort_service_dicts_circular_imports_2(self):
+        services = [
+            {
+                'links': ['postgres', 'redis'],
+                'name': 'web'
+            },
+            {
+                'name': 'redis',
+                'links': ['web']
+            },
+            {
+                'name': 'postgres'
+            }
+        ]
+
+        try:
+            sort_service_dicts(services)
+        except DependencyError as e:
+            self.assertIn('redis', e.msg)
+            self.assertIn('web', e.msg)
+        else:
+            self.fail('Should have thrown an DependencyError')
+
+    def test_sort_service_dicts_self_imports(self):
+        services = [
+            {
+                'links': ['web'],
+                'name': 'web'
+            },
+        ]
+
+        try:
+            sort_service_dicts(services)
+        except DependencyError as e:
+            self.assertIn('web', e.msg)
+        else:
+            self.fail('Should have thrown an DependencyError')

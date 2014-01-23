@@ -8,7 +8,7 @@ import signal
 from inspect import getdoc
 
 from .. import __version__
-from ..project import NoSuchService
+from ..project import NoSuchService, DependencyError
 from ..service import CannotBeScaledError
 from .command import Command
 from .formatter import Formatter
@@ -40,10 +40,7 @@ def main():
     except KeyboardInterrupt:
         log.error("\nAborting.")
         exit(1)
-    except UserError as e:
-        log.error(e.msg)
-        exit(1)
-    except NoSuchService as e:
+    except (UserError, NoSuchService, DependencyError) as e:
         log.error(e.msg)
         exit(1)
     except NoSuchCommand as e:

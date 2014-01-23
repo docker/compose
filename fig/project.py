@@ -2,21 +2,36 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import logging
 from .service import Service
-from .compat.functools import cmp_to_key
 
 log = logging.getLogger(__name__)
 
+
 def sort_service_dicts(services):
-    # Sort in dependency order
-    def cmp(x, y):
-        x_deps_y = y['name'] in x.get('links', [])
-        y_deps_x = x['name'] in y.get('links', [])
-        if x_deps_y and not y_deps_x:
-            return 1
-        elif y_deps_x and not x_deps_y:
-            return -1
-        return 0
-    return sorted(services, key=cmp_to_key(cmp))
+    # Get all services that are dependant on another.
+    dependent_services = [s for s in services if s.get('links')]
+    flatten_links = sum([s['links'] for s in dependent_services], [])
+    # Get all services that are not linked to and don't link to others.
+    non_dependent_sevices = [s for s in services if s['name'] not in flatten_links and not s.get('links')]
+    sorted_services = []
+    # Topological sort.
+    while dependent_services:
+        n = dependent_services.pop()
+        # Check if a service is dependent on itself, if so raise an error.
+        if n['name'] in n.get('links', []):
+            raise DependencyError('A service can not link to itself: %s' % n['name'])
+        sorted_services.append(n)
+        for l in n['links']:
+            # Get the linked service.
+            linked_service = next(s for s in services if l == s['name'])
+            # Check that there isn't a circular import between services.
+            if n['name'] in linked_service.get('links', []):
+                raise DependencyError('Circular import between %s and %s' % (n['name'], linked_service['name']))
+            # Check the linked service has no links and is not already in the
+            # sorted service list.
+            if not linked_service.get('links') and linked_service not in sorted_services:
+                sorted_services.insert(0, linked_service)
+    return non_dependent_sevices + sorted_services
+
 
 class Project(object):
     """
@@ -131,6 +146,14 @@ class NoSuchService(Exception):
     def __init__(self, name):
         self.name = name
         self.msg = "No such service: %s" % self.name
+
+    def __str__(self):
+        return self.msg
+
+
+class DependencyError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
 
     def __str__(self):
         return self.msg
