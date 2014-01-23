@@ -1,6 +1,12 @@
 Change log
 ==========
 
+0.1.3 (2014-01-23)
+------------------
+
+ - Fix ports sometimes being configured incorrectly. (#46)
+ - Fix log output sometimes not displaying. (#47)
+
 0.1.2 (2014-01-22)
 ------------------
 
