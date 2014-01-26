@@ -1,12 +1,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from . import unittest
+from .testcases import DockerClientTestCase
 from mock import patch
 from six import StringIO
 from fig.cli.main import TopLevelCommand
 
-class CLITestCase(unittest.TestCase):
+class CLITestCase(DockerClientTestCase):
     def setUp(self):
+        super(CLITestCase, self).setUp()
         self.command = TopLevelCommand()
         self.command.base_dir = 'tests/fixtures/simple-figfile'
 
