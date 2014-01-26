@@ -61,6 +61,10 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(web.containers(stopped=True)), 1)
         self.assertEqual(len(db.containers(stopped=True)), 1)
 
+        # remove intermediate containers
+        for (service, container) in old:
+            container.remove()
+
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
