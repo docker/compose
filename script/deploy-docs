@@ -2,7 +2,7 @@
 
 set -ex
 
-pushd docs
+pushd docs/_site
 
 export GIT_DIR=.git-gh-pages
 export GIT_WORK_TREE=.
@@ -15,15 +15,12 @@ if !(git remote | grep origin); then
   git remote add origin git@github.com:orchardup/fig.git
 fi
 
-cp .gitignore-gh-pages .gitignore
-echo ".git-gh-pages" >> .gitignore
+echo ".git-gh-pages" > .gitignore
 
 git add -u
 git add .
 
 git commit -m "update" || echo "didn't commit"
 git push -f origin master:gh-pages
-
-rm .gitignore
 
 popd
