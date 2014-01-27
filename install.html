@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en-gb">
+  <head>
+    <meta charset="utf-8">
+    <title>Installing Fig</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/fig.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo mobile-logo">
+        <img src="img/logo.png">
+        Fig
+      </div>
+
+      <div class="content"><h1>Installing Fig</h1>
+
+<p>First, install Docker. If you&#39;re on OS X, you can use <a href="https://github.com/noplay/docker-osx">docker-osx</a>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl https://raw.github.com/noplay/docker-osx/master/docker-osx &gt; /usr/local/bin/docker-osx
+$ chmod +x /usr/local/bin/docker-osx
+$ docker-osx shell
+</code></pre></div>
+<p>Docker has guides for <a href="http://docs.docker.io/en/latest/installation/ubuntulinux/">Ubuntu</a> and <a href="http://docs.docker.io/en/latest/installation/">other platforms</a> in their documentation.</p>
+
+<p>Next, install Fig:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ sudo pip install -U fig
+</code></pre></div>
+<p>(This command also upgrades Fig when we release a new version. If you don’t have pip installed, try <code>brew install python</code> or <code>apt-get install python-pip</code>.)</p>
+
+<p>That should be all you need! Run <code>fig --version</code> to see if it worked.</p>
+</div>
+
+      <div class="sidebar">
+        <h1 class="logo">
+          <img src="img/logo.png">
+          Fig
+        </h1>
+
+        <ul class="nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="install.html">Install</a></li>
+          <li><a href="rails.html">Get started with Rails</a></li>
+          <li><a href="django.html">Get started with Django</a></li>
+        </ul>
+        <ul class="nav">
+          <li>Reference:</li>
+          <ul>
+            <li><a href="yml.html">fig.yml</a></li>
+            <li><a href="cli.html">Commands</a></li>
+            <li><a href="env.html">Environment variables</a></li>
+          </ul>
+        </ul>
+        <ul class="nav">
+          <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
+          <li><a href="https://twitter.com/orchardup">Follow us on Twitter</a></li>
+        </ul>
+
+        <div class="badges">
+          <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
+          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+        </div>
+      </div>
+    </div>
+      <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-43996733-3', 'orchardup.github.io');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>

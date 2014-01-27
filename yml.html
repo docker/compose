@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en-gb">
+  <head>
+    <meta charset="utf-8">
+    <title>fig.yml reference</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/fig.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo mobile-logo">
+        <img src="img/logo.png">
+        Fig
+      </div>
+
+      <div class="content"><h1>fig.yml reference</h1>
+
+<p>Each service defined in <code>fig.yml</code> must specify exactly one of <code>image</code> or <code>build</code>. Other keys are optional, and are analogous to their <code>docker run</code> command-line counterparts.</p>
+
+<p>As with <code>docker run</code>, options specified in the Dockerfile (e.g. <code>CMD</code>, <code>EXPOSE</code>, <code>VOLUME</code>, <code>ENV</code>) are respected by default - you don&#39;t need to specify them again in <code>fig.yml</code>.</p>
+<div class="highlight"><pre><code class="yaml language-yaml" data-lang="yaml"><span class="l-Scalar-Plain">-- Tag or partial image ID. Can be local or remote - Fig will attempt to pull if it doesn&#39;t exist locally.</span>
+<span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">ubuntu</span>
+<span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">orchardup/postgresql</span>
+<span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">a4bc65fd</span>
+
+<span class="l-Scalar-Plain">-- Path to a directory containing a Dockerfile. Fig will build and tag it with a generated name, and use that image thereafter.</span>
+<span class="l-Scalar-Plain">build</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">/path/to/build/dir</span>
+
+<span class="l-Scalar-Plain">-- Override the default command.</span>
+<span class="l-Scalar-Plain">command</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">bundle exec thin -p 3000</span>
+
+<span class="l-Scalar-Plain">-- Link to containers in another service (see &quot;Communicating between containers&quot;).</span>
+<span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">db</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">redis</span>
+
+<span class="l-Scalar-Plain">-- Expose ports. Either specify both ports (HOST:CONTAINER), or just the container port (a random host port will be chosen).</span>
+<span class="l-Scalar-Plain">ports</span><span class="p-Indicator">:</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">3000</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">8000:8000</span>
+
+<span class="l-Scalar-Plain">-- Map volumes from the host machine (HOST:CONTAINER).</span>
+<span class="l-Scalar-Plain">volumes</span><span class="p-Indicator">:</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">cache/:/tmp/cache</span>
+
+<span class="l-Scalar-Plain">-- Add environment variables.</span>
+<span class="l-Scalar-Plain">environment</span><span class="p-Indicator">:</span>
+  <span class="l-Scalar-Plain">RACK_ENV</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">development</span>
+</code></pre></div></div>
+
+      <div class="sidebar">
+        <h1 class="logo">
+          <img src="img/logo.png">
+          Fig
+        </h1>
+
+        <ul class="nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="install.html">Install</a></li>
+          <li><a href="rails.html">Get started with Rails</a></li>
+          <li><a href="django.html">Get started with Django</a></li>
+        </ul>
+        <ul class="nav">
+          <li>Reference:</li>
+          <ul>
+            <li><a href="yml.html">fig.yml</a></li>
+            <li><a href="cli.html">Commands</a></li>
+            <li><a href="env.html">Environment variables</a></li>
+          </ul>
+        </ul>
+        <ul class="nav">
+          <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
+          <li><a href="https://twitter.com/orchardup">Follow us on Twitter</a></li>
+        </ul>
+
+        <div class="badges">
+          <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
+          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+        </div>
+      </div>
+    </div>
+      <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-43996733-3', 'orchardup.github.io');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>

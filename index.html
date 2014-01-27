@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en-gb">
+  <head>
+    <meta charset="utf-8">
+    <title>Fig | Punctual, lightweight development environments using Docker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/fig.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo mobile-logo">
+        <img src="img/logo.png">
+        Fig
+      </div>
+
+      <div class="content"><p><strong class="strapline">Fast, isolated development environments using Docker.</strong></p>
+
+<p>Define your app&#39;s environment with Docker so it can be reproduced anywhere.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
+ADD . /code
+RUN pip install -r requirements.txt
+WORKDIR /code
+CMD python app.py
+</code></pre></div>
+<p>Define your app&#39;s services so they can be run alongside in an isolated environment. (No more installing Postgres on your laptop!)</p>
+<div class="highlight"><pre><code class="yaml language-yaml" data-lang="yaml"><span class="l-Scalar-Plain">web</span><span class="p-Indicator">:</span>
+  <span class="l-Scalar-Plain">build</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">.</span>
+  <span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
+   <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">db</span>
+  <span class="l-Scalar-Plain">ports</span><span class="p-Indicator">:</span>
+   <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">8000:8000</span>
+<span class="l-Scalar-Plain">db</span><span class="p-Indicator">:</span>
+  <span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">orchardup/postgresql</span>
+</code></pre></div>
+<p>Then type <code>fig up</code>, and Fig will start and run your entire app:</p>
+
+<p><img src="https://orchardup.com/static/images/fig-example-large.f96065fc9e22.gif" alt="example fig run"></p>
+
+<p>There are commands to:</p>
+
+<ul>
+<li>start, stop and rebuild services</li>
+<li>view the status of running services</li>
+<li>tail running services&#39; log output</li>
+<li>run a one-off command on a service</li>
+</ul>
+
+<p>Fig is a project from <a href="https://orchardup.com">Orchard</a>. <a href="https://twitter.com/orchardup">Follow us on Twitter</a> to keep up to date with Fig and other Docker news.</p>
+
+<h2>Quick start</h2>
+
+<p>Let&#39;s get a basic Python web app running on Fig. It assumes a little knowledge of Python, but the concepts should be clear if you&#39;re not familiar with it.</p>
+
+<p>First, install Docker. If you&#39;re on OS X, you can use <a href="https://github.com/noplay/docker-osx">docker-osx</a>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl https://raw.github.com/noplay/docker-osx/master/docker-osx &gt; /usr/local/bin/docker-osx
+$ chmod +x /usr/local/bin/docker-osx
+$ docker-osx shell
+</code></pre></div>
+<p>Docker has guides for <a href="http://docs.docker.io/en/latest/installation/ubuntulinux/">Ubuntu</a> and <a href="http://docs.docker.io/en/latest/installation/">other platforms</a> in their documentation.</p>
+
+<p>Next, install Fig:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ sudo pip install -U fig
+</code></pre></div>
+<p>(This command also upgrades Fig when we release a new version. If you don’t have pip installed, try <code>brew install python</code> or <code>apt-get install python-pip</code>.)</p>
+
+<p>You&#39;ll want to make a directory for the project:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ mkdir figtest
+$ cd figtest
+</code></pre></div>
+<p>Inside this directory, create <code>app.py</code>, a simple web app that uses the Flask framework and increments a value in Redis:</p>
+<div class="highlight"><pre><code class="python language-python" data-lang="python"><span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">redis</span> <span class="kn">import</span> <span class="n">Redis</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">redis</span> <span class="o">=</span> <span class="n">Redis</span><span class="p">(</span>
+    <span class="n">host</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;FIGTEST_REDIS_1_PORT_6379_TCP_ADDR&#39;</span><span class="p">),</span>
+    <span class="n">port</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;FIGTEST_REDIS_1_PORT_6379_TCP_PORT&#39;</span><span class="p">))</span>
+<span class="p">)</span>
+
+<span class="nd">@app.route</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">hello</span><span class="p">():</span>
+    <span class="n">redis</span><span class="o">.</span><span class="n">incr</span><span class="p">(</span><span class="s">&#39;hits&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="s">&#39;Hello World! I have been seen </span><span class="si">%s</span><span class="s"> times.&#39;</span> <span class="o">%</span> <span class="n">redis</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hits&#39;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</code></pre></div>
+<p>We define our Python dependencies in a file called <code>requirements.txt</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">flask
+redis
+</code></pre></div>
+<p>And we define how to build this into a Docker image using a file called <code>Dockerfile</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM stackbrew/ubuntu:13.10
+RUN apt-get -qq update
+RUN apt-get install -y python python-pip
+ADD . /code
+WORKDIR /code
+RUN pip install -r requirements.txt
+EXPOSE 5000
+CMD python app.py
+</code></pre></div>
+<p>That tells Docker to create an image with Python and Flask installed on it, run the command <code>python app.py</code>, and open port 5000 (the port that Flask listens on).</p>
+
+<p>We then define a set of services using <code>fig.yml</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">web:
+  build: .
+  ports:
+   - 5000:5000
+  volumes:
+   - .:/code
+  links:
+   - redis
+redis:
+  image: orchardup/redis
+</code></pre></div>
+<p>This defines two services:</p>
+
+<ul>
+<li><code>web</code>, which is built from <code>Dockerfile</code> in the current directory. It also says to forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.</li>
+<li><code>redis</code>, which uses the public image <a href="https://index.docker.io/u/orchardup/redis/">orchardup/redis</a>. </li>
+</ul>
+
+<p>Now if we run <code>fig up</code>, it&#39;ll pull a Redis image, build an image for our own code, and start everything up:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig up
+Pulling image orchardup/redis...
+Building web...
+Starting figtest_redis_1...
+Starting figtest_web_1...
+figtest_redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
+figtest_web_1 |  * Running on http://0.0.0.0:5000/
+</code></pre></div>
+<p>Open up <a href="http://localhost:5000">http://localhost:5000</a> in your browser (or <a href="http://localdocker:5000">http://localdocker:5000</a> if you&#39;re using <a href="https://github.com/noplay/docker-osx">docker-osx</a>) and you should see it running!</p>
+
+<p>If you want to run your services in the background, you can pass the <code>-d</code> flag to <code>fig up</code> and use <code>fig ps</code> to see what is currently running:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig up -d
+Starting figtest_redis_1...
+Starting figtest_web_1...
+$ fig ps
+        Name                 Command            State       Ports
+-------------------------------------------------------------------
+figtest_redis_1   /usr/local/bin/run         Up
+figtest_web_1     /bin/sh -c python app.py   Up      5000-&gt;5000/tcp
+</code></pre></div>
+<p><code>fig run</code> allows you to run one-off commands for your services. For example, to see what environment variables are available to the <code>web</code> service:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web env
+</code></pre></div>
+<p>See <code>fig --help</code> other commands that are available.</p>
+
+<p>If you started Fig with <code>fig up -d</code>, you&#39;ll probably want to stop your services once you&#39;ve finished with them:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig stop
+</code></pre></div>
+<p>That&#39;s more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, <a href="https://github.com/orchardup/fig">open an issue on GitHub</a> or <a href="mailto:hello@orchardup.com">email us</a>.</p>
+</div>
+
+      <div class="sidebar">
+        <h1 class="logo">
+          <img src="img/logo.png">
+          Fig
+        </h1>
+
+        <ul class="nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="install.html">Install</a></li>
+          <li><a href="rails.html">Get started with Rails</a></li>
+          <li><a href="django.html">Get started with Django</a></li>
+        </ul>
+        <ul class="nav">
+          <li>Reference:</li>
+          <ul>
+            <li><a href="yml.html">fig.yml</a></li>
+            <li><a href="cli.html">Commands</a></li>
+            <li><a href="env.html">Environment variables</a></li>
+          </ul>
+        </ul>
+        <ul class="nav">
+          <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
+          <li><a href="https://twitter.com/orchardup">Follow us on Twitter</a></li>
+        </ul>
+
+        <div class="badges">
+          <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
+          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+        </div>
+      </div>
+    </div>
+      <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-43996733-3', 'orchardup.github.io');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>

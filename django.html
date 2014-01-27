@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en-gb">
+  <head>
+    <meta charset="utf-8">
+    <title>Getting started with Fig and Django</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/fig.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo mobile-logo">
+        <img src="img/logo.png">
+        Fig
+      </div>
+
+      <div class="content"><h1>Getting started with Fig and Django</h1>
+
+<p>Let&#39;s use Fig to set up and run a Django/PostgreSQL app. Before starting, you&#39;ll need to have <a href="install.html">Fig installed</a>.</p>
+
+<p>Let&#39;s set up the three files that&#39;ll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called <code>Dockerfile</code>. It&#39;ll contain this to start with:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
+RUN mkdir /code
+WORKDIR /code
+ADD requirements.txt /code/
+RUN pip install -r requirements.txt
+ADD . /code/
+</code></pre></div>
+<p>That&#39;ll install our application inside an image with Python installed alongside all of our Python dependencies.</p>
+
+<p>Second, we define our Python dependencies in a file called <code>requirements.txt</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">Django
+</code></pre></div>
+<p>Simple enough. Finally, this is all tied together with a file called <code>fig.yml</code>. It describes the services that our app comprises of (a web server and database), what Docker images they use, how they link together, what volumes will be mounted inside the containers and what ports they expose.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">db:
+  image: orchardup/postgresql
+  ports:
+    - 5432
+web:
+  build: .
+  command: python manage.py runserver 0.0.0.0:8000
+  volumes:
+    - .:/code
+  ports:
+    - 8000:8000
+  links:
+    - db
+</code></pre></div>
+<p>See the <a href=""><code>fig.yml</code> reference</a> for more information on how it works.</p>
+
+<p>We can now start a Django project using <code>fig run</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web django-admin.py startproject figexample .
+</code></pre></div>
+<p>First, Fig will build an image for the <code>web</code> service using the <code>Dockerfile</code>. It will then run <code>django-admin.py startproject figexample .</code> inside a container using that image.</p>
+
+<p>This will generate a Django app inside the current directory:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ ls
+Dockerfile       fig.yml          figexample       manage.py        requirements.txt
+</code></pre></div>
+<p>First thing we need to do is set up the database connection. Replace the <code>DATABASES = ...</code> definition in <code>figexample/settings.py</code> to read:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">DATABASES = {
+    &#39;default&#39;: {
+        &#39;ENGINE&#39;: &#39;django.db.backends.postgresql_psycopg2&#39;,
+        &#39;NAME&#39;: &#39;docker&#39;,
+        &#39;USER&#39;: &#39;docker&#39;,
+        &#39;PASSWORD&#39;: &#39;docker&#39;,
+        &#39;HOST&#39;: os.environ.get(&#39;MYAPP_DB_1_PORT_5432_TCP_ADDR&#39;),
+        &#39;PORT&#39;: os.environ.get(&#39;MYAPP_DB_1_PORT_5432_TCP_PORT&#39;),
+    }
+}
+</code></pre></div>
+<p>Then, run <code>fig up</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">Recreating myapp_db_1...
+Recreating myapp_web_1...
+Attaching to myapp_db_1, myapp_web_1
+myapp_db_1 |
+myapp_db_1 | PostgreSQL stand-alone backend 9.1.11
+myapp_db_1 | 2014-01-27 12:17:03 UTC LOG:  database system is ready to accept connections
+myapp_db_1 | 2014-01-27 12:17:03 UTC LOG:  autovacuum launcher started
+myapp_web_1 | Validating models...
+myapp_web_1 |
+myapp_web_1 | 0 errors found
+myapp_web_1 | January 27, 2014 - 12:12:40
+myapp_web_1 | Django version 1.6.1, using settings &#39;figexample.settings&#39;
+myapp_web_1 | Starting development server at http://0.0.0.0:8000/
+myapp_web_1 | Quit the server with CONTROL-C.
+</code></pre></div>
+<p>And your Django app should be running at localhost:3000 (or localdocker:3000 if you&#39;re using docker-osx).</p>
+
+<p>You can also run management commands with Docker. To set up your database, for example, run <code>fig up</code> and in other terminal run:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web python manage.py syncdb
+</code></pre></div></div>
+
+      <div class="sidebar">
+        <h1 class="logo">
+          <img src="img/logo.png">
+          Fig
+        </h1>
+
+        <ul class="nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="install.html">Install</a></li>
+          <li><a href="rails.html">Get started with Rails</a></li>
+          <li><a href="django.html">Get started with Django</a></li>
+        </ul>
+        <ul class="nav">
+          <li>Reference:</li>
+          <ul>
+            <li><a href="yml.html">fig.yml</a></li>
+            <li><a href="cli.html">Commands</a></li>
+            <li><a href="env.html">Environment variables</a></li>
+          </ul>
+        </ul>
+        <ul class="nav">
+          <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
+          <li><a href="https://twitter.com/orchardup">Follow us on Twitter</a></li>
+        </ul>
+
+        <div class="badges">
+          <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
+          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+        </div>
+      </div>
+    </div>
+      <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-43996733-3', 'orchardup.github.io');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>
