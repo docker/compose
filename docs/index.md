@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Fig | Punctual, lightweight development environments using Docker
+title: Fig | Fast, isolated development environments using Docker
 ---
 
 <strong class="strapline">Fast, isolated development environments using Docker.</strong>
