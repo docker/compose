@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140127042058357943413">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140127042118713981835">
   </head>
   <body>
     <div class="container">
@@ -78,8 +78,8 @@ Rakefile     db           test
   pool: 5
   username: docker
   password: docker
-  host: &lt;%= ENV.fetch(&#39;MYAPP_DB_1_PORT_5432_TCP_ADDR&#39;, &#39;localhost&#39;) %&gt;
-  port: &lt;%= ENV.fetch(&#39;MYAPP_DB_1_PORT_5432_TCP_PORT&#39;, &#39;5432&#39;) %&gt;
+  host: &lt;%= ENV.fetch(&#39;DB_1_PORT_5432_TCP_ADDR&#39;, &#39;localhost&#39;) %&gt;
+  port: &lt;%= ENV.fetch(&#39;DB_1_PORT_5432_TCP_PORT&#39;, &#39;5432&#39;) %&gt;
 
 test:
   &lt;&lt;: *default
@@ -114,6 +114,7 @@ myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick::HTTPServer#start: pid=1 port=
           <li><a href="install.html">Install</a></li>
           <li><a href="rails.html">Get started with Rails</a></li>
           <li><a href="django.html">Get started with Django</a></li>
+          <li><a href="wordpress.html">Get started with Wordpress</a></li>
         </ul>
         <ul class="nav">
           <li>Reference:</li>

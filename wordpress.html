@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en-gb">
+  <head>
+    <meta charset="utf-8">
+    <title>Getting started with Fig and Wordpress</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140127042118713981835">
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo mobile-logo">
+        <a href="index.html">
+          <img src="img/logo.png">
+          Fig
+        </a>
+      </div>
+
+      <div class="content"><h1>Getting started with Fig and Wordpress</h1>
+
+<p>Fig makes it nice and easy to run Wordpress in an isolated environment. <a href="install.html">Install Fig</a>, then write a <code>Dockerfile</code> which installs PHP and Wordpress:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/php5
+
+ADD http://wordpress.org/wordpress-3.8.1.tar.gz /wordpress.tar.gz
+RUN tar -xzf /wordpress.tar.gz
+ADD wp-config.php /wordpress/wp-config.php
+
+ADD router.php /router.php
+</code></pre></div>
+<p>Next up, <code>fig.yml</code> starts our web service and a separate MySQL instance:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">web:
+  build: .
+  command: php -S 0.0.0.0:8000 -t /wordpress
+  ports:
+    - 8000:8000
+  links:
+    - db
+db:
+  image: orchardup/mysql
+  ports:
+    - 3306:3306
+  environment:
+    MYSQL_DATABASE: wordpress
+</code></pre></div>
+<p>Our Dockerfile relies on two supporting files - first up, <code>wp-config.php</code> is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">&lt;?php
+define(&#39;DB_NAME&#39;, &#39;wordpress&#39;);
+define(&#39;DB_USER&#39;, &#39;root&#39;);
+define(&#39;DB_PASSWORD&#39;, &#39;&#39;);
+define(&#39;DB_HOST&#39;, getenv(&quot;DB_1_PORT_3306_TCP_ADDR&quot;) . &quot;:&quot; . getenv(&quot;DB_1_PORT_3306_TCP_PORT&quot;));
+define(&#39;DB_CHARSET&#39;, &#39;utf8&#39;);
+define(&#39;DB_COLLATE&#39;, &#39;&#39;);
+
+define(&#39;AUTH_KEY&#39;,         &#39;put your unique phrase here&#39;);
+define(&#39;SECURE_AUTH_KEY&#39;,  &#39;put your unique phrase here&#39;);
+define(&#39;LOGGED_IN_KEY&#39;,    &#39;put your unique phrase here&#39;);
+define(&#39;NONCE_KEY&#39;,        &#39;put your unique phrase here&#39;);
+define(&#39;AUTH_SALT&#39;,        &#39;put your unique phrase here&#39;);
+define(&#39;SECURE_AUTH_SALT&#39;, &#39;put your unique phrase here&#39;);
+define(&#39;LOGGED_IN_SALT&#39;,   &#39;put your unique phrase here&#39;);
+define(&#39;NONCE_SALT&#39;,       &#39;put your unique phrase here&#39;);
+
+$table_prefix  = &#39;wp_&#39;;
+define(&#39;WPLANG&#39;, &#39;&#39;);
+define(&#39;WP_DEBUG&#39;, false);
+
+if ( !defined(&#39;ABSPATH&#39;) )
+    define(&#39;ABSPATH&#39;, dirname(__FILE__) . &#39;/&#39;);
+
+require_once(ABSPATH . &#39;wp-settings.php&#39;);
+</code></pre></div>
+<p>Finally, <code>router.php</code> tells PHP&#39;s built-in web server how to run Wordpress:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">&lt;?php
+
+$root = $_SERVER[&#39;DOCUMENT_ROOT&#39;];
+chdir($root);
+$path = &#39;/&#39;.ltrim(parse_url($_SERVER[&#39;REQUEST_URI&#39;])[&#39;path&#39;],&#39;/&#39;);
+set_include_path(get_include_path().&#39;:&#39;.__DIR__);
+if(file_exists($root.$path))
+{
+    if(is_dir($root.$path) &amp;&amp; substr($path,strlen($path) - 1, 1) !== &#39;/&#39;)
+        $path = rtrim($path,&#39;/&#39;).&#39;/index.php&#39;;
+    if(strpos($path,&#39;.php&#39;) === false) return false;
+    else {
+        chdir(dirname($root.$path));
+        require_once $root.$path;
+    }
+}else include_once &#39;index.php&#39;;
+</code></pre></div>
+<p>With those four files in place, run <code>fig up</code> and it&#39;ll pull and build the images we need, and then start the web and database containers. You&#39;ll then be able to visit Wordpress and set it up by visiting <a href="http://localhost:8000">localhost:8000</a> - or <a href="http://localdocker:8000">localdocker:8000</a> if you&#39;re using docker-osx.</p>
+</div>
+
+      <div class="sidebar">
+        <h1 class="logo">
+          <a href="index.html">
+            <img src="img/logo.png">
+            Fig
+          </a>
+        </h1>
+
+        <ul class="nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="install.html">Install</a></li>
+          <li><a href="rails.html">Get started with Rails</a></li>
+          <li><a href="django.html">Get started with Django</a></li>
+          <li><a href="wordpress.html">Get started with Wordpress</a></li>
+        </ul>
+        <ul class="nav">
+          <li>Reference:</li>
+          <ul>
+            <li><a href="yml.html">fig.yml</a></li>
+            <li><a href="cli.html">Commands</a></li>
+            <li><a href="env.html">Environment variables</a></li>
+          </ul>
+        </ul>
+        <ul class="nav">
+          <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
+          <li><a href="https://twitter.com/orchardup">Follow us on Twitter</a></li>
+          <li><a href="http://webchat.freenode.net/?channels=%23orchardup&uio=d4">#orchardup on Freenode</a></li>
+        </ul>
+
+        <div class="badges">
+          <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
+          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+        </div>
+      </div>
+    </div>
+      <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-43996733-3', 'orchardup.github.io');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>
