@@ -11,8 +11,10 @@
   <body>
     <div class="container">
       <div class="logo mobile-logo">
-        <img src="img/logo.png">
-        Fig
+        <a href="index.html">
+          <img src="img/logo.png">
+          Fig
+        </a>
       </div>
 
       <div class="content"><p><strong class="strapline">Fast, isolated development environments using Docker.</strong></p>
@@ -24,7 +26,7 @@ RUN pip install -r requirements.txt
 WORKDIR /code
 CMD python app.py
 </code></pre></div>
-<p>Define your app&#39;s services so they can be run alongside in an isolated environment:</p>
+<p>Define the services that make up your app so they can be run together in an isolated environment:</p>
 <div class="highlight"><pre><code class="yaml language-yaml" data-lang="yaml"><span class="l-Scalar-Plain">web</span><span class="p-Indicator">:</span>
   <span class="l-Scalar-Plain">build</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">.</span>
   <span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
@@ -158,8 +160,10 @@ figtest_web_1     /bin/sh -c python app.py   Up      5000-&gt;5000/tcp
 
       <div class="sidebar">
         <h1 class="logo">
-          <img src="img/logo.png">
-          Fig
+          <a href="index.html">
+            <img src="img/logo.png">
+            Fig
+          </a>
         </h1>
 
         <ul class="nav">

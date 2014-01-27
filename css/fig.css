@@ -60,7 +60,11 @@ img {
   font-family: 'Lilita One', sans-serif;
   font-size: 80px;
   margin: 20px 0 40px 0;
+}
+
+.logo a {
   color: #a41211;
+  text-decoration: none;
 }
 
 .logo img {
