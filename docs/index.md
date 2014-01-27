@@ -5,7 +5,7 @@ title: Fig | Fast, isolated development environments using Docker
 
 <strong class="strapline">Fast, isolated development environments using Docker.</strong>
 
-Define your app's environment with Docker so it can be reproduced anywhere.
+Define your app's environment with Docker so it can be reproduced anywhere:
 
     FROM orchardup/python:2.7
     ADD . /code
@@ -13,7 +13,7 @@ Define your app's environment with Docker so it can be reproduced anywhere.
     WORKDIR /code
     CMD python app.py
 
-Define your app's services so they can be run alongside in an isolated environment. (No more installing Postgres on your laptop!)
+Define your app's services so they can be run alongside in an isolated environment:
 
 ```yaml
 web:
@@ -25,6 +25,8 @@ web:
 db:
   image: orchardup/postgresql
 ```
+
+(No more installing Postgres on your laptop!)
 
 Then type `fig up`, and Fig will start and run your entire app:
 
