@@ -1,4 +1,5 @@
 *.egg-info
 *.pyc
 /dist
-/_site
+/docs/_site
+/docs/.git-gh-pages

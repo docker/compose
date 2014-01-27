@@ -1,0 +1,5 @@
+#!/bin/bash
+
+pushd docs
+fig run jekyll jekyll build
+popd
