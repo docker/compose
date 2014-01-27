@@ -154,6 +154,7 @@ class ServiceTest(DockerClientTestCase):
         db.start_container()
         web.start_container()
         self.assertIn('figtest_db_1', web.containers()[0].links())
+        self.assertIn('db_1', web.containers()[0].links())
         db.stop(timeout=1)
         web.stop(timeout=1)
 

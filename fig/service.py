@@ -207,10 +207,11 @@ class Service(object):
             return max(numbers) + 1
 
     def _get_links(self):
-        links = {}
+        links = []
         for service in self.links:
             for container in service.containers():
-                links[container.name] = container.name
+                links.append((container.name, container.name))
+                links.append((container.name, container.name_without_project))
         return links
 
     def _get_container_options(self, override_options, one_off=False):
