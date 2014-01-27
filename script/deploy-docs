@@ -15,12 +15,15 @@ if !(git remote | grep origin); then
   git remote add origin git@github.com:orchardup/fig.git
 fi
 
+git fetch origin
+git reset --soft origin/gh-pages
+
 echo ".git-gh-pages" > .gitignore
 
 git add -u
 git add .
 
 git commit -m "update" || echo "didn't commit"
-git push -f origin master:gh-pages
+git push origin master:gh-pages
 
 popd
