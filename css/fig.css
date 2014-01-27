@@ -158,10 +158,19 @@ a.btn:hover {
 }
 
 .strapline {
-  font-size: 40px;
-  display: block;
-  line-height: 1.2;
-  margin-top: 25px;
-  margin-bottom: 35px;
+  font-size: 30px;
 }
 
+@media (min-width: 768px) {
+  .strapline {
+    font-size: 40px;
+    display: block;
+    line-height: 1.2;
+    margin-top: 25px;
+    margin-bottom: 35px;
+  }
+}
+
+strong {
+  font-weight: 700;
+}

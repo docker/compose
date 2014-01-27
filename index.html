@@ -2,9 +2,9 @@
 <html lang="en-gb">
   <head>
     <meta charset="utf-8">
-    <title>Fig | Punctual, lightweight development environments using Docker</title>
+    <title>Fig | Fast, isolated development environments using Docker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="css/fig.css">
   </head>
@@ -17,14 +17,14 @@
 
       <div class="content"><p><strong class="strapline">Fast, isolated development environments using Docker.</strong></p>
 
-<p>Define your app&#39;s environment with Docker so it can be reproduced anywhere.</p>
+<p>Define your app&#39;s environment with Docker so it can be reproduced anywhere:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
 ADD . /code
 RUN pip install -r requirements.txt
 WORKDIR /code
 CMD python app.py
 </code></pre></div>
-<p>Define your app&#39;s services so they can be run alongside in an isolated environment. (No more installing Postgres on your laptop!)</p>
+<p>Define your app&#39;s services so they can be run alongside in an isolated environment:</p>
 <div class="highlight"><pre><code class="yaml language-yaml" data-lang="yaml"><span class="l-Scalar-Plain">web</span><span class="p-Indicator">:</span>
   <span class="l-Scalar-Plain">build</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">.</span>
   <span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
@@ -34,6 +34,8 @@ CMD python app.py
 <span class="l-Scalar-Plain">db</span><span class="p-Indicator">:</span>
   <span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">orchardup/postgresql</span>
 </code></pre></div>
+<p>(No more installing Postgres on your laptop!)</p>
+
 <p>Then type <code>fig up</code>, and Fig will start and run your entire app:</p>
 
 <p><img src="https://orchardup.com/static/images/fig-example-large.f96065fc9e22.gif" alt="example fig run"></p>
