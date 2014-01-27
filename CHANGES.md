@@ -1,6 +1,11 @@
 Change log
 ==========
 
+0.1.4 (2014-01-27)
+------------------
+
+ - Add a link alias without the project name. This makes the environment variables a little shorter: `REDIS_1_PORT_6379_TCP_ADDR`. (#54)
+
 0.1.3 (2014-01-23)
 ------------------
 
