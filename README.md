@@ -6,9 +6,17 @@ Fig
 [![PyPI version](https://badge.fury.io/py/fig.png)](http://badge.fury.io/py/fig)
 <!--/hide-on-homepage-->
 
-Punctual, lightweight development environments using Docker.
+Fast, isolated development environments using Docker.
 
-Fig is a tool for defining and running isolated application environments. You define the services which comprise your app in a simple, version-controllable YAML configuration file that looks like this:
+Define your app's environment with Docker so it can be reproduced anywhere.
+
+    FROM orchardup/python:2.7
+    ADD . /code
+    RUN pip install -r requirements.txt
+    WORKDIR /code
+    CMD python app.py
+
+Define your app's services so they can be run alongside in an isolated environment. (No more installing Postgres on your laptop!)
 
 ```yaml
 web:
@@ -32,7 +40,7 @@ There are commands to:
  - tail running services' log output
  - run a one-off command on a service
 
-Fig is a project from [Orchard](https://orchardup.com), a Docker hosting service. [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
+Fig is a project from [Orchard](https://orchardup.com). [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
 
 
 Getting started
