@@ -52,61 +52,98 @@ img {
   max-width: 100%;
 }
 
-/* Customize container */
-@media (min-width: 768px) {
-  .container {
-    max-width: 730px;
-  }
-}
-
-@media (min-width: 481px) {
-  .github-top {
-    position: absolute;
-    top: 0;
-    right: 0;
-  }
-}
-
-.content h1 {
-  display: none;
+.container {
+  margin-left: 0;
 }
 
 .logo {
-  text-align: center;
   font-family: 'Lilita One', sans-serif;
   font-size: 80px;
-  color: #a41211;
   margin: 20px 0 40px 0;
+  color: #a41211;
 }
 
 .logo img {
-  width: 100px;
+  width: 80px;
   vertical-align: -17px;
 }
 
-@media (min-width: 481px) {
-  .logo {
-    font-size: 96px;
-    margin-top: 40px;
-  }
-  .logo img {
-    vertical-align: -40px;
-    width: 150px;
-    margin-right: 20px;
-  }
-}
-
-.github-top,
-.github-bottom {
+.mobile-logo {
   text-align: center;
 }
 
-.github-top {
-  margin: 30px;
+.sidebar {
+  font-size: 16px;
 }
 
-.github-bottom {
-  margin: 60px 0;
+.sidebar a {
+  color: #a41211;
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  .sidebar .logo {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-logo {
+    display: none;
+  }
+
+  .logo {
+    margin-top: 40px;
+  }
+
+  .content h1 {
+    margin: 60px 0 55px 0;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    overflow-y: auto;
+    padding-left: 40px;
+    border-right: 1px solid #ccc;
+  }
+
+  .content {
+    margin-left: 320px;
+    max-width: 650px;
+  }
+}
+
+.nav {
+  margin: 20px 0;
+}
+
+.nav li a {
+  display: block;
+  padding: 8px 0;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.nav li a:hover, .nav li a:focus {
+  text-decoration: underline;
+  background: none;
+}
+
+.nav ul {
+  padding-left: 20px;
+  list-style: none;
+}
+
+.badges {
+  margin: 40px 0;
 }
 
 a.btn {
@@ -120,5 +157,14 @@ a.btn:hover {
   color: white;
 }
 
+.strapline {
+  font-size: 40px;
+  display: block;
+  line-height: 1.2;
+  margin-top: 25px;
+  margin-bottom: 35px;
+}
 
-
+strong {
+  font-weight: 700;
+}

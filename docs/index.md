@@ -3,17 +3,17 @@ layout: default
 title: Fig | Punctual, lightweight development environments using Docker
 ---
 
-Fig
-===
+<strong class="strapline">Fast, isolated development environments using Docker.</strong>
 
-<!--
-[![Build Status](https://travis-ci.org/orchardup/fig.png?branch=master)](https://travis-ci.org/orchardup/fig)
-[![PyPI version](https://badge.fury.io/py/fig.png)](http://badge.fury.io/py/fig)
--->
+Define your app's environment with Docker so it can be reproduced anywhere.
 
-Punctual, lightweight development environments using Docker.
+    FROM orchardup/python:2.7
+    ADD . /code
+    RUN pip install -r requirements.txt
+    WORKDIR /code
+    CMD python app.py
 
-Fig is a tool for defining and running isolated application environments. You define the services which comprise your app in a simple, version-controllable YAML configuration file that looks like this:
+Define your app's services so they can be run alongside in an isolated environment. (No more installing Postgres on your laptop!)
 
 ```yaml
 web:
@@ -37,11 +37,11 @@ There are commands to:
  - tail running services' log output
  - run a one-off command on a service
 
-Fig is a project from [Orchard](https://orchardup.com), a Docker hosting service. [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
+Fig is a project from [Orchard](https://orchardup.com). [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
 
 
-Getting started
----------------
+Quick start
+-----------
 
 Let's get a basic Python web app running on Fig. It assumes a little knowledge of Python, but the concepts should be clear if you're not familiar with it.
 
@@ -156,138 +156,3 @@ If you started Fig with `fig up -d`, you'll probably want to stop your services 
     $ fig stop
 
 That's more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/orchardup/fig) or [email us](mailto:hello@orchardup.com).
-
-
-Reference
----------
-
-### fig.yml
-
-Each service defined in `fig.yml` must specify exactly one of `image` or `build`. Other keys are optional, and are analogous to their `docker run` command-line counterparts.
-
-As with `docker run`, options specified in the Dockerfile (e.g. `CMD`, `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to specify them again in `fig.yml`.
-
-```yaml
--- Tag or partial image ID. Can be local or remote - Fig will attempt to pull if it doesn't exist locally.
-image: ubuntu
-image: orchardup/postgresql
-image: a4bc65fd
-
--- Path to a directory containing a Dockerfile. Fig will build and tag it with a generated name, and use that image thereafter.
-build: /path/to/build/dir
-
--- Override the default command.
-command: bundle exec thin -p 3000
-
--- Link to containers in another service (see "Communicating between containers").
-links:
- - db
- - redis
-
--- Expose ports. Either specify both ports (HOST:CONTAINER), or just the container port (a random host port will be chosen).
-ports:
- - 3000
- - 8000:8000
-
--- Map volumes from the host machine (HOST:CONTAINER).
-volumes:
- - cache/:/tmp/cache
-
--- Add environment variables.
-environment:
-  RACK_ENV: development
-```
-
-### Commands
-
-Most commands are run against one or more services. If the service is omitted, it will apply to all services.
-
-Run `fig [COMMAND] --help` for full usage.
-
-#### build
-
-Build or rebuild services.
-
-Services are built once and then tagged as `project_service`, e.g. `figtest_db`. If you change a service's `Dockerfile` or the contents of its build directory, you can run `fig build` to rebuild it.
-
-#### help
-
-Get help on a command.
-
-#### kill
-
-Force stop service containers.
-
-#### logs
-
-View output from services.
-
-#### ps
-
-List containers.
-
-#### rm
-
-Remove stopped service containers.
-
-
-#### run
-
-Run a one-off command on a service.
-
-For example:
-
-    $ fig run web python manage.py shell
-
-Note that this will not start any services that the command's service links to. So if, for example, your one-off command talks to your database, you will need to run `fig up -d db` first.
-
-#### scale
-
-Set number of containers to run for a service.
-
-Numbers are specified in the form `service=num` as arguments.
-For example:
-
-    $ fig scale web=2 worker=3
-
-#### start
-
-Start existing containers for a service.
-
-#### stop
-
-Stop running containers without removing them. They can be started again with `fig start`.
-
-#### up
-
-Build, (re)create, start and attach to containers for a service.
-
-By default, `fig up` will aggregate the output of each container, and when it exits, all containers will be stopped. If you run `fig up -d`, it'll start the containers in the background and leave them running.
-
-If there are existing containers for a service, `fig up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `fig.yml` are picked up.
-
-### Environment variables
-
-Fig uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
-
-<b><i>name</i>\_PORT</b><br>
-Full URL, e.g. `MYAPP_DB_1_PORT=tcp://172.17.0.5:5432`
-
-<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i></b><br>
-Full URL, e.g. `MYAPP_DB_1_PORT_5432_TCP=tcp://172.17.0.5:5432`
-
-<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i>\_ADDR</b><br>
-Container's IP address, e.g. `MYAPP_DB_1_PORT_5432_TCP_ADDR=172.17.0.5`
-
-<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i>\_PORT</b><br>
-Exposed port number, e.g. `MYAPP_DB_1_PORT_5432_TCP_PORT=5432`
-
-<b><i>name</i>\_PORT\_<i>num</i>\_<i>protocol</i>\_PROTO</b><br>
-Protocol (tcp or udp), e.g. `MYAPP_DB_1_PORT_5432_TCP_PROTO=tcp`
-
-<b><i>name</i>\_NAME</b><br>
-Fully qualified container name, e.g. `MYAPP_DB_1_NAME=/myapp_web_1/myapp_db_1`
-
-
-[Docker links]: http://docs.docker.io/en/latest/use/port_redirection/#linking-a-container
-[volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/
