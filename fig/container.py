@@ -51,6 +51,10 @@ class Container(object):
         return self.dictionary['Name'][1:]
 
     @property
+    def name_without_project(self):
+        return '_'.join(self.dictionary['Name'].split('_')[1:])
+
+    @property
     def number(self):
         try:
             return int(self.name.split('_')[-1])
