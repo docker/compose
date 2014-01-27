@@ -13,7 +13,7 @@ Define your app's environment with Docker so it can be reproduced anywhere:
     WORKDIR /code
     CMD python app.py
 
-Define your app's services so they can be run alongside in an isolated environment:
+Define the services that make up your app so they can be run together in an isolated environment:
 
 ```yaml
 web:
