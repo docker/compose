@@ -708,8 +708,11 @@ class Client(requests.Session):
         start_config['PublishAllPorts'] = publish_all_ports
 
         if links:
+            if isinstance(links, dict):
+                links = six.iteritems(links)
+
             formatted_links = [
-                '{0}:{1}'.format(k, v) for k, v in sorted(six.iteritems(links))
+                '{0}:{1}'.format(k, v) for k, v in sorted(links)
             ]
 
             start_config['Links'] = formatted_links
