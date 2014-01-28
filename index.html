@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128040090773526307">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128041078430247910">
   </head>
   <body>
     <div class="container">
@@ -79,8 +79,8 @@ $ cd figtest
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
 <span class="n">redis</span> <span class="o">=</span> <span class="n">Redis</span><span class="p">(</span>
-    <span class="n">host</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;FIGTEST_REDIS_1_PORT_6379_TCP_ADDR&#39;</span><span class="p">),</span>
-    <span class="n">port</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;FIGTEST_REDIS_1_PORT_6379_TCP_PORT&#39;</span><span class="p">))</span>
+    <span class="n">host</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;REDIS_1_PORT_6379_TCP_ADDR&#39;</span><span class="p">),</span>
+    <span class="n">port</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;REDIS_1_PORT_6379_TCP_PORT&#39;</span><span class="p">))</span>
 <span class="p">)</span>
 
 <span class="nd">@app.route</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)</span>
@@ -95,21 +95,18 @@ $ cd figtest
 <div class="highlight"><pre><code class="text language-text" data-lang="text">flask
 redis
 </code></pre></div>
-<p>And we define how to build this into a Docker image using a file called <code>Dockerfile</code>:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM stackbrew/ubuntu:13.10
-RUN apt-get -qq update
-RUN apt-get install -y python python-pip
+<p>Next, we want to create a Docker image containing all of our app&#39;s dependencies. We specify how to build one using a file called <code>Dockerfile</code>:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
 ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt
-EXPOSE 5000
-CMD python app.py
 </code></pre></div>
-<p>That tells Docker to create an image with Python and Flask installed on it, run the command <code>python app.py</code>, and open port 5000 (the port that Flask listens on).</p>
+<p>This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/use/builder/">Dockerfile reference</a>.</p>
 
 <p>We then define a set of services using <code>fig.yml</code>:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
   build: .
+  command: python app.py
   ports:
    - 5000:5000
   volumes:
@@ -122,7 +119,7 @@ redis:
 <p>This defines two services:</p>
 
 <ul>
-<li><code>web</code>, which is built from <code>Dockerfile</code> in the current directory. It also says to forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.</li>
+<li><code>web</code>, which is built from <code>Dockerfile</code> in the current directory. It also says to run the command <code>python app.py</code> inside the image, forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.</li>
 <li><code>redis</code>, which uses the public image <a href="https://index.docker.io/u/orchardup/redis/">orchardup/redis</a>. </li>
 </ul>
 
