@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140127042058357943413">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128040019385841956">
   </head>
   <body>
     <div class="container">
@@ -22,8 +22,8 @@
 <p>Define your app&#39;s environment with Docker so it can be reproduced anywhere:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
 ADD . /code
-RUN pip install -r requirements.txt
 WORKDIR /code
+RUN pip install -r requirements.txt
 CMD python app.py
 </code></pre></div>
 <p>Define the services that make up your app so they can be run together in an isolated environment:</p>
@@ -171,6 +171,7 @@ figtest_web_1     /bin/sh -c python app.py   Up      5000-&gt;5000/tcp
           <li><a href="install.html">Install</a></li>
           <li><a href="rails.html">Get started with Rails</a></li>
           <li><a href="django.html">Get started with Django</a></li>
+          <li><a href="wordpress.html">Get started with Wordpress</a></li>
         </ul>
         <ul class="nav">
           <li>Reference:</li>
