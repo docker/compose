@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140127042195880413617">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140127042058357943413">
   </head>
   <body>
     <div class="container">
@@ -67,8 +67,8 @@ Dockerfile       fig.yml          figexample       manage.py        requirements
         &#39;NAME&#39;: &#39;docker&#39;,
         &#39;USER&#39;: &#39;docker&#39;,
         &#39;PASSWORD&#39;: &#39;docker&#39;,
-        &#39;HOST&#39;: os.environ.get(&#39;DB_1_PORT_5432_TCP_ADDR&#39;),
-        &#39;PORT&#39;: os.environ.get(&#39;DB_1_PORT_5432_TCP_PORT&#39;),
+        &#39;HOST&#39;: os.environ.get(&#39;MYAPP_DB_1_PORT_5432_TCP_ADDR&#39;),
+        &#39;PORT&#39;: os.environ.get(&#39;MYAPP_DB_1_PORT_5432_TCP_PORT&#39;),
     }
 }
 </code></pre></div>
@@ -107,7 +107,6 @@ myapp_web_1 | Quit the server with CONTROL-C.
           <li><a href="install.html">Install</a></li>
           <li><a href="rails.html">Get started with Rails</a></li>
           <li><a href="django.html">Get started with Django</a></li>
-          <li><a href="wordpress.html">Get started with Wordpress</a></li>
         </ul>
         <ul class="nav">
           <li>Reference:</li>
