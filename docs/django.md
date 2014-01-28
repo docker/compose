@@ -84,7 +84,7 @@ Then, run `fig up`:
     myapp_web_1 | Starting development server at http://0.0.0.0:8000/
     myapp_web_1 | Quit the server with CONTROL-C.
 
-And your Django app should be running at localhost:3000 (or localdocker:3000 if you're using docker-osx).
+And your Django app should be running at [localhost:8000](http://localhost:8000) (or [localdocker:8000](http://localdocker:8000) if you're using docker-osx).
 
 You can also run management commands with Docker. To set up your database, for example, run `fig up` and in another terminal run:
 
