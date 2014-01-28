@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128041078430247910">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128041233288693912">
   </head>
   <body>
     <div class="container">
@@ -28,6 +28,8 @@ ADD wp-config.php /wordpress/wp-config.php
 
 ADD router.php /router.php
 </code></pre></div>
+<p>This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/use/builder/">Dockerfile reference</a>.</p>
+
 <p>Next up, <code>fig.yml</code> starts our web service and a separate MySQL instance:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
   build: .
