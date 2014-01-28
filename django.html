@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128040083604582542">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128040090773526307">
   </head>
   <body>
     <div class="container">
@@ -72,6 +72,8 @@ Dockerfile       fig.yml          figexample       manage.py        requirements
     }
 }
 </code></pre></div>
+<p>These settings are determined by the <a href="https://github.com/orchardup/docker-postgresql">orchardup/postgresql</a> Docker image we are using.</p>
+
 <p>Then, run <code>fig up</code>:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">Recreating myapp_db_1...
 Recreating myapp_web_1...
@@ -90,7 +92,7 @@ myapp_web_1 | Quit the server with CONTROL-C.
 </code></pre></div>
 <p>And your Django app should be running at localhost:3000 (or localdocker:3000 if you&#39;re using docker-osx).</p>
 
-<p>You can also run management commands with Docker. To set up your database, for example, run <code>fig up</code> and in other terminal run:</p>
+<p>You can also run management commands with Docker. To set up your database, for example, run <code>fig up</code> and in another terminal run:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web python manage.py syncdb
 </code></pre></div></div>
 
