@@ -69,9 +69,11 @@ class Client(requests.Session):
                  timeout=DEFAULT_TIMEOUT_SECONDS):
         super(Client, self).__init__()
         if base_url is None:
-            base_url = "unix://var/run/docker.sock"
-        if base_url.startswith('unix:///'):
+            base_url = "http+unix://var/run/docker.sock"
+        if 'unix:///' in base_url:
             base_url = base_url.replace('unix:/', 'unix:')
+        if base_url.startswith('unix:'):
+            base_url = "http+" + base_url
         if base_url.startswith('tcp:'):
             base_url = base_url.replace('tcp:', 'http:')
         if base_url.endswith('/'):
@@ -81,7 +83,7 @@ class Client(requests.Session):
         self._timeout = timeout
         self._auth_configs = auth.load_config()
 
-        self.mount('unix://', unixconn.UnixAdapter(base_url, timeout))
+        self.mount('http+unix://', unixconn.UnixAdapter(base_url, timeout))
 
     def _set_request_timeout(self, kwargs):
         """Prepare the kwargs for an HTTP request by inserting the timeout

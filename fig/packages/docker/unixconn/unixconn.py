@@ -36,7 +36,7 @@ class UnixHTTPConnection(httplib.HTTPConnection, object):
     def connect(self):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
-        sock.connect(self.base_url.replace("unix:/", ""))
+        sock.connect(self.base_url.replace("http+unix:/", ""))
         self.sock = sock
 
     def _extract_path(self, url):
