@@ -69,4 +69,4 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
 
             return os.path.join(self.base_dir, 'fig.yaml')
         else:
-            os.path.join(self.base_dir, 'fig.yml')
+            return os.path.join(self.base_dir, 'fig.yml')
