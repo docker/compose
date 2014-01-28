@@ -223,7 +223,7 @@ class Client(requests.Session):
     def _stream_result(self, response):
         """Generator for straight-out, non chunked-encoded HTTP responses."""
         self._raise_for_status(response)
-        for line in response.iter_lines(chunk_size=1):
+        for line in response.iter_lines(chunk_size=1, decode_unicode=True):
             # filter out keep-alive new lines
             if line:
                 yield line + '\n'
