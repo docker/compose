@@ -65,6 +65,8 @@ First thing we need to do is set up the database connection. Replace the `DATABA
         }
     }
 
+These settings are determined by the [orchardup/postgresql](https://github.com/orchardup/docker-postgresql) Docker image we are using.
+
 Then, run `fig up`:
 
     Recreating myapp_db_1...
@@ -84,7 +86,7 @@ Then, run `fig up`:
 
 And your Django app should be running at localhost:3000 (or localdocker:3000 if you're using docker-osx).
 
-You can also run management commands with Docker. To set up your database, for example, run `fig up` and in other terminal run:
+You can also run management commands with Docker. To set up your database, for example, run `fig up` and in another terminal run:
 
     $ fig run web python manage.py syncdb
 
