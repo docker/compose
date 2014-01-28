@@ -92,23 +92,20 @@ We define our Python dependencies in a file called `requirements.txt`:
     flask
     redis
 
-And we define how to build this into a Docker image using a file called `Dockerfile`:
+Next, we want to create a Docker image containing all of our app's dependencies. We specify how to build one using a file called `Dockerfile`:
 
-    FROM stackbrew/ubuntu:13.10
-    RUN apt-get -qq update
-    RUN apt-get install -y python python-pip
+    FROM orchardup/python:2.7
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
-    EXPOSE 5000
-    CMD python app.py
 
-That tells Docker to create an image with Python and Flask installed on it, run the command `python app.py`, and open port 5000 (the port that Flask listens on).
+This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the [Dockerfile tutorial](https://www.docker.io/learn/dockerfile/) and the [Dockerfile reference](http://docs.docker.io/en/latest/use/builder/).
 
 We then define a set of services using `fig.yml`:
 
     web:
       build: .
+      command: python app.py
       ports:
        - 5000:5000
       volumes:
@@ -120,7 +117,7 @@ We then define a set of services using `fig.yml`:
 
 This defines two services:
 
- - `web`, which is built from `Dockerfile` in the current directory. It also says to forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
+ - `web`, which is built from `Dockerfile` in the current directory. It also says to run the command `python app.py` inside the image, forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
  - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/). 
 
 Now if we run `fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
