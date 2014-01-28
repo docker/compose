@@ -11,13 +11,13 @@ Define your app's environment with Docker so it can be reproduced anywhere:
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
-    CMD python app.py
 
 Define the services that make up your app so they can be run together in an isolated environment:
 
 ```yaml
 web:
   build: .
+  command: python app.py
   links:
    - db
   ports:
