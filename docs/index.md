@@ -9,8 +9,8 @@ Define your app's environment with Docker so it can be reproduced anywhere:
 
     FROM orchardup/python:2.7
     ADD . /code
-    RUN pip install -r requirements.txt
     WORKDIR /code
+    RUN pip install -r requirements.txt
     CMD python app.py
 
 Define the services that make up your app so they can be run together in an isolated environment:
