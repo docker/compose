@@ -74,8 +74,8 @@ from redis import Redis
 import os
 app = Flask(__name__)
 redis = Redis(
-    host=os.environ.get('FIGTEST_REDIS_1_PORT_6379_TCP_ADDR'),
-    port=int(os.environ.get('FIGTEST_REDIS_1_PORT_6379_TCP_PORT'))
+    host=os.environ.get('REDIS_1_PORT_6379_TCP_ADDR'),
+    port=int(os.environ.get('REDIS_1_PORT_6379_TCP_PORT'))
 )
 
 @app.route('/')
