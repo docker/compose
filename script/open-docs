@@ -1,0 +1,2 @@
+#!/bin/bash
+open file://`pwd`/docs/_site/index.html
