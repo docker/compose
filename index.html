@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128041287129997528">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140128041470920682054">
   </head>
   <body>
     <div class="container">
@@ -24,11 +24,11 @@
 ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt
-CMD python app.py
 </code></pre></div>
 <p>Define the services that make up your app so they can be run together in an isolated environment:</p>
 <div class="highlight"><pre><code class="yaml language-yaml" data-lang="yaml"><span class="l-Scalar-Plain">web</span><span class="p-Indicator">:</span>
   <span class="l-Scalar-Plain">build</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">.</span>
+  <span class="l-Scalar-Plain">command</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">python app.py</span>
   <span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
    <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">db</span>
   <span class="l-Scalar-Plain">ports</span><span class="p-Indicator">:</span>
