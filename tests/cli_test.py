@@ -15,6 +15,13 @@ class CLITestCase(DockerClientTestCase):
         self.command.project.kill()
         self.command.project.remove_stopped()
 
+    def test_yaml_filename_check(self):
+        self.command.base_dir = 'tests/fixtures/longer-filename-figfile'
+
+        project = self.command.project
+
+        self.assertTrue( project.get_service('definedinyamlnotyml'), "Service: definedinyamlnotyml should have been loaded from .yaml file" )
+
     def test_help(self):
         self.assertRaises(SystemExit, lambda: self.command.dispatch(['-h'], None))
 
