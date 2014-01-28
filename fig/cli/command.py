@@ -36,8 +36,9 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
     @cached_property
     def project(self):
         try:
-            yaml_path = os.path.join(self.base_dir, 'fig.yml')
+            yaml_path = self.check_yaml_filename()
             config = yaml.load(open(yaml_path))
+
         except IOError as e:
             if e.errno == errno.ENOENT:
                 log.error("Can't find %s. Are you in the right directory?", os.path.basename(e.filename))
@@ -60,3 +61,12 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
     def formatter(self):
         return Formatter()
 
+    def check_yaml_filename(self):
+        if os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
+
+            log.warning("Fig just read the file 'fig.yaml' on startup, rather than 'fig.yml'")
+            log.warning("Please be aware that fig.yml the expected extension in most cases, and using .yaml can cause compatibility issues in future")
+
+            return os.path.join(self.base_dir, 'fig.yaml')
+        else:
+            return os.path.join(self.base_dir, 'fig.yml')
