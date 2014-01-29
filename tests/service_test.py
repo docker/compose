@@ -113,7 +113,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', environment={'FOO': '1'}, volumes=['/var/db'], entrypoint=['ps'])
         old_container = service.create_container()
         self.assertEqual(old_container.dictionary['Config']['Entrypoint'], ['ps'])
-        self.assertEqual(old_container.dictionary['Config']['Env'], ['FOO=1'])
+        self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
         self.assertEqual(old_container.name, 'figtest_db_1')
         service.start_container(old_container)
         volume_path = old_container.inspect()['Volumes']['/var/db']
@@ -130,7 +130,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], None)
 
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['ps'])
-        self.assertEqual(new_container.dictionary['Config']['Env'], ['FOO=2'])
+        self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
         service.start_container(new_container)
         self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
