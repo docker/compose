@@ -11,6 +11,7 @@ Let's use Fig to set up and run a Django/PostgreSQL app. Before starting, you'll
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
     FROM orchardup/python:2.7
+    RUN apt-get update -qq && apt-get install -y python-psycopg2
     RUN mkdir /code
     WORKDIR /code
     ADD requirements.txt /code/
