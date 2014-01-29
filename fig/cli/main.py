@@ -210,8 +210,13 @@ class TopLevelCommand(Command):
         if options['-d'] or options['-T'] or not sys.stdin.isatty():
             tty = False
 
+        if 'commands' in service.options and options['COMMAND'] in service.options['commands']:
+            command = service.options['commands'][options['COMMAND']]
+        else:
+            command = [options['COMMAND']] + options['ARGS']
+
         container_options = {
-            'command': [options['COMMAND']] + options['ARGS'],
+            'command': command,
             'tty': tty,
             'stdin_open': not options['-d'],
         }

@@ -1,0 +1,5 @@
+web:
+  build: .
+  commands:
+   r: runner
+   l: cowsay hello world!
