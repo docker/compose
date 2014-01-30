@@ -8,6 +8,8 @@ Environment variables reference
 
 Fig uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
 
+To see what environment variables are available to a service, run `fig run SERVICE env`.
+
 <b><i>name</i>\_PORT</b><br>
 Full URL, e.g. `DB_1_PORT=tcp://172.17.0.5:5432`
 
