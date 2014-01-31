@@ -1,6 +1,16 @@
 Change log
 ==========
 
+0.2.0 (2014-01-31)
+------------------
+
+ - Link services to themselves so run commands can access the running service. (#67)
+ - Much better documentation.
+ - Make service dependency resolution more reliable. (#48)
+ - Load Fig configurations with a `.yaml` extension. (#58)
+
+Big thanks to @cameronmaske, @mrchrisadams and @damianmoore for their help with this release.
+
 0.1.4 (2014-01-27)
 ------------------
 
