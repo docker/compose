@@ -47,6 +47,12 @@ For example:
 
 Note that this will not start any services that the command's service links to. So if, for example, your one-off command talks to your database, you will need to run `fig up -d db` first.
 
+One-off commands are started in new containers with the same config as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and no ports will be created in case they collide.
+
+Links are also created between one-off commands and the other containers for that service so you can do stuff like this:
+
+    $ fig run db /bin/sh -c "psql -h \$DB_1_PORT_5432_TCP_ADDR -U docker"
+
 ## scale
 
 Set number of containers to run for a service.
