@@ -1,6 +1,75 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+def flatten(d):
+    """
+        Transform data like this:
+            [('k0', 'v0'), [('k1', 'v1'),('k2', 'v2')], [[('k3', 'v3')]]]
+        into dictionary:
+            {
+                'k0': 'v0',
+                'k1': 'v1',
+                'k2': 'v2',
+                'k3': 'v3',
+            }
+    """
+    g = {}
+    def _inner(_d):
+        if isinstance(_d, tuple):
+            g[_d[0]] = _d[1]
+        elif isinstance(_d, list):
+            map(_inner, _d)
+    _inner(d)
+    return g
+
+def prepare_d(d, prefix=u''):
+    """
+        Return list from nested data structures like this:
+        {
+            'Param1':{
+                'ListParam':['a','b', 'c'],
+                'DictParam':{
+                    'ListParam':['a', 'b', 'c'],
+                    'NumberParam': 100,
+                    'BoolParam':False,
+                    'EmptyDictParam':{},
+                    'EmptyListParam':[]
+                }
+            }
+        }
+        into this
+        [
+            [
+                [
+                    (u'.Param1.ListParam.0', u'a'),
+                    (u'.Param1.ListParam.1', u'b'),
+                    (u'.Param1.ListParam.2', u'c')
+                ],
+                [
+                    (u'.Param1.DictParam.EmptyDictParam', None),
+                    (u'.Param1.DictParam.NumberParam', u'100'),
+                    [
+                        (u'.Param1.DictParam.ListParam.0', u'a'),
+                        (u'.Param1.DictParam.ListParam.1', u'b'),
+                        (u'.Param1.DictParam.ListParam.2', u'c')
+                    ],
+                    (u'.Param1.DictParam.EmptyListParam', None),
+                    (u'.Param1.DictParam.BoolParam', u'False')
+                ]
+            ]
+        ]
+    """
+    if isinstance(d, dict):
+        if len(d):
+            return map(lambda (key, value): prepare_d(value, u'%s.%s' % (prefix, key)), d.items())
+        return (prefix, None)
+    elif isinstance(d, list):
+        if len(d) > 0:
+            return map(lambda (key, value): prepare_d(value, u'%s.%s' % (prefix, key)), enumerate(d))
+        return (prefix, None)
+    return (prefix, unicode(d))
+
+
 class Container(object):
     """
     Represents a Docker container, constructed from the output of
@@ -33,6 +102,11 @@ class Container(object):
     def create(cls, client, **options):
         response = client.create_container(**options)
         return cls.from_id(client, response['Id'])
+
+    @property
+    def flat_dictionary(self):
+        self.inspect_if_not_inspected()
+        return flatten(prepare_d(self.dictionary))
 
     @property
     def id(self):

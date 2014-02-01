@@ -54,6 +54,16 @@ class Service(object):
         for c in self.containers():
             log.info("Stopping %s..." % c.name)
             c.stop(**options)
+            if self.options.get('events', None) is not None:
+                d = c.flat_dictionary
+                onStop = self.options.get('events', {}).get('onStop', [])
+                if not isinstance(onStop, list):
+                    onStop = list(onStop)
+                for cmd in onStop:
+                    log.info(cmd % d)
+                    os.system(cmd % d)
+
+
 
     def kill(self, **options):
         for c in self.containers():
@@ -190,6 +200,14 @@ class Service(object):
             port_bindings=port_bindings,
             binds=volume_bindings,
         )
+        if options.get('events', None) is not None:
+            d = container.flat_dictionary
+            onStart = options.get('events', {}).get('onStart', [])
+            if not isinstance(onStart, list):
+                onStart = list(onStart)
+            for cmd in onStart:
+                log.info(cmd % d)
+                os.system(cmd % d)
         return container
 
     def next_container_name(self, one_off=False):
