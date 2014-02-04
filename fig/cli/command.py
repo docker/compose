@@ -11,7 +11,7 @@ import yaml
 from ..project import Project
 from .docopt_command import DocoptCommand
 from .formatter import Formatter
-from .utils import cached_property, docker_url
+from .utils import cached_property, docker_url, call_silently
 from .errors import UserError
 
 log = logging.getLogger(__name__)
@@ -23,7 +23,10 @@ class Command(DocoptCommand):
         try:
             super(Command, self).dispatch(*args, **kwargs)
         except ConnectionError:
-            raise UserError("""
+            if call_silently(['which', 'docker-osx']) == 0:
+                raise UserError("Couldn't connect to Docker daemon - you might need to run `docker-osx shell`.")
+            else:
+                raise UserError("""
 Couldn't connect to Docker daemon at %s - is it running?
 
 If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
