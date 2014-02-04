@@ -33,11 +33,18 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
     def client(self):
         return Client(docker_url())
 
+    def __expand_env_variables(self, yaml_path):
+        file_content = open(yaml_path).read()
+        for k, v in os.environ.iteritems():
+            if file_content.find('$' + k) != -1:
+                file_content = file_content.replace('$' + k, v)
+        return file_content
+
     @cached_property
     def project(self):
         try:
             yaml_path = self.check_yaml_filename()
-            config = yaml.load(open(yaml_path))
+            config = yaml.load(self.__expand_env_variables(yaml_path))
 
         except IOError as e:
             if e.errno == errno.ENOENT:
