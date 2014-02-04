@@ -125,4 +125,4 @@ def is_mac():
 
 
 def is_ubuntu():
-    return platform.system() == 'Linux'
+    return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
