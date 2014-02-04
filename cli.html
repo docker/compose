@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140130041048359961315">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140204050085391629020">
   </head>
   <body>
     <div class="container">
@@ -58,6 +58,11 @@
 </code></pre></div>
 <p>Note that this will not start any services that the command&#39;s service links to. So if, for example, your one-off command talks to your database, you will need to run <code>fig up -d db</code> first.</p>
 
+<p>One-off commands are started in new containers with the same config as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and no ports will be created in case they collide.</p>
+
+<p>Links are also created between one-off commands and the other containers for that service so you can do stuff like this:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run db /bin/sh -c &quot;psql -h \$DB_1_PORT_5432_TCP_ADDR -U docker&quot;
+</code></pre></div>
 <h2>scale</h2>
 
 <p>Set number of containers to run for a service.</p>
