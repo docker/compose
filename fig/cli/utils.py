@@ -5,6 +5,7 @@ import datetime
 import os
 import socket
 import subprocess
+import platform
 from .errors import UserError
 
 
@@ -117,3 +118,11 @@ def call_silently(*args, **kwargs):
     """
     with open(os.devnull, 'w') as shutup:
         return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
+
+
+def is_mac():
+    return platform.system() == 'Darwin'
+
+
+def is_ubuntu():
+    return platform.system() == 'Linux'
