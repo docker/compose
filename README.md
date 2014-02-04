@@ -52,4 +52,10 @@ Running the test suite
 
     $ script/test
 
+Building OS X binaries
+---------------------
+
+    $ script/build-osx
+
+Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyInstaller](http://www.pyinstaller.org/ticket/807).
 
