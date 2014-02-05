@@ -12,7 +12,7 @@ Fig makes it nice and easy to run Wordpress in an isolated environment. [Install
 FROM orchardup/php5
 
 ADD http://wordpress.org/wordpress-3.8.1.tar.gz /wordpress.tar.gz
-RUN tar -xzf /wordpress.tar.gz
+RUN mv /wordpress-3.8.1/wordpress /wordpress
 ADD wp-config.php /wordpress/wp-config.php
 
 ADD router.php /router.php
