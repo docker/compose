@@ -7,8 +7,10 @@ import logging
 import os
 import re
 import yaml
+import six
 
 from ..project import Project
+from ..service import ConfigError
 from .docopt_command import DocoptCommand
 from .formatter import Formatter
 from .utils import cached_property, docker_url
@@ -47,7 +49,10 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
 
             exit(1)
 
-        return Project.from_config(self.project_name, config, self.client)
+        try:
+            return Project.from_config(self.project_name, config, self.client)
+        except ConfigError as e:
+            raise UserError(six.text_type(e))
 
     @cached_property
     def project_name(self):

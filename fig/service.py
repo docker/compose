@@ -10,6 +10,14 @@ from .container import Container
 log = logging.getLogger(__name__)
 
 
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint']
+DOCKER_CONFIG_HINTS = {
+    'link': 'links',
+    'port': 'ports',
+    'volume': 'volumes',
+}
+
+
 class BuildError(Exception):
     pass
 
@@ -18,14 +26,27 @@ class CannotBeScaledError(Exception):
     pass
 
 
+class ConfigError(ValueError):
+    pass
+
+
 class Service(object):
     def __init__(self, name, client=None, project='default', links=[], **options):
         if not re.match('^[a-zA-Z0-9]+$', name):
-            raise ValueError('Invalid name: %s' % name)
+            raise ConfigError('Invalid name: %s' % name)
         if not re.match('^[a-zA-Z0-9]+$', project):
-            raise ValueError('Invalid project: %s' % project)
+            raise ConfigError('Invalid project: %s' % project)
         if 'image' in options and 'build' in options:
-            raise ValueError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
+            raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
+
+        supported_options = DOCKER_CONFIG_KEYS + ['build']
+
+        for k in options:
+            if k not in supported_options:
+                msg = "Unsupported config option for %s service: '%s'" % (name, k)
+                if k in DOCKER_CONFIG_HINTS:
+                    msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
+                raise ConfigError(msg)
 
         self.name = name
         self.client = client
@@ -218,8 +239,7 @@ class Service(object):
         return links
 
     def _get_container_options(self, override_options, one_off=False):
-        keys = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint']
-        container_options = dict((k, self.options[k]) for k in keys if k in self.options)
+        container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
         container_options['name'] = self.next_container_name(one_off)
