@@ -4,6 +4,8 @@ from __future__ import division
 import datetime
 import os
 import socket
+import subprocess
+import platform
 from .errors import UserError
 
 
@@ -108,3 +110,19 @@ def split_buffer(reader, separator):
 
     if len(buffered) > 0:
         yield buffered
+
+
+def call_silently(*args, **kwargs):
+    """
+    Like subprocess.call(), but redirects stdout and stderr to /dev/null.
+    """
+    with open(os.devnull, 'w') as shutup:
+        return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
+
+
+def is_mac():
+    return platform.system() == 'Darwin'
+
+
+def is_ubuntu():
+    return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
