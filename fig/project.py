@@ -116,11 +116,11 @@ class Project(object):
             service.start(**options)
 
     def stop(self, service_names=None, **options):
-        for service in self.get_services(service_names):
+        for service in reversed(self.get_services(service_names)):
             service.stop(**options)
 
     def kill(self, service_names=None, **options):
-        for service in self.get_services(service_names):
+        for service in reversed(self.get_services(service_names)):
             service.kill(**options)
 
     def build(self, service_names=None, **options):
