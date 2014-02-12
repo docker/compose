@@ -44,6 +44,27 @@ class SortServiceTest(unittest.TestCase):
         self.assertEqual(sorted_services[1]['name'], 'postgres')
         self.assertEqual(sorted_services[2]['name'], 'web')
 
+    def test_sort_service_dicts_3(self):
+        services = [
+            {
+                'name': 'child'
+            },
+            {
+                'name': 'parent',
+                'links': ['child']
+            },
+            {
+                'links': ['parent'],
+                'name': 'grandparent'
+            },
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 3)
+        self.assertEqual(sorted_services[0]['name'], 'child')
+        self.assertEqual(sorted_services[1]['name'], 'parent')
+        self.assertEqual(sorted_services[2]['name'], 'grandparent')
+
     def test_sort_service_dicts_circular_imports(self):
         services = [
             {
@@ -84,6 +105,30 @@ class SortServiceTest(unittest.TestCase):
         except DependencyError as e:
             self.assertIn('redis', e.msg)
             self.assertIn('web', e.msg)
+        else:
+            self.fail('Should have thrown an DependencyError')
+
+    def test_sort_service_dicts_circular_imports_3(self):
+        services = [
+            {
+                'links': ['b'],
+                'name': 'a'
+            },
+            {
+                'name': 'b',
+                'links': ['c']
+            },
+            {
+                'name': 'c',
+                'links': ['a']
+            }
+        ]
+
+        try:
+            sort_service_dicts(services)
+        except DependencyError as e:
+            self.assertIn('a', e.msg)
+            self.assertIn('b', e.msg)
         else:
             self.fail('Should have thrown an DependencyError')
 

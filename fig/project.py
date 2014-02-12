@@ -7,31 +7,30 @@ log = logging.getLogger(__name__)
 
 
 def sort_service_dicts(services):
-    # Get all services that are dependant on another.
-    dependent_services = [s for s in services if s.get('links')]
-    flatten_links = sum([s['links'] for s in dependent_services], [])
-    # Get all services that are not linked to and don't link to others.
-    non_dependent_sevices = [s for s in services if s['name'] not in flatten_links and not s.get('links')]
+    # Topological sort (Cormen/Tarjan algorithm).
+    unmarked = services[:]
+    temporary_marked = set()
     sorted_services = []
-    # Topological sort.
-    while dependent_services:
-        n = dependent_services.pop()
-        # Check if a service is dependent on itself, if so raise an error.
-        if n['name'] in n.get('links', []):
-            raise DependencyError('A service can not link to itself: %s' % n['name'])
-        sorted_services.append(n)
-        for l in n['links']:
-            # Get the linked service.
-            linked_service = next(s for s in services if l == s['name'])
-            # Check that there isn't a circular import between services.
-            if n['name'] in linked_service.get('links', []):
-                raise DependencyError('Circular import between %s and %s' % (n['name'], linked_service['name']))
-            # Check the linked service has no links and is not already in the
-            # sorted service list.
-            if not linked_service.get('links') and linked_service not in sorted_services:
-                sorted_services.insert(0, linked_service)
-    return non_dependent_sevices + sorted_services
 
+    def visit(n):
+        if n['name'] in temporary_marked:
+            if n['name'] in n.get('links', []):
+                raise DependencyError('A service can not link to itself: %s' % n['name'])
+            else:
+                raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
+        if n in unmarked:
+            temporary_marked.add(n['name'])
+            dependents = [m for m in services if n['name'] in m.get('links', [])]
+            for m in dependents:
+                visit(m)
+            temporary_marked.remove(n['name'])
+            unmarked.remove(n)
+            sorted_services.insert(0, n)
+
+    while unmarked:
+        visit(unmarked[-1])
+
+    return sorted_services
 
 class Project(object):
     """
