@@ -289,7 +289,7 @@ class TopLevelCommand(Command):
         if not detached:
             to_attach = [c for (s, c) in new]
             print("Attaching to", list_containers(to_attach))
-            log_printer = LogPrinter(to_attach)
+            log_printer = LogPrinter(to_attach, attach_params={"logs": True})
 
         for (service, container) in new:
             service.start_container(container)
