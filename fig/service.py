@@ -167,44 +167,24 @@ class Service(object):
 
         port_bindings = {}
 
-        # FIXME : debug
-        from pprint import pprint
-        if options.get('ports', None) is not None:
-                    # FIXME : check udp for this port too
-            pprint(options['ports'])
-        # ENDFIXME
-
             for port in options['ports']:
                 port = str(port)
                 if ':' in port:
-
-                    # FIXME : check if . is in one of the port
-                    # -> . == ip_adresse
-                    # size is not a good indicator, you cand do:
-                    # 4243
-                    # 4243:4243
-                    # 127.0.0.1:4243
-                    # 127.0.0.1:4243:4243
                     external_port, internal_port = port.split(':', 1)
 
-                    # FIXME : test
+                    # If external_port is an ip address
                     if external_port.find('.') != -1:
                         port_split = internal_port.split(':', 1)
                         if len(port_split) > 1:
                             external_port = (external_port, port_split[0])
                             internal_port = port_split[1]
                         else:
-                            external_port = (external_port)
+                            external_port = (external_port,)
                             internal_port = port_split[0]
-                        print external_port, internal_port
                 else:
                     external_port, internal_port = (None, port)
 
                 port_bindings[internal_port] = external_port
-
-        # FIXME : debug
-        pprint(port_bindings)
-        # ENDFIXME
 
         volume_bindings = {}
 
@@ -263,9 +243,6 @@ class Service(object):
                     port = tuple(port.split('/'))
                 ports.append(port)
             container_options['ports'] = ports
-            from pprint import pprint
-            print "create:"
-            pprint(container_options)
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
