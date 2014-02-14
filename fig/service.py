@@ -158,32 +158,34 @@ class Service(object):
 
         return (intermediate_container, new_container)
 
-    def __port_bindings(self, ports):
+    def __port_bindings(self, options):
         """
         Compute the correct datastructure to represent the port forwarding.
         """
 
         port_bindings = {}
 
-        for port in ports:
-            port = str(port)
+        if options.get('ports', None) is not None:
+            ports = options['ports']
+            for port in ports:
+                port = str(port)
 
-            if ':' in port:
-                external_port, internal_port = port.split(':', 1)
+                if ':' in port:
+                    external_port, internal_port = port.split(':', 1)
 
-                if external_port.find('.') != -1:
-                    port_split = internal_port.split(':', 1)
+                    if external_port.find('.') != -1:
+                        port_split = internal_port.split(':', 1)
 
-                    if len(port_split) > 1:
-                        external_port = (external_port, port_split[0])
-                        internal_port = port_split[1]
-                    else:
-                        external_port = (external_port,)
-                        internal_port = port_split[0]
-            else:
-                external_port, internal_port = (None, port)
+                        if len(port_split) > 1:
+                            external_port = (external_port, port_split[0])
+                            internal_port = port_split[1]
+                        else:
+                            external_port = (external_port,)
+                            internal_port = port_split[0]
+                else:
+                    external_port, internal_port = (None, port)
 
-            port_bindings[internal_port] = external_port
+                port_bindings[internal_port] = external_port
 
         return port_bindings
 
@@ -204,7 +206,7 @@ class Service(object):
 
         container.start(
             links=self._get_links(),
-            port_bindings=self.__port_bindings(options['ports']),
+            port_bindings=self.__port_bindings(options),
             binds=volume_bindings,
         )
         return container
