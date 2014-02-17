@@ -229,5 +229,12 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', ports=['8000:8000'])
         self.assertRaises(CannotBeScaledError, lambda: service.scale(1))
 
+    def test_scale_sets_ports(self):
+        service = self.create_service('web', ports=['8000'])
+        service.scale(2)
+        containers = service.containers()
+        self.assertEqual(len(containers), 2)
+        for container in containers:
+            self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
 
 
