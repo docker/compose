@@ -1,6 +1,16 @@
 Change log
 ==========
 
+0.2.2 (2014-02-17)
+------------------
+
+ - Resolve dependencies using Cormen/Tarjan topological sort
+ - Fix `fig up` not printing log output
+ - Stop containers in reverse order to starting
+ - Fix scale command not binding ports
+
+Thanks to @barnybug and @dustinlacewell for their work on this release.
+
 0.2.1 (2014-02-04)
 ------------------
 
