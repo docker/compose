@@ -1,0 +1,10 @@
+#!/bin/bash
+set -ex
+
+# Kill background processes on exit
+trap 'kill -9 $(jobs -p)' SIGINT SIGTERM EXIT
+
+export DOCKER_HOST=tcp://localhost:4243
+orchard proxy -H $TRAVIS_JOB_ID $DOCKER_HOST &
+sleep 2
+nosetests -v
