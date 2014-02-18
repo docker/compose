@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140218071004472810102">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140218071035391237738">
   </head>
   <body>
     <div class="container">
@@ -22,7 +22,7 @@
 <p>Fig makes it nice and easy to run Wordpress in an isolated environment. <a href="install.html">Install Fig</a>, then download Wordpress into the current directory:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl http://wordpress.org/wordpress-3.8.1.tar.gz | tar -xvzf -
 </code></pre></div>
-<p>This will create a directory called <code>wordpress</code>, which you can rename to the name of your project if you wish. Inside, that directory, we need to write a file that defines what environment your app is going to run in:</p>
+<p>This will create a directory called <code>wordpress</code>, which you can rename to the name of your project if you wish. Inside that directory, we create <code>Dockerfile</code>, a file that defines what environment your app is going to run in:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/php5
 ADD . /code
 </code></pre></div>
