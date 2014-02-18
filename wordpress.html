@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140205050198479311721">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140218071004472810102">
   </head>
   <body>
     <div class="container">
@@ -19,25 +19,25 @@
 
       <div class="content"><h1>Getting started with Fig and Wordpress</h1>
 
-<p>Fig makes it nice and easy to run Wordpress in an isolated environment. <a href="install.html">Install Fig</a>, then write a <code>Dockerfile</code> which installs PHP and Wordpress:</p>
+<p>Fig makes it nice and easy to run Wordpress in an isolated environment. <a href="install.html">Install Fig</a>, then download Wordpress into the current directory:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl http://wordpress.org/wordpress-3.8.1.tar.gz | tar -xvzf -
+</code></pre></div>
+<p>This will create a directory called <code>wordpress</code>, which you can rename to the name of your project if you wish. Inside, that directory, we need to write a file that defines what environment your app is going to run in:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/php5
-
-ADD http://wordpress.org/wordpress-3.8.1.tar.gz /wordpress.tar.gz
-RUN tar -xzf /wordpress.tar.gz
-ADD wp-config.php /wordpress/wp-config.php
-
-ADD router.php /router.php
+ADD . /code
 </code></pre></div>
 <p>This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/use/builder/">Dockerfile reference</a>.</p>
 
 <p>Next up, <code>fig.yml</code> starts our web service and a separate MySQL instance:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
   build: .
-  command: php -S 0.0.0.0:8000 -t /wordpress
+  command: php -S 0.0.0.0:8000 -t /code
   ports:
     - 8000:8000
   links:
     - db
+  volumes:
+    - .:/code
 db:
   image: orchardup/mysql
   ports:
@@ -45,7 +45,7 @@ db:
   environment:
     MYSQL_DATABASE: wordpress
 </code></pre></div>
-<p>Our Dockerfile relies on two supporting files - first up, <code>wp-config.php</code> is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:</p>
+<p>Two supporting files are needed to get this working - first up, <code>wp-config.php</code> is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">&lt;?php
 define(&#39;DB_NAME&#39;, &#39;wordpress&#39;);
 define(&#39;DB_USER&#39;, &#39;root&#39;);
@@ -90,7 +90,7 @@ if(file_exists($root.$path))
     }
 }else include_once &#39;index.php&#39;;
 </code></pre></div>
-<p>With those four files in place, run <code>fig up</code> and it&#39;ll pull and build the images we need, and then start the web and database containers. You&#39;ll then be able to visit Wordpress and set it up by visiting <a href="http://localhost:8000">localhost:8000</a> - or <a href="http://localdocker:8000">localdocker:8000</a> if you&#39;re using docker-osx.</p>
+<p>With those four files in place, run <code>fig up</code> inside your Wordpress directory and it&#39;ll pull and build the images we need, and then start the web and database containers. You&#39;ll then be able to visit Wordpress and set it up by visiting <a href="http://localhost:8000">localhost:8000</a> - or <a href="http://localdocker:8000">localdocker:8000</a> if you&#39;re using docker-osx.</p>
 </div>
 
       <div class="sidebar">
