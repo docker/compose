@@ -6,16 +6,15 @@ title: Getting started with Fig and Wordpress
 Getting started with Fig and Wordpress
 ======================================
 
-Fig makes it nice and easy to run Wordpress in an isolated environment. [Install Fig](install.html), then write a `Dockerfile` which installs PHP and Wordpress:
+Fig makes it nice and easy to run Wordpress in an isolated environment. [Install Fig](install.html), then download Wordpress into the current directory:
+
+    $ curl http://wordpress.org/wordpress-3.8.1.tar.gz | tar -xvzf -
+
+This will create a directory called `wordpress`, which you can rename to the name of your project if you wish. Inside, that directory, we need to write a file that defines what environment your app is going to run in:
 
 ```
 FROM orchardup/php5
-
-ADD http://wordpress.org/wordpress-3.8.1.tar.gz /wordpress.tar.gz
-RUN tar -xzf /wordpress.tar.gz
-ADD wp-config.php /wordpress/wp-config.php
-
-ADD router.php /router.php
+ADD . /code
 ```
 
 This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the [Dockerfile tutorial](https://www.docker.io/learn/dockerfile/) and the [Dockerfile reference](http://docs.docker.io/en/latest/use/builder/).
@@ -25,11 +24,13 @@ Next up, `fig.yml` starts our web service and a separate MySQL instance:
 ```
 web:
   build: .
-  command: php -S 0.0.0.0:8000 -t /wordpress
+  command: php -S 0.0.0.0:8000 -t /code
   ports:
     - 8000:8000
   links:
     - db
+  volumes:
+    - .:/code
 db:
   image: orchardup/mysql
   ports:
@@ -38,7 +39,7 @@ db:
     MYSQL_DATABASE: wordpress
 ```
 
-Our Dockerfile relies on two supporting files - first up, `wp-config.php` is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:
+Two supporting files are needed to get this working - first up, `wp-config.php` is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:
 
 ```
 <?php
@@ -89,4 +90,4 @@ if(file_exists($root.$path))
 }else include_once 'index.php';
 ```
 
-With those four files in place, run `fig up` and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress and set it up by visiting [localhost:8000](http://localhost:8000) - or [localdocker:8000](http://localdocker:8000) if you're using docker-osx.
+With those four files in place, run `fig up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress and set it up by visiting [localhost:8000](http://localhost:8000) - or [localdocker:8000](http://localdocker:8000) if you're using docker-osx.
