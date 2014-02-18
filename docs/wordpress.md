@@ -10,7 +10,7 @@ Fig makes it nice and easy to run Wordpress in an isolated environment. [Install
 
     $ curl http://wordpress.org/wordpress-3.8.1.tar.gz | tar -xvzf -
 
-This will create a directory called `wordpress`, which you can rename to the name of your project if you wish. Inside, that directory, we need to write a file that defines what environment your app is going to run in:
+This will create a directory called `wordpress`, which you can rename to the name of your project if you wish. Inside that directory, we create `Dockerfile`, a file that defines what environment your app is going to run in:
 
 ```
 FROM orchardup/php5
