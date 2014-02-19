@@ -1,23 +1,14 @@
 #!/bin/bash
-
-# Exit on first error
 set -ex
 
-# Put Python eggs in a writeable directory
-export PYTHON_EGG_CACHE="/tmp/.python-eggs"
-
-# Activate correct virtualenv
-TRAVIS_PYTHON_VERSION=$1
-source /home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/activate
-
-env
+if [[ $TRAVIS_PYTHON_VERSION == "2.6" ]]; then
+  pip install unittest2
+fi
 
 # Kill background processes on exit
 trap 'kill -9 $(jobs -p)' SIGINT SIGTERM EXIT
 
-# Start docker daemon
-docker -d -H unix:///var/run/docker.sock 2>> /dev/null >> /dev/null &
+export DOCKER_HOST=tcp://localhost:4243
+orchard proxy -H $TRAVIS_JOB_ID $DOCKER_HOST &
 sleep 2
-
-# $init is set by sekexe
-cd $(dirname $init)/.. && nosetests -v
+nosetests -v

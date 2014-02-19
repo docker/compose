@@ -5,17 +5,21 @@ python:
 - '3.2'
 - '3.3'
 env:
-- DOCKER_VERSION=0.7.6
-- DOCKER_VERSION=0.8.0
+  global:
+  - secure: exbot0LTV/0Wic6ElKCrOZmh2ZrieuGwEqfYKf5rVuwu1sLngYRihh+lBL/hTwc79NSu829pbwiWfsQZrXbk/yvaS7avGR0CLDoipyPxlYa2/rfs/o4OdTZqXv0LcFmmd54j5QBMpWU1S+CYOwNkwas57trrvIpPbzWjMtfYzOU=
 matrix:
   allow_failures:
   - python: '3.2'
   - python: '3.3'
-install: script/travis-install
-script:
-- pwd
-- env
-- sekexe/run "`pwd`/script/travis $TRAVIS_PYTHON_VERSION"
+install:
+- pip install .
+- pip install -r requirements.txt
+- pip install -r requirements-dev.txt
+- sudo curl -L -o /usr/local/bin/orchard https://github.com/orchardup/go-orchard/releases/download/2.0.4/linux
+- sudo chmod +x /usr/local/bin/orchard
+before_script: orchard hosts create $TRAVIS_JOB_ID
+script: script/travis
+after_script: orchard hosts rm -f $TRAVIS_JOB_ID
 deploy:
   provider: pypi
   user: orchard
