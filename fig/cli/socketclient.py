@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) != 2:
         sys.stderr.write("Usage: python socketclient.py WEBSOCKET_URL\n")
-        exit(1)
+        sys.exit(1)
 
     url = sys.argv[1]
     socket = websocket.create_connection(url)

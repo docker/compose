@@ -39,18 +39,18 @@ def main():
         command.sys_dispatch()
     except KeyboardInterrupt:
         log.error("\nAborting.")
-        exit(1)
+        sys.exit(1)
     except (UserError, NoSuchService, DependencyError) as e:
         log.error(e.msg)
-        exit(1)
+        sys.exit(1)
     except NoSuchCommand as e:
         log.error("No such command: %s", e.command)
         log.error("")
         log.error("\n".join(parse_doc_section("commands:", getdoc(e.supercommand))))
-        exit(1)
+        sys.exit(1)
     except APIError as e:
         log.error(e.explanation)
-        exit(1)
+        sys.exit(1)
 
 
 # stolen from docopt master

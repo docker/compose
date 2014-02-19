@@ -8,6 +8,7 @@ import os
 import re
 import yaml
 import six
+import sys
 
 from ..project import Project
 from ..service import ConfigError
@@ -69,7 +70,7 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
             else:
                 log.error(e)
 
-            exit(1)
+            sys.exit(1)
 
         try:
             return Project.from_config(self.project_name, config, self.client)
