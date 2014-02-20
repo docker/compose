@@ -30,14 +30,14 @@ Finally, `fig.yml` is where the magic happens. It describes what services our ap
     db:
       image: orchardup/postgresql
       ports:
-        - 5432
+        - "5432"
     web:
       build: .
       command: bundle exec rackup -p 3000
       volumes:
         - .:/myapp
       ports:
-        - 3000:3000
+        - "3000:3000"
       links:
         - db
 

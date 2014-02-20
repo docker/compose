@@ -22,10 +22,13 @@ web:
   links:
    - db
   ports:
-   - 8000:8000
+   - "8000:8000"
+   - "49100:22"
 db:
   image: orchardup/postgresql
 ```
+
+**Note** When mapping ports in the format HOST:CONTAINER you may experience erroneous results when using a container port lower than 60. This is due to YAML parsing numbers in the format "xx:yy" as sexagesimal (base 60) for this reason it is recommended to define your port mappings as strings.
 
 (No more installing Postgres on your laptop!)
 

@@ -21,7 +21,7 @@ web:
   links:
    - db
   ports:
-   - 8000:8000
+   - "8000:8000"
 db:
   image: orchardup/postgresql
 ```
@@ -107,7 +107,7 @@ We then define a set of services using `fig.yml`:
       build: .
       command: python app.py
       ports:
-       - 5000:5000
+       - "5000:5000"
       volumes:
        - .:/code
       links:
