@@ -39,18 +39,18 @@ def main():
         command.sys_dispatch()
     except KeyboardInterrupt:
         log.error("\nAborting.")
-        exit(1)
+        sys.exit(1)
     except (UserError, NoSuchService, DependencyError) as e:
         log.error(e.msg)
-        exit(1)
+        sys.exit(1)
     except NoSuchCommand as e:
         log.error("No such command: %s", e.command)
         log.error("")
         log.error("\n".join(parse_doc_section("commands:", getdoc(e.supercommand))))
-        exit(1)
+        sys.exit(1)
     except APIError as e:
         log.error(e.explanation)
-        exit(1)
+        sys.exit(1)
 
 
 # stolen from docopt master
@@ -242,11 +242,8 @@ class TopLevelCommand(Command):
 
             $ fig scale web=2 worker=3
 
-        Usage: scale [SERVICE=NUM...]
-        Options:
-           -e  ENV         Specify an alternate environment to use: Default is None 
+        Usage: scale [SERVICE=NUM...]        
         """
-        
 
         for s in options['SERVICE=NUM']:
             if '=' not in s:
@@ -266,13 +263,8 @@ class TopLevelCommand(Command):
         """
         Start existing containers.
 
-        Usage: start [SERVICE...]
-
-        Options:
-           -e  ENV         Specify an alternate environment to use: Default is None 
+        Usage: start [SERVICE...]        
         """
-        
-
         self.project.start(service_names=options['SERVICE'])
 
     def stop(self, options):
@@ -281,13 +273,8 @@ class TopLevelCommand(Command):
 
         They can be started again with `fig start`.
 
-        Usage: stop [SERVICE...] 
-        
-        Options:
-           -e  ENV         Specify an alternate environment to use: Default is None  
+        Usage: stop [SERVICE...]
         """
-        
-
         self.project.stop(service_names=options['SERVICE'])
 
     def up(self, options):
