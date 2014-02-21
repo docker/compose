@@ -131,7 +131,7 @@ class TopLevelCommand(Command):
         """
         View output from containers.
 
-        Usage: logs [SERVICE...] 
+        Usage: logs [SERVICE...]
         """
         
 
@@ -240,7 +240,7 @@ class TopLevelCommand(Command):
 
             $ fig scale web=2 worker=3
 
-        Usage: scale [SERVICE=NUM...]    
+        Usage: scale [SERVICE=NUM...]  
         """
 
         for s in options['SERVICE=NUM']:
@@ -287,7 +287,7 @@ class TopLevelCommand(Command):
         and recreate them (preserving mounted volumes with volumes-from),
         so that changes in `fig.yml` are picked up.
 
-        Usage: up [options] [SERVICE...] 
+        Usage: up [options] [SERVICE...]
 
         Options:
             -d    Detached mode: Run containers in the background, print new
