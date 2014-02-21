@@ -131,7 +131,7 @@ class TopLevelCommand(Command):
         """
         View output from containers.
 
-        Usage: logs [SERVICE...]     
+        Usage: logs [SERVICE...] 
         """
         
 
@@ -146,7 +146,7 @@ class TopLevelCommand(Command):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q              Only display IDs
+            -q    Only display IDs
         """
         
 
@@ -181,8 +181,6 @@ class TopLevelCommand(Command):
 
         Usage: rm [SERVICE...]
         """
-        
-
         all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
@@ -208,10 +206,10 @@ class TopLevelCommand(Command):
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d              Detached mode: Run container in the background, print new
-                            container name
-            -T              Disable pseudo-tty allocation. By default `fig run`
-                            allocates a TTY.
+            -d    Detached mode: Run container in the background, print new
+                  container name
+            -T    Disable pseudo-tty allocation. By default `fig run`
+                  allocates a TTY.
         """
         service = self.project.get_service(options['SERVICE'])
 
@@ -242,7 +240,7 @@ class TopLevelCommand(Command):
 
             $ fig scale web=2 worker=3
 
-        Usage: scale [SERVICE=NUM...]        
+        Usage: scale [SERVICE=NUM...]    
         """
 
         for s in options['SERVICE=NUM']:
@@ -263,7 +261,7 @@ class TopLevelCommand(Command):
         """
         Start existing containers.
 
-        Usage: start [SERVICE...]        
+        Usage: start [SERVICE...]
         """
         self.project.start(service_names=options['SERVICE'])
 
@@ -289,14 +287,11 @@ class TopLevelCommand(Command):
         and recreate them (preserving mounted volumes with volumes-from),
         so that changes in `fig.yml` are picked up.
 
-        By default 
-
         Usage: up [options] [SERVICE...] 
 
         Options:
-            -d              Detached mode: Run containers in the background, print new
-                            container names
-            -e  ENV         Specify an alternate environment to use: Default is None              
+            -d    Detached mode: Run containers in the background, print new
+                  container names
         """
         detached = options['-d']
                       
@@ -307,7 +302,7 @@ class TopLevelCommand(Command):
         if not detached:
             to_attach = [c for (s, c) in new]
             print("Attaching to", list_containers(to_attach))
-            log_printer = LogPrinter(to_attach)
+            log_printer = LogPrinter(to_attach, attach_params={"logs": True})
 
         for (service, container) in new:
             service.start_container(container)

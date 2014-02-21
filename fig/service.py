@@ -111,7 +111,7 @@ class Service(object):
         while len(running_containers) < desired_num:
             c = stopped_containers.pop(0)
             log.info("Starting %s..." % c.name)
-            c.start()
+            self.start_container(c)
             running_containers.append(c)
 
 
