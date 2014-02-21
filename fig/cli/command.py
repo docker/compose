@@ -8,6 +8,7 @@ import os
 import re
 import yaml
 import six
+import sys
 
 from ..project import Project
 from ..service import ConfigError
@@ -20,7 +21,7 @@ log = logging.getLogger(__name__)
 
 class Command(DocoptCommand):
     base_dir = '.'
-    
+
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
@@ -88,11 +89,11 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
                     config = config['environments'][self.env]
                 else: # There are environments set in the yaml file, but none are specified with `-e`
                     log.error('You have environments defined in your fig file but haven\'t specified any to use\nTry adding `-e <environment> to your options')
-                    exit(1)
+                    sys.exit(1)
             else: # If the user specifies an environment, but none exists in the yaml file.
                 if self.env:
                     log.error('You have specified an environment with `-e, --environment <environment>` but have none in your fig file.')
-                    exit(1)    
+                    sys.exit(1)    
             return config
 
         except IOError as e:
@@ -101,7 +102,7 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
             else:
                 log.error(e)
 
-            exit(1)
+            sys.sys.exit(1)
 
     def check_yaml_filename(self):
         if self.yaml_file == 'fig.yml':
@@ -113,8 +114,8 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
 
                     return os.path.join(self.base_dir, 'fig.yaml')
                 else:
-                    print("Couldn't find either fig.yml or fig.yaml. Please check your fig file name or specifiy it with -f FIGFILE")
+                    print("Couldn't find either fig.yml or fig.yaml. Please check your fig file name or specifiy it with -f FILE ")
 
         if os.path.exists(os.path.join(self.base_dir, self.yaml_file)):
-            return '{0}/{1}'.format(self.base_dir, self.yaml_file)
+            return os.path.join(self.base_dir, self.yaml_file)
 

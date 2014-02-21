@@ -59,11 +59,8 @@ class Project(object):
         return project
 
     @classmethod
-    def from_config(cls, name, config, client, env=None):
+    def from_config(cls, name, config, client):
         dicts = []
-        
-        if env:
-            config = config[env]
 
         for service_name, service in list(config.items()):
             service['name'] = service_name
