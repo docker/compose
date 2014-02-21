@@ -165,9 +165,9 @@ class Service(object):
         intermediate_container = Container.create(
             self.client,
             image=container.image,
-            command='echo',
             volumes_from=container.id,
-            entrypoint=None
+            entrypoint=['echo'],
+            command=[],
         )
         intermediate_container.start()
         intermediate_container.wait()
