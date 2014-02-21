@@ -32,7 +32,6 @@ def sort_service_dicts(services):
 
     return sorted_services
 
-
 class Project(object):
     """
     A collection of services.
@@ -61,7 +60,6 @@ class Project(object):
     @classmethod
     def from_config(cls, name, config, client):
         dicts = []
-
         for service_name, service in list(config.items()):
             service['name'] = service_name
             dicts.append(service)
