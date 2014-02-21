@@ -39,18 +39,18 @@ def main():
         command.sys_dispatch()
     except KeyboardInterrupt:
         log.error("\nAborting.")
-        sys.exit(1)
+        exit(1)
     except (UserError, NoSuchService, DependencyError) as e:
         log.error(e.msg)
-        sys.exit(1)
+        exit(1)
     except NoSuchCommand as e:
         log.error("No such command: %s", e.command)
         log.error("")
         log.error("\n".join(parse_doc_section("commands:", getdoc(e.supercommand))))
-        sys.exit(1)
+        exit(1)
     except APIError as e:
         log.error(e.explanation)
-        sys.exit(1)
+        exit(1)
 
 
 # stolen from docopt master
@@ -68,8 +68,10 @@ class TopLevelCommand(Command):
       fig -h|--help
 
     Options:
-      --verbose            Show more output
-      --version            Print version and exit
+      --verbose                            Show more output
+      --version                            Print version and exit
+      -e, --environment ENVIRONMENT        Specify an alternate environment to use: Default is None
+      -f, --file FILE                      Specify an alternate fig file. 
 
     Commands:
       build     Build or rebuild services
@@ -85,6 +87,10 @@ class TopLevelCommand(Command):
       up        Create and start containers
 
     """
+    
+    # Take an arg for enviroment load. 
+    env = None
+        
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
         options['version'] = "fig %s" % __version__
@@ -125,8 +131,10 @@ class TopLevelCommand(Command):
         """
         View output from containers.
 
-        Usage: logs [SERVICE...]
+        Usage: logs [SERVICE...]     
         """
+        
+
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}).run()
@@ -138,8 +146,10 @@ class TopLevelCommand(Command):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q    Only display IDs
+            -q              Only display IDs
         """
+        
+
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True) + self.project.containers(service_names=options['SERVICE'], one_off=True)
 
         if options['-q']:
@@ -171,6 +181,8 @@ class TopLevelCommand(Command):
 
         Usage: rm [SERVICE...]
         """
+        
+
         all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
@@ -196,10 +208,10 @@ class TopLevelCommand(Command):
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d    Detached mode: Run container in the background, print new
-                  container name
-            -T    Disable pseudo-tty allocation. By default `fig run`
-                  allocates a TTY.
+            -d              Detached mode: Run container in the background, print new
+                            container name
+            -T              Disable pseudo-tty allocation. By default `fig run`
+                            allocates a TTY.
         """
         service = self.project.get_service(options['SERVICE'])
 
@@ -231,7 +243,11 @@ class TopLevelCommand(Command):
             $ fig scale web=2 worker=3
 
         Usage: scale [SERVICE=NUM...]
+        Options:
+           -e  ENV         Specify an alternate environment to use: Default is None 
         """
+        
+
         for s in options['SERVICE=NUM']:
             if '=' not in s:
                 raise UserError('Arguments to scale should be in the form service=num')
@@ -251,7 +267,12 @@ class TopLevelCommand(Command):
         Start existing containers.
 
         Usage: start [SERVICE...]
+
+        Options:
+           -e  ENV         Specify an alternate environment to use: Default is None 
         """
+        
+
         self.project.start(service_names=options['SERVICE'])
 
     def stop(self, options):
@@ -260,8 +281,13 @@ class TopLevelCommand(Command):
 
         They can be started again with `fig start`.
 
-        Usage: stop [SERVICE...]
+        Usage: stop [SERVICE...] 
+        
+        Options:
+           -e  ENV         Specify an alternate environment to use: Default is None  
         """
+        
+
         self.project.stop(service_names=options['SERVICE'])
 
     def up(self, options):
@@ -276,20 +302,25 @@ class TopLevelCommand(Command):
         and recreate them (preserving mounted volumes with volumes-from),
         so that changes in `fig.yml` are picked up.
 
-        Usage: up [options] [SERVICE...]
+        By default 
+
+        Usage: up [options] [SERVICE...] 
 
         Options:
-            -d    Detached mode: Run containers in the background, print new
-                  container names
+            -d              Detached mode: Run containers in the background, print new
+                            container names
+            -e  ENV         Specify an alternate environment to use: Default is None              
         """
         detached = options['-d']
+                      
+        
 
         (old, new) = self.project.recreate_containers(service_names=options['SERVICE'])
 
         if not detached:
             to_attach = [c for (s, c) in new]
             print("Attaching to", list_containers(to_attach))
-            log_printer = LogPrinter(to_attach, attach_params={"logs": True})
+            log_printer = LogPrinter(to_attach)
 
         for (service, container) in new:
             service.start_container(container)
