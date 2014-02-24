@@ -1,8 +1,7 @@
 #!/bin/bash
+set -ex
 
 script/build-docs
-
-set -ex
 
 pushd docs/_site
 
