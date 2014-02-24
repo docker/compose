@@ -8,7 +8,7 @@ Installing Fig
 
 First, install Docker. If you're on OS X, you can use [docker-osx](https://github.com/noplay/docker-osx):
 
-    $ curl https://raw.github.com/noplay/docker-osx/0.7.6/docker-osx > /usr/local/bin/docker-osx
+    $ curl https://raw.github.com/noplay/docker-osx/0.8.0/docker-osx > /usr/local/bin/docker-osx
     $ chmod +x /usr/local/bin/docker-osx
     $ docker-osx shell
 
