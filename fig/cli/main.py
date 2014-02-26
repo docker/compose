@@ -68,8 +68,10 @@ class TopLevelCommand(Command):
       fig -h|--help
 
     Options:
-      --verbose            Show more output
-      --version            Print version and exit
+      --verbose                            Show more output
+      --version                            Print version and exit
+      -e, --environment ENVIRONMENT        Specify an alternate environment to use: Default is None
+      -f, --file FILE                      Specify an alternate fig file. 
 
     Commands:
       build     Build or rebuild services
@@ -85,6 +87,10 @@ class TopLevelCommand(Command):
       up        Create and start containers
 
     """
+    
+    # Take an arg for enviroment load. 
+    env = None
+        
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
         options['version'] = "fig %s" % __version__
@@ -127,6 +133,8 @@ class TopLevelCommand(Command):
 
         Usage: logs [SERVICE...]
         """
+        
+
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}).run()
@@ -140,6 +148,8 @@ class TopLevelCommand(Command):
         Options:
             -q    Only display IDs
         """
+        
+
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True) + self.project.containers(service_names=options['SERVICE'], one_off=True)
 
         if options['-q']:
@@ -230,8 +240,9 @@ class TopLevelCommand(Command):
 
             $ fig scale web=2 worker=3
 
-        Usage: scale [SERVICE=NUM...]
+        Usage: scale [SERVICE=NUM...]  
         """
+
         for s in options['SERVICE=NUM']:
             if '=' not in s:
                 raise UserError('Arguments to scale should be in the form service=num')
@@ -283,6 +294,8 @@ class TopLevelCommand(Command):
                   container names
         """
         detached = options['-d']
+                      
+        
 
         (old, new) = self.project.recreate_containers(service_names=options['SERVICE'])
 

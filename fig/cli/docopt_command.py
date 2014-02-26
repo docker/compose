@@ -29,6 +29,16 @@ class DocoptCommand(object):
     def parse(self, argv, global_options):
         options = docopt_full_help(getdoc(self), argv, **self.docopt_options())
         command = options['COMMAND']
+        
+        # Add command line arg for specifying environments
+        if options['--environment']:
+            self.env = options['--environment']       
+            
+        # Add command line arg or specifying alternate fig file.
+        if options['--file']:
+            self.yaml_file = options['--file']
+        else:
+            self.yaml_file = 'fig.yml'
 
         if command is None:
             raise SystemExit(getdoc(self))

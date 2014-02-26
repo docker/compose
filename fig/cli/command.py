@@ -61,18 +61,7 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
     @cached_property
     def project(self):
         try:
-            yaml_path = self.check_yaml_filename()
-            config = yaml.load(open(yaml_path))
-
-        except IOError as e:
-            if e.errno == errno.ENOENT:
-                log.error("Can't find %s. Are you in the right directory?", os.path.basename(e.filename))
-            else:
-                log.error(e)
-
-            sys.exit(1)
-
-        try:
+            config = self.get_config()
             return Project.from_config(self.project_name, config, self.client)
         except ConfigError as e:
             raise UserError(six.text_type(e))
@@ -89,12 +78,44 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
     def formatter(self):
         return Formatter()
 
+    def get_config(self):
+        try:
+            yaml_path = self.check_yaml_filename()
+            config = yaml.load(open(yaml_path))
+            
+            # Did the user set an environment? Do any exist in the specified yaml file?
+            if 'environments' in config.keys():
+                if self.env:
+                    config = config['environments'][self.env]
+                else: # There are environments set in the yaml file, but none are specified with `-e`
+                    log.error('You have environments defined in your fig file but haven\'t specified any to use\nTry adding `-e <environment> to your options')
+                    sys.exit(1)
+            else: # If the user specifies an environment, but none exists in the yaml file.
+                if self.env:
+                    log.error('You have specified an environment with `-e, --environment <environment>` but have none in your fig file.')
+                    sys.exit(1)    
+            return config
+
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                log.error("Can't find %s. Are you in the right directory?", os.path.basename(e.filename))
+            else:
+                log.error(e)
+
+            sys.sys.exit(1)
+
     def check_yaml_filename(self):
-        if os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
+        if self.yaml_file == 'fig.yml':
+            if not os.path.exists(os.path.join(self.base_dir, 'fig.yml')):
+                if os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
 
-            log.warning("Fig just read the file 'fig.yaml' on startup, rather than 'fig.yml'")
-            log.warning("Please be aware that fig.yml the expected extension in most cases, and using .yaml can cause compatibility issues in future")
+                    log.warning("Fig just read the file 'fig.yaml' on startup, rather than 'fig.yml'")
+                    log.warning("Please be aware that fig.yml the expected extension in most cases, and using .yaml can cause compatibility issues in the future")
 
-            return os.path.join(self.base_dir, 'fig.yaml')
-        else:
-            return os.path.join(self.base_dir, 'fig.yml')
+                    return os.path.join(self.base_dir, 'fig.yaml')
+                else:
+                    print("Couldn't find either fig.yml or fig.yaml. Please check your fig file name or specifiy it with -f FILE ")
+
+        if os.path.exists(os.path.join(self.base_dir, self.yaml_file)):
+            return os.path.join(self.base_dir, self.yaml_file)
+
