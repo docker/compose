@@ -70,6 +70,7 @@ class TopLevelCommand(Command):
     Options:
       --verbose            Show more output
       --version            Print version and exit
+      -f, --file FILE      Specify an alternate fig file (default: fig.yml)
 
     Commands:
       build     Build or rebuild services

@@ -1,0 +1,3 @@
+yetanother:
+  image: ubuntu
+  command: /bin/sleep 300
