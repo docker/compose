@@ -13,48 +13,48 @@ class UserError(Exception):
 class DockerNotFoundMac(UserError):
     def __init__(self):
         super(DockerNotFoundMac, self).__init__("""
-Couldn't connect to Docker daemon. You might need to install docker-osx:
+        Couldn't connect to Docker daemon. You might need to install docker-osx:
 
-https://github.com/noplay/docker-osx
-""")
+        https://github.com/noplay/docker-osx
+        """)
 
 
 class DockerNotFoundUbuntu(UserError):
     def __init__(self):
         super(DockerNotFoundUbuntu, self).__init__("""
-Couldn't connect to Docker daemon. You might need to install Docker:
+        Couldn't connect to Docker daemon. You might need to install Docker:
 
-http://docs.docker.io/en/latest/installation/ubuntulinux/
-""")
+        http://docs.docker.io/en/latest/installation/ubuntulinux/
+        """)
 
 
 class DockerNotFoundGeneric(UserError):
     def __init__(self):
         super(DockerNotFoundGeneric, self).__init__("""
-Couldn't connect to Docker daemon. You might need to install Docker:
+        Couldn't connect to Docker daemon. You might need to install Docker:
 
-http://docs.docker.io/en/latest/installation/
-""")
+        http://docs.docker.io/en/latest/installation/
+        """)
 
 
 class ConnectionErrorDockerOSX(UserError):
     def __init__(self):
         super(ConnectionErrorDockerOSX, self).__init__("""
-Couldn't connect to Docker daemon - you might need to run `docker-osx shell`.
-""")
+        Couldn't connect to Docker daemon - you might need to run `docker-osx shell`.
+        """)
 
 
 class ConnectionErrorGeneric(UserError):
     def __init__(self, url):
         super(ConnectionErrorGeneric, self).__init__("""
-Couldn't connect to Docker daemon at %s - is it running?
+        Couldn't connect to Docker daemon at %s - is it running?
 
-If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
-""" % url)
+        If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
+        """ % url)
 
 
 class FigFileNotFound(UserError):
     def __init__(self, filename):
         super(FigFileNotFound, self).__init__("""
-Can't find %s. Are you in the right directory?
-""" % filename)
+        Can't find %s. Are you in the right directory?
+        """ % filename)
