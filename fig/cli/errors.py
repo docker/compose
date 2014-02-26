@@ -51,3 +51,10 @@ Couldn't connect to Docker daemon at %s - is it running?
 
 If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
 """ % url)
+
+
+class FigFileNotFound(UserError):
+    def __init__(self, filename):
+        super(FigFileNotFound, self).__init__("""
+Can't find %s. Are you in the right directory?
+""" % filename)

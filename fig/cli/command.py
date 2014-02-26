@@ -50,11 +50,8 @@ class Command(DocoptCommand):
 
         except IOError as e:
             if e.errno == errno.ENOENT:
-                log.error("Can't find %s. Are you in the right directory?", os.path.basename(e.filename))
-            else:
-                log.error(e)
-
-            sys.exit(1)
+                raise errors.FigFileNotFound(os.path.basename(e.filename))
+            raise errors.UserError(six.text_type(e))
 
         try:
             return Project.from_config(self.project_name, config, self.client)
