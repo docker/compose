@@ -15,7 +15,7 @@ from ..service import ConfigError
 from .docopt_command import DocoptCommand
 from .formatter import Formatter
 from .utils import cached_property, docker_url, call_silently, is_mac, is_ubuntu
-from .errors import UserError
+from . import errors
 
 log = logging.getLogger(__name__)
 
@@ -28,31 +28,15 @@ class Command(DocoptCommand):
         except ConnectionError:
             if call_silently(['which', 'docker']) != 0:
                 if is_mac():
-                    raise UserError("""
-Couldn't connect to Docker daemon. You might need to install docker-osx:
-
-https://github.com/noplay/docker-osx
-""")
+                    raise errors.DockerNotFoundMac()
                 elif is_ubuntu():
-                    raise UserError("""
-Couldn't connect to Docker daemon. You might need to install Docker:
-
-http://docs.docker.io/en/latest/installation/ubuntulinux/
-""")
+                    raise errors.DockerNotFoundUbuntu()
                 else:
-                    raise UserError("""
-Couldn't connect to Docker daemon. You might need to install Docker:
-
-http://docs.docker.io/en/latest/installation/
-""")
+                    raise errors.DockerNotFoundGeneric()
             elif call_silently(['which', 'docker-osx']) == 0:
-                raise UserError("Couldn't connect to Docker daemon - you might need to run `docker-osx shell`.")
+                raise errors.ConnectionErrorDockerOSX()
             else:
-                raise UserError("""
-Couldn't connect to Docker daemon at %s - is it running?
-
-If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
-""" % self.client.base_url)
+                raise errors.ConnectionErrorGeneric(self.client.base_url)
 
     @cached_property
     def client(self):
@@ -66,16 +50,13 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
 
         except IOError as e:
             if e.errno == errno.ENOENT:
-                log.error("Can't find %s. Are you in the right directory?", os.path.basename(e.filename))
-            else:
-                log.error(e)
-
-            sys.exit(1)
+                raise errors.FigFileNotFound(os.path.basename(e.filename))
+            raise errors.UserError(six.text_type(e))
 
         try:
             return Project.from_config(self.project_name, config, self.client)
         except ConfigError as e:
-            raise UserError(six.text_type(e))
+            raise errors.UserError(six.text_type(e))
 
     @cached_property
     def project_name(self):
