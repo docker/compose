@@ -62,7 +62,7 @@ If it's at a non-standard location, specify the URL with the DOCKER_HOST environ
     def project(self):
         try:
             yaml_path = self.check_yaml_filename()
-            config = yaml.load(open(yaml_path))
+            config = yaml.load(os.path.expandvars(open(yaml_path).read()))
 
         except IOError as e:
             if e.errno == errno.ENOENT:
