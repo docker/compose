@@ -39,7 +39,7 @@ There are commands to:
  - tail running services' log output
  - run a one-off command on a service
 
-Fig is a project from [Orchard](https://orchardup.com). [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
+Fig is a project from [Orchard](https://orchardup.com), a Docker hosting service. [Follow us on Twitter](https://twitter.com/orchardup) to keep up to date with Fig and other Docker news.
 
 
 Quick start
