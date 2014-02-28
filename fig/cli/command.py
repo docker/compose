@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import yaml
-import six
+from ..packages import six
 import sys
 
 from ..project import Project

@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 
 import requests
-import six
+from fig.packages import six
 
 
 def mkbuildcontext(dockerfile):

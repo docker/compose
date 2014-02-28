@@ -19,7 +19,7 @@ import struct
 
 import requests
 import requests.exceptions
-import six
+from fig.packages import six
 
 from .auth import auth
 from .unixconn import unixconn

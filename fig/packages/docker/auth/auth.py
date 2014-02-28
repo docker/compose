@@ -17,7 +17,7 @@ import fileinput
 import json
 import os
 
-import six
+from fig.packages import six
 
 from ..utils import utils
 
