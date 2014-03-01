@@ -154,7 +154,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_start_container_creates_links(self):
         db = self.create_service('db')
-        web = self.create_service('web', links=[db])
+        web = self.create_service('web', links=[(db, None)])
         db.start_container()
         web.start_container()
         self.assertIn('figtest_db_1', web.containers()[0].links())
