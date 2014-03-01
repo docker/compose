@@ -99,7 +99,7 @@ Next, we want to create a Docker image containing all of our app's dependencies.
     WORKDIR /code
     RUN pip install -r requirements.txt
 
-This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the [Dockerfile tutorial](https://www.docker.io/learn/dockerfile/) and the [Dockerfile reference](http://docs.docker.io/en/latest/use/builder/).
+This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the [Dockerfile tutorial](https://www.docker.io/learn/dockerfile/) and the [Dockerfile reference](http://docs.docker.io/en/latest/reference/builder/).
 
 We then define a set of services using `fig.yml`:
 
