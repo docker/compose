@@ -229,8 +229,10 @@ class Service(object):
 
     def _get_links(self):
         links = []
-        for service in self.links:
+        for service, link_name in self.links:
             for container in service.containers():
+                if link_name:
+                    links.append((container.name, link_name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         for container in self.containers():
