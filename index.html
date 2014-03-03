@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140301081157179514735">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140228081933111372101">
   </head>
   <body>
     <div class="container">
@@ -101,7 +101,7 @@ ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt
 </code></pre></div>
-<p>This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/reference/builder/">Dockerfile reference</a>.</p>
+<p>This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/use/builder/">Dockerfile reference</a>.</p>
 
 <p>We then define a set of services using <code>fig.yml</code>:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
