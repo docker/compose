@@ -111,8 +111,9 @@ class Container(object):
     def kill(self):
         return self.client.kill(self.id)
 
-    def remove(self):
-        return self.client.remove_container(self.id)
+    def remove(self, **options):
+        v = options.get('remove_volumes', False)
+        return self.client.remove_container(self.id, v=v)
 
     def inspect_if_not_inspected(self):
         if not self.has_been_inspected:

@@ -170,6 +170,9 @@ class TopLevelCommand(Command):
         Remove stopped service containers.
 
         Usage: rm [SERVICE...]
+
+        Options:
+            -v    Remove volumes associated with containers
         """
         all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
@@ -177,7 +180,8 @@ class TopLevelCommand(Command):
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
             if yesno("Are you sure? [yN] ", default=False):
-                self.project.remove_stopped(service_names=options['SERVICE'])
+                self.project.remove_stopped(service_names=options['SERVICE'],
+                                            remove_volumes=options['-v'])
         else:
             print("No stopped containers")
 
