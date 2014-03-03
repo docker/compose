@@ -26,7 +26,7 @@ web:
   build: .
   command: php -S 0.0.0.0:8000 -t /code
   ports:
-    - 8000:8000
+    - "8000:8000"
   links:
     - db
   volumes:
@@ -34,7 +34,7 @@ web:
 db:
   image: orchardup/mysql
   ports:
-    - 3306:3306
+    - "3306:3306"
   environment:
     MYSQL_DATABASE: wordpress
 ```

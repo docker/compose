@@ -29,14 +29,14 @@ Simple enough. Finally, this is all tied together with a file called `fig.yml`. 
     db:
       image: orchardup/postgresql
       ports:
-        - 5432
+        - "5432"
     web:
       build: .
       command: python manage.py runserver 0.0.0.0:8000
       volumes:
         - .:/code
       ports:
-        - 8000:8000
+        - "8000:8000"
       links:
         - db
 
