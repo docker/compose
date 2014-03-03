@@ -24,9 +24,12 @@ build: /path/to/build/dir
 -- Override the default command.
 command: bundle exec thin -p 3000
 
--- Link to containers in another service
+-- Link to containers in another service. Optionally specify an alternate name
+-- for the link, which will determine how environment variables are prefixed,
+-- e.g. "db" -> DB_1_PORT, "db:database" -> DATABASE_1_PORT
 links:
  - db
+ - db:database
  - redis
 
 -- Expose ports. Either specify both ports (HOST:CONTAINER), or just the
