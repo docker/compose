@@ -14,10 +14,18 @@ First, install Docker. If you're on OS X, you can use [docker-osx](https://githu
 
 Docker has guides for [Ubuntu](http://docs.docker.io/en/latest/installation/ubuntulinux/) and [other platforms](http://docs.docker.io/en/latest/installation/) in their documentation.
 
-Next, install Fig:
+Next, install Fig. On OS X:
+
+    $ curl -L https://github.com/orchardup/fig/releases/download/0.3.0/darwin > /usr/local/bin/fig
+    $ chmod +x /usr/local/bin/fig
+
+On 64-bit Linux:
+
+    $ curl -L https://github.com/orchardup/fig/releases/download/0.3.0/linux > /usr/local/bin/fig
+    $ chmod +x /usr/local/bin/fig
+
+Fig is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
 
     $ sudo pip install -U fig
-
-(This command also upgrades Fig when we release a new version. If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`.)
 
 That should be all you need! Run `fig --version` to see if it worked.
