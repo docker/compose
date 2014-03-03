@@ -1,6 +1,19 @@
 Change log
 ==========
 
+0.3.0 (2014-03-03)
+------------------
+
+ - We now ship binaries for OS X and Linux. No more having to install with Pip!
+ - Add `-f` flag to specify alternate `fig.yml` files
+ - Add support for custom link names
+ - Fix a bug where recreating would sometimes hang
+ - Update docker-py to support Docker 0.8.0.
+ - Various documentation improvements
+ - Various error message improvements
+
+Thanks @marksteve, @Gazler and @teozkr!
+
 0.2.2 (2014-02-17)
 ------------------
 
