@@ -11,24 +11,31 @@ Each service defined in `fig.yml` must specify exactly one of `image` or `build`
 As with `docker run`, options specified in the Dockerfile (e.g. `CMD`, `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to specify them again in `fig.yml`.
 
 ```yaml
--- Tag or partial image ID. Can be local or remote - Fig will attempt to pull if it doesn't exist locally.
+-- Tag or partial image ID. Can be local or remote - Fig will attempt to pull
+-- if it doesn't exist locally.
 image: ubuntu
 image: orchardup/postgresql
 image: a4bc65fd
 
--- Path to a directory containing a Dockerfile. Fig will build and tag it with a generated name, and use that image thereafter.
+-- Path to a directory containing a Dockerfile. Fig will build and tag it with
+-- a generated name, and use that image thereafter.
 build: /path/to/build/dir
 
 -- Override the default command.
 command: bundle exec thin -p 3000
 
--- Link to containers in another service (see "Communicating between containers").
+-- Link to containers in another service
 links:
  - db
  - redis
 
--- Expose ports. Either specify both ports (HOST:CONTAINER), or just the container port (a random host port will be chosen).
--- Note: When mapping ports in the HOST:CONTAINER format, you may experience erroneous results when using a container port lower than 60, because YAML will parse numbers in the format "xx:yy" as sexagesimal (base 60). For this reason, we recommend always explicitly specifying your port mappings as strings.
+-- Expose ports. Either specify both ports (HOST:CONTAINER), or just the
+-- container port (a random host port will be chosen).
+-- Note: When mapping ports in the HOST:CONTAINER format, you may experience
+-- erroneous results when using a container port lower than 60, because YAML
+-- will parse numbers in the format "xx:yy" as sexagesimal (base 60). For
+-- this reason, we recommend always explicitly specifying your port mappings
+-- as strings.
 ports:
  - "3000"
  - "8000:8000"
