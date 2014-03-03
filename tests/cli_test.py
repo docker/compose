@@ -31,6 +31,28 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['ps'], None)
         self.assertIn('fig_simple_1', mock_stdout.getvalue())
 
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_default_figfile(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/multiple-figfiles'
+        self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['ps'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertIn('fig_simple_1', output)
+        self.assertIn('fig_another_1', output)
+        self.assertNotIn('fig_yetanother_1', output)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_alternate_figfile(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/multiple-figfiles'
+        self.command.dispatch(['-f', 'fig2.yml', 'up', '-d'], None)
+        self.command.dispatch(['-f', 'fig2.yml', 'ps'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertNotIn('fig_simple_1', output)
+        self.assertNotIn('fig_another_1', output)
+        self.assertIn('fig_yetanother_1', output)
+
     def test_scale(self):
         project = self.command.project
 

@@ -22,6 +22,9 @@ log = logging.getLogger(__name__)
 class Command(DocoptCommand):
     base_dir = '.'
 
+    def __init__(self):
+        self.yaml_path = os.environ.get('FIG_FILE', None)
+
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
@@ -38,6 +41,11 @@ class Command(DocoptCommand):
             else:
                 raise errors.ConnectionErrorGeneric(self.client.base_url)
 
+    def perform_command(self, options, *args, **kwargs):
+        if options['--file'] is not None:
+            self.yaml_path = os.path.join(self.base_dir, options['--file'])
+        return super(Command, self).perform_command(options, *args, **kwargs)
+
     @cached_property
     def client(self):
         return Client(docker_url())
@@ -45,9 +53,10 @@ class Command(DocoptCommand):
     @cached_property
     def project(self):
         try:
-            yaml_path = self.check_yaml_filename()
+            yaml_path = self.yaml_path
+            if yaml_path is None:
+                yaml_path = self.check_yaml_filename()
             config = yaml.load(open(yaml_path))
-
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
