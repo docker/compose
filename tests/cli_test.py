@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from .testcases import DockerClientTestCase
 from mock import patch
-from six import StringIO
+from fig.packages.six import StringIO
 from fig.cli.main import TopLevelCommand
 
 class CLITestCase(DockerClientTestCase):
