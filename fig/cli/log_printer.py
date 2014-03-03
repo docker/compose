@@ -18,7 +18,7 @@ class LogPrinter(object):
     def run(self):
         mux = Multiplexer(self.generators)
         for line in mux.loop():
-            sys.stdout.write(line)
+            sys.stdout.write(line.encode(sys.__stdout__.encoding or 'utf8'))
 
     def _make_log_generators(self):
         color_fns = cycle(colors.rainbow())
