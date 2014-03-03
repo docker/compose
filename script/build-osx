@@ -1,0 +1,6 @@
+#!/bin/bash
+set -ex
+virtualenv venv
+venv/bin/pip install pyinstaller==2.1
+venv/bin/pip install .
+venv/bin/pyinstaller -F bin/fig

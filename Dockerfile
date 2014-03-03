@@ -1,9 +1,10 @@
-FROM stackbrew/ubuntu:12.04
-RUN apt-get update -qq
-RUN apt-get install -y python python-pip
+FROM orchardup/python:2.7
 ADD requirements.txt /code/
 WORKDIR /code/
 RUN pip install -r requirements.txt
 ADD requirements-dev.txt /code/
 RUN pip install -r requirements-dev.txt
 ADD . /code/
+RUN useradd -d /home/user -m -s /bin/bash user
+RUN chown -R user /code/
+USER user
