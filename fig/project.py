@@ -12,15 +12,17 @@ def sort_service_dicts(services):
     temporary_marked = set()
     sorted_services = []
 
+    get_service_names = lambda links: [link.split(':')[0] for link in links]
+
     def visit(n):
         if n['name'] in temporary_marked:
-            if n['name'] in n.get('links', []):
+            if n['name'] in get_service_names(n.get('links', [])):
                 raise DependencyError('A service can not link to itself: %s' % n['name'])
             else:
                 raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
         if n in unmarked:
             temporary_marked.add(n['name'])
-            dependents = [m for m in services if n['name'] in m.get('links', [])]
+            dependents = [m for m in services if n['name'] in get_service_names(m.get('links', []))]
             for m in dependents:
                 visit(m)
             temporary_marked.remove(n['name'])
@@ -51,8 +53,12 @@ class Project(object):
             # Reference links by object
             links = []
             if 'links' in service_dict:
-                for service_name in service_dict.get('links', []):
-                    links.append(project.get_service(service_name))
+                for link in service_dict.get('links', []):
+                    if ':' in link:
+                        service_name, link_name = link.split(':', 1)
+                    else:
+                        service_name, link_name = link, None
+                    links.append((project.get_service(service_name), link_name))
                 del service_dict['links']
             project.services.append(Service(client=client, project=name, links=links, **service_dict))
         return project
