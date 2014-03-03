@@ -22,12 +22,13 @@ class DockerClientTestCase(unittest.TestCase):
                 self.client.remove_image(i)
 
     def create_service(self, name, **kwargs):
+        if 'command' not in kwargs:
+            kwargs['command'] = ["/bin/sleep", "300"]
         return Service(
             project='figtest',
             name=name,
             client=self.client,
             image="ubuntu",
-            command=["/bin/sleep", "300"],
             **kwargs
         )
 
