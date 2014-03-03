@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140228081933111372101">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140303091963271416714">
   </head>
   <body>
     <div class="container">
@@ -32,7 +32,7 @@ RUN pip install -r requirements.txt
   <span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
    <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">db</span>
   <span class="l-Scalar-Plain">ports</span><span class="p-Indicator">:</span>
-   <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">8000:8000</span>
+   <span class="p-Indicator">-</span> <span class="s">&quot;8000:8000&quot;</span>
 <span class="l-Scalar-Plain">db</span><span class="p-Indicator">:</span>
   <span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">orchardup/postgresql</span>
 </code></pre></div>
@@ -101,14 +101,14 @@ ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt
 </code></pre></div>
-<p>This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/use/builder/">Dockerfile reference</a>.</p>
+<p>This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/reference/builder/">Dockerfile reference</a>.</p>
 
 <p>We then define a set of services using <code>fig.yml</code>:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
   build: .
   command: python app.py
   ports:
-   - 5000:5000
+   - &quot;5000:5000&quot;
   volumes:
    - .:/code
   links:
