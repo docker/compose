@@ -9,6 +9,7 @@ from .container import Container
 
 log = logging.getLogger(__name__)
 
+reload(sys).setdefaultencoding('utf8')
 
 DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint']
 DOCKER_CONFIG_HINTS = {
@@ -283,7 +284,7 @@ class Service(object):
                 match = re.search(r'Successfully built ([0-9a-f]+)', line)
                 if match:
                     image_id = match.group(1)
-            sys.stdout.write(line.encode('utf8'))
+            sys.stdout.write(line)
 
         if image_id is None:
             raise BuildError()
