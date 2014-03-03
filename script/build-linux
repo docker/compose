@@ -1,0 +1,3 @@
+#!/bin/sh
+docker build -t fig .
+docker run -v `pwd`/dist:/code/dist fig pyinstaller -F bin/fig
