@@ -67,6 +67,8 @@ class Project(object):
     def from_config(cls, name, config, client):
         dicts = []
         for service_name, service in list(config.items()):
+            if not isinstance(service, dict):
+                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.')
             service['name'] = service_name
             dicts.append(service)
         return cls.from_dicts(name, dicts, client)
@@ -156,9 +158,13 @@ class NoSuchService(Exception):
         return self.msg
 
 
-class DependencyError(Exception):
+class ConfigurationError(Exception):
     def __init__(self, msg):
         self.msg = msg
 
     def __str__(self):
         return self.msg
+
+class DependencyError(ConfigurationError):
+    pass
+
