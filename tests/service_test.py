@@ -217,6 +217,16 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(list(container['NetworkSettings']['Ports'].keys()), ['8000/tcp'])
         self.assertNotEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8000')
 
+    def test_start_container_stays_unpriviliged(self):
+        service = self.create_service('web')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['Privileged'], False)
+
+    def test_start_container_becomes_priviliged(self):
+        service = self.create_service('web', privileged = True)
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['Privileged'], True)
+
     def test_expose_does_not_publish_ports(self):
         service = self.create_service('web', expose=[8000])
         container = service.start_container().inspect()
