@@ -183,8 +183,10 @@ class TopLevelCommand(Command):
             print("Going to remove", list_containers(stopped_containers))
             if options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
-                self.project.remove_stopped(service_names=options['SERVICE'],
-                                            remove_volumes=options.get('-v', False))
+                self.project.remove_stopped(
+                    service_names=options['SERVICE'],
+                    v=options.get('-v', False)
+                )
         else:
             print("No stopped containers")
 
