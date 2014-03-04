@@ -86,7 +86,10 @@ class Container(object):
     @property
     def human_readable_command(self):
         self.inspect_if_not_inspected()
-        return ' '.join(self.dictionary['Config']['Cmd'])
+        if self.dictionary['Config']['Cmd']:
+            return ' '.join(self.dictionary['Config']['Cmd'])
+        else:
+            return ''
 
     @property
     def environment(self):
