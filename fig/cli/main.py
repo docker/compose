@@ -182,7 +182,7 @@ class TopLevelCommand(Command):
             print("Going to remove", list_containers(stopped_containers))
             if yesno("Are you sure? [yN] ", default=False):
                 self.project.remove_stopped(service_names=options['SERVICE'],
-                                            remove_volumes=options['-v'])
+                                            remove_volumes=options.get('-v', False))
         else:
             print("No stopped containers")
 
