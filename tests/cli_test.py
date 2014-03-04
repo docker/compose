@@ -53,6 +53,14 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('fig_another_1', output)
         self.assertIn('fig_yetanother_1', output)
 
+    def test_rm(self):
+        service = self.command.project.get_service('simple')
+        service.create_container()
+        service.kill()
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.command.dispatch(['rm', '--force'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 0)
+
     def test_scale(self):
         project = self.command.project
 
