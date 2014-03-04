@@ -212,6 +212,11 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(list(container['NetworkSettings']['Ports'].keys()), ['8000/tcp'])
         self.assertNotEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8000')
 
+    def test_expose_does_not_publish_ports(self):
+        service = self.create_service('web', expose=[8000])
+        container = service.start_container().inspect()
+        self.assertEqual(container['NetworkSettings']['Ports'], {'8000/tcp': None})
+
     def test_start_container_creates_port_with_explicit_protocol(self):
         service = self.create_service('web', ports=['8000/udp'])
         container = service.start_container().inspect()
