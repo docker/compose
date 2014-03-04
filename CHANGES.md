@@ -1,6 +1,13 @@
 Change log
 ==========
 
+0.3.1 (2014-03-04)
+------------------
+
+ - Added contribution instructions. (Thanks @kvz!)
+ - Fixed `fig rm` throwing an error.
+ - Fixed a bug in `fig ps` on Docker 0.8.1 when there is a container with no command.
+
 0.3.0 (2014-03-03)
 ------------------
 
