@@ -70,6 +70,8 @@ class Container(object):
         for private, public in list(self.dictionary['NetworkSettings']['Ports'].items()):
             if public:
                 ports.append('%s->%s' % (public[0]['HostPort'], private))
+            else:
+                ports.append(private)
         return ', '.join(ports)
 
     @property
