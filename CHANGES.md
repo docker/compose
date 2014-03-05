@@ -1,6 +1,12 @@
 Change log
 ==========
 
+0.3.2 (2014-03-05)
+------------------
+
+ - Added an `--rm` option to `fig run`. (Thanks @marksteve!)
+ - Added an `expose` option to `fig.yml`.
+
 0.3.1 (2014-03-04)
 ------------------
 
