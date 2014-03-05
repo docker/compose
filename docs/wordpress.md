@@ -33,8 +33,6 @@ web:
     - .:/code
 db:
   image: orchardup/mysql
-  ports:
-    - "3306:3306"
   environment:
     MYSQL_DATABASE: wordpress
 ```

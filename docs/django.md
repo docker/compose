@@ -28,8 +28,6 @@ Simple enough. Finally, this is all tied together with a file called `fig.yml`. 
 
     db:
       image: orchardup/postgresql
-      ports:
-        - "5432"
     web:
       build: .
       command: python manage.py runserver 0.0.0.0:8000

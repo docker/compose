@@ -44,6 +44,12 @@ ports:
  - "8000:8000"
  - "49100:22"
 
+-- Expose ports without publishing them to the host machine - they'll only be
+-- accessible to linked services. Only the internal port can be specified.
+expose:
+ - "3000"
+ - "8000"
+
 -- Map volumes from the host machine (HOST:CONTAINER).
 volumes:
  - cache/:/tmp/cache

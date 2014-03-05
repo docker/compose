@@ -39,7 +39,7 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        supported_options = DOCKER_CONFIG_KEYS + ['build']
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
 
         for k in options:
             if k not in supported_options:
@@ -246,9 +246,10 @@ class Service(object):
 
         container_options['name'] = self.next_container_name(one_off)
 
-        if 'ports' in container_options:
+        if 'ports' in container_options or 'expose' in self.options:
             ports = []
-            for port in container_options['ports']:
+            all_ports = container_options.get('ports', []) + self.options.get('expose', [])
+            for port in all_ports:
                 port = str(port)
                 if ':' in port:
                     port = port.split(':')[-1]
