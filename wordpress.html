@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140304091107842780509">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140305091426861355716">
   </head>
   <body>
     <div class="container">
@@ -40,8 +40,6 @@ ADD . /code
     - .:/code
 db:
   image: orchardup/mysql
-  ports:
-    - &quot;3306:3306&quot;
   environment:
     MYSQL_DATABASE: wordpress
 </code></pre></div>

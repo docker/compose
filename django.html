@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140304091107842780509">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140305091426861355716">
   </head>
   <body>
     <div class="container">
@@ -38,8 +38,6 @@ ADD . /code/
 <p>Simple enough. Finally, this is all tied together with a file called <code>fig.yml</code>. It describes the services that our app comprises of (a web server and database), what Docker images they use, how they link together, what volumes will be mounted inside the containers and what ports they expose.</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">db:
   image: orchardup/postgresql
-  ports:
-    - &quot;5432&quot;
 web:
   build: .
   command: python manage.py runserver 0.0.0.0:8000
