@@ -209,6 +209,7 @@ class TopLevelCommand(Command):
                   container name
             -T    Disable pseudo-tty allocation. By default `fig run`
                   allocates a TTY.
+            --rm  Remove container after run. Ignored in detached mode.
         """
         service = self.project.get_service(options['SERVICE'])
 
@@ -229,6 +230,10 @@ class TopLevelCommand(Command):
             with self._attach_to_container(container.id, raw=tty) as c:
                 service.start_container(container, ports=None)
                 c.run()
+            if options['--rm']:
+                container.wait()
+                log.info("Removing %s..." % container.name)
+                self.client.remove_container(container.id)
 
     def scale(self, options):
         """
