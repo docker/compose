@@ -207,7 +207,7 @@ class Service(object):
                     volume_bindings[os.path.abspath(external_dir)] = internal_dir
 
         container.start(
-            links=self._get_links(),
+            links=self._get_links(link_to_self=override_options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
         )
@@ -227,7 +227,7 @@ class Service(object):
         else:
             return max(numbers) + 1
 
-    def _get_links(self):
+    def _get_links(self, link_to_self):
         links = []
         for service, link_name in self.links:
             for container in service.containers():
@@ -235,9 +235,10 @@ class Service(object):
                     links.append((container.name, link_name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
-        for container in self.containers():
-            links.append((container.name, container.name))
-            links.append((container.name, container.name_without_project))
+        if link_to_self:
+            for container in self.containers():
+                links.append((container.name, container.name))
+                links.append((container.name, container.name_without_project))
         return links
 
     def _get_container_options(self, override_options, one_off=False):
