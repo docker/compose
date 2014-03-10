@@ -3,12 +3,8 @@ python:
 - '2.6'
 - '2.7'
 env:
-- DOCKER_VERSION=0.8.0
-- DOCKER_VERSION=0.8.1
-matrix:
-  allow_failures:
-  - python: '3.2'
-  - python: '3.3'
+- DOCKER_VERSION=0.9.1
+- DOCKER_VERSION=0.10.0
 install: script/travis-install
 script:
 - pwd

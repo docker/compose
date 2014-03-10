@@ -40,7 +40,7 @@ class UnixHTTPConnection(httplib.HTTPConnection, object):
         self.sock = sock
 
     def _extract_path(self, url):
-        #remove the base_url entirely..
+        # remove the base_url entirely..
         return url.replace(self.base_url, "")
 
     def request(self, method, url, **kwargs):
