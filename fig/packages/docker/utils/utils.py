@@ -57,9 +57,10 @@ def compare_version(v1, v2):
 def ping(url):
     try:
         res = requests.get(url)
-        return res.status >= 400
     except Exception:
         return False
+    else:
+        return res.status_code < 400
 
 
 def _convert_port_binding(binding):
