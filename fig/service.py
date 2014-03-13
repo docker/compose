@@ -10,11 +10,14 @@ from .container import Container
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint', 'privileged']
 DOCKER_CONFIG_HINTS = {
-    'link': 'links',
-    'port': 'ports',
-    'volume': 'volumes',
+    'link'      : 'links',
+    'port'      : 'ports',
+    'privilege' : 'privileged',
+    'priviliged': 'privileged',
+    'privilige' : 'privileged',
+    'volume'    : 'volumes',
 }
 
 
@@ -126,7 +129,7 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        container_options = self._get_container_options(override_options, one_off=one_off)
+        container_options = self._get_container_create_options(override_options, one_off=one_off)
         try:
             return Container.create(self.client, **container_options)
         except APIError as e:
@@ -206,10 +209,13 @@ class Service(object):
                     external_dir, internal_dir = volume.split(':')
                     volume_bindings[os.path.abspath(external_dir)] = internal_dir
 
+        privileged = options.get('privileged', False)
+
         container.start(
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
+            privileged=privileged,
         )
         return container
 
@@ -241,7 +247,7 @@ class Service(object):
                 links.append((container.name, container.name_without_project))
         return links
 
-    def _get_container_options(self, override_options, one_off=False):
+    def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
@@ -266,6 +272,10 @@ class Service(object):
             if len(self.client.images(name=self._build_tag_name())) == 0:
                 self.build()
             container_options['image'] = self._build_tag_name()
+
+        # Priviliged is only required for starting containers, not for creating them
+        if 'privileged' in container_options:
+            del container_options['privileged']
 
         return container_options
 
