@@ -116,6 +116,9 @@ class Service(object):
             log.info("Starting %s..." % c.name)
             self.start_container(c)
             running_containers.append(c)
+        #remove stopped containers, otherwise after a restart there are as many
+        # running containers as before as all stopped containers are started
+        self.remove_stopped()
 
 
     def remove_stopped(self, **options):
