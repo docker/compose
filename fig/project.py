@@ -137,6 +137,17 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
+    def up(self, service_names=None):
+        (old, new) = self.recreate_containers(service_names=service_names)
+
+        for (service, container) in new:
+            service.start_container(container)
+
+        for (service, container) in old:
+            container.remove()
+
+        return new
+
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.remove_stopped(**options)
