@@ -304,8 +304,6 @@ class TopLevelCommand(Command):
             to_attach = [c for (s, c) in new]
             print("Attaching to", list_containers(to_attach))
             log_printer = LogPrinter(to_attach, attach_params={"logs": True})
-
-        if not detached:
             try:
                 log_printer.run()
             finally:
