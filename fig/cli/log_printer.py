@@ -4,7 +4,7 @@ import sys
 
 from itertools import cycle
 
-from .multiplexer import Multiplexer
+from .multiplexer import Multiplexer, STOP
 from . import colors
 from .utils import split_buffer
 
@@ -34,7 +34,13 @@ class LogPrinter(object):
         prefix = color_fn(container.name + " | ")
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
-        return (prefix + line.decode('utf-8') for line in line_generator)
+
+        for line in line_generator:
+            yield prefix + line.decode('utf-8')
+
+        exit_code = container.wait()
+        yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
+        yield STOP
 
     def _attach(self, container):
         params = {
