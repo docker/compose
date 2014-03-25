@@ -47,19 +47,7 @@ Quick start
 
 Let's get a basic Python web app running on Fig. It assumes a little knowledge of Python, but the concepts should be clear if you're not familiar with it.
 
-First, install Docker. If you're on OS X, you can use [docker-osx](https://github.com/noplay/docker-osx):
-
-    $ curl https://raw.github.com/noplay/docker-osx/0.7.6/docker-osx > /usr/local/bin/docker-osx
-    $ chmod +x /usr/local/bin/docker-osx
-    $ docker-osx shell
-
-Docker has guides for [Ubuntu](http://docs.docker.io/en/latest/installation/ubuntulinux/) and [other platforms](http://docs.docker.io/en/latest/installation/) in their documentation.
-
-Next, install Fig:
-
-    $ sudo pip install -U fig
-
-(This command also upgrades Fig when we release a new version. If you don’t have pip installed, try `brew install python` or `apt-get install python-pip`.)
+First, [install Docker and Fig](install.html).
 
 You'll want to make a directory for the project:
 
