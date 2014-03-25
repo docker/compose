@@ -295,7 +295,7 @@ class Service(object):
                 match = re.search(r'Successfully built ([0-9a-f]+)', line)
                 if match:
                     image_id = match.group(1)
-            sys.stdout.write(line)
+            sys.stdout.write(line.encode(sys.__stdout__.encoding or 'utf8'))
 
         if image_id is None:
             raise BuildError()
