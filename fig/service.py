@@ -85,6 +85,14 @@ class Service(object):
             c.kill(**options)
 
     def scale(self, desired_num):
+        """
+        Adjusts the number of containers to the specified number and ensures they are running.
+
+        - creates containers until there are at least `desired_num`
+        - stops containers until there are at most `desired_num` running
+        - starts containers until there are at least `desired_num` running
+        - removes all stopped containers
+        """
         if not self.can_be_scaled():
             raise CannotBeScaledError()
 
@@ -116,8 +124,7 @@ class Service(object):
             log.info("Starting %s..." % c.name)
             self.start_container(c)
             running_containers.append(c)
-        #remove stopped containers, otherwise after a restart there are as many
-        # running containers as before as all stopped containers are started
+
         self.remove_stopped()
 
 
