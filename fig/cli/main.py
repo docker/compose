@@ -9,7 +9,7 @@ from inspect import getdoc
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
-from ..service import CannotBeScaledError
+from ..service import BuildError, CannotBeScaledError
 from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
@@ -50,6 +50,9 @@ def main():
         sys.exit(1)
     except APIError as e:
         log.error(e.explanation)
+        sys.exit(1)
+    except BuildError as e:
+        log.error("Service '%s' failed to build." % e.service.name)
         sys.exit(1)
 
 

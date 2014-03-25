@@ -22,7 +22,8 @@ DOCKER_CONFIG_HINTS = {
 
 
 class BuildError(Exception):
-    pass
+    def __init__(self, service):
+        self.service = service
 
 
 class CannotBeScaledError(Exception):
@@ -298,7 +299,7 @@ class Service(object):
             sys.stdout.write(line)
 
         if image_id is None:
-            raise BuildError()
+            raise BuildError(self)
 
         return image_id
 
