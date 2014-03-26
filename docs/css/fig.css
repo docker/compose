@@ -209,6 +209,10 @@ img {
   vertical-align: 1px;
 }
 
+.why strong {
+  color: #665275;
+}
+
 .footer {
   margin-top: 30px;
   background: #E7EBDD;
