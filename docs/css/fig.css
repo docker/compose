@@ -117,6 +117,19 @@ img {
   padding-top: 0;
 }
 
+.homepage h2, .homepage h3,
+.homepage strong {
+  color: #854B86;
+}
+
+.homepage h2, .homepage h3 {
+  font-weight: 700;
+}
+
+.homepage strong {
+  font-weight: 400;
+}
+
 .leader {
   text-align: center;
   background: #5B3A5C;
@@ -147,8 +160,6 @@ img {
 
 .homepage-section h2 {
   margin-top: 0;
-  font-weight: 700;
-  color: #5B3A5C;
 }
 
 .call-to-action {

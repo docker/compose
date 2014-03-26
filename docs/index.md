@@ -61,24 +61,24 @@ RUN pip install -r requirements.txt</pre>
   </div>
 </div>
 
-<div class="homepage-section">
+<div class="homepage-section why">
   <div class="container">
     <h2 class="text-center">Why use Fig?</h2>
 
     <div class="row">
       <div class="col-md-6">
         <h3>Isolation</h3>
-        <p>Not just your app: every invididual service runs in its own Docker container, with its dependencies and nothing else. No more installing Postgres on your laptop; no more juggling Ruby and Python versions.</p>
+        <p>Every service runs in its own Docker container, with its dependencies and nothing else. <strong>No more installing Postgres on your laptop. No more juggling Ruby and Python versions. No more gemsets or virtualenv.</strong></p>
 
         <h3>Simplicity</h3>
-        <p>Your app’s environment is minimally described. No more configuration management, bless its baroque little cotton socks.</p>
+        <p>Your app’s environment is minimally described. <strong>No more configuration management</strong>, bless its baroque little cotton socks.</p>
       </div>
       <div class="col-md-6">
         <h3>Repeatability</h3>
-        <p>Anyone with Fig installed can check out your repository, type <code>fig up</code> and be running in moments. No more spending half a day getting set up on a new project.</p>
+        <p>Anyone with Fig installed can check out your repository, type <code>fig up</code> and be running in moments. <strong>No more spending half a day getting new developers set up.</strong></p>
 
         <h3>Speed</h3>
-        <p>Thanks to lightweight containers and Docker’s layered filesystem model, build and boot times are minimal. No more 6GB VM images.</p>
+        <p>Thanks to lightweight containers and Docker’s layered filesystem model, build and boot times are minimal. <strong>No more 6GB VM images.</strong></p>
       </div>
     </div>
   </div>
