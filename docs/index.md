@@ -9,8 +9,8 @@ body_class: homepage
   <div class="container">
     <div class="row">
       <div class="col-md-10 col-md-offset-1">
-        <h1>Fast, isolated development<br>environments using Docker.</h1>
-        <p>Fig makes setting up your environment ridiculously simple, and boots your app with a single command.</p>
+        <h1>Development environments made effortless.</h1>
+        <p>Use Docker to isolate your app’s dependencies. Install and boot in a single command.</p>
       </div>
     </div>
   </div>
@@ -21,7 +21,7 @@ body_class: homepage
     <div class="row">
       <div class="col-md-6">
         <h2 class="text-center">Configure</h2>
-        <p>Define your app’s services in <code>fig.yml</code>. Everything’s isolated.</p>
+        <p>Define your services in <code>fig.yml</code>. Everything’s isolated.</p>
 
         <pre>web:
   build: .
@@ -33,7 +33,7 @@ body_class: homepage
 db:
   image: orchardup/postgresql</pre>
 
-        <p>You can use a <a href="">Dockerfile</a> to install a service’s dependencies:</p>
+        <p>You can use a <a href="http://docs.docker.io/en/latest/reference/builder/">Dockerfile</a> to set up a service’s environment:</p>
 
         <pre>FROM orchardup/python:2.7
 ADD . /code
