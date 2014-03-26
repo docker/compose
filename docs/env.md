@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Fig environment variables reference
+docs: true
 ---
 
 Environment variables reference

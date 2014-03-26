@@ -1,16 +1,15 @@
 body {
-  padding-top: 20px;
-  padding-bottom: 60px;
   font-family: 'Lato', sans-serif;
   font-weight: 300;
   font-size: 18px;
-  color: #362;
+  color: #333;
+
+  padding-top: 82px;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Lato', sans-serif;
   font-weight: 400;
-  color: #25594D;
 }
 
 h2, h3, h4, h5, h6 {
@@ -22,13 +21,14 @@ p {
 }
 
 a, a:hover, a:visited {
-  color: #4D9900;
-  text-decoration: underline;
+  color: #a41211;
+  text-decoration: none;
+  font-weight: 400;
 }
 
 pre, code {
   border: none;
-  background: #D5E1B4;
+  background: #E7EBDD;
 }
 
 code, pre code {
@@ -52,129 +52,153 @@ img {
   max-width: 100%;
 }
 
-.container {
-  margin-left: 0;
+.navbar {
+  background: #E7EBDD;
+  border-bottom: 2px solid #bec9a1;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.logo {
-  font-family: 'Lilita One', sans-serif;
-  font-size: 80px;
-  margin: 20px 0 40px 0;
-}
-
-.logo a {
-  color: #a41211;
-  text-decoration: none;
-}
-
-.logo img {
-  width: 80px;
-  vertical-align: -17px;
-}
-
-.mobile-logo {
-  text-align: center;
-}
-
-.sidebar {
-  font-size: 16px;
-}
-
-.sidebar a {
+.navbar a, .navbar a:hover, .navbar a:focus {
   color: #a41211;
 }
 
-@media (max-width: 767px) {
-  .sidebar {
-    text-align: center;
-    margin-top: 40px;
-  }
-
-  .sidebar .logo {
-    display: none;
-  }
+.navbar-brand, .navbar-brand:hover, .navbar-brand:focus {
+  font-size: 40px;
+  font-weight: 900;
+  text-decoration: none;
+  height: 62px;
 }
 
-@media (min-width: 768px) {
-  .mobile-logo {
-    display: none;
-  }
-
-  .logo {
-    margin-top: 40px;
-  }
-
-  .content h1 {
-    margin: 60px 0 55px 0;
-  }
-
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    overflow-y: auto;
-    padding-left: 40px;
-    border-right: 1px solid #ccc;
-  }
-
-  .content {
-    margin-left: 320px;
-    max-width: 650px;
-  }
+.navbar-brand img {
+  width: 30px;
+  vertical-align: -2px;
 }
 
-.nav {
-  margin: 20px 0;
-}
-
-.nav li a {
-  display: block;
-  padding: 8px 0;
-  line-height: 1.2;
+.navbar-nav > li > a {
+  padding-top: 22px;
+  padding-bottom: 22px;
   text-decoration: none;
 }
 
-.nav li a:hover, .nav li a:focus {
-  text-decoration: underline;
-  background: none;
+.navbar-nav > li > a:hover, .navbar-nav > li > a:focus {
+  background-color: #D5DFC7;
 }
 
-.nav ul {
-  padding-left: 20px;
-  list-style: none;
+.navbar-toggle {
+  border-color: #bec9a1;
+  margin-top: 14px;
 }
 
-.badges {
-  margin: 40px 0;
+.navbar-toggle .icon-bar {
+  background: #bec9a1;
 }
 
-a.btn {
-  background: #25594D;
-  color: white;
+.btn {
+  border: none;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 600;
   text-transform: uppercase;
   text-decoration: none;
 }
 
-a.btn:hover {
+.btn-primary, a.btn-primary {
   color: white;
+  background: #5B3A5C;
 }
 
-.strapline {
+.btn-primary:hover, a.btn-primary:hover {
+  color: white;
+  background: #946F96;
+}
+
+.homepage {
+  padding-top: 0;
+}
+
+.leader {
+  text-align: center;
+  background: #5B3A5C;
+  color: white;
+  padding-top: 90px;
+  padding-bottom: 20px;
+}
+
+.leader h1 {
   font-size: 30px;
+  font-weight: 700;
 }
 
 @media (min-width: 768px) {
-  .strapline {
+  .leader {
+    padding-top: 150px;
+    padding-bottom: 70px;
+  }
+
+  .leader h1 {
     font-size: 40px;
-    display: block;
-    line-height: 1.2;
-    margin-top: 25px;
-    margin-bottom: 35px;
   }
 }
 
-strong {
+.homepage-section {
+  padding: 40px 0;
+}
+
+.homepage-section h2 {
+  margin-top: 0;
   font-weight: 700;
+  color: #5B3A5C;
+}
+
+.call-to-action {
+  color: #5B3A5C;
+  background: #E0D1E0;
+  font-weight: 700;
+}
+
+.call-to-action .btn {
+  margin-left: 16px;
+  vertical-align: 1px;
+}
+
+.footer {
+  margin-top: 30px;
+  background: #E7EBDD;
+  padding: 20px 0;
+  font-size: 16px;
+  font-weight: 400;
+  color: #696F55;
+}
+
+.footer .badges {
+  margin-left: 20px;
+}
+
+.sidebar {
+  margin-top: 20px;
+}
+
+.sidebar ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar li {
+  padding: 4px 0;
+}
+
+.sidebar a {
+  font-weight: 300;
+}
+
+.sidebar a:hover {
+  text-decoration: underline;
+}
+
+.sidebar p {
+  color: #666;
+  border-top: 1px solid #ddd;
+  padding-top: 20px;
 }

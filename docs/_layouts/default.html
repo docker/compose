@@ -4,56 +4,90 @@
     <meta charset="utf-8">
     <title>{{ page.title }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Lato:300,400,700|Raleway:600,700,800,900' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="css/fig.css?{{ site.time | date:'%Y%m%d%U%H%N%S' }}">
   </head>
-  <body>
-    <div class="container">
-      <div class="logo mobile-logo">
-        <a href="index.html">
-          <img src="img/logo.png">
-          Fig
-        </a>
-      </div>
-
-      <div class="content">{{ content }}</div>
-
-      <div class="sidebar">
-        <h1 class="logo">
-          <a href="index.html">
+  <body class="{{page.body_class}}">
+    <nav class="navbar navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="index.html">
             <img src="img/logo.png">
             Fig
           </a>
-        </h1>
+        </div>
 
-        <ul class="nav">
-          <li><a href="index.html">Home</a></li>
-          <li><a href="install.html">Install</a></li>
-          <li><a href="rails.html">Get started with Rails</a></li>
-          <li><a href="django.html">Get started with Django</a></li>
-          <li><a href="wordpress.html">Get started with Wordpress</a></li>
-        </ul>
-        <ul class="nav">
-          <li>Reference:</li>
-          <ul>
-            <li><a href="yml.html">fig.yml</a></li>
-            <li><a href="cli.html">Commands</a></li>
-            <li><a href="env.html">Environment variables</a></li>
+        <div class="collapse navbar-collapse" id="navbar-collapse">
+          <ul class="nav navbar-nav navbar-right">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="install.html">Install</a></li>
+            <li><a href="docs.html">Docs</a></li>
+            <li><a href="https://github.com/orchardup/fig">GitHub</a></li>
           </ul>
-        </ul>
-        <ul class="nav">
-          <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
-          <li><a href="https://twitter.com/orchardup">Follow us on Twitter</a></li>
-          <li><a href="http://webchat.freenode.net/?channels=%23orchardup&uio=d4">#orchardup on Freenode</a></li>
-        </ul>
-
-        <div class="badges">
-          <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
-          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
         </div>
       </div>
+    </nav>
+
+    {% if page.docs == true %}
+      <div class="container">
+        <div class="row">
+          <div class="col-md-9 col-md-push-3">{{content}}</div>
+          <div class="col-md-3 col-md-pull-9">
+            <div class="sidebar">
+              <ul>
+                <li><a href="docs.html">Documentation home</a></li>
+                <li><a href="install.html">Install</a></li>
+                <li><a href="quickstart.html">Quick start</a></li>
+              </ul>
+              <p>Guides</p>
+              <ul>
+                <li><a href="rails.html">Get started with Rails</a></li>
+                <li><a href="django.html">Get started with Django</a></li>
+                <li><a href="wordpress.html">Get started with Wordpress</a></li>
+              </ul>
+              <p>Reference</p>
+              <ul>
+                <li><a href="yml.html">fig.yml</a></li>
+                <li><a href="cli.html">Commands</a></li>
+                <li><a href="env.html">Environment variables</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      {% if page.full_width != true %}<div class="container">{% endif %}
+      {{ content }}
+      {% if page.full_width != true %}</div>{% endif %}
+    {% endif %}
+
+    <div class="footer">
+      <div class="container">
+        <div class="pull-right">
+          <p class="badges">
+            <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
+            <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+          </p>
+        </div>
+
+        <p>
+          Fig is a project by <a href="https://orchardup.com">Orchard</a>.
+          <a href="https://twitter.com/orchardup">Follow us on Twitter</a>, or come hang out in
+          <a href="http://webchat.freenode.net/?channels=%23orchardup&amp;uio=d4">#orchardup on Freenode</a>.
+        </p>
+      </div>
     </div>
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+
       <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
     <script>
       (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){

@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Getting started with Fig and Django
+docs: true
 ---
 
 Getting started with Fig and Django

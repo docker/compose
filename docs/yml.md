@@ -1,6 +1,7 @@
 ---
 layout: default
 title: fig.yml reference
+docs: true
 ---
 
 fig.yml reference

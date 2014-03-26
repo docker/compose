@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Fig CLI reference
+docs: true
 ---
 
 CLI reference
