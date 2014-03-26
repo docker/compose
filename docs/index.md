@@ -40,7 +40,7 @@ ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt</pre>
 
-        <p class="text-right"><a href="quickstart.html">Read the quickstart guide &rarr;</a></p>
+        <p class="text-right"><a href="docs.html">Read the quick start guide &rarr;</a></p>
       </div>
 
       <div class="col-md-6">

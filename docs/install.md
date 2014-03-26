@@ -31,4 +31,4 @@ Fig is also available as a Python package if you're on another platform (or if y
 
 That should be all you need! Run `fig --version` to see if it worked.
 
-Next up, try the [quick start](quickstart.html).
+Next up, try the [quick start](docs.html).
