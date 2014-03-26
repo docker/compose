@@ -26,6 +26,10 @@ a, a:hover, a:visited {
   font-weight: 400;
 }
 
+a:hover {
+  text-decoration: underline;
+}
+
 pre, code {
   border: none;
   background: #E7EBDD;
