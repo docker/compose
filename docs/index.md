@@ -7,12 +7,8 @@ body_class: homepage
 
 <div class="leader">
   <div class="container">
-    <div class="row">
-      <div class="col-md-10 col-md-offset-1">
-        <h1>Development environments made effortless.</h1>
-        <p>Use Docker to isolate your app’s dependencies. Install and boot in a single command.</p>
-      </div>
-    </div>
+    <h1>Development environments made effortless.</h1>
+    <p>Use Docker to isolate your app’s dependencies. Install and boot in a single command.</p>
   </div>
 </div>
 
