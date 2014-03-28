@@ -7,6 +7,11 @@ except ImportError:
     from queue import Queue, Empty  # Python 3.x
 
 
+# Yield STOP from an input generator to stop the
+# top-level loop without processing any more input.
+STOP = object()
+
+
 class Multiplexer(object):
     def __init__(self, generators):
         self.generators = generators
@@ -17,7 +22,11 @@ class Multiplexer(object):
 
         while True:
             try:
-                yield self.queue.get(timeout=0.1)
+                item = self.queue.get(timeout=0.1)
+                if item is STOP:
+                    break
+                else:
+                    yield item
             except Empty:
                 pass
 
