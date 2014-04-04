@@ -32,7 +32,7 @@ class Command(DocoptCommand):
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
             raise errors.UserError(six.text_type(e))
-        self.yaml_path = yaml_path
+        self.yaml_path = os.path.abspath(yaml_path)
         self.explicit_project_name = None
 
     def dispatch(self, *args, **kwargs):
