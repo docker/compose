@@ -58,7 +58,11 @@ class Project(object):
                         service_name, link_name = link.split(':', 1)
                     else:
                         service_name, link_name = link, None
-                    links.append((project.get_service(service_name), link_name))
+                    try:
+                        links.append((project.get_service(service_name), link_name))
+                    except NoSuchService:
+                        raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
+
                 del service_dict['links']
             project.services.append(Service(client=client, project=name, links=links, **service_dict))
         return project
