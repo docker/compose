@@ -34,6 +34,8 @@ Then type `fig up`, and Fig will start and run your entire app:
 
 ![example fig run](https://orchardup.com/static/images/fig-example-large.f96065fc9e22.gif)
 
+Fig is both a lightweight Vagrant and a next-level Foreman. Like Foreman, it runs your app's various services and aggregates their log output in one place; like Vagrant, it makes your environment isolated and repeatable—and it runs your *whole* app, including the database.
+
 There are commands to:
 
  - start, stop and rebuild services
