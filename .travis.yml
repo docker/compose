@@ -5,6 +5,7 @@ python:
 env:
 - DOCKER_VERSION=0.8.0
 - DOCKER_VERSION=0.8.1
+- DOCKER_VERSION=0.9.0
 matrix:
   allow_failures:
   - python: '3.2'
