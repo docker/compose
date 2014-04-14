@@ -18,7 +18,7 @@ class DockerClientTestCase(unittest.TestCase):
                 self.client.kill(c['Id'])
                 self.client.remove_container(c['Id'])
         for i in self.client.images():
-            if isinstance(i['Tag'], basestring) and 'figtest' in i['Tag']:
+            if isinstance(i.get('Tag'), basestring) and 'figtest' in i['Tag']:
                 self.client.remove_image(i)
 
     def create_service(self, name, **kwargs):

@@ -5,6 +5,7 @@ import logging
 import re
 import os
 import sys
+import json
 from .container import Container
 
 log = logging.getLogger(__name__)
@@ -146,7 +147,8 @@ class Service(object):
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 log.info('Pulling image %s...' % container_options['image'])
-                self.client.pull(container_options['image'])
+                output = self.client.pull(container_options['image'], stream=True)
+                stream_output(output, sys.stdout)
                 return Container.create(self.client, **container_options)
             raise
 
@@ -299,14 +301,15 @@ class Service(object):
             stream=True
         )
 
+        all_events = stream_output(build_output, sys.stdout)
+
         image_id = None
 
-        for line in build_output:
-            if line:
-                match = re.search(r'Successfully built ([0-9a-f]+)', line)
+        for event in all_events:
+            if 'stream' in event:
+                match = re.search(r'Successfully built ([0-9a-f]+)', event.get('stream', ''))
                 if match:
                     image_id = match.group(1)
-            sys.stdout.write(line.encode(sys.__stdout__.encoding or 'utf-8'))
 
         if image_id is None:
             raise BuildError(self)
@@ -327,6 +330,84 @@ class Service(object):
             if ':' in str(port):
                 return False
         return True
+
+
+def stream_output(output, stream):
+    is_terminal = hasattr(stream, 'fileno') and os.isatty(stream.fileno())
+    all_events = []
+    lines = {}
+    diff = 0
+
+    for chunk in output:
+        event = json.loads(chunk)
+        all_events.append(event)
+
+        if 'progress' in event or 'progressDetail' in event:
+            image_id = event['id']
+
+            if image_id in lines:
+                diff = len(lines) - lines[image_id]
+            else:
+                lines[image_id] = len(lines)
+                stream.write("\n")
+                diff = 0
+
+            if is_terminal:
+                # move cursor up `diff` rows
+                stream.write("%c[%dA" % (27, diff))
+
+        try:
+            print_output_event(event, stream, is_terminal)
+        except Exception:
+            stream.write(repr(event) + "\n")
+            raise
+
+        if 'id' in event and is_terminal:
+            # move cursor back down
+            stream.write("%c[%dB" % (27, diff))
+
+        stream.flush()
+
+    return all_events
+
+def print_output_event(event, stream, is_terminal):
+    if 'errorDetail' in event:
+        raise Exception(event['errorDetail']['message'])
+
+    terminator = ''
+
+    if is_terminal and 'stream' not in event:
+        # erase current line
+        stream.write("%c[2K\r" % 27)
+        terminator = "\r"
+        pass
+    elif 'progressDetail' in event:
+        return
+
+    if 'time' in event:
+        stream.write("[%s] " % event['time'])
+
+    if 'id' in event:
+        stream.write("%s: " % event['id'])
+
+    if 'from' in event:
+        stream.write("(from %s) " % event['from'])
+
+    status = event.get('status', '')
+
+    if 'progress' in event:
+        stream.write("%s %s%s" % (status, event['progress'], terminator))
+    elif 'progressDetail' in event:
+        detail = event['progressDetail']
+        if 'current' in detail:
+            percentage = float(detail['current']) / float(detail['total']) * 100
+            stream.write('%s (%.1f%%)%s' % (status, percentage, terminator))
+        else:
+            stream.write('%s%s' % (status, terminator))
+    elif 'stream' in event:
+        stream.write("%s%s" % (event['stream'], terminator))
+    else:
+        stream.write("%s%s\n" % (status, terminator))
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
