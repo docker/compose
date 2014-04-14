@@ -3,10 +3,8 @@ from __future__ import absolute_import
 from __future__ import division
 import datetime
 import os
-import socket
 import subprocess
 import platform
-from .errors import UserError
 
 
 def cached_property(f):
