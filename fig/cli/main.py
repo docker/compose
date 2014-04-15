@@ -227,11 +227,11 @@ class TopLevelCommand(Command):
         }
         container = service.create_container(one_off=True, **container_options)
         if options['-d']:
-            service.start_container(container, ports=None)
+            service.start_container(container, ports=None, one_off=True)
             print(container.name)
         else:
             with self._attach_to_container(container.id, raw=tty) as c:
-                service.start_container(container, ports=None)
+                service.start_container(container, ports=None, one_off=True)
                 c.run()
             if options['--rm']:
                 container.wait()
