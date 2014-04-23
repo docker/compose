@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from fig import Service
 from fig.service import CannotBeScaledError, ConfigError
-from fig.packages.docker.client import APIError
+from fig.packages.docker.errors import APIError
 from .testcases import DockerClientTestCase
 
 
