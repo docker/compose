@@ -15,4 +15,4 @@
 __title__ = 'docker-py'
 __version__ = '0.3.0'
 
-from .client import Client, APIError  # flake8: noqa
+from .client import Client # flake8: noqa
