@@ -698,8 +698,8 @@ class Client(requests.Session):
                                       params={'term': term}),
                             True)
 
-    def start(self, container, binds=None, port_bindings=None, lxc_conf=None,
-              publish_all_ports=False, links=None, privileged=False):
+    def start(self, container, binds=None, volumes_from=None, port_bindings=None,
+              lxc_conf=None, publish_all_ports=False, links=None, privileged=False):
         if isinstance(container, dict):
             container = container.get('Id')
 
@@ -717,6 +717,11 @@ class Client(requests.Session):
                 '{0}:{1}'.format(host, dest) for host, dest in binds.items()
             ]
             start_config['Binds'] = bind_pairs
+
+        if volumes_from and not isinstance(volumes_from, six.string_types):
+            volumes_from = ','.join(volumes_from)
+
+        start_config['VolumesFrom'] = volumes_from
 
         if port_bindings:
             start_config['PortBindings'] = utils.convert_port_bindings(

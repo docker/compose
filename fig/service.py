@@ -154,25 +154,24 @@ class Service(object):
 
     def recreate_containers(self, **override_options):
         """
-        If a container for this service doesn't exist, create one. If there are
-        any, stop them and create new ones. Does not remove the old containers.
+        If a container for this service doesn't exist, create and start one. If there are
+        any, stop them, create+start new ones, and remove the old containers.
         """
         containers = self.containers(stopped=True)
 
         if len(containers) == 0:
             log.info("Creating %s..." % self.next_container_name())
-            return ([], [self.create_container(**override_options)])
+            container = self.create_container(**override_options)
+            self.start_container(container)
+            return [(None, container)]
         else:
-            old_containers = []
-            new_containers = []
+            tuples = []
 
             for c in containers:
                 log.info("Recreating %s..." % c.name)
-                (old_container, new_container) = self.recreate_container(c, **override_options)
-                old_containers.append(old_container)
-                new_containers.append(new_container)
+                tuples.append(self.recreate_container(c, **override_options))
 
-            return (old_containers, new_containers)
+            return tuples
 
     def recreate_container(self, container, **override_options):
         if container.is_running:
@@ -185,17 +184,20 @@ class Service(object):
             entrypoint=['echo'],
             command=[],
         )
-        intermediate_container.start()
+        intermediate_container.start(volumes_from=container.id)
         intermediate_container.wait()
         container.remove()
 
         options = dict(override_options)
         options['volumes_from'] = intermediate_container.id
         new_container = self.create_container(**options)
+        self.start_container(new_container, volumes_from=intermediate_container.id)
+
+        intermediate_container.remove()
 
         return (intermediate_container, new_container)
 
-    def start_container(self, container=None, **override_options):
+    def start_container(self, container=None, volumes_from=None, **override_options):
         if container is None:
             container = self.create_container(**override_options)
 
@@ -228,6 +230,7 @@ class Service(object):
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
+            volumes_from=volumes_from,
             privileged=privileged,
         )
         return container

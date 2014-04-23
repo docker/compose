@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from fig import Service
 from fig.service import CannotBeScaledError, ConfigError
+from fig.packages.docker.client import APIError
 from .testcases import DockerClientTestCase
 
 
@@ -132,23 +133,22 @@ class ServiceTest(DockerClientTestCase):
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
-        (intermediate, new) = service.recreate_containers()
-        self.assertEqual(len(intermediate), 1)
-        self.assertEqual(len(new), 1)
+        tuples = service.recreate_containers()
+        self.assertEqual(len(tuples), 1)
 
-        new_container = new[0]
-        intermediate_container = intermediate[0]
+        intermediate_container = tuples[0][0]
+        new_container = tuples[0][1]
         self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['echo'])
 
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['ps'])
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['ax'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
-        service.start_container(new_container)
         self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
 
-        self.assertEqual(len(self.client.containers(all=True)), num_containers_before + 1)
+        self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
+        self.assertRaises(APIError, lambda: self.client.inspect_container(intermediate_container.id))
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')

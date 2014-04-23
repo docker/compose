@@ -301,10 +301,9 @@ class TopLevelCommand(Command):
         """
         detached = options['-d']
 
-        new = self.project.up(service_names=options['SERVICE'])
+        to_attach = self.project.up(service_names=options['SERVICE'])
 
         if not detached:
-            to_attach = [c for (s, c) in new]
             print("Attaching to", list_containers(to_attach))
             log_printer = LogPrinter(to_attach, attach_params={"logs": True})
 

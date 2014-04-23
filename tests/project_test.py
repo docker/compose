@@ -63,29 +63,6 @@ class ProjectTest(DockerClientTestCase):
         project = Project('test', [web], self.client)
         self.assertEqual(project.get_service('web'), web)
 
-    def test_recreate_containers(self):
-        web = self.create_service('web')
-        db = self.create_service('db')
-        project = Project('test', [web, db], self.client)
-
-        old_web_container = web.create_container()
-        self.assertEqual(len(web.containers(stopped=True)), 1)
-        self.assertEqual(len(db.containers(stopped=True)), 0)
-
-        (old, new) = project.recreate_containers()
-        self.assertEqual(len(old), 1)
-        self.assertEqual(old[0][0], web)
-        self.assertEqual(len(new), 2)
-        self.assertEqual(new[0][0], web)
-        self.assertEqual(new[1][0], db)
-
-        self.assertEqual(len(web.containers(stopped=True)), 1)
-        self.assertEqual(len(db.containers(stopped=True)), 1)
-
-        # remove intermediate containers
-        for (service, container) in old:
-            container.remove()
-
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
@@ -121,12 +98,23 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up(self):
         web = self.create_service('web')
-        db = self.create_service('db')
+        db = self.create_service('db', volumes=['/var/db'])
         project = Project('figtest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
+
+        project.up(['db'])
+        self.assertEqual(len(project.containers()), 1)
+        old_db_id = project.containers()[0].id
+        db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
+
         project.up()
         self.assertEqual(len(project.containers()), 2)
+
+        db_container = [c for c in project.containers() if 'db' in c.name][0]
+        self.assertNotEqual(c.id, old_db_id)
+        self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
+
         project.kill()
         project.remove_stopped()
 
