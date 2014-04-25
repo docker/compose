@@ -114,6 +114,12 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertIn('/var/db', container.inspect()['Volumes'])
 
+    def test_create_container_with_specified_volume(self):
+        service = self.create_service('db', volumes=['/tmp:/host-tmp'])
+        container = service.create_container()
+        service.start_container(container)
+        self.assertIn('/host-tmp', container.inspect()['Volumes'])
+
     def test_recreate_containers(self):
         service = self.create_service(
             'db',

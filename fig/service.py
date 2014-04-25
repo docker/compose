@@ -222,7 +222,10 @@ class Service(object):
             for volume in options['volumes']:
                 if ':' in volume:
                     external_dir, internal_dir = volume.split(':')
-                    volume_bindings[os.path.abspath(external_dir)] = internal_dir
+                    volume_bindings[os.path.abspath(external_dir)] = {
+                        'bind': internal_dir,
+                        'ro': False,
+                    }
 
         privileged = options.get('privileged', False)
 
