@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from fig.packages.docker import Client
 from fig.service import Service
 from fig.cli.utils import docker_url
-from . import unittest
+from .. import unittest
 
 
 class DockerClientTestCase(unittest.TestCase):

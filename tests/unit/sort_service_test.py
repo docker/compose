@@ -1,5 +1,5 @@
 from fig.project import sort_service_dicts, DependencyError
-from . import unittest
+from .. import unittest
 
 
 class SortServiceTest(unittest.TestCase):

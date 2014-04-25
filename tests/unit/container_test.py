@@ -1,10 +1,10 @@
 from __future__ import unicode_literals
-from .testcases import DockerClientTestCase
+from .. import unittest
 from fig.container import Container
 
-class ContainerTest(DockerClientTestCase):
+class ContainerTest(unittest.TestCase):
     def test_from_ps(self):
-        container = Container.from_ps(self.client, {
+        container = Container.from_ps(None, {
             "Id":"abc",
             "Image":"ubuntu:12.04",
             "Command":"sleep 300",
@@ -22,7 +22,7 @@ class ContainerTest(DockerClientTestCase):
         })
 
     def test_environment(self):
-        container = Container(self.client, {
+        container = Container(None, {
             'ID': 'abc',
             'Config': {
                 'Env': [
@@ -37,7 +37,7 @@ class ContainerTest(DockerClientTestCase):
         })
 
     def test_number(self):
-        container = Container.from_ps(self.client, {
+        container = Container.from_ps(None, {
             "Id":"abc",
             "Image":"ubuntu:12.04",
             "Command":"sleep 300",
