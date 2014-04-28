@@ -1,10 +1,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from .packages.docker.client import APIError
+from .packages.docker.errors import APIError
 import logging
 import re
 import os
 import sys
+import json
 from .container import Container
 
 log = logging.getLogger(__name__)
@@ -146,31 +147,31 @@ class Service(object):
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 log.info('Pulling image %s...' % container_options['image'])
-                self.client.pull(container_options['image'])
+                output = self.client.pull(container_options['image'], stream=True)
+                stream_output(output, sys.stdout)
                 return Container.create(self.client, **container_options)
             raise
 
     def recreate_containers(self, **override_options):
         """
-        If a container for this service doesn't exist, create one. If there are
-        any, stop them and create new ones. Does not remove the old containers.
+        If a container for this service doesn't exist, create and start one. If there are
+        any, stop them, create+start new ones, and remove the old containers.
         """
         containers = self.containers(stopped=True)
 
         if len(containers) == 0:
             log.info("Creating %s..." % self.next_container_name())
-            return ([], [self.create_container(**override_options)])
+            container = self.create_container(**override_options)
+            self.start_container(container)
+            return [(None, container)]
         else:
-            old_containers = []
-            new_containers = []
+            tuples = []
 
             for c in containers:
                 log.info("Recreating %s..." % c.name)
-                (old_container, new_container) = self.recreate_container(c, **override_options)
-                old_containers.append(old_container)
-                new_containers.append(new_container)
+                tuples.append(self.recreate_container(c, **override_options))
 
-            return (old_containers, new_containers)
+            return tuples
 
     def recreate_container(self, container, **override_options):
         if container.is_running:
@@ -183,17 +184,20 @@ class Service(object):
             entrypoint=['echo'],
             command=[],
         )
-        intermediate_container.start()
+        intermediate_container.start(volumes_from=container.id)
         intermediate_container.wait()
         container.remove()
 
         options = dict(override_options)
         options['volumes_from'] = intermediate_container.id
         new_container = self.create_container(**options)
+        self.start_container(new_container, volumes_from=intermediate_container.id)
+
+        intermediate_container.remove()
 
         return (intermediate_container, new_container)
 
-    def start_container(self, container=None, **override_options):
+    def start_container(self, container=None, volumes_from=None, **override_options):
         if container is None:
             container = self.create_container(**override_options)
 
@@ -218,7 +222,10 @@ class Service(object):
             for volume in options['volumes']:
                 if ':' in volume:
                     external_dir, internal_dir = volume.split(':')
-                    volume_bindings[os.path.abspath(external_dir)] = internal_dir
+                    volume_bindings[os.path.abspath(external_dir)] = {
+                        'bind': internal_dir,
+                        'ro': False,
+                    }
 
         privileged = options.get('privileged', False)
 
@@ -226,6 +233,7 @@ class Service(object):
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
+            volumes_from=volumes_from,
             privileged=privileged,
         )
         return container
@@ -299,14 +307,15 @@ class Service(object):
             stream=True
         )
 
+        all_events = stream_output(build_output, sys.stdout)
+
         image_id = None
 
-        for line in build_output:
-            if line:
-                match = re.search(r'Successfully built ([0-9a-f]+)', line)
+        for event in all_events:
+            if 'stream' in event:
+                match = re.search(r'Successfully built ([0-9a-f]+)', event.get('stream', ''))
                 if match:
                     image_id = match.group(1)
-            sys.stdout.write(line.encode(sys.__stdout__.encoding or 'utf-8'))
 
         if image_id is None:
             raise BuildError(self)
@@ -327,6 +336,84 @@ class Service(object):
             if ':' in str(port):
                 return False
         return True
+
+
+def stream_output(output, stream):
+    is_terminal = hasattr(stream, 'fileno') and os.isatty(stream.fileno())
+    all_events = []
+    lines = {}
+    diff = 0
+
+    for chunk in output:
+        event = json.loads(chunk)
+        all_events.append(event)
+
+        if 'progress' in event or 'progressDetail' in event:
+            image_id = event['id']
+
+            if image_id in lines:
+                diff = len(lines) - lines[image_id]
+            else:
+                lines[image_id] = len(lines)
+                stream.write("\n")
+                diff = 0
+
+            if is_terminal:
+                # move cursor up `diff` rows
+                stream.write("%c[%dA" % (27, diff))
+
+        try:
+            print_output_event(event, stream, is_terminal)
+        except Exception:
+            stream.write(repr(event) + "\n")
+            raise
+
+        if 'id' in event and is_terminal:
+            # move cursor back down
+            stream.write("%c[%dB" % (27, diff))
+
+        stream.flush()
+
+    return all_events
+
+def print_output_event(event, stream, is_terminal):
+    if 'errorDetail' in event:
+        raise Exception(event['errorDetail']['message'])
+
+    terminator = ''
+
+    if is_terminal and 'stream' not in event:
+        # erase current line
+        stream.write("%c[2K\r" % 27)
+        terminator = "\r"
+        pass
+    elif 'progressDetail' in event:
+        return
+
+    if 'time' in event:
+        stream.write("[%s] " % event['time'])
+
+    if 'id' in event:
+        stream.write("%s: " % event['id'])
+
+    if 'from' in event:
+        stream.write("(from %s) " % event['from'])
+
+    status = event.get('status', '')
+
+    if 'progress' in event:
+        stream.write("%s %s%s" % (status, event['progress'], terminator))
+    elif 'progressDetail' in event:
+        detail = event['progressDetail']
+        if 'current' in detail:
+            percentage = float(detail['current']) / float(detail['total']) * 100
+            stream.write('%s (%.1f%%)%s' % (status, percentage, terminator))
+        else:
+            stream.write('%s%s' % (status, terminator))
+    elif 'stream' in event:
+        stream.write("%s%s" % (event['stream'], terminator))
+    else:
+        stream.write("%s%s\n" % (status, terminator))
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')

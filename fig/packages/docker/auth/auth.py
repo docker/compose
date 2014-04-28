@@ -20,6 +20,7 @@ import os
 from fig.packages import six
 
 from ..utils import utils
+from .. import errors
 
 INDEX_URL = 'https://index.docker.io/v1/'
 DOCKER_CONFIG_FILENAME = '.dockercfg'
@@ -45,18 +46,19 @@ def expand_registry_url(hostname):
 
 def resolve_repository_name(repo_name):
     if '://' in repo_name:
-        raise ValueError('Repository name cannot contain a '
-                         'scheme ({0})'.format(repo_name))
+        raise errors.InvalidRepository(
+            'Repository name cannot contain a scheme ({0})'.format(repo_name))
     parts = repo_name.split('/', 1)
-    if not '.' in parts[0] and not ':' in parts[0] and parts[0] != 'localhost':
+    if '.' not in parts[0] and ':' not in parts[0] and parts[0] != 'localhost':
         # This is a docker index repo (ex: foo/bar or ubuntu)
         return INDEX_URL, repo_name
     if len(parts) < 2:
-        raise ValueError('Invalid repository name ({0})'.format(repo_name))
+        raise errors.InvalidRepository(
+            'Invalid repository name ({0})'.format(repo_name))
 
     if 'index.docker.io' in parts[0]:
-        raise ValueError('Invalid repository name,'
-                         'try "{0}" instead'.format(parts[1]))
+        raise errors.InvalidRepository(
+            'Invalid repository name, try "{0}" instead'.format(parts[1]))
 
     return expand_registry_url(parts[0]), parts[1]
 
@@ -87,6 +89,11 @@ def resolve_authconfig(authconfig, registry=None):
     return authconfig.get(swap_protocol(registry), None)
 
 
+def encode_auth(auth_info):
+    return base64.b64encode(auth_info.get('username', '') + b':' +
+                            auth_info.get('password', ''))
+
+
 def decode_auth(auth):
     if isinstance(auth, six.string_types):
         auth = auth.encode('ascii')
@@ -98,6 +105,12 @@ def decode_auth(auth):
 def encode_header(auth):
     auth_json = json.dumps(auth).encode('ascii')
     return base64.b64encode(auth_json)
+
+
+def encode_full_header(auth):
+    """ Returns the given auth block encoded for the X-Registry-Config header.
+    """
+    return encode_header({'configs': auth})
 
 
 def load_config(root=None):
@@ -136,7 +149,8 @@ def load_config(root=None):
             data.append(line.strip().split(' = ')[1])
         if len(data) < 2:
             # Not enough data
-            raise Exception('Invalid or empty configuration file!')
+            raise errors.InvalidConfigFile(
+                'Invalid or empty configuration file!')
 
         username, password = decode_auth(data[0])
         conf[INDEX_URL] = {

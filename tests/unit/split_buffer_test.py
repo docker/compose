@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from fig.cli.utils import split_buffer
-from . import unittest
+from .. import unittest
 
 class SplitBufferTest(unittest.TestCase):
     def test_single_line_chunks(self):

@@ -15,6 +15,7 @@
 import io
 import tarfile
 import tempfile
+from distutils.version import StrictVersion
 
 import requests
 from fig.packages import six
@@ -51,15 +52,34 @@ def tar(path):
 
 
 def compare_version(v1, v2):
-    return float(v2) - float(v1)
+    """Compare docker versions
+
+    >>> v1 = '1.9'
+    >>> v2 = '1.10'
+    >>> compare_version(v1, v2)
+    1
+    >>> compare_version(v2, v1)
+    -1
+    >>> compare_version(v2, v2)
+    0
+    """
+    s1 = StrictVersion(v1)
+    s2 = StrictVersion(v2)
+    if s1 == s2:
+        return 0
+    elif s1 > s2:
+        return -1
+    else:
+        return 1
 
 
 def ping(url):
     try:
         res = requests.get(url)
-        return res.status >= 400
     except Exception:
         return False
+    else:
+        return res.status_code < 400
 
 
 def _convert_port_binding(binding):
@@ -94,3 +114,15 @@ def convert_port_bindings(port_bindings):
         else:
             result[key] = [_convert_port_binding(v)]
     return result
+
+
+def parse_repository_tag(repo):
+    column_index = repo.rfind(':')
+    if column_index < 0:
+        return repo, ""
+    tag = repo[column_index+1:]
+    slash_index = tag.find('/')
+    if slash_index < 0:
+        return repo[:column_index], tag
+
+    return repo, ""

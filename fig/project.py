@@ -105,23 +105,6 @@ class Project(object):
             unsorted = [self.get_service(name) for name in service_names]
             return [s for s in self.services if s in unsorted]
 
-    def recreate_containers(self, service_names=None):
-        """
-        For each service, create or recreate their containers.
-        Returns a tuple with two lists. The first is a list of
-        (service, old_container) tuples; the second is a list
-        of (service, new_container) tuples.
-        """
-        old = []
-        new = []
-
-        for service in self.get_services(service_names):
-            (s_old, s_new) = service.recreate_containers()
-            old += [(service, container) for container in s_old]
-            new += [(service, container) for container in s_new]
-
-        return (old, new)
-
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.start(**options)
@@ -142,15 +125,13 @@ class Project(object):
                 log.info('%s uses an image, skipping' % service.name)
 
     def up(self, service_names=None):
-        (old, new) = self.recreate_containers(service_names=service_names)
+        new_containers = []
 
-        for (service, container) in new:
-            service.start_container(container)
+        for service in self.get_services(service_names):
+            for (_, new) in service.recreate_containers():
+                new_containers.append(new)
 
-        for (service, container) in old:
-            container.remove()
-
-        return new
+        return new_containers
 
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):

@@ -12,4 +12,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-from .client import Client, APIError  # flake8: noqa
+__title__ = 'docker-py'
+__version__ = '0.3.0'
+
+from .client import Client # flake8: noqa

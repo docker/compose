@@ -15,7 +15,7 @@ from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import yesno
 
-from ..packages.docker.client import APIError
+from ..packages.docker.errors import APIError
 from .errors import UserError
 from .docopt_command import NoSuchCommand
 from .socketclient import SocketClient
@@ -301,10 +301,9 @@ class TopLevelCommand(Command):
         """
         detached = options['-d']
 
-        new = self.project.up(service_names=options['SERVICE'])
+        to_attach = self.project.up(service_names=options['SERVICE'])
 
         if not detached:
-            to_attach = [c for (s, c) in new]
             print("Attaching to", list_containers(to_attach))
             log_printer = LogPrinter(to_attach, attach_params={"logs": True})
 

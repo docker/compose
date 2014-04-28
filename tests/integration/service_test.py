@@ -1,34 +1,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from fig import Service
-from fig.service import CannotBeScaledError, ConfigError
+from fig.service import CannotBeScaledError
+from fig.packages.docker.errors import APIError
 from .testcases import DockerClientTestCase
 
-
 class ServiceTest(DockerClientTestCase):
-    def test_name_validations(self):
-        self.assertRaises(ConfigError, lambda: Service(name=''))
-
-        self.assertRaises(ConfigError, lambda: Service(name=' '))
-        self.assertRaises(ConfigError, lambda: Service(name='/'))
-        self.assertRaises(ConfigError, lambda: Service(name='!'))
-        self.assertRaises(ConfigError, lambda: Service(name='\xe2'))
-        self.assertRaises(ConfigError, lambda: Service(name='_'))
-        self.assertRaises(ConfigError, lambda: Service(name='____'))
-        self.assertRaises(ConfigError, lambda: Service(name='foo_bar'))
-        self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__'))
-
-        Service('a')
-        Service('foo')
-
-    def test_project_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
-        Service(name='foo', project='bar')
-
-    def test_config_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
-        Service(name='foo', ports=['8000'])
-
     def test_containers(self):
         foo = self.create_service('foo')
         bar = self.create_service('bar')
@@ -113,6 +90,12 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertIn('/var/db', container.inspect()['Volumes'])
 
+    def test_create_container_with_specified_volume(self):
+        service = self.create_service('db', volumes=['/tmp:/host-tmp'])
+        container = service.create_container()
+        service.start_container(container)
+        self.assertIn('/host-tmp', container.inspect()['Volumes'])
+
     def test_recreate_containers(self):
         service = self.create_service(
             'db',
@@ -132,23 +115,22 @@ class ServiceTest(DockerClientTestCase):
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
-        (intermediate, new) = service.recreate_containers()
-        self.assertEqual(len(intermediate), 1)
-        self.assertEqual(len(new), 1)
+        tuples = service.recreate_containers()
+        self.assertEqual(len(tuples), 1)
 
-        new_container = new[0]
-        intermediate_container = intermediate[0]
+        intermediate_container = tuples[0][0]
+        new_container = tuples[0][1]
         self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['echo'])
 
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['ps'])
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['ax'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
-        service.start_container(new_container)
         self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
 
-        self.assertEqual(len(self.client.containers(all=True)), num_containers_before + 1)
+        self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
+        self.assertRaises(APIError, lambda: self.client.inspect_container(intermediate_container.id))
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
@@ -271,5 +253,3 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(containers), 2)
         for container in containers:
             self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
-
-
