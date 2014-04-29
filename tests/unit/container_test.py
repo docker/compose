@@ -13,12 +13,12 @@ class ContainerTest(unittest.TestCase):
             "Ports":None,
             "SizeRw":0,
             "SizeRootFs":0,
-            "Names":["/db_1"]
+            "Names":["/figtest_db_1"]
         }, has_been_inspected=True)
         self.assertEqual(container.dictionary, {
             "ID": "abc",
             "Image":"ubuntu:12.04",
-            "Name": "/db_1",
+            "Name": "/figtest_db_1",
         })
 
     def test_environment(self):
@@ -46,6 +46,24 @@ class ContainerTest(unittest.TestCase):
             "Ports":None,
             "SizeRw":0,
             "SizeRootFs":0,
-            "Names":["/db_1"]
+            "Names":["/figtest_db_1"]
         }, has_been_inspected=True)
         self.assertEqual(container.number, 1)
+
+    def test_name(self):
+        container = Container.from_ps(None, {
+            "Id":"abc",
+            "Image":"ubuntu:12.04",
+            "Command":"sleep 300",
+            "Names":["/figtest_db_1"]
+        }, has_been_inspected=True)
+        self.assertEqual(container.name, "figtest_db_1")
+
+    def test_name_without_project(self):
+        container = Container.from_ps(None, {
+            "Id":"abc",
+            "Image":"ubuntu:12.04",
+            "Command":"sleep 300",
+            "Names":["/figtest_db_1"]
+        }, has_been_inspected=True)
+        self.assertEqual(container.name_without_project, "db_1")
