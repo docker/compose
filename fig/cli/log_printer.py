@@ -13,12 +13,26 @@ class LogPrinter(object):
     def __init__(self, containers, attach_params=None):
         self.containers = containers
         self.attach_params = attach_params or {}
+        self.prefix_width = self._calculate_prefix_width(containers)
         self.generators = self._make_log_generators()
 
     def run(self):
         mux = Multiplexer(self.generators)
         for line in mux.loop():
             sys.stdout.write(line.encode(sys.__stdout__.encoding or 'utf-8'))
+
+    def _calculate_prefix_width(self, containers):
+        """
+        Calculate the maximum width of container names so we can make the log
+        prefixes line up like so:
+
+        db_1  | Listening
+        web_1 | Listening
+        """
+        prefix_width = 0
+        for container in containers:
+            prefix_width = max(prefix_width, len(container.name_without_project))
+        return prefix_width
 
     def _make_log_generators(self):
         color_fns = cycle(colors.rainbow())
@@ -31,7 +45,7 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(container.name_without_project + " | ")
+        prefix = color_fn(self._generate_prefix(container))
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
 
@@ -41,6 +55,14 @@ class LogPrinter(object):
         exit_code = container.wait()
         yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
         yield STOP
+
+    def _generate_prefix(self, container):
+        """
+        Generate the prefix for a log line without colour
+        """
+        name = container.name_without_project
+        padding = ' ' * (self.prefix_width - len(name))
+        return ''.join([name, padding, ' | '])
 
     def _attach(self, container):
         params = {
