@@ -31,7 +31,7 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(container.name + " | ")
+        prefix = color_fn(container.name_without_project + " | ")
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
 
