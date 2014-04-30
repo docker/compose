@@ -23,8 +23,9 @@ DOCKER_CONFIG_HINTS = {
 
 
 class BuildError(Exception):
-    def __init__(self, service):
+    def __init__(self, service, reason):
         self.service = service
+        self.reason = reason
 
 
 class CannotBeScaledError(Exception):
@@ -307,7 +308,10 @@ class Service(object):
             stream=True
         )
 
-        all_events = stream_output(build_output, sys.stdout)
+        try:
+            all_events = stream_output(build_output, sys.stdout)
+        except StreamOutputError, e:
+            raise BuildError(self, unicode(e))
 
         image_id = None
 
@@ -338,6 +342,10 @@ class Service(object):
         return True
 
 
+class StreamOutputError(Exception):
+    pass
+
+
 def stream_output(output, stream):
     is_terminal = hasattr(stream, 'fileno') and os.isatty(stream.fileno())
     all_events = []
@@ -362,11 +370,7 @@ def stream_output(output, stream):
                 # move cursor up `diff` rows
                 stream.write("%c[%dA" % (27, diff))
 
-        try:
-            print_output_event(event, stream, is_terminal)
-        except Exception:
-            stream.write(repr(event) + "\n")
-            raise
+        print_output_event(event, stream, is_terminal)
 
         if 'id' in event and is_terminal:
             # move cursor back down
@@ -378,7 +382,7 @@ def stream_output(output, stream):
 
 def print_output_event(event, stream, is_terminal):
     if 'errorDetail' in event:
-        raise Exception(event['errorDetail']['message'])
+        raise StreamOutputError(event['errorDetail']['message'])
 
     terminator = ''
 

@@ -52,7 +52,7 @@ def main():
         log.error(e.explanation)
         sys.exit(1)
     except BuildError as e:
-        log.error("Service '%s' failed to build." % e.service.name)
+        log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
         sys.exit(1)
 
 
