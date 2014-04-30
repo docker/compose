@@ -1,6 +1,18 @@
 Change log
 ==========
 
+0.4.0 (2014-04-29)
+------------------
+
+ - Support Docker 0.9 and 0.10
+ - Display progress bars correctly when pulling images (no more ski slopes)
+ - `fig up` now stops all services when any container exits
+ - Added support for the `privileged` config option in fig.yml (thanks @kvz!)
+ - Shortened and aligned log prefixes in `fig up` output
+ - Only containers started with `fig run` link back to their own service
+ - Handle UTF-8 correctly when streaming `fig build/run/up` output (thanks @mauvm and @shanejonas!)
+ - Error message improvements
+
 0.3.2 (2014-03-05)
 ------------------
 
