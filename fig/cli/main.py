@@ -233,10 +233,11 @@ class TopLevelCommand(Command):
             with self._attach_to_container(container.id, raw=tty) as c:
                 service.start_container(container, ports=None, one_off=True)
                 c.run()
+            exit_code = container.wait()
             if options['--rm']:
-                container.wait()
                 log.info("Removing %s..." % container.name)
                 self.client.remove_container(container.id)
+            sys.exit(exit_code)
 
     def scale(self, options):
         """
