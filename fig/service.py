@@ -21,6 +21,8 @@ DOCKER_CONFIG_HINTS = {
     'volume'    : 'volumes',
 }
 
+VALID_NAME_CHARS = '[a-zA-Z0-9]'
+
 
 class BuildError(Exception):
     def __init__(self, service, reason):
@@ -38,10 +40,10 @@ class ConfigError(ValueError):
 
 class Service(object):
     def __init__(self, name, client=None, project='default', links=[], **options):
-        if not re.match('^[a-zA-Z0-9]+$', name):
-            raise ConfigError('Invalid name: %s' % name)
-        if not re.match('^[a-zA-Z0-9]+$', project):
-            raise ConfigError('Invalid project: %s' % project)
+        if not re.match('^%s+$' % VALID_NAME_CHARS, name):
+            raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
+        if not re.match('^%s+$' % VALID_NAME_CHARS, project):
+            raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
