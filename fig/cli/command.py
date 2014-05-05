@@ -24,6 +24,7 @@ class Command(DocoptCommand):
 
     def __init__(self):
         self.yaml_path = os.environ.get('FIG_FILE', None)
+        self.explicit_project_name = None
 
     def dispatch(self, *args, **kwargs):
         try:
@@ -44,6 +45,8 @@ class Command(DocoptCommand):
     def perform_command(self, options, *args, **kwargs):
         if options['--file'] is not None:
             self.yaml_path = os.path.join(self.base_dir, options['--file'])
+        if options['--project-name'] is not None:
+            self.explicit_project_name = options['--project-name']
         return super(Command, self).perform_command(options, *args, **kwargs)
 
     @cached_property
@@ -70,6 +73,8 @@ class Command(DocoptCommand):
     @cached_property
     def project_name(self):
         project = os.path.basename(os.getcwd())
+        if self.explicit_project_name is not None:
+            project = self.explicit_project_name
         project = re.sub(r'[^a-zA-Z0-9]', '', project)
         if not project:
             project = 'default'

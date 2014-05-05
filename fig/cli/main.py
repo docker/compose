@@ -71,9 +71,10 @@ class TopLevelCommand(Command):
       fig -h|--help
 
     Options:
-      --verbose            Show more output
-      --version            Print version and exit
-      -f, --file FILE      Specify an alternate fig file (default: fig.yml)
+      --verbose                 Show more output
+      --version                 Print version and exit
+      -f, --file FILE           Specify an alternate fig file (default: fig.yml)
+      -p, --project-name NAME   Specify an alternate project name (default: directory name)
 
     Commands:
       build     Build or rebuild services
