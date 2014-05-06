@@ -32,7 +32,7 @@ db:
 
 Then type `fig up`, and Fig will start and run your entire app:
 
-![example fig run](https://orchardup.com/static/images/fig-example-large.f96065fc9e22.gif)
+![example fig run](https://orchardup.com/static/images/fig-example-large.gif)
 
 There are commands to:
 
