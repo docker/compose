@@ -78,7 +78,7 @@ class Container(object):
     def human_readable_state(self):
         self.inspect_if_not_inspected()
         if self.dictionary['State']['Running']:
-            if self.dictionary['State']['Ghost']:
+            if self.dictionary['State'].get('Ghost'):
                 return 'Ghost'
             else:
                 return 'Up'
