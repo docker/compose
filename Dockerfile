@@ -9,4 +9,3 @@ RUN python setup.py develop
 RUN useradd -d /home/user -m -s /bin/bash user
 RUN chown -R user /code/
 USER user
-ENTRYPOINT /usr/local/bin/fig
