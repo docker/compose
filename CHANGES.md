@@ -4,7 +4,9 @@ Change log
 0.4.1 (2014-05-08)
 ------------------
 
- - Add support for Docker 0.11.0.
+ - Add support for Docker 0.11.0. (Thanks @marksteve!)
+ - Make project name configurable. (Thanks @jefmathiot!)
+ - Return correct exit code from `fig run`.
 
 0.4.0 (2014-04-29)
 ------------------
