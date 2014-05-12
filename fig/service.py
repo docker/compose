@@ -305,7 +305,8 @@ class Service(object):
         build_output = self.client.build(
             self.options['build'],
             tag=self._build_tag_name(),
-            stream=True
+            stream=True,
+            rm=True
         )
 
         try:
