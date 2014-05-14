@@ -58,7 +58,7 @@ img {
 
 .logo {
   font-family: 'Lilita One', sans-serif;
-  font-size: 80px;
+  font-size: 64px;
   margin: 20px 0 40px 0;
 }
 
@@ -68,8 +68,8 @@ img {
 }
 
 .logo img {
-  width: 80px;
-  vertical-align: -17px;
+  width: 60px;
+  vertical-align: -8px;
 }
 
 .mobile-logo {
@@ -77,11 +77,16 @@ img {
 }
 
 .sidebar {
-  font-size: 16px;
+  font-size: 15px;
+  color: #777;
 }
 
 .sidebar a {
   color: #a41211;
+}
+
+.sidebar p {
+  margin: 10px 0;
 }
 
 @media (max-width: 767px) {
@@ -101,7 +106,8 @@ img {
   }
 
   .logo {
-    margin-top: 40px;
+    margin-top: 30px;
+    margin-bottom: 30px;
   }
 
   .content h1 {
@@ -116,6 +122,7 @@ img {
     width: 280px;
     overflow-y: auto;
     padding-left: 40px;
+    padding-right: 10px;
     border-right: 1px solid #ccc;
   }
 
@@ -126,12 +133,12 @@ img {
 }
 
 .nav {
-  margin: 20px 0;
+  margin: 15px 0;
 }
 
 .nav li a {
   display: block;
-  padding: 8px 0;
+  padding: 5px 0;
   line-height: 1.2;
   text-decoration: none;
 }
