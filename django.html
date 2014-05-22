@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140514191545224156134">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140522201617072076549">
   </head>
   <body>
     <div class="container">
@@ -23,6 +23,7 @@
 
 <p>Let&#39;s set up the three files that&#39;ll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called <code>Dockerfile</code>. It&#39;ll contain this to start with:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
+ENV PYTHONUNBUFFERED 1
 RUN apt-get update -qq &amp;&amp; apt-get install -y python-psycopg2
 RUN mkdir /code
 WORKDIR /code
