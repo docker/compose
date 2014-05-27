@@ -81,7 +81,7 @@ class SocketClient:
                 chunk = socket.recv(4096)
 
                 if chunk:
-                    stream.write(chunk.encode(stream.encoding or 'utf-8'))
+                    stream.write(chunk)
                     stream.flush()
                 else:
                     break
