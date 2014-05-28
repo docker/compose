@@ -35,7 +35,7 @@ setup(
     url='http://orchardup.github.io/fig/',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
-    license='BSD',
+    license='Apache License 2.0',
     packages=find_packages(),
     include_package_data=True,
     test_suite='nose.collector',
