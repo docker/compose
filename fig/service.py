@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint', 'privileged', 'net']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -39,7 +39,7 @@ class ConfigError(ValueError):
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=[], **options):
+    def __init__(self, name, client=None, project='default', links=[], volumes_from=[], **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -60,6 +60,7 @@ class Service(object):
         self.client = client
         self.project = project
         self.links = links or []
+        self.volumes_from = volumes_from or []
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -190,7 +191,7 @@ class Service(object):
 
         options = dict(override_options)
         new_container = self.create_container(**options)
-        self.start_container(new_container, volumes_from=intermediate_container.id)
+        self.start_container(new_container, intermediate_container=intermediate_container)
 
         intermediate_container.remove()
 
@@ -203,7 +204,7 @@ class Service(object):
             log.info("Starting %s..." % container.name)
             return self.start_container(container, **options)
 
-    def start_container(self, container=None, volumes_from=None, **override_options):
+    def start_container(self, container=None, intermediate_container=None,**override_options):
         if container is None:
             container = self.create_container(**override_options)
 
@@ -240,7 +241,7 @@ class Service(object):
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
-            volumes_from=volumes_from,
+            volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=net,
         )
@@ -286,6 +287,20 @@ class Service(object):
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         return links
+
+    def _get_volumes_from(self, intermediate_container=None):
+        volumes_from = []
+        for v in self.volumes_from:
+            if isinstance(v, Service):
+                for container in v.containers(stopped=True):
+                    volumes_from.append(container.id)
+            elif isinstance(v, Container):
+                volumes_from.append(v.id)
+
+        if intermediate_container:
+            volumes_from.append(intermediate_container.id)
+
+        return volumes_from
 
     def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)

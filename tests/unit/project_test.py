@@ -30,12 +30,19 @@ class ProjectTest(unittest.TestCase):
             },
             {
                 'name': 'db',
-                'image': 'busybox:latest'
+                'image': 'busybox:latest',
+                'volumes_from': ['volume']
+            },
+            {
+                'name': 'volume',
+                'image': 'busybox:latest',
+                'volumes': ['/tmp'],
             }
         ], None)
 
-        self.assertEqual(project.services[0].name, 'db')
-        self.assertEqual(project.services[1].name, 'web')
+        self.assertEqual(project.services[0].name, 'volume')
+        self.assertEqual(project.services[1].name, 'db')
+        self.assertEqual(project.services[2].name, 'web')
 
     def test_from_config(self):
         project = Project.from_config('figtest', {

@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from fig import Service
 from fig.service import CannotBeScaledError
+from fig.container import Container
 from fig.packages.docker.errors import APIError
 from .testcases import DockerClientTestCase
 
@@ -96,6 +97,16 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertIn('/host-tmp', container.inspect()['Volumes'])
 
+    def test_create_container_with_volumes_from(self):
+        volume_service = self.create_service('data')
+        volume_container_1 = volume_service.create_container()
+        volume_container_2 = Container.create(self.client, image='busybox:latest', command=["/bin/sleep", "300"])
+        host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
+        host_container = host_service.create_container()
+        host_service.start_container(host_container)
+        self.assertIn(volume_container_1.id, host_container.inspect()['HostConfig']['VolumesFrom'])
+        self.assertIn(volume_container_2.id, host_container.inspect()['HostConfig']['VolumesFrom'])
+
     def test_recreate_containers(self):
         service = self.create_service(
             'db',
@@ -127,6 +138,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
         self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
+        self.assertIn(intermediate_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
