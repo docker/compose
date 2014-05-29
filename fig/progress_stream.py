@@ -1,5 +1,6 @@
 import json
 import os
+import codecs
 
 
 class StreamOutputError(Exception):
@@ -8,6 +9,7 @@ class StreamOutputError(Exception):
 
 def stream_output(output, stream):
     is_terminal = hasattr(stream, 'fileno') and os.isatty(stream.fileno())
+    stream = codecs.getwriter('utf-8')(stream)
     all_events = []
     lines = {}
     diff = 0
