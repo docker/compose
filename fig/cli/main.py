@@ -202,9 +202,10 @@ class TopLevelCommand(Command):
 
             $ fig run web python manage.py shell
 
-        Note that this will not start any services that the command's service
-        links to. So if, for example, your one-off command talks to your
-        database, you will need to run `fig up -d db` first.
+        Note that by default this will not start any services that the
+        command's service links to. So if, for example, your one-off command
+        talks to your database, you will need to either run `fig up -d db`
+        first, or use `fig run --up SERVICE COMMAND [ARGS...]`.
 
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
@@ -214,7 +215,13 @@ class TopLevelCommand(Command):
             -T    Disable pseudo-tty allocation. By default `fig run`
                   allocates a TTY.
             --rm  Remove container after run. Ignored in detached mode.
+            --up  Also start services that the command's service links to
         """
+
+        if options['--up']:
+            # FIXME: I'm not sure if this is good python form
+            self.up({'-d': True, 'SERVICE': None})
+
         service = self.project.get_service(options['SERVICE'])
 
         tty = True
