@@ -2,5 +2,6 @@ simple:
   image: ubuntu
   command: /bin/sleep 300
 another:
+  auto_start: false
   image: ubuntu
   command: /bin/sleep 300
