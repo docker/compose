@@ -37,13 +37,16 @@ class ConfigError(ValueError):
 
 
 class Service(object):
-    def __init__(self, name, auto_start=True, client=None, project='default', links=[], **options):
+    def __init__(self, name, client=None, project='default', links=[], **options):
         if not re.match('^[a-zA-Z0-9]+$', name):
             raise ConfigError('Invalid name: %s' % name)
         if not re.match('^[a-zA-Z0-9]+$', project):
             raise ConfigError('Invalid project: %s' % project)
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
+
+        if 'auto_start' not in options:
+            options['auto_start'] = True
 
         supported_options = DOCKER_CONFIG_KEYS + ['auto_start', 'build', 'expose']
 
@@ -55,7 +58,6 @@ class Service(object):
                 raise ConfigError(msg)
 
         self.name = name
-        self.auto_start = auto_start
         self.client = client
         self.project = project
         self.links = links or []

@@ -13,7 +13,7 @@ class ProjectTest(unittest.TestCase):
             {
                 'name': 'db',
                 'image': 'ubuntu'
-            }
+            },
         ], None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')

@@ -20,6 +20,10 @@ class ServiceTest(unittest.TestCase):
         Service('a')
         Service('foo')
 
+    def test_auto_start_defaults_true(self):
+        service = Service(name='foo', project='bar')
+        self.assertEqual(service.options['auto_start'], True)
+
     def test_project_validation(self):
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
         Service(name='foo', project='bar')

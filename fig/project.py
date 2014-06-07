@@ -65,12 +65,7 @@ class Project(object):
 
                 del service_dict['links']
 
-            auto_start = True
-            if 'auto_start' in service_dict:
-                auto_start = service_dict.get('auto_start', True)
-                del service_dict['auto_start']
-
-            project.services.append(Service(auto_start=auto_start, client=client, project=name, links=links, **service_dict))
+            project.services.append(Service(client=client, project=name, links=links, **service_dict))
         return project
 
     @classmethod
@@ -94,7 +89,7 @@ class Project(object):
 
         raise NoSuchService(name)
 
-    def get_services(self, service_names=None, auto_start=True):
+    def get_services(self, service_names=None):
         """
         Returns a list of this project's services filtered
         by the provided list of names, or all services if
@@ -106,7 +101,7 @@ class Project(object):
         do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            return filter(lambda srv: srv.auto_start == auto_start, self.services)
+            return filter(lambda s: s.options['auto_start'], self.services)
         else:
             unsorted = [self.get_service(name) for name in service_names]
             return [s for s in self.services if s in unsorted]
