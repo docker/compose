@@ -125,10 +125,18 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def up(self, service_names=None):
+    def up(self, service_names=None, start_links=True):
         new_containers = []
 
         for service in self.get_services(service_names):
+            linked_services = service.get_linked_names()
+
+            if start_links and len(linked_services) > 0:
+                new_containers.extend(self.up(
+                    service_names=linked_services,
+                    start_links=True
+                ))
+
             for (_, new) in service.recreate_containers():
                 new_containers.append(new)
 

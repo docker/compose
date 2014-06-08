@@ -220,10 +220,10 @@ class TopLevelCommand(Command):
         service = self.project.get_service(options['SERVICE'])
 
         if not options['--no-links']:
-            self.up({
-                '-d': True,
-                'SERVICE': self._get_linked_service_names(service)
-            })
+            self.project.up(
+                service_names=service.get_linked_names(),
+                start_links=True
+            )
 
         tty = True
         if options['-d'] or options['-T'] or not sys.stdin.isatty():
@@ -306,12 +306,16 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d    Detached mode: Run containers in the background, print new
-                  container names
+            -d          Detached mode: Run containers in the background, print
+                        new container names.
+            --no-links  Don't start linked services.
         """
         detached = options['-d']
 
-        to_attach = self.project.up(service_names=options['SERVICE'])
+        start_links = not options['--no-links']
+        service_names = options['SERVICE']
+
+        to_attach = self.project.up(service_names=service_names, start_links=start_links)
 
         if not detached:
             print("Attaching to", list_containers(to_attach))
@@ -321,12 +325,12 @@ class TopLevelCommand(Command):
                 log_printer.run()
             finally:
                 def handler(signal, frame):
-                    self.project.kill(service_names=options['SERVICE'])
+                    self.project.kill(service_names=service_names)
                     sys.exit(0)
                 signal.signal(signal.SIGINT, handler)
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
-                self.project.stop(service_names=options['SERVICE'])
+                self.project.stop(service_names=service_names)
 
     def _attach_to_container(self, container_id, raw=False):
         socket_in = self.client.attach_socket(container_id, params={'stdin': 1, 'stream': 1})

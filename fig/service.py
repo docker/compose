@@ -242,6 +242,9 @@ class Service(object):
         )
         return container
 
+    def get_linked_names(self):
+        return [s.name for (s, _) in self.links]
+
     def next_container_name(self, one_off=False):
         bits = [self.project, self.name]
         if one_off:
