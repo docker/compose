@@ -54,6 +54,9 @@ expose:
 volumes:
  - cache/:/tmp/cache
 
+-- Do not automatically run this service on `fig up` (default: true)
+auto_start: false
+
 -- Add environment variables.
 environment:
   RACK_ENV: development
