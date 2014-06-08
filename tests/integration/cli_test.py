@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from .testcases import DockerClientTestCase
-from mock import patch
+#from mock import patch
 from fig.cli.main import TopLevelCommand
 from fig.packages.six import StringIO
 
@@ -49,6 +49,26 @@ class CLITestCase(DockerClientTestCase):
         another = self.command.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
         self.assertEqual(len(another.containers()), 0)
+
+    def test_up_with_links(self):
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch([str('up'), str('-d'), str('web')], None)
+        web = self.command.project.get_service('web')
+        db = self.command.project.get_service('db')
+        console = self.command.project.get_service('console')
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+    def test_up_with_no_links(self):
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch([str('up'), str('-d'), str('--no-links'), str('web')], None)
+        web = self.command.project.get_service('web')
+        db = self.command.project.get_service('db')
+        console = self.command.project.get_service('console')
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(len(db.containers()), 0)
+        self.assertEqual(len(console.containers()), 0)
 
     def test_rm(self):
         service = self.command.project.get_service('simple')
