@@ -202,26 +202,28 @@ class TopLevelCommand(Command):
 
             $ fig run web python manage.py shell
 
-        Note that by default this will not start any services that the
-        command's service links to. So if, for example, your one-off command
-        talks to your database, you will need to either run `fig up -d db`
-        first, or use `fig run --up SERVICE COMMAND [ARGS...]`.
+        By default, linked services will be started, unless they are already
+        running. If you do not want to start linked services, use
+        `fig run --no-links SERVICE COMMAND [ARGS...]`.
 
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d    Detached mode: Run container in the background, print new
-                  container name
-            -T    Disable pseudo-tty allocation. By default `fig run`
-                  allocates a TTY.
-            --rm  Remove container after run. Ignored in detached mode.
-            --up  Also start services that the command's service links to
+            -d          Detached mode: Run container in the background, print
+                        new container name.
+            -T          Disable pseudo-tty allocation. By default `fig run`
+                        allocates a TTY.
+            --rm        Remove container after run. Ignored in detached mode.
+            --no-links  Don't start linked services.
         """
 
-        if options['--up']:
-            self.up({'-d': True, 'SERVICE': None})
-
         service = self.project.get_service(options['SERVICE'])
+
+        if not options['--no-links']:
+            self.up({
+                '-d': True,
+                'SERVICE': self._get_linked_service_names(service)
+            })
 
         tty = True
         if options['-d'] or options['-T'] or not sys.stdin.isatty():
@@ -337,6 +339,9 @@ class TopLevelCommand(Command):
             socket_err=socket_err,
             raw=raw,
         )
+
+    def _get_linked_service_names(self, service):
+        return [s.name for (s, _) in service.links]
 
 def list_containers(containers):
     return ", ".join(c.name for c in containers)
