@@ -4,14 +4,18 @@ from .testcases import DockerClientTestCase
 from mock import patch
 from fig.cli.main import TopLevelCommand
 from fig.packages.six import StringIO
+import sys
 
 class CLITestCase(DockerClientTestCase):
     def setUp(self):
         super(CLITestCase, self).setUp()
+        self.old_sys_exit = sys.exit
+        sys.exit = lambda code=0: None
         self.command = TopLevelCommand()
         self.command.base_dir = 'tests/fixtures/simple-figfile'
 
     def tearDown(self):
+        sys.exit = self.old_sys_exit
         self.command.project.kill()
         self.command.project.remove_stopped()
 
@@ -69,6 +73,26 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 0)
         self.assertEqual(len(console.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_run_with_links(self, mock_stdout):
+        mock_stdout.fileno = lambda: 1
+
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch([str('run'), str('web'), str('/bin/true')], None)
+        db = self.command.project.get_service('db')
+        console = self.command.project.get_service('console')
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_run_with_no_links(self, mock_stdout):
+        mock_stdout.fileno = lambda: 1
+
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch([str('run'), str('--no-links'), str('web'), str('/bin/true')], None)
+        db = self.command.project.get_service('db')
+        self.assertEqual(len(db.containers()), 0)
 
     def test_rm(self):
         service = self.command.project.get_service('simple')
