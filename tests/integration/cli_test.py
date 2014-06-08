@@ -94,7 +94,7 @@ class CLITestCase(DockerClientTestCase):
 
         old_ids = [c.id for c in service.containers()]
 
-        self.command.dispatch(['up', '-d', '--keep-old'], None)
+        self.command.dispatch(['up', '-d', '--no-recreate'], None)
         self.assertEqual(len(service.containers()), 1)
 
         new_ids = [c.id for c in service.containers()]

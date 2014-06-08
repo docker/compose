@@ -82,6 +82,6 @@ Linked services will be started, unless they are already running.
 
 By default, `fig up` will aggregate the output of each container, and when it exits, all containers will be stopped. If you run `fig up -d`, it'll start the containers in the background and leave them running.
 
-By default if there are existing containers for a service, `fig up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `fig.yml` are picked up. If you do no want containers to be stopped and recreated, use `fig up --keep-old`. This will still start any stopped containers, if needed.
+By default if there are existing containers for a service, `fig up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `fig.yml` are picked up. If you do no want containers to be stopped and recreated, use `fig up --no-recreate`. This will still start any stopped containers, if needed.
 
 [volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/
