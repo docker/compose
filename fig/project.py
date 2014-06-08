@@ -139,13 +139,17 @@ class Project(object):
                 log.info('%s uses an image, skipping' % service.name)
 
     def up(self, service_names=None, start_links=True, keep_old=False):
-        new_containers = []
+        running_containers = []
 
         for service in self.get_services(service_names, include_links=start_links):
-            for (_, new) in service.recreate_containers(keep_old):
-                new_containers.append(new)
+            if keep_old:
+                for container in service.start_or_create_containers():
+                    running_containers.append(container)
+            else:
+                for (_, container) in service.recreate_containers():
+                    running_containers.append(container)
 
-        return new_containers
+        return running_containers
 
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):

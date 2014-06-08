@@ -132,52 +132,6 @@ class ServiceTest(DockerClientTestCase):
         self.assertNotEqual(old_container.id, new_container.id)
         self.assertRaises(APIError, lambda: self.client.inspect_container(intermediate_container.id))
 
-    def test_recreate_containers_with_keep_old_running(self):
-        service = self.create_service(
-            'db',
-            environment={'FOO': '1'},
-            volumes=['/var/db'],
-            entrypoint=['ps'],
-            command=['ax']
-        )
-        old_container = service.create_container()
-        service.start_container(old_container)
-
-        num_containers_before = len(self.client.containers(all=True))
-
-        tuples = service.recreate_containers(keep_old=True)
-        self.assertEqual(len(tuples), 1)
-
-        intermediate_container = tuples[0][0]
-        new_container = tuples[0][1]
-
-        self.assertIsNone(intermediate_container)
-        self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
-        self.assertEqual(old_container.id, new_container.id)
-
-    def test_recreate_containers_with_keep_old_stopped(self):
-        service = self.create_service(
-            'db',
-            environment={'FOO': '1'},
-            volumes=['/var/db'],
-            entrypoint=['ps'],
-            command=['ax']
-        )
-        old_container = service.create_container()
-        old_container.stop()
-
-        num_containers_before = len(self.client.containers(all=True))
-
-        tuples = service.recreate_containers(keep_old=True)
-        self.assertEqual(len(tuples), 1)
-
-        intermediate_container = tuples[0][0]
-        new_container = tuples[0][1]
-
-        self.assertIsNone(intermediate_container)
-        self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
-        self.assertEqual(old_container.id, new_container.id)
-
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         db.start_container(environment={'FOO': 'BAR'})

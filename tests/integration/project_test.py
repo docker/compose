@@ -74,7 +74,7 @@ class ProjectTest(DockerClientTestCase):
         project.kill()
         project.remove_stopped()
 
-    def test_project_up_with_keep_old(self):
+    def test_project_up_with_keep_old_running(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/var/db'])
         project = Project('figtest', [web, db], self.client)
@@ -90,6 +90,34 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
+        self.assertEqual(c.id, old_db_id)
+        self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_project_up_with_keep_old_stopped(self):
+        web = self.create_service('web')
+        db = self.create_service('db', volumes=['/var/db'])
+        project = Project('figtest', [web, db], self.client)
+        project.start()
+        self.assertEqual(len(project.containers()), 0)
+
+        project.up(['db'])
+        project.stop()
+
+        old_containers = project.containers(stopped=True)
+
+        self.assertEqual(len(old_containers), 1)
+        old_db_id = old_containers[0].id
+        db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
+
+        project.up(keep_old=True)
+
+        new_containers = project.containers(stopped=True)
+        self.assertEqual(len(new_containers), 2)
+
+        db_container = [c for c in new_containers if 'db' in c.name][0]
         self.assertEqual(c.id, old_db_id)
         self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
 

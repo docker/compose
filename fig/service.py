@@ -154,7 +154,7 @@ class Service(object):
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, keep_old=False, **override_options):
+    def recreate_containers(self, **override_options):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
@@ -166,8 +166,6 @@ class Service(object):
             container = self.create_container(**override_options)
             self.start_container(container)
             return [(None, container)]
-        elif keep_old:
-            return [(None, self.start_container_if_stopped(c)) for c in containers]
         else:
             tuples = []
 
@@ -248,6 +246,16 @@ class Service(object):
             privileged=privileged,
         )
         return container
+
+    def start_or_create_containers(self):
+        containers = self.containers(stopped=True)
+
+        if len(containers) == 0:
+            log.info("Creating %s..." % self.next_container_name())
+            new_container = self.create_container()
+            return [self.start_container(new_container)]
+        else:
+            return [self.start_container_if_stopped(c) for c in containers]
 
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
