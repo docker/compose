@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
 from .testcases import DockerClientTestCase
 from mock import patch
@@ -56,7 +55,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up_with_links(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch([str('up'), str('-d'), str('web')], None)
+        self.command.dispatch(['up', '-d', 'web'], None)
         web = self.command.project.get_service('web')
         db = self.command.project.get_service('db')
         console = self.command.project.get_service('console')
@@ -66,7 +65,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up_with_no_links(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch([str('up'), str('-d'), str('--no-links'), str('web')], None)
+        self.command.dispatch(['up', '-d', '--no-links', 'web'], None)
         web = self.command.project.get_service('web')
         db = self.command.project.get_service('db')
         console = self.command.project.get_service('console')
@@ -95,7 +94,7 @@ class CLITestCase(DockerClientTestCase):
 
         old_ids = [c.id for c in service.containers()]
 
-        self.command.dispatch([str('up'), str('-d'), str('--keep-old')], None)
+        self.command.dispatch(['up', '-d', '--keep-old'], None)
         self.assertEqual(len(service.containers()), 1)
 
         new_ids = [c.id for c in service.containers()]
@@ -108,7 +107,7 @@ class CLITestCase(DockerClientTestCase):
         mock_stdout.fileno = lambda: 1
 
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch([str('run'), str('web'), str('/bin/true')], None)
+        self.command.dispatch(['run', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
         console = self.command.project.get_service('console')
         self.assertEqual(len(db.containers()), 1)
@@ -119,7 +118,7 @@ class CLITestCase(DockerClientTestCase):
         mock_stdout.fileno = lambda: 1
 
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch([str('run'), str('--no-links'), str('web'), str('/bin/true')], None)
+        self.command.dispatch(['run', '--no-links', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
@@ -128,13 +127,13 @@ class CLITestCase(DockerClientTestCase):
         mock_stdout.fileno = lambda: 1
 
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch([str('up'), str('-d'), str('db')], None)
+        self.command.dispatch(['up', '-d', 'db'], None)
         db = self.command.project.get_service('db')
         self.assertEqual(len(db.containers()), 1)
 
         old_ids = [c.id for c in db.containers()]
 
-        self.command.dispatch([str('run'), str('web'), str('/bin/true')], None)
+        self.command.dispatch(['run', 'web', '/bin/true'], None)
         self.assertEqual(len(db.containers()), 1)
 
         new_ids = [c.id for c in db.containers()]
