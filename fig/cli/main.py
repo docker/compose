@@ -219,7 +219,6 @@ class TopLevelCommand(Command):
         """
 
         if options['--up']:
-            # FIXME: I'm not sure if this is good python form
             self.up({'-d': True, 'SERVICE': None})
 
         service = self.project.get_service(options['SERVICE'])
