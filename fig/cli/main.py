@@ -353,8 +353,5 @@ class TopLevelCommand(Command):
             raw=raw,
         )
 
-    def _get_linked_service_names(self, service):
-        return [s.name for (s, _) in service.links]
-
 def list_containers(containers):
     return ", ".join(c.name for c in containers)
