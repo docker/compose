@@ -46,6 +46,21 @@ class ProjectTest(DockerClientTestCase):
 
         project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(web.containers()), 0)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_project_up_recreates_containers(self):
+        web = self.create_service('web')
+        db = self.create_service('db', volumes=['/var/db'])
+        project = Project('figtest', [web, db], self.client)
+        project.start()
+        self.assertEqual(len(project.containers()), 0)
+
+        project.up(['db'])
+        self.assertEqual(len(project.containers()), 1)
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
 
@@ -54,6 +69,28 @@ class ProjectTest(DockerClientTestCase):
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
         self.assertNotEqual(c.id, old_db_id)
+        self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_project_up_with_keep_old(self):
+        web = self.create_service('web')
+        db = self.create_service('db', volumes=['/var/db'])
+        project = Project('figtest', [web, db], self.client)
+        project.start()
+        self.assertEqual(len(project.containers()), 0)
+
+        project.up(['db'])
+        self.assertEqual(len(project.containers()), 1)
+        old_db_id = project.containers()[0].id
+        db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
+
+        project.up(keep_old=True)
+        self.assertEqual(len(project.containers()), 2)
+
+        db_container = [c for c in project.containers() if 'db' in c.name][0]
+        self.assertEqual(c.id, old_db_id)
         self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
 
         project.kill()
@@ -69,6 +106,42 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         self.assertEqual(len(project.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_project_up_starts_links(self):
+        console = self.create_service('console')
+        db = self.create_service('db', volumes=['/var/db'])
+        web = self.create_service('web', links=[(db, 'db')])
+
+        project = Project('figtest', [web, db, console], self.client)
+        project.start()
+        self.assertEqual(len(project.containers()), 0)
+
+        project.up(['web'])
+        self.assertEqual(len(project.containers()), 2)
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_project_up_with_no_links(self):
+        console = self.create_service('console')
+        db = self.create_service('db', volumes=['/var/db'])
+        web = self.create_service('web', links=[(db, 'db')])
+
+        project = Project('figtest', [web, db, console], self.client)
+        project.start()
+        self.assertEqual(len(project.containers()), 0)
+
+        project.up(['web'], start_links=False)
+        self.assertEqual(len(project.containers()), 1)
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(len(db.containers()), 0)
         self.assertEqual(len(console.containers()), 0)
 
         project.kill()
