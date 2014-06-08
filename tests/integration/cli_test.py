@@ -74,6 +74,35 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 0)
         self.assertEqual(len(console.containers()), 0)
 
+    def test_up_with_recreate(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.command.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+
+        old_ids = [c.id for c in service.containers()]
+
+        self.command.dispatch(['up', '-d'], None)
+        self.assertEqual(len(service.containers()), 1)
+
+        new_ids = [c.id for c in service.containers()]
+
+        self.assertNotEqual(old_ids, new_ids)
+
+    def test_up_with_keep_old(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.command.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+
+        old_ids = [c.id for c in service.containers()]
+
+        self.command.dispatch([str('up'), str('-d'), str('--keep-old')], None)
+        self.assertEqual(len(service.containers()), 1)
+
+        new_ids = [c.id for c in service.containers()]
+
+        self.assertEqual(old_ids, new_ids)
+
+
     @patch('sys.stdout', new_callable=StringIO)
     def test_run_with_links(self, mock_stdout):
         mock_stdout.fileno = lambda: 1
@@ -93,6 +122,24 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch([str('run'), str('--no-links'), str('web'), str('/bin/true')], None)
         db = self.command.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_run_does_not_recreate_linked_containers(self, mock_stdout):
+        mock_stdout.fileno = lambda: 1
+
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch([str('up'), str('-d'), str('db')], None)
+        db = self.command.project.get_service('db')
+        self.assertEqual(len(db.containers()), 1)
+
+        old_ids = [c.id for c in db.containers()]
+
+        self.command.dispatch([str('run'), str('web'), str('/bin/true')], None)
+        self.assertEqual(len(db.containers()), 1)
+
+        new_ids = [c.id for c in db.containers()]
+
+        self.assertEqual(old_ids, new_ids)
 
     def test_rm(self):
         service = self.command.project.get_service('simple')
