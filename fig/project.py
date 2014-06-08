@@ -104,7 +104,10 @@ class Project(object):
         Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            return [s for s in self.services if s.options['auto_start']]
+            return self.get_services(
+                service_names=[s.name for s in self.services if s.options['auto_start']],
+                include_links=include_links
+            )
         else:
             unsorted = [self.get_service(name) for name in service_names]
             services = [s for s in self.services if s in unsorted]
@@ -156,10 +159,19 @@ class Project(object):
         return l
 
     def _prepend_with_links(self, acc, service):
-        linked_services = self.get_services(
-            service_names=service.get_linked_names(),
-            include_links=True
-        )
+        if service in acc:
+            return acc
+
+        linked_names = service.get_linked_names()
+
+        if len(linked_names) > 0:
+            linked_services = self.get_services(
+                service_names=linked_names,
+                include_links=True
+            )
+        else:
+            linked_services = []
+
         linked_services.append(service)
         return acc + linked_services
 
