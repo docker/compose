@@ -95,13 +95,13 @@ class Project(object):
         by the provided list of names, or all auto_start services if
         service_names is None or [].
 
-        If include_links is specified, returns a list prepended with the needed
-        links for service_names, in order of dependency.
+        If include_links is specified, returns a list including the links for
+        service_names, in order of dependency.
 
-        Preserves the original order of self.services.
+        Preserves the original order of self.services where possible,
+        reordering as needed to resolve links.
 
-        Raises NoSuchService if any of the named services
-        do not exist.
+        Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
             return [s for s in self.services if s.options['auto_start']]
