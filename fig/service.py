@@ -76,9 +76,7 @@ class Service(object):
 
     def start(self, **options):
         for c in self.containers(stopped=True):
-            if not c.is_running:
-                log.info("Starting %s..." % c.name)
-                self.start_container(c, **options)
+            self.start_container_if_stopped(c, **options)
 
     def stop(self, **options):
         for c in self.containers():
@@ -156,7 +154,7 @@ class Service(object):
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, **override_options):
+    def recreate_containers(self, keep_old=False, **override_options):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
@@ -168,6 +166,8 @@ class Service(object):
             container = self.create_container(**override_options)
             self.start_container(container)
             return [(None, container)]
+        elif keep_old:
+            return [(None, self.start_container_if_stopped(c)) for c in containers]
         else:
             tuples = []
 
@@ -200,6 +200,13 @@ class Service(object):
         intermediate_container.remove()
 
         return (intermediate_container, new_container)
+
+    def start_container_if_stopped(self, container, **options):
+        if container.is_running:
+            return container
+        else:
+            log.info("Starting %s..." % container.name)
+            return self.start_container(container, **options)
 
     def start_container(self, container=None, volumes_from=None, **override_options):
         if container is None:

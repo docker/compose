@@ -222,7 +222,8 @@ class TopLevelCommand(Command):
         if not options['--no-links']:
             self.project.up(
                 service_names=service.get_linked_names(),
-                start_links=True
+                start_links=True,
+                keep_old=True
             )
 
         tty = True
@@ -301,7 +302,9 @@ class TopLevelCommand(Command):
 
         If there are existing containers for a service, `fig up` will stop
         and recreate them (preserving mounted volumes with volumes-from),
-        so that changes in `fig.yml` are picked up.
+        so that changes in `fig.yml` are picked up. If you do not want existing
+        containers to be recreated, `fig up --keep-old` will re-use existing
+        containers.
 
         Usage: up [options] [SERVICE...]
 
@@ -309,13 +312,19 @@ class TopLevelCommand(Command):
             -d          Detached mode: Run containers in the background, print
                         new container names.
             --no-links  Don't start linked services.
+            --keep-old  If containers already exist, don't recreate them.
         """
         detached = options['-d']
 
         start_links = not options['--no-links']
+        keep_old = options['--keep-old']
         service_names = options['SERVICE']
 
-        to_attach = self.project.up(service_names=service_names, start_links=start_links)
+        to_attach = self.project.up(
+            service_names=service_names,
+            start_links=start_links,
+            keep_old=keep_old
+        )
 
         if not detached:
             print("Attaching to", list_containers(to_attach))

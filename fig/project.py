@@ -138,11 +138,11 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def up(self, service_names=None, start_links=True):
+    def up(self, service_names=None, start_links=True, keep_old=False):
         new_containers = []
 
         for service in self.get_services(service_names, include_links=start_links):
-            for (_, new) in service.recreate_containers():
+            for (_, new) in service.recreate_containers(keep_old):
                 new_containers.append(new)
 
         return new_containers
@@ -159,9 +159,6 @@ class Project(object):
         return l
 
     def _prepend_with_links(self, acc, service):
-        if service in acc:
-            return acc
-
         linked_names = service.get_linked_names()
 
         if len(linked_names) > 0:
