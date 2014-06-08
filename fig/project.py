@@ -89,11 +89,14 @@ class Project(object):
 
         raise NoSuchService(name)
 
-    def get_services(self, service_names=None):
+    def get_services(self, service_names=None, include_links=False):
         """
         Returns a list of this project's services filtered
-        by the provided list of names, or all services if
+        by the provided list of names, or all auto_start services if
         service_names is None or [].
+
+        If include_links is specified, returns a list prepended with the needed
+        links for service_names, in order of dependency.
 
         Preserves the original order of self.services.
 
@@ -101,10 +104,17 @@ class Project(object):
         do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            return filter(lambda s: s.options['auto_start'], self.services)
+            return [s for s in self.services if s.options['auto_start']]
         else:
             unsorted = [self.get_service(name) for name in service_names]
-            return [s for s in self.services if s in unsorted]
+            services = [s for s in self.services if s in unsorted]
+
+            if include_links:
+                services = reduce(self._prepend_with_links, services, [])
+
+            uniques = []
+            [uniques.append(s) for s in services if s not in uniques]
+            return uniques
 
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
@@ -128,15 +138,7 @@ class Project(object):
     def up(self, service_names=None, start_links=True):
         new_containers = []
 
-        for service in self.get_services(service_names):
-            linked_services = service.get_linked_names()
-
-            if start_links and len(linked_services) > 0:
-                new_containers.extend(self.up(
-                    service_names=linked_services,
-                    start_links=True
-                ))
-
+        for service in self.get_services(service_names, include_links=start_links):
             for (_, new) in service.recreate_containers():
                 new_containers.append(new)
 
@@ -152,6 +154,14 @@ class Project(object):
             for container in service.containers(*args, **kwargs):
                 l.append(container)
         return l
+
+    def _prepend_with_links(self, acc, service):
+        linked_services = self.get_services(
+            service_names=service.get_linked_names(),
+            include_links=True
+        )
+        linked_services.append(service)
+        return acc + linked_services
 
 
 class NoSuchService(Exception):
