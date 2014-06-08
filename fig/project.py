@@ -113,7 +113,7 @@ class Project(object):
             services = [s for s in self.services if s in unsorted]
 
             if include_links:
-                services = reduce(self._prepend_with_links, services, [])
+                services = reduce(self._inject_links, services, [])
 
             uniques = []
             [uniques.append(s) for s in services if s not in uniques]
@@ -158,7 +158,7 @@ class Project(object):
                 l.append(container)
         return l
 
-    def _prepend_with_links(self, acc, service):
+    def _inject_links(self, acc, service):
         linked_names = service.get_linked_names()
 
         if len(linked_names) > 0:
