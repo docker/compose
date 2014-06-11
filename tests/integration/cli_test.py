@@ -65,7 +65,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up_with_no_links(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch(['up', '-d', '--no-links', 'web'], None)
+        self.command.dispatch(['up', '-d', '--only', 'web'], None)
         web = self.command.project.get_service('web')
         db = self.command.project.get_service('db')
         console = self.command.project.get_service('console')
@@ -118,7 +118,7 @@ class CLITestCase(DockerClientTestCase):
         mock_stdout.fileno = lambda: 1
 
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch(['run', '--no-links', 'web', '/bin/true'], None)
+        self.command.dispatch(['run', '--only', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
