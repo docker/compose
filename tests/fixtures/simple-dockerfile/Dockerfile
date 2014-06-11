@@ -1,2 +1,2 @@
-FROM ubuntu
+FROM busybox:latest
 CMD echo "success"
