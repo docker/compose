@@ -1,0 +1,11 @@
+db:
+  image: ubuntu
+  command: /bin/sleep 300
+web:
+  image: ubuntu
+  command: /bin/sleep 300
+  links:
+    - db:db
+console:
+  image: ubuntu
+  command: /bin/sleep 300
