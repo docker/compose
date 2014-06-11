@@ -1,6 +1,6 @@
 simple:
-  image: ubuntu
+  image: busybox:latest
   command: /bin/sleep 300
 another:
-  image: ubuntu
+  image: busybox:latest
   command: /bin/sleep 300
