@@ -8,29 +8,29 @@ class ProjectTest(unittest.TestCase):
         project = Project.from_dicts('figtest', [
             {
                 'name': 'web',
-                'image': 'ubuntu'
+                'image': 'busybox:latest'
             },
             {
                 'name': 'db',
-                'image': 'ubuntu'
+                'image': 'busybox:latest'
             },
         ], None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
-        self.assertEqual(project.get_service('web').options['image'], 'ubuntu')
+        self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
         self.assertEqual(project.get_service('db').name, 'db')
-        self.assertEqual(project.get_service('db').options['image'], 'ubuntu')
+        self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
     def test_from_dict_sorts_in_dependency_order(self):
         project = Project.from_dicts('figtest', [
             {
                 'name': 'web',
-                'image': 'ubuntu',
+                'image': 'busybox:latest',
                 'links': ['db'],
             },
             {
                 'name': 'db',
-                'image': 'ubuntu'
+                'image': 'busybox:latest'
             }
         ], None)
 
@@ -40,22 +40,22 @@ class ProjectTest(unittest.TestCase):
     def test_from_config(self):
         project = Project.from_config('figtest', {
             'web': {
-                'image': 'ubuntu',
+                'image': 'busybox:latest',
             },
             'db': {
-                'image': 'ubuntu',
+                'image': 'busybox:latest',
             },
         }, None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
-        self.assertEqual(project.get_service('web').options['image'], 'ubuntu')
+        self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
         self.assertEqual(project.get_service('db').name, 'db')
-        self.assertEqual(project.get_service('db').options['image'], 'ubuntu')
+        self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
     def test_from_config_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
             project = Project.from_config('figtest', {
-                'web': 'ubuntu',
+                'web': 'busybox:latest',
             }, None)
 
     def test_get_service(self):
@@ -63,7 +63,7 @@ class ProjectTest(unittest.TestCase):
             project='figtest',
             name='web',
             client=None,
-            image="ubuntu",
+            image="busybox:latest",
         )
         project = Project('test', [web], None)
         self.assertEqual(project.get_service('web'), web)

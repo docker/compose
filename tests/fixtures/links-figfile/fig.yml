@@ -1,11 +1,11 @@
 db:
-  image: ubuntu
+  image: busybox:latest
   command: /bin/sleep 300
 web:
-  image: ubuntu
+  image: busybox:latest
   command: /bin/sleep 300
   links:
     - db:db
 console:
-  image: ubuntu
+  image: busybox:latest
   command: /bin/sleep 300

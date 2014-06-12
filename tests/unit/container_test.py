@@ -6,7 +6,7 @@ class ContainerTest(unittest.TestCase):
     def test_from_ps(self):
         container = Container.from_ps(None, {
             "Id":"abc",
-            "Image":"ubuntu:12.04",
+            "Image":"busybox:latest",
             "Command":"sleep 300",
             "Created":1387384730,
             "Status":"Up 8 seconds",
@@ -17,7 +17,7 @@ class ContainerTest(unittest.TestCase):
         }, has_been_inspected=True)
         self.assertEqual(container.dictionary, {
             "ID": "abc",
-            "Image":"ubuntu:12.04",
+            "Image":"busybox:latest",
             "Name": "/figtest_db_1",
         })
 
@@ -39,7 +39,7 @@ class ContainerTest(unittest.TestCase):
     def test_number(self):
         container = Container.from_ps(None, {
             "Id":"abc",
-            "Image":"ubuntu:12.04",
+            "Image":"busybox:latest",
             "Command":"sleep 300",
             "Created":1387384730,
             "Status":"Up 8 seconds",
@@ -53,7 +53,7 @@ class ContainerTest(unittest.TestCase):
     def test_name(self):
         container = Container.from_ps(None, {
             "Id":"abc",
-            "Image":"ubuntu:12.04",
+            "Image":"busybox:latest",
             "Command":"sleep 300",
             "Names":["/figtest_db_1"]
         }, has_been_inspected=True)
@@ -62,7 +62,7 @@ class ContainerTest(unittest.TestCase):
     def test_name_without_project(self):
         container = Container.from_ps(None, {
             "Id":"abc",
-            "Image":"ubuntu:12.04",
+            "Image":"busybox:latest",
             "Command":"sleep 300",
             "Names":["/figtest_db_1"]
         }, has_been_inspected=True)
