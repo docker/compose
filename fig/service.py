@@ -416,7 +416,10 @@ def print_output_event(event, stream, is_terminal):
         else:
             stream.write('%s%s' % (status, terminator))
     elif 'stream' in event:
-        stream.write("%s%s" % (event['stream'], terminator))
+        try:
+            stream.write("%s%s" % (event['stream'], terminator))
+        except UnicodeEncodeError as uee:
+            stream.write("%s%s" % (event['stream'].encode('utf-8'), terminator))
     else:
         stream.write("%s%s\n" % (status, terminator))
 
