@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140611231994474927802">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140616242219585024157">
   </head>
   <body>
     <div class="container">
@@ -26,7 +26,7 @@
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/php5
 ADD . /code
 </code></pre></div>
-<p>This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the <a href="https://www.docker.io/learn/dockerfile/">Dockerfile tutorial</a> and the <a href="http://docs.docker.io/en/latest/reference/builder/">Dockerfile reference</a>.</p>
+<p>This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the <a href="https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile">Docker user guide</a> and the <a href="http://docs.docker.com/reference/builder/">Dockerfile reference</a>.</p>
 
 <p>Next up, <code>fig.yml</code> starts our web service and a separate MySQL instance:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
