@@ -19,7 +19,7 @@ Let's set up the three files that'll get us started. First, our app is going to 
     RUN pip install -r requirements.txt
     ADD . /code/
 
-That'll install our application inside an image with Python installed alongside all of our Python dependencies. For more information on how to write Dockerfiles, see the [Dockerfile tutorial](https://www.docker.io/learn/dockerfile/) and the [Dockerfile reference](http://docs.docker.io/en/latest/reference/builder/).
+That'll install our application inside an image with Python installed alongside all of our Python dependencies. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
 Second, we define our Python dependencies in a file called `requirements.txt`:
 

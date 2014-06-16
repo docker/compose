@@ -18,7 +18,7 @@ Let's set up the three files that'll get us started. First, our app is going to 
     RUN bundle install
     ADD . /myapp
 
-That'll put our application code inside an image with Ruby, Bundler and all our dependencies. For more information on how to write Dockerfiles, see the [Dockerfile tutorial](https://www.docker.io/learn/dockerfile/) and the [Dockerfile reference](http://docs.docker.io/en/latest/reference/builder/).
+That'll put our application code inside an image with Ruby, Bundler and all our dependencies. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
 Next, we have a bootstrap `Gemfile` which just loads Rails. It'll be overwritten in a moment by `rails new`.
 
