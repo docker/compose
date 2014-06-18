@@ -10,16 +10,17 @@ from .utils import split_buffer
 
 
 class LogPrinter(object):
-    def __init__(self, containers, attach_params=None):
+    def __init__(self, containers, attach_params=None, output=sys.stdout):
         self.containers = containers
         self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
         self.generators = self._make_log_generators()
+        self.output = output
 
     def run(self):
         mux = Multiplexer(self.generators)
         for line in mux.loop():
-            sys.stdout.write(line.encode(sys.__stdout__.encoding or 'utf-8'))
+            self.output.write(line)
 
     def _calculate_prefix_width(self, containers):
         """
@@ -45,12 +46,12 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(self._generate_prefix(container))
+        prefix = color_fn(self._generate_prefix(container)).encode('utf-8')
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
 
         for line in line_generator:
-            yield prefix + line.decode('utf-8')
+            yield prefix + line
 
         exit_code = container.wait()
         yield color_fn("%s exited with code %s\n" % (container.name, exit_code))

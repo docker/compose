@@ -1,2 +1,2 @@
 #!/bin/sh
-nosetests
+PYTHONIOENCODING=ascii nosetests $@
