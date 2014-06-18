@@ -1,6 +1,11 @@
 Change log
 ==========
 
+0.4.2 (2014-06-18)
+------------------
+
+ - Fix various encoding errors when using `fig run`, `fig up` and `fig build`.
+
 0.4.1 (2014-05-08)
 ------------------
 
