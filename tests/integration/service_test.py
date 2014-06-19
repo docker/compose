@@ -253,3 +253,18 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(containers), 2)
         for container in containers:
             self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
+
+    def test_network_mode_none(self):
+        service = self.create_service('web', net='none')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['NetworkMode'], 'none')
+
+    def test_network_mode_bridged(self):
+        service = self.create_service('web', net='bridge')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['NetworkMode'], 'bridge')
+
+    def test_network_mode_host(self):
+        service = self.create_service('web', net='host')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['NetworkMode'], 'host')
