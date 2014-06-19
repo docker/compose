@@ -59,3 +59,5 @@ environment:
   RACK_ENV: development
 ```
 
+-- Networking mode. Use the same values as the docker client --net parameter
+net: "host"

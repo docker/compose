@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint', 'privileged']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'volumes_from', 'entrypoint', 'privileged', 'net']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -229,6 +229,7 @@ class Service(object):
                     }
 
         privileged = options.get('privileged', False)
+        net = options.get('net', 'bridge')
 
         container.start(
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
@@ -236,6 +237,7 @@ class Service(object):
             binds=volume_bindings,
             volumes_from=volumes_from,
             privileged=privileged,
+            network_mode=net,
         )
         return container
 
@@ -296,6 +298,10 @@ class Service(object):
         # Priviliged is only required for starting containers, not for creating them
         if 'privileged' in container_options:
             del container_options['privileged']
+
+        # net is only required for starting containers, not for creating them
+        if 'net' in container_options:
+            del container_options['net']
 
         return container_options
 
