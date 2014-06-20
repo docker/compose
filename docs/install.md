@@ -6,13 +6,7 @@ title: Installing Fig
 Installing Fig
 ==============
 
-First, install Docker version 1.0.0. If you're on OS X, you can use [docker-osx](https://github.com/noplay/docker-osx):
-
-    $ curl https://raw.githubusercontent.com/noplay/docker-osx/1.0.0/docker-osx > /usr/local/bin/docker-osx
-    $ chmod +x /usr/local/bin/docker-osx
-    $ docker-osx shell
-
-Docker has guides for [Ubuntu](http://docs.docker.io/en/latest/installation/ubuntulinux/) and [other platforms](http://docs.docker.io/en/latest/installation/) in their documentation.
+First, [install Docker](https://docs.docker.com/installation/) version 1.0.0. 
 
 Next, install Fig. On OS X:
 
