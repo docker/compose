@@ -51,7 +51,7 @@ class CLITestCase(DockerClientTestCase):
         service = self.command.project.get_service('simple')
         another = self.command.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
-        self.assertEqual(len(another.containers()), 0)
+        self.assertEqual(len(another.containers()), 1)
 
     def test_up_with_links(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
@@ -63,9 +63,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
-    def test_up_with_no_links(self):
+    def test_up_with_no_deps(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch(['up', '-d', '--only', 'web'], None)
+        self.command.dispatch(['up', '-d', '--no-deps', 'web'], None)
         web = self.command.project.get_service('web')
         db = self.command.project.get_service('db')
         console = self.command.project.get_service('console')
@@ -114,11 +114,11 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     @patch('sys.stdout', new_callable=StringIO)
-    def test_run_with_no_links(self, mock_stdout):
+    def test_run_with_no_deps(self, mock_stdout):
         mock_stdout.fileno = lambda: 1
 
         self.command.base_dir = 'tests/fixtures/links-figfile'
-        self.command.dispatch(['run', '--only', 'web', '/bin/true'], None)
+        self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 

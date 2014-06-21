@@ -204,22 +204,22 @@ class TopLevelCommand(Command):
 
         By default, linked services will be started, unless they are already
         running. If you do not want to start linked services, use
-        `fig run --only SERVICE COMMAND [ARGS...]`.
+        `fig run --no-deps SERVICE COMMAND [ARGS...]`.
 
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d      Detached mode: Run container in the background, print new
-                    container name.
-            -T      Disable pseudo-tty allocation. By default `fig run`
-                    allocates a TTY.
-            --rm    Remove container after run. Ignored in detached mode.
-            --only  Don't start linked services.
+            -d         Detached mode: Run container in the background, print
+                       new container name.
+            -T         Disable pseudo-tty allocation. By default `fig run`
+                       allocates a TTY.
+            --rm       Remove container after run. Ignored in detached mode.
+            --no-deps  Don't start linked services.
         """
 
         service = self.project.get_service(options['SERVICE'])
 
-        if not options['--only']:
+        if not options['--no-deps']:
             self.project.up(
                 service_names=service.get_linked_names(),
                 start_links=True,
@@ -309,14 +309,14 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d         Detached mode: Run containers in the background,
-                       print new container names.
-            --only     Don't start linked services.
+            -d             Detached mode: Run containers in the background,
+                           print new container names.
+            --no-deps      Don't start linked services.
             --no-recreate  If containers already exist, don't recreate them.
         """
         detached = options['-d']
 
-        start_links = not options['--only']
+        start_links = not options['--no-deps']
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
 

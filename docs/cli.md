@@ -53,9 +53,9 @@ Links are also created between one-off commands and the other containers for tha
 
     $ fig run db /bin/sh -c "psql -h \$DB_1_PORT_5432_TCP_ADDR -U docker"
 
-If you do not want linked containers to be started when running the one-off command, specify the `--only` flag:
+If you do not want linked containers to be started when running the one-off command, specify the `--no-deps` flag:
 
-    $ fig run --only web python manage.py shell
+    $ fig run --no-deps web python manage.py shell
 
 ## scale
 
