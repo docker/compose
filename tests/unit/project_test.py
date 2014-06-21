@@ -68,7 +68,7 @@ class ProjectTest(unittest.TestCase):
         project = Project('test', [web], None)
         self.assertEqual(project.get_service('web'), web)
 
-    def test_get_services_returns_all_auto_started_without_args(self):
+    def test_get_services_returns_all_services_without_args(self):
         web = Service(
             project='figtest',
             name='web',
@@ -76,10 +76,9 @@ class ProjectTest(unittest.TestCase):
         console = Service(
             project='figtest',
             name='console',
-            auto_start=False
         )
         project = Project('test', [web, console], None)
-        self.assertEqual(project.get_services(), [web])
+        self.assertEqual(project.get_services(), [web, console])
 
     def test_get_services_returns_listed_services_with_args(self):
         web = Service(
@@ -89,7 +88,6 @@ class ProjectTest(unittest.TestCase):
         console = Service(
             project='figtest',
             name='console',
-            auto_start=False
         )
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(['console']), [console])

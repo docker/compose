@@ -124,17 +124,17 @@ class ProjectTest(DockerClientTestCase):
         project.kill()
         project.remove_stopped()
 
-    def test_project_up_without_auto_start(self):
-        console = self.create_service('console', auto_start=False)
+    def test_project_up_without_all_services(self):
+        console = self.create_service('console')
         db = self.create_service('db')
         project = Project('figtest', [console, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
         project.up()
-        self.assertEqual(len(project.containers()), 1)
+        self.assertEqual(len(project.containers()), 2)
         self.assertEqual(len(db.containers()), 1)
-        self.assertEqual(len(console.containers()), 0)
+        self.assertEqual(len(console.containers()), 1)
 
         project.kill()
         project.remove_stopped()
@@ -157,7 +157,7 @@ class ProjectTest(DockerClientTestCase):
         project.kill()
         project.remove_stopped()
 
-    def test_project_up_with_no_links(self):
+    def test_project_up_with_no_deps(self):
         console = self.create_service('console')
         db = self.create_service('db', volumes=['/var/db'])
         web = self.create_service('web', links=[(db, 'db')])

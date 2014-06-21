@@ -2,6 +2,5 @@ simple:
   image: busybox:latest
   command: /bin/sleep 300
 another:
-  auto_start: false
   image: busybox:latest
   command: /bin/sleep 300

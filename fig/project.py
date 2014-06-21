@@ -92,8 +92,8 @@ class Project(object):
     def get_services(self, service_names=None, include_links=False):
         """
         Returns a list of this project's services filtered
-        by the provided list of names, or all auto_start services if
-        service_names is None or [].
+        by the provided list of names, or all services if service_names is None
+        or [].
 
         If include_links is specified, returns a list including the links for
         service_names, in order of dependency.
@@ -105,7 +105,7 @@ class Project(object):
         """
         if service_names is None or len(service_names) == 0:
             return self.get_services(
-                service_names=[s.name for s in self.services if s.options['auto_start']],
+                service_names=[s.name for s in self.services],
                 include_links=include_links
             )
         else:

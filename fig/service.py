@@ -45,10 +45,7 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        if 'auto_start' not in options:
-            options['auto_start'] = True
-
-        supported_options = DOCKER_CONFIG_KEYS + ['auto_start', 'build', 'expose']
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
 
         for k in options:
             if k not in supported_options:
