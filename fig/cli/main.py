@@ -211,6 +211,7 @@ class TopLevelCommand(Command):
         Options:
             -d    Detached mode: Run container in the background, print new
                   container name
+            -p    Allocate ports as defined in fig.yml
             -T    Disable pseudo-tty allocation. By default `fig run`
                   allocates a TTY.
             --rm  Remove container after run. Ignored in detached mode.
@@ -227,12 +228,13 @@ class TopLevelCommand(Command):
             'stdin_open': not options['-d'],
         }
         container = service.create_container(one_off=True, **container_options)
+        ports = service.options['ports'] if options['-p'] else None
         if options['-d']:
-            service.start_container(container, ports=None, one_off=True)
+            service.start_container(container, ports=ports, one_off=True)
             print(container.name)
         else:
             with self._attach_to_container(container.id, raw=tty) as c:
-                service.start_container(container, ports=None, one_off=True)
+                service.start_container(container, ports=ports, one_off=True)
                 c.run()
             exit_code = container.wait()
             if options['--rm']:
