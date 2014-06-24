@@ -14,6 +14,7 @@ from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import yesno
+from .ttysizer import TTYSizer
 
 from ..packages.docker.errors import APIError
 from .errors import UserError
@@ -240,9 +241,15 @@ class TopLevelCommand(Command):
             service.start_container(container, ports=None, one_off=True)
             print(container.name)
         else:
-            with self._attach_to_container(container.id, raw=tty) as c:
+            with self._attach_to_container(container, raw=tty) as c:
                 service.start_container(container, ports=None, one_off=True)
+
+                if tty:
+                    tty_sizer = TTYSizer(container)
+                    tty_sizer.start()
+
                 c.run()
+
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
@@ -341,10 +348,10 @@ class TopLevelCommand(Command):
                 print("Gracefully stopping... (press Ctrl+C again to force)")
                 self.project.stop(service_names=service_names)
 
-    def _attach_to_container(self, container_id, raw=False):
-        socket_in = self.client.attach_socket(container_id, params={'stdin': 1, 'stream': 1})
-        socket_out = self.client.attach_socket(container_id, params={'stdout': 1, 'logs': 1, 'stream': 1})
-        socket_err = self.client.attach_socket(container_id, params={'stderr': 1, 'logs': 1, 'stream': 1})
+    def _attach_to_container(self, container, raw=False):
+        socket_in = self.client.attach_socket(container.id, params={'stdin': 1, 'stream': 1})
+        socket_out = self.client.attach_socket(container.id, params={'stdout': 1, 'logs': 1, 'stream': 1})
+        socket_err = self.client.attach_socket(container.id, params={'stderr': 1, 'logs': 1, 'stream': 1})
 
         return SocketClient(
             socket_in=socket_in,
