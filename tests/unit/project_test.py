@@ -67,3 +67,68 @@ class ProjectTest(unittest.TestCase):
         )
         project = Project('test', [web], None)
         self.assertEqual(project.get_service('web'), web)
+
+    def test_get_services_returns_all_services_without_args(self):
+        web = Service(
+            project='figtest',
+            name='web',
+        )
+        console = Service(
+            project='figtest',
+            name='console',
+        )
+        project = Project('test', [web, console], None)
+        self.assertEqual(project.get_services(), [web, console])
+
+    def test_get_services_returns_listed_services_with_args(self):
+        web = Service(
+            project='figtest',
+            name='web',
+        )
+        console = Service(
+            project='figtest',
+            name='console',
+        )
+        project = Project('test', [web, console], None)
+        self.assertEqual(project.get_services(['console']), [console])
+
+    def test_get_services_with_include_links(self):
+        db = Service(
+            project='figtest',
+            name='db',
+        )
+        web = Service(
+            project='figtest',
+            name='web',
+            links=[(db, 'database')]
+        )
+        cache = Service(
+            project='figtest',
+            name='cache'
+        )
+        console = Service(
+            project='figtest',
+            name='console',
+            links=[(web, 'web')]
+        )
+        project = Project('test', [web, db, cache, console], None)
+        self.assertEqual(
+            project.get_services(['console'], include_links=True),
+            [db, web, console]
+        )
+
+    def test_get_services_removes_duplicates_following_links(self):
+        db = Service(
+            project='figtest',
+            name='db',
+        )
+        web = Service(
+            project='figtest',
+            name='web',
+            links=[(db, 'database')]
+        )
+        project = Project('test', [web, db], None)
+        self.assertEqual(
+            project.get_services(['web', 'db'], include_links=True),
+            [db, web]
+        )

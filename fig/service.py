@@ -75,9 +75,7 @@ class Service(object):
 
     def start(self, **options):
         for c in self.containers(stopped=True):
-            if not c.is_running:
-                log.info("Starting %s..." % c.name)
-                self.start_container(c, **options)
+            self.start_container_if_stopped(c, **options)
 
     def stop(self, **options):
         for c in self.containers():
@@ -200,6 +198,13 @@ class Service(object):
 
         return (intermediate_container, new_container)
 
+    def start_container_if_stopped(self, container, **options):
+        if container.is_running:
+            return container
+        else:
+            log.info("Starting %s..." % container.name)
+            return self.start_container(container, **options)
+
     def start_container(self, container=None, volumes_from=None, **override_options):
         if container is None:
             container = self.create_container(**override_options)
@@ -242,6 +247,19 @@ class Service(object):
             network_mode=net,
         )
         return container
+
+    def start_or_create_containers(self):
+        containers = self.containers(stopped=True)
+
+        if len(containers) == 0:
+            log.info("Creating %s..." % self.next_container_name())
+            new_container = self.create_container()
+            return [self.start_container(new_container)]
+        else:
+            return [self.start_container_if_stopped(c) for c in containers]
+
+    def get_linked_names(self):
+        return [s.name for (s, _) in self.links]
 
     def next_container_name(self, one_off=False):
         bits = [self.project, self.name]

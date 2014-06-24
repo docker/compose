@@ -202,20 +202,29 @@ class TopLevelCommand(Command):
 
             $ fig run web python manage.py shell
 
-        Note that this will not start any services that the command's service
-        links to. So if, for example, your one-off command talks to your
-        database, you will need to run `fig up -d db` first.
+        By default, linked services will be started, unless they are already
+        running. If you do not want to start linked services, use
+        `fig run --no-deps SERVICE COMMAND [ARGS...]`.
 
         Usage: run [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d    Detached mode: Run container in the background, print new
-                  container name
-            -T    Disable pseudo-tty allocation. By default `fig run`
-                  allocates a TTY.
-            --rm  Remove container after run. Ignored in detached mode.
+            -d         Detached mode: Run container in the background, print
+                       new container name.
+            -T         Disable pseudo-tty allocation. By default `fig run`
+                       allocates a TTY.
+            --rm       Remove container after run. Ignored in detached mode.
+            --no-deps  Don't start linked services.
         """
+
         service = self.project.get_service(options['SERVICE'])
+
+        if not options['--no-deps']:
+            self.project.up(
+                service_names=service.get_linked_names(),
+                start_links=True,
+                recreate=False
+            )
 
         tty = True
         if options['-d'] or options['-T'] or not sys.stdin.isatty():
@@ -293,17 +302,29 @@ class TopLevelCommand(Command):
 
         If there are existing containers for a service, `fig up` will stop
         and recreate them (preserving mounted volumes with volumes-from),
-        so that changes in `fig.yml` are picked up.
+        so that changes in `fig.yml` are picked up. If you do not want existing
+        containers to be recreated, `fig up --no-recreate` will re-use existing
+        containers.
 
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d    Detached mode: Run containers in the background, print new
-                  container names
+            -d             Detached mode: Run containers in the background,
+                           print new container names.
+            --no-deps      Don't start linked services.
+            --no-recreate  If containers already exist, don't recreate them.
         """
         detached = options['-d']
 
-        to_attach = self.project.up(service_names=options['SERVICE'])
+        start_links = not options['--no-deps']
+        recreate = not options['--no-recreate']
+        service_names = options['SERVICE']
+
+        to_attach = self.project.up(
+            service_names=service_names,
+            start_links=start_links,
+            recreate=recreate
+        )
 
         if not detached:
             print("Attaching to", list_containers(to_attach))
@@ -313,12 +334,12 @@ class TopLevelCommand(Command):
                 log_printer.run()
             finally:
                 def handler(signal, frame):
-                    self.project.kill(service_names=options['SERVICE'])
+                    self.project.kill(service_names=service_names)
                     sys.exit(0)
                 signal.signal(signal.SIGINT, handler)
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
-                self.project.stop(service_names=options['SERVICE'])
+                self.project.stop(service_names=service_names)
 
     def _attach_to_container(self, container_id, raw=False):
         socket_in = self.client.attach_socket(container_id, params={'stdin': 1, 'stream': 1})

@@ -1,17 +1,20 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
 from .testcases import DockerClientTestCase
 from mock import patch
 from fig.cli.main import TopLevelCommand
 from fig.packages.six import StringIO
+import sys
 
 class CLITestCase(DockerClientTestCase):
     def setUp(self):
         super(CLITestCase, self).setUp()
+        self.old_sys_exit = sys.exit
+        sys.exit = lambda code=0: None
         self.command = TopLevelCommand()
         self.command.base_dir = 'tests/fixtures/simple-figfile'
 
     def tearDown(self):
+        sys.exit = self.old_sys_exit
         self.command.project.kill()
         self.command.project.remove_stopped()
 
@@ -42,6 +45,100 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('fig_simple_1', output)
         self.assertNotIn('fig_another_1', output)
         self.assertIn('fig_yetanother_1', output)
+
+    def test_up(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.command.project.get_service('simple')
+        another = self.command.project.get_service('another')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(len(another.containers()), 1)
+
+    def test_up_with_links(self):
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch(['up', '-d', 'web'], None)
+        web = self.command.project.get_service('web')
+        db = self.command.project.get_service('db')
+        console = self.command.project.get_service('console')
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+    def test_up_with_no_deps(self):
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch(['up', '-d', '--no-deps', 'web'], None)
+        web = self.command.project.get_service('web')
+        db = self.command.project.get_service('db')
+        console = self.command.project.get_service('console')
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(len(db.containers()), 0)
+        self.assertEqual(len(console.containers()), 0)
+
+    def test_up_with_recreate(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.command.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+
+        old_ids = [c.id for c in service.containers()]
+
+        self.command.dispatch(['up', '-d'], None)
+        self.assertEqual(len(service.containers()), 1)
+
+        new_ids = [c.id for c in service.containers()]
+
+        self.assertNotEqual(old_ids, new_ids)
+
+    def test_up_with_keep_old(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.command.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+
+        old_ids = [c.id for c in service.containers()]
+
+        self.command.dispatch(['up', '-d', '--no-recreate'], None)
+        self.assertEqual(len(service.containers()), 1)
+
+        new_ids = [c.id for c in service.containers()]
+
+        self.assertEqual(old_ids, new_ids)
+
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_run_with_links(self, mock_stdout):
+        mock_stdout.fileno = lambda: 1
+
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch(['run', 'web', '/bin/true'], None)
+        db = self.command.project.get_service('db')
+        console = self.command.project.get_service('console')
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_run_with_no_deps(self, mock_stdout):
+        mock_stdout.fileno = lambda: 1
+
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
+        db = self.command.project.get_service('db')
+        self.assertEqual(len(db.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_run_does_not_recreate_linked_containers(self, mock_stdout):
+        mock_stdout.fileno = lambda: 1
+
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch(['up', '-d', 'db'], None)
+        db = self.command.project.get_service('db')
+        self.assertEqual(len(db.containers()), 1)
+
+        old_ids = [c.id for c in db.containers()]
+
+        self.command.dispatch(['run', 'web', '/bin/true'], None)
+        self.assertEqual(len(db.containers()), 1)
+
+        new_ids = [c.id for c in db.containers()]
+
+        self.assertEqual(old_ids, new_ids)
 
     def test_rm(self):
         service = self.command.project.get_service('simple')

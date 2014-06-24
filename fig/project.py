@@ -64,6 +64,7 @@ class Project(object):
                         raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
 
                 del service_dict['links']
+
             project.services.append(Service(client=client, project=name, links=links, **service_dict))
         return project
 
@@ -88,22 +89,35 @@ class Project(object):
 
         raise NoSuchService(name)
 
-    def get_services(self, service_names=None):
+    def get_services(self, service_names=None, include_links=False):
         """
         Returns a list of this project's services filtered
-        by the provided list of names, or all services if
-        service_names is None or [].
+        by the provided list of names, or all services if service_names is None
+        or [].
 
-        Preserves the original order of self.services.
+        If include_links is specified, returns a list including the links for
+        service_names, in order of dependency.
 
-        Raises NoSuchService if any of the named services
-        do not exist.
+        Preserves the original order of self.services where possible,
+        reordering as needed to resolve links.
+
+        Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            return self.services
+            return self.get_services(
+                service_names=[s.name for s in self.services],
+                include_links=include_links
+            )
         else:
             unsorted = [self.get_service(name) for name in service_names]
-            return [s for s in self.services if s in unsorted]
+            services = [s for s in self.services if s in unsorted]
+
+            if include_links:
+                services = reduce(self._inject_links, services, [])
+
+            uniques = []
+            [uniques.append(s) for s in services if s not in uniques]
+            return uniques
 
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
@@ -124,14 +138,18 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def up(self, service_names=None):
-        new_containers = []
+    def up(self, service_names=None, start_links=True, recreate=True):
+        running_containers = []
 
-        for service in self.get_services(service_names):
-            for (_, new) in service.recreate_containers():
-                new_containers.append(new)
+        for service in self.get_services(service_names, include_links=start_links):
+            if recreate:
+                for (_, container) in service.recreate_containers():
+                    running_containers.append(container)
+            else:
+                for container in service.start_or_create_containers():
+                    running_containers.append(container)
 
-        return new_containers
+        return running_containers
 
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):
@@ -143,6 +161,20 @@ class Project(object):
             for container in service.containers(*args, **kwargs):
                 l.append(container)
         return l
+
+    def _inject_links(self, acc, service):
+        linked_names = service.get_linked_names()
+
+        if len(linked_names) > 0:
+            linked_services = self.get_services(
+                service_names=linked_names,
+                include_links=True
+            )
+        else:
+            linked_services = []
+
+        linked_services.append(service)
+        return acc + linked_services
 
 
 class NoSuchService(Exception):
