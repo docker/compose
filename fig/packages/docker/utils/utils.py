@@ -92,6 +92,13 @@ def _convert_port_binding(binding):
             result['HostIp'] = binding[0]
         else:
             result['HostPort'] = binding[0]
+    elif isinstance(binding, dict):
+        if 'HostPort' in binding:
+            result['HostPort'] = binding['HostPort']
+            if 'HostIp' in binding:
+                result['HostIp'] = binding['HostIp']
+        else:
+            raise ValueError(binding)
     else:
         result['HostPort'] = binding
 
@@ -116,13 +123,25 @@ def convert_port_bindings(port_bindings):
     return result
 
 
+def convert_volume_binds(binds):
+    result = []
+    for k, v in binds.items():
+        if isinstance(v, dict):
+            result.append('%s:%s:%s' % (
+                k, v['bind'], 'ro' if v.get('ro', False) else 'rw'
+            ))
+        else:
+            result.append('%s:%s:rw' % (k, v))
+    return result
+
+
 def parse_repository_tag(repo):
     column_index = repo.rfind(':')
     if column_index < 0:
-        return repo, ""
+        return repo, None
     tag = repo[column_index+1:]
     slash_index = tag.find('/')
     if slash_index < 0:
         return repo[:column_index], tag
 
-    return repo, ""
+    return repo, None
