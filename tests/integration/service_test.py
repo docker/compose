@@ -231,6 +231,27 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('8000/tcp', container['NetworkSettings']['Ports'])
         self.assertEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8001')
 
+    def test_port_with_explicit_interface(self):
+        service = self.create_service('web', ports=[
+            '127.0.0.1:8001:8000',
+            '0.0.0.0:9001:9000',
+        ])
+        container = service.start_container().inspect()
+        self.assertEqual(container['NetworkSettings']['Ports'], {
+            '8000/tcp': [
+                {
+                    'HostIp': '127.0.0.1',
+                    'HostPort': '8001',
+                },
+            ],
+            '9000/tcp': [
+                {
+                    'HostIp': '0.0.0.0',
+                    'HostPort': '9001',
+                },
+            ],
+        })
+
     def test_scale(self):
         service = self.create_service('web')
         service.scale(1)
