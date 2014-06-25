@@ -216,12 +216,7 @@ class Service(object):
 
         if options.get('ports', None) is not None:
             for port in options['ports']:
-                port = str(port)
-                if ':' in port:
-                    external_port, internal_port = port.split(':', 1)
-                else:
-                    external_port, internal_port = (None, port)
-
+                internal_port, external_port = split_port(port)
                 port_bindings[internal_port] = external_port
 
         volume_bindings = {}
@@ -409,3 +404,21 @@ def split_volume(v):
         return v.split(':', 1)
     else:
         return (None, v)
+
+
+def split_port(port):
+    port = str(port)
+    external_ip = None
+    if ':' in port:
+        external_port, internal_port = port.rsplit(':', 1)
+        if ':' in external_port:
+            external_ip, external_port = external_port.split(':', 1)
+    else:
+        external_port, internal_port = (None, port)
+    if external_ip:
+        if external_port:
+            external_port = (external_ip, external_port)
+        else:
+            external_port = (external_ip,)
+    return internal_port, external_port
+
