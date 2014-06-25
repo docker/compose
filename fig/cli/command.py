@@ -1,13 +1,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from ..packages.docker import Client
+from docker import Client
 from requests.exceptions import ConnectionError
 import errno
 import logging
 import os
 import re
 import yaml
-from ..packages import six
+import six
 import sys
 
 from ..project import Project

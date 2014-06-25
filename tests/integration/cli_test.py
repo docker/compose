@@ -2,8 +2,8 @@ from __future__ import absolute_import
 from .testcases import DockerClientTestCase
 from mock import patch
 from fig.cli.main import TopLevelCommand
-from fig.packages.six import StringIO
 import sys
+from six import StringIO
 
 class CLITestCase(DockerClientTestCase):
     def setUp(self):

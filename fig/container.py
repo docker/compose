@@ -17,7 +17,7 @@ class Container(object):
         Construct a container object from the output of GET /containers/json.
         """
         new_dictionary = {
-            'ID': dictionary['Id'],
+            'Id': dictionary['Id'],
             'Image': dictionary['Image'],
         }
         for name in dictionary.get('Names', []):
@@ -36,7 +36,7 @@ class Container(object):
 
     @property
     def id(self):
-        return self.dictionary['ID']
+        return self.dictionary['Id']
 
     @property
     def image(self):

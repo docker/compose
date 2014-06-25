@@ -16,14 +16,14 @@ class ContainerTest(unittest.TestCase):
             "Names":["/figtest_db_1"]
         }, has_been_inspected=True)
         self.assertEqual(container.dictionary, {
-            "ID": "abc",
+            "Id": "abc",
             "Image":"busybox:latest",
             "Name": "/figtest_db_1",
         })
 
     def test_environment(self):
         container = Container(None, {
-            'ID': 'abc',
+            'Id': 'abc',
             'Config': {
                 'Env': [
                     'FOO=BAR',
