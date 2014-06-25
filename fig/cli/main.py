@@ -6,6 +6,7 @@ import re
 import signal
 
 from inspect import getdoc
+import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
@@ -18,7 +19,6 @@ from .utils import yesno
 from ..packages.docker.errors import APIError
 from .errors import UserError
 from .docopt_command import NoSuchCommand
-from .socketclient import SocketClient
 
 log = logging.getLogger(__name__)
 
@@ -240,9 +240,8 @@ class TopLevelCommand(Command):
             service.start_container(container, ports=None, one_off=True)
             print(container.name)
         else:
-            with self._attach_to_container(container.id, raw=tty) as c:
-                service.start_container(container, ports=None, one_off=True)
-                c.run()
+            service.start_container(container, ports=None, one_off=True)
+            dockerpty.start(self.client, container.id)
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
@@ -340,18 +339,6 @@ class TopLevelCommand(Command):
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
                 self.project.stop(service_names=service_names)
-
-    def _attach_to_container(self, container_id, raw=False):
-        socket_in = self.client.attach_socket(container_id, params={'stdin': 1, 'stream': 1})
-        socket_out = self.client.attach_socket(container_id, params={'stdout': 1, 'logs': 1, 'stream': 1})
-        socket_err = self.client.attach_socket(container_id, params={'stderr': 1, 'logs': 1, 'stream': 1})
-
-        return SocketClient(
-            socket_in=socket_in,
-            socket_out=socket_out,
-            socket_err=socket_err,
-            raw=raw,
-        )
 
 def list_containers(containers):
     return ", ".join(c.name for c in containers)
