@@ -16,6 +16,7 @@ import json
 import re
 import shlex
 import struct
+import warnings
 
 import requests
 import requests.exceptions
@@ -29,7 +30,7 @@ from . import errors
 if not six.PY3:
     import websocket
 
-DEFAULT_DOCKER_API_VERSION = '1.9'
+DEFAULT_DOCKER_API_VERSION = '1.12'
 DEFAULT_TIMEOUT_SECONDS = 60
 STREAM_HEADER_SIZE_BYTES = 8
 
@@ -95,7 +96,8 @@ class Client(requests.Session):
                           mem_limit=0, ports=None, environment=None, dns=None,
                           volumes=None, volumes_from=None,
                           network_disabled=False, entrypoint=None,
-                          cpu_shares=None, working_dir=None, domainname=None):
+                          cpu_shares=None, working_dir=None, domainname=None,
+                          memswap_limit=0):
         if isinstance(command, six.string_types):
             command = shlex.split(str(command))
         if isinstance(environment, dict):
@@ -121,8 +123,12 @@ class Client(requests.Session):
                 volumes_dict[vol] = {}
             volumes = volumes_dict
 
-        if volumes_from and not isinstance(volumes_from, six.string_types):
-            volumes_from = ','.join(volumes_from)
+        if volumes_from:
+            if not isinstance(volumes_from, six.string_types):
+                volumes_from = ','.join(volumes_from)
+        else:
+            # Force None, an empty list or dict causes client.start to fail
+            volumes_from = None
 
         attach_stdin = False
         attach_stdout = False
@@ -136,6 +142,14 @@ class Client(requests.Session):
             if stdin_open:
                 attach_stdin = True
                 stdin_once = True
+
+        if utils.compare_version('1.10', self._version) >= 0:
+            message = ('{0!r} parameter has no effect on create_container().'
+                       ' It has been moved to start()')
+            if dns is not None:
+                raise errors.DockerException(message.format('dns'))
+            if volumes_from is not None:
+                raise errors.DockerException(message.format('volumes_from'))
 
         return {
             'Hostname': hostname,
@@ -158,7 +172,8 @@ class Client(requests.Session):
             'NetworkDisabled': network_disabled,
             'Entrypoint': entrypoint,
             'CpuShares': cpu_shares,
-            'WorkingDir': working_dir
+            'WorkingDir': working_dir,
+            'MemorySwap': memswap_limit
         }
 
     def _post_json(self, url, data, **kwargs):
@@ -235,7 +250,7 @@ class Client(requests.Session):
             start = walker + STREAM_HEADER_SIZE_BYTES
             end = start + length
             walker = end
-            yield str(buf[start:end])
+            yield buf[start:end]
 
     def _multiplexed_socket_stream_helper(self, response):
         """A generator of multiplexed data blocks coming from a response
@@ -296,8 +311,10 @@ class Client(requests.Session):
             return stream_result() if stream else \
                 self._result(response, binary=True)
 
+        sep = bytes() if six.PY3 else str()
+
         return stream and self._multiplexed_socket_stream_helper(response) or \
-            ''.join([x for x in self._multiplexed_buffer_helper(response)])
+            sep.join([x for x in self._multiplexed_buffer_helper(response)])
 
     def attach_socket(self, container, params=None, ws=False):
         if params is None:
@@ -318,14 +335,20 @@ class Client(requests.Session):
             u, None, params=self._attach_params(params), stream=True))
 
     def build(self, path=None, tag=None, quiet=False, fileobj=None,
-              nocache=False, rm=False, stream=False, timeout=None):
+              nocache=False, rm=False, stream=False, timeout=None,
+              custom_context=False, encoding=None):
         remote = context = headers = None
         if path is None and fileobj is None:
             raise TypeError("Either path or fileobj needs to be provided.")
 
-        if fileobj is not None:
+        if custom_context:
+            if not fileobj:
+                raise TypeError("You must specify fileobj with custom_context")
+            context = fileobj
+        elif fileobj is not None:
             context = utils.mkbuildcontext(fileobj)
-        elif path.startswith(('http://', 'https://', 'git://', 'github.com/')):
+        elif path.startswith(('http://', 'https://',
+                              'git://', 'github.com/')):
             remote = path
         else:
             context = utils.tar(path)
@@ -341,8 +364,11 @@ class Client(requests.Session):
             'nocache': nocache,
             'rm': rm
         }
+
         if context is not None:
             headers = {'Content-Type': 'application/tar'}
+            if encoding:
+                headers['Content-Encoding'] = encoding
 
         if utils.compare_version('1.9', self._version) >= 0:
             # If we don't have any auth data so far, try reloading the config
@@ -393,10 +419,11 @@ class Client(requests.Session):
                             json=True)
 
     def containers(self, quiet=False, all=False, trunc=True, latest=False,
-                   since=None, before=None, limit=-1):
+                   since=None, before=None, limit=-1, size=False):
         params = {
             'limit': 1 if latest else limit,
             'all': 1 if all else 0,
+            'size': 1 if size else 0,
             'trunc_cmd': 1 if trunc else 0,
             'since': since,
             'before': before
@@ -424,12 +451,13 @@ class Client(requests.Session):
                          mem_limit=0, ports=None, environment=None, dns=None,
                          volumes=None, volumes_from=None,
                          network_disabled=False, name=None, entrypoint=None,
-                         cpu_shares=None, working_dir=None, domainname=None):
+                         cpu_shares=None, working_dir=None, domainname=None,
+                         memswap_limit=0):
 
         config = self._container_config(
             image, command, hostname, user, detach, stdin_open, tty, mem_limit,
             ports, environment, dns, volumes, volumes_from, network_disabled,
-            entrypoint, cpu_shares, working_dir, domainname
+            entrypoint, cpu_shares, working_dir, domainname, memswap_limit
         )
         return self.create_container_from_config(config, name)
 
@@ -454,6 +482,12 @@ class Client(requests.Session):
         if isinstance(container, dict):
             container = container.get('Id')
         res = self._get(self._url("/containers/{0}/export".format(container)),
+                        stream=True)
+        self._raise_for_status(res)
+        return res.raw
+
+    def get_image(self, image):
+        res = self._get(self._url("/images/{0}/get".format(image)),
                         stream=True)
         self._raise_for_status(res)
         return res.raw
@@ -513,6 +547,10 @@ class Client(requests.Session):
                             True)
 
     def insert(self, image, url, path):
+        if utils.compare_version('1.12', self._version) >= 0:
+            raise errors.DeprecatedMethod(
+                'insert is not available for API version >=1.12'
+            )
         api_url = self._url("/images/" + image + "/insert")
         params = {
             'url': url,
@@ -544,6 +582,10 @@ class Client(requests.Session):
 
         self._raise_for_status(res)
 
+    def load_image(self, data):
+        res = self._post(self._url("/images/load"), data=data)
+        self._raise_for_status(res)
+
     def login(self, username, password=None, email=None, registry=None,
               reauth=False):
         # If we don't have any auth data so far, try reloading the config file
@@ -572,7 +614,27 @@ class Client(requests.Session):
             self._auth_configs[registry] = req_data
         return self._result(response, json=True)
 
-    def logs(self, container, stdout=True, stderr=True, stream=False):
+    def logs(self, container, stdout=True, stderr=True, stream=False,
+             timestamps=False):
+        if isinstance(container, dict):
+            container = container.get('Id')
+        if utils.compare_version('1.11', self._version) >= 0:
+            params = {'stderr': stderr and 1 or 0,
+                      'stdout': stdout and 1 or 0,
+                      'timestamps': timestamps and 1 or 0,
+                      'follow': stream and 1 or 0}
+            url = self._url("/containers/{0}/logs".format(container))
+            res = self._get(url, params=params, stream=stream)
+            if stream:
+                return self._multiplexed_socket_stream_helper(res)
+            elif six.PY3:
+                return bytes().join(
+                    [x for x in self._multiplexed_buffer_helper(res)]
+                )
+            else:
+                return str().join(
+                    [x for x in self._multiplexed_buffer_helper(res)]
+                )
         return self.attach(
             container,
             stdout=stdout,
@@ -580,6 +642,9 @@ class Client(requests.Session):
             stream=stream,
             logs=True
         )
+
+    def ping(self):
+        return self._result(self._get(self._url('/_ping')))
 
     def port(self, container, private_port):
         if isinstance(container, dict):
@@ -597,6 +662,8 @@ class Client(requests.Session):
         return h_ports
 
     def pull(self, repository, tag=None, stream=False):
+        if not tag:
+            repository, tag = utils.parse_repository_tag(repository)
         registry, repo_name = auth.resolve_repository_name(repository)
         if repo_name.count(":") == 1:
             repository, tag = repository.rsplit(":", 1)
@@ -653,16 +720,17 @@ class Client(requests.Session):
         return stream and self._stream_helper(response) \
             or self._result(response)
 
-    def remove_container(self, container, v=False, link=False):
+    def remove_container(self, container, v=False, link=False, force=False):
         if isinstance(container, dict):
             container = container.get('Id')
-        params = {'v': v, 'link': link}
+        params = {'v': v, 'link': link, 'force': force}
         res = self._delete(self._url("/containers/" + container),
                            params=params)
         self._raise_for_status(res)
 
-    def remove_image(self, image):
-        res = self._delete(self._url("/images/" + image))
+    def remove_image(self, image, force=False, noprune=False):
+        params = {'force': force, 'noprune': noprune}
+        res = self._delete(self._url("/images/" + image), params=params)
         self._raise_for_status(res)
 
     def restart(self, container, timeout=10):
@@ -678,8 +746,9 @@ class Client(requests.Session):
                                       params={'term': term}),
                             True)
 
-    def start(self, container, binds=None, volumes_from=None, port_bindings=None,
-              lxc_conf=None, publish_all_ports=False, links=None, privileged=False, network_mode=None):
+    def start(self, container, binds=None, port_bindings=None, lxc_conf=None,
+              publish_all_ports=False, links=None, privileged=False,
+              dns=None, dns_search=None, volumes_from=None, network_mode=None):
         if isinstance(container, dict):
             container = container.get('Id')
 
@@ -693,19 +762,7 @@ class Client(requests.Session):
             'LxcConf': lxc_conf
         }
         if binds:
-            bind_pairs = [
-                '%s:%s:%s' % (
-                    h, d['bind'],
-                    'ro' if 'ro' in d and d['ro'] else 'rw'
-                ) for h, d in binds.items()
-            ]
-
-            start_config['Binds'] = bind_pairs
-
-        if volumes_from and not isinstance(volumes_from, six.string_types):
-            volumes_from = ','.join(volumes_from)
-
-        start_config['VolumesFrom'] = volumes_from
+            start_config['Binds'] = utils.convert_volume_binds(binds)
 
         if port_bindings:
             start_config['PortBindings'] = utils.convert_port_bindings(
@@ -726,11 +783,42 @@ class Client(requests.Session):
 
         start_config['Privileged'] = privileged
 
+        if utils.compare_version('1.10', self._version) >= 0:
+            if dns is not None:
+                start_config['Dns'] = dns
+            if volumes_from is not None:
+                if isinstance(volumes_from, six.string_types):
+                    volumes_from = volumes_from.split(',')
+                start_config['VolumesFrom'] = volumes_from
+        else:
+            warning_message = ('{0!r} parameter is discarded. It is only'
+                               ' available for API version greater or equal'
+                               ' than 1.10')
+
+            if dns is not None:
+                warnings.warn(warning_message.format('dns'),
+                              DeprecationWarning)
+            if volumes_from is not None:
+                warnings.warn(warning_message.format('volumes_from'),
+                              DeprecationWarning)
+
+        if dns_search:
+            start_config['DnsSearch'] = dns_search
+
         if network_mode:
             start_config['NetworkMode'] = network_mode
 
         url = self._url("/containers/{0}/start".format(container))
         res = self._post_json(url, data=start_config)
+        self._raise_for_status(res)
+
+    def resize(self, container, height, width):
+        if isinstance(container, dict):
+            container = container.get('Id')
+
+        params = {'h': height, 'w': width}
+        url = self._url("/containers/{0}/resize".format(container))
+        res = self._post(url, params=params)
         self._raise_for_status(res)
 
     def stop(self, container, timeout=10):

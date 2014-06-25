@@ -59,3 +59,7 @@ class InvalidRepository(DockerException):
 
 class InvalidConfigFile(DockerException):
     pass
+
+
+class DeprecatedMethod(DockerException):
+    pass

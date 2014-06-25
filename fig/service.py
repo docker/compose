@@ -181,7 +181,6 @@ class Service(object):
         intermediate_container = Container.create(
             self.client,
             image=container.image,
-            volumes_from=container.id,
             entrypoint=['echo'],
             command=[],
         )
@@ -190,7 +189,6 @@ class Service(object):
         container.remove()
 
         options = dict(override_options)
-        options['volumes_from'] = intermediate_container.id
         new_container = self.create_container(**options)
         self.start_container(new_container, volumes_from=intermediate_container.id)
 
