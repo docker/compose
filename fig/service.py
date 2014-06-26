@@ -216,7 +216,9 @@ class Service(object):
             for port in options['ports']:
                 port = str(port)
                 if ':' in port:
-                    external_port, internal_port = port.split(':', 1)
+                    external_port, internal_port = port.rsplit(':', 1)
+                    if ":" in external_port:
+                        external_port=tuple(external_port.split(":"))
                 else:
                     external_port, internal_port = (None, port)
 
