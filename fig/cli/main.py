@@ -103,9 +103,13 @@ class TopLevelCommand(Command):
         e.g. `figtest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `fig build` to rebuild it.
 
-        Usage: build [SERVICE...]
+        Usage: build [options] [SERVICE...]
+
+        Options:
+            --no-cache  Do not use cache when building the image.
         """
-        self.project.build(service_names=options['SERVICE'])
+        no_cache = bool(options.get('--no-cache', False))
+        self.project.build(service_names=options['SERVICE'], no_cache=no_cache)
 
     def help(self, options):
         """

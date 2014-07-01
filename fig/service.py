@@ -356,14 +356,15 @@ class Service(object):
 
         return container_options
 
-    def build(self):
+    def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
         build_output = self.client.build(
             self.options['build'],
             tag=self._build_tag_name(),
             stream=True,
-            rm=True
+            rm=True,
+            nocache=no_cache,
         )
 
         try:
