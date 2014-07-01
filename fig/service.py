@@ -237,6 +237,7 @@ class Service(object):
 
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
+        dns = options.get('dns')
 
         container.start(
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
@@ -245,6 +246,7 @@ class Service(object):
             volumes_from=volumes_from,
             privileged=privileged,
             network_mode=net,
+            dns=dns,
         )
         return container
 
