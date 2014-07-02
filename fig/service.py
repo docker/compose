@@ -231,6 +231,7 @@ class Service(object):
 
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
+        dns = options.get('dns')
 
         container.start(
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
@@ -239,6 +240,7 @@ class Service(object):
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=net,
+            dns=dns,
         )
         return container
 
@@ -434,4 +436,3 @@ def split_port(port):
         else:
             external_port = (external_ip,)
     return internal_port, external_port
-

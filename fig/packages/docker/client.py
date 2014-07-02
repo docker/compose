@@ -146,8 +146,6 @@ class Client(requests.Session):
         if utils.compare_version('1.10', self._version) >= 0:
             message = ('{0!r} parameter has no effect on create_container().'
                        ' It has been moved to start()')
-            if dns is not None:
-                raise errors.DockerException(message.format('dns'))
             if volumes_from is not None:
                 raise errors.DockerException(message.format('volumes_from'))
 
@@ -784,8 +782,6 @@ class Client(requests.Session):
         start_config['Privileged'] = privileged
 
         if utils.compare_version('1.10', self._version) >= 0:
-            if dns is not None:
-                start_config['Dns'] = dns
             if volumes_from is not None:
                 if isinstance(volumes_from, six.string_types):
                     volumes_from = volumes_from.split(',')
@@ -795,12 +791,11 @@ class Client(requests.Session):
                                ' available for API version greater or equal'
                                ' than 1.10')
 
-            if dns is not None:
-                warnings.warn(warning_message.format('dns'),
-                              DeprecationWarning)
             if volumes_from is not None:
                 warnings.warn(warning_message.format('volumes_from'),
                               DeprecationWarning)
+        if dns:
+            start_config['Dns'] = dns
 
         if dns_search:
             start_config['DnsSearch'] = dns_search
