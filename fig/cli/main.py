@@ -220,11 +220,14 @@ class TopLevelCommand(Command):
         service = self.project.get_service(options['SERVICE'])
 
         if not options['--no-deps']:
-            self.project.up(
-                service_names=service.get_linked_names(),
-                start_links=True,
-                recreate=False
-            )
+            deps = service.get_linked_names()
+
+            if len(deps) > 0:
+                self.project.up(
+                    service_names=deps,
+                    start_links=True,
+                    recreate=False,
+                )
 
         tty = True
         if options['-d'] or options['-T'] or not sys.stdin.isatty():

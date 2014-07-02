@@ -103,9 +103,13 @@ class CLITestCase(DockerClientTestCase):
 
 
     @patch('dockerpty.start')
-    def test_run_with_links(self, mock_stdout):
-        mock_stdout.fileno = lambda: 1
+    def test_run_service_without_links(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+        self.command.dispatch(['run', 'console', '/bin/true'], None)
+        self.assertEqual(len(self.command.project.containers()), 0)
 
+    @patch('dockerpty.start')
+    def test_run_service_with_links(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
