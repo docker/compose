@@ -23,7 +23,16 @@ class Command(DocoptCommand):
     base_dir = '.'
 
     def __init__(self):
-        self.yaml_path = os.environ.get('FIG_FILE', None)
+        try:
+            yaml_path = os.environ.get('FIG_FILE')
+            if yaml_path is None:
+                yaml_path = self.check_yaml_filename()
+
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                raise errors.FigFileNotFound(os.path.basename(e.filename))
+            raise errors.UserError(six.text_type(e))
+        self.yaml_path = os.path.abspath(yaml_path)
         self.explicit_project_name = None
 
     def dispatch(self, *args, **kwargs):
@@ -55,15 +64,7 @@ class Command(DocoptCommand):
 
     @cached_property
     def project(self):
-        try:
-            yaml_path = self.yaml_path
-            if yaml_path is None:
-                yaml_path = self.check_yaml_filename()
-            config = yaml.load(open(yaml_path))
-        except IOError as e:
-            if e.errno == errno.ENOENT:
-                raise errors.FigFileNotFound(os.path.basename(e.filename))
-            raise errors.UserError(six.text_type(e))
+        config = yaml.load(open(self.yaml_path))
 
         try:
             return Project.from_config(self.project_name, config, self.client)
@@ -72,11 +73,13 @@ class Command(DocoptCommand):
 
     @cached_property
     def project_name(self):
-        project = os.path.basename(os.getcwd())
         if self.explicit_project_name is not None:
             project = self.explicit_project_name
-        project = re.sub(r'[^a-zA-Z0-9]', '', project)
+        else:
+            project = re.sub(r'[^a-zA-Z0-9]', '', os.path.basename(os.path.dirname(self.yaml_path)))
+
         if not project:
+            # only when fig.yml is in / (root) directory
             project = 'default'
         return project
 
