@@ -206,7 +206,7 @@ class TopLevelCommand(Command):
         running. If you do not want to start linked services, use
         `fig run --no-deps SERVICE COMMAND [ARGS...]`.
 
-        Usage: run [options] SERVICE COMMAND [ARGS...]
+        Usage: run [options] SERVICE [COMMAND] [ARGS...]
 
         Options:
             -d         Detached mode: Run container in the background, print
@@ -233,8 +233,13 @@ class TopLevelCommand(Command):
         if options['-d'] or options['-T'] or not sys.stdin.isatty():
             tty = False
 
+        if options['COMMAND']:
+            command = [options['COMMAND']] + options['ARGS']
+        else:
+            command = service.options.get('command')
+
         container_options = {
-            'command': [options['COMMAND']] + options['ARGS'],
+            'command': command,
             'tty': tty,
             'stdin_open': not options['-d'],
         }
