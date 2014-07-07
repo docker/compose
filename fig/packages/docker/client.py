@@ -13,6 +13,7 @@
 #    limitations under the License.
 
 import json
+import os
 import re
 import shlex
 import struct
@@ -351,7 +352,12 @@ class Client(requests.Session):
                               'git://', 'github.com/')):
             remote = path
         else:
-            context = utils.tar(path)
+            dockerignore = os.path.join(path, '.dockerignore')
+            exclude = None
+            if os.path.exists(dockerignore):
+                with open(dockerignore, 'r') as f:
+                    exclude = list(filter(bool, f.read().split('\n')))
+            context = utils.tar(path, exclude=exclude)
 
         if utils.compare_version('1.8', self._version) >= 0:
             stream = True
