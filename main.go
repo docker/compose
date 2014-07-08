@@ -16,6 +16,7 @@ type Container struct {
 	Commands []string `yaml:"command"`
 	Links    []string `yaml:"links"`
 	Ports    []string `yaml:"ports"`
+	Volumes  []string `yaml:"volumes"`
 }
 
 func main() {
