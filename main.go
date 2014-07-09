@@ -12,12 +12,41 @@ import (
 )
 
 type Service struct {
+	Name     string
 	Image    string   `yaml:"image"`
 	BuildDir string   `yaml:"build"`
-	Commands []string `yaml:"command"`
+	Command  string   `yaml:"command"`
 	Links    []string `yaml:"links"`
 	Ports    []string `yaml:"ports"`
 	Volumes  []string `yaml:"volumes"`
+	Running  bool
+}
+
+// TODO: set protocol and address properly
+// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
+var cli = dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "boot2docker:2375", nil)
+
+func (s *Service) Run() error {
+	fmt.Println("running service ", s)
+
+	err := cli.CmdRun("-d", "--name", s.Name, s.Image, s.Command)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func startServices(services []Service) {
+	fmt.Println(services)
+
+	for _, service := range services {
+		fmt.Println(service)
+		err := service.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "something went wrong in the run", err)
+		}
+	}
 }
 
 func CmdUp(c *gangstaCli.Context) {
@@ -25,14 +54,12 @@ func CmdUp(c *gangstaCli.Context) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
 	}
+	namedServices := []Service{}
 	services := make(map[string]Service)
 	err = yaml.Unmarshal(servicesRaw, &services)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error unmarshalling fig.yml file")
 	}
-	// TODO: set protocol and address properly
-	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
-	cli := dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "localhost:2375", nil)
 	for name, service := range services {
 		if service.Image == "" {
 			curdir, err := os.Getwd()
@@ -41,9 +68,17 @@ func CmdUp(c *gangstaCli.Context) {
 			}
 			imageName := fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
 			service.Image = imageName
-			cli.CmdBuild("-t", imageName, service.BuildDir)
+			err = cli.CmdBuild("-t", imageName, service.BuildDir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error running build for image")
+			}
 		}
+		service.Name = name
+		fmt.Println(name, service)
+		namedServices = append(namedServices, service)
 	}
+
+	startServices(namedServices)
 }
 
 func main() {
