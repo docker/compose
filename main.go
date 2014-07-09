@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	gangstaCli "github.com/codegangsta/cli"
 	dockerClient "github.com/dotcloud/docker/api/client"
 	yaml "gopkg.in/yaml.v1"
 )
@@ -19,7 +20,7 @@ type Service struct {
 	Volumes  []string `yaml:"volumes"`
 }
 
-func main() {
+func CmdUp(c *gangstaCli.Context) {
 	configRaw, err := ioutil.ReadFile("fig.yml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
@@ -43,4 +44,20 @@ func main() {
 			cli.CmdBuild("-t", imageName, service.BuildDir)
 		}
 	}
+}
+
+func main() {
+	app := gangstaCli.NewApp()
+	app.Name = "fig"
+	app.Usage = "Orchestrate Docker containers"
+	app.Commands = []gangstaCli.Command{
+		{
+			Name:   "up",
+			Usage:  "Initialize a pod of containers based on a fig.yml file",
+			Action: CmdUp,
+		},
+	}
+
+	app.Run(os.Args)
+
 }
