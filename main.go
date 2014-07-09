@@ -10,7 +10,7 @@ import (
 	yaml "gopkg.in/yaml.v1"
 )
 
-type Container struct {
+type Service struct {
 	Image    string   `yaml:"image"`
 	BuildDir string   `yaml:"build"`
 	Commands []string `yaml:"command"`
@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
 	}
-	config := make(map[string]Container)
+	config := make(map[string]Service)
 	err = yaml.Unmarshal(configRaw, &config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error unmarshalling fig.yml file")
@@ -33,14 +33,15 @@ func main() {
 	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
 	cli := dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "localhost:2375", nil)
 	fmt.Println(config)
-	for name, container := range config {
-		if container.Image == "" {
+	for name, service := range config {
+		if service.Image == "" {
 			curdir, err := os.Getwd()
-			fmt.Println(curdir)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error getting name of current directory")
 			}
-			cli.CmdBuild("-t", fmt.Sprintf("%s_%s", filepath.Base(curdir), name), container.BuildDir)
+			imageName := fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
+			service.Image = imageName
+			cli.CmdBuild("-t", imageName, service.BuildDir)
 		}
 	}
 }
