@@ -30,7 +30,6 @@ func (s *Service) Run() error {
 	var err error
 
 	err = cli.CmdRm("-f", s.Name)
-	fmt.Println(s.Command)
 
 	cmd := []string{}
 	if len(s.Links) > 0 {
@@ -51,15 +50,32 @@ func (s *Service) Run() error {
 	return nil
 }
 
-func startServices(services []Service) {
+func runServices(services []Service) error {
+	nRun := len(services)
+	linkResolve := make(map[string]bool)
 
-	for _, service := range services {
-		fmt.Println(service)
-		err := service.Run()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "something went wrong in the run", err)
+	/* Boot services in proper order */
+	for {
+		for _, service := range services {
+			readyToRun := true
+			for _, link := range service.Links {
+				readyToRun = readyToRun && linkResolve[link]
+			}
+			if readyToRun {
+				err := service.Run()
+				if err != nil {
+					return err
+				}
+				linkResolve[service.Name] = true
+				nRun--
+				if nRun == 0 {
+					return nil
+				}
+			}
 		}
 	}
+
+	return nil
 }
 
 func CmdUp(c *gangstaCli.Context) {
@@ -90,7 +106,10 @@ func CmdUp(c *gangstaCli.Context) {
 		namedServices = append(namedServices, service)
 	}
 
-	startServices(namedServices)
+	err = runServices(namedServices)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "There was a problem with the run: ", err)
+	}
 }
 
 func main() {
