@@ -30,7 +30,14 @@ func (s *Service) Run() error {
 	var err error
 
 	err = cli.CmdRm("-f", s.Name)
-	err = cli.CmdRun("--name", s.Name, s.Image, "sh", "-c", s.Command)
+	fmt.Println(s.Command)
+
+	cmd := []string{"-d", "--name", s.Name, s.Image}
+	if s.Command != "" {
+		cmd = append(cmd, []string{"sh", "-c", s.Command}...)
+	}
+
+	err = cli.CmdRun(cmd...)
 	if err != nil {
 		return err
 	}
