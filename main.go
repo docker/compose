@@ -27,9 +27,10 @@ type Service struct {
 var cli = dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "boot2docker:2375", nil)
 
 func (s *Service) Run() error {
-	fmt.Println("running service ", s)
+	var err error
 
-	err := cli.CmdRun("-d", "--name", s.Name, s.Image, s.Command)
+	err = cli.CmdRm("-f", s.Name)
+	err = cli.CmdRun("--name", s.Name, s.Image, "sh", "-c", s.Command)
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,6 @@ func (s *Service) Run() error {
 }
 
 func startServices(services []Service) {
-	fmt.Println(services)
 
 	for _, service := range services {
 		fmt.Println(service)
@@ -74,7 +74,6 @@ func CmdUp(c *gangstaCli.Context) {
 			}
 		}
 		service.Name = name
-		fmt.Println(name, service)
 		namedServices = append(namedServices, service)
 	}
 
