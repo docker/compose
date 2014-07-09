@@ -32,7 +32,6 @@ func main() {
 	// TODO: set protocol and address properly
 	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
 	cli := dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "localhost:2375", nil)
-	fmt.Println(config)
 	for name, service := range config {
 		if service.Image == "" {
 			curdir, err := os.Getwd()
