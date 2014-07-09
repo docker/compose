@@ -21,19 +21,19 @@ type Service struct {
 }
 
 func CmdUp(c *gangstaCli.Context) {
-	configRaw, err := ioutil.ReadFile("fig.yml")
+	servicesRaw, err := ioutil.ReadFile("fig.yml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
 	}
-	config := make(map[string]Service)
-	err = yaml.Unmarshal(configRaw, &config)
+	services := make(map[string]Service)
+	err = yaml.Unmarshal(servicesRaw, &services)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error unmarshalling fig.yml file")
 	}
 	// TODO: set protocol and address properly
 	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
 	cli := dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "localhost:2375", nil)
-	for name, service := range config {
+	for name, service := range services {
 		if service.Image == "" {
 			curdir, err := os.Getwd()
 			if err != nil {
