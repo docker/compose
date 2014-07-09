@@ -32,7 +32,13 @@ func (s *Service) Run() error {
 	err = cli.CmdRm("-f", s.Name)
 	fmt.Println(s.Command)
 
-	cmd := []string{"-d", "--name", s.Name, s.Image}
+	cmd := []string{}
+	if len(s.Links) > 0 {
+		for _, link := range s.Links {
+			cmd = append(cmd, []string{"--link", fmt.Sprintf("%s:%s_1", link, link)}...)
+		}
+	}
+	cmd = append(cmd, []string{"-d", "--name", s.Name, s.Image}...)
 	if s.Command != "" {
 		cmd = append(cmd, []string{"sh", "-c", s.Command}...)
 	}
