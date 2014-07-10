@@ -132,7 +132,7 @@ func (s *Service) Exists() bool {
 func runServices(services []Service) error {
 	started := make(map[string]bool)
 	stopped := make(map[string]bool)
-	nStarted := len(services)
+	nToStart := len(services)
 
 	for {
 		/* Boot services in proper order */
@@ -162,8 +162,8 @@ func runServices(services []Service) error {
 					fmt.Fprintf(os.Stderr, "Error starting service", err)
 				}
 				started[service.Name] = true
-				nStarted--
-				if nStarted == 0 {
+				nToStart--
+				if nToStart == 0 {
 					return nil
 				}
 			}
