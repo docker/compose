@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -19,6 +19,7 @@ DOCKER_CONFIG_HINTS = {
     'priviliged': 'privileged',
     'privilige' : 'privileged',
     'volume'    : 'volumes',
+    'workdir'   : 'working_dir',
 }
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
