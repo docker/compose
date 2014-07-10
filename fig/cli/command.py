@@ -59,7 +59,7 @@ class Command(DocoptCommand):
             yaml_path = self.yaml_path
             if yaml_path is None:
                 yaml_path = self.check_yaml_filename()
-            config = yaml.load(open(yaml_path))
+            config = yaml.safe_load(open(yaml_path))
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
