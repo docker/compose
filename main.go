@@ -6,22 +6,24 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	gangstaCli "github.com/codegangsta/cli"
-	dockerClient "github.com/dotcloud/docker/api/client"
+	dockerCli "github.com/dotcloud/docker/api/client"
+	apiClient "github.com/fsouza/go-dockerclient"
 	yaml "gopkg.in/yaml.v1"
 )
 
 type Service struct {
-	Name     string
-	Image    string   `yaml:"image"`
-	BuildDir string   `yaml:"build"`
-	Command  string   `yaml:"command"`
-	Links    []string `yaml:"links"`
-	Ports    []string `yaml:"ports"`
-	Volumes  []string `yaml:"volumes"`
-	Running  bool
-	Logger   ServiceLogger
+	Name      string
+	Image     string   `yaml:"image"`
+	BuildDir  string   `yaml:"build"`
+	Command   string   `yaml:"command"`
+	Links     []string `yaml:"links"`
+	Ports     []string `yaml:"ports"`
+	Volumes   []string `yaml:"volumes"`
+	Logger    ServiceLogger
+	Container apiClient.Container
 }
 
 type ServiceLogger struct {
@@ -34,6 +36,8 @@ type ServiceLogger struct {
 type StdWriter struct {
 	ServiceName string
 }
+
+var api *apiClient.Client
 
 func (s StdWriter) Write(p []byte) (int, error) {
 	fmt.Println(s.ServiceName)
@@ -53,87 +57,75 @@ func NewServiceLogger(name string) ServiceLogger {
 	return serviceLogger
 }
 
-func isRunning(serviceName string) bool {
-	var (
-		err    error
-		val    []byte
-		reader io.Reader
-		writer io.Writer
-	)
-	cli := dockerClient.NewDockerCli(os.Stdin, writer, os.Stderr, "tcp", "localhost:2375", nil)
-	err = cli.CmdInspect([]string{"-f", "'{{ .State.Running }}'", serviceName}...)
+func (s *Service) Create() error {
+
+	config := apiClient.Config{
+		AttachStdout: true,
+		AttachStdin:  true,
+		Image:        s.Image,
+		Cmd:          strings.Fields(s.Command),
+	}
+	opts := apiClient.CreateContainerOptions{Name: s.Name, Config: &config}
+	container, err := api.CreateContainer(opts)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "something went wrong inspecting in isRunning", err)
-		return false
-	} else {
-		_, err = io.Copy(writer, reader)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error Copy from reader in isRunning")
-		}
-		val, err = ioutil.ReadAll(reader)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error ReadAll from reader in isRunning")
-		}
-		return (string(val[:]) == "true")
+		return err
 	}
-}
-
-func (s Service) Run(errmsg chan error) error {
-	serviceLogger := NewServiceLogger(s.Name)
-	cli := dockerClient.NewDockerCli(os.Stdin, serviceLogger.Stdout, os.Stderr, "tcp", "localhost:2375", nil)
-	/*
-		err := cli.CmdRm("-f", s.Name)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error with removing container")
-			errmsg <- err
-		}
-	*/
-
-	cmd := []string{}
-	if len(s.Links) > 0 {
-		for _, link := range s.Links {
-			cmd = append(cmd, []string{"--link", fmt.Sprintf("%s:%s_1", link, link)}...)
-		}
-	}
-	cmd = append(cmd, []string{"--name", s.Name, s.Image}...)
-	if s.Command != "" {
-		cmd = append(cmd, []string{"sh", "-c", s.Command}...)
-	}
-
-	fmt.Println(cmd)
-	fmt.Println("running cmd", cmd)
-
-	go func() {
-		err := cli.CmdRun(cmd...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error in CmdRun of the container")
-			errmsg <- err
-		}
-	}()
-
+	s.Container = *container
 	return nil
 }
 
-func runServices(services []Service) error {
-	errmsg := make(chan error)
+func (s *Service) Start() error {
+	links := []string{}
+	// TODO: this should work like pyfig
+	for _, link := range s.Links {
+		links = append(links, fmt.Sprintf("%s:%s_1", link, link))
+	}
+	err := api.StartContainer(s.Container.ID, &apiClient.HostConfig{
+		Links: links,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-	/* Boot services in proper order */
+func (s *Service) Stop() error {
+	return nil
+}
+
+func (s *Service) IsRunning() bool {
+	return false
+}
+
+func runServices(services []Service) error {
+	started := make(map[string]bool)
+	nStarted := len(services)
+
 	for {
-		select {
-		case err := <-errmsg:
-			return err
-		default:
-			for _, service := range services {
-				readyToRun := true
-				for _, link := range service.Links {
-					readyToRun = readyToRun && isRunning(link)
+		/* Boot services in proper order */
+		for _, service := range services {
+			shouldStart := true
+			if service.IsRunning() && !started[service.Name] {
+				service.Stop()
+			}
+			for _, link := range service.Links {
+				if !started[link] {
+					shouldStart = false
 				}
-				fmt.Println("readyToRun", readyToRun)
-				if readyToRun && !isRunning(service.Name) {
-					go func(service Service) {
-						fmt.Println("running ", service)
-						service.Run(errmsg)
-					}(service)
+			}
+			if shouldStart {
+				err := service.Create()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error creating service", err)
+				}
+				err = service.Start()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error starting service", err)
+				}
+				started[service.Name] = true
+				nStarted--
+				if nStarted == 0 {
+					return nil
 				}
 			}
 		}
@@ -145,7 +137,7 @@ func runServices(services []Service) error {
 func CmdUp(c *gangstaCli.Context) {
 	// TODO: set protocol and address properly
 	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
-	cli := dockerClient.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "boot2docker:2375", nil)
+	cli := dockerCli.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "boot2docker:2375", nil)
 	servicesRaw, err := ioutil.ReadFile("fig.yml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
@@ -180,6 +172,13 @@ func CmdUp(c *gangstaCli.Context) {
 }
 
 func main() {
+	var err error
+	api, err = apiClient.NewClient("tcp://boot2docker:2375")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating api client!")
+		os.Exit(1)
+	}
+
 	app := gangstaCli.NewApp()
 	app.Name = "fig"
 	app.Usage = "Orchestrate Docker containers"
@@ -192,5 +191,4 @@ func main() {
 	}
 
 	app.Run(os.Args)
-
 }
