@@ -304,6 +304,17 @@ class Service(object):
 
         container_options['name'] = self.next_container_name(one_off)
 
+        # If a qualified hostname was given, split it into an
+        # unqualified hostname and a domainname unless domainname
+        # was also given explicitly. This matches the behavior of
+        # the official Docker CLI in that scenario.
+        if ('hostname' in container_options
+                and 'domainname' not in container_options
+                and '.' in container_options['hostname']):
+            parts = container_options['hostname'].partition('.')
+            container_options['hostname'] = parts[0]
+            container_options['domainname'] = parts[2]
+
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
             all_ports = container_options.get('ports', []) + self.options.get('expose', [])
