@@ -90,23 +90,62 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) Stop() error {
+	err := api.StopContainer(s.Name, 10)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "attempt to stop container ", s.Name, "failed", err)
+	}
+	return nil
+}
+
+func (s *Service) Remove() error {
+	err := api.RemoveContainer(apiClient.RemoveContainerOptions{
+		ID: s.Name,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "attempt to remove container ", s.Name, "failed", err)
+	}
 	return nil
 }
 
 func (s *Service) IsRunning() bool {
-	return false
+	container, err := api.InspectContainer(s.Name)
+	if err != nil {
+		if _, ok := err.(apiClient.NoSuchContainer); ok {
+			fmt.Fprintf(os.Stderr, "unknown error checking if container is running: ", err)
+		}
+		return false
+	}
+	return container.State.Running
+}
+
+func (s *Service) Exists() bool {
+	_, err := api.InspectContainer(s.Name)
+	if err != nil {
+		if _, ok := err.(apiClient.NoSuchContainer); ok {
+			fmt.Fprintf(os.Stderr, "unknown error checking if container is running: ", err)
+		}
+		return false
+	}
+	return true
 }
 
 func runServices(services []Service) error {
 	started := make(map[string]bool)
+	stopped := make(map[string]bool)
 	nStarted := len(services)
 
 	for {
 		/* Boot services in proper order */
 		for _, service := range services {
 			shouldStart := true
-			if service.IsRunning() && !started[service.Name] {
-				service.Stop()
+			if !stopped[service.Name] {
+				if service.IsRunning() {
+					service.Stop()
+				}
+				if service.Exists() {
+					service.Remove()
+				}
+				stopped[service.Name] = true
 			}
 			for _, link := range service.Links {
 				if !started[link] {
