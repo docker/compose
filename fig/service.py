@@ -40,7 +40,7 @@ class ConfigError(ValueError):
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=[], volumes_from=[], **options):
+    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
