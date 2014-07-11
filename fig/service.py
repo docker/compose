@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -303,6 +303,17 @@ class Service(object):
         container_options.update(override_options)
 
         container_options['name'] = self.next_container_name(one_off)
+
+        # If a qualified hostname was given, split it into an
+        # unqualified hostname and a domainname unless domainname
+        # was also given explicitly. This matches the behavior of
+        # the official Docker CLI in that scenario.
+        if ('hostname' in container_options
+                and 'domainname' not in container_options
+                and '.' in container_options['hostname']):
+            parts = container_options['hostname'].partition('.')
+            container_options['hostname'] = parts[0]
+            container_options['domainname'] = parts[2]
 
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
