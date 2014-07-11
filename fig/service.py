@@ -178,7 +178,7 @@ class Service(object):
 
     def recreate_container(self, container, **override_options):
         try:
-            container.stop(timeout=1)
+            container.stop()
         except APIError as e:
             if (e.response.status_code == 500
                     and e.explanation
