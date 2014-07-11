@@ -322,11 +322,13 @@ class TopLevelCommand(Command):
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
 
-        to_attach = self.project.up(
+        self.project.up(
             service_names=service_names,
             start_links=start_links,
             recreate=recreate
         )
+
+        to_attach = [c for s in self.project.get_services(service_names) for c in s.containers()]
 
         if not detached:
             print("Attaching to", list_containers(to_attach))
