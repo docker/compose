@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -159,17 +160,28 @@ func runServices(services []Service) error {
 }
 
 func attachServices(services []Service) error {
-	readers := []io.Reader{}
+
+	prefixLength := maxPrefixLength(services)
+
+	// Format string for later logging.
+	// This has been an Aanand and Nathan creation.
+	// * drops mic *
+	fmtString := fmt.Sprintf("%%-%ds | %%s\n", prefixLength)
+
 	for _, service := range services {
-		fmt.Println("ATTACHING TO SERVICE", service)
-		attachReader, err := service.Attach()
+		reader, err := service.Attach()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error attaching to container", err)
 		}
-		readers = append(readers, attachReader)
-	}
-	for _, reader := range readers {
-		go io.Copy(os.Stdout, reader)
+		go func(reader io.Reader, name string) {
+			scanner := bufio.NewScanner(reader)
+			for scanner.Scan() {
+				fmt.Printf(fmtString, name, scanner.Text())
+			}
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "There was an error with the scanner in attached container", err)
+			}
+		}(reader, service.Name)
 	}
 	return nil
 }
@@ -232,6 +244,16 @@ func CmdUp(c *gangstaCli.Context) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "there was an error in wait services call", err)
 	}
+}
+
+func maxPrefixLength(services []Service) int {
+	maxLength := 0
+	for _, service := range services {
+		if len(service.Name) > maxLength {
+			maxLength = len(service.Name)
+		}
+	}
+	return maxLength
 }
 
 func main() {
