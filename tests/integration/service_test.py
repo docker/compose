@@ -113,12 +113,12 @@ class ServiceTest(DockerClientTestCase):
             'db',
             environment={'FOO': '1'},
             volumes=['/var/db'],
-            entrypoint=['ps'],
-            command=['ax']
+            entrypoint=['sleep'],
+            command=['300']
         )
         old_container = service.create_container()
-        self.assertEqual(old_container.dictionary['Config']['Entrypoint'], ['ps'])
-        self.assertEqual(old_container.dictionary['Config']['Cmd'], ['ax'])
+        self.assertEqual(old_container.dictionary['Config']['Entrypoint'], ['sleep'])
+        self.assertEqual(old_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
         self.assertEqual(old_container.name, 'figtest_db_1')
         service.start_container(old_container)
@@ -134,8 +134,8 @@ class ServiceTest(DockerClientTestCase):
         new_container = tuples[0][1]
         self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['echo'])
 
-        self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['ps'])
-        self.assertEqual(new_container.dictionary['Config']['Cmd'], ['ax'])
+        self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
+        self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
         self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
@@ -144,6 +144,19 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
         self.assertRaises(APIError, lambda: self.client.inspect_container(intermediate_container.id))
+
+    def test_recreate_containers_when_containers_are_stopped(self):
+        service = self.create_service(
+            'db',
+            environment={'FOO': '1'},
+            volumes=['/var/db'],
+            entrypoint=['sleep'],
+            command=['300']
+        )
+        old_container = service.create_container()
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service.recreate_containers()
+        self.assertEqual(len(service.containers(stopped=True)), 1)
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
