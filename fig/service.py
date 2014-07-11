@@ -177,8 +177,15 @@ class Service(object):
             return tuples
 
     def recreate_container(self, container, **override_options):
-        if container.is_running:
-            container.stop(timeout=1)
+        try:
+            container.stop()
+        except APIError as e:
+            if (e.response.status_code == 500
+                    and e.explanation
+                    and 'no such process' in str(e.explanation)):
+                pass
+            else:
+                raise
 
         intermediate_container = Container.create(
             self.client,
