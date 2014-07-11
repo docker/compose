@@ -330,6 +330,11 @@ class Service(object):
         if 'volumes' in container_options:
             container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
 
+        if 'environment' in container_options:
+            if isinstance(container_options['environment'], list):
+                container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
+            container_options['environment'] = dict(resolve_env(k,v) for k,v in container_options['environment'].iteritems())
+
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
                 self.build()
@@ -447,3 +452,16 @@ def split_port(port):
             external_port = (external_ip,)
     return internal_port, external_port
 
+def split_env(env):
+    if '=' in env:
+        return env.split('=', 1)
+    else:
+        return env, None
+
+def resolve_env(key,val):
+    if val is not None:
+        return key, val
+    elif key in os.environ:
+        return key, os.environ[key]
+    else:
+        return key, ''

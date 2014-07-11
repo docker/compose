@@ -5,6 +5,7 @@ from fig.service import CannotBeScaledError
 from fig.container import Container
 from fig.packages.docker.errors import APIError
 from .testcases import DockerClientTestCase
+import os
 
 class ServiceTest(DockerClientTestCase):
     def test_containers(self):
@@ -306,3 +307,23 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container().inspect()
         self.assertEqual(container['Config']['WorkingDir'], '/working/dir/sample')
+
+    def test_split_env(self):
+        service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
+        env = service.start_container().environment
+        for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.iteritems():
+            self.assertEqual(env[k], v)
+
+    def test_resolve_env(self):
+        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
+        os.environ['FILE_DEF'] = 'E1'
+        os.environ['FILE_DEF_EMPTY'] = 'E2'
+        os.environ['ENV_DEF'] = 'E3'
+        try:
+            env = service.start_container().environment
+            for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.iteritems():
+                self.assertEqual(env[k], v)
+        finally:
+            del os.environ['FILE_DEF']
+            del os.environ['FILE_DEF_EMPTY']
+            del os.environ['ENV_DEF']
