@@ -22,46 +22,16 @@ type Service struct {
 	Links     []string `yaml:"links"`
 	Ports     []string `yaml:"ports"`
 	Volumes   []string `yaml:"volumes"`
-	Logger    ServiceLogger
 	Container apiClient.Container
 }
 
-type ServiceLogger struct {
-	ServiceName string
-	Stdout      io.Writer
-	Stderr      io.Writer
-	Stdin       io.ReadCloser
-}
-
-type StdWriter struct {
-	ServiceName string
-}
-
 var api *apiClient.Client
-
-func (s StdWriter) Write(p []byte) (int, error) {
-	fmt.Println(s.ServiceName)
-	fmt.Println(string(p[:]))
-	return len(p) + len(s.ServiceName), nil
-}
-
-func NewStdWriter(name string) StdWriter {
-	return StdWriter{ServiceName: name}
-}
-
-func NewServiceLogger(name string) ServiceLogger {
-	serviceLogger := ServiceLogger{}
-	serviceLogger.ServiceName = name
-	stdOut := StdWriter{}
-	serviceLogger.Stdout = stdOut
-	return serviceLogger
-}
 
 func (s *Service) Create() error {
 
 	config := apiClient.Config{
 		AttachStdout: true,
-		AttachStdin:  true,
+		AttachStdin:  false,
 		Image:        s.Image,
 		Cmd:          strings.Fields(s.Command),
 	}
@@ -129,6 +99,21 @@ func (s *Service) Exists() bool {
 	return true
 }
 
+func (s *Service) Attach() (io.Reader, error) {
+	r, w := io.Pipe()
+	options := apiClient.AttachToContainerOptions{
+		Container:    s.Name,
+		OutputStream: w,
+		ErrorStream:  w,
+		Stream:       true,
+		Stdout:       true,
+		Stderr:       true,
+		Logs:         true,
+	}
+	go api.AttachToContainer(options)
+	return r, nil
+}
+
 func runServices(services []Service) error {
 	started := make(map[string]bool)
 	stopped := make(map[string]bool)
@@ -173,6 +158,37 @@ func runServices(services []Service) error {
 	return nil
 }
 
+func attachServices(services []Service) error {
+	readers := []io.Reader{}
+	for _, service := range services {
+		fmt.Println("ATTACHING TO SERVICE", service)
+		attachReader, err := service.Attach()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error attaching to container", err)
+		}
+		readers = append(readers, attachReader)
+	}
+	for _, reader := range readers {
+		go io.Copy(os.Stdout, reader)
+	}
+	return nil
+}
+
+func waitServices(services []Service) error {
+	exited := make(chan int)
+	for _, service := range services {
+		go func(service Service) {
+			exitCode, err := api.WaitContainer(service.Name)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "container wait had error", err)
+			}
+			exited <- exitCode
+		}(service)
+	}
+	<-exited
+	return nil
+}
+
 func CmdUp(c *gangstaCli.Context) {
 	// TODO: set protocol and address properly
 	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
@@ -207,6 +223,14 @@ func CmdUp(c *gangstaCli.Context) {
 	err = runServices(namedServices)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "There was a problem with the run: ", err)
+	}
+	err = attachServices(namedServices)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "There was an error with attaching to the services", err)
+	}
+	err = waitServices(namedServices)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "there was an error in wait services call", err)
 	}
 }
 
