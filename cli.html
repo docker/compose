@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140618241628695887053">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140711272072728909035">
   </head>
   <body>
     <div class="container">
@@ -56,12 +56,15 @@
 <p>For example:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web python manage.py shell
 </code></pre></div>
-<p>Note that this will not start any services that the command&#39;s service links to. So if, for example, your one-off command talks to your database, you will need to run <code>fig up -d db</code> first.</p>
+<p>By default, linked services will be started, unless they are already running.</p>
 
 <p>One-off commands are started in new containers with the same config as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and no ports will be created in case they collide.</p>
 
 <p>Links are also created between one-off commands and the other containers for that service so you can do stuff like this:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run db /bin/sh -c &quot;psql -h \$DB_1_PORT_5432_TCP_ADDR -U docker&quot;
+</code></pre></div>
+<p>If you do not want linked containers to be started when running the one-off command, specify the <code>--no-deps</code> flag:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run --no-deps web python manage.py shell
 </code></pre></div>
 <h2>scale</h2>
 
@@ -83,9 +86,11 @@ For example:</p>
 
 <p>Build, (re)create, start and attach to containers for a service.</p>
 
+<p>Linked services will be started, unless they are already running.</p>
+
 <p>By default, <code>fig up</code> will aggregate the output of each container, and when it exits, all containers will be stopped. If you run <code>fig up -d</code>, it&#39;ll start the containers in the background and leave them running.</p>
 
-<p>If there are existing containers for a service, <code>fig up</code> will stop and recreate them (preserving mounted volumes with <a href="http://docs.docker.io/en/latest/use/working_with_volumes/">volumes-from</a>), so that changes in <code>fig.yml</code> are picked up.</p>
+<p>By default if there are existing containers for a service, <code>fig up</code> will stop and recreate them (preserving mounted volumes with <a href="http://docs.docker.io/en/latest/use/working_with_volumes/">volumes-from</a>), so that changes in <code>fig.yml</code> are picked up. If you do no want containers to be stopped and recreated, use <code>fig up --no-recreate</code>. This will still start any stopped containers, if needed.</p>
 </div>
 
       <div class="sidebar">

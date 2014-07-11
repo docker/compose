@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140618241628695887053">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140711272072728909035">
   </head>
   <body>
     <div class="container">
@@ -65,10 +65,21 @@
 <span class="l-Scalar-Plain">volumes</span><span class="p-Indicator">:</span>
  <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">cache/:/tmp/cache</span>
 
+<span class="l-Scalar-Plain">-- Mount all of the volumes from another service or container</span>
+<span class="l-Scalar-Plain">volumes_from</span><span class="p-Indicator">:</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">service_name</span>
+ <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">container_name</span>
+
 <span class="l-Scalar-Plain">-- Add environment variables.</span>
+<span class="l-Scalar-Plain">-- Environment variables with only a key are resolved to values on the host</span> 
+<span class="l-Scalar-Plain">-- machine, which can be helpful for secret or host-specific values.</span>
 <span class="l-Scalar-Plain">environment</span><span class="p-Indicator">:</span>
   <span class="l-Scalar-Plain">RACK_ENV</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">development</span>
-</code></pre></div></div>
+  <span class="l-Scalar-Plain">SESSION_SECRET</span><span class="p-Indicator">:</span>
+</code></pre></div>
+<p>-- Networking mode. Use the same values as the docker client --net parameter
+net: &quot;host&quot;</p>
+</div>
 
       <div class="sidebar">
         <h1 class="logo">
