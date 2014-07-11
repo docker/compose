@@ -55,8 +55,11 @@ volumes:
  - cache/:/tmp/cache
 
 -- Add environment variables.
+-- Environment variables with only a key are resolved to values on the host 
+-- machine, which can be helpful for secret or host-specific values.
 environment:
   RACK_ENV: development
+  SESSION_SECRET:
 ```
 
 -- Networking mode. Use the same values as the docker client --net parameter
