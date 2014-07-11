@@ -73,3 +73,21 @@ The easiest way to do this is to use the `--signoff` flag when committing. E.g.:
 
     $ git commit --signoff
 
+
+## Release process
+
+1. Open pull request that:
+
+ - Updates version in `fig/__init__.py`
+ - Updates version in `docs/install.md`
+ - Adds release notes to `CHANGES.md`
+
+2. Create unpublished GitHub release with release notes
+
+3. Build Linux version on any Docker host with `script/build-linux` and attach to release
+
+4. Build OS X version on Mountain Lion with `script/build-osx` and attach to release
+
+5. Publish GitHub release, creating tag
+
+
