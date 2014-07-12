@@ -45,13 +45,15 @@ func CmdUp(c *gangstaCli.Context) {
 		if service.Image == "" {
 			curdir, err := os.Getwd()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting name of current directory")
+				fmt.Fprintf(os.Stderr, "Error getting name of current directory\n")
 			}
 			imageName := fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
 			service.Image = imageName
+			fmt.Println("Building service", imageName)
 			err = cli.CmdBuild("-t", imageName, service.BuildDir)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error running build for image")
+				fmt.Fprintf(os.Stderr, "error running build for image\n", err)
+				os.Exit(1)
 			}
 		}
 		service.Name = name

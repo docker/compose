@@ -156,6 +156,7 @@ func (s *Service) Attach() (io.Reader, error) {
 		Stderr:       true,
 		Logs:         true,
 	}
+	fmt.Println("Attaching to container", s.Name)
 	go s.api.AttachToContainer(options)
 	return r, nil
 }

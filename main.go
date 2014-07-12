@@ -33,13 +33,16 @@ func runServices(services []Service) error {
 				}
 			}
 			if shouldStart {
+				fmt.Println("Creating service", service.Name)
 				err := service.Create()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error creating service", err)
+					os.Exit(1)
 				}
 				err = service.Start()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error starting service", err)
+					os.Exit(1)
 				}
 				started[service.Name] = true
 				nToStart--
