@@ -16,25 +16,28 @@ import (
 )
 
 type Service struct {
-	Name      string
-	Image     string   `yaml:"image"`
-	BuildDir  string   `yaml:"build"`
-	Command   string   `yaml:"command"`
-	Links     []string `yaml:"links"`
-	Ports     []string `yaml:"ports"`
-	Volumes   []string `yaml:"volumes"`
-	Container apiClient.Container
+	Name         string
+	Image        string   `yaml:"image"`
+	BuildDir     string   `yaml:"build"`
+	Command      string   `yaml:"command"`
+	Links        []string `yaml:"links"`
+	Ports        []string `yaml:"ports"`
+	Volumes      []string `yaml:"volumes"`
+	ExposedPorts map[apiClient.Port]struct{}
+	Container    apiClient.Container
 }
 
 var api *apiClient.Client
 
 func (s *Service) Create() error {
+	s.configureExposedPorts()
 
 	config := apiClient.Config{
 		AttachStdout: true,
 		AttachStdin:  false,
 		Image:        s.Image,
 		Cmd:          strings.Fields(s.Command),
+		ExposedPorts: s.ExposedPorts,
 	}
 	opts := apiClient.CreateContainerOptions{Name: s.Name, Config: &config}
 	container, err := api.CreateContainer(opts)
@@ -45,6 +48,49 @@ func (s *Service) Create() error {
 	return nil
 }
 
+/**
+  This is weird looking but Docker API expects JSON such as :
+
+	 "PortBindings": {
+		"80/tcp": [
+			{
+				"HostIp": "0.0.0.0",
+				"HostPort": "49153"
+			}
+		]
+	 },
+
+  	to define port bindings, so this function creates the data structure
+	that gets marshalled into that JSON.
+*/
+func (s *Service) createPortBindings() map[apiClient.Port][]apiClient.PortBinding {
+	bindingsToMarshal := make(map[apiClient.Port][]apiClient.PortBinding)
+	for _, portBinding := range s.Ports {
+		ports := strings.Split(portBinding, ":")
+		val := []apiClient.PortBinding{}
+		key := apiClient.Port(fmt.Sprintf("%s/tcp", ports[0]))
+		if len(ports) > 1 {
+			val = append(val, apiClient.PortBinding{
+				HostIp:   "0.0.0.0",
+				HostPort: ports[1],
+			})
+		}
+		bindingsToMarshal[key] = val
+	}
+	return bindingsToMarshal
+}
+
+func (s *Service) configureExposedPorts() {
+	s.ExposedPorts = make(map[apiClient.Port]struct{})
+	for _, binding := range s.Ports {
+		ports := strings.Split(binding, ":")
+		if len(ports) > 1 {
+			exposedPortKey := apiClient.Port(fmt.Sprintf("%s/tcp", ports[1]))
+			s.ExposedPorts[exposedPortKey] = struct{}{}
+		}
+	}
+}
+
 func (s *Service) Start() error {
 	links := []string{}
 	// TODO: this should work like pyfig
@@ -52,7 +98,8 @@ func (s *Service) Start() error {
 		links = append(links, fmt.Sprintf("%s:%s_1", link, link))
 	}
 	err := api.StartContainer(s.Container.ID, &apiClient.HostConfig{
-		Links: links,
+		Links:        links,
+		PortBindings: s.createPortBindings(),
 	})
 	if err != nil {
 		return err
