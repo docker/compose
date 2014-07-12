@@ -5,14 +5,13 @@ import (
 )
 
 var choices = []string{
-	"black",
+	"white",
+	"magenta",
+	"cyan",
 	"red",
 	"green",
 	"yellow",
 	"blue",
-	"magenta",
-	"cyan",
-	"white",
 }
 
 var whichChoice = 0

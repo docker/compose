@@ -166,9 +166,11 @@ func attachServices(services []Service) error {
 	// Format string for later logging.
 	// This has been an Aanand and Nathan creation.
 	// * drops mic *
-	fmtString := fmt.Sprintf("%%-%ds | %%s\n", prefixLength)
-
+	prefixFmt := fmt.Sprintf("%%-%ds | ", prefixLength)
 	for _, service := range services {
+
+		uncoloredPrefix := fmt.Sprintf(prefixFmt, service.Name)
+		coloredPrefix := rainbow(uncoloredPrefix)
 		reader, err := service.Attach()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error attaching to container", err)
@@ -176,7 +178,7 @@ func attachServices(services []Service) error {
 		go func(reader io.Reader, name string) {
 			scanner := bufio.NewScanner(reader)
 			for scanner.Scan() {
-				fmt.Printf(fmtString, name, scanner.Text())
+				fmt.Printf("%s%s \n", coloredPrefix, scanner.Text())
 			}
 			if err := scanner.Err(); err != nil {
 				fmt.Fprintf(os.Stderr, "There was an error with the scanner in attached container", err)
