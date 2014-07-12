@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	gangstaCli "github.com/codegangsta/cli"
 	dockerCli "github.com/dotcloud/docker/api/client"
@@ -13,15 +14,24 @@ import (
 )
 
 func CmdUp(c *gangstaCli.Context) {
-	api, err := apiClient.NewClient("tcp://boot2docker:2375")
+
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		dockerHost = "unix:///var/run/docker.sock"
+	}
+
+	api, err := apiClient.NewClient(dockerHost)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating client!!", err)
 	}
 
-	// TODO: set protocol and address properly
-	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
-	cli := dockerCli.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "boot2docker:2375", nil)
+	splitDockerHost := strings.Split(dockerHost, "://")
+	protocol := splitDockerHost[0]
+	location := splitDockerHost[len(splitDockerHost)-1]
+
+	cli := dockerCli.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, protocol, location, nil)
 	servicesRaw, err := ioutil.ReadFile("fig.yml")
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
 	}
