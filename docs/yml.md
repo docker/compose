@@ -43,6 +43,7 @@ ports:
  - "3000"
  - "8000:8000"
  - "49100:22"
+ - "127.0.0.1:8001:8001"
 
 -- Expose ports without publishing them to the host machine - they'll only be
 -- accessible to linked services. Only the internal port can be specified.
