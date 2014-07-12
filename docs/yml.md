@@ -74,10 +74,11 @@ expose:
 
 ### volumes
 
-Map volumes from the host machine (`HOST:CONTAINER`).
+Mount paths as volumes, optionally specifying a path on the host machine (`HOST:CONTAINER`).
 
 ```
 volumes:
+ - /var/lib/mysql
  - cache/:/tmp/cache
 ```
 
@@ -93,12 +94,18 @@ volumes_from:
 
 ### environment
 
-Add environment variables. Environment variables with only a key are resolved to values on the host machine, which can be helpful for secret or host-specific values.
+Add environment variables. You can use either an array or a dictionary.
+
+Environment variables with only a key are resolved to their values on the machine Fig is running on, which can be helpful for secret or host-specific values.
 
 ```
 environment:
   RACK_ENV: development
   SESSION_SECRET:
+
+environment:
+  - RACK_ENV=development
+  - SESSION_SECRET
 ```
 
 ### net
@@ -106,5 +113,8 @@ environment:
 Networking mode. Use the same values as the docker client `--net` parameter.
 
 ```
+net: "bridge"
+net: "none"
+net: "container:[name or id]"
 net: "host"
 ```
