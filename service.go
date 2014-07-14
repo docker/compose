@@ -75,9 +75,23 @@ func (s *Service) Create() error {
 		Cmd:          strings.Fields(s.Command),
 		ExposedPorts: s.ExposedPorts,
 	}
-	opts := apiClient.CreateContainerOptions{Name: s.Name, Config: &config}
-	container, err := s.api.CreateContainer(opts)
+	createOpts := apiClient.CreateContainerOptions{
+		Name:   s.Name,
+		Config: &config,
+	}
+	container, err := s.api.CreateContainer(createOpts)
 	if err != nil {
+		if err == apiClient.ErrNoSuchImage {
+			pullOpts := apiClient.PullImageOptions{
+				Repository: s.Image,
+			}
+			fmt.Println("Unable to find image", s.Image, "locally, pulling...")
+			err = s.api.PullImage(pullOpts, apiClient.AuthConfiguration{})
+			if err != nil {
+				return err
+			}
+			s.Create()
+		}
 		return err
 	}
 	s.Container = *container
