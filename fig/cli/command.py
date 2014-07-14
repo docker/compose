@@ -69,7 +69,7 @@ class Command(DocoptCommand):
 
     @cached_property
     def project_name(self):
-        project = os.path.basename(os.path.dirname(self.yaml_path))
+        project = os.path.basename(os.path.dirname(os.path.abspath(self.yaml_path)))
         if self.explicit_project_name is not None:
             project = self.explicit_project_name
         project = re.sub(r'[^a-zA-Z0-9]', '', project)
