@@ -121,8 +121,8 @@ func (s *Service) Remove() error {
 func (s *Service) IsRunning() bool {
 	container, err := s.api.InspectContainer(s.Name)
 	if err != nil {
-		if _, ok := err.(apiClient.NoSuchContainer); ok {
-			fmt.Fprintf(os.Stderr, "unknown error checking if container is running: ", err)
+		if _, ok := err.(*apiClient.NoSuchContainer); !ok {
+			fmt.Fprintf(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
 		}
 		return false
 	}
@@ -132,8 +132,8 @@ func (s *Service) IsRunning() bool {
 func (s *Service) Exists() bool {
 	_, err := s.api.InspectContainer(s.Name)
 	if err != nil {
-		if _, ok := err.(apiClient.NoSuchContainer); ok {
-			fmt.Fprintf(os.Stderr, "unknown error checking if container is running: ", err)
+		if _, ok := err.(*apiClient.NoSuchContainer); !ok {
+			fmt.Fprintf(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
 		}
 		return false
 	}
