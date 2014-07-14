@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140712271606456577018">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140714282175298613054">
   </head>
   <body>
     <div class="container">
@@ -22,65 +22,85 @@
 <p>Each service defined in <code>fig.yml</code> must specify exactly one of <code>image</code> or <code>build</code>. Other keys are optional, and are analogous to their <code>docker run</code> command-line counterparts.</p>
 
 <p>As with <code>docker run</code>, options specified in the Dockerfile (e.g. <code>CMD</code>, <code>EXPOSE</code>, <code>VOLUME</code>, <code>ENV</code>) are respected by default - you don&#39;t need to specify them again in <code>fig.yml</code>.</p>
-<div class="highlight"><pre><code class="yaml language-yaml" data-lang="yaml"><span class="l-Scalar-Plain">-- Tag or partial image ID. Can be local or remote - Fig will attempt to pull</span>
-<span class="l-Scalar-Plain">-- if it doesn&#39;t exist locally.</span>
-<span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">ubuntu</span>
-<span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">orchardup/postgresql</span>
-<span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">a4bc65fd</span>
 
-<span class="l-Scalar-Plain">-- Path to a directory containing a Dockerfile. Fig will build and tag it with</span>
-<span class="l-Scalar-Plain">-- a generated name, and use that image thereafter.</span>
-<span class="l-Scalar-Plain">build</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">/path/to/build/dir</span>
+<h3>image</h3>
 
-<span class="l-Scalar-Plain">-- Override the default command.</span>
-<span class="l-Scalar-Plain">command</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">bundle exec thin -p 3000</span>
-
-<span class="l-Scalar-Plain">-- Link to containers in another service. Optionally specify an alternate name</span>
-<span class="l-Scalar-Plain">-- for the link, which will determine how environment variables are prefixed,</span>
-<span class="l-Scalar-Plain">-- e.g. &quot;db&quot; -&gt; DB_1_PORT, &quot;db:database&quot; -&gt; DATABASE_1_PORT</span>
-<span class="l-Scalar-Plain">links</span><span class="p-Indicator">:</span>
- <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">db</span>
- <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">db:database</span>
- <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">redis</span>
-
-<span class="l-Scalar-Plain">-- Expose ports. Either specify both ports (HOST:CONTAINER), or just the</span>
-<span class="l-Scalar-Plain">-- container port (a random host port will be chosen).</span>
-<span class="l-Scalar-Plain">-- Note</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">When mapping ports in the HOST:CONTAINER format, you may experience</span>
-<span class="l-Scalar-Plain">-- erroneous results when using a container port lower than 60, because YAML</span>
-<span class="l-Scalar-Plain">-- will parse numbers in the format &quot;xx:yy&quot; as sexagesimal (base 60). For</span>
-<span class="l-Scalar-Plain">-- this reason, we recommend always explicitly specifying your port mappings</span>
-<span class="l-Scalar-Plain">-- as strings.</span>
-<span class="l-Scalar-Plain">ports</span><span class="p-Indicator">:</span>
- <span class="p-Indicator">-</span> <span class="s">&quot;3000&quot;</span>
- <span class="p-Indicator">-</span> <span class="s">&quot;8000:8000&quot;</span>
- <span class="p-Indicator">-</span> <span class="s">&quot;49100:22&quot;</span>
- <span class="p-Indicator">-</span> <span class="s">&quot;127.0.0.1:8001:8001&quot;</span>
-
-<span class="l-Scalar-Plain">-- Expose ports without publishing them to the host machine - they&#39;ll only be</span>
-<span class="l-Scalar-Plain">-- accessible to linked services. Only the internal port can be specified.</span>
-<span class="l-Scalar-Plain">expose</span><span class="p-Indicator">:</span>
- <span class="p-Indicator">-</span> <span class="s">&quot;3000&quot;</span>
- <span class="p-Indicator">-</span> <span class="s">&quot;8000&quot;</span>
-
-<span class="l-Scalar-Plain">-- Map volumes from the host machine (HOST:CONTAINER).</span>
-<span class="l-Scalar-Plain">volumes</span><span class="p-Indicator">:</span>
- <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">cache/:/tmp/cache</span>
-
-<span class="l-Scalar-Plain">-- Mount all of the volumes from another service or container</span>
-<span class="l-Scalar-Plain">volumes_from</span><span class="p-Indicator">:</span>
- <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">service_name</span>
- <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">container_name</span>
-
-<span class="l-Scalar-Plain">-- Add environment variables.</span>
-<span class="l-Scalar-Plain">-- Environment variables with only a key are resolved to values on the host</span> 
-<span class="l-Scalar-Plain">-- machine, which can be helpful for secret or host-specific values.</span>
-<span class="l-Scalar-Plain">environment</span><span class="p-Indicator">:</span>
-  <span class="l-Scalar-Plain">RACK_ENV</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">development</span>
-  <span class="l-Scalar-Plain">SESSION_SECRET</span><span class="p-Indicator">:</span>
+<p>Tag or partial image ID. Can be local or remote - Fig will attempt to pull if it doesn&#39;t exist locally.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">image: ubuntu
+image: orchardup/postgresql
+image: a4bc65fd
 </code></pre></div>
-<p>-- Networking mode. Use the same values as the docker client --net parameter
-net: &quot;host&quot;</p>
-</div>
+<h3>build</h3>
+
+<p>Path to a directory containing a Dockerfile. Fig will build and tag it with a generated name, and use that image thereafter.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">build: /path/to/build/dir
+</code></pre></div>
+<h3>command</h3>
+
+<p>Override the default command.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">command: bundle exec thin -p 3000
+</code></pre></div>
+<h3>links</h3>
+
+<p>Link to containers in another service. Optionally specify an alternate name for the link, which will determine how environment variables are prefixed, e.g. <code>db</code> -&gt; <code>DB_1_PORT</code>, <code>db:database</code> -&gt; <code>DATABASE_1_PORT</code></p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">links:
+ - db
+ - db:database
+ - redis
+</code></pre></div>
+<h3>ports</h3>
+
+<p>Expose ports. Either specify both ports (<code>HOST:CONTAINER</code>), or just the container port (a random host port will be chosen).</p>
+
+<p><strong>Note:</strong> When mapping ports in the <code>HOST:CONTAINER</code> format, you may experience erroneous results when using a container port lower than 60, because YAML will parse numbers in the format <code>xx:yy</code> as sexagesimal (base 60). For this reason, we recommend always explicitly specifying your port mappings as strings.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">ports:
+ - &quot;3000&quot;
+ - &quot;8000:8000&quot;
+ - &quot;49100:22&quot;
+ - &quot;127.0.0.1:8001:8001&quot;
+</code></pre></div>
+<h3>expose</h3>
+
+<p>Expose ports without publishing them to the host machine - they&#39;ll only be accessible to linked services. Only the internal port can be specified.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">expose:
+ - &quot;3000&quot;
+ - &quot;8000&quot;
+</code></pre></div>
+<h3>volumes</h3>
+
+<p>Mount paths as volumes, optionally specifying a path on the host machine (<code>HOST:CONTAINER</code>).</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">volumes:
+ - /var/lib/mysql
+ - cache/:/tmp/cache
+</code></pre></div>
+<h3>volumes_from</h3>
+
+<p>Mount all of the volumes from another service or container.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">volumes_from:
+ - service_name
+ - container_name
+</code></pre></div>
+<h3>environment</h3>
+
+<p>Add environment variables. You can use either an array or a dictionary.</p>
+
+<p>Environment variables with only a key are resolved to their values on the machine Fig is running on, which can be helpful for secret or host-specific values.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">environment:
+  RACK_ENV: development
+  SESSION_SECRET:
+
+environment:
+  - RACK_ENV=development
+  - SESSION_SECRET
+</code></pre></div>
+<h3>net</h3>
+
+<p>Networking mode. Use the same values as the docker client <code>--net</code> parameter.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">net: &quot;bridge&quot;
+net: &quot;none&quot;
+net: &quot;container:[name or id]&quot;
+net: &quot;host&quot;
+</code></pre></div></div>
 
       <div class="sidebar">
         <h1 class="logo">
