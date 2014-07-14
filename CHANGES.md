@@ -9,6 +9,8 @@ Change log
  - `volumes_from` now works properly with containers as well as services
  - Fixed a race condition when recreating containers in `fig up`
 
+Thanks @ryanbrainard and @d11wtq!
+
 
 0.5.0 (2014-07-11)
 ------------------
