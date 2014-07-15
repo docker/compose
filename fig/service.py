@@ -132,7 +132,6 @@ class Service(object):
 
         self.remove_stopped()
 
-
     def remove_stopped(self, **options):
         for c in self.containers(stopped=True):
             if not c.is_running:
@@ -212,7 +211,7 @@ class Service(object):
             log.info("Starting %s..." % container.name)
             return self.start_container(container, **options)
 
-    def start_container(self, container=None, intermediate_container=None,**override_options):
+    def start_container(self, container=None, intermediate_container=None, **override_options):
         if container is None:
             container = self.create_container(**override_options)
 
@@ -342,7 +341,7 @@ class Service(object):
         if 'environment' in container_options:
             if isinstance(container_options['environment'], list):
                 container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
-            container_options['environment'] = dict(resolve_env(k,v) for k,v in container_options['environment'].iteritems())
+            container_options['environment'] = dict(resolve_env(k, v) for k, v in container_options['environment'].iteritems())
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -459,13 +458,15 @@ def split_port(port):
             external_port = (external_ip,)
     return internal_port, external_port
 
+
 def split_env(env):
     if '=' in env:
         return env.split('=', 1)
     else:
         return env, None
 
-def resolve_env(key,val):
+
+def resolve_env(key, val):
     if val is not None:
         return key, val
     elif key in os.environ:

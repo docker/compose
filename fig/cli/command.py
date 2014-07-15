@@ -8,7 +8,6 @@ import os
 import re
 import yaml
 from ..packages import six
-import sys
 
 from ..project import Project
 from ..service import ConfigError
@@ -18,6 +17,7 @@ from .utils import cached_property, docker_url, call_silently, is_mac, is_ubuntu
 from . import errors
 
 log = logging.getLogger(__name__)
+
 
 class Command(DocoptCommand):
     base_dir = '.'
