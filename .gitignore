@@ -1,5 +1,6 @@
 *.egg-info
 *.pyc
+.tox
 /build
 /dist
 /docs/_site
