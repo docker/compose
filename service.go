@@ -129,7 +129,7 @@ func (s *Service) Restart() error {
 func (s *Service) Stop() error {
 	err := s.api.StopContainer(s.Name, 10)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "attempt to stop container ", s.Name, "failed", err)
+		return err
 	}
 	return nil
 }
