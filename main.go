@@ -87,8 +87,8 @@ func waitServices(services []Service, wg *sync.WaitGroup) error {
 	// Add one counter to the waitgroup for the group of services.
 	// If even one of the services exits (without a restart), we should exit the
 	// root process.
+	wg.Add(1)
 	for _, service := range services {
-		wg.Add(1)
 		go service.Wait(wg)
 	}
 	return nil
