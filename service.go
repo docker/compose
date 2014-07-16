@@ -1,22 +1,26 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	apiClient "github.com/fsouza/go-dockerclient"
 )
 
 type Service struct {
 	Name         string
+	LogPrefix    string
 	Image        string   `yaml:"image"`
 	BuildDir     string   `yaml:"build"`
 	Command      string   `yaml:"command"`
 	Links        []string `yaml:"links"`
 	Ports        []string `yaml:"ports"`
 	Volumes      []string `yaml:"volumes"`
+	IsBase       bool
 	ExposedPorts map[apiClient.Port]struct{}
 	Container    apiClient.Container
 	api          *apiClient.Client
@@ -114,6 +118,14 @@ func (s *Service) Start() error {
 	return nil
 }
 
+func (s *Service) Restart() error {
+	err := s.api.RestartContainer(s.Name, 10)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) Stop() error {
 	err := s.api.StopContainer(s.Name, 10)
 	if err != nil {
@@ -154,12 +166,21 @@ func (s *Service) Exists() bool {
 	return true
 }
 
-func (s *Service) Wait(name string) (int, error) {
-	exitCode, err := s.api.WaitContainer(name)
-	return exitCode, err
+func (s *Service) Wait(wg *sync.WaitGroup) (int, error) {
+	exited := make(chan int)
+	go func(s Service) {
+		exitCode, err := s.api.WaitContainer(s.Name)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "container wait had error", err)
+		}
+		exited <- exitCode
+	}(*s)
+	exitCode := <-exited
+	wg.Done()
+	return exitCode, nil
 }
 
-func (s *Service) Attach() (io.Reader, error) {
+func (s *Service) Attach() error {
 	r, w := io.Pipe()
 	options := apiClient.AttachToContainerOptions{
 		Container:    s.Name,
@@ -171,5 +192,14 @@ func (s *Service) Attach() (io.Reader, error) {
 		Logs:         true,
 	}
 	go s.api.AttachToContainer(options)
-	return r, nil
+	go func(reader io.Reader, s Service) {
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			fmt.Printf("%s%s \n", s.LogPrefix, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "There was an error with the scanner in attached container", err)
+		}
+	}(r, *s)
+	return nil
 }

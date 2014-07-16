@@ -1,10 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"os"
+	"sync"
 
 	gangstaCli "github.com/codegangsta/cli"
 )
@@ -53,7 +52,8 @@ func runServices(services []Service) error {
 	return nil
 }
 
-func attachServices(services []Service) error {
+func setColoredPrefixes(services []Service) []Service {
+	servicesWithColoredPrefixes := []Service{}
 
 	prefixLength := maxPrefixLength(services)
 
@@ -61,39 +61,36 @@ func attachServices(services []Service) error {
 	// This has been an Aanand and Nathan creation.
 	// * drops mic *
 	prefixFmt := fmt.Sprintf("%%-%ds | ", prefixLength)
-	for _, service := range services {
 
+	for _, service := range services {
 		uncoloredPrefix := fmt.Sprintf(prefixFmt, service.Name)
 		coloredPrefix := rainbow(uncoloredPrefix)
-		reader, err := service.Attach()
+		service.LogPrefix = coloredPrefix
+		servicesWithColoredPrefixes = append(servicesWithColoredPrefixes, service)
+	}
+
+	return servicesWithColoredPrefixes
+}
+
+func attachServices(services []Service) error {
+
+	for _, service := range services {
+		err := service.Attach()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error attaching to container", err)
 		}
-		go func(reader io.Reader, name string) {
-			scanner := bufio.NewScanner(reader)
-			for scanner.Scan() {
-				fmt.Printf("%s%s \n", coloredPrefix, scanner.Text())
-			}
-			if err := scanner.Err(); err != nil {
-				fmt.Fprintf(os.Stderr, "There was an error with the scanner in attached container", err)
-			}
-		}(reader, service.Name)
 	}
 	return nil
 }
 
-func waitServices(services []Service) error {
-	exited := make(chan int)
+func waitServices(services []Service, wg *sync.WaitGroup) error {
+	// Add one counter to the waitgroup for the group of services.
+	// If even one of the services exits (without a restart), we should exit the
+	// root process.
 	for _, service := range services {
-		go func(service Service) {
-			exitCode, err := service.Wait(service.Name)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "container wait had error", err)
-			}
-			exited <- exitCode
-		}(service)
+		wg.Add(1)
+		go service.Wait(wg)
 	}
-	<-exited
 	return nil
 }
 
@@ -113,7 +110,10 @@ func main() {
 	app.Usage = "Orchestrate Docker containers"
 	app.Commands = []gangstaCli.Command{
 		{
-			Name:   "up",
+			Name: "up",
+			Flags: []gangstaCli.Flag{
+				gangstaCli.BoolFlag{Name: "watch", Usage: "Watch build directory for changes and auto-rebuild/restart"},
+			},
 			Usage:  "Initialize a pod of containers based on a fig.yml file",
 			Action: CmdUp,
 		},
