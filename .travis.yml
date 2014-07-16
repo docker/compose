@@ -16,6 +16,7 @@ before_script:
  - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then orchard hosts create $TRAVIS_JOB_ID; fi'
 script:
  - nosetests tests/unit
+ - flake8 fig
  - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then script/travis-integration; fi'
 after_script:
  - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then orchard hosts rm -f $TRAVIS_JOB_ID; fi'
