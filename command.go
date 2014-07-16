@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	gangstaCli "github.com/codegangsta/cli"
 	dockerCli "github.com/dotcloud/docker/api/client"
@@ -94,27 +95,44 @@ func CmdUp(c *gangstaCli.Context) {
 			fmt.Fprintf(os.Stderr, "Error creating fs watcher", err)
 		}
 
+		lastEvent := time.Now()
+
 		go func() {
 			for {
 				select {
 				case ev := <-watcher.Event:
-					if ev.IsModify() {
-						fmt.Println("event detected in fsnotify", ev)
-						err = cli.CmdBuild("-t", imageName, buildDir)
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "error running build for image")
+					if time.Since(lastEvent) > (time.Millisecond * 100) {
+						if ev.IsModify() {
+							fmt.Println("event detected in fsnotify", ev)
+							err = cli.CmdBuild("-t", imageName, buildDir)
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "error running build for image")
+							}
+							wg.Add(1)
+							err = baseService.Stop()
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "error attempting container stop", err)
+							}
+							err = baseService.Remove()
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "error attempting container remove", err)
+							}
+							err = baseService.Create()
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "error attempting container create", err)
+							}
+							err = baseService.Start()
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "error attempting container start", err)
+							}
+							err = baseService.Attach()
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "error attaching coloredServices[0]", err)
+							}
+							go baseService.Wait(&wg)
 						}
-						wg.Add(1)
-						err = baseService.Restart()
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "error attempting container restart", err)
-						}
-						err = baseService.Attach()
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "error attaching coloredServices[0]", err)
-						}
-						go baseService.Wait(&wg)
 					}
+					lastEvent = time.Now()
 				default:
 					//case err := <-watcher.Event:
 					//fmt.Fprintf(os.Stderr, "error detected in fsnotify", err, "\n")
