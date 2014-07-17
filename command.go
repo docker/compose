@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -14,6 +17,40 @@ import (
 	"github.com/howeyc/fsnotify"
 	yaml "gopkg.in/yaml.v1"
 )
+
+var (
+	dockerIgnorePath string
+	ignoredFiles     = make(map[string]bool)
+)
+
+func ignoreFile(filename string) bool {
+	if val, ok := ignoredFiles[filename]; ok && filename != ".dockerignore" {
+		return val
+	} else {
+		// "Cache" invalidated or first time, (re)calculate
+		dockerignore, err := ioutil.ReadFile(dockerIgnorePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading .dockerignore file", err)
+		}
+		buffer := bytes.NewBuffer(dockerignore)
+		scanner := bufio.NewScanner(buffer)
+		for scanner.Scan() {
+			matched, err := path.Match(scanner.Text(), filename)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error matching .dockerignore filename", err)
+			}
+			if matched {
+				ignoredFiles[filename] = true
+				return true
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintln(os.Stderr, "error scanning .dockerignore file", err)
+		}
+	}
+	ignoredFiles[filename] = false
+	return false
+}
 
 func CmdUp(c *gangstaCli.Context) {
 	var (
@@ -53,6 +90,7 @@ func CmdUp(c *gangstaCli.Context) {
 			imageName = fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
 			service.Image = imageName
 			buildDir = service.BuildDir
+			dockerIgnorePath = buildDir + "/.dockerignore"
 			err = cli.CmdBuild("-t", imageName, buildDir)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error running build for image")
@@ -89,52 +127,56 @@ func CmdUp(c *gangstaCli.Context) {
 			}
 		}
 		baseService = coloredServices[baseServiceIndex]
-		fmt.Println("printing baseService", baseService)
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating fs watcher", err)
 		}
 
-		lastEvent := time.Now()
+		timer := &time.Timer{}
 
 		go func() {
 			for {
 				select {
 				case ev := <-watcher.Event:
-					if time.Since(lastEvent) > (time.Millisecond * 100) {
+					fmt.Println(ev)
+					if !ignoreFile(ev.Name) {
 						if ev.IsModify() {
-							fmt.Println("event detected in fsnotify", ev)
-							err = cli.CmdBuild("-t", imageName, buildDir)
-							if err != nil {
-								fmt.Fprintf(os.Stderr, "error running build for image")
-							}
-							wg.Add(1)
-							err = baseService.Stop()
-							if err != nil {
-								fmt.Fprintf(os.Stderr, "error attempting container stop", err)
-							}
-							err = baseService.Remove()
-							if err != nil {
-								fmt.Fprintf(os.Stderr, "error attempting container remove", err)
-							}
-							err = baseService.Create()
-							if err != nil {
-								fmt.Fprintf(os.Stderr, "error attempting container create", err)
-							}
-							err = baseService.Start()
-							if err != nil {
-								fmt.Fprintf(os.Stderr, "error attempting container start", err)
-							}
-							err = baseService.Attach()
-							if err != nil {
-								fmt.Fprintf(os.Stderr, "error attaching coloredServices[0]", err)
-							}
-							go baseService.Wait(&wg)
+							timer.Stop()
+							fmt.Println("setting timer for", ev)
+							timer = time.AfterFunc(100*time.Millisecond, func() {
+								fmt.Println("event detected in fsnotify", ev)
+								err = cli.CmdBuild("-t", imageName, buildDir)
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "error running build for image")
+								}
+								wg.Add(1)
+								err = baseService.Stop()
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "error attempting container stop", err)
+								}
+								err = baseService.Remove()
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "error attempting container remove", err)
+								}
+								err = baseService.Create()
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "error attempting container create", err)
+								}
+								err = baseService.Start()
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "error attempting container start", err)
+								}
+								err = baseService.Attach()
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "error attaching coloredServices[0]", err)
+								}
+								go baseService.Wait(&wg)
+							})
 						}
 					}
-					lastEvent = time.Now()
+				case _ = <-watcher.Error:
+					//timer.Stop()
 				default:
-					//case err := <-watcher.Event:
 					//fmt.Fprintf(os.Stderr, "error detected in fsnotify", err, "\n")
 				}
 			}
