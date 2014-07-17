@@ -1,6 +1,55 @@
 Change log
 ==========
 
+0.5.1 (2014-07-11)
+------------------
+
+ - If a service has a command defined, `fig run [service]` with no further arguments will run it.
+ - The project name now defaults to the directory containing fig.yml, not the current working directory (if they're different)
+ - `volumes_from` now works properly with containers as well as services
+ - Fixed a race condition when recreating containers in `fig up`
+
+Thanks @ryanbrainard and @d11wtq!
+
+
+0.5.0 (2014-07-11)
+------------------
+
+ - Fig now starts links when you run `fig run` or `fig up`.
+   
+   For example, if you have a `web` service which depends on a `db` service, `fig run web ...` will start the `db` service.
+
+ - Environment variables can now be resolved from the environment that Fig is running in. Just specify it as a blank variable in your `fig.yml` and, if set, it'll be resolved:
+   ```
+   environment:
+     RACK_ENV: development
+     SESSION_SECRET:
+   ```
+
+ - `volumes_from` is now supported in `fig.yml`. All of the volumes from the specified services and containers will be mounted:
+
+   ```
+   volumes_from:
+    - service_name
+    - container_name
+   ```
+
+ - A host address can now be specified in `ports`:
+
+   ```
+   ports:
+    - "0.0.0.0:8000:8000"
+    - "127.0.0.1:8001:8001"
+   ```
+
+ - The `net` and `workdir` options are now supported in `fig.yml`.
+ - The `hostname` option now works in the same way as the Docker CLI, splitting out into a `domainname` option.
+ - TTY behaviour is far more robust, and resizes are supported correctly.
+ - Load YAML files safely.
+
+Thanks to @d11wtq, @ryanbrainard, @rail44, @j0hnsmith, @binarin, @Elemecca, @mozz100 and @marksteve for their help with this release!
+
+
 0.4.2 (2014-06-18)
 ------------------
 

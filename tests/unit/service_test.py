@@ -41,4 +41,40 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(internal_port, "2000")
         self.assertEqual(external_port, "1000")
 
+    def test_split_domainname_none(self):
+        service = Service('foo',
+                hostname = 'name',
+            )
+        service.next_container_name = lambda x: 'foo'
+        opts = service._get_container_create_options({})
+        self.assertEqual(opts['hostname'], 'name', 'hostname')
+        self.assertFalse('domainname' in opts, 'domainname')
 
+    def test_split_domainname_fqdn(self):
+        service = Service('foo',
+                hostname = 'name.domain.tld',
+            )
+        service.next_container_name = lambda x: 'foo'
+        opts = service._get_container_create_options({})
+        self.assertEqual(opts['hostname'], 'name', 'hostname')
+        self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+
+    def test_split_domainname_both(self):
+        service = Service('foo',
+                hostname = 'name',
+                domainname = 'domain.tld',
+            )
+        service.next_container_name = lambda x: 'foo'
+        opts = service._get_container_create_options({})
+        self.assertEqual(opts['hostname'], 'name', 'hostname')
+        self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+
+    def test_split_domainname_weird(self):
+        service = Service('foo',
+                hostname = 'name.sub',
+                domainname = 'domain.tld',
+            )
+        service.next_container_name = lambda x: 'foo'
+        opts = service._get_container_create_options({})
+        self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
+        self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')

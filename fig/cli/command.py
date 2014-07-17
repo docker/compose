@@ -23,7 +23,7 @@ class Command(DocoptCommand):
     base_dir = '.'
 
     def __init__(self):
-        self.yaml_path = os.environ.get('FIG_FILE', None)
+        self._yaml_path = os.environ.get('FIG_FILE', None)
         self.explicit_project_name = None
 
     def dispatch(self, *args, **kwargs):
@@ -56,10 +56,7 @@ class Command(DocoptCommand):
     @cached_property
     def project(self):
         try:
-            yaml_path = self.yaml_path
-            if yaml_path is None:
-                yaml_path = self.check_yaml_filename()
-            config = yaml.load(open(yaml_path))
+            config = yaml.safe_load(open(self.yaml_path))
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
@@ -72,7 +69,7 @@ class Command(DocoptCommand):
 
     @cached_property
     def project_name(self):
-        project = os.path.basename(os.getcwd())
+        project = os.path.basename(os.path.dirname(os.path.abspath(self.yaml_path)))
         if self.explicit_project_name is not None:
             project = self.explicit_project_name
         project = re.sub(r'[^a-zA-Z0-9]', '', project)
@@ -84,8 +81,11 @@ class Command(DocoptCommand):
     def formatter(self):
         return Formatter()
 
-    def check_yaml_filename(self):
-        if os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
+    @cached_property
+    def yaml_path(self):
+        if self._yaml_path is not None:
+            return self._yaml_path
+        elif os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
 
             log.warning("Fig just read the file 'fig.yaml' on startup, rather than 'fig.yml'")
             log.warning("Please be aware that fig.yml the expected extension in most cases, and using .yaml can cause compatibility issues in future")
@@ -93,3 +93,7 @@ class Command(DocoptCommand):
             return os.path.join(self.base_dir, 'fig.yaml')
         else:
             return os.path.join(self.base_dir, 'fig.yml')
+
+    @yaml_path.setter
+    def yaml_path(self, value):
+        self._yaml_path = value

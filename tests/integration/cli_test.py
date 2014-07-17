@@ -22,7 +22,7 @@ class CLITestCase(DockerClientTestCase):
     def test_ps(self, mock_stdout):
         self.command.project.get_service('simple').create_container()
         self.command.dispatch(['ps'], None)
-        self.assertIn('fig_simple_1', mock_stdout.getvalue())
+        self.assertIn('simplefigfile_simple_1', mock_stdout.getvalue())
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_default_figfile(self, mock_stdout):
@@ -31,9 +31,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['ps'], None)
 
         output = mock_stdout.getvalue()
-        self.assertIn('fig_simple_1', output)
-        self.assertIn('fig_another_1', output)
-        self.assertNotIn('fig_yetanother_1', output)
+        self.assertIn('multiplefigfiles_simple_1', output)
+        self.assertIn('multiplefigfiles_another_1', output)
+        self.assertNotIn('multiplefigfiles_yetanother_1', output)
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_figfile(self, mock_stdout):
@@ -42,9 +42,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['-f', 'fig2.yml', 'ps'], None)
 
         output = mock_stdout.getvalue()
-        self.assertNotIn('fig_simple_1', output)
-        self.assertNotIn('fig_another_1', output)
-        self.assertIn('fig_yetanother_1', output)
+        self.assertNotIn('multiplefigfiles_simple_1', output)
+        self.assertNotIn('multiplefigfiles_another_1', output)
+        self.assertIn('multiplefigfiles_yetanother_1', output)
 
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
@@ -109,7 +109,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(self.command.project.containers()), 0)
 
     @patch('dockerpty.start')
-    def test_run_service_with_links(self, mock_stdout):
+    def test_run_service_with_links(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
@@ -118,18 +118,14 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     @patch('dockerpty.start')
-    def test_run_with_no_deps(self, mock_stdout):
-        mock_stdout.fileno = lambda: 1
-
+    def test_run_with_no_deps(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
         db = self.command.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
     @patch('dockerpty.start')
-    def test_run_does_not_recreate_linked_containers(self, mock_stdout):
-        mock_stdout.fileno = lambda: 1
-
+    def test_run_does_not_recreate_linked_containers(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['up', '-d', 'db'], None)
         db = self.command.project.get_service('db')
@@ -143,6 +139,30 @@ class CLITestCase(DockerClientTestCase):
         new_ids = [c.id for c in db.containers()]
 
         self.assertEqual(old_ids, new_ids)
+
+    @patch('dockerpty.start')
+    def test_run_without_command(self, __):
+        self.command.base_dir = 'tests/fixtures/commands-figfile'
+        self.client.build('tests/fixtures/simple-dockerfile', tag='figtest_test')
+
+        for c in self.command.project.containers(stopped=True, one_off=True):
+            c.remove()
+
+        self.command.dispatch(['run', 'implicit'], None)
+        service = self.command.project.get_service('implicit')
+        containers = service.containers(stopped=True, one_off=True)
+        self.assertEqual(
+            [c.human_readable_command for c in containers],
+            [u'/bin/sh -c echo "success"'],
+        )
+
+        self.command.dispatch(['run', 'explicit'], None)
+        service = self.command.project.get_service('explicit')
+        containers = service.containers(stopped=True, one_off=True)
+        self.assertEqual(
+            [c.human_readable_command for c in containers],
+            [u'/bin/true'],
+        )
 
     def test_rm(self):
         service = self.command.project.get_service('simple')

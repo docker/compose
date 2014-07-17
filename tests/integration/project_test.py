@@ -1,9 +1,49 @@
 from __future__ import unicode_literals
 from fig.project import Project, ConfigurationError
+from fig.container import Container
 from .testcases import DockerClientTestCase
 
 
 class ProjectTest(DockerClientTestCase):
+    def test_volumes_from_service(self):
+        project = Project.from_config(
+            name='figtest',
+            config={
+                'data': {
+                    'image': 'busybox:latest',
+                    'volumes': ['/var/data'],
+                },
+                'db': {
+                    'image': 'busybox:latest',
+                    'volumes_from': ['data'],
+                },
+            },
+            client=self.client,
+        )
+        db = project.get_service('db')
+        data = project.get_service('data')
+        self.assertEqual(db.volumes_from, [data])
+
+    def test_volumes_from_container(self):
+        data_container = Container.create(
+            self.client,
+            image='busybox:latest',
+            volumes=['/var/data'],
+            name='figtest_data_container',
+        )
+        project = Project.from_config(
+            name='figtest',
+            config={
+                'db': {
+                    'image': 'busybox:latest',
+                    'volumes_from': ['figtest_data_container'],
+                },
+            },
+            client=self.client,
+        )
+        db = project.get_service('db')
+        self.assertEqual(db.volumes_from, [data_container])
+
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')

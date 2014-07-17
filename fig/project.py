@@ -135,8 +135,8 @@ class Project(object):
                     volumes_from.append(service)
                 except NoSuchService:
                     try:
-                        container = Container.from_id(client, volume_name)
-                        volumes_from.append(Container.from_id(client, volume_name))
+                        container = Container.from_id(self.client, volume_name)
+                        volumes_from.append(container)
                     except APIError:
                         raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
             del service_dict['volumes_from']

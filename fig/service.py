@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -19,6 +19,7 @@ DOCKER_CONFIG_HINTS = {
     'priviliged': 'privileged',
     'privilige' : 'privileged',
     'volume'    : 'volumes',
+    'workdir'   : 'working_dir',
 }
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -39,7 +40,7 @@ class ConfigError(ValueError):
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=[], volumes_from=[], **options):
+    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -176,8 +177,15 @@ class Service(object):
             return tuples
 
     def recreate_container(self, container, **override_options):
-        if container.is_running:
-            container.stop(timeout=1)
+        try:
+            container.stop()
+        except APIError as e:
+            if (e.response.status_code == 500
+                    and e.explanation
+                    and 'no such process' in str(e.explanation)):
+                pass
+            else:
+                raise
 
         intermediate_container = Container.create(
             self.client,
@@ -305,6 +313,17 @@ class Service(object):
 
         container_options['name'] = self.next_container_name(one_off)
 
+        # If a qualified hostname was given, split it into an
+        # unqualified hostname and a domainname unless domainname
+        # was also given explicitly. This matches the behavior of
+        # the official Docker CLI in that scenario.
+        if ('hostname' in container_options
+                and 'domainname' not in container_options
+                and '.' in container_options['hostname']):
+            parts = container_options['hostname'].partition('.')
+            container_options['hostname'] = parts[0]
+            container_options['domainname'] = parts[2]
+
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
             all_ports = container_options.get('ports', []) + self.options.get('expose', [])
@@ -319,6 +338,11 @@ class Service(object):
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
+
+        if 'environment' in container_options:
+            if isinstance(container_options['environment'], list):
+                container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
+            container_options['environment'] = dict(resolve_env(k,v) for k,v in container_options['environment'].iteritems())
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -436,3 +460,17 @@ def split_port(port):
         else:
             external_port = (external_ip,)
     return internal_port, external_port
+
+def split_env(env):
+    if '=' in env:
+        return env.split('=', 1)
+    else:
+        return env, None
+
+def resolve_env(key,val):
+    if val is not None:
+        return key, val
+    elif key in os.environ:
+        return key, os.environ[key]
+    else:
+        return key, ''
