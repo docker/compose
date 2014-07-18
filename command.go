@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -17,6 +18,33 @@ import (
 	"github.com/howeyc/fsnotify"
 	yaml "gopkg.in/yaml.v1"
 )
+
+type TimedEvent struct {
+	eventName string
+	duration  time.Duration
+}
+
+type timedEventSorter struct {
+	events []TimedEvent
+	by     func(te1, te2 *TimedEvent) bool
+}
+
+func (s *timedEventSorter) Len() int {
+	return len(s.events)
+}
+
+func (s *timedEventSorter) Swap(i, j int) {
+	s.events[i], s.events[j] = s.events[j], s.events[i]
+}
+
+func (s *timedEventSorter) Less(i, j int) bool {
+	return s.by(&s.events[i], &s.events[j])
+}
+
+type RebootStep struct {
+	stepName string
+	method   func() error
+}
 
 var (
 	dockerIgnorePath string
@@ -134,48 +162,55 @@ func CmdUp(c *gangstaCli.Context) {
 
 		timer := &time.Timer{}
 
+		sequence := []RebootStep{
+			{"build", func() error {
+				err := cli.CmdBuild("-t", imageName, buildDir)
+				return err
+			}},
+			{"stop", baseService.Stop},
+			{"remove", baseService.Remove},
+			{"create", baseService.Create},
+			{"start", baseService.Start},
+			{"attach", baseService.Attach},
+		}
+
 		go func() {
 			for {
 				select {
 				case ev := <-watcher.Event:
-					fmt.Println(ev)
+					times := []TimedEvent{}
+					lastStep := time.Now()
+					rebuildStartTime := time.Now()
 					if !ignoreFile(ev.Name) {
-						if ev.IsModify() {
+						if ev.IsCreate() {
 							timer.Stop()
-							fmt.Println("setting timer for", ev)
 							timer = time.AfterFunc(100*time.Millisecond, func() {
-								fmt.Println("event detected in fsnotify", ev)
-								err = cli.CmdBuild("-t", imageName, buildDir)
-								if err != nil {
-									fmt.Fprintf(os.Stderr, "error running build for image")
-								}
 								wg.Add(1)
-								err = baseService.Stop()
-								if err != nil {
-									fmt.Fprintf(os.Stderr, "error attempting container stop", err)
+								for _, rebootStep := range sequence {
+									lastStep = time.Now()
+									err = rebootStep.method()
+									if err != nil {
+										fmt.Fprintln(os.Stderr, "error attempting container", rebootStep.stepName, err)
+									}
+									times = append(times, TimedEvent{rebootStep.stepName, time.Since(lastStep)})
 								}
-								err = baseService.Remove()
-								if err != nil {
-									fmt.Fprintf(os.Stderr, "error attempting container remove", err)
+								timedEventSorter := timedEventSorter{
+									events: times,
+									by: func(te1, te2 *TimedEvent) bool {
+										return te1.duration > te2.duration
+									},
 								}
-								err = baseService.Create()
-								if err != nil {
-									fmt.Fprintf(os.Stderr, "error attempting container create", err)
-								}
-								err = baseService.Start()
-								if err != nil {
-									fmt.Fprintf(os.Stderr, "error attempting container start", err)
-								}
-								err = baseService.Attach()
-								if err != nil {
-									fmt.Fprintf(os.Stderr, "error attaching coloredServices[0]", err)
+								sort.Sort(&timedEventSorter)
+								fmt.Println("-> Rebuild time took", time.Since(rebuildStartTime).Seconds(), "seconds total")
+								for _, timedEvent := range times {
+									fmt.Printf("\t-> %-6s %s %f seconds\n", timedEvent.eventName, "took", timedEvent.duration.Seconds())
 								}
 								go baseService.Wait(&wg)
 							})
 						}
 					}
-				case _ = <-watcher.Error:
-					//timer.Stop()
+				case err = <-watcher.Error:
+					fmt.Fprintln(os.Stderr, err)
 				default:
 					//fmt.Fprintf(os.Stderr, "error detected in fsnotify", err, "\n")
 				}
