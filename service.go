@@ -134,6 +134,17 @@ func (s *Service) Stop() error {
 	return nil
 }
 
+func (s *Service) Kill() error {
+	options := apiClient.KillContainerOptions{
+		ID: s.Name,
+	}
+	err := s.api.KillContainer(options)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) Remove() error {
 	err := s.api.RemoveContainer(apiClient.RemoveContainerOptions{
 		ID: s.Name,
