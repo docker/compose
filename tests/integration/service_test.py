@@ -316,6 +316,16 @@ class ServiceTest(DockerClientTestCase):
         container = service.start_container().inspect()
         self.assertEqual(container['HostConfig']['NetworkMode'], 'host')
 
+    def test_dns_single_value(self):
+        service = self.create_service('web', dns='8.8.8.8')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['Dns'], ['8.8.8.8'])
+
+    def test_dns_list(self):
+        service = self.create_service('web', dns=['8.8.8.8', '9.9.9.9'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['Dns'], ['8.8.8.8', '9.9.9.9'])
+
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container().inspect()
