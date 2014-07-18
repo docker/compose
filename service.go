@@ -202,6 +202,7 @@ func (s *Service) Attach() error {
 		Stderr:       true,
 		Logs:         true,
 	}
+	fmt.Println("Attaching to container", s.Name)
 	go s.api.AttachToContainer(options)
 	go func(reader io.Reader, s Service) {
 		scanner := bufio.NewScanner(reader)

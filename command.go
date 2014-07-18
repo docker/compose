@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,15 +90,23 @@ func CmdUp(c *gangstaCli.Context) {
 		baseServiceIndex int
 	)
 
-	api, err := apiClient.NewClient("tcp://boot2docker:2375")
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		dockerHost = "unix:///var/run/docker.sock"
+	}
+
+	api, err := apiClient.NewClient(dockerHost)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating client!!", err)
 	}
-	// TODO: set protocol and address properly
-	// (default to "unix" and "/var/run/docker.sock", otherwise use $DOCKER_HOST)
-	cli := dockerCli.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, "tcp", "boot2docker:2375", nil)
 
+	splitDockerHost := strings.Split(dockerHost, "://")
+	protocol := splitDockerHost[0]
+	location := splitDockerHost[len(splitDockerHost)-1]
+
+	cli := dockerCli.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, protocol, location, nil)
 	servicesRaw, err := ioutil.ReadFile("fig.yml")
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
 	}
@@ -113,7 +122,7 @@ func CmdUp(c *gangstaCli.Context) {
 		if service.Image == "" {
 			curdir, err := os.Getwd()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting name of current directory")
+				fmt.Fprintf(os.Stderr, "Error getting name of current directory\n")
 			}
 			imageName = fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
 			service.Image = imageName
@@ -121,7 +130,8 @@ func CmdUp(c *gangstaCli.Context) {
 			dockerIgnorePath = buildDir + "/.dockerignore"
 			err = cli.CmdBuild("-t", imageName, buildDir)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error running build for image")
+				fmt.Fprintf(os.Stderr, "error running build for image\n", err)
+				os.Exit(1)
 			}
 			service.IsBase = true
 		} else {
@@ -178,11 +188,12 @@ func CmdUp(c *gangstaCli.Context) {
 			for {
 				select {
 				case ev := <-watcher.Event:
+					fmt.Println("got event", ev)
 					times := []TimedEvent{}
 					lastStep := time.Now()
 					rebuildStartTime := time.Now()
 					if !ignoreFile(ev.Name) {
-						if ev.IsCreate() {
+						if ev.IsModify() && ev.IsAttrib() {
 							timer.Stop()
 							timer = time.AfterFunc(100*time.Millisecond, func() {
 								wg.Add(1)
@@ -206,6 +217,7 @@ func CmdUp(c *gangstaCli.Context) {
 									fmt.Printf("\t-> %-6s %s %f seconds\n", timedEvent.eventName, "took", timedEvent.duration.Seconds())
 								}
 								go baseService.Wait(&wg)
+								<-watcher.Event
 							})
 						}
 					}
