@@ -150,7 +150,7 @@ func (s *Service) Remove() error {
 		ID: s.Name,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "attempt to remove container ", s.Name, "failed", err)
+		fmt.Fprintln(os.Stderr, "attempt to remove container ", s.Name, "failed", err)
 	}
 	return nil
 }
@@ -159,7 +159,7 @@ func (s *Service) IsRunning() bool {
 	container, err := s.api.InspectContainer(s.Name)
 	if err != nil {
 		if _, ok := err.(*apiClient.NoSuchContainer); !ok {
-			fmt.Fprintf(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
+			fmt.Fprintln(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
 		}
 		return false
 	}
@@ -170,7 +170,7 @@ func (s *Service) Exists() bool {
 	_, err := s.api.InspectContainer(s.Name)
 	if err != nil {
 		if _, ok := err.(*apiClient.NoSuchContainer); !ok {
-			fmt.Fprintf(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
+			fmt.Fprintln(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
 		}
 		return false
 	}
@@ -182,7 +182,7 @@ func (s *Service) Wait(wg *sync.WaitGroup) (int, error) {
 	go func(s Service) {
 		exitCode, err := s.api.WaitContainer(s.Name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "container wait had error", err)
+			fmt.Fprintln(os.Stderr, "container wait had error", err)
 		}
 		exited <- exitCode
 	}(*s)
@@ -210,7 +210,7 @@ func (s *Service) Attach() error {
 			fmt.Printf("%s%s \n", s.LogPrefix, scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "There was an error with the scanner in attached container", err)
+			fmt.Fprintln(os.Stderr, "There was an error with the scanner in attached container", err)
 		}
 	}(r, *s)
 	return nil

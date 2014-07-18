@@ -59,7 +59,7 @@ func ignoreFile(filename string) bool {
 		// "Cache" invalidated or first time, (re)calculate
 		dockerignore, err := ioutil.ReadFile(dockerIgnorePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading .dockerignore file", err)
+			fmt.Fprintln(os.Stderr, "error reading .dockerignore file", err)
 		}
 		buffer := bytes.NewBuffer(dockerignore)
 		scanner := bufio.NewScanner(buffer)
@@ -97,7 +97,7 @@ func CmdUp(c *gangstaCli.Context) {
 
 	api, err := apiClient.NewClient(dockerHost)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating client!!", err)
+		fmt.Fprintln(os.Stderr, "Error creating client!!", err)
 	}
 
 	splitDockerHost := strings.Split(dockerHost, "://")
@@ -108,12 +108,12 @@ func CmdUp(c *gangstaCli.Context) {
 	servicesRaw, err := ioutil.ReadFile("fig.yml")
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening fig.yml file")
+		fmt.Fprintln(os.Stderr, "Error opening fig.yml file")
 	}
 	services := make(map[string]Service)
 	err = yaml.Unmarshal(servicesRaw, &services)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error unmarshalling fig.yml file")
+		fmt.Fprintln(os.Stderr, "Error unmarshalling fig.yml file")
 	}
 
 	namedServices := []Service{}
@@ -122,7 +122,7 @@ func CmdUp(c *gangstaCli.Context) {
 		if service.Image == "" {
 			curdir, err := os.Getwd()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting name of current directory\n")
+				fmt.Fprintln(os.Stderr, "Error getting name of current directory")
 			}
 			imageName = fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
 			service.Image = imageName
@@ -130,7 +130,7 @@ func CmdUp(c *gangstaCli.Context) {
 			dockerIgnorePath = buildDir + "/.dockerignore"
 			err = cli.CmdBuild("-t", imageName, buildDir)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error running build for image\n", err)
+				fmt.Fprintln(os.Stderr, "error running build for image", err)
 				os.Exit(1)
 			}
 			service.IsBase = true
@@ -146,16 +146,16 @@ func CmdUp(c *gangstaCli.Context) {
 
 	err = runServices(coloredServices)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "There was a problem with the run: ", err)
+		fmt.Fprintln(os.Stderr, "There was a problem with the run: ", err)
 	}
 	err = attachServices(coloredServices)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "There was an error with attaching to the services", err)
+		fmt.Fprintln(os.Stderr, "There was an error with attaching to the services", err)
 	}
 
 	err = waitServices(coloredServices, &wg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "there was an error in wait services call", err)
+		fmt.Fprintln(os.Stderr, "there was an error in wait services call", err)
 	}
 
 	if c.Bool("watch") {
@@ -167,7 +167,7 @@ func CmdUp(c *gangstaCli.Context) {
 		baseService = coloredServices[baseServiceIndex]
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating fs watcher", err)
+			fmt.Fprintln(os.Stderr, "Error creating fs watcher", err)
 		}
 
 		timer := &time.Timer{}
@@ -224,14 +224,13 @@ func CmdUp(c *gangstaCli.Context) {
 				case err = <-watcher.Error:
 					fmt.Fprintln(os.Stderr, err)
 				default:
-					//fmt.Fprintf(os.Stderr, "error detected in fsnotify", err, "\n")
 				}
 			}
 		}()
 
 		err = watcher.Watch(buildDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error watching directory", buildDir, err)
+			fmt.Fprintln(os.Stderr, "Error watching directory", buildDir, err)
 		}
 	}
 
