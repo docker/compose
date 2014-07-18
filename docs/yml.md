@@ -118,3 +118,14 @@ net: "none"
 net: "container:[name or id]"
 net: "host"
 ```
+
+### dns
+
+Custom DNS servers. Can be a single value or a list.
+
+```
+dns: 8.8.8.8
+dns:
+  - 8.8.8.8
+  - 9.9.9.9
+```
