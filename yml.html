@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140714282175298613054">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140720290036636438038">
   </head>
   <body>
     <div class="container">
@@ -100,6 +100,14 @@ environment:
 net: &quot;none&quot;
 net: &quot;container:[name or id]&quot;
 net: &quot;host&quot;
+</code></pre></div>
+<h3>dns</h3>
+
+<p>Custom DNS servers. Can be a single value or a list.</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">dns: 8.8.8.8
+dns:
+  - 8.8.8.8
+  - 9.9.9.9
 </code></pre></div></div>
 
       <div class="sidebar">
