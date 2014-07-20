@@ -46,6 +46,18 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplefigfiles_another_1', output)
         self.assertIn('multiplefigfiles_yetanother_1', output)
 
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_build_no_cache(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.command.dispatch(['build', 'simple'], None)
+        mock_stdout.truncate(0)
+        cache_indicator = 'Using cache'
+        self.command.dispatch(['build', 'simple'], None)
+        self.assertIn(cache_indicator, output)
+        mock_stdout.truncate(0)
+        self.command.dispatch(['build', '--no-cache', 'simple'], None)
+        self.assertNotIn(cache_indicator, output)
+
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.command.project.get_service('simple')
@@ -193,3 +205,4 @@ class CLITestCase(DockerClientTestCase):
         self.command.scale({'SERVICE=NUM': ['simple=0', 'another=0']})
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
+
