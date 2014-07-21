@@ -2,7 +2,7 @@
 
 ## Development environment
 
-If you're looking contribute to [Fig](http://orchardup.github.io/fig/)
+If you're looking contribute to [Fig](http://www.fig.sh/)
 but you're new to the project or maybe even to Python, here are the steps
 that should get you started.
 

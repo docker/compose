@@ -46,4 +46,4 @@ Fig is a project from [Orchard](https://orchardup.com), a Docker hosting service
 Installation and documentation
 ------------------------------
 
-Full documentation is available on [Fig's website](http://orchardup.github.io/fig/).
+Full documentation is available on [Fig's website](http://www.fig.sh/).

@@ -39,7 +39,7 @@ Simple enough. Finally, this is all tied together with a file called `fig.yml`. 
       links:
         - db
 
-See the [`fig.yml` reference](http://orchardup.github.io/fig/yml.html) for more information on how it works.
+See the [`fig.yml` reference](yml.html) for more information on how it works.
 
 We can now start a Django project using `fig run`:
 
