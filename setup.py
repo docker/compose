@@ -32,7 +32,7 @@ setup(
     name='fig',
     version=find_version("fig", "__init__.py"),
     description='Punctual, lightweight development environments using Docker',
-    url='http://orchardup.github.io/fig/',
+    url='http://www.fig.sh/',
     author='Orchard Laboratories Ltd.',
     author_email='hello@orchardup.com',
     license='Apache License 2.0',
