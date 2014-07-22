@@ -215,6 +215,7 @@ class TopLevelCommand(Command):
                        allocates a TTY.
             --rm       Remove container after run. Ignored in detached mode.
             --no-deps  Don't start linked services.
+            -w WORKDIR Working directory inside the container.
         """
 
         service = self.project.get_service(options['SERVICE'])
@@ -233,6 +234,8 @@ class TopLevelCommand(Command):
         if options['-d'] or options['-T'] or not sys.stdin.isatty():
             tty = False
 
+        workdir = options['-w']
+
         if options['COMMAND']:
             command = [options['COMMAND']] + options['ARGS']
         else:
@@ -243,6 +246,8 @@ class TopLevelCommand(Command):
             'tty': tty,
             'stdin_open': not options['-d'],
         }
+        if workdir:
+            container_options['working_dir'] = workdir
         container = service.create_container(one_off=True, **container_options)
         if options['-d']:
             service.start_container(container, ports=None, one_off=True)
