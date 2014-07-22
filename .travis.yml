@@ -9,14 +9,14 @@ install:
 - pip install .
 - pip install -r requirements.txt
 - pip install -r requirements-dev.txt
-- sudo curl -L -o /usr/local/bin/orchard https://github.com/orchardup/go-orchard/releases/download/2.0.5/linux
+- sudo curl -L -o /usr/local/bin/orchard https://github.com/orchardup/go-orchard/releases/download/2.1.0/linux
 - sudo chmod +x /usr/local/bin/orchard
 before_script:
  - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then orchard hosts rm -f $TRAVIS_JOB_ID || true; fi'
  - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then orchard hosts create $TRAVIS_JOB_ID; fi'
 script:
  - nosetests tests/unit
- - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then script/travis-integration; fi'
+ - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then orchard run -H $TRAVIS_JOB_ID nosetests -v; fi'
 after_script:
  - 'if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then orchard hosts rm -f $TRAVIS_JOB_ID; fi'
 deploy:
