@@ -28,7 +28,7 @@ db:
 
 (No more installing Postgres on your laptop!)
 
-Then type `fig up`, and Fig will start and run your entire app:
+Then type `sudo fig up`, and Fig will start and run your entire app:
 
 ![example fig run](https://orchardup.com/static/images/fig-example-large.gif)
 
@@ -106,9 +106,9 @@ This defines two services:
  - `web`, which is built from `Dockerfile` in the current directory. It also says to run the command `python app.py` inside the image, forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
  - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/). 
 
-Now if we run `fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
+Now if we run `sudo fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
 
-    $ fig up
+    $ sudo fig up
     Pulling image orchardup/redis...
     Building web...
     Starting figtest_redis_1...
@@ -120,10 +120,10 @@ Open up [http://localhost:5000](http://localhost:5000) in your browser (or [http
 
 If you want to run your services in the background, you can pass the `-d` flag to `fig up` and use `fig ps` to see what is currently running:
 
-    $ fig up -d
+    $ sudo fig up -d
     Starting figtest_redis_1...
     Starting figtest_web_1...
-    $ fig ps
+    $ sudo fig ps
             Name                 Command            State       Ports
     -------------------------------------------------------------------
     figtest_redis_1   /usr/local/bin/run         Up
@@ -131,13 +131,13 @@ If you want to run your services in the background, you can pass the `-d` flag t
 
 `fig run` allows you to run one-off commands for your services. For example, to see what environment variables are available to the `web` service:
 
-    $ fig run web env
+    $ sudo fig run web env
 
 
 See `fig --help` other commands that are available.
 
-If you started Fig with `fig up -d`, you'll probably want to stop your services once you've finished with them:
+If you started Fig with `sudo fig up -d`, you'll probably want to stop your services once you've finished with them:
 
-    $ fig stop
+    $ sudo fig stop
 
 That's more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/orchardup/fig) or [email us](mailto:hello@orchardup.com).
