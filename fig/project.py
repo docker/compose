@@ -154,10 +154,10 @@ class Project(object):
         for service in reversed(self.get_services(service_names)):
             service.kill(**options)
 
-    def build(self, service_names=None, **options):
+    def build(self, service_names=None, no_cache=False):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(**options)
+                service.build(no_cache)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
