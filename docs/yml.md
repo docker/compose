@@ -129,3 +129,19 @@ dns:
   - 8.8.8.8
   - 9.9.9.9
 ```
+
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged
+
+Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.
+
+```
+working_dir: /code
+entrypoint: /code/entrypoint.sh
+user: postgresql
+
+hostname: foo
+domainname: foo.com
+
+mem_limit: 1000000000
+privileged: true
+```
