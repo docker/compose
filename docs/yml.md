@@ -76,8 +76,7 @@ expose:
 
 Mount paths as volumes, optionally specifying a path on the host machine (`HOST:CONTAINER`).
 
-Note: Mapping local volumes is currently unsupported on boot2docker. We
-recommend you use docker-osx if want to map local volumes.
+Note: Mapping local volumes is currently unsupported on boot2docker. We recommend you use [docker-osx](https://github.com/noplay/docker-osx) if want to map local volumes.
 
 ```
 volumes:
