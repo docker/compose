@@ -50,12 +50,16 @@ class CLITestCase(DockerClientTestCase):
     def test_build_no_cache(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
+
         mock_stdout.truncate(0)
         cache_indicator = 'Using cache'
         self.command.dispatch(['build', 'simple'], None)
+        output = mock_stdout.getvalue()
         self.assertIn(cache_indicator, output)
+
         mock_stdout.truncate(0)
         self.command.dispatch(['build', '--no-cache', 'simple'], None)
+        output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
 
     def test_up(self):
