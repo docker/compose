@@ -157,6 +157,22 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(old_ids, new_ids)
 
     @patch('dockerpty.start')
+    def test_run_with_working_dir(self, __):
+        self.command.base_dir = 'tests/fixtures/links-figfile'
+
+        for c in self.command.project.containers(stopped=True, one_off=True):
+            c.remove()
+
+        self.command.dispatch(['run', '-w', '/tmp', 'web', '/bin/pwd'], None)
+        service = self.command.project.get_service('web')
+        containers = service.containers(stopped=True, one_off=True)
+
+        self.assertEqual(
+            [c.inspect()['Config']['WorkingDir'] for c in containers],
+            [u'/tmp'],
+        )
+
+    @patch('dockerpty.start')
     def test_run_without_command(self, __):
         self.command.base_dir = 'tests/fixtures/commands-figfile'
         self.client.build('tests/fixtures/simple-dockerfile', tag='figtest_test')
