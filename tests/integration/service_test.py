@@ -260,7 +260,7 @@ class ServiceTest(DockerClientTestCase):
     def test_port_with_explicit_interface(self):
         service = self.create_service('web', ports=[
             '127.0.0.1:8001:8000',
-            '0.0.0.0:9001:9000',
+            '0.0.0.0:9001:9000/udp',
         ])
         container = service.start_container().inspect()
         self.assertEqual(container['NetworkSettings']['Ports'], {
@@ -270,7 +270,7 @@ class ServiceTest(DockerClientTestCase):
                     'HostPort': '8001',
                 },
             ],
-            '9000/tcp': [
+            '9000/udp': [
                 {
                     'HostIp': '0.0.0.0',
                     'HostPort': '9001',

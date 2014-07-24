@@ -33,6 +33,10 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(internal_port, "2000")
         self.assertEqual(external_port, ("127.0.0.1", "1000"))
 
+        internal_port, external_port = split_port("127.0.0.1:1000:2000/udp")
+        self.assertEqual(internal_port, "2000/udp")
+        self.assertEqual(external_port, ("127.0.0.1", "1000"))
+
         internal_port, external_port = split_port("127.0.0.1::2000")
         self.assertEqual(internal_port, "2000")
         self.assertEqual(external_port, ("127.0.0.1",))
