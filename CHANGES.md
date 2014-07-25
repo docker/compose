@@ -27,7 +27,7 @@ Thanks @ryanbrainard and @d11wtq!
 ------------------
 
  - Fig now starts links when you run `fig run` or `fig up`.
-   
+
    For example, if you have a `web` service which depends on a `db` service, `fig run web ...` will start the `db` service.
 
  - Environment variables can now be resolved from the environment that Fig is running in. Just specify it as a blank variable in your `fig.yml` and, if set, it'll be resolved:
@@ -187,5 +187,3 @@ Big thanks to @tomstuart, @EnTeQuAk, @schickling, @aronasorman and @GeoffreyPlit
 ------------------
 
 Initial release.
-
-

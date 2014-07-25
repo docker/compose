@@ -3,7 +3,7 @@ from .. import unittest
 
 
 class SortServiceTest(unittest.TestCase):
-    def test_sort_service_dicts_1(self):
+    def test_sort_service_dicts(self):
         services = [
             {
                 'links': ['redis'],

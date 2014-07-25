@@ -60,7 +60,7 @@ class Container(object):
         try:
             return int(self.name.split('_')[-1])
         except ValueError:
-            return None
+            return 1
 
     @property
     def human_readable_ports(self):

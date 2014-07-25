@@ -22,7 +22,7 @@ class CLITestCase(DockerClientTestCase):
     def test_ps(self, mock_stdout):
         self.command.project.get_service('simple').create_container()
         self.command.dispatch(['ps'], None)
-        self.assertIn('simplefigfile_simple_1', mock_stdout.getvalue())
+        self.assertIn('simplefigfile_simple', mock_stdout.getvalue())
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_default_figfile(self, mock_stdout):
@@ -31,9 +31,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['ps'], None)
 
         output = mock_stdout.getvalue()
-        self.assertIn('multiplefigfiles_simple_1', output)
-        self.assertIn('multiplefigfiles_another_1', output)
-        self.assertNotIn('multiplefigfiles_yetanother_1', output)
+        self.assertIn('multiplefigfiles_simple', output)
+        self.assertIn('multiplefigfiles_another', output)
+        self.assertNotIn('multiplefigfiles_yetanother', output)
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_figfile(self, mock_stdout):
@@ -42,9 +42,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['-f', 'fig2.yml', 'ps'], None)
 
         output = mock_stdout.getvalue()
-        self.assertNotIn('multiplefigfiles_simple_1', output)
-        self.assertNotIn('multiplefigfiles_another_1', output)
-        self.assertIn('multiplefigfiles_yetanother_1', output)
+        self.assertNotIn('multiplefigfiles_simple', output)
+        self.assertNotIn('multiplefigfiles_another', output)
+        self.assertIn('multiplefigfiles_yetanother', output)
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_build_no_cache(self, mock_stdout):

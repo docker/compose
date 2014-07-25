@@ -15,7 +15,7 @@ class ServiceTest(DockerClientTestCase):
         foo.start_container()
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, 'figtest_foo_1')
+        self.assertEqual(foo.containers()[0].name, 'figtest_foo')
         self.assertEqual(len(bar.containers()), 0)
 
         bar.start_container()
@@ -25,7 +25,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(bar.containers()), 2)
 
         names = [c.name for c in bar.containers()]
-        self.assertIn('figtest_bar_1', names)
+        self.assertIn('figtest_bar', names)
         self.assertIn('figtest_bar_2', names)
 
     def test_containers_one_off(self):
@@ -37,7 +37,7 @@ class ServiceTest(DockerClientTestCase):
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
         service.start_container()
-        self.assertEqual(service.containers()[0].name, 'figtest_web_1')
+        self.assertEqual(service.containers()[0].name, 'figtest_web')
 
     def test_start_stop(self):
         service = self.create_service('scalingtest')
@@ -78,13 +78,13 @@ class ServiceTest(DockerClientTestCase):
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'figtest_db_run_1')
+        self.assertEqual(container.name, 'figtest_db_run')
 
     def test_create_container_with_one_off_when_existing_container_is_running(self):
         db = self.create_service('db')
         db.start()
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'figtest_db_run_1')
+        self.assertEqual(container.name, 'figtest_db_run')
 
     def test_create_container_with_unspecified_volume(self):
         service = self.create_service('db', volumes=['/var/db'])
@@ -100,12 +100,12 @@ class ServiceTest(DockerClientTestCase):
 
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
-        volume_container_1 = volume_service.create_container()
+        volume_container = volume_service.create_container()
         volume_container_2 = Container.create(self.client, image='busybox:latest', command=["/bin/sleep", "300"])
         host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
         host_container = host_service.create_container()
         host_service.start_container(host_container)
-        self.assertIn(volume_container_1.id, host_container.inspect()['HostConfig']['VolumesFrom'])
+        self.assertIn(volume_container.id, host_container.inspect()['HostConfig']['VolumesFrom'])
         self.assertIn(volume_container_2.id, host_container.inspect()['HostConfig']['VolumesFrom'])
 
     def test_recreate_containers(self):
@@ -120,7 +120,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.dictionary['Config']['Entrypoint'], ['sleep'])
         self.assertEqual(old_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
-        self.assertEqual(old_container.name, 'figtest_db_1')
+        self.assertEqual(old_container.name, 'figtest_db')
         service.start_container(old_container)
         volume_path = old_container.inspect()['Volumes']['/var/db']
 
@@ -137,7 +137,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
-        self.assertEqual(new_container.name, 'figtest_db_1')
+        self.assertEqual(new_container.name, 'figtest_db')
         self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
         self.assertIn(intermediate_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
 
@@ -173,8 +173,8 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web', links=[(db, None)])
         db.start_container()
         web.start_container()
-        self.assertIn('figtest_db_1', web.containers()[0].links())
-        self.assertIn('db_1', web.containers()[0].links())
+        self.assertIn('figtest_db', web.containers()[0].links())
+        self.assertIn('db', web.containers()[0].links())
 
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')

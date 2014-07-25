@@ -44,11 +44,11 @@ class MockContainer(object):
 
     @property
     def name(self):
-        return 'myapp_web_1'
+        return 'myapp_web'
 
     @property
     def name_without_project(self):
-        return 'web_1'
+        return 'web'
 
     def attach(self, *args, **kwargs):
         return self._reader()

@@ -27,8 +27,8 @@ class LogPrinter(object):
         Calculate the maximum width of container names so we can make the log
         prefixes line up like so:
 
-        db_1  | Listening
-        web_1 | Listening
+        db  | Listening
+        web | Listening
         """
         prefix_width = 0
         for container in containers:
