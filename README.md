@@ -6,7 +6,7 @@ Fig
 
 Fast, isolated development environments using Docker.
 
-Define your app's environment with Docker so it can be reproduced anywhere:
+Define your app's environment in the `Dockerfile` so it can be reproduced anywhere:
 
     FROM orchardup/python:2.7
     ADD . /code
@@ -14,7 +14,7 @@ Define your app's environment with Docker so it can be reproduced anywhere:
     RUN pip install -r requirements.txt
     CMD python app.py
 
-Define the services that make up your app so they can be run together in an isolated environment:
+In `fig.yml` define the services that make up your app so they can be run together in an isolated environment:
 
 ```yaml
 web:
