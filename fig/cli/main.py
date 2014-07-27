@@ -24,16 +24,7 @@ log = logging.getLogger(__name__)
 
 
 def main():
-    console_handler = logging.StreamHandler(stream=sys.stderr)
-    console_handler.setFormatter(logging.Formatter())
-    console_handler.setLevel(logging.INFO)
-    root_logger = logging.getLogger()
-    root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.DEBUG)
-
-    # Disable requests logging
-    logging.getLogger("requests").propagate = False
-
+    setup_logging()
     try:
         command = TopLevelCommand()
         command.sys_dispatch()
@@ -54,6 +45,18 @@ def main():
     except BuildError as e:
         log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
         sys.exit(1)
+
+
+def setup_logging():
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setFormatter(logging.Formatter())
+    console_handler.setLevel(logging.INFO)
+    root_logger = logging.getLogger()
+    root_logger.addHandler(console_handler)
+    root_logger.setLevel(logging.DEBUG)
+
+    # Disable requests logging
+    logging.getLogger("requests").propagate = False
 
 
 # stolen from docopt master

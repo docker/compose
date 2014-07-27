@@ -1,9 +1,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+import logging
+import os
 from .. import unittest
+
+from fig.cli import main
 from fig.cli.main import TopLevelCommand
 from fig.packages.six import StringIO
-import os
+
 
 class CLITestCase(unittest.TestCase):
     def test_default_project_name(self):
@@ -35,3 +39,8 @@ class CLITestCase(unittest.TestCase):
         command = TopLevelCommand()
         with self.assertRaises(SystemExit):
             command.dispatch(['-h'], None)
+
+    def test_setup_logging(self):
+        main.setup_logging()
+        self.assertEqual(logging.getLogger().level, logging.DEBUG)
+        self.assertEqual(logging.getLogger('requests').propagate, False)
