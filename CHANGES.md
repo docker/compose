@@ -1,6 +1,17 @@
 Change log
 ==========
 
+0.5.2 (2014-07-28)
+------------------
+
+ - Added a `--no-cache` option to `fig build`, which bypasses the cache just like `docker build --no-cache`.
+ - Fixed the `dns:` fig.yml option, which was causing fig to error out.
+ - Fixed a bug where fig couldn't start under Python 2.6.
+ - Fixed a log-streaming bug that occasionally caused fig to exit.
+
+Thanks @dnephin and @marksteve!
+
+
 0.5.1 (2014-07-11)
 ------------------
 
