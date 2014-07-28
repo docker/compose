@@ -1,2 +1,4 @@
 #!/bin/sh
+set -e
+flake8 fig
 PYTHONIOENCODING=ascii nosetests $@
