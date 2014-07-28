@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+
 class Container(object):
     """
     Represents a Docker container, constructed from the output of

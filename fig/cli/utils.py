@@ -65,11 +65,11 @@ def prettydate(d):
     elif s < 120:
         return '1 minute ago'
     elif s < 3600:
-        return '{0} minutes ago'.format(s/60)
+        return '{0} minutes ago'.format(s / 60)
     elif s < 7200:
         return '1 hour ago'
     else:
-        return '{0} hours ago'.format(s/3600)
+        return '{0} hours ago'.format(s / 3600)
 
 
 def mkdir(path, permissions=0o700):
@@ -103,8 +103,8 @@ def split_buffer(reader, separator):
             index = buffered.find(separator)
             if index == -1:
                 break
-            yield buffered[:index+1]
-            buffered = buffered[index+1:]
+            yield buffered[:index + 1]
+            buffered = buffered[index + 1:]
 
     if len(buffered) > 0:
         yield buffered

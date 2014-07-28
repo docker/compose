@@ -281,12 +281,12 @@ class TopLevelCommand(Command):
             try:
                 num = int(num)
             except ValueError:
-                raise UserError('Number of containers for service "%s" is not a number' % service)
+                raise UserError('Number of containers for service "%s" is not a '
+                                'number' % service_name)
             try:
                 self.project.get_service(service_name).scale(num)
             except CannotBeScaledError:
                 raise UserError('Service "%s" cannot be scaled because it specifies a port on the host. If multiple containers for this service were created, the port would clash.\n\nRemove the ":" from the port definition in fig.yml so Docker can choose a random port for each container.' % service_name)
-
 
     def start(self, options):
         """
@@ -356,6 +356,7 @@ class TopLevelCommand(Command):
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
                 self.project.stop(service_names=service_names)
+
 
 def list_containers(containers):
     return ", ".join(c.name for c in containers)

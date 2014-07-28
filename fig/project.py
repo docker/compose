@@ -38,6 +38,7 @@ def sort_service_dicts(services):
 
     return sorted_services
 
+
 class Project(object):
     """
     A collection of services.
@@ -216,6 +217,6 @@ class ConfigurationError(Exception):
     def __str__(self):
         return self.msg
 
+
 class DependencyError(ConfigurationError):
     pass
-
