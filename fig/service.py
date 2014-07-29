@@ -211,7 +211,7 @@ class Service(object):
             log.info("Starting %s..." % container.name)
             return self.start_container(container, **options)
 
-    def start_container(self, container=None, intermediate_container=None,**override_options):
+    def start_container(self, container=None, intermediate_container=None, **override_options):
         if container is None:
             container = self.create_container(**override_options)
 
@@ -230,15 +230,15 @@ class Service(object):
         if options.get('volumes', None) is not None:
             for volume in options['volumes']:
                 if ':' in volume:
-                    volume_split = volume.split(':')
-                    external_dir, internal_dir = volume_split[:2]
+                    external_dir, internal_dir = volume.split(':')
                     volume_bindings[os.path.abspath(external_dir)] = {
                         'bind': internal_dir,
-                        'ro': len(volume_split) == 3 and volume_split[2] == 'ro',
+                        'ro': False,
                     }
 
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
+        dns = options.get('dns', None)
 
         container.start(
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
@@ -247,6 +247,7 @@ class Service(object):
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=net,
+            dns=dns,
         )
         return container
 
