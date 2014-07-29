@@ -3,4 +3,4 @@ PyYAML==3.10
 requests==2.2.1
 texttable==0.8.1
 websocket-client==0.11.0
-dockerpty==0.2.2
+dockerpty==0.2.3
