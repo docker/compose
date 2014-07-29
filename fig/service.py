@@ -282,12 +282,12 @@ class Service(object):
         links = []
         for service, link_name in self.links:
             for container in service.containers():
-                if link_name:
-                    links.append((container.name, link_name))
+                links.append((container.name, link_name or service.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         if link_to_self:
             for container in self.containers():
+                links.append((container.name, self.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         return links
