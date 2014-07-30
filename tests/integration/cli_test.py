@@ -5,6 +5,7 @@ from fig.cli.main import TopLevelCommand
 from fig.packages.six import StringIO
 import sys
 
+
 class CLITestCase(DockerClientTestCase):
     def setUp(self):
         super(CLITestCase, self).setUp()
@@ -15,12 +16,16 @@ class CLITestCase(DockerClientTestCase):
 
     def tearDown(self):
         sys.exit = self.old_sys_exit
-        self.command.project.kill()
-        self.command.project.remove_stopped()
+        self.project.kill()
+        self.project.remove_stopped()
+
+    @property
+    def project(self):
+        return self.command.get_project(self.command.get_config_path())
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps(self, mock_stdout):
-        self.command.project.get_service('simple').create_container()
+        self.project.get_service('simple').create_container()
         self.command.dispatch(['ps'], None)
         self.assertIn('simplefigfile_simple_1', mock_stdout.getvalue())
 
@@ -64,17 +69,17 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
-        service = self.command.project.get_service('simple')
-        another = self.command.project.get_service('another')
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
         self.assertEqual(len(another.containers()), 1)
 
     def test_up_with_links(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['up', '-d', 'web'], None)
-        web = self.command.project.get_service('web')
-        db = self.command.project.get_service('db')
-        console = self.command.project.get_service('console')
+        web = self.project.get_service('web')
+        db = self.project.get_service('db')
+        console = self.project.get_service('console')
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
@@ -82,16 +87,16 @@ class CLITestCase(DockerClientTestCase):
     def test_up_with_no_deps(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['up', '-d', '--no-deps', 'web'], None)
-        web = self.command.project.get_service('web')
-        db = self.command.project.get_service('db')
-        console = self.command.project.get_service('console')
+        web = self.project.get_service('web')
+        db = self.project.get_service('db')
+        console = self.project.get_service('console')
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 0)
         self.assertEqual(len(console.containers()), 0)
 
     def test_up_with_recreate(self):
         self.command.dispatch(['up', '-d'], None)
-        service = self.command.project.get_service('simple')
+        service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
 
         old_ids = [c.id for c in service.containers()]
@@ -105,7 +110,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up_with_keep_old(self):
         self.command.dispatch(['up', '-d'], None)
-        service = self.command.project.get_service('simple')
+        service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
 
         old_ids = [c.id for c in service.containers()]
@@ -117,19 +122,18 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
-
     @patch('dockerpty.start')
     def test_run_service_without_links(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'console', '/bin/true'], None)
-        self.assertEqual(len(self.command.project.containers()), 0)
+        self.assertEqual(len(self.project.containers()), 0)
 
     @patch('dockerpty.start')
     def test_run_service_with_links(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'web', '/bin/true'], None)
-        db = self.command.project.get_service('db')
-        console = self.command.project.get_service('console')
+        db = self.project.get_service('db')
+        console = self.project.get_service('console')
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
@@ -137,14 +141,14 @@ class CLITestCase(DockerClientTestCase):
     def test_run_with_no_deps(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
-        db = self.command.project.get_service('db')
+        db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
     @patch('dockerpty.start')
     def test_run_does_not_recreate_linked_containers(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['up', '-d', 'db'], None)
-        db = self.command.project.get_service('db')
+        db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 1)
 
         old_ids = [c.id for c in db.containers()]
@@ -161,11 +165,11 @@ class CLITestCase(DockerClientTestCase):
         self.command.base_dir = 'tests/fixtures/commands-figfile'
         self.client.build('tests/fixtures/simple-dockerfile', tag='figtest_test')
 
-        for c in self.command.project.containers(stopped=True, one_off=True):
+        for c in self.project.containers(stopped=True, one_off=True):
             c.remove()
 
         self.command.dispatch(['run', 'implicit'], None)
-        service = self.command.project.get_service('implicit')
+        service = self.project.get_service('implicit')
         containers = service.containers(stopped=True, one_off=True)
         self.assertEqual(
             [c.human_readable_command for c in containers],
@@ -173,7 +177,7 @@ class CLITestCase(DockerClientTestCase):
         )
 
         self.command.dispatch(['run', 'explicit'], None)
-        service = self.command.project.get_service('explicit')
+        service = self.project.get_service('explicit')
         containers = service.containers(stopped=True, one_off=True)
         self.assertEqual(
             [c.human_readable_command for c in containers],
@@ -181,7 +185,7 @@ class CLITestCase(DockerClientTestCase):
         )
 
     def test_rm(self):
-        service = self.command.project.get_service('simple')
+        service = self.project.get_service('simple')
         service.create_container()
         service.kill()
         self.assertEqual(len(service.containers(stopped=True)), 1)
@@ -189,24 +193,23 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
     def test_scale(self):
-        project = self.command.project
+        project = self.project
 
-        self.command.scale({'SERVICE=NUM': ['simple=1']})
+        self.command.scale(project, {'SERVICE=NUM': ['simple=1']})
         self.assertEqual(len(project.get_service('simple').containers()), 1)
 
-        self.command.scale({'SERVICE=NUM': ['simple=3', 'another=2']})
+        self.command.scale(project, {'SERVICE=NUM': ['simple=3', 'another=2']})
         self.assertEqual(len(project.get_service('simple').containers()), 3)
         self.assertEqual(len(project.get_service('another').containers()), 2)
 
-        self.command.scale({'SERVICE=NUM': ['simple=1', 'another=1']})
+        self.command.scale(project, {'SERVICE=NUM': ['simple=1', 'another=1']})
         self.assertEqual(len(project.get_service('simple').containers()), 1)
         self.assertEqual(len(project.get_service('another').containers()), 1)
 
-        self.command.scale({'SERVICE=NUM': ['simple=1', 'another=1']})
+        self.command.scale(project, {'SERVICE=NUM': ['simple=1', 'another=1']})
         self.assertEqual(len(project.get_service('simple').containers()), 1)
         self.assertEqual(len(project.get_service('another').containers()), 1)
 
-        self.command.scale({'SERVICE=NUM': ['simple=0', 'another=0']})
+        self.command.scale(project, {'SERVICE=NUM': ['simple=0', 'another=0']})
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
-

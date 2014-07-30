@@ -23,7 +23,7 @@ class DocoptCommand(object):
     def dispatch(self, argv, global_options):
         self.perform_command(*self.parse(argv, global_options))
 
-    def perform_command(self, options, command, handler, command_options):
+    def perform_command(self, options, handler, command_options):
         handler(command_options)
 
     def parse(self, argv, global_options):
@@ -43,7 +43,7 @@ class DocoptCommand(object):
             raise NoSuchCommand(command, self)
 
         command_options = docopt_full_help(docstring, options['ARGS'], options_first=True)
-        return (options, command, handler, command_options)
+        return options, handler, command_options
 
 
 class NoSuchCommand(Exception):

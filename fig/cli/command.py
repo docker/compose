@@ -12,19 +12,16 @@ from ..packages import six
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
-from .formatter import Formatter
-from .utils import cached_property, docker_url, call_silently, is_mac, is_ubuntu
+from .utils import docker_url, call_silently, is_mac, is_ubuntu
+from . import verbose_proxy
 from . import errors
+from .. import __version__
 
 log = logging.getLogger(__name__)
 
 
 class Command(DocoptCommand):
     base_dir = '.'
-
-    def __init__(self):
-        self._yaml_path = os.environ.get('FIG_FILE', None)
-        self.explicit_project_name = None
 
     def dispatch(self, *args, **kwargs):
         try:
@@ -40,60 +37,70 @@ class Command(DocoptCommand):
             elif call_silently(['which', 'docker-osx']) == 0:
                 raise errors.ConnectionErrorDockerOSX()
             else:
-                raise errors.ConnectionErrorGeneric(self.client.base_url)
+                raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
-    def perform_command(self, options, *args, **kwargs):
-        if options['--file'] is not None:
-            self.yaml_path = os.path.join(self.base_dir, options['--file'])
-        if options['--project-name'] is not None:
-            self.explicit_project_name = options['--project-name']
-        return super(Command, self).perform_command(options, *args, **kwargs)
+    def perform_command(self, options, handler, command_options):
+        explicit_config_path = options.get('--file') or os.environ.get('FIG_FILE')
+        project = self.get_project(
+            self.get_config_path(explicit_config_path),
+            project_name=options.get('--project-name'),
+            verbose=options.get('--verbose'))
 
-    @cached_property
-    def client(self):
-        return Client(docker_url())
+        handler(project, command_options)
 
-    @cached_property
-    def project(self):
+    def get_client(self, verbose=False):
+        client = Client(docker_url())
+        if verbose:
+            version_info = six.iteritems(client.version())
+            log.info("Fig version %s", __version__)
+            log.info("Docker base_url: %s", client.base_url)
+            log.info("Docker version: %s",
+                     ", ".join("%s=%s" % item for item in version_info))
+            return verbose_proxy.VerboseProxy('docker', client)
+        return client
+
+    def get_config(self, config_path):
         try:
-            config = yaml.safe_load(open(self.yaml_path))
+            with open(config_path, 'r') as fh:
+                return yaml.safe_load(fh)
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
             raise errors.UserError(six.text_type(e))
 
+    def get_project(self, config_path, project_name=None, verbose=False):
         try:
-            return Project.from_config(self.project_name, config, self.client)
+            return Project.from_config(
+                self.get_project_name(config_path, project_name),
+                self.get_config(config_path),
+                self.get_client(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
 
-    @cached_property
-    def project_name(self):
-        project = os.path.basename(os.path.dirname(os.path.abspath(self.yaml_path)))
-        if self.explicit_project_name is not None:
-            project = self.explicit_project_name
-        project = re.sub(r'[^a-zA-Z0-9]', '', project)
-        if not project:
-            project = 'default'
-        return project
+    def get_project_name(self, config_path, project_name=None):
+        def normalize_name(name):
+            return re.sub(r'[^a-zA-Z0-9]', '', name)
 
-    @cached_property
-    def formatter(self):
-        return Formatter()
+        if project_name is not None:
+            return normalize_name(project_name)
 
-    @cached_property
-    def yaml_path(self):
-        if self._yaml_path is not None:
-            return self._yaml_path
-        elif os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
+        project = os.path.basename(os.path.dirname(os.path.abspath(config_path)))
+        if project:
+            return normalize_name(project)
 
-            log.warning("Fig just read the file 'fig.yaml' on startup, rather than 'fig.yml'")
-            log.warning("Please be aware that fig.yml the expected extension in most cases, and using .yaml can cause compatibility issues in future")
+        return 'default'
+
+    def get_config_path(self, file_path=None):
+        if file_path:
+            return os.path.join(self.base_dir, file_path)
+
+        if os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
+            log.warning("Fig just read the file 'fig.yaml' on startup, rather "
+                        "than 'fig.yml'")
+            log.warning("Please be aware that fig.yml the expected extension "
+                        "in most cases, and using .yaml can cause compatibility "
+                        "issues in future")
 
             return os.path.join(self.base_dir, 'fig.yaml')
-        else:
-            return os.path.join(self.base_dir, 'fig.yml')
 
-    @yaml_path.setter
-    def yaml_path(self, value):
-        self._yaml_path = value
+        return os.path.join(self.base_dir, 'fig.yml')
