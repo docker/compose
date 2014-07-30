@@ -5,7 +5,7 @@ import os
 from .. import unittest
 import mock
 
-from fig.packages import docker
+import docker
 
 from fig import Service
 from fig.service import (

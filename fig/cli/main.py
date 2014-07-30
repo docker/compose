@@ -16,7 +16,7 @@ from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import yesno
 
-from ..packages.docker.errors import APIError
+from docker.errors import APIError
 from .errors import UserError
 from .docopt_command import NoSuchCommand
 
