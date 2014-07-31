@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140724290097110190040">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140731301937469468021">
     <link rel="canonical" href="http://www.fig.sh/yml.html">
   </head>
   <body>
@@ -70,6 +70,8 @@ image: a4bc65fd
 <h3>volumes</h3>
 
 <p>Mount paths as volumes, optionally specifying a path on the host machine (<code>HOST:CONTAINER</code>).</p>
+
+<p>Note: Mapping local volumes is currently unsupported on boot2docker. We recommend you use <a href="https://github.com/noplay/docker-osx">docker-osx</a> if want to map local volumes.</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">volumes:
  - /var/lib/mysql
  - cache/:/tmp/cache
