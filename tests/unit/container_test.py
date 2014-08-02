@@ -1,6 +1,11 @@
 from __future__ import unicode_literals
 from .. import unittest
+
+import mock
+from fig.packages import docker
+
 from fig.container import Container
+
 
 class ContainerTest(unittest.TestCase):
     def test_from_ps(self):
@@ -67,3 +72,16 @@ class ContainerTest(unittest.TestCase):
             "Names":["/figtest_db_1"]
         }, has_been_inspected=True)
         self.assertEqual(container.name_without_project, "db_1")
+
+    def test_inspect_if_not_inspected(self):
+        mock_client = mock.create_autospec(docker.Client)
+        container = Container(mock_client, dict(Id="the_id"))
+
+        container.inspect_if_not_inspected()
+        mock_client.inspect_container.assert_called_once_with("the_id")
+        self.assertEqual(container.dictionary,
+                         mock_client.inspect_container.return_value)
+        self.assertTrue(container.has_been_inspected)
+
+        container.inspect_if_not_inspected()
+        self.assertEqual(mock_client.inspect_container.call_count, 1)

@@ -108,8 +108,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
-        self.assertNotEqual(c.id, old_db_id)
-        self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
+        self.assertNotEqual(db_container.id, old_db_id)
+        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
+                         db_volume_path)
 
         project.kill()
         project.remove_stopped()
@@ -130,8 +131,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
-        self.assertEqual(c.id, old_db_id)
-        self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
+        self.assertEqual(db_container.id, old_db_id)
+        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
+                         db_volume_path)
 
         project.kill()
         project.remove_stopped()
@@ -158,8 +160,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(new_containers), 2)
 
         db_container = [c for c in new_containers if 'db' in c.name][0]
-        self.assertEqual(c.id, old_db_id)
-        self.assertEqual(c.inspect()['Volumes']['/var/db'], db_volume_path)
+        self.assertEqual(db_container.id, old_db_id)
+        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
+                         db_volume_path)
 
         project.kill()
         project.remove_stopped()

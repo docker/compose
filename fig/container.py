@@ -97,11 +97,8 @@ class Container(object):
     @property
     def environment(self):
         self.inspect_if_not_inspected()
-        out = {}
-        for var in self.dictionary.get('Config', {}).get('Env', []):
-            k, v = var.split('=', 1)
-            out[k] = v
-        return out
+        return dict(var.split("=", 1)
+                    for var in self.dictionary.get('Config', {}).get('Env', []))
 
     @property
     def is_running(self):
@@ -132,6 +129,7 @@ class Container(object):
 
     def inspect(self):
         self.dictionary = self.client.inspect_container(self.id)
+        self.has_been_inspected = True
         return self.dictionary
 
     def links(self):
