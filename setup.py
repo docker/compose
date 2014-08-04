@@ -22,8 +22,16 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
-with open('requirements.txt') as f:
-    install_requires = f.read().splitlines()
+
+install_requires = [
+    'docopt >= 0.6.1, < 0.7',
+    'PyYAML >= 3.10, < 4',
+    'requests >= 2.2.1, < 3',
+    'texttable >= 0.8.1, < 0.9',
+    'websocket-client >= 0.11.0, < 0.12',
+    'dockerpty >= 0.2.3, < 0.3',
+]
+
 
 with open('requirements-dev.txt') as f:
     tests_require = f.read().splitlines()
