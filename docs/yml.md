@@ -30,7 +30,7 @@ build: /path/to/build/dir
 
 ### command
 
-Override the default command.
+Override the default command (`/bin/sleep 300`). 
 
 ```
 command: bundle exec thin -p 3000
