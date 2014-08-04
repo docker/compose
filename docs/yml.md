@@ -39,7 +39,7 @@ command: bundle exec thin -p 3000
 ### links
 
 
-Link to containers in another service. Optionally specify an alternate name for the link, which will determine how environment variables are prefixed, e.g. `db` -> `DB_1_PORT`, `db:database` -> `DATABASE_1_PORT`
+Link to containers in another service. Optionally specify an alternate name for the link, which will determine how environment variables are prefixed, e.g. `db` -> `DB_PORT`, `db:database` -> `DATABASE_PORT`
 
 ```
 links:

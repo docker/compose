@@ -73,8 +73,8 @@ Open up your newly-generated `database.yml`. Replace its contents with the follo
       pool: 5
       username: docker
       password: docker
-      host: <%= ENV.fetch('DB_1_PORT_5432_TCP_ADDR', 'localhost') %>
-      port: <%= ENV.fetch('DB_1_PORT_5432_TCP_PORT', '5432') %>
+      host: <%= ENV.fetch('DB_PORT_5432_TCP_ADDR', 'localhost') %>
+      port: <%= ENV.fetch('DB_PORT_5432_TCP_PORT', '5432') %>
 
     test:
       <<: *default
@@ -86,9 +86,9 @@ We can now boot the app.
 
 If all's well, you should see some PostgreSQL output, and then—after a few seconds—the familiar refrain:
 
-    myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick 1.3.1
-    myapp_web_1 | [2014-01-17 17:16:29] INFO  ruby 2.0.0 (2013-11-22) [x86_64-linux-gnu]
-    myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick::HTTPServer#start: pid=1 port=3000
+    myapp_web | [2014-01-17 17:16:29] INFO  WEBrick 1.3.1
+    myapp_web | [2014-01-17 17:16:29] INFO  ruby 2.0.0 (2013-11-22) [x86_64-linux-gnu]
+    myapp_web | [2014-01-17 17:16:29] INFO  WEBrick::HTTPServer#start: pid=1 port=3000
 
 Finally, we just need to create the database. In another terminal, run:
 

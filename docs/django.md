@@ -60,8 +60,8 @@ First thing we need to do is set up the database connection. Replace the `DATABA
             'NAME': 'docker',
             'USER': 'docker',
             'PASSWORD': 'docker',
-            'HOST': os.environ.get('DB_1_PORT_5432_TCP_ADDR'),
-            'PORT': os.environ.get('DB_1_PORT_5432_TCP_PORT'),
+            'HOST': os.environ.get('DB_PORT_5432_TCP_ADDR'),
+            'PORT': os.environ.get('DB_PORT_5432_TCP_PORT'),
         }
     }
 
@@ -69,24 +69,23 @@ These settings are determined by the [orchardup/postgresql](https://github.com/o
 
 Then, run `fig up`:
 
-    Recreating myapp_db_1...
-    Recreating myapp_web_1...
-    Attaching to myapp_db_1, myapp_web_1
-    myapp_db_1 |
-    myapp_db_1 | PostgreSQL stand-alone backend 9.1.11
-    myapp_db_1 | 2014-01-27 12:17:03 UTC LOG:  database system is ready to accept connections
-    myapp_db_1 | 2014-01-27 12:17:03 UTC LOG:  autovacuum launcher started
-    myapp_web_1 | Validating models...
-    myapp_web_1 |
-    myapp_web_1 | 0 errors found
-    myapp_web_1 | January 27, 2014 - 12:12:40
-    myapp_web_1 | Django version 1.6.1, using settings 'figexample.settings'
-    myapp_web_1 | Starting development server at http://0.0.0.0:8000/
-    myapp_web_1 | Quit the server with CONTROL-C.
+    Recreating myapp_db...
+    Recreating myapp_web...
+    Attaching to myapp_db, myapp_web
+    myapp_db |
+    myapp_db | PostgreSQL stand-alone backend 9.1.11
+    myapp_db | 2014-01-27 12:17:03 UTC LOG:  database system is ready to accept connections
+    myapp_db | 2014-01-27 12:17:03 UTC LOG:  autovacuum launcher started
+    myapp_web | Validating models...
+    myapp_web |
+    myapp_web | 0 errors found
+    myapp_web | January 27, 2014 - 12:12:40
+    myapp_web | Django version 1.6.1, using settings 'figexample.settings'
+    myapp_web | Starting development server at http://0.0.0.0:8000/
+    myapp_web | Quit the server with CONTROL-C.
 
 And your Django app should be running at [localhost:8000](http://localhost:8000) (or [localdocker:8000](http://localdocker:8000) if you're using docker-osx).
 
 You can also run management commands with Docker. To set up your database, for example, run `fig up` and in another terminal run:
 
     $ fig run web python manage.py syncdb
-

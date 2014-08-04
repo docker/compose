@@ -54,15 +54,15 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(web.containers()), 0)
         self.assertEqual(len(db.containers()), 0)
 
-        web_container_1 = web.create_container()
+        web_container = web.create_container()
         web_container_2 = web.create_container()
         db_container = db.create_container()
 
         project.start(service_names=['web'])
-        self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name]))
+        self.assertEqual(set(c.name for c in project.containers()), set([web_container.name, web_container_2.name]))
 
         project.start()
-        self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name, db_container.name]))
+        self.assertEqual(set(c.name for c in project.containers()), set([web_container.name, web_container_2.name, db_container.name]))
 
         project.stop(service_names=['web'], timeout=1)
         self.assertEqual(set(c.name for c in project.containers()), set([db_container.name]))

@@ -60,8 +60,8 @@ from redis import Redis
 import os
 app = Flask(__name__)
 redis = Redis(
-    host=os.environ.get('REDIS_1_PORT_6379_TCP_ADDR'),
-    port=int(os.environ.get('REDIS_1_PORT_6379_TCP_PORT'))
+    host=os.environ.get('REDIS_PORT_6379_TCP_ADDR'),
+    port=int(os.environ.get('REDIS_PORT_6379_TCP_PORT'))
 )
 
 @app.route('/')
@@ -104,30 +104,30 @@ We then define a set of services using `fig.yml`:
 This defines two services:
 
  - `web`, which is built from `Dockerfile` in the current directory. It also says to run the command `python app.py` inside the image, forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
- - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/). 
+ - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/).
 
 Now if we run `fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
 
     $ fig up
     Pulling image orchardup/redis...
     Building web...
-    Starting figtest_redis_1...
-    Starting figtest_web_1...
-    redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
-    web_1   |  * Running on http://0.0.0.0:5000/
+    Starting figtest_redis...
+    Starting figtest_web...
+    redis | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
+    web   |  * Running on http://0.0.0.0:5000/
 
 Open up [http://localhost:5000](http://localhost:5000) in your browser (or [http://localdocker:5000](http://localdocker:5000) if you're using [docker-osx](https://github.com/noplay/docker-osx)) and you should see it running!
 
 If you want to run your services in the background, you can pass the `-d` flag to `fig up` and use `fig ps` to see what is currently running:
 
     $ fig up -d
-    Starting figtest_redis_1...
-    Starting figtest_web_1...
+    Starting figtest_redis...
+    Starting figtest_web...
     $ fig ps
             Name                 Command            State       Ports
     -------------------------------------------------------------------
-    figtest_redis_1   /usr/local/bin/run         Up
-    figtest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
+    figtest_redis   /usr/local/bin/run         Up
+    figtest_web     /bin/sh -c python app.py   Up      5000->5000/tcp
 
 `fig run` allows you to run one-off commands for your services. For example, to see what environment variables are available to the `web` service:
 

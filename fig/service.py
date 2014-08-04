@@ -268,7 +268,10 @@ class Service(object):
         bits = [self.project, self.name]
         if one_off:
             bits.append('run')
-        return '_'.join(bits + [str(self.next_container_number(one_off=one_off))])
+        number = self.next_container_number(one_off=one_off)
+        if number > 1:
+            bits = bits + [str(number)]
+        return '_'.join(bits)
 
     def next_container_number(self, one_off=False):
         numbers = [parse_name(c.name)[2] for c in self.containers(stopped=True, one_off=one_off)]
@@ -400,7 +403,7 @@ class Service(object):
         return True
 
 
-NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
+NAME_RE = re.compile(r'^([^_]+)_([^_]+)(_run)?(_(\d+))?$')
 
 
 def is_valid_name(name, one_off=False):
@@ -408,15 +411,19 @@ def is_valid_name(name, one_off=False):
     if match is None:
         return False
     if one_off:
-        return match.group(3) == 'run_'
+        return match.group(3) == '_run'
     else:
         return match.group(3) is None
 
 
 def parse_name(name, one_off=False):
     match = NAME_RE.match(name)
-    (project, service_name, _, suffix) = match.groups()
-    return (project, service_name, int(suffix))
+    (project, service_name, _, suffix, suffixNumber) = match.groups()
+    if suffixNumber is None:
+        number = 1
+    else:
+        number = int(suffixNumber)
+    return (project, service_name, number)
 
 
 def get_container_name(container):
