@@ -7,7 +7,7 @@ title: Fig | Fast, isolated development environments using Docker
 
 Define your app's environment with Docker so it can be reproduced anywhere:
 
-    FROM orchardup/python:2.7
+    FROM python:2.7
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
@@ -23,7 +23,7 @@ web:
   ports:
    - "8000:8000"
 db:
-  image: orchardup/postgresql
+  image: postgres
 ```
 
 (No more installing Postgres on your laptop!)
