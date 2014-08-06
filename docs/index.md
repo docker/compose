@@ -59,10 +59,7 @@ from flask import Flask
 from redis import Redis
 import os
 app = Flask(__name__)
-redis = Redis(
-    host=os.environ.get('REDIS_1_PORT_6379_TCP_ADDR'),
-    port=int(os.environ.get('REDIS_1_PORT_6379_TCP_PORT'))
-)
+redis = Redis(host="redis_1", port=6379)
 
 @app.route('/')
 def hello():
