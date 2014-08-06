@@ -10,9 +10,8 @@ Let's use Fig to set up and run a Django/PostgreSQL app. Before starting, you'll
 
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
-    FROM orchardup/python:2.7
+    FROM python:2.7
     ENV PYTHONUNBUFFERED 1
-    RUN apt-get update -qq && apt-get install -y python-psycopg2
     RUN mkdir /code
     WORKDIR /code
     ADD requirements.txt /code/
@@ -24,11 +23,12 @@ That'll install our application inside an image with Python installed alongside 
 Second, we define our Python dependencies in a file called `requirements.txt`:
 
     Django
+    psycopg2
 
 Simple enough. Finally, this is all tied together with a file called `fig.yml`. It describes the services that our app comprises of (a web server and database), what Docker images they use, how they link together, what volumes will be mounted inside the containers and what ports they expose.
 
     db:
-      image: orchardup/postgresql
+      image: postgres
     web:
       build: .
       command: python manage.py runserver 0.0.0.0:8000
@@ -57,15 +57,14 @@ First thing we need to do is set up the database connection. Replace the `DATABA
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': 'docker',
-            'USER': 'docker',
-            'PASSWORD': 'docker',
-            'HOST': os.environ.get('DB_1_PORT_5432_TCP_ADDR'),
-            'PORT': os.environ.get('DB_1_PORT_5432_TCP_PORT'),
+            'NAME': 'postgres',
+            'USER': 'postgres',
+            'HOST': 'db_1',
+            'PORT': 5432,
         }
     }
 
-These settings are determined by the [orchardup/postgresql](https://github.com/orchardup/docker-postgresql) Docker image we are using.
+These settings are determined by the [postgres](https://registry.hub.docker.com/_/postgres/) Docker image we are using.
 
 Then, run `fig up`:
 
