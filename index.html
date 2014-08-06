@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140731301937469468021">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140806312262093609022">
     <link rel="canonical" href="http://www.fig.sh/">
   </head>
   <body>
@@ -67,10 +67,7 @@ $ cd figtest
 <span class="kn">from</span> <span class="nn">redis</span> <span class="kn">import</span> <span class="n">Redis</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
-<span class="n">redis</span> <span class="o">=</span> <span class="n">Redis</span><span class="p">(</span>
-    <span class="n">host</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;REDIS_1_PORT_6379_TCP_ADDR&#39;</span><span class="p">),</span>
-    <span class="n">port</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;REDIS_1_PORT_6379_TCP_PORT&#39;</span><span class="p">))</span>
-<span class="p">)</span>
+<span class="n">redis</span> <span class="o">=</span> <span class="n">Redis</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&quot;redis_1&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">6379</span><span class="p">)</span>
 
 <span class="nd">@app.route</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">hello</span><span class="p">():</span>
