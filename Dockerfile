@@ -1,4 +1,5 @@
-FROM orchardup/python:2.7
+FROM ubuntu:14.04
+RUN apt-get update -qq && apt-get install -qy python python-pip python-dev
 ADD requirements.txt /code/
 WORKDIR /code/
 RUN pip install -r requirements.txt
