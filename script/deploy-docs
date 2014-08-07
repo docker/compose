@@ -13,7 +13,7 @@ if [ ! -d "$GIT_DIR" ]; then
 fi
 
 if !(git remote | grep origin); then
-  git remote add origin git@github.com:orchardup/fig.git
+  git remote add origin git@github.com:docker/fig.git
 fi
 
 git fetch origin

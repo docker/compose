@@ -6,7 +6,7 @@ If you're looking contribute to [Fig](http://www.fig.sh/)
 but you're new to the project or maybe even to Python, here are the steps
 that should get you started.
 
-1. Fork [https://github.com/orchardup/fig](https://github.com/orchardup/fig) to your username. kvz in this example.
+1. Fork [https://github.com/docker/fig](https://github.com/docker/fig) to your username. kvz in this example.
 1. Clone your forked repository locally `git clone git@github.com:kvz/fig.git`.
 1. Enter the local directory `cd fig`.
 1. Set up a development environment `python setup.py develop`. That will install the dependencies and set up a symlink from your `fig` executable to the checkout of the repo. So from any of your fig projects, `fig` now refers to your development project. Time to start hacking : )

@@ -1,7 +1,7 @@
 Fig
 ===
 
-[![Build Status](https://travis-ci.org/orchardup/fig.svg?branch=master)](https://travis-ci.org/orchardup/fig)
+[![Build Status](https://travis-ci.org/docker/fig.svg?branch=master)](https://travis-ci.org/docker/fig)
 [![PyPI version](https://badge.fury.io/py/fig.png)](http://badge.fury.io/py/fig)
 
 Fast, isolated development environments using Docker.
