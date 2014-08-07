@@ -77,7 +77,7 @@ We define our Python dependencies in a file called `requirements.txt`:
 
 Next, we want to create a Docker image containing all of our app's dependencies. We specify how to build one using a file called `Dockerfile`:
 
-    FROM orchardup/python:2.7
+    FROM python:2.7
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
@@ -96,17 +96,17 @@ We then define a set of services using `fig.yml`:
       links:
        - redis
     redis:
-      image: orchardup/redis
+      image: redis
 
 This defines two services:
 
  - `web`, which is built from `Dockerfile` in the current directory. It also says to run the command `python app.py` inside the image, forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
- - `redis`, which uses the public image [orchardup/redis](https://index.docker.io/u/orchardup/redis/). 
+ - `redis`, which uses the public image [redis](https://registry.hub.docker.com/_/redis/). 
 
 Now if we run `fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
 
     $ fig up
-    Pulling image orchardup/redis...
+    Pulling image redis...
     Building web...
     Starting figtest_redis_1...
     Starting figtest_web_1...
