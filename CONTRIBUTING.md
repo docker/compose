@@ -91,3 +91,8 @@ The easiest way to do this is to use the `--signoff` flag when committing. E.g.:
 5. Publish GitHub release, creating tag
 
 6. Update website with `script/deploy-docs`
+
+7. Upload PyPi package
+
+    $ git checkout $VERSION
+    $ python setup.py sdist upload
