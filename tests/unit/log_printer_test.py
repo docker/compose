@@ -7,15 +7,27 @@ from .. import unittest
 
 
 class LogPrinterTest(unittest.TestCase):
-    def test_single_container(self):
+    def get_default_output(self, monochrome=False):
         def reader(*args, **kwargs):
             yield "hello\nworld"
 
         container = MockContainer(reader)
-        output = run_log_printer([container])
+        output = run_log_printer([container], monochrome=monochrome)
+        return output
+
+    def test_single_container(self):
+        output = self.get_default_output()
 
         self.assertIn('hello', output)
         self.assertIn('world', output)
+
+    def test_monochrome(self):
+        output = self.get_default_output(monochrome=True)
+        self.assertNotIn('\033[', output)
+
+    def test_polychrome(self):
+        output = self.get_default_output()
+        self.assertIn('\033[', output)
 
     def test_unicode(self):
         glyph = u'\u2022'.encode('utf-8')
@@ -29,10 +41,10 @@ class LogPrinterTest(unittest.TestCase):
         self.assertIn(glyph, output)
 
 
-def run_log_printer(containers):
+def run_log_printer(containers, monochrome=False):
     r, w = os.pipe()
     reader, writer = os.fdopen(r, 'r'), os.fdopen(w, 'w')
-    printer = LogPrinter(containers, output=writer)
+    printer = LogPrinter(containers, output=writer, monochrome=monochrome)
     printer.run()
     writer.close()
     return reader.read()
