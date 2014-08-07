@@ -9,11 +9,3 @@ install:
 script:
  - flake8 fig
  - nosetests tests/unit
-deploy:
-  provider: pypi
-  user: orchard
-  password:
-    secure: M8UMupCLSsB1hV00Zn6ra8Vg81SCFBpbcRsa0nUw9kgXn9hOCESWYVHTqQ1ksWZOa8z6WMaqYtoosPKXGJQNf0wF/kEVDsMUeaZWOF/PqDkx1EwQ1diVfwlbN4/k0iX+Se7SrZfiWnJiAqiIPqToQipvLlJohqf8WwfPcVvILVE=
-  on:
-    tags: true
-    repo: orchardup/fig
