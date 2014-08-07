@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140806312262093609022">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140807310288269723058">
     <link rel="canonical" href="http://www.fig.sh/django.html">
   </head>
   <body>
@@ -23,9 +23,8 @@
 <p>Let&#39;s use Fig to set up and run a Django/PostgreSQL app. Before starting, you&#39;ll need to have <a href="install.html">Fig installed</a>.</p>
 
 <p>Let&#39;s set up the three files that&#39;ll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called <code>Dockerfile</code>. It&#39;ll contain this to start with:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM python:2.7
 ENV PYTHONUNBUFFERED 1
-RUN apt-get update -qq &amp;&amp; apt-get install -y python-psycopg2
 RUN mkdir /code
 WORKDIR /code
 ADD requirements.txt /code/
@@ -36,10 +35,11 @@ ADD . /code/
 
 <p>Second, we define our Python dependencies in a file called <code>requirements.txt</code>:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">Django
+psycopg2
 </code></pre></div>
 <p>Simple enough. Finally, this is all tied together with a file called <code>fig.yml</code>. It describes the services that our app comprises of (a web server and database), what Docker images they use, how they link together, what volumes will be mounted inside the containers and what ports they expose.</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">db:
-  image: orchardup/postgresql
+  image: postgres
 web:
   build: .
   command: python manage.py runserver 0.0.0.0:8000
@@ -65,15 +65,14 @@ Dockerfile       fig.yml          figexample       manage.py        requirements
 <div class="highlight"><pre><code class="text language-text" data-lang="text">DATABASES = {
     &#39;default&#39;: {
         &#39;ENGINE&#39;: &#39;django.db.backends.postgresql_psycopg2&#39;,
-        &#39;NAME&#39;: &#39;docker&#39;,
-        &#39;USER&#39;: &#39;docker&#39;,
-        &#39;PASSWORD&#39;: &#39;docker&#39;,
-        &#39;HOST&#39;: os.environ.get(&#39;DB_1_PORT_5432_TCP_ADDR&#39;),
-        &#39;PORT&#39;: os.environ.get(&#39;DB_1_PORT_5432_TCP_PORT&#39;),
+        &#39;NAME&#39;: &#39;postgres&#39;,
+        &#39;USER&#39;: &#39;postgres&#39;,
+        &#39;HOST&#39;: &#39;db_1&#39;,
+        &#39;PORT&#39;: 5432,
     }
 }
 </code></pre></div>
-<p>These settings are determined by the <a href="https://github.com/orchardup/docker-postgresql">orchardup/postgresql</a> Docker image we are using.</p>
+<p>These settings are determined by the <a href="https://registry.hub.docker.com/_/postgres/">postgres</a> Docker image we are using.</p>
 
 <p>Then, run <code>fig up</code>:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">Recreating myapp_db_1...
@@ -122,11 +121,10 @@ myapp_web_1 | Quit the server with CONTROL-C.
         </ul>
         <ul class="nav">
           <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
-          <li><a href="http://webchat.freenode.net/?channels=%23orchardup&uio=d4">#orchardup on Freenode</a></li>
+          <li><a href="http://webchat.freenode.net/?channels=%23docker&uio=d4">#docker on Freenode</a></li>
         </ul>
 
-        <p>Fig is a project from <a href="https://www.orchardup.com">Orchard</a>, a Docker hosting service.</p>
-        <p><a href="https://twitter.com/orchardup">Follow us on Twitter</a> to keep up to date with Fig and other Docker news.</p>
+        <p>Fig is a project from <a href="https://www.docker.com">Docker</a>.</p>
 
         <div class="badges">
           <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>

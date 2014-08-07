@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140806312262093609022">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140807310288269723058">
     <link rel="canonical" href="http://www.fig.sh/rails.html">
   </head>
   <body>
@@ -23,7 +23,7 @@
 <p>We&#39;re going to use Fig to set up and run a Rails/PostgreSQL app. Before starting, you&#39;ll need to have <a href="install.html">Fig installed</a>.</p>
 
 <p>Let&#39;s set up the three files that&#39;ll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called <code>Dockerfile</code>. It&#39;ll contain this to start with:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM binaryphile/ruby:2.0.0-p247
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM ruby
 RUN apt-get update -qq &amp;&amp; apt-get install -y build-essential libpq-dev
 RUN mkdir /myapp
 WORKDIR /myapp
@@ -127,11 +127,10 @@ myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick::HTTPServer#start: pid=1 port=
         </ul>
         <ul class="nav">
           <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
-          <li><a href="http://webchat.freenode.net/?channels=%23orchardup&uio=d4">#orchardup on Freenode</a></li>
+          <li><a href="http://webchat.freenode.net/?channels=%23docker&uio=d4">#docker on Freenode</a></li>
         </ul>
 
-        <p>Fig is a project from <a href="https://www.orchardup.com">Orchard</a>, a Docker hosting service.</p>
-        <p><a href="https://twitter.com/orchardup">Follow us on Twitter</a> to keep up to date with Fig and other Docker news.</p>
+        <p>Fig is a project from <a href="https://www.docker.com">Docker</a>.</p>
 
         <div class="badges">
           <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>

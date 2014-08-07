@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140806312262093609022">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140807310288269723058">
     <link rel="canonical" href="http://www.fig.sh/">
   </head>
   <body>
@@ -21,7 +21,7 @@
       <div class="content"><p><strong class="strapline">Fast, isolated development environments using Docker.</strong></p>
 
 <p>Define your app&#39;s environment with Docker so it can be reproduced anywhere:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/python:2.7
+<div class="highlight"><pre><code class="text language-text" data-lang="text">FROM python:2.7
 ADD . /code
 WORKDIR /code
 RUN pip install -r requirements.txt
@@ -35,7 +35,7 @@ RUN pip install -r requirements.txt
   <span class="l-Scalar-Plain">ports</span><span class="p-Indicator">:</span>
    <span class="p-Indicator">-</span> <span class="s">&quot;8000:8000&quot;</span>
 <span class="l-Scalar-Plain">db</span><span class="p-Indicator">:</span>
-  <span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">orchardup/postgresql</span>
+  <span class="l-Scalar-Plain">image</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">postgres</span>
 </code></pre></div>
 <p>(No more installing Postgres on your laptop!)</p>
 
@@ -138,7 +138,7 @@ figtest_web_1     /bin/sh -c python app.py   Up      5000-&gt;5000/tcp
 <p>If you started Fig with <code>fig up -d</code>, you&#39;ll probably want to stop your services once you&#39;ve finished with them:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig stop
 </code></pre></div>
-<p>That&#39;s more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, <a href="https://github.com/orchardup/fig">open an issue on GitHub</a> or <a href="mailto:hello@orchardup.com">email us</a>.</p>
+<p>That&#39;s more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, <a href="https://github.com/orchardup/fig">open an issue on GitHub</a>.</p>
 </div>
 
       <div class="sidebar">
@@ -166,11 +166,10 @@ figtest_web_1     /bin/sh -c python app.py   Up      5000-&gt;5000/tcp
         </ul>
         <ul class="nav">
           <li><a href="https://github.com/orchardup/fig">Fig on GitHub</a></li>
-          <li><a href="http://webchat.freenode.net/?channels=%23orchardup&uio=d4">#orchardup on Freenode</a></li>
+          <li><a href="http://webchat.freenode.net/?channels=%23docker&uio=d4">#docker on Freenode</a></li>
         </ul>
 
-        <p>Fig is a project from <a href="https://www.orchardup.com">Orchard</a>, a Docker hosting service.</p>
-        <p><a href="https://twitter.com/orchardup">Follow us on Twitter</a> to keep up to date with Fig and other Docker news.</p>
+        <p>Fig is a project from <a href="https://www.docker.com">Docker</a>.</p>
 
         <div class="badges">
           <iframe src="http://ghbtns.com/github-btn.html?user=orchardup&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
