@@ -44,7 +44,7 @@ Two supporting files are needed to get this working - first up, `wp-config.php` 
 define('DB_NAME', 'wordpress');
 define('DB_USER', 'root');
 define('DB_PASSWORD', '');
-define('DB_HOST', getenv("DB_1_PORT_3306_TCP_ADDR") . ":" . getenv("DB_1_PORT_3306_TCP_PORT"));
+define('DB_HOST', "db_1:3306");
 define('DB_CHARSET', 'utf8');
 define('DB_COLLATE', '');
 

@@ -6,6 +6,8 @@ title: Fig environment variables reference
 Environment variables reference
 ===============================
 
+**Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, <b><i>name</i>_1</b>) as the hostname to connect to. See the [fig.yml documentation](yml.html#links) for details.
+
 Fig uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
 
 To see what environment variables are available to a service, run `fig run SERVICE env`.
