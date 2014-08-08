@@ -8,18 +8,28 @@ from fig.container import Container
 
 
 class ContainerTest(unittest.TestCase):
+
+
+    def setUp(self):
+        self.container_dict = {
+            "Id": "abc",
+            "Image": "busybox:latest",
+            "Command": "sleep 300",
+            "Created": 1387384730,
+            "Status": "Up 8 seconds",
+            "Ports": None,
+            "SizeRw": 0,
+            "SizeRootFs": 0,
+            "Names": ["/figtest_db_1"],
+            "NetworkSettings": {
+                "Ports": {},
+            },
+        }
+
     def test_from_ps(self):
-        container = Container.from_ps(None, {
-            "Id":"abc",
-            "Image":"busybox:latest",
-            "Command":"sleep 300",
-            "Created":1387384730,
-            "Status":"Up 8 seconds",
-            "Ports":None,
-            "SizeRw":0,
-            "SizeRootFs":0,
-            "Names":["/figtest_db_1"]
-        }, has_been_inspected=True)
+        container = Container.from_ps(None,
+                                      self.container_dict,
+                                      has_been_inspected=True)
         self.assertEqual(container.dictionary, {
             "Id": "abc",
             "Image":"busybox:latest",
@@ -42,35 +52,21 @@ class ContainerTest(unittest.TestCase):
         })
 
     def test_number(self):
-        container = Container.from_ps(None, {
-            "Id":"abc",
-            "Image":"busybox:latest",
-            "Command":"sleep 300",
-            "Created":1387384730,
-            "Status":"Up 8 seconds",
-            "Ports":None,
-            "SizeRw":0,
-            "SizeRootFs":0,
-            "Names":["/figtest_db_1"]
-        }, has_been_inspected=True)
+        container = Container.from_ps(None,
+                                      self.container_dict,
+                                      has_been_inspected=True)
         self.assertEqual(container.number, 1)
 
     def test_name(self):
-        container = Container.from_ps(None, {
-            "Id":"abc",
-            "Image":"busybox:latest",
-            "Command":"sleep 300",
-            "Names":["/figtest_db_1"]
-        }, has_been_inspected=True)
+        container = Container.from_ps(None,
+                                      self.container_dict,
+                                      has_been_inspected=True)
         self.assertEqual(container.name, "figtest_db_1")
 
     def test_name_without_project(self):
-        container = Container.from_ps(None, {
-            "Id":"abc",
-            "Image":"busybox:latest",
-            "Command":"sleep 300",
-            "Names":["/figtest_db_1"]
-        }, has_been_inspected=True)
+        container = Container.from_ps(None,
+                                      self.container_dict,
+                                      has_been_inspected=True)
         self.assertEqual(container.name_without_project, "db_1")
 
     def test_inspect_if_not_inspected(self):
@@ -85,3 +81,27 @@ class ContainerTest(unittest.TestCase):
 
         container.inspect_if_not_inspected()
         self.assertEqual(mock_client.inspect_container.call_count, 1)
+
+    def test_human_readable_ports_none(self):
+        container = Container(None, self.container_dict, has_been_inspected=True)
+        self.assertEqual(container.human_readable_ports, '')
+
+    def test_human_readable_ports_public_and_private(self):
+        self.container_dict['NetworkSettings']['Ports'].update({
+            "45454/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "49197" } ],
+            "45453/tcp": [],
+        })
+        container = Container(None, self.container_dict, has_been_inspected=True)
+
+        expected = "45453/tcp, 0.0.0.0:49197->45454/tcp"
+        self.assertEqual(container.human_readable_ports, expected)
+
+    def test_get_local_port(self):
+        self.container_dict['NetworkSettings']['Ports'].update({
+            "45454/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "49197" } ],
+        })
+        container = Container(None, self.container_dict, has_been_inspected=True)
+
+        self.assertEqual(
+            container.get_local_port(45454, protocol='tcp'),
+            '0.0.0.0:49197')

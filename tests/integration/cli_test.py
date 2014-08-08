@@ -1,9 +1,11 @@
 from __future__ import absolute_import
-from .testcases import DockerClientTestCase
-from mock import patch
-from fig.cli.main import TopLevelCommand
-from fig.packages.six import StringIO
 import sys
+
+from fig.packages.six import StringIO
+from mock import patch
+
+from .testcases import DockerClientTestCase
+from fig.cli.main import TopLevelCommand
 
 
 class CLITestCase(DockerClientTestCase):
@@ -213,3 +215,17 @@ class CLITestCase(DockerClientTestCase):
         self.command.scale(project, {'SERVICE=NUM': ['simple=0', 'another=0']})
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
+
+    def test_port(self):
+        self.command.base_dir = 'tests/fixtures/ports-figfile'
+        self.command.dispatch(['up', '-d'], None)
+        container = self.project.get_service('simple').get_container()
+
+        @patch('sys.stdout', new_callable=StringIO)
+        def get_port(number, mock_stdout):
+            self.command.dispatch(['port', 'simple', str(number)], None)
+            return mock_stdout.getvalue().rstrip()
+
+        self.assertEqual(get_port(3000), container.get_local_port(3000))
+        self.assertEqual(get_port(3001), "0.0.0.0:9999")
+        self.assertEqual(get_port(3002), "")
