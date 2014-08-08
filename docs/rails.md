@@ -73,7 +73,7 @@ Open up your newly-generated `database.yml`. Replace its contents with the follo
       pool: 5
       username: postgres
       password:
-      host: db_1
+      host: db
 
     test:
       <<: *default

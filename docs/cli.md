@@ -51,7 +51,7 @@ One-off commands are started in new containers with the same config as a normal 
 
 Links are also created between one-off commands and the other containers for that service so you can do stuff like this:
 
-    $ fig run db psql -h db_1 -U postgres
+    $ fig run db psql -h db -U docker
 
 If you do not want linked containers to be started when running the one-off command, specify the `--no-deps` flag:
 
