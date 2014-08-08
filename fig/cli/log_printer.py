@@ -10,11 +10,11 @@ from .utils import split_buffer
 
 
 class LogPrinter(object):
-    def __init__(self, containers, attach_params=None, output=sys.stdout):
+    def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False):
         self.containers = containers
         self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
-        self.generators = self._make_log_generators()
+        self.generators = self._make_log_generators(monochrome)
         self.output = output
 
     def run(self):
@@ -35,12 +35,15 @@ class LogPrinter(object):
             prefix_width = max(prefix_width, len(container.name_without_project))
         return prefix_width
 
-    def _make_log_generators(self):
+    def _make_log_generators(self, monochrome):
         color_fns = cycle(colors.rainbow())
         generators = []
 
         for container in self.containers:
-            color_fn = color_fns.next()
+            if monochrome:
+                color_fn = lambda s: s
+            else:
+                color_fn = color_fns.next()
             generators.append(self._make_log_generator(container, color_fn))
 
         return generators
