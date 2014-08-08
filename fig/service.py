@@ -89,6 +89,11 @@ class Service(object):
             log.info("Killing %s..." % c.name)
             c.kill(**options)
 
+    def restart(self, **options):
+        for c in self.containers():
+            log.info("Restarting %s..." % c.name)
+            c.restart(**options)
+
     def scale(self, desired_num):
         """
         Adjusts the number of containers to the specified number and ensures they are running.
