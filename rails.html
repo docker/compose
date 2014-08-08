@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140807310306634594032">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
     <link rel="canonical" href="http://www.fig.sh/rails.html">
   </head>
   <body>
@@ -39,7 +39,7 @@ gem &#39;rails&#39;, &#39;4.0.2&#39;
 </code></pre></div>
 <p>Finally, <code>fig.yml</code> is where the magic happens. It describes what services our app comprises (a database and a web app), how to get each one&#39;s Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration we need to link them together and expose the web app&#39;s port.</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">db:
-  image: orchardup/postgresql
+  image: postgres
   ports:
     - &quot;5432&quot;
 web:
@@ -69,18 +69,17 @@ Rakefile     db           test
 <p>Now that we&#39;ve got a new <code>Gemfile</code>, we need to build the image again. (This, and changes to the Dockerfile itself, should be the only times you&#39;ll need to rebuild).</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig build
 </code></pre></div>
-<p>The app is now bootable, but we&#39;re not quite there yet. By default, Rails expects a database to be running on <code>localhost</code> - we need to point it at the <code>db</code> container instead. We also need to change the username and password to align with the defaults set by <code>orchardup/postgresql</code>.</p>
+<p>The app is now bootable, but we&#39;re not quite there yet. By default, Rails expects a database to be running on <code>localhost</code> - we need to point it at the <code>db</code> container instead. We also need to change the database and username to align with the defaults set by the <code>postgres</code> image.</p>
 
 <p>Open up your newly-generated <code>database.yml</code>. Replace its contents with the following:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">development: &amp;default
   adapter: postgresql
   encoding: unicode
-  database: myapp_development
+  database: postgres
   pool: 5
-  username: docker
-  password: docker
-  host: &lt;%= ENV.fetch(&#39;DB_1_PORT_5432_TCP_ADDR&#39;, &#39;localhost&#39;) %&gt;
-  port: &lt;%= ENV.fetch(&#39;DB_1_PORT_5432_TCP_PORT&#39;, &#39;5432&#39;) %&gt;
+  username: postgres
+  password:
+  host: db_1
 
 test:
   &lt;&lt;: *default
