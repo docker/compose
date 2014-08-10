@@ -14,6 +14,7 @@ import (
 type Service struct {
 	Name         string
 	LogPrefix    string
+	Env          []string
 	Image        string   `yaml:"image"`
 	BuildDir     string   `yaml:"build"`
 	Command      string   `yaml:"command"`
@@ -77,6 +78,7 @@ func (s *Service) Create() error {
 		AttachStdin:  false,
 		Image:        s.Image,
 		Cmd:          strings.Fields(s.Command),
+		Env:          s.Env,
 		ExposedPorts: s.ExposedPorts,
 	}
 	createOpts := apiClient.CreateContainerOptions{
