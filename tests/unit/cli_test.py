@@ -4,6 +4,8 @@ import logging
 import os
 from .. import unittest
 
+import mock
+
 from fig.cli import main
 from fig.cli.main import TopLevelCommand
 from fig.packages.six import StringIO
@@ -16,24 +18,37 @@ class CLITestCase(unittest.TestCase):
         try:
             os.chdir('tests/fixtures/simple-figfile')
             command = TopLevelCommand()
-            self.assertEquals('simplefigfile', command.project_name)
+            project_name = command.get_project_name(command.get_config_path())
+            self.assertEquals('simplefigfile', project_name)
         finally:
             os.chdir(cwd)
 
     def test_project_name_with_explicit_base_dir(self):
         command = TopLevelCommand()
         command.base_dir = 'tests/fixtures/simple-figfile'
-        self.assertEquals('simplefigfile', command.project_name)
+        project_name = command.get_project_name(command.get_config_path())
+        self.assertEquals('simplefigfile', project_name)
 
     def test_project_name_with_explicit_project_name(self):
         command = TopLevelCommand()
-        command.explicit_project_name = 'explicit-project-name'
-        self.assertEquals('explicitprojectname', command.project_name)
+        name = 'explicit-project-name'
+        project_name = command.get_project_name(None, project_name=name)
+        self.assertEquals('explicitprojectname', project_name)
 
     def test_yaml_filename_check(self):
         command = TopLevelCommand()
         command.base_dir = 'tests/fixtures/longer-filename-figfile'
-        self.assertTrue(command.project.get_service('definedinyamlnotyml'))
+        with mock.patch('fig.cli.command.log', autospec=True) as mock_log:
+            self.assertTrue(command.get_config_path())
+        self.assertEqual(mock_log.warning.call_count, 2)
+
+    def test_get_project(self):
+        command = TopLevelCommand()
+        command.base_dir = 'tests/fixtures/longer-filename-figfile'
+        project = command.get_project(command.get_config_path())
+        self.assertEqual(project.name, 'longerfilenamefigfile')
+        self.assertTrue(project.client)
+        self.assertTrue(project.services)
 
     def test_help(self):
         command = TopLevelCommand()

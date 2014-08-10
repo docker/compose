@@ -98,7 +98,7 @@ class TopLevelCommand(Command):
         options['version'] = "fig %s" % __version__
         return options
 
-    def build(self, options):
+    def build(self, project, options):
         """
         Build or rebuild services.
 
@@ -112,9 +112,9 @@ class TopLevelCommand(Command):
             --no-cache  Do not use cache when building the image.
         """
         no_cache = bool(options.get('--no-cache', False))
-        self.project.build(service_names=options['SERVICE'], no_cache=no_cache)
+        project.build(service_names=options['SERVICE'], no_cache=no_cache)
 
-    def help(self, options):
+    def help(self, project, options):
         """
         Get help on a command.
 
@@ -125,15 +125,15 @@ class TopLevelCommand(Command):
             raise NoSuchCommand(command, self)
         raise SystemExit(getdoc(getattr(self, command)))
 
-    def kill(self, options):
+    def kill(self, project, options):
         """
         Force stop service containers.
 
         Usage: kill [SERVICE...]
         """
-        self.project.kill(service_names=options['SERVICE'])
+        project.kill(service_names=options['SERVICE'])
 
-    def logs(self, options):
+    def logs(self, project, options):
         """
         View output from containers.
 
@@ -142,14 +142,13 @@ class TopLevelCommand(Command):
         Options:
             --no-color  Produce monochrome output.
         """
-        containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        containers = project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
-
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}, monochrome=monochrome).run()
 
-    def ps(self, options):
+    def ps(self, project, options):
         """
         List containers.
 
@@ -158,7 +157,7 @@ class TopLevelCommand(Command):
         Options:
             -q    Only display IDs
         """
-        containers = self.project.containers(service_names=options['SERVICE'], stopped=True) + self.project.containers(service_names=options['SERVICE'], one_off=True)
+        containers = project.containers(service_names=options['SERVICE'], stopped=True) + project.containers(service_names=options['SERVICE'], one_off=True)
 
         if options['-q']:
             for container in containers:
@@ -183,7 +182,7 @@ class TopLevelCommand(Command):
                 ])
             print(Formatter().table(headers, rows))
 
-    def rm(self, options):
+    def rm(self, project, options):
         """
         Remove stopped service containers.
 
@@ -193,21 +192,21 @@ class TopLevelCommand(Command):
             --force   Don't ask to confirm removal
             -v        Remove volumes associated with containers
         """
-        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
             if options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
-                self.project.remove_stopped(
+                project.remove_stopped(
                     service_names=options['SERVICE'],
                     v=options.get('-v', False)
                 )
         else:
             print("No stopped containers")
 
-    def run(self, options):
+    def run(self, project, options):
         """
         Run a one-off command on a service.
 
@@ -229,14 +228,13 @@ class TopLevelCommand(Command):
             --rm       Remove container after run. Ignored in detached mode.
             --no-deps  Don't start linked services.
         """
-
-        service = self.project.get_service(options['SERVICE'])
+        service = project.get_service(options['SERVICE'])
 
         if not options['--no-deps']:
             deps = service.get_linked_names()
 
             if len(deps) > 0:
-                self.project.up(
+                project.up(
                     service_names=deps,
                     start_links=True,
                     recreate=False,
@@ -262,14 +260,14 @@ class TopLevelCommand(Command):
             print(container.name)
         else:
             service.start_container(container, ports=None, one_off=True)
-            dockerpty.start(self.client, container.id)
+            dockerpty.start(project.client, container.id)
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
-                self.client.remove_container(container.id)
+                project.client.remove_container(container.id)
             sys.exit(exit_code)
 
-    def scale(self, options):
+    def scale(self, project, options):
         """
         Set number of containers to run for a service.
 
@@ -290,19 +288,24 @@ class TopLevelCommand(Command):
                 raise UserError('Number of containers for service "%s" is not a '
                                 'number' % service_name)
             try:
-                self.project.get_service(service_name).scale(num)
+                project.get_service(service_name).scale(num)
             except CannotBeScaledError:
-                raise UserError('Service "%s" cannot be scaled because it specifies a port on the host. If multiple containers for this service were created, the port would clash.\n\nRemove the ":" from the port definition in fig.yml so Docker can choose a random port for each container.' % service_name)
+                raise UserError(
+                    'Service "%s" cannot be scaled because it specifies a port '
+                    'on the host. If multiple containers for this service were '
+                    'created, the port would clash.\n\nRemove the ":" from the '
+                    'port definition in fig.yml so Docker can choose a random '
+                    'port for each container.' % service_name)
 
-    def start(self, options):
+    def start(self, project, options):
         """
         Start existing containers.
 
         Usage: start [SERVICE...]
         """
-        self.project.start(service_names=options['SERVICE'])
+        project.start(service_names=options['SERVICE'])
 
-    def stop(self, options):
+    def stop(self, project, options):
         """
         Stop running containers without removing them.
 
@@ -310,9 +313,9 @@ class TopLevelCommand(Command):
 
         Usage: stop [SERVICE...]
         """
-        self.project.stop(service_names=options['SERVICE'])
+        project.stop(service_names=options['SERVICE'])
 
-    def up(self, options):
+    def up(self, project, options):
         """
         Build, (re)create, start and attach to containers for a service.
 
@@ -343,13 +346,13 @@ class TopLevelCommand(Command):
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
 
-        self.project.up(
+        project.up(
             service_names=service_names,
             start_links=start_links,
             recreate=recreate
         )
 
-        to_attach = [c for s in self.project.get_services(service_names) for c in s.containers()]
+        to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
 
         if not detached:
             print("Attaching to", list_containers(to_attach))
@@ -359,12 +362,12 @@ class TopLevelCommand(Command):
                 log_printer.run()
             finally:
                 def handler(signal, frame):
-                    self.project.kill(service_names=service_names)
+                    project.kill(service_names=service_names)
                     sys.exit(0)
                 signal.signal(signal.SIGINT, handler)
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
-                self.project.stop(service_names=service_names)
+                project.stop(service_names=service_names)
 
 
 def list_containers(containers):

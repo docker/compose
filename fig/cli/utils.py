@@ -7,25 +7,6 @@ import subprocess
 import platform
 
 
-def cached_property(f):
-    """
-    returns a cached property that is calculated by function f
-    http://code.activestate.com/recipes/576563-cached-property/
-    """
-    def get(self):
-        try:
-            return self._property_cache[f]
-        except AttributeError:
-            self._property_cache = {}
-            x = self._property_cache[f] = f(self)
-            return x
-        except KeyError:
-            x = self._property_cache[f] = f(self)
-            return x
-
-    return property(get)
-
-
 def yesno(prompt, default=None):
     """
     Prompt the user for a yes or no.
