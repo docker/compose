@@ -6,9 +6,10 @@ import (
 	"sync"
 
 	gangstaCli "github.com/codegangsta/cli"
+	"github.com/orchardup/fig/service"
 )
 
-func runServices(services []Service) error {
+func runServices(services []service.Service) error {
 	started := make(map[string]bool)
 	stopped := make(map[string]bool)
 	nToStart := len(services)
@@ -55,8 +56,8 @@ func runServices(services []Service) error {
 	return nil
 }
 
-func setColoredPrefixes(services []Service) []Service {
-	servicesWithColoredPrefixes := []Service{}
+func setColoredPrefixes(services []service.Service) []service.Service {
+	servicesWithColoredPrefixes := []service.Service{}
 
 	prefixLength := maxPrefixLength(services)
 
@@ -75,7 +76,7 @@ func setColoredPrefixes(services []Service) []Service {
 	return servicesWithColoredPrefixes
 }
 
-func attachServices(services []Service) error {
+func attachServices(services []service.Service) error {
 
 	for _, service := range services {
 		err := service.Attach()
@@ -86,7 +87,7 @@ func attachServices(services []Service) error {
 	return nil
 }
 
-func waitServices(services []Service, wg *sync.WaitGroup) error {
+func waitServices(services []service.Service, wg *sync.WaitGroup) error {
 	// Add one counter to the waitgroup for the group of services.
 	// If even one of the services exits (without a restart), we should exit the
 	// root process.
@@ -97,7 +98,7 @@ func waitServices(services []Service, wg *sync.WaitGroup) error {
 	return nil
 }
 
-func maxPrefixLength(services []Service) int {
+func maxPrefixLength(services []service.Service) int {
 	maxLength := 0
 	for _, service := range services {
 		if len(service.Name) > maxLength {

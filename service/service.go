@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"bufio"
@@ -23,7 +23,7 @@ type Service struct {
 	IsBase       bool
 	ExposedPorts map[apiClient.Port]struct{}
 	Container    apiClient.Container
-	api          *apiClient.Client
+	Api          *apiClient.Client
 }
 
 /**
@@ -83,14 +83,14 @@ func (s *Service) Create() error {
 		Name:   s.Name,
 		Config: &config,
 	}
-	container, err := s.api.CreateContainer(createOpts)
+	container, err := s.Api.CreateContainer(createOpts)
 	if err != nil {
 		if err == apiClient.ErrNoSuchImage {
 			pullOpts := apiClient.PullImageOptions{
 				Repository: s.Image,
 			}
 			fmt.Println("Unable to find image", s.Image, "locally, pulling...")
-			err = s.api.PullImage(pullOpts, apiClient.AuthConfiguration{})
+			err = s.Api.PullImage(pullOpts, apiClient.AuthConfiguration{})
 			if err != nil {
 				return err
 			}
@@ -108,7 +108,7 @@ func (s *Service) Start() error {
 	for _, link := range s.Links {
 		links = append(links, fmt.Sprintf("%s:%s_1", link, link))
 	}
-	err := s.api.StartContainer(s.Container.ID, &apiClient.HostConfig{
+	err := s.Api.StartContainer(s.Container.ID, &apiClient.HostConfig{
 		Links:        links,
 		PortBindings: s.createPortBindings(),
 	})
@@ -119,7 +119,7 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) Restart() error {
-	err := s.api.RestartContainer(s.Name, 10)
+	err := s.Api.RestartContainer(s.Name, 10)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (s *Service) Restart() error {
 }
 
 func (s *Service) Stop() error {
-	err := s.api.StopContainer(s.Name, 10)
+	err := s.Api.StopContainer(s.Name, 10)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (s *Service) Kill() error {
 	options := apiClient.KillContainerOptions{
 		ID: s.Name,
 	}
-	err := s.api.KillContainer(options)
+	err := s.Api.KillContainer(options)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (s *Service) Kill() error {
 }
 
 func (s *Service) Remove() error {
-	err := s.api.RemoveContainer(apiClient.RemoveContainerOptions{
+	err := s.Api.RemoveContainer(apiClient.RemoveContainerOptions{
 		ID: s.Name,
 	})
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Service) Remove() error {
 }
 
 func (s *Service) IsRunning() bool {
-	container, err := s.api.InspectContainer(s.Name)
+	container, err := s.Api.InspectContainer(s.Name)
 	if err != nil {
 		if _, ok := err.(*apiClient.NoSuchContainer); !ok {
 			fmt.Fprintln(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
@@ -167,7 +167,7 @@ func (s *Service) IsRunning() bool {
 }
 
 func (s *Service) Exists() bool {
-	_, err := s.api.InspectContainer(s.Name)
+	_, err := s.Api.InspectContainer(s.Name)
 	if err != nil {
 		if _, ok := err.(*apiClient.NoSuchContainer); !ok {
 			fmt.Fprintln(os.Stderr, "non-NoSuchContainer error checking if container is running: ", err)
@@ -180,7 +180,7 @@ func (s *Service) Exists() bool {
 func (s *Service) Wait(wg *sync.WaitGroup) (int, error) {
 	exited := make(chan int)
 	go func(s Service) {
-		exitCode, err := s.api.WaitContainer(s.Name)
+		exitCode, err := s.Api.WaitContainer(s.Name)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "container wait had error", err)
 		}
@@ -203,7 +203,7 @@ func (s *Service) Attach() error {
 		Logs:         true,
 	}
 	fmt.Println("Attaching to container", s.Name)
-	go s.api.AttachToContainer(options)
+	go s.Api.AttachToContainer(options)
 	go func(reader io.Reader, s Service) {
 		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {

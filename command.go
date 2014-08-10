@@ -17,6 +17,7 @@ import (
 	dockerCli "github.com/dotcloud/docker/api/client"
 	apiClient "github.com/fsouza/go-dockerclient"
 	"github.com/howeyc/fsnotify"
+	"github.com/orchardup/fig/service"
 	yaml "gopkg.in/yaml.v1"
 )
 
@@ -86,7 +87,7 @@ func CmdUp(c *gangstaCli.Context) {
 		wg               sync.WaitGroup
 		buildDir         string
 		imageName        string
-		baseService      Service
+		baseService      service.Service
 		baseServiceIndex int
 	)
 
@@ -110,13 +111,13 @@ func CmdUp(c *gangstaCli.Context) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error opening fig.yml file")
 	}
-	services := make(map[string]Service)
+	services := make(map[string]service.Service)
 	err = yaml.Unmarshal(servicesRaw, &services)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error unmarshalling fig.yml file")
 	}
 
-	namedServices := []Service{}
+	namedServices := []service.Service{}
 
 	for name, service := range services {
 		if service.Image == "" {
@@ -138,7 +139,7 @@ func CmdUp(c *gangstaCli.Context) {
 			service.IsBase = false
 		}
 		service.Name = name
-		service.api = api
+		service.Api = api
 		namedServices = append(namedServices, service)
 	}
 
