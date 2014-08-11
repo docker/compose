@@ -1,3 +1,5 @@
+package main
+
 import "time"
 
 type TimedEvent struct {
