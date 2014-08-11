@@ -106,7 +106,10 @@ func (s *Service) createEnvironmentVariables() error {
 
 func (s *Service) Create() error {
 	s.configureExposedPorts()
-	s.createEnvironmentVariables()
+	err := s.createEnvironmentVariables()
+	if err != nil {
+		return err
+	}
 
 	config := apiClient.Config{
 		AttachStdout: true,
