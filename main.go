@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	gangstaCli "github.com/codegangsta/cli"
-	"github.com/orchardup/fig/service"
+	"github.com/docker/fig/service"
 )
 
 func runServices(services []service.Service) error {

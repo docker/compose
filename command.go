@@ -17,7 +17,7 @@ import (
 	dockerCli "github.com/dotcloud/docker/api/client"
 	apiClient "github.com/fsouza/go-dockerclient"
 	"github.com/howeyc/fsnotify"
-	"github.com/orchardup/fig/service"
+	"github.com/docker/fig/service"
 	yaml "gopkg.in/yaml.v1"
 )
 
