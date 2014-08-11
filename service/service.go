@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 
@@ -38,6 +37,12 @@ type Service struct {
 	ExposedPorts         map[apiClient.Port]struct{}
 	Container            apiClient.Container
 	Api                  *apiClient.Client
+}
+
+type EnvDemarshallingError struct{}
+
+func (e EnvDemarshallingError) Error() string {
+	return "fig.yml environment setting does not map to slice of strings, or dictionary of string: string"
 }
 
 /**
@@ -83,18 +88,20 @@ func (s *Service) configureExposedPorts() {
 	}
 }
 
-func (s *Service) createEnvironmentVariables() {
-	if reflect.TypeOf(s.Env).Kind() == reflect.Map {
-		env := s.Env.(map[interface{}]interface{})
-		for key, value := range env {
+func (s *Service) createEnvironmentVariables() error {
+	if envMap, ok := s.Env.(map[interface{}]interface{}); ok {
+		for key, value := range envMap {
 			s.EnvironmentVariables = append(s.EnvironmentVariables, fmt.Sprintf("%s=%s", key, value))
 		}
-	} else {
-		env := s.Env.([]interface{})
-		for _, e := range env {
+		return nil
+	}
+	if envStringSlice, ok := s.Env.([]interface{}); ok {
+		for _, e := range envStringSlice {
 			s.EnvironmentVariables = append(s.EnvironmentVariables, e.(string))
 		}
+		return nil
 	}
+	return EnvDemarshallingError{}
 }
 
 func (s *Service) Create() error {
