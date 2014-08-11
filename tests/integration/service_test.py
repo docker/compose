@@ -1,11 +1,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+import os
+
 from fig import Service
 from fig.service import CannotBeScaledError
 from fig.container import Container
 from fig.packages.docker.errors import APIError
 from .testcases import DockerClientTestCase
-import os
+
 
 class ServiceTest(DockerClientTestCase):
     def test_containers(self):
@@ -143,7 +145,9 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
-        self.assertRaises(APIError, lambda: self.client.inspect_container(intermediate_container.id))
+        self.assertRaises(APIError,
+                          self.client.inspect_container,
+                          intermediate_container.id)
 
     def test_recreate_containers_when_containers_are_stopped(self):
         service = self.create_service(

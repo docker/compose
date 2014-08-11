@@ -65,15 +65,17 @@ class Service(object):
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
-        l = []
-        for container in self.client.containers(all=stopped):
-            name = get_container_name(container)
-            if not name or not is_valid_name(name, one_off):
-                continue
-            project, name, number = parse_name(name)
-            if project == self.project and name == self.name:
-                l.append(Container.from_ps(self.client, container))
-        return l
+        return [Container.from_ps(self.client, container)
+                for container in self.client.containers(all=stopped)
+                if self.has_container(container, one_off=one_off)]
+
+    def has_container(self, container, one_off=False):
+        """Return True if `container` was created to fulfill this service."""
+        name = get_container_name(container)
+        if not name or not is_valid_name(name, one_off):
+            return False
+        project, name, number = parse_name(name)
+        return project == self.project and name == self.name
 
     def start(self, **options):
         for c in self.containers(stopped=True):

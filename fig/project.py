@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import logging
+
 from .service import Service
 from .container import Container
 from .packages.docker.errors import APIError
@@ -179,12 +180,11 @@ class Project(object):
         for service in self.get_services(service_names):
             service.remove_stopped(**options)
 
-    def containers(self, service_names=None, *args, **kwargs):
-        l = []
-        for service in self.get_services(service_names):
-            for container in service.containers(*args, **kwargs):
-                l.append(container)
-        return l
+    def containers(self, service_names=None, stopped=False, one_off=False):
+        return [Container.from_ps(self.client, container)
+                for container in self.client.containers(all=stopped)
+                for service in self.get_services(service_names)
+                if service.has_container(container, one_off=one_off)]
 
     def _inject_links(self, acc, service):
         linked_names = service.get_linked_names()
