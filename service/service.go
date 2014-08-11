@@ -12,19 +12,30 @@ import (
 )
 
 type Service struct {
-	Name         string
-	LogPrefix    string
-	Env          []string `yaml:"environment"`
-	Image        string   `yaml:"image"`
-	BuildDir     string   `yaml:"build"`
-	Command      string   `yaml:"command"`
-	Links        []string `yaml:"links"`
-	Ports        []string `yaml:"ports"`
-	Volumes      []string `yaml:"volumes"`
-	IsBase       bool
-	ExposedPorts map[apiClient.Port]struct{}
-	Container    apiClient.Container
-	Api          *apiClient.Client
+	Name           string
+	LogPrefix      string
+	Env            []string `yaml:"environment"`
+	Expose         string   `yaml:"expose"`
+	Image          string   `yaml:"image"`
+	BuildDir       string   `yaml:"build"`
+	Dns            []string `yaml:"dns"`
+	NetworkingMode string   `yaml:"net"`
+	Command        string   `yaml:"command"`
+	Links          []string `yaml:"links"`
+	Ports          []string `yaml:"ports"`
+	Volumes        []string `yaml:"volumes"`
+	VolumesFrom    []string `yaml:"volumes_from"`
+	WorkingDir     string   `yaml:"working_dir"`
+	Entrypoint     string   `yaml:"entrypoint"`
+	User           string   `yaml:"user"`
+	HostName       string   `yaml:"hostname"`
+	DomainName     string   `yaml:"domainname"`
+	MemLimit       string   `yaml:"mem_limit"`
+	Privileged     bool     `yaml:"privileged"`
+	IsBase         bool
+	ExposedPorts   map[apiClient.Port]struct{}
+	Container      apiClient.Container
+	Api            *apiClient.Client
 }
 
 /**
