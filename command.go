@@ -60,6 +60,33 @@ func ignoreFile(filename string) bool {
 	return false
 }
 
+func CmdBuild(c *gangstaCli.Context) {
+}
+
+func CmdKill(c *gangstaCli.Context) {
+}
+
+func CmdLogs(c *gangstaCli.Context) {
+}
+
+func CmdPs(c *gangstaCli.Context) {
+}
+
+func CmdRm(c *gangstaCli.Context) {
+}
+
+func CmdRun(c *gangstaCli.Context) {
+}
+
+func CmdScale(c *gangstaCli.Context) {
+}
+
+func CmdStart(c *gangstaCli.Context) {
+}
+
+func CmdStop(c *gangstaCli.Context) {
+}
+
 func CmdUp(c *gangstaCli.Context) {
 	var (
 		wg               sync.WaitGroup

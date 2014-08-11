@@ -112,11 +112,130 @@ func main() {
 	app := gangstaCli.NewApp()
 	app.Name = "fig"
 	app.Usage = "Punctual, lightweight development environments using Docker."
+	app.Flags = []gangstaCli.Flag{
+		gangstaCli.BoolFlag{
+			Name:  "verbose",
+			Usage: "Show more output",
+		},
+		gangstaCli.StringFlag{
+			Name:  "f, file",
+			Usage: "Specify an alternate fig file (default: fig.yml)",
+		},
+		gangstaCli.StringFlag{
+			Name:  "p, project-name",
+			Usage: "Specify an alternate project name (default: directory name)",
+		},
+	}
 	app.Commands = []gangstaCli.Command{
+		{
+			Name: "build",
+			Flags: []gangstaCli.Flag{
+				gangstaCli.BoolFlag{
+					Name:  "no-cache",
+					Usage: "Do not use cache when building the image.",
+				},
+			},
+			Usage:  "Build or rebuild services",
+			Action: CmdBuild,
+		},
+		{
+			Name:   "kill",
+			Flags:  []gangstaCli.Flag{},
+			Usage:  "Kill containers",
+			Action: CmdKill,
+		},
+		{
+			Name:   "logs",
+			Flags:  []gangstaCli.Flag{},
+			Usage:  "View output from containers",
+			Action: CmdLogs,
+		},
+		{
+			Name: "ps",
+			Flags: []gangstaCli.Flag{
+				gangstaCli.BoolFlag{
+					Name:  "q",
+					Usage: "Only display IDs",
+				},
+			},
+			Usage:  "List containers",
+			Action: CmdPs,
+		},
+		{
+			Name: "rm",
+			Flags: []gangstaCli.Flag{
+				gangstaCli.BoolFlag{
+					Name:  "force",
+					Usage: "Don't ask to confirm removal",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "v",
+					Usage: "Remove volumes associated with containers",
+				},
+			},
+			Usage:  "Remove stopped containers",
+			Action: CmdRm,
+		},
+		{
+			Name: "run",
+			Flags: []gangstaCli.Flag{
+				gangstaCli.BoolFlag{
+					Name:  "d",
+					Usage: "Detached mode: Run container in the background, print new container name.",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "T",
+					Usage: "Disables psuedo-tty allocation. By default `fig run` allocates a TTY.",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "rm",
+					Usage: "Remove container after run.  Ignored in detached mode.",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "no-deps",
+					Usage: "Don't start linked services.",
+				},
+			},
+			Usage:  "Run a one-off command",
+			Action: CmdRm,
+		},
+		{
+			Name:   "scale",
+			Flags:  []gangstaCli.Flag{},
+			Usage:  "Set number of containers for a service",
+			Action: CmdRm,
+		},
+		{
+			Name:   "start",
+			Flags:  []gangstaCli.Flag{},
+			Usage:  "Start services",
+			Action: CmdRm,
+		},
+		{
+			Name:   "stop",
+			Flags:  []gangstaCli.Flag{},
+			Usage:  "Stop services",
+			Action: CmdStop,
+		},
 		{
 			Name: "up",
 			Flags: []gangstaCli.Flag{
-				gangstaCli.BoolFlag{Name: "watch", Usage: "Watch build directory for changes and auto-rebuild/restart"},
+				gangstaCli.BoolFlag{
+					Name:  "watch",
+					Usage: "Watch build directory for changes and auto-rebuild/restart",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "d",
+					Usage: "Detached mode: Run containers in the background, print new container names.",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "no-deps",
+					Usage: "Don't start linked services.",
+				},
+				gangstaCli.BoolFlag{
+					Name:  "no-recreate",
+					Usage: "If containers already exist, don't recreate them.",
+				},
 			},
 			Usage:  "Create and start containers",
 			Action: CmdUp,
