@@ -43,7 +43,7 @@ setup(
     url='http://www.fig.sh/',
     author='Docker, Inc.',
     license='Apache License 2.0',
-    packages=find_packages(),
+    packages=find_packages(exclude=[ 'tests.*', 'tests' ]),
     include_package_data=True,
     test_suite='nose.collector',
     install_requires=install_requires,
