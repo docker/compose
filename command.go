@@ -14,10 +14,10 @@ import (
 	"time"
 
 	gangstaCli "github.com/codegangsta/cli"
-	dockerCli "github.com/dotcloud/docker/api/client"
+	dockerCli "github.com/docker/docker/api/client"
+	"github.com/docker/fig/service"
 	apiClient "github.com/fsouza/go-dockerclient"
 	"github.com/howeyc/fsnotify"
-	"github.com/docker/fig/service"
 	yaml "gopkg.in/yaml.v1"
 )
 
