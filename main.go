@@ -111,14 +111,14 @@ func maxPrefixLength(services []service.Service) int {
 func main() {
 	app := gangstaCli.NewApp()
 	app.Name = "fig"
-	app.Usage = "Orchestrate Docker containers"
+	app.Usage = "Punctual, lightweight development environments using Docker."
 	app.Commands = []gangstaCli.Command{
 		{
 			Name: "up",
 			Flags: []gangstaCli.Flag{
 				gangstaCli.BoolFlag{Name: "watch", Usage: "Watch build directory for changes and auto-rebuild/restart"},
 			},
-			Usage:  "Initialize a pod of containers based on a fig.yml file",
+			Usage:  "Create and start containers",
 			Action: CmdUp,
 		},
 	}
