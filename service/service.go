@@ -14,7 +14,7 @@ import (
 type Service struct {
 	Name         string
 	LogPrefix    string
-	Env          []string
+	Env          []string `yaml:"environment"`
 	Image        string   `yaml:"image"`
 	BuildDir     string   `yaml:"build"`
 	Command      string   `yaml:"command"`
