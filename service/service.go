@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -12,30 +13,31 @@ import (
 )
 
 type Service struct {
-	Name           string
-	LogPrefix      string
-	Env            []string `yaml:"environment"`
-	Expose         string   `yaml:"expose"`
-	Image          string   `yaml:"image"`
-	BuildDir       string   `yaml:"build"`
-	Dns            []string `yaml:"dns"`
-	NetworkingMode string   `yaml:"net"`
-	Command        string   `yaml:"command"`
-	Links          []string `yaml:"links"`
-	Ports          []string `yaml:"ports"`
-	Volumes        []string `yaml:"volumes"`
-	VolumesFrom    []string `yaml:"volumes_from"`
-	WorkingDir     string   `yaml:"working_dir"`
-	Entrypoint     string   `yaml:"entrypoint"`
-	User           string   `yaml:"user"`
-	HostName       string   `yaml:"hostname"`
-	DomainName     string   `yaml:"domainname"`
-	MemLimit       string   `yaml:"mem_limit"`
-	Privileged     bool     `yaml:"privileged"`
-	IsBase         bool
-	ExposedPorts   map[apiClient.Port]struct{}
-	Container      apiClient.Container
-	Api            *apiClient.Client
+	Name                 string
+	LogPrefix            string
+	Env                  interface{} `yaml:"environment"`
+	EnvironmentVariables []string
+	Expose               string   `yaml:"expose"`
+	Image                string   `yaml:"image"`
+	BuildDir             string   `yaml:"build"`
+	Dns                  []string `yaml:"dns"`
+	NetworkingMode       string   `yaml:"net"`
+	Command              string   `yaml:"command"`
+	Links                []string `yaml:"links"`
+	Ports                []string `yaml:"ports"`
+	Volumes              []string `yaml:"volumes"`
+	VolumesFrom          []string `yaml:"volumes_from"`
+	WorkingDir           string   `yaml:"working_dir"`
+	Entrypoint           string   `yaml:"entrypoint"`
+	User                 string   `yaml:"user"`
+	HostName             string   `yaml:"hostname"`
+	DomainName           string   `yaml:"domainname"`
+	MemLimit             string   `yaml:"mem_limit"`
+	Privileged           bool     `yaml:"privileged"`
+	IsBase               bool
+	ExposedPorts         map[apiClient.Port]struct{}
+	Container            apiClient.Container
+	Api                  *apiClient.Client
 }
 
 /**
@@ -81,15 +83,30 @@ func (s *Service) configureExposedPorts() {
 	}
 }
 
+func (s *Service) createEnvironmentVariables() {
+	if reflect.TypeOf(s.Env).Kind() == reflect.Map {
+		env := s.Env.(map[interface{}]interface{})
+		for key, value := range env {
+			s.EnvironmentVariables = append(s.EnvironmentVariables, fmt.Sprintf("%s=%s", key, value))
+		}
+	} else {
+		env := s.Env.([]interface{})
+		for _, e := range env {
+			s.EnvironmentVariables = append(s.EnvironmentVariables, e.(string))
+		}
+	}
+}
+
 func (s *Service) Create() error {
 	s.configureExposedPorts()
+	s.createEnvironmentVariables()
 
 	config := apiClient.Config{
 		AttachStdout: true,
 		AttachStdin:  false,
 		Image:        s.Image,
 		Cmd:          strings.Fields(s.Command),
-		Env:          s.Env,
+		Env:          s.EnvironmentVariables,
 		ExposedPorts: s.ExposedPorts,
 	}
 	createOpts := apiClient.CreateContainerOptions{
