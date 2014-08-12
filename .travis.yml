@@ -7,5 +7,6 @@ install:
 - pip install -r requirements.txt
 - pip install -r requirements-dev.txt
 script:
+ - script/validate-dco
  - flake8 fig
  - nosetests tests/unit
