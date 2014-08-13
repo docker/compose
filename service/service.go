@@ -36,6 +36,7 @@ type Service struct {
 	IsBase               bool
 	ExposedPorts         map[apiClient.Port]struct{}
 	Container            apiClient.Container
+	OnAttachHook         func(io.Reader, Service)
 	Api                  *apiClient.Client
 }
 
@@ -231,6 +232,16 @@ func (s *Service) Wait(wg *sync.WaitGroup) (int, error) {
 	return exitCode, nil
 }
 
+func defaultOnAttachHook(reader io.Reader, s Service) {
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		fmt.Printf("%s%s \n", s.LogPrefix, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "There was an error with the scanner in attached container", err)
+	}
+}
+
 func (s *Service) Attach() error {
 	r, w := io.Pipe()
 	options := apiClient.AttachToContainerOptions{
@@ -244,14 +255,10 @@ func (s *Service) Attach() error {
 	}
 	fmt.Println("Attaching to container", s.Name)
 	go s.Api.AttachToContainer(options)
-	go func(reader io.Reader, s Service) {
-		scanner := bufio.NewScanner(reader)
-		for scanner.Scan() {
-			fmt.Printf("%s%s \n", s.LogPrefix, scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintln(os.Stderr, "There was an error with the scanner in attached container", err)
-		}
-	}(r, *s)
+	if s.OnAttachHook != nil {
+		go s.OnAttachHook(r, *s)
+	} else {
+		go defaultOnAttachHook(r, *s)
+	}
 	return nil
 }
