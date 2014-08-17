@@ -221,12 +221,11 @@ class TopLevelCommand(Command):
         Usage: run [options] SERVICE [COMMAND] [ARGS...]
 
         Options:
-            -d         Detached mode: Run container in the background, print
-                       new container name.
-            -T         Disable pseudo-tty allocation. By default `fig run`
-                       allocates a TTY.
-            --rm       Remove container after run. Ignored in detached mode.
-            --no-deps  Don't start linked services.
+            -d                  Detached mode: Run container in the background, print new container name.
+            -T                  Disable pseudo-tty allocation. By default `fig run` allocates a TTY.
+            --rm                Remove container after run. Ignored in detached mode.
+            --no-deps           Don't start linked services.
+            --entrypoint=<cmd>  Override entrypoint of the image.
         """
         service = project.get_service(options['SERVICE'])
 
@@ -254,6 +253,10 @@ class TopLevelCommand(Command):
             'tty': tty,
             'stdin_open': not options['-d'],
         }
+
+        if options['--entrypoint']:
+            container_options['entrypoint'] = options.get('--entrypoint')
+
         container = service.create_container(one_off=True, **container_options)
         if options['-d']:
             service.start_container(container, ports=None, one_off=True)

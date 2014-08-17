@@ -89,8 +89,12 @@ class Container(object):
     @property
     def human_readable_command(self):
         self.inspect_if_not_inspected()
-        if self.dictionary['Config']['Cmd']:
-            return ' '.join(self.dictionary['Config']['Cmd'])
+        config = self.dictionary['Config']
+        entrypoint = config['Entrypoint'] or []
+        cmd = config['Cmd'] or []
+        whole_cmd = entrypoint + cmd
+        if whole_cmd:
+            return ' '.join(whole_cmd)
         else:
             return ''
 
