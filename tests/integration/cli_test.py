@@ -191,6 +191,21 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
+    @patch('dockerpty.start')
+    def test_run_service_with_entrypoint_overridden(self, _):
+        self.command.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
+        name = 'service'
+        self.command.dispatch(
+            ['run', '--entrypoint', '/bin/echo', name, 'helloworld'],
+            None
+        )
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(
+            container.human_readable_command,
+            u'/bin/echo helloworld'
+        )
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()

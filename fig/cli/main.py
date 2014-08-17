@@ -262,6 +262,7 @@ class TopLevelCommand(Command):
                        allocates a TTY.
             --rm       Remove container after run. Ignored in detached mode.
             --no-deps  Don't start linked services.
+            --entrypoint  Override the entrypoint of the image.
         """
         service = project.get_service(options['SERVICE'])
 
@@ -289,6 +290,10 @@ class TopLevelCommand(Command):
             'tty': tty,
             'stdin_open': not options['-d'],
         }
+
+        if options['--entrypoint']:
+            container_options['entrypoint'] = options.get('--entrypoint')
+
         container = service.create_container(one_off=True, **container_options)
         if options['-d']:
             service.start_container(container, ports=None, one_off=True)
