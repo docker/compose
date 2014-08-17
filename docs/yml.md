@@ -132,6 +132,17 @@ dns:
   - 9.9.9.9
 ```
 
+### dns_search
+
+Custom DNS search domains. Can be a single value or a list.
+
+```
+dns_search: example.com
+dns:
+  - dc1.example.com
+  - dc2.example.com
+```
+
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.

@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'dns_search', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -241,6 +241,7 @@ class Service(object):
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
+        dns_search = options.get('dns_search', None)
 
         container.start(
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
@@ -249,7 +250,7 @@ class Service(object):
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=net,
-            dns=dns,
+            dns=dns, dns_search=dns_search
         )
         return container
 
@@ -351,7 +352,7 @@ class Service(object):
             container_options['image'] = self._build_tag_name()
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns']:
+        for key in ['privileged', 'net', 'dns', 'dns_search']:
             if key in container_options:
                 del container_options[key]
 

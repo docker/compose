@@ -94,7 +94,7 @@ class Client(requests.Session):
     def _container_config(self, image, command, hostname=None, user=None,
                           detach=False, stdin_open=False, tty=False,
                           mem_limit=0, ports=None, environment=None, dns=None,
-                          volumes=None, volumes_from=None,
+                          dns_search=None, volumes=None, volumes_from=None,
                           network_disabled=False, entrypoint=None,
                           cpu_shares=None, working_dir=None, domainname=None,
                           memswap_limit=0):
@@ -166,6 +166,7 @@ class Client(requests.Session):
             'Env': environment,
             'Cmd': command,
             'Dns': dns,
+            'DnsSearch': dns_search,
             'Image': image,
             'Volumes': volumes,
             'VolumesFrom': volumes_from,
@@ -449,14 +450,14 @@ class Client(requests.Session):
     def create_container(self, image, command=None, hostname=None, user=None,
                          detach=False, stdin_open=False, tty=False,
                          mem_limit=0, ports=None, environment=None, dns=None,
-                         volumes=None, volumes_from=None,
+                         dns_search=None, volumes=None, volumes_from=None,
                          network_disabled=False, name=None, entrypoint=None,
                          cpu_shares=None, working_dir=None, domainname=None,
                          memswap_limit=0):
 
         config = self._container_config(
             image, command, hostname, user, detach, stdin_open, tty, mem_limit,
-            ports, environment, dns, volumes, volumes_from, network_disabled,
+            ports, environment, dns, dns_search, volumes, volumes_from, network_disabled,
             entrypoint, cpu_shares, working_dir, domainname, memswap_limit
         )
         return self.create_container_from_config(config, name)
