@@ -1,6 +1,11 @@
 Change log
 ==========
 
+0.5.3 (2014-08-18)
+------------------
+
+ - Fixed situation where custom link name was declared and extra links were created
+
 0.5.2 (2014-07-28)
 ------------------
 

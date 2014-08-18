@@ -183,6 +183,15 @@ class ServiceTest(DockerClientTestCase):
         web.start_container()
         self.assertIn('custom_link_name', web.containers()[0].links())
 
+    def test_start_container_creates_links_with_names_without_extra_links(self):
+	db = self.create_service('db')
+        web = self.create_service('web', links=[(db, 'custom_link_name')])
+        db.start_container()
+        web.start_container()
+        self.assertIn('custom_link_name', web.containers()[0].links())
+	self.assertNotIn('figtest_db_1', web.containers()[0].links())
+        self.assertNotIn('db_1', web.containers()[0].links())
+
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
         db = self.create_service('db')
         c1 = db.start_container()

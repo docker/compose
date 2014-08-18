@@ -284,8 +284,9 @@ class Service(object):
             for container in service.containers():
                 if link_name:
                     links.append((container.name, link_name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                else:
+                    links.append((container.name, container.name))
+                    links.append((container.name, container.name_without_project))
         if link_to_self:
             for container in self.containers():
                 links.append((container.name, container.name))
