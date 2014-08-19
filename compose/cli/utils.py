@@ -9,6 +9,7 @@ import ssl
 import subprocess
 
 from docker import version as docker_py_version
+from six.moves import input
 
 from .. import __version__
 
@@ -23,7 +24,7 @@ def yesno(prompt, default=None):
     Unrecognised input (anything other than "y", "n", "yes",
     "no" or "") will return None.
     """
-    answer = raw_input(prompt).strip().lower()
+    answer = input(prompt).strip().lower()
 
     if answer == "y" or answer == "yes":
         return True

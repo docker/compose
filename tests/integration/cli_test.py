@@ -5,9 +5,9 @@ import shlex
 import sys
 from operator import attrgetter
 
-from mock import patch
 from six import StringIO
 
+from .. import mock
 from .testcases import DockerClientTestCase
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
@@ -51,13 +51,13 @@ class CLITestCase(DockerClientTestCase):
         self.command.base_dir = old_base_dir
 
     # TODO: address the "Inappropriate ioctl for device" warnings in test output
-    @patch('sys.stdout', new_callable=StringIO)
+    @mock.patch('sys.stdout', new_callable=StringIO)
     def test_ps(self, mock_stdout):
         self.project.get_service('simple').create_container()
         self.command.dispatch(['ps'], None)
         self.assertIn('simplecomposefile_simple_1', mock_stdout.getvalue())
 
-    @patch('sys.stdout', new_callable=StringIO)
+    @mock.patch('sys.stdout', new_callable=StringIO)
     def test_ps_default_composefile(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         self.command.dispatch(['up', '-d'], None)
@@ -68,7 +68,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn('multiplecomposefiles_another_1', output)
         self.assertNotIn('multiplecomposefiles_yetanother_1', output)
 
-    @patch('sys.stdout', new_callable=StringIO)
+    @mock.patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_composefile(self, mock_stdout):
         config_path = os.path.abspath(
             'tests/fixtures/multiple-composefiles/compose2.yml')
@@ -83,19 +83,19 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplecomposefiles_another_1', output)
         self.assertIn('multiplecomposefiles_yetanother_1', output)
 
-    @patch('compose.service.log')
+    @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
         self.command.dispatch(['pull'], None)
         mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
         mock_logging.info.assert_any_call('Pulling another (busybox:latest)...')
 
-    @patch('compose.service.log')
+    @mock.patch('compose.service.log')
     def test_pull_with_digest(self, mock_logging):
         self.command.dispatch(['-f', 'digest.yml', 'pull'], None)
         mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
         mock_logging.info.assert_any_call('Pulling digest (busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
 
-    @patch('sys.stdout', new_callable=StringIO)
+    @mock.patch('sys.stdout', new_callable=StringIO)
     def test_build_no_cache(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
@@ -189,7 +189,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertFalse(config['AttachStdout'])
         self.assertFalse(config['AttachStdin'])
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_without_links(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['run', 'console', '/bin/true'], None)
@@ -202,7 +202,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertTrue(config['AttachStdout'])
         self.assertTrue(config['AttachStdin'])
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_links(self, __):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['run', 'web', '/bin/true'], None)
@@ -211,14 +211,14 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_with_no_deps(self, __):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
         db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_does_not_recreate_linked_containers(self, __):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['up', '-d', 'db'], None)
@@ -234,7 +234,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_without_command(self, _):
         self.command.base_dir = 'tests/fixtures/commands-composefile'
         self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
@@ -255,7 +255,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_entrypoint_overridden(self, _):
         self.command.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
         name = 'service'
@@ -270,7 +270,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/echo', u'helloworld'],
         )
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_user_overridden(self, _):
         self.command.base_dir = 'tests/fixtures/user-composefile'
         name = 'service'
@@ -281,7 +281,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(user, container.get('Config.User'))
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_user_overridden_short_form(self, _):
         self.command.base_dir = 'tests/fixtures/user-composefile'
         name = 'service'
@@ -292,7 +292,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(user, container.get('Config.User'))
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_environement_overridden(self, _):
         name = 'service'
         self.command.base_dir = 'tests/fixtures/environment-composefile'
@@ -312,7 +312,7 @@ class CLITestCase(DockerClientTestCase):
         # make sure a value with a = don't crash out
         self.assertEqual('moto=bobo', container.environment['allo'])
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_without_map_ports(self, __):
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
@@ -330,7 +330,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_random, None)
         self.assertEqual(port_assigned, None)
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_map_ports(self, __):
 
         # create one off container
@@ -353,7 +353,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_range[0], "0.0.0.0:49153")
         self.assertEqual(port_range[1], "0.0.0.0:49154")
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_explicitly_maped_ports(self, __):
 
         # create one off container
@@ -372,7 +372,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "0.0.0.0:30000")
         self.assertEqual(port_full, "0.0.0.0:30001")
 
-    @patch('dockerpty.start')
+    @mock.patch('dockerpty.start')
     def test_run_service_with_explicitly_maped_ip_ports(self, __):
 
         # create one off container
@@ -508,7 +508,7 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['up', '-d'], None)
         container = self.project.get_service('simple').get_container()
 
-        @patch('sys.stdout', new_callable=StringIO)
+        @mock.patch('sys.stdout', new_callable=StringIO)
         def get_port(number, mock_stdout):
             self.command.dispatch(['port', 'simple', str(number)], None)
             return mock_stdout.getvalue().rstrip()
@@ -525,7 +525,7 @@ class CLITestCase(DockerClientTestCase):
             self.project.containers(service_names=['simple']),
             key=attrgetter('name'))
 
-        @patch('sys.stdout', new_callable=StringIO)
+        @mock.patch('sys.stdout', new_callable=StringIO)
         def get_port(number, mock_stdout, index=None):
             if index is None:
                 self.command.dispatch(['port', 'simple', str(number)], None)
@@ -547,7 +547,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 1)
         self.assertIn("FOO=1", containers[0].get('Config.Env'))
 
-    @patch.dict(os.environ)
+    @mock.patch.dict(os.environ)
     def test_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
         os.environ['HOME'] = '/tmp/home-dir'

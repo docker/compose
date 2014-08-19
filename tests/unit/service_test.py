@@ -2,9 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
-import mock
 from docker.utils import LogConfig
 
+from .. import mock
 from .. import unittest
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT

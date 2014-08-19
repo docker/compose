@@ -1,7 +1,7 @@
 include Dockerfile
 include LICENSE
 include requirements.txt
-include requirements-dev.txt
+include requirements-dev*.txt
 include tox.ini
 include *.md
 include compose/config/schema.json
