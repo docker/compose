@@ -4,6 +4,8 @@ from __future__ import unicode_literals
 import sys
 from itertools import cycle
 
+import six
+
 from . import colors
 from .multiplexer import Multiplexer
 from .utils import split_buffer
@@ -20,6 +22,8 @@ class LogPrinter(object):
     def run(self):
         mux = Multiplexer(self.generators)
         for line in mux.loop():
+            if isinstance(line, six.text_type) and not six.PY3:
+                line = line.encode('utf-8')
             self.output.write(line)
 
     def _calculate_prefix_width(self, containers):
@@ -52,7 +56,7 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(self._generate_prefix(container)).encode('utf-8')
+        prefix = color_fn(self._generate_prefix(container))
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
 

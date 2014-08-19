@@ -727,7 +727,7 @@ class Service(object):
         try:
             all_events = stream_output(build_output, sys.stdout)
         except StreamOutputError as e:
-            raise BuildError(self, unicode(e))
+            raise BuildError(self, six.text_type(e))
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes

@@ -1,8 +1,8 @@
 from __future__ import unicode_literals
 
 import docker
-import mock
 
+from .. import mock
 from .. import unittest
 from compose.const import LABEL_SERVICE
 from compose.container import Container

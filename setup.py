@@ -48,8 +48,11 @@ tests_require = [
 ]
 
 
-if sys.version_info < (2, 7):
+if sys.version_info < (2, 6):
     tests_require.append('unittest2')
+if sys.version_info[:1] < (3,):
+    tests_require.append('pyinstaller')
+    tests_require.append('mock >= 1.0.1')
 
 
 setup(

@@ -3,9 +3,8 @@ from __future__ import unicode_literals
 
 import os
 
-import mock
-
 from compose.cli import docker_client
+from tests import mock
 from tests import unittest
 
 
