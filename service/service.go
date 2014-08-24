@@ -244,16 +244,12 @@ func (s *Service) Exists() bool {
 }
 
 func (s *Service) Wait(wg *sync.WaitGroup) (int, error) {
-	exited := make(chan int)
-	go func(s Service) {
-		exitCode, err := s.Api.WaitContainer(s.Name)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "container wait had error", err)
-		}
-		exited <- exitCode
-	}(*s)
-	exitCode := <-exited
-	wg.Done()
+	defer wg.Done()
+	exitCode, err := s.Api.WaitContainer(s.Name)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "container wait had error", err)
+		return exitCode, err
+	}
 	return exitCode, nil
 }
 
