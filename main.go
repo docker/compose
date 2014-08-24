@@ -241,6 +241,10 @@ func main() {
 					Usage: "Detached mode: Run containers in the background, print new container names.",
 				},
 				gangstaCli.BoolFlag{
+					Name:  "k,kill",
+					Usage: "Kill instead of stop on terminal stignal",
+				},
+				gangstaCli.BoolFlag{
 					Name:  "no-clean",
 					Usage: "Don't remove containers after signal interrupt (CTRL+C)",
 				},

@@ -257,9 +257,16 @@ func CmdUp(c *gangstaCli.Context) {
 		for _ = range signalChan {
 			fmt.Println("\nReceived an interrupt, stopping services...")
 			for _, s := range coloredServices {
-				err := s.Stop()
-				if err != nil {
-					fmt.Fprintln(os.Stderr, "stopping error", err)
+				if c.Bool("kill") {
+					err := s.Kill()
+					if err != nil {
+						fmt.Fprintln(os.Stderr, "killing error", err)
+					}
+				} else {
+					err := s.Stop()
+					if err != nil {
+						fmt.Fprintln(os.Stderr, "stopping error", err)
+					}
 				}
 				if !c.Bool("no-clean") {
 					fmt.Println("Removing service", s.Name, "...")
