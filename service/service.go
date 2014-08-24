@@ -16,24 +16,24 @@ type Service struct {
 	LogPrefix            string
 	Env                  interface{} `yaml:"environment"`
 	EnvironmentVariables []string
-	Expose               string   `yaml:"expose"`
-	Image                string   `yaml:"image"`
-	BuildDir             string   `yaml:"build"`
-	Dns                  []string `yaml:"dns"`
-	NetworkingMode       string   `yaml:"net"`
-	Command              string   `yaml:"command"`
-	Links                []string `yaml:"links"`
-	Ports                []string `yaml:"ports"`
-	Volumes              []string `yaml:"volumes"`
-	VolumesFrom          []string `yaml:"volumes_from"`
-	WorkingDir           string   `yaml:"working_dir"`
-	Entrypoint           string   `yaml:"entrypoint"`
-	User                 string   `yaml:"user"`
-	HostName             string   `yaml:"hostname"`
-	DomainName           string   `yaml:"domainname"`
-	MemLimit             string   `yaml:"mem_limit"`
-	Privileged           bool     `yaml:"privileged"`
-	WatchDirs            []string `yaml:"watch"`
+	Expose               string              `yaml:"expose"`
+	Image                string              `yaml:"image"`
+	BuildDir             string              `yaml:"build"`
+	Dns                  []string            `yaml:"dns"`
+	NetworkingMode       string              `yaml:"net"`
+	Command              string              `yaml:"command"`
+	Links                []string            `yaml:"links"`
+	Ports                []string            `yaml:"ports"`
+	Volumes              map[string]struct{} `yaml:"volumes"`
+	VolumesFrom          []string            `yaml:"volumes_from"`
+	WorkingDir           string              `yaml:"working_dir"`
+	Entrypoint           string              `yaml:"entrypoint"`
+	User                 string              `yaml:"user"`
+	HostName             string              `yaml:"hostname"`
+	DomainName           string              `yaml:"domainname"`
+	MemLimit             string              `yaml:"mem_limit"`
+	Privileged           bool                `yaml:"privileged"`
+	WatchDirs            []string            `yaml:"watch"`
 	IsBase               bool
 
 	ExposedPorts map[apiClient.Port]struct{}
@@ -115,6 +115,10 @@ func (s *Service) Create() error {
 			return err
 		}
 	}
+	volumesFrom := ""
+	if s.VolumesFrom != nil {
+		volumesFrom = s.VolumesFrom[0]
+	}
 
 	config := apiClient.Config{
 		AttachStdout: true,
@@ -123,6 +127,8 @@ func (s *Service) Create() error {
 		Cmd:          strings.Fields(s.Command),
 		Env:          s.EnvironmentVariables,
 		ExposedPorts: s.ExposedPorts,
+		Volumes:      s.Volumes,
+		VolumesFrom:  volumesFrom,
 	}
 	createOpts := apiClient.CreateContainerOptions{
 		Name:   s.Name,
@@ -156,6 +162,7 @@ func (s *Service) Start() error {
 	err := s.Api.StartContainer(s.Container.ID, &apiClient.HostConfig{
 		Links:        links,
 		PortBindings: s.createPortBindings(),
+		VolumesFrom:  s.VolumesFrom,
 	})
 	if err != nil {
 		return err
