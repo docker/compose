@@ -9,38 +9,54 @@ import (
 	"github.com/docker/fig/service"
 )
 
+func runService(srv *service.Service) error {
+	fmt.Println("Creating srv", srv.Name)
+	err := srv.Create()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating service", err)
+		os.Exit(1)
+	}
+	err = srv.Start()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting service", err)
+		os.Exit(1)
+	}
+	return nil
+}
+
 func runServices(services []service.Service) error {
+	var err error
 	started := make(map[string]bool)
 	stopped := make(map[string]bool)
 	nToStart := len(services)
 
 	for {
 		/* Boot services in proper order */
-		for _, service := range services {
+		for _, srv := range services {
 			shouldStart := true
-			if !stopped[service.Name] {
-				service.Stop()
-				service.Remove()
-				stopped[service.Name] = true
+			if !stopped[srv.Name] {
+				err = srv.Stop()
+				if err != nil {
+					return err
+				}
+				err = srv.Remove()
+				if err != nil {
+					return err
+				}
+				stopped[srv.Name] = true
 			}
-			for _, link := range service.Links {
+			fmt.Println(srv.Links)
+			for _, link := range srv.Links {
 				if !started[link] {
 					shouldStart = false
 				}
 			}
 			if shouldStart {
-				fmt.Println("Creating service", service.Name)
-				err := service.Create()
+				err := runService(&srv)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error creating service", err)
-					os.Exit(1)
+					return err
 				}
-				err = service.Start()
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error starting service", err)
-					os.Exit(1)
-				}
-				started[service.Name] = true
+				started[srv.Name] = true
 				nToStart--
 				if nToStart == 0 {
 					return nil
