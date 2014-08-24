@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"sort"
@@ -124,28 +125,28 @@ func CmdUp(c *gangstaCli.Context) {
 
 	namedServices := []service.Service{}
 
-	for name, service := range services {
-		if service.Image == "" {
+	for name, s := range services {
+		if s.Image == "" {
 			curdir, err := os.Getwd()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Error getting name of current directory")
 			}
 			imageName = fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
-			service.Image = imageName
-			buildDir = service.BuildDir
+			s.Image = imageName
+			buildDir = s.BuildDir
 			dockerIgnorePath = buildDir + "/.dockerignore"
 			err = cli.CmdBuild("-t", imageName, buildDir)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error running build for image", err)
 				os.Exit(1)
 			}
-			service.IsBase = true
+			s.IsBase = true
 		} else {
-			service.IsBase = false
+			s.IsBase = false
 		}
-		service.Name = name
-		service.Api = api
-		namedServices = append(namedServices, service)
+		s.Name = name
+		s.Api = api
+		namedServices = append(namedServices, s)
 	}
 
 	coloredServices := setColoredPrefixes(namedServices)
@@ -165,8 +166,8 @@ func CmdUp(c *gangstaCli.Context) {
 	}
 
 	if c.Bool("watch") {
-		for index, service := range coloredServices {
-			if service.IsBase {
+		for index, s := range coloredServices {
+			if s.IsBase {
 				baseServiceIndex = index
 			}
 		}
@@ -240,5 +241,22 @@ func CmdUp(c *gangstaCli.Context) {
 		}
 	}
 
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
+	go func() {
+		for _ = range signalChan {
+			fmt.Println("Received a interrupt, Cleaning up...")
+			for _, s := range coloredServices {
+				err := s.Stop()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "stopping error", err)
+				}
+				err = s.Remove()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "removing error", err)
+				}
+			}
+		}
+	}()
 	wg.Wait()
 }

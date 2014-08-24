@@ -107,9 +107,11 @@ func (s *Service) createEnvironmentVariables() error {
 
 func (s *Service) Create() error {
 	s.configureExposedPorts()
-	err := s.createEnvironmentVariables()
-	if err != nil {
-		return err
+	if s.Env != nil {
+		err := s.createEnvironmentVariables()
+		if err != nil {
+			return err
+		}
 	}
 
 	config := apiClient.Config{
@@ -166,11 +168,42 @@ func (s *Service) Restart() error {
 	}
 	return nil
 }
-
 func (s *Service) Stop() error {
+	if s.IsRunning() {
+		err := s.stop()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error stopping running service!")
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) stop() error {
 	err := s.Api.StopContainer(s.Name, 10)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s *Service) Remove() error {
+	if s.Exists() {
+		err := s.remove()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error removing running service!")
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) remove() error {
+	err := s.Api.RemoveContainer(apiClient.RemoveContainerOptions{
+		ID: s.Name,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "attempt to remove container ", s.Name, "failed", err)
 	}
 	return nil
 }
@@ -182,16 +215,6 @@ func (s *Service) Kill() error {
 	err := s.Api.KillContainer(options)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-func (s *Service) Remove() error {
-	err := s.Api.RemoveContainer(apiClient.RemoveContainerOptions{
-		ID: s.Name,
-	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "attempt to remove container ", s.Name, "failed", err)
 	}
 	return nil
 }

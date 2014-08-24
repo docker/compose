@@ -19,12 +19,8 @@ func runServices(services []service.Service) error {
 		for _, service := range services {
 			shouldStart := true
 			if !stopped[service.Name] {
-				if service.IsRunning() {
-					service.Stop()
-				}
-				if service.Exists() {
-					service.Remove()
-				}
+				service.Stop()
+				service.Remove()
 				stopped[service.Name] = true
 			}
 			for _, link := range service.Links {
@@ -91,7 +87,7 @@ func waitServices(services []service.Service, wg *sync.WaitGroup) error {
 	// Add one counter to the waitgroup for the group of services.
 	// If even one of the services exits (without a restart), we should exit the
 	// root process.
-	wg.Add(1)
+	wg.Add(len(services))
 	for _, service := range services {
 		go service.Wait(wg)
 	}
