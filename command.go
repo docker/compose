@@ -117,7 +117,13 @@ func CmdUp(c *gangstaCli.Context) {
 	location := splitDockerHost[len(splitDockerHost)-1]
 
 	cli := dockerCli.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, protocol, location, nil)
-	servicesRaw, err := ioutil.ReadFile("fig.yml")
+	filename := ""
+	if c.GlobalString("file") != "" {
+		filename = c.GlobalString("file")
+	} else {
+		filename = "fig.yml"
+	}
+	servicesRaw, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error opening fig.yml file")
