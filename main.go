@@ -10,7 +10,7 @@ import (
 )
 
 func runService(srv *service.Service) error {
-	fmt.Println("Creating srv", srv.Name)
+	fmt.Println("Running service", srv.Name)
 	err := srv.Create()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating service", err)
@@ -45,7 +45,6 @@ func runServices(services []service.Service) error {
 				}
 				stopped[srv.Name] = true
 			}
-			fmt.Println(srv.Links)
 			for _, link := range srv.Links {
 				if !started[link] {
 					shouldStart = false
@@ -246,7 +245,7 @@ func main() {
 				},
 				gangstaCli.BoolFlag{
 					Name:  "no-clean",
-					Usage: "Don't remove containers after signal interrupt (CTRL+C)",
+					Usage: "Don't remove containers after termination signal interrupt (CTRL+C)",
 				},
 				gangstaCli.BoolFlag{
 					Name:  "no-deps",
