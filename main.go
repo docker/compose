@@ -225,6 +225,10 @@ func main() {
 					Usage: "Detached mode: Run containers in the background, print new container names.",
 				},
 				gangstaCli.BoolFlag{
+					Name:  "no-clean",
+					Usage: "Don't remove containers after signal interrupt (CTRL+C)",
+				},
+				gangstaCli.BoolFlag{
 					Name:  "no-deps",
 					Usage: "Don't start linked services.",
 				},

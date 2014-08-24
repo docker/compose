@@ -254,9 +254,11 @@ func CmdUp(c *gangstaCli.Context) {
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "stopping error", err)
 				}
-				err = s.Remove()
-				if err != nil {
-					fmt.Fprintln(os.Stderr, "removing error", err)
+				if !c.Bool("no-clean") {
+					err = s.Remove()
+					if err != nil {
+						fmt.Fprintln(os.Stderr, "removing error", err)
+					}
 				}
 			}
 		}
