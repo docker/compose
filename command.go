@@ -98,9 +98,8 @@ func buildMsg() {
 
 func CmdUp(c *gangstaCli.Context) {
 	var (
-		wg        sync.WaitGroup
-		buildDir  string
-		imageName string
+		wg       sync.WaitGroup
+		buildDir string
 	)
 
 	dockerHost := os.Getenv("DOCKER_HOST")
@@ -132,17 +131,18 @@ func CmdUp(c *gangstaCli.Context) {
 	namedServices := []service.Service{}
 
 	for name, s := range services {
+		s.Cli = cli
 		if s.Image == "" {
 			buildMsg()
 			curdir, err := os.Getwd()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Error getting name of current directory")
 			}
-			imageName = fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
+			imageName := fmt.Sprintf("%s_%s", filepath.Base(curdir), name)
 			s.Image = imageName
 			buildDir = s.BuildDir
 			dockerIgnorePath = buildDir + "/.dockerignore"
-			err = cli.CmdBuild("-t", imageName, buildDir)
+			err = s.Build()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error running build for image", err)
 				os.Exit(1)

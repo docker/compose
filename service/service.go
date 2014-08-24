@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	dockerCli "github.com/docker/docker/api/client"
 	apiClient "github.com/fsouza/go-dockerclient"
 )
 
@@ -40,12 +41,18 @@ type Service struct {
 	Container    apiClient.Container
 	OnAttachHook func(io.Reader, Service)
 	Api          *apiClient.Client
+	Cli          *dockerCli.DockerCli
 }
 
 type EnvDemarshallingError struct{}
 
 func (e EnvDemarshallingError) Error() string {
 	return "fig.yml environment setting does not map to slice of strings, or dictionary of string: string"
+}
+
+func (s *Service) Build() error {
+	err := s.Cli.CmdBuild("-t", s.Image, s.BuildDir)
+	return err
 }
 
 /**
