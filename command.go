@@ -245,23 +245,28 @@ func CmdUp(c *gangstaCli.Context) {
 	}
 
 	signalChan := make(chan os.Signal, 1)
+	cleanupDone := make(chan bool)
 	signal.Notify(signalChan, os.Interrupt)
 	go func() {
 		for _ = range signalChan {
-			fmt.Println("Received a interrupt, Cleaning up...")
+			fmt.Println("\nReceived an interrupt, stopping services...")
 			for _, s := range coloredServices {
 				err := s.Stop()
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "stopping error", err)
 				}
 				if !c.Bool("no-clean") {
+					fmt.Println("Removing service", s.Name, "...")
 					err = s.Remove()
 					if err != nil {
 						fmt.Fprintln(os.Stderr, "removing error", err)
 					}
 				}
 			}
+			cleanupDone <- true
 		}
 	}()
+
 	wg.Wait()
+	<-cleanupDone
 }
