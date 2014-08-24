@@ -88,6 +88,14 @@ func CmdStart(c *gangstaCli.Context) {
 func CmdStop(c *gangstaCli.Context) {
 }
 
+func buildMsg() {
+	fmt.Println("********************************************")
+	fmt.Println("********************************************")
+	fmt.Println("*** Image Name not specified, building... **")
+	fmt.Println("********************************************")
+	fmt.Println("********************************************")
+}
+
 func CmdUp(c *gangstaCli.Context) {
 	var (
 		wg        sync.WaitGroup
@@ -125,6 +133,7 @@ func CmdUp(c *gangstaCli.Context) {
 
 	for name, s := range services {
 		if s.Image == "" {
+			buildMsg()
 			curdir, err := os.Getwd()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Error getting name of current directory")
