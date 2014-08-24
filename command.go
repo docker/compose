@@ -90,11 +90,9 @@ func CmdStop(c *gangstaCli.Context) {
 
 func CmdUp(c *gangstaCli.Context) {
 	var (
-		wg               sync.WaitGroup
-		buildDir         string
-		imageName        string
-		baseService      service.Service
-		baseServiceIndex int
+		wg        sync.WaitGroup
+		buildDir  string
+		imageName string
 	)
 
 	dockerHost := os.Getenv("DOCKER_HOST")
@@ -166,78 +164,74 @@ func CmdUp(c *gangstaCli.Context) {
 	}
 
 	if c.Bool("watch") {
-		for index, s := range coloredServices {
-			if s.IsBase {
-				baseServiceIndex = index
+		for _, watchedService := range coloredServices {
+			sequence := []RebootStep{
+				{"build", func() error {
+					err := cli.CmdBuild("-t", imageName, buildDir)
+					return err
+				}},
+				{"stop", watchedService.Stop},
+				{"remove", watchedService.Remove},
+				{"create", watchedService.Create},
+				{"start", watchedService.Start},
+				{"attach", watchedService.Attach},
 			}
-		}
-		baseService = coloredServices[baseServiceIndex]
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error creating fs watcher", err)
-		}
-
-		timer := &time.Timer{}
-
-		sequence := []RebootStep{
-			{"build", func() error {
-				err := cli.CmdBuild("-t", imageName, buildDir)
-				return err
-			}},
-			{"stop", baseService.Stop},
-			{"remove", baseService.Remove},
-			{"create", baseService.Create},
-			{"start", baseService.Start},
-			{"attach", baseService.Attach},
-		}
-
-		go func() {
-			for {
-				select {
-				case ev := <-watcher.Event:
-					fmt.Println("got event", ev)
-					times := []TimedEvent{}
-					lastStep := time.Now()
-					rebuildStartTime := time.Now()
-					if !ignoreFile(ev.Name) {
-						if ev.IsModify() && ev.IsAttrib() {
-							timer.Stop()
-							timer = time.AfterFunc(100*time.Millisecond, func() {
-								wg.Add(1)
-								for _, rebootStep := range sequence {
-									lastStep = time.Now()
-									err = rebootStep.method()
-									if err != nil {
-										fmt.Fprintln(os.Stderr, "error attempting container", rebootStep.stepName, err)
+			timer := &time.Timer{}
+			watcher, err := fsnotify.NewWatcher()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Error creating fs watcher", err)
+			}
+			go func() {
+				for {
+					select {
+					case ev := <-watcher.Event:
+						fmt.Println("got event", ev)
+						times := []TimedEvent{}
+						lastStep := time.Now()
+						rebuildStartTime := time.Now()
+						if !ignoreFile(ev.Name) {
+							if ev.IsModify() && ev.IsAttrib() {
+								timer.Stop()
+								timer = time.AfterFunc(100*time.Millisecond, func() {
+									wg.Add(1)
+									for _, rebootStep := range sequence {
+										lastStep = time.Now()
+										err = rebootStep.method()
+										if err != nil {
+											fmt.Fprintln(os.Stderr, "error attempting container", rebootStep.stepName, err)
+										}
+										times = append(times, TimedEvent{rebootStep.stepName, time.Since(lastStep)})
 									}
-									times = append(times, TimedEvent{rebootStep.stepName, time.Since(lastStep)})
-								}
-								timedEventSorter := timedEventSorter{
-									events: times,
-									by: func(te1, te2 *TimedEvent) bool {
-										return te1.duration > te2.duration
-									},
-								}
-								sort.Sort(&timedEventSorter)
-								fmt.Println("-> Rebuild time took", time.Since(rebuildStartTime).Seconds(), "seconds total")
-								for _, timedEvent := range times {
-									fmt.Printf("\t-> %-6s %s %f seconds\n", timedEvent.eventName, "took", timedEvent.duration.Seconds())
-								}
-								go baseService.Wait(&wg)
-								<-watcher.Event
-							})
+									timedEventSorter := timedEventSorter{
+										events: times,
+										by: func(te1, te2 *TimedEvent) bool {
+											return te1.duration > te2.duration
+										},
+									}
+									sort.Sort(&timedEventSorter)
+									fmt.Println("-> Rebuild time took", time.Since(rebuildStartTime).Seconds(), "seconds total")
+									for _, timedEvent := range times {
+										fmt.Printf("\t-> %-6s %s %f seconds\n", timedEvent.eventName, "took", timedEvent.duration.Seconds())
+									}
+									go watchedService.Wait(&wg)
+									<-watcher.Event
+								})
+							}
 						}
+					case err = <-watcher.Error:
+						fmt.Fprintln(os.Stderr, err)
+					default:
 					}
-				case err = <-watcher.Error:
-					fmt.Fprintln(os.Stderr, err)
-				default:
+				}
+			}()
+
+			for _, dir := range watchedService.WatchDirs {
+				err = watcher.Watch(dir)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Error watching directory", buildDir, err)
 				}
 			}
-		}()
 
-		err = watcher.Watch(buildDir)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error watching directory", buildDir, err)
 		}
 	}
 

@@ -33,11 +33,13 @@ type Service struct {
 	DomainName           string   `yaml:"domainname"`
 	MemLimit             string   `yaml:"mem_limit"`
 	Privileged           bool     `yaml:"privileged"`
+	WatchDirs            []string `yaml:"watch"`
 	IsBase               bool
-	ExposedPorts         map[apiClient.Port]struct{}
-	Container            apiClient.Container
-	OnAttachHook         func(io.Reader, Service)
-	Api                  *apiClient.Client
+
+	ExposedPorts map[apiClient.Port]struct{}
+	Container    apiClient.Container
+	OnAttachHook func(io.Reader, Service)
+	Api          *apiClient.Client
 }
 
 type EnvDemarshallingError struct{}
