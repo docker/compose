@@ -10,7 +10,6 @@ class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = Client(docker_url())
-        cls.client.pull('busybox', tag='latest')
 
     def setUp(self):
         for c in self.client.containers(all=True):
