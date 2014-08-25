@@ -232,9 +232,6 @@ func CmdUp(c *gangstaCli.Context) {
 				fmt.Fprintln(os.Stderr, "error running build for image", err)
 				os.Exit(1)
 			}
-			s.IsBase = true
-		} else {
-			s.IsBase = false
 		}
 		s.Name = name
 		s.Api = api
