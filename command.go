@@ -159,7 +159,7 @@ func watchService(srv *service.Service, wg *sync.WaitGroup) {
 	}()
 
 	for _, dir := range srv.WatchDirs {
-		err = watcher.Watch(".")
+		err = watcher.Watch(dir)
 		fmt.Println("watching directory", dir)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error watching directory", srv.BuildDir, err)
@@ -269,30 +269,36 @@ func CmdUp(c *gangstaCli.Context) {
 	go func() {
 		for _ = range signalChan {
 			fmt.Println("\nReceived an interrupt, stopping services...")
-			for _, s := range coloredServices {
-				if c.Bool("kill") {
-					err := s.Kill()
-					if err != nil {
-						fmt.Fprintln(os.Stderr, "killing error", err)
-					}
-				} else {
-					err := s.Stop()
-					if err != nil {
-						fmt.Fprintln(os.Stderr, "stopping error", err)
-					}
-				}
-				if !c.Bool("no-clean") {
-					fmt.Println("Removing service", s.Name, "...")
-					err = s.Remove()
-					if err != nil {
-						fmt.Fprintln(os.Stderr, "removing error", err)
-					}
-				}
-			}
+			cleanup(coloredServices, c)
 			cleanupDone <- true
 		}
 	}()
 
 	wg.Wait()
 	<-cleanupDone
+}
+
+func cleanup(services []service.Service, c *gangstaCli.Context) {
+	var err error
+	for _, s := range services {
+		if c.Bool("kill") {
+			err = s.Kill()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "killing error", err)
+			}
+		} else {
+			err = s.Stop()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "stopping error", err)
+			}
+		}
+		if !c.Bool("no-clean") {
+			fmt.Println("Removing service", s.Name, "...")
+			err = s.Remove()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "removing error", err)
+			}
+		}
+	}
+
 }
