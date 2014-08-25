@@ -230,10 +230,11 @@ class Service(object):
         if options.get('volumes', None) is not None:
             for volume in options['volumes']:
                 if ':' in volume:
-                    external_dir, internal_dir = volume.split(':')
+                    volume_split = split_volume(volume)
+                    external_dir, internal_dir = volume_split[:2]
                     volume_bindings[os.path.abspath(external_dir)] = {
                         'bind': internal_dir,
-                        'ro': False,
+                        'ro': len(volume_split) == 3 and volume_split[2] == 'ro',
                     }
 
         privileged = options.get('privileged', False)
@@ -433,13 +434,16 @@ def get_container_name(container):
 
 def split_volume(v):
     """
+
+    :param v:
     If v is of the format EXTERNAL:INTERNAL, returns (EXTERNAL, INTERNAL).
     If v is of the format INTERNAL, returns (None, INTERNAL).
     """
     if ':' in v:
-        return v.split(':', 1)
+        v_split = v.split(':', 2)
     else:
-        return (None, v)
+        v_split = (None, v)
+    return v_split
 
 
 def split_port(port):
