@@ -245,7 +245,7 @@ class Service(object):
     def start_or_create_containers(self):
         containers = self.containers(stopped=True)
 
-        if len(containers) == 0:
+        if not containers:
             log.info("Creating %s..." % self.next_container_name())
             new_container = self.create_container()
             return [self.start_container(new_container)]
@@ -451,20 +451,20 @@ def build_volume_binding(volume_spec):
 
 
 def split_port(port):
-    port = str(port)
-    external_ip = None
-    if ':' in port:
-        external_port, internal_port = port.rsplit(':', 1)
-        if ':' in external_port:
-            external_ip, external_port = external_port.split(':', 1)
-    else:
-        external_port, internal_port = (None, port)
-    if external_ip:
-        if external_port:
-            external_port = (external_ip, external_port)
-        else:
-            external_port = (external_ip,)
-    return internal_port, external_port
+    parts = str(port).split(':')
+    if not 1 <= len(parts) <= 3:
+        raise ConfigError('Invalid port "%s", should be '
+                          '[[remote_ip:]remote_port:]port[/protocol]' % port)
+
+    if len(parts) == 1:
+        internal_port, = parts
+        return internal_port, None
+    if len(parts) == 2:
+        external_port, internal_port = parts
+        return internal_port, external_port
+
+    external_ip, external_port, internal_port = parts
+    return internal_port, (external_ip, external_port or None)
 
 
 def split_env(env):

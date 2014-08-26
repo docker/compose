@@ -38,22 +38,34 @@ class ServiceTest(unittest.TestCase):
         self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
         Service(name='foo', ports=['8000'])
 
-    def test_split_port(self):
+    def test_split_port_with_host_ip(self):
         internal_port, external_port = split_port("127.0.0.1:1000:2000")
         self.assertEqual(internal_port, "2000")
         self.assertEqual(external_port, ("127.0.0.1", "1000"))
 
+    def test_split_port_with_protocol(self):
         internal_port, external_port = split_port("127.0.0.1:1000:2000/udp")
         self.assertEqual(internal_port, "2000/udp")
         self.assertEqual(external_port, ("127.0.0.1", "1000"))
 
+    def test_split_port_with_host_ip_no_port(self):
         internal_port, external_port = split_port("127.0.0.1::2000")
         self.assertEqual(internal_port, "2000")
-        self.assertEqual(external_port, ("127.0.0.1",))
+        self.assertEqual(external_port, ("127.0.0.1", None))
 
+    def test_split_port_with_host_port(self):
         internal_port, external_port = split_port("1000:2000")
         self.assertEqual(internal_port, "2000")
         self.assertEqual(external_port, "1000")
+
+    def test_split_port_no_host_port(self):
+        internal_port, external_port = split_port("2000")
+        self.assertEqual(internal_port, "2000")
+        self.assertEqual(external_port, None)
+
+    def test_split_port_invalid(self):
+        with self.assertRaises(ConfigError):
+            split_port("0.0.0.0:1000:2000:tcp")
 
     def test_split_domainname_none(self):
         service = Service('foo',
