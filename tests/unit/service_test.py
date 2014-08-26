@@ -82,3 +82,10 @@ class ServiceTest(unittest.TestCase):
         opts = service._get_container_create_options({})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+
+    def test_build_path(self):
+        service = Service('foo', build='.')
+        self.assertEqual(service.build_path, '.')
+
+        service = Service('foo', image='test')
+        self.assertEqual(service.build_path, None)

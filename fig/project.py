@@ -157,11 +157,21 @@ class Project(object):
             service.kill(**options)
 
     def build(self, service_names=None, no_cache=False):
+        _built_images = {}
         for service in self.get_services(service_names):
-            if service.can_be_built():
-                service.build(no_cache)
-            else:
+            is_already_built = service.build_path in _built_images
+            if is_already_built:
+                (builder_service, image_id) = _built_images[service.build_path]
+                service.tag(image_id)
+                log.info(
+                    'Image for %s is already built by %s, the tag will be updated.',
+                    service.name, builder_service
+                )
+            elif not service.can_be_built():
                 log.info('%s uses an image, skipping' % service.name)
+            else:
+                image_id = service.build(no_cache)
+                _built_images[service.build_path] = (service.name, image_id)
 
     def up(self, service_names=None, start_links=True, recreate=True):
         running_containers = []

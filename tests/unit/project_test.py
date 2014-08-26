@@ -1,7 +1,9 @@
 from __future__ import unicode_literals
+from mock import Mock
 from .. import unittest
 from fig.service import Service
 from fig.project import Project, ConfigurationError
+
 
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
@@ -139,3 +141,28 @@ class ProjectTest(unittest.TestCase):
             project.get_services(['web', 'db'], include_links=True),
             [db, web]
         )
+
+    def test_skip_images_already_built(self):
+        test = Service(name='test')
+        srv1 = Mock(spec=test, build_path='/srv/myapp/')
+        srv2 = Mock(spec=test, build_path='/srv/myapp/')
+        srv3 = Mock(spec=test, build_path='/srv/db/')
+        services = [srv1, srv2, srv3]
+        project = Project('test', services, None)
+
+        project.build()
+
+        srv1.build.assert_called_with(False)
+        self.assertFalse(srv2.build.called)
+        self.assertTrue(srv2.tag.called)
+        srv3.build.assert_called_with(False)
+
+    def test_skip_services_with_existing_images(self):
+        test = Service(name='test')
+        srv1 = Mock(spec=test, build_path='/srv/myapp/')
+        srv2 = Mock(spec=test)
+        srv2.can_be_built.return_value = False
+        project = Project('test', [srv1, srv2], None)
+        project.build()
+        srv1.build.assert_called_with(False)
+        self.assertFalse(srv2.build.called)
