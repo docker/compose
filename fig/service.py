@@ -386,6 +386,13 @@ class Service(object):
 
         return image_id
 
+    def tag(self, image_id):
+        self.client.tag(image_id, self._build_tag_name())
+
+    @property
+    def build_path(self):
+        return self.options.get('build')
+
     def can_be_built(self):
         return 'build' in self.options
 
