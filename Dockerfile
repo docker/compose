@@ -1,11 +1,6 @@
-FROM orchardup/python:2.7
-ADD requirements.txt /code/
-WORKDIR /code/
-RUN pip install -r requirements.txt
-ADD requirements-dev.txt /code/
-RUN pip install -r requirements-dev.txt
-ADD . /code/
-RUN python setup.py develop
-RUN useradd -d /home/user -m -s /bin/bash user
-RUN chown -R user /code/
-USER user
+FROM golang:1.3
+
+ADD . /go/src/github.com/docker/fig
+WORKDIR /go/src/github.com/docker/fig
+RUN go get ./...
+RUN go build
