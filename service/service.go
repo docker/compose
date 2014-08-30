@@ -97,16 +97,44 @@ func (s *Service) configureExposedPorts() {
 	}
 }
 
+func envInterfaceToString(i interface{}) (string, error) {
+	var vStr string
+	switch v := i.(type) {
+	case int:
+		vStr = fmt.Sprintf("%v", v)
+	case float64:
+		vStr = fmt.Sprintf("%v", v)
+	case string:
+		vStr = v
+	default:
+		// didn't recognize the type
+		return "", EnvDemarshallingError{}
+	}
+	return vStr, nil
+}
+
 func (s *Service) createEnvironmentVariables() error {
 	if envMap, ok := s.Env.(map[interface{}]interface{}); ok {
 		for key, value := range envMap {
-			s.EnvironmentVariables = append(s.EnvironmentVariables, fmt.Sprintf("%s=%s", key, value))
+			eStrKey, err := envInterfaceToString(key)
+			if err != nil {
+				return err
+			}
+			eStrVal, err := envInterfaceToString(value)
+			if err != nil {
+				return err
+			}
+			s.EnvironmentVariables = append(s.EnvironmentVariables, fmt.Sprintf("%s=%s", eStrKey, eStrVal))
 		}
 		return nil
 	}
 	if envStringSlice, ok := s.Env.([]interface{}); ok {
 		for _, e := range envStringSlice {
-			s.EnvironmentVariables = append(s.EnvironmentVariables, e.(string))
+			eStrVal, err := envInterfaceToString(e)
+			if err != nil {
+				return err
+			}
+			s.EnvironmentVariables = append(s.EnvironmentVariables, eStrVal)
 		}
 		return nil
 	}
