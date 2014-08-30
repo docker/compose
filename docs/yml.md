@@ -146,6 +146,18 @@ dns:
   - 9.9.9.9
 ```
 
+### tags
+
+Tag the image with additional names when it is built.
+
+```
+tags:
+  - foo
+  - user/service_foo
+  - user/service_foo:v2.3
+```
+
+
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.

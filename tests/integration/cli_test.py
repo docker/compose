@@ -6,6 +6,7 @@ from mock import patch
 
 from .testcases import DockerClientTestCase
 from fig.cli.main import TopLevelCommand
+from fig.service import split_tag
 
 
 class CLITestCase(DockerClientTestCase):
@@ -74,6 +75,21 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['build', '--no-cache', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_build_with_tags(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/tags-figfile'
+        tags = self.project.get_service('simple').options['tags']
+
+        try:
+            self.command.dispatch(['build', 'simple'], None)
+            for tag in tags:
+                tag_name, _ = split_tag(tag)
+                self.assertTrue(self.client.images(tag_name))
+        finally:
+            for tag in tags:
+                self.client.remove_image(tag, force=True)
+
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')

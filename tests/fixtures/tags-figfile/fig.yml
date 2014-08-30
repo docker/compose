@@ -1,0 +1,10 @@
+
+simple:
+  build: tests/fixtures/tags-figfile
+  command: /bin/sleep 300
+  tags:
+    - 'tag-without-version'
+    - 'tag-with-version:v3'
+    - 'user/tag-with-user'
+    - 'user/tag-with-user-and-version:v4'
+
