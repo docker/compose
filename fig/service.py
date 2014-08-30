@@ -30,6 +30,10 @@ class BuildError(Exception):
         self.service = service
         self.reason = reason
 
+class PublishError(Exception):
+    def __init__(self, service, reason):
+        self.service = service
+        self.reason = reason
 
 class CannotBeScaledError(Exception):
     pass
@@ -40,11 +44,14 @@ class ConfigError(ValueError):
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, **options):
+    def __init__(self, name, client=None, project='default', repository='', links=None, volumes_from=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
             raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
+        if repository:
+            if not re.match('^%s+$' % VALID_NAME_CHARS, repository):
+                raise ConfigError('Invalid repository name "%s" - only %s are allowed' % (repository, VALID_NAME_CHARS))
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
@@ -58,6 +65,7 @@ class Service(object):
                 raise ConfigError(msg)
 
         self.name = name
+        self.repository = repository
         self.client = client
         self.project = project
         self.links = links or []
@@ -386,6 +394,32 @@ class Service(object):
 
         return image_id
 
+    def push(self):
+        log.info('Pushing %s...' % self.name)
+
+        push_output = self.client.push(
+            self._build_tag_name(),
+            stream=True
+        )
+
+        try:
+            all_events = stream_output(push_output, sys.stdout)
+        except StreamOutputError, e:
+            raise PublishError(self, unicode(e))
+
+        success = False
+
+        for event in all_events:
+            if 'status' in event:
+                match = re.search(r'Pushing tag for rev', event.get('status', ''))
+                if match:
+                    success = True
+
+        if success is False:
+            raise PublishError(self)
+
+        return True
+
     def can_be_built(self):
         return 'build' in self.options
 
@@ -393,7 +427,10 @@ class Service(object):
         """
         The tag to give to images built for this service.
         """
-        return '%s_%s' % (self.project, self.name)
+        if self.repository:
+            return '%s/%s_%s' % (self.repository, self.project, self.name)
+        else:
+            return '%s_%s' % (self.project, self.name)
 
     def can_be_scaled(self):
         for port in self.options.get('ports', []):

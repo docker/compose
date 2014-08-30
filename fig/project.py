@@ -44,33 +44,33 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client):
+    def __init__(self, name, repo_name, services, client):
         self.name = name
+        self.repo_name = repo_name
         self.services = services
         self.client = client
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, repo_name, service_dicts, client):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
-        project = cls(name, [], client)
+        project = cls(name, repo_name, [], client)
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
-
-            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
+            project.services.append(Service(client=client, project=name, repository=repo_name, links=links, volumes_from=volumes_from, **service_dict))
         return project
 
     @classmethod
-    def from_config(cls, name, config, client):
+    def from_config(cls, name, repo_name, config, client):
         dicts = []
         for service_name, service in list(config.items()):
             if not isinstance(service, dict):
                 raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.')
             service['name'] = service_name
             dicts.append(service)
-        return cls.from_dicts(name, dicts, client)
+        return cls.from_dicts(name, repo_name, dicts, client)
 
     def get_service(self, name):
         """
@@ -160,6 +160,13 @@ class Project(object):
         for service in self.get_services(service_names):
             if service.can_be_built():
                 service.build(no_cache)
+            else:
+                log.info('%s uses an image, skipping' % service.name)
+
+    def push(self, service_names=None):
+        for service in self.get_services(service_names):
+            if service.can_be_built():
+                service.push()
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
