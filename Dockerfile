@@ -1,5 +1,5 @@
-FROM ubuntu:14.04
-RUN apt-get update -qq && apt-get install -qy python python-pip python-dev
+FROM debian:wheezy
+RUN apt-get update -qq && apt-get install -qy python python-pip python-dev && apt-get clean
 ADD requirements.txt /code/
 WORKDIR /code/
 RUN pip install -r requirements.txt
