@@ -175,29 +175,62 @@ class ServiceTest(DockerClientTestCase):
     def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, None)])
+
+        db.start_container()
         db.start_container()
         web.start_container()
-        self.assertIn('figtest_db_1', web.containers()[0].links())
-        self.assertIn('db_1', web.containers()[0].links())
+
+        self.assertEqual(
+            set(web.containers()[0].links()),
+            set([
+                'figtest_db_1', 'db_1',
+                'figtest_db_2', 'db_2',
+                'db',
+            ]),
+        )
 
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'custom_link_name')])
+
+        db.start_container()
         db.start_container()
         web.start_container()
-        self.assertIn('custom_link_name', web.containers()[0].links())
+
+        self.assertEqual(
+            set(web.containers()[0].links()),
+            set([
+                'figtest_db_1', 'db_1',
+                'figtest_db_2', 'db_2',
+                'custom_link_name',
+            ]),
+        )
 
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
         db = self.create_service('db')
-        c1 = db.start_container()
-        c2 = db.start_container()
-        self.assertNotIn(c1.name, c2.links())
+
+        db.start_container()
+        db.start_container()
+
+        c = db.start_container()
+        self.assertEqual(set(c.links()), set([]))
 
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
-        c1 = db.start_container()
-        c2 = db.start_container(one_off=True)
-        self.assertIn(c1.name, c2.links())
+
+        db.start_container()
+        db.start_container()
+
+        c = db.start_container(one_off=True)
+
+        self.assertEqual(
+            set(c.links()),
+            set([
+                'figtest_db_1', 'db_1',
+                'figtest_db_2', 'db_2',
+                'db',
+            ]),
+        )
 
     def test_start_container_builds_images(self):
         service = Service(
