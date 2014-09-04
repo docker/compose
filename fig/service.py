@@ -11,7 +11,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'devices', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -19,6 +19,7 @@ DOCKER_CONFIG_HINTS = {
     'priviliged': 'privileged',
     'privilige' : 'privileged',
     'volume'    : 'volumes',
+    'device'    : 'devices',
     'workdir'   : 'working_dir',
 }
 
@@ -238,6 +239,22 @@ class Service(object):
                         'ro': False,
                     }
 
+        device_bindings = {}
+
+        if options.get('devices', None) is not None:
+            for device in options['devices']:
+                if ':' in device:
+                    external_device, internal_device = device.split(':')
+                    device_bindings[os.path.abspath(external_device)] = {
+                        'bind': internal_device,
+                        'rom': False,
+                    }
+                else:
+                    device_bindings[os.path.abspath(device)] = {
+                        'bind': device,
+                        'rom': False
+                    }
+
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
@@ -246,6 +263,7 @@ class Service(object):
             links=self._get_links(link_to_self=override_options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
+            device_binds=device_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=net,
@@ -339,6 +357,9 @@ class Service(object):
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
+
+        if 'devices' in container_options:
+            container_options['devices'] = dict((split_device(v)[1], {}) for v in container_options['devices'])
 
         if 'environment' in container_options:
             if isinstance(container_options['environment'], list):
@@ -442,6 +463,16 @@ def split_volume(v):
         return v.split(':', 1)
     else:
         return (None, v)
+
+def split_device(d):
+    """
+    If d is of the format EXTERNAL:INTERNAL, returns (EXTERNAL, INTERNAL).
+    If d is of the format INTERNAL, returns (None, INTERNAL).
+    """
+    if ':' in d:
+        return d.split(':', 1)
+    else:
+        return (None, d)
 
 
 def split_port(port):
