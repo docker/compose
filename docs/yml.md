@@ -36,10 +36,10 @@ Override the default command.
 command: bundle exec thin -p 3000
 ```
 
+<a name="links"></a>
 ### links
 
-
-Link to containers in another service. Optionally specify an alternate name for the link, which will determine how environment variables are prefixed, e.g. `db` -> `DB_1_PORT`, `db:database` -> `DATABASE_1_PORT`
+Link to containers in another service. Either specify both the service name and the link alias (`SERVICE:ALIAS`), or just the service name (which will also be used for the alias).
 
 ```
 links:
@@ -47,6 +47,16 @@ links:
  - db:database
  - redis
 ```
+
+An entry with the alias' name will be created in `/etc/hosts` inside containers for this service, e.g:
+
+```
+172.17.2.186  db
+172.17.2.186  database
+172.17.2.187  redis
+```
+
+Environment variables will also be created - see the [environment variable reference](env.html) for details.
 
 ### ports
 
