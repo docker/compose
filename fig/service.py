@@ -6,6 +6,7 @@ import logging
 import re
 import os
 import sys
+import shutil
 from .container import Container
 from .progress_stream import stream_output, StreamOutputError
 
@@ -348,39 +349,56 @@ class Service(object):
 
         return container_options
 
+    # If path is a file use it as the active Dockerfile
+    #   by copying it to <context path>/Dockerfile, and if a Dockerfile
+    #   already exists, then temporarily copy it to Dockerfile.bk.
+    # Otherwise, return the context directory unmodified.
+    def create_temp_dockerfile(self, path):
+        bk_made=False
+        context_dir = active_dfile = active_dfile_bk = path
+
+        if os.path.isfile(path):
+          context_dir=os.path.dirname(path)
+          if context_dir == "":
+            context_dir = "."
+
+          active_dfile="%s/Dockerfile" % context_dir
+          active_dfile_bk="%s/Dockerfile.bk" % context_dir
+
+          # if a Dockerfile is already in the directory
+          #  then make a backup copy
+          if os.path.isfile(active_dfile):
+            shutil.copyfile(active_dfile, active_dfile_bk)
+            bk_made=True
+          else:
+            bk_made=False
+
+          # make the current file, the active Dockerfile
+          shutil.copyfile(path, active_dfile)
+
+        return bk_made, active_dfile, active_dfile_bk, context_dir
+
+    #  Remove the temporary Dockerfile and restore the backup of the 
+    #  previous Dockerfile if one was made.
+    def rm_temp_dockerfile(self, bk_made, active_dfile, active_dfile_bk):
+        if bk_made:
+          shutil.copyfile(active_dfile_bk, active_dfile)
+          os.unlink(active_dfile_bk)
+        else:
+          os.unlink(active_dfile)
+
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
-        needs_clean_up=False
-        dirname=self.options['build']
-        if os.path.isfile(self.options['build']):
-          log.info('FILE')
-          filename=os.path.basename(self.options['build'])
-          dirname=os.path.dirname(self.options['build'])
-          if dirname == "":
-            dirname = "."
-
-          log.info('DIRNAME: %s' % dirname)
-          if os.path.isfile("%s/Dockerfile" % dirname):
-            shutil.copyfile("%s/Dockerfile" % dirname, "%s/Dockerfile.bk" % dirname)
-          else:
-            needs_clean_up=True
-          log.info('FILENAME: %s' % filename)
-          shutil.copyfile(self.options['build'], "%s/Dockerfile" % dirname)
-
+        bk_made, active_dfile, active_dfile_bk, context_dir = self.create_temp_dockerfile(self.options['build'])
         build_output = self.client.build(
-            dirname,
+            context_dir,
             tag=self._build_tag_name(),
             stream=True,
             rm=True,
             nocache=no_cache,
         )
-
-        if needs_clean_up:
-          shutil.copyfile("%s/Dockerfile.bk" % dirname, "%s/Dockerfile" % dirname)
-          os.unlink("%s/Dockerfile.bk" % dirname)
-        else:
-          os.unlink("%s/Dockerfile" % dirname)
+        self.rm_temp_dockerfile(bk_made, active_dfile, active_dfile_bk)
 
         try:
             all_events = stream_output(build_output, sys.stdout)
