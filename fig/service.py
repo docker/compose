@@ -354,38 +354,38 @@ class Service(object):
     #   already exists, then temporarily copy it to Dockerfile.bk.
     # Otherwise, return the context directory unmodified.
     def create_temp_dockerfile(self, path):
-        bk_made=False
+        bk_made = False
         context_dir = active_dfile = active_dfile_bk = path
 
         if os.path.isfile(path):
-          context_dir=os.path.dirname(path)
-          if context_dir == "":
-            context_dir = "."
+            context_dir = os.path.dirname(path)
+            if context_dir == "":
+                context_dir = "."
 
-          active_dfile="%s/Dockerfile" % context_dir
-          active_dfile_bk="%s/Dockerfile.bk" % context_dir
+            active_dfile = "%s/Dockerfile" % context_dir
+            active_dfile_bk = "%s/Dockerfile.bk" % context_dir
 
-          # if a Dockerfile is already in the directory
-          #  then make a backup copy
-          if os.path.isfile(active_dfile):
-            shutil.copyfile(active_dfile, active_dfile_bk)
-            bk_made=True
-          else:
-            bk_made=False
+            # if a Dockerfile is already in the directory
+            #  then make a backup copy
+            if os.path.isfile(active_dfile):
+                shutil.copyfile(active_dfile, active_dfile_bk)
+                bk_made = True
+            else:
+                bk_made = False
 
-          # make the current file, the active Dockerfile
-          shutil.copyfile(path, active_dfile)
+            # make the current file, the active Dockerfile
+            shutil.copyfile(path, active_dfile)
 
         return bk_made, active_dfile, active_dfile_bk, context_dir
 
-    #  Remove the temporary Dockerfile and restore the backup of the 
+    #  Remove the temporary Dockerfile and restore the backup of the
     #  previous Dockerfile if one was made.
     def rm_temp_dockerfile(self, bk_made, active_dfile, active_dfile_bk):
         if bk_made:
-          shutil.copyfile(active_dfile_bk, active_dfile)
-          os.unlink(active_dfile_bk)
+            shutil.copyfile(active_dfile_bk, active_dfile)
+            os.unlink(active_dfile_bk)
         else:
-          os.unlink(active_dfile)
+            os.unlink(active_dfile)
 
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
