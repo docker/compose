@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import sys
 
-from fig.packages.six import StringIO
+from six import StringIO
 from mock import patch
 
 from .testcases import DockerClientTestCase
