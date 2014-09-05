@@ -4,7 +4,7 @@ from itertools import chain
 import logging
 import pprint
 
-from fig.packages import six
+import six
 
 
 def format_call(args, kwargs):

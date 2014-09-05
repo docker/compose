@@ -28,6 +28,10 @@ Force stop service containers.
 
 View output from services.
 
+## port
+
+Print the public port for a port binding
+
 ## ps
 
 List containers.

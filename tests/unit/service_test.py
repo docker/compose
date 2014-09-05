@@ -5,6 +5,8 @@ import os
 from .. import unittest
 import mock
 
+import docker
+
 from fig import Service
 from fig.service import (
     ConfigError,
@@ -97,13 +99,32 @@ class ServiceTest(unittest.TestCase):
 
     def test_split_domainname_weird(self):
         service = Service('foo',
-                hostname = 'name.sub',
-                domainname = 'domain.tld',
+                hostname='name.sub',
+                domainname='domain.tld',
             )
         service.next_container_name = lambda x: 'foo'
         opts = service._get_container_create_options({})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+
+    def test_get_container_not_found(self):
+        mock_client = mock.create_autospec(docker.Client)
+        mock_client.containers.return_value = []
+        service = Service('foo', client=mock_client)
+
+        self.assertRaises(ValueError, service.get_container)
+
+    @mock.patch('fig.service.Container', autospec=True)
+    def test_get_container(self, mock_container_class):
+        mock_client = mock.create_autospec(docker.Client)
+        container_dict = dict(Name='default_foo_2')
+        mock_client.containers.return_value = [container_dict]
+        service = Service('foo', client=mock_client)
+
+        container = service.get_container(number=2)
+        self.assertEqual(container, mock_container_class.from_ps.return_value)
+        mock_container_class.from_ps.assert_called_once_with(
+            mock_client, container_dict)
 
 
 class ServiceVolumesTest(unittest.TestCase):

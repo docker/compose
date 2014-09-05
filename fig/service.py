@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from collections import namedtuple
-from .packages.docker.errors import APIError
+from docker.errors import APIError
 import logging
 import re
 import os
@@ -79,8 +79,21 @@ class Service(object):
         name = get_container_name(container)
         if not name or not is_valid_name(name, one_off):
             return False
-        project, name, number = parse_name(name)
+        project, name, _number = parse_name(name)
         return project == self.project and name == self.name
+
+    def get_container(self, number=1):
+        """Return a :class:`fig.container.Container` for this service. The
+        container must be active, and match `number`.
+        """
+        for container in self.client.containers():
+            if not self.has_container(container):
+                continue
+            _, _, container_number = parse_name(get_container_name(container))
+            if container_number == number:
+                return Container.from_ps(self.client, container)
+
+        raise ValueError("No container found for %s_%s" % (self.name, number))
 
     def start(self, **options):
         for c in self.containers(stopped=True):
