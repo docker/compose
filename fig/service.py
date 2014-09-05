@@ -355,9 +355,11 @@ class Service(object):
     # Otherwise, return the context directory unmodified.
     def create_temp_dockerfile(self, path):
         bk_made = False
+        temp_created = False
         context_dir = active_dfile = active_dfile_bk = path
 
         if os.path.isfile(path):
+            temp_created = True
             context_dir = os.path.dirname(path)
             if context_dir == "":
                 context_dir = "."
@@ -376,21 +378,21 @@ class Service(object):
             # make the current file, the active Dockerfile
             shutil.copyfile(path, active_dfile)
 
-        return bk_made, active_dfile, active_dfile_bk, context_dir
+        return temp_created, bk_made, active_dfile, active_dfile_bk, context_dir
 
     #  Remove the temporary Dockerfile and restore the backup of the
     #  previous Dockerfile if one was made.
-    def rm_temp_dockerfile(self, bk_made, active_dfile, active_dfile_bk):
+    def rm_temp_dockerfile(self, temp_created, bk_made, active_dfile, active_dfile_bk):
         if bk_made:
             shutil.copyfile(active_dfile_bk, active_dfile)
             os.unlink(active_dfile_bk)
-        else:
+        elif temp_created:
             os.unlink(active_dfile)
 
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
-        bk_made, active_dfile, active_dfile_bk, context_dir = self.create_temp_dockerfile(self.options['build'])
+        temp_created, bk_made, active_dfile, active_dfile_bk, context_dir = self.create_temp_dockerfile(self.options['build'])
         build_output = self.client.build(
             context_dir,
             tag=self._build_tag_name(),
@@ -398,7 +400,7 @@ class Service(object):
             rm=True,
             nocache=no_cache,
         )
-        self.rm_temp_dockerfile(bk_made, active_dfile, active_dfile_bk)
+        self.rm_temp_dockerfile(temp_created, bk_made, active_dfile, active_dfile_bk)
 
         try:
             all_events = stream_output(build_output, sys.stdout)
