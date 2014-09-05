@@ -351,13 +351,36 @@ class Service(object):
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
+        needs_clean_up=False
+        dirname=self.options['build']
+        if os.path.isfile(self.options['build']):
+          log.info('FILE')
+          filename=os.path.basename(self.options['build'])
+          dirname=os.path.dirname(self.options['build'])
+          if dirname == "":
+            dirname = "."
+
+          log.info('DIRNAME: %s' % dirname)
+          if os.path.isfile("%s/Dockerfile" % dirname):
+            shutil.copyfile("%s/Dockerfile" % dirname, "%s/Dockerfile.bk" % dirname)
+          else:
+            needs_clean_up=True
+          log.info('FILENAME: %s' % filename)
+          shutil.copyfile(self.options['build'], "%s/Dockerfile" % dirname)
+
         build_output = self.client.build(
-            self.options['build'],
+            dirname,
             tag=self._build_tag_name(),
             stream=True,
             rm=True,
             nocache=no_cache,
         )
+
+        if needs_clean_up:
+          shutil.copyfile("%s/Dockerfile.bk" % dirname, "%s/Dockerfile" % dirname)
+          os.unlink("%s/Dockerfile.bk" % dirname)
+        else:
+          os.unlink("%s/Dockerfile" % dirname)
 
         try:
             all_events = stream_output(build_output, sys.stdout)
