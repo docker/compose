@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from .. import unittest
 
 import mock
-from fig.packages import docker
+import docker
 
 from fig.container import Container
 

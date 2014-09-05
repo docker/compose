@@ -8,7 +8,7 @@ import mock
 
 from fig.cli import main
 from fig.cli.main import TopLevelCommand
-from fig.packages.six import StringIO
+from six import StringIO
 
 
 class CLITestCase(unittest.TestCase):
