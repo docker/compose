@@ -365,7 +365,8 @@ class Service(object):
     # If path is a file use it as the active Dockerfile
     #   by copying it to <context path>/Dockerfile, and if a Dockerfile
     #   already exists, then temporarily copy it to Dockerfile.bk.
-    # Otherwise, return the context directory unmodified.
+    # Otherwise, return the context directory unmodified, to be used
+    #   in maintaining previous functionality
     def create_temp_dockerfile(self, path):
         bk_made = False
         temp_created = False
