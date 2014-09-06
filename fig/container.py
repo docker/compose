@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-from fig.packages import six
+import six
 
 
 class Container(object):
