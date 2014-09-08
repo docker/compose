@@ -123,6 +123,9 @@ class Container(object):
     def kill(self):
         return self.client.kill(self.id)
 
+    def restart(self):
+        return self.client.restart(self.id)
+
     def remove(self, **options):
         return self.client.remove_container(self.id, **options)
 

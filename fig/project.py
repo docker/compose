@@ -156,6 +156,10 @@ class Project(object):
         for service in reversed(self.get_services(service_names)):
             service.kill(**options)
 
+    def restart(self, service_names=None, **options):
+        for service in self.get_services(service_names):
+            service.restart(**options)
+
     def build(self, service_names=None, no_cache=False):
         for service in self.get_services(service_names):
             if service.can_be_built():

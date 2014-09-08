@@ -91,6 +91,7 @@ class TopLevelCommand(Command):
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
+      restart   Restart services
       up        Create and start containers
 
     """
@@ -335,6 +336,14 @@ class TopLevelCommand(Command):
         Usage: stop [SERVICE...]
         """
         project.stop(service_names=options['SERVICE'])
+
+    def restart(self, project, options):
+        """
+        Restart running containers.
+
+        Usage: restart [SERVICE...]
+        """
+        project.restart(service_names=options['SERVICE'])
 
     def up(self, project, options):
         """
