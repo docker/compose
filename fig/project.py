@@ -180,6 +180,10 @@ class Project(object):
 
         return running_containers
 
+    def pull(self, service_names=None):
+        for service in self.get_services(service_names, include_links=True):
+            service.pull()
+
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.remove_stopped(**options)

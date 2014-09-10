@@ -36,6 +36,10 @@ Print the public port for a port binding
 
 List containers.
 
+## pull
+
+Pulls service images.
+
 ## rm
 
 Remove stopped service containers.

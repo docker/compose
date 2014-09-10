@@ -86,6 +86,7 @@ class TopLevelCommand(Command):
       logs      View output from containers
       port      Print the public port for a port binding
       ps        List containers
+      pull      Pulls service images
       rm        Remove stopped containers
       run       Run a one-off command
       scale     Set number of containers for a service
@@ -203,6 +204,14 @@ class TopLevelCommand(Command):
                     container.human_readable_ports,
                 ])
             print(Formatter().table(headers, rows))
+
+    def pull(self, project, options):
+        """
+        Pulls images for services.
+
+        Usage: pull [SERVICE...]
+        """
+        project.pull(service_names=options['SERVICE'])
 
     def rm(self, project, options):
         """
