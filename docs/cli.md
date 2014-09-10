@@ -32,6 +32,10 @@ View output from services.
 
 List containers.
 
+## pull
+
+Pulls service images.
+
 ## rm
 
 Remove stopped service containers.
