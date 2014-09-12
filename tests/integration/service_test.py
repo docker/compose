@@ -397,6 +397,12 @@ class ServiceTest(DockerClientTestCase):
         for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.iteritems():
             self.assertEqual(env[k], v)
 
+    def test_env_from_file_combined_with_env(self):
+        service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
+        env = service.start_container().environment
+        for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.iteritems():
+            self.assertEqual(env[k], v)
+
     def test_resolve_env(self):
         service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
         os.environ['FILE_DEF'] = 'E1'
