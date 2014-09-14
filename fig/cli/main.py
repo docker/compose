@@ -4,6 +4,7 @@ import logging
 import sys
 import re
 import signal
+from operator import attrgetter
 
 from inspect import getdoc
 import dockerpty
@@ -180,7 +181,10 @@ class TopLevelCommand(Command):
         Options:
             -q    Only display IDs
         """
-        containers = project.containers(service_names=options['SERVICE'], stopped=True) + project.containers(service_names=options['SERVICE'], one_off=True)
+        containers = sorted(
+            project.containers(service_names=options['SERVICE'], stopped=True) +
+            project.containers(service_names=options['SERVICE'], one_off=True),
+            key=attrgetter('name'))
 
         if options['-q']:
             for container in containers:
