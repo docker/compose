@@ -16,7 +16,7 @@ from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import yesno
 
-from ..packages.docker.errors import APIError
+from docker.errors import APIError
 from .errors import UserError
 from .docopt_command import NoSuchCommand
 
@@ -86,12 +86,15 @@ class TopLevelCommand(Command):
       help      Get help on a command
       kill      Kill containers
       logs      View output from containers
+      port      Print the public port for a port binding
       ps        List containers
+      pull      Pulls service images
       rm        Remove stopped containers
       run       Run a one-off command
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
+      restart   Restart services
       up        Create and start containers
 
     """
@@ -163,6 +166,26 @@ class TopLevelCommand(Command):
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}, monochrome=monochrome).run()
 
+    def port(self, project, options):
+        """
+        Print the public port for a port binding.
+
+        Usage: port [options] SERVICE PRIVATE_PORT
+
+        Options:
+            --protocol=proto  tcp or udp (defaults to tcp)
+            --index=index     index of the container if there are multiple
+                              instances of a service (defaults to 1)
+        """
+        service = project.get_service(options['SERVICE'])
+        try:
+            container = service.get_container(number=options.get('--index') or 1)
+        except ValueError as e:
+            raise UserError(str(e))
+        print(container.get_local_port(
+            options['PRIVATE_PORT'],
+            protocol=options.get('--protocol') or 'tcp') or '')
+
     def ps(self, project, options):
         """
         List containers.
@@ -196,6 +219,14 @@ class TopLevelCommand(Command):
                     container.human_readable_ports,
                 ])
             print(Formatter().table(headers, rows))
+
+    def pull(self, project, options):
+        """
+        Pulls images for services.
+
+        Usage: pull [SERVICE...]
+        """
+        project.pull(service_names=options['SERVICE'])
 
     def rm(self, project, options):
         """
@@ -329,6 +360,14 @@ class TopLevelCommand(Command):
         Usage: stop [SERVICE...]
         """
         project.stop(service_names=options['SERVICE'])
+
+    def restart(self, project, options):
+        """
+        Restart running containers.
+
+        Usage: restart [SERVICE...]
+        """
+        project.restart(service_names=options['SERVICE'])
 
     def up(self, project, options):
         """

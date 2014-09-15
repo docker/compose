@@ -59,7 +59,7 @@ First thing we need to do is set up the database connection. Replace the `DATABA
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'postgres',
             'USER': 'postgres',
-            'HOST': 'db_1',
+            'HOST': 'db',
             'PORT': 5432,
         }
     }

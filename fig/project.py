@@ -4,7 +4,7 @@ import logging
 
 from .service import Service
 from .container import Container
-from .packages.docker.errors import APIError
+from docker.errors import APIError
 
 log = logging.getLogger(__name__)
 
@@ -156,6 +156,10 @@ class Project(object):
         for service in reversed(self.get_services(service_names)):
             service.kill(**options)
 
+    def restart(self, service_names=None, **options):
+        for service in self.get_services(service_names):
+            service.restart(**options)
+
     def build(self, service_names=None, no_cache=False):
         for service in self.get_services(service_names):
             if service.can_be_built():
@@ -182,6 +186,10 @@ class Project(object):
                     running_containers.append(container)
 
         return running_containers
+
+    def pull(self, service_names=None):
+        for service in self.get_services(service_names, include_links=True):
+            service.pull()
 
     def remove_stopped(self, service_names=None, **options):
         for service in self.get_services(service_names):

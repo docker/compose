@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from .packages.docker.errors import APIError
+from collections import namedtuple
+from docker.errors import APIError
 import logging
 import re
 import os
@@ -43,6 +44,9 @@ class ConfigError(ValueError):
     pass
 
 
+VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
+
+
 class Service(object):
     def __init__(self, name, client=None, project='default', repository='', links=None, volumes_from=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
@@ -82,8 +86,21 @@ class Service(object):
         name = get_container_name(container)
         if not name or not is_valid_name(name, one_off):
             return False
-        project, name, number = parse_name(name)
+        project, name, _number = parse_name(name)
         return project == self.project and name == self.name
+
+    def get_container(self, number=1):
+        """Return a :class:`fig.container.Container` for this service. The
+        container must be active, and match `number`.
+        """
+        for container in self.client.containers():
+            if not self.has_container(container):
+                continue
+            _, _, container_number = parse_name(get_container_name(container))
+            if container_number == number:
+                return Container.from_ps(self.client, container)
+
+        raise ValueError("No container found for %s_%s" % (self.name, number))
 
     def start(self, **options):
         for c in self.containers(stopped=True):
@@ -98,6 +115,11 @@ class Service(object):
         for c in self.containers():
             log.info("Killing %s..." % c.name)
             c.kill(**options)
+
+    def restart(self, **options):
+        for c in self.containers():
+            log.info("Restarting %s..." % c.name)
+            c.restart(**options)
 
     def scale(self, desired_num):
         """
@@ -222,37 +244,22 @@ class Service(object):
             return self.start_container(container, **options)
 
     def start_container(self, container=None, intermediate_container=None, **override_options):
-        if container is None:
-            container = self.create_container(**override_options)
+        container = container or self.create_container(**override_options)
+        options = dict(self.options, **override_options)
+        ports = dict(split_port(port) for port in options.get('ports') or [])
 
-        options = self.options.copy()
-        options.update(override_options)
-
-        port_bindings = {}
-
-        if options.get('ports', None) is not None:
-            for port in options['ports']:
-                internal_port, external_port = split_port(port)
-                port_bindings[internal_port] = external_port
-
-        volume_bindings = {}
-
-        if options.get('volumes', None) is not None:
-            for volume in options['volumes']:
-                if ':' in volume:
-                    external_dir, internal_dir = volume.split(':')
-                    volume_bindings[os.path.abspath(external_dir)] = {
-                        'bind': internal_dir,
-                        'ro': False,
-                    }
+        volume_bindings = dict(
+            build_volume_binding(parse_volume_spec(volume))
+            for volume in options.get('volumes') or []
+            if ':' in volume)
 
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
 
         container.start(
-            links=self._get_links(link_to_self=override_options.get('one_off', False)),
-            port_bindings=port_bindings,
+            links=self._get_links(link_to_self=options.get('one_off', False)),
+            port_bindings=ports,
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
@@ -264,7 +271,7 @@ class Service(object):
     def start_or_create_containers(self):
         containers = self.containers(stopped=True)
 
-        if len(containers) == 0:
+        if not containers:
             log.info("Creating %s..." % self.next_container_name())
             new_container = self.create_container()
             return [self.start_container(new_container)]
@@ -292,12 +299,12 @@ class Service(object):
         links = []
         for service, link_name in self.links:
             for container in service.containers():
-                if link_name:
-                    links.append((container.name, link_name))
+                links.append((container.name, link_name or service.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         if link_to_self:
             for container in self.containers():
+                links.append((container.name, self.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         return links
@@ -346,7 +353,9 @@ class Service(object):
             container_options['ports'] = ports
 
         if 'volumes' in container_options:
-            container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
+            container_options['volumes'] = dict(
+                (parse_volume_spec(v).internal, {})
+                for v in container_options['volumes'])
 
         if 'environment' in container_options:
             if isinstance(container_options['environment'], list):
@@ -438,6 +447,11 @@ class Service(object):
                 return False
         return True
 
+    def pull(self):
+        if 'image' in self.options:
+            log.info('Pulling %s (%s)...' % (self.name, self.options.get('image')))
+            self.client.pull(self.options.get('image'))
+
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
 
@@ -470,32 +484,47 @@ def get_container_name(container):
             return name[1:]
 
 
-def split_volume(v):
-    """
-    If v is of the format EXTERNAL:INTERNAL, returns (EXTERNAL, INTERNAL).
-    If v is of the format INTERNAL, returns (None, INTERNAL).
-    """
-    if ':' in v:
-        return v.split(':', 1)
-    else:
-        return (None, v)
+def parse_volume_spec(volume_config):
+    parts = volume_config.split(':')
+    if len(parts) > 3:
+        raise ConfigError("Volume %s has incorrect format, should be "
+                          "external:internal[:mode]" % volume_config)
+
+    if len(parts) == 1:
+        return VolumeSpec(None, parts[0], 'rw')
+
+    if len(parts) == 2:
+        parts.append('rw')
+
+    external, internal, mode = parts
+    if mode not in ('rw', 'ro'):
+        raise ConfigError("Volume %s has invalid mode (%s), should be "
+                          "one of: rw, ro." % (volume_config, mode))
+
+    return VolumeSpec(external, internal, mode)
+
+
+def build_volume_binding(volume_spec):
+    internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
+    external = os.path.expanduser(volume_spec.external)
+    return os.path.abspath(os.path.expandvars(external)), internal
 
 
 def split_port(port):
-    port = str(port)
-    external_ip = None
-    if ':' in port:
-        external_port, internal_port = port.rsplit(':', 1)
-        if ':' in external_port:
-            external_ip, external_port = external_port.split(':', 1)
-    else:
-        external_port, internal_port = (None, port)
-    if external_ip:
-        if external_port:
-            external_port = (external_ip, external_port)
-        else:
-            external_port = (external_ip,)
-    return internal_port, external_port
+    parts = str(port).split(':')
+    if not 1 <= len(parts) <= 3:
+        raise ConfigError('Invalid port "%s", should be '
+                          '[[remote_ip:]remote_port:]port[/protocol]' % port)
+
+    if len(parts) == 1:
+        internal_port, = parts
+        return internal_port, None
+    if len(parts) == 2:
+        external_port, internal_port = parts
+        return internal_port, external_port
+
+    external_ip, external_port, internal_port = parts
+    return internal_port, (external_ip, external_port or None)
 
 
 def split_env(env):

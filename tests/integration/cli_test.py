@@ -1,9 +1,11 @@
 from __future__ import absolute_import
-from .testcases import DockerClientTestCase
-from mock import patch
-from fig.cli.main import TopLevelCommand
-from fig.packages.six import StringIO
 import sys
+
+from six import StringIO
+from mock import patch
+
+from .testcases import DockerClientTestCase
+from fig.cli.main import TopLevelCommand
 
 
 class CLITestCase(DockerClientTestCase):
@@ -51,6 +53,12 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplefigfiles_another_1', output)
         self.assertIn('multiplefigfiles_yetanother_1', output)
 
+    @patch('fig.service.log')
+    def test_pull(self, mock_logging):
+        self.command.dispatch(['pull'], None)
+        mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
+        mock_logging.info.assert_any_call('Pulling another (busybox:latest)...')
+
     @patch('sys.stdout', new_callable=StringIO)
     def test_build_no_cache(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
@@ -66,7 +74,6 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['build', '--no-cache', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
-
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -192,6 +199,22 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
+    def test_restart(self):
+        service = self.project.get_service('simple')
+        container = service.create_container()
+        service.start_container(container)
+        started_at = container.dictionary['State']['StartedAt']
+        self.command.dispatch(['restart'], None)
+        container.inspect()
+        self.assertNotEqual(
+            container.dictionary['State']['FinishedAt'],
+            '0001-01-01T00:00:00Z',
+        )
+        self.assertNotEqual(
+            container.dictionary['State']['StartedAt'],
+            started_at,
+        )
+
     def test_scale(self):
         project = self.project
 
@@ -213,3 +236,17 @@ class CLITestCase(DockerClientTestCase):
         self.command.scale(project, {'SERVICE=NUM': ['simple=0', 'another=0']})
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
+
+    def test_port(self):
+        self.command.base_dir = 'tests/fixtures/ports-figfile'
+        self.command.dispatch(['up', '-d'], None)
+        container = self.project.get_service('simple').get_container()
+
+        @patch('sys.stdout', new_callable=StringIO)
+        def get_port(number, mock_stdout):
+            self.command.dispatch(['port', 'simple', str(number)], None)
+            return mock_stdout.getvalue().rstrip()
+
+        self.assertEqual(get_port(3000), container.get_local_port(3000))
+        self.assertEqual(get_port(3001), "0.0.0.0:9999")
+        self.assertEqual(get_port(3002), "")

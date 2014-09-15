@@ -9,6 +9,8 @@ class UserError(Exception):
     def __unicode__(self):
         return self.msg
 
+    __str__ = __unicode__
+
 
 class DockerNotFoundMac(UserError):
     def __init__(self):

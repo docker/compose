@@ -28,9 +28,17 @@ Force stop service containers.
 
 View output from services.
 
+## port
+
+Print the public port for a port binding
+
 ## ps
 
 List containers.
+
+## pull
+
+Pulls service images.
 
 ## rm
 
@@ -51,7 +59,7 @@ One-off commands are started in new containers with the same config as a normal 
 
 Links are also created between one-off commands and the other containers for that service so you can do stuff like this:
 
-    $ fig run db /bin/sh -c "psql -h \$DB_1_PORT_5432_TCP_ADDR -U docker"
+    $ fig run db psql -h db -U docker
 
 If you do not want linked containers to be started when running the one-off command, specify the `--no-deps` flag:
 
