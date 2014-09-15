@@ -33,7 +33,7 @@ Finally, `fig.yml` is where the magic happens. It describes what services our ap
         - "5432"
     web:
       build: .
-      command: bundle exec rackup -p 3000
+      command: bundle exec rackup -p 3000 -b 0.0.0.0
       volumes:
         - .:/myapp
       ports:
