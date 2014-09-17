@@ -241,7 +241,7 @@ class Service(object):
         ports = {}
         for port in options.get('ports') or []:
             internal, external = split_port(port)
-            if not internal in ports.keys():
+            if internal not in ports.keys():
                 ports[internal] = []
             ports[internal].append(external)
 
