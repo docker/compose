@@ -238,7 +238,11 @@ class Service(object):
     def start_container(self, container=None, intermediate_container=None, **override_options):
         container = container or self.create_container(**override_options)
         options = dict(self.options, **override_options)
-        ports = dict(split_port(port) for port in options.get('ports') or [])
+        ports = {}
+        for port in options.get('ports') or []:
+            if not split_port(port)[0] in ports.keys():
+                ports[split_port(port)[0]] = []
+            ports[split_port(port)[0]].append(split_port(port)[1])
 
         volume_bindings = dict(
             build_volume_binding(parse_volume_spec(volume))
