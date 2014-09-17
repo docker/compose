@@ -241,7 +241,7 @@ class Service(object):
         ports = {}
         for port in options.get('ports') or []:
             if not split_port(port)[0] in ports.keys():
-                  ports[split_port(port)[0]] = []
+                ports[split_port(port)[0]] = []
             ports[split_port(port)[0]].append(split_port(port)[1])
 
         volume_bindings = dict(
