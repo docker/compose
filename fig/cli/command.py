@@ -51,8 +51,8 @@ class Command(DocoptCommand):
         handler(project, command_options)
 
     def get_client(self, verbose=False):
-        if os.environ.get('FIG_TLS_PATH') is not None:
-            tls_path = os.environ.get('FIG_TLS_PATH')
+        if os.environ.get('DOCKER_CERT_PATH') is not None:
+            tls_path = os.environ.get('DOCKER_CERT_PATH')
             tls_config = tls.TLSConfig(
                 ssl_version=ssl.PROTOCOL_TLSv1,
                 verify=True,
