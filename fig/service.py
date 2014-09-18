@@ -413,10 +413,13 @@ class Service(object):
                 return False
         return True
 
-    def pull(self):
+    def pull(self, insecure_registry=False):
         if 'image' in self.options:
             log.info('Pulling %s (%s)...' % (self.name, self.options.get('image')))
-            self.client.pull(self.options.get('image'))
+            self.client.pull(
+                self.options.get('image'),
+                insecure_registry=insecure_registry
+            )
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')

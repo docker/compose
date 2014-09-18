@@ -213,9 +213,17 @@ class TopLevelCommand(Command):
         """
         Pulls images for services.
 
-        Usage: pull [SERVICE...]
+        Usage: pull [options] [SERVICE...]
+
+        Options:
+            --allow-insecure-ssl    Allow insecure connections to the docker
+                                    registry
         """
-        project.pull(service_names=options['SERVICE'])
+        insecure_registry = options['--allow-insecure-ssl']
+        project.pull(
+            service_names=options['SERVICE'],
+            insecure_registry=insecure_registry
+        )
 
     def rm(self, project, options):
         """
