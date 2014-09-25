@@ -17,6 +17,10 @@ from fig.service import (
 
 
 class ServiceTest(unittest.TestCase):
+
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.Client)
+
     def test_name_validations(self):
         self.assertRaises(ConfigError, lambda: Service(name=''))
 
@@ -70,29 +74,27 @@ class ServiceTest(unittest.TestCase):
             split_port("0.0.0.0:1000:2000:tcp")
 
     def test_split_domainname_none(self):
-        service = Service('foo',
-                hostname = 'name',
-            )
-        service.next_container_name = lambda x: 'foo'
+        service = Service('foo', hostname='name', client=self.mock_client)
+        self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
     def test_split_domainname_fqdn(self):
         service = Service('foo',
-                hostname = 'name.domain.tld',
-            )
-        service.next_container_name = lambda x: 'foo'
+                hostname='name.domain.tld',
+                client=self.mock_client)
+        self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_both(self):
         service = Service('foo',
-                hostname = 'name',
-                domainname = 'domain.tld',
-            )
-        service.next_container_name = lambda x: 'foo'
+                hostname='name',
+                domainname='domain.tld',
+                client=self.mock_client)
+        self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
@@ -101,8 +103,8 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo',
                 hostname='name.sub',
                 domainname='domain.tld',
-            )
-        service.next_container_name = lambda x: 'foo'
+                client=self.mock_client)
+        self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
