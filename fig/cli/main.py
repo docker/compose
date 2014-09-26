@@ -346,6 +346,14 @@ class TopLevelCommand(Command):
         """
         project.stop(service_names=options['SERVICE'])
 
+    def tag(self, project, options):
+        """
+        Tag images that were built by a build directive.
+
+        Usage: tag [SERVICE...]
+        """
+        project.tag(service_names=options['SERVICE'])
+
     def restart(self, project, options):
         """
         Restart running containers.

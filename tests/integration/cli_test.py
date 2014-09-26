@@ -77,18 +77,22 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn(cache_indicator, output)
 
     @patch('sys.stdout', new_callable=StringIO)
-    def test_build_with_tags(self, mock_stdout):
+    def test_tag(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/tags-figfile'
         tags = self.project.get_service('simple').options['tags']
 
         try:
             self.command.dispatch(['build', 'simple'], None)
+            self.command.dispatch(['tag', 'simple'], None)
             for tag in tags:
                 tag_name, _ = split_tag(tag)
                 self.assertTrue(self.client.images(tag_name))
         finally:
             for tag in tags:
-                self.client.remove_image(tag, force=True)
+                try:
+                    self.client.remove_image(tag, force=True)
+                except Exception:
+                    pass
 
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)

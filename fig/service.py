@@ -389,7 +389,7 @@ class Service(object):
             container_options['environment'] = dict(resolve_env(k, v) for k, v in container_options['environment'].iteritems())
 
         if self.can_be_built():
-            if not self.client.images(name=self.full_name):
+            if not self.get_image_ids():
                 self.build()
             container_options['image'] = self.full_name
 
@@ -399,6 +399,17 @@ class Service(object):
                 del container_options[key]
 
         return container_options
+
+    def get_image_ids(self):
+        images = self.client.images(name=self.full_name)
+        return [image['Id'] for image in images]
+
+    def get_latest_image_id(self):
+        images = self.get_image_ids()
+        if len(images) < 1:
+            raise BuildError(
+                self, 'No images for %s, build first' % self.full_name)
+        return images[0]
 
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
@@ -427,12 +438,16 @@ class Service(object):
         if image_id is None:
             raise BuildError(self, event if all_events else 'Unknown')
 
-        self.tag_image(image_id)
         return image_id
 
-    def tag_image(self, image_id):
+    def tag(self):
+        if not self.can_be_built():
+            log.info('%s uses an image, skipping' % self.name)
+            return
+
+        image_id = self.get_latest_image_id()
         for tag in self.options.get('tags', []):
-            image_name, image_tag = split_tag(tag)
+            image_name, image_tag = split_tag(os.path.expandvars(tag))
             self.client.tag(image_id, image_name, tag=image_tag)
 
     def can_be_built(self):
