@@ -170,7 +170,7 @@ class CLITestCase(DockerClientTestCase):
     @patch('dockerpty.start')
     def test_run_without_command(self, __):
         self.command.base_dir = 'tests/fixtures/commands-figfile'
-        self.client.build('tests/fixtures/simple-dockerfile', tag='figtest_test')
+        self.check_build('tests/fixtures/simple-dockerfile', tag='figtest_test')
 
         for c in self.project.containers(stopped=True, one_off=True):
             c.remove()
