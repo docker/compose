@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from docker import Client
 from fig.service import Service
 from fig.cli.utils import docker_url
+from fig.progress_stream import stream_output
 from .. import unittest
 
 
@@ -31,5 +32,6 @@ class DockerClientTestCase(unittest.TestCase):
             **kwargs
         )
 
-
-
+    def check_build(self, *args, **kwargs):
+        build_output = self.client.build(*args, **kwargs)
+        stream_output(build_output, open('/dev/null', 'w'))
