@@ -35,6 +35,14 @@ class CLITestCase(unittest.TestCase):
         project_name = command.get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
+    def test_project_name_from_environment(self):
+        command = TopLevelCommand()
+        name = 'namefromenv'
+        with mock.patch.dict(os.environ):
+            os.environ['FIG_PROJECT_NAME'] = name
+            project_name = command.get_project_name(None)
+        self.assertEquals(project_name, name)
+
     def test_yaml_filename_check(self):
         command = TopLevelCommand()
         command.base_dir = 'tests/fixtures/longer-filename-figfile'
