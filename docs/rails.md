@@ -68,6 +68,7 @@ Open up your newly-generated `database.yml`. Replace its contents with the follo
 
     development: &default
       adapter: postgresql
+      template: template0
       encoding: unicode
       database: postgres
       pool: 5
