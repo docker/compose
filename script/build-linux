@@ -3,5 +3,5 @@ set -ex
 mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist
 docker build -t fig .
-docker run -v `pwd`/dist:/code/dist fig pyinstaller -F bin/fig
-docker run -v `pwd`/dist:/code/dist fig dist/fig --version
+docker run -u user -v `pwd`/dist:/code/dist fig pyinstaller -F bin/fig
+docker run -u user -v `pwd`/dist:/code/dist fig dist/fig --version
