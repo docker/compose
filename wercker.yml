@@ -5,11 +5,5 @@ build:
         name: validate DCO
         code: script/validate-dco
     - script:
-        name: build
-        code: docker build -t fig .
-    - script:
-        name: flake8
-        code: docker run -v /var/run/docker.sock:/var/run/docker.sock fig flake8 fig
-    - script:
         name: run tests
-        code: docker run -v /var/run/docker.sock:/var/run/docker.sock fig nosetests
+        code: script/test
