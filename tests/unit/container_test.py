@@ -105,3 +105,15 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(
             container.get_local_port(45454, protocol='tcp'),
             '0.0.0.0:49197')
+
+    def test_get(self):
+        container = Container(None, {
+            "Status":"Up 8 seconds",
+            "HostConfig": {
+                "VolumesFrom": ["volume_id",]
+            },
+        }, has_been_inspected=True)
+
+        self.assertEqual(container.get('Status'), "Up 8 seconds")
+        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id",])
+        self.assertEqual(container.get('Foo.Bar.DoesNotExist'), None)

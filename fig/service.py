@@ -205,6 +205,10 @@ class Service(object):
             return tuples
 
     def recreate_container(self, container, **override_options):
+        """Recreate a container. An intermediate container is created so that
+        the new container has the same name, while still supporting
+        `volumes-from` the original container.
+        """
         try:
             container.stop()
         except APIError as e:

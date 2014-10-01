@@ -107,14 +107,16 @@ class ServiceTest(DockerClientTestCase):
         host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
         host_container = host_service.create_container()
         host_service.start_container(host_container)
-        self.assertIn(volume_container_1.id, host_container.inspect()['HostConfig']['VolumesFrom'])
-        self.assertIn(volume_container_2.id, host_container.inspect()['HostConfig']['VolumesFrom'])
+        self.assertIn(volume_container_1.id,
+                      host_container.get('HostConfig.VolumesFrom'))
+        self.assertIn(volume_container_2.id,
+                      host_container.get('HostConfig.VolumesFrom'))
 
     def test_recreate_containers(self):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=['/var/db'],
+            volumes=['/etc'],
             entrypoint=['sleep'],
             command=['300']
         )
@@ -124,7 +126,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
         self.assertEqual(old_container.name, 'figtest_db_1')
         service.start_container(old_container)
-        volume_path = old_container.inspect()['Volumes']['/var/db']
+        volume_path = old_container.inspect()['Volumes']['/etc']
 
         num_containers_before = len(self.client.containers(all=True))
 
@@ -140,7 +142,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
-        self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
+        self.assertEqual(new_container.inspect()['Volumes']['/etc'], volume_path)
         self.assertIn(intermediate_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
@@ -340,18 +342,18 @@ class ServiceTest(DockerClientTestCase):
 
     def test_network_mode_none(self):
         service = self.create_service('web', net='none')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['NetworkMode'], 'none')
+        container = service.start_container()
+        self.assertEqual(container.get('HostConfig.NetworkMode'), 'none')
 
     def test_network_mode_bridged(self):
         service = self.create_service('web', net='bridge')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['NetworkMode'], 'bridge')
+        container = service.start_container()
+        self.assertEqual(container.get('HostConfig.NetworkMode'), 'bridge')
 
     def test_network_mode_host(self):
         service = self.create_service('web', net='host')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['NetworkMode'], 'host')
+        container = service.start_container()
+        self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
     def test_dns_single_value(self):
         service = self.create_service('web', dns='8.8.8.8')

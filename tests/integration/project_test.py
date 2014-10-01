@@ -94,7 +94,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_recreates_containers(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=['/var/db'])
+        db = self.create_service('db', volumes=['/etc'])
         project = Project('figtest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -102,15 +102,14 @@ class ProjectTest(DockerClientTestCase):
         project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
         old_db_id = project.containers()[0].id
-        db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
+        db_volume_path = project.containers()[0].get('Volumes./etc')
 
         project.up()
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
         self.assertNotEqual(db_container.id, old_db_id)
-        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
-                         db_volume_path)
+        self.assertEqual(db_container.get('Volumes./etc'), db_volume_path)
 
         project.kill()
         project.remove_stopped()
