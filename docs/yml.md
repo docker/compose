@@ -177,7 +177,7 @@ Custom DNS search domains. Can be a single value or a list.
 
 ```
 dns_search: example.com
-dns:
+dns_search:
   - dc1.example.com
   - dc2.example.com
 ```
