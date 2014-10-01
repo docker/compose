@@ -167,6 +167,13 @@ class ServiceTest(unittest.TestCase):
         mock_container_class.from_ps.assert_called_once_with(
             mock_client, container_dict)
 
+    @mock.patch('fig.service.log', autospec=True)
+    def test_pull_image(self, mock_log):
+        service = Service('foo', client=self.mock_client, image='someimage:sometag')
+        service.pull(insecure_registry=True)
+        self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True)
+        mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
+
 
 class ServiceVolumesTest(unittest.TestCase):
 
