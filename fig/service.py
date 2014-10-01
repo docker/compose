@@ -4,6 +4,7 @@ from collections import namedtuple
 import logging
 import re
 import os
+from operator import attrgetter
 import sys
 
 from docker.errors import APIError
@@ -308,12 +309,17 @@ class Service(object):
 
     def _get_volumes_from(self, intermediate_container=None):
         volumes_from = []
-        for v in self.volumes_from:
-            if isinstance(v, Service):
-                for container in v.containers(stopped=True):
-                    volumes_from.append(container.id)
-            elif isinstance(v, Container):
-                volumes_from.append(v.id)
+        for volume_source in self.volumes_from:
+            if isinstance(volume_source, Service):
+                containers = volume_source.containers(stopped=True)
+
+                if not containers:
+                    volumes_from.append(volume_source.create_container().id)
+                else:
+                    volumes_from.extend(map(attrgetter('id'), containers))
+
+            elif isinstance(volume_source, Container):
+                volumes_from.append(volume_source.id)
 
         if intermediate_container:
             volumes_from.append(intermediate_container.id)
