@@ -6,4 +6,5 @@ venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-dev.txt
 venv/bin/pip install .
 venv/bin/pyinstaller -F bin/fig
-dist/fig --version
+mv dist/fig dist/fig-Darwin-x86_64
+dist/fig-Darwin-x86_64 --version

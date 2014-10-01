@@ -86,7 +86,7 @@ The easiest way to do this is to use the `--signoff` flag when committing. E.g.:
 
 3. Build Linux version on any Docker host with `script/build-linux` and attach to release
 
-4. Build OS X version on Mountain Lion with `script/build-osx` and attach to release
+4. Build OS X version on Mountain Lion with `script/build-osx` and attach to release as `fig-Darwin-x86_64` and `fig-Linux-x86_64`.
 
 5. Publish GitHub release, creating tag
 
