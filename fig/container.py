@@ -89,7 +89,9 @@ class Container(object):
 
     @property
     def human_readable_command(self):
-        return ' '.join(self.get('Config.Cmd') or '')
+        entrypoint = self.get('Config.Entrypoint') or []
+        cmd = self.get('Config.Cmd') or []
+        return ' '.join(entrypoint + cmd)
 
     @property
     def environment(self):
