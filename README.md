@@ -1,7 +1,7 @@
 Fig
 ===
 
-[![wercker status](https://app.wercker.com/status/0d0c60a19c7df950ff68329caa7123ae/s/master "wercker status")](https://app.wercker.com/project/bykey/0d0c60a19c7df950ff68329caa7123ae)
+[![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
 
 Fast, isolated development environments using Docker.
 
