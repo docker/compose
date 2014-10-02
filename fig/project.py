@@ -167,6 +167,10 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
+    def tag(self, service_names=None):
+        for service in self.get_services(service_names):
+            service.tag()
+
     def up(self, service_names=None, start_links=True, recreate=True):
         running_containers = []
 

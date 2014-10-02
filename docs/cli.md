@@ -82,6 +82,11 @@ Start existing containers for a service.
 
 Stop running containers without removing them. They can be started again with `fig start`.
 
+## tag
+
+Tag all containers that were created with `fig build` with tags from the
+`fig.yml`.
+
 ## up
 
 Build, (re)create, start and attach to containers for a service.

@@ -10,6 +10,7 @@ import docker
 from fig import Service
 from fig.container import Container
 from fig.service import (
+    BuildError,
     ConfigError,
     split_port,
     parse_volume_spec,
@@ -21,6 +22,70 @@ class ServiceTest(unittest.TestCase):
 
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.Client)
+
+    def test_build_with_build_Error(self):
+        service = Service('buildtest', client=self.mock_client, build='/path')
+        with self.assertRaises(BuildError):
+            service.build()
+
+    def test_build_with_cache(self):
+        service = Service(
+            'buildtest',
+            client=self.mock_client,
+            build='/path',
+            tags=['foo', 'foo:v2'])
+        expected = 'abababab'
+
+        with mock.patch('fig.service.stream_output') as mock_stream_output:
+            mock_stream_output.return_value = [
+                dict(stream='Successfully built %s' % expected)
+            ]
+            image_id = service.build()
+        self.assertEqual(image_id, expected)
+        self.mock_client.build.assert_called_once_with(
+            '/path',
+            tag=service.full_name,
+            stream=True,
+            rm=True,
+            nocache=False)
+
+    def test_bad_tags_from_config(self):
+        with self.assertRaises(ConfigError) as exc_context:
+            Service('something', tags='my_tag_is_a_string')
+        self.assertEqual(str(exc_context.exception),
+                         'Service something tags must be a list.')
+
+    def test_get_image_ids(self):
+        service = Service('imagetest', client=self.mock_client, build='/path')
+        image_id = "abcd"
+        self.mock_client.images.return_value = [dict(Id=image_id)]
+        self.assertEqual(service.get_image_ids(), [image_id])
+
+    def test_tag_no_image(self):
+        self.mock_client.images.return_value = []
+        service = Service(
+            'tagtest',
+            client=self.mock_client,
+            build='/path',
+            tags=['foo', 'foo:v2'])
+
+        with self.assertRaises(BuildError):
+            service.tag()
+
+    def test_tag(self):
+        image_id = 'aaaaaa'
+        self.mock_client.images.return_value = [dict(Id=image_id)]
+        service = Service(
+            'tagtest',
+            client=self.mock_client,
+            build='/path',
+            tags=['foo', 'foo:v2'])
+
+        service.tag()
+        self.assertEqual(self.mock_client.tag.mock_calls, [
+            mock.call(image_id, 'foo', tag=None),
+            mock.call(image_id, 'foo', tag='v2'),
+        ])
 
     def test_name_validations(self):
         self.assertRaises(ConfigError, lambda: Service(name=''))
@@ -149,23 +214,21 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_get_container_not_found(self):
-        mock_client = mock.create_autospec(docker.Client)
-        mock_client.containers.return_value = []
-        service = Service('foo', client=mock_client)
+        self.mock_client.containers.return_value = []
+        service = Service('foo', client=self.mock_client)
 
         self.assertRaises(ValueError, service.get_container)
 
     @mock.patch('fig.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
-        mock_client = mock.create_autospec(docker.Client)
         container_dict = dict(Name='default_foo_2')
-        mock_client.containers.return_value = [container_dict]
-        service = Service('foo', client=mock_client)
+        self.mock_client.containers.return_value = [container_dict]
+        service = Service('foo', client=self.mock_client)
 
         container = service.get_container(number=2)
         self.assertEqual(container, mock_container_class.from_ps.return_value)
         mock_container_class.from_ps.assert_called_once_with(
-            mock_client, container_dict)
+            self.mock_client, container_dict)
 
     @mock.patch('fig.service.log', autospec=True)
     def test_pull_image(self, mock_log):

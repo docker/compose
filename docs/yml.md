@@ -146,6 +146,27 @@ dns:
   - 9.9.9.9
 ```
 
+### tags
+
+A list of tags to apply to an image build by fig, when `fig tag` is called.
+Tags support environment variable substitution.
+
+
+```
+tags:
+  # A tag
+  - "foo"
+  # A tag with a user
+  - "user/service_foo"
+  # A tag with a user and version
+  - "user/service_foo:v2.3"
+  # A tag with a registry and version
+  - "private.example.com/service_foo:v2.3"
+  # A tag using an environment variable
+  - "private.example.com/service_foo:${GIT_SHA}"
+```
+
+
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.
