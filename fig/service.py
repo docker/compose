@@ -58,7 +58,7 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose', 'noop']
 
         for k in options:
             if k not in supported_options:
@@ -223,7 +223,7 @@ class Service(object):
         intermediate_container = Container.create(
             self.client,
             image=container.image,
-            entrypoint=['echo'],
+            entrypoint=self.options.get('noop', ['echo']),
             command=[],
         )
         intermediate_container.start(volumes_from=container.id)
