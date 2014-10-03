@@ -129,6 +129,16 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
+    def test_up_with_minimal_data_volume(self):
+        self.command.base_dir = 'tests/fixtures/datavolume-figfile'
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('app')
+        self.assertEqual(len(service.containers()), 1)
+
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('app')
+        self.assertEqual(len(service.containers()), 0)
+
     @patch('dockerpty.start')
     def test_run_service_without_links(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/links-figfile'

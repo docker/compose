@@ -146,6 +146,19 @@ dns:
   - 9.9.9.9
 ```
 
+### noop
+
+Specify a explicit no-op command for use during intermediate container creation with
+minimal images that don't have `echo`. For example [hello-world](https://registry.hub.docker.com/u/library/hello-world/).
+
+```
+datavol:
+  image: hello-world
+  noop: /hello
+  volume:
+    - /mydata
+```
+
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.
