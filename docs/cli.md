@@ -99,18 +99,16 @@ By default if there are existing containers for a service, `fig up` will stop an
 
 ## Environment Variables
 
-Fig commands support the following environment variables
+Several environment variables can be used to configure Fig's behaviour.
 
-### FIG_PROJECT_NAME
+### FIG\_PROJECT\_NAME
 
-Set the project name. Defaults to the `basename` of the current working
-directory.
+Set the project name, which is prepended to the name of every container started by Fig. Defaults to the `basename` of the current working directory.
 
-### FIG_FILE
+### FIG\_FILE
 
-Set the path to the `fig.yml` to use. Defaults to `fig.yml` in the current
-working directory.
+Set the path to the `fig.yml` to use. Defaults to `fig.yml` in the current working directory.
 
-### DOCKER_HOST
+### DOCKER\_HOST
 
-Set the url to the docker remote.
+Set the URL to the docker daemon. Defaults to `unix:///var/run/docker.sock`, as with the docker client.
