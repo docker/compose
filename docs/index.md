@@ -113,7 +113,7 @@ Now if we run `fig up`, it'll pull a Redis image, build an image for our own cod
     redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     web_1   |  * Running on http://0.0.0.0:5000/
 
-Open up [http://localhost:5000](http://localhost:5000) in your browser (or [http://localdocker:5000](http://localdocker:5000) if you're using [docker-osx](https://github.com/noplay/docker-osx)) and you should see it running!
+The web app should now be listening on port 5000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
 
 If you want to run your services in the background, you can pass the `-d` flag to `fig up` and use `fig ps` to see what is currently running:
 
