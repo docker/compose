@@ -1,0 +1,17 @@
+datam:
+  image: hello-world
+  noop: /hello
+  volumes:
+    - /avolume
+
+dataw:
+  image: debian:7
+  volumes:
+    - /another
+
+app:
+  image: figtest_test
+  command: [ "/bin/true" ]
+  volumes_from:
+    - datam
+    - dataw
