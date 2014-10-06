@@ -10,42 +10,44 @@ Most commands are run against one or more services. If the service is omitted, i
 
 Run `fig [COMMAND] --help` for full usage.
 
-## build
+## Commands
+
+### build
 
 Build or rebuild services.
 
 Services are built once and then tagged as `project_service`, e.g. `figtest_db`. If you change a service's `Dockerfile` or the contents of its build directory, you can run `fig build` to rebuild it.
 
-## help
+### help
 
 Get help on a command.
 
-## kill
+### kill
 
 Force stop service containers.
 
-## logs
+### logs
 
 View output from services.
 
-## port
+### port
 
 Print the public port for a port binding
 
-## ps
+### ps
 
 List containers.
 
-## pull
+### pull
 
 Pulls service images.
 
-## rm
+### rm
 
 Remove stopped service containers.
 
 
-## run
+### run
 
 Run a one-off command on a service.
 
@@ -65,7 +67,7 @@ If you do not want linked containers to be started when running the one-off comm
 
     $ fig run --no-deps web python manage.py shell
 
-## scale
+### scale
 
 Set number of containers to run for a service.
 
@@ -74,15 +76,15 @@ For example:
 
     $ fig scale web=2 worker=3
 
-## start
+### start
 
 Start existing containers for a service.
 
-## stop
+### stop
 
 Stop running containers without removing them. They can be started again with `fig start`.
 
-## up
+### up
 
 Build, (re)create, start and attach to containers for a service.
 
@@ -93,3 +95,22 @@ By default, `fig up` will aggregate the output of each container, and when it ex
 By default if there are existing containers for a service, `fig up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `fig.yml` are picked up. If you do no want containers to be stopped and recreated, use `fig up --no-recreate`. This will still start any stopped containers, if needed.
 
 [volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/
+
+
+## Environment Variables
+
+Fig commands support the following environment variables
+
+### FIG_PROJECT_NAME
+
+Set the project name. Defaults to the `basename` of the current working
+directory.
+
+### FIG_FILE
+
+Set the path to the `fig.yml` to use. Defaults to `fig.yml` in the current
+working directory.
+
+### DOCKER_HOST
+
+Set the url to the docker remote.
