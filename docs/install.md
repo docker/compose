@@ -18,7 +18,7 @@ There are also guides for [Ubuntu](https://docs.docker.com/installation/ubuntuli
 
 Next, install Fig:
 
-    curl -L https://github.com/docker/fig/releases/download/0.5.2/fig-`uname -s`-`uname -m` > /usr/local/bin/fig; chmod +x /usr/local/bin/fig
+    curl -L https://github.com/docker/fig/releases/download/1.0.0/fig-`uname -s`-`uname -m` > /usr/local/bin/fig; chmod +x /usr/local/bin/fig
 
 Releases are available for OS X and 64-bit Linux. Fig is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
 
