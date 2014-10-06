@@ -93,6 +93,6 @@ Finally, we just need to create the database. In another terminal, run:
 
     $ fig run web rake db:create
 
-And we're rolling—see for yourself at [localhost:3000](http://localhost:3000) (or [localdocker:3000](http://localdocker:3000) if you're using docker-osx).
+And we're rolling—your app should now be running on port 3000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
 
 ![Screenshot of Rails' stock index.html](https://orchardup.com/static/images/fig-rails-screenshot.png)

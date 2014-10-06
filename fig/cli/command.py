@@ -34,8 +34,8 @@ class Command(DocoptCommand):
                     raise errors.DockerNotFoundUbuntu()
                 else:
                     raise errors.DockerNotFoundGeneric()
-            elif call_silently(['which', 'docker-osx']) == 0:
-                raise errors.ConnectionErrorDockerOSX()
+            elif call_silently(['which', 'boot2docker']) == 0:
+                raise errors.ConnectionErrorBoot2Docker()
             else:
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 

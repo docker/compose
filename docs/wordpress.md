@@ -88,4 +88,4 @@ if(file_exists($root.$path))
 }else include_once 'index.php';
 ```
 
-With those four files in place, run `fig up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress and set it up by visiting [localhost:8000](http://localhost:8000) - or [localdocker:8000](http://localdocker:8000) if you're using docker-osx.
+With those four files in place, run `fig up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
