@@ -3,3 +3,4 @@ nose
 git+https://github.com/pyinstaller/pyinstaller.git@12e40471c77f588ea5be352f7219c873ddaae056#egg=pyinstaller
 unittest2
 flake8
+coverage
