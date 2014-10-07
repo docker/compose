@@ -206,6 +206,26 @@ class CLITestCase(DockerClientTestCase):
             u'/bin/echo helloworld'
         )
 
+    @patch('dockerpty.start')
+    def test_run_service_with_environement_overridden(self, _):
+        name = 'service'
+        self.command.base_dir = 'tests/fixtures/environment-figfile'
+        self.command.dispatch(
+            ['run', '-e', 'foo=notbar', '-e', 'allo=moto=bobo',
+             '-e', 'alpha=beta', name],
+            None
+        )
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        # env overriden
+        self.assertEqual('notbar', container.environment['foo'])
+        # keep environement from yaml
+        self.assertEqual('world', container.environment['hello'])
+        # added option from command line
+        self.assertEqual('beta', container.environment['alpha'])
+        # make sure a value with a = don't crash out
+        self.assertEqual('moto=bobo', container.environment['allo'])
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
