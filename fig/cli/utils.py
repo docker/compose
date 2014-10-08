@@ -62,7 +62,9 @@ def mkdir(path, permissions=0o700):
     return path
 
 
-def docker_url():
+def docker_url(options=None):
+    if options is not None and 'docker_host' in options and options['docker_host'] is not None:
+        return options['docker_host']
     return os.environ.get('DOCKER_HOST')
 
 

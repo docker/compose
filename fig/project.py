@@ -44,33 +44,35 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client):
+    def __init__(self, name, services,client_maker):
         self.name = name
         self.services = services
-        self.client = client
+        self.client_maker = client_maker
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, service_dicts, client_maker):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
-        project = cls(name, [], client)
+
+        project = cls(name, [],client_maker)
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
+            client = client_maker.get_client(service_dict['name'],{ 'docker_host' : service_dict.get('docker_host',None) })
 
             project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
         return project
 
     @classmethod
-    def from_config(cls, name, config, client):
+    def from_config(cls, name, config, clientmaker):
         dicts = []
         for service_name, service in list(config.items()):
             if not isinstance(service, dict):
                 raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.')
             service['name'] = service_name
             dicts.append(service)
-        return cls.from_dicts(name, dicts, client)
+        return cls.from_dicts(name, dicts, clientmaker)
 
     def get_service(self, name):
         """
@@ -137,7 +139,7 @@ class Project(object):
                     volumes_from.append(service)
                 except NoSuchService:
                     try:
-                        container = Container.from_id(self.client, volume_name)
+                        container = Container.from_id(service.client, volume_name)
                         volumes_from.append(container)
                     except APIError:
                         raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
@@ -189,9 +191,9 @@ class Project(object):
             service.remove_stopped(**options)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
-        return [Container.from_ps(self.client, container)
-                for container in self.client.containers(all=stopped)
+        return [Container.from_ps(service.client, container)
                 for service in self.get_services(service_names)
+                for container in service.client.containers(all=stopped)
                 if service.has_container(container, one_off=one_off)]
 
     def _inject_links(self, acc, service):
