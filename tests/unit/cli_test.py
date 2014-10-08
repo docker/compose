@@ -55,7 +55,7 @@ class CLITestCase(unittest.TestCase):
         command.base_dir = 'tests/fixtures/longer-filename-figfile'
         project = command.get_project(command.get_config_path())
         self.assertEqual(project.name, 'longerfilenamefigfile')
-        self.assertTrue(project.client)
+        self.assertTrue(project.client_maker)
         self.assertTrue(project.services)
 
     def test_help(self):

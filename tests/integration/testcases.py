@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from docker import Client
 from fig.service import Service
 from fig.cli.utils import docker_url
+from fig.cli.command import ClientMaker
 from fig.progress_stream import stream_output
 from .. import unittest
 
@@ -11,6 +12,7 @@ class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = Client(docker_url())
+        cls.client_maker = ClientMaker()
 
     def setUp(self):
         for c in self.client.containers(all=True):

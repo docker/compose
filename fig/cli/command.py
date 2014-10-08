@@ -24,7 +24,10 @@ class ClientMaker(object):
         self.clients = {}
         self.verbose = verbose
 
-    def get_client(self,name="DEFAULT",options=None):
+    def get_client(self,name,options=None):
+        if name in self.clients:
+            return self.clients[name]
+
         docker_options = { 
             'base_url' : docker_url(options)
         }

@@ -65,14 +65,14 @@ class Project(object):
         return project
 
     @classmethod
-    def from_config(cls, name, config, clientmaker):
+    def from_config(cls, name, config, client_maker):
         dicts = []
         for service_name, service in list(config.items()):
             if not isinstance(service, dict):
                 raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.')
             service['name'] = service_name
             dicts.append(service)
-        return cls.from_dicts(name, dicts, clientmaker)
+        return cls.from_dicts(name, dicts, client_maker)
 
     def get_service(self, name):
         """
@@ -139,7 +139,8 @@ class Project(object):
                     volumes_from.append(service)
                 except NoSuchService:
                     try:
-                        container = Container.from_id(service.client, volume_name)
+                        client = self.client_maker.get_client(service_dict['name'],{ 'docker_host' : service_dict.get('docker_host',None) })
+                        container = Container.from_id(client, volume_name)
                         volumes_from.append(container)
                     except APIError:
                         raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))

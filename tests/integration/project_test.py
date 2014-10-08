@@ -18,7 +18,7 @@ class ProjectTest(DockerClientTestCase):
                     'volumes_from': ['data'],
                 },
             },
-            client=self.client,
+            client_maker=self.client_maker,
         )
         db = project.get_service('db')
         data = project.get_service('data')
@@ -39,7 +39,7 @@ class ProjectTest(DockerClientTestCase):
                     'volumes_from': ['figtest_data_container'],
                 },
             },
-            client=self.client,
+            client_maker=self.client_maker,
         )
         db = project.get_service('db')
         self.assertEqual(db.volumes_from, [data_container])
@@ -47,7 +47,7 @@ class ProjectTest(DockerClientTestCase):
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
-        project = Project('figtest', [web, db], self.client)
+        project = Project('figtest', [web, db], self.client_maker)
 
         project.start()
 
@@ -80,7 +80,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/var/db'])
-        project = Project('figtest', [web, db], self.client)
+        project = Project('figtest', [web, db], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -95,7 +95,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_recreates_containers(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/etc'])
-        project = Project('figtest', [web, db], self.client)
+        project = Project('figtest', [web, db], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -117,7 +117,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_with_no_recreate_running(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/var/db'])
-        project = Project('figtest', [web, db], self.client)
+        project = Project('figtest', [web, db], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -140,7 +140,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/var/db'])
-        project = Project('figtest', [web, db], self.client)
+        project = Project('figtest', [web, db], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -169,7 +169,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_without_all_services(self):
         console = self.create_service('console')
         db = self.create_service('db')
-        project = Project('figtest', [console, db], self.client)
+        project = Project('figtest', [console, db], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -186,7 +186,7 @@ class ProjectTest(DockerClientTestCase):
         db = self.create_service('db', volumes=['/var/db'])
         web = self.create_service('web', links=[(db, 'db')])
 
-        project = Project('figtest', [web, db, console], self.client)
+        project = Project('figtest', [web, db, console], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -204,7 +204,7 @@ class ProjectTest(DockerClientTestCase):
         db = self.create_service('db', volumes=['/var/db'])
         web = self.create_service('web', links=[(db, 'db')])
 
-        project = Project('figtest', [web, db, console], self.client)
+        project = Project('figtest', [web, db, console], self.client_maker)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
@@ -219,7 +219,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_unscale_after_restart(self):
         web = self.create_service('web')
-        project = Project('figtest', [web], self.client)
+        project = Project('figtest', [web], self.client_maker)
 
         project.start()
 
