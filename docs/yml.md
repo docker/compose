@@ -58,6 +58,18 @@ An entry with the alias' name will be created in `/etc/hosts` inside containers 
 
 Environment variables will also be created - see the [environment variable reference](env.html) for details.
 
+### external_links
+
+Link to containers started outside this `fig.yml` or even outside of fig, especially for containers that provide shared or common services.
+`external_links` follow semantics similar to `links` when specifying both the container name and the link alias (`CONTAINER:ALIAS`).
+
+```
+external_links:
+ - redis_1
+ - project_db_1:mysql
+ - project_db_1:postgresql
+```
+
 ### ports
 
 Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container port (a random host port will be chosen).

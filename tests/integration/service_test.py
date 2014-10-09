@@ -219,6 +219,26 @@ class ServiceTest(DockerClientTestCase):
             ]),
         )
 
+    def test_start_container_with_external_links(self):
+        db = self.create_service('db')
+        web = self.create_service('web', external_links=['figtest_db_1',
+                                                         'figtest_db_2',
+                                                         'figtest_db_3:db_3'])
+
+        db.start_container()
+        db.start_container()
+        db.start_container()
+        web.start_container()
+
+        self.assertEqual(
+            set(web.containers()[0].links()),
+            set([
+                'figtest_db_1',
+                'figtest_db_2',
+                'db_3',
+                ]),
+        )
+
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
         db = self.create_service('db')
 
