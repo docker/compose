@@ -44,7 +44,7 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services,client_maker):
+    def __init__(self, name, services, client_maker):
         self.name = name
         self.services = services
         self.client_maker = client_maker
@@ -55,11 +55,11 @@ class Project(object):
         Construct a ServiceCollection from a list of dicts representing services.
         """
 
-        project = cls(name, [],client_maker)
+        project = cls(name, [], client_maker)
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
-            client = client_maker.get_client(service_dict['name'],{ 'docker_host' : service_dict.get('docker_host',None) })
+            client = client_maker.get_client(service_dict['name'], {'docker_host' : service_dict.get('docker_host', None)})
 
             project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
         return project
@@ -139,7 +139,7 @@ class Project(object):
                     volumes_from.append(service)
                 except NoSuchService:
                     try:
-                        client = self.client_maker.get_client(service_dict['name'],{ 'docker_host' : service_dict.get('docker_host',None) })
+                        client = self.client_maker.get_client(service_dict['name'], {'docker_host': service_dict.get('docker_host', None)})
                         container = Container.from_id(client, volume_name)
                         volumes_from.append(container)
                     except APIError:

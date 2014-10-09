@@ -19,18 +19,18 @@ from .. import __version__
 
 log = logging.getLogger(__name__)
 
+
 class ClientMaker(object):
-    def __init__(self,verbose=False):
+
+    def __init__(self, verbose=False):
         self.clients = {}
         self.verbose = verbose
 
-    def get_client(self,name,options=None):
+    def get_client(self, name, options=None):
         if name in self.clients:
             return self.clients[name]
 
-        docker_options = { 
-            'base_url' : docker_url(options)
-        }
+        docker_options = {'base_url' : docker_url(options)}
         client = Client(**docker_options)
         if self.verbose:
             version_info = six.iteritems(client.version())
@@ -38,10 +38,11 @@ class ClientMaker(object):
             log.info("Docker base_url: %s", client.base_url)
             log.info("Docker version: %s",
                      ", ".join("%s=%s" % item for item in version_info))
-            self.clients[name] =  verbose_proxy.VerboseProxy('docker', client)
+            self.clients[name] = verbose_proxy.VerboseProxy('docker', client)
         else:
             self.clients[name] = client
         return self.clients[name]
+
 
 class Command(DocoptCommand):
     base_dir = '.'
@@ -49,7 +50,7 @@ class Command(DocoptCommand):
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
-        except ConnectionError,e:
+        except ConnectionError as e:
             if call_silently(['which', 'docker']) != 0:
                 if is_mac():
                     raise errors.DockerNotFoundMac()
