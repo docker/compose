@@ -136,7 +136,7 @@ class ServiceTest(DockerClientTestCase):
 
         intermediate_container = tuples[0][0]
         new_container = tuples[0][1]
-        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['echo'])
+        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['/bin/echo'])
 
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
