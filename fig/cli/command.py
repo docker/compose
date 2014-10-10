@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from docker import Client
+from docker import tls
 from requests.exceptions import ConnectionError
 import errno
 import logging
@@ -8,6 +9,7 @@ import os
 import re
 import yaml
 import six
+import ssl
 
 from ..project import Project
 from ..service import ConfigError
@@ -49,7 +51,17 @@ class Command(DocoptCommand):
         handler(project, command_options)
 
     def get_client(self, verbose=False):
-        client = Client(docker_url())
+        if os.environ.get('DOCKER_CERT_PATH') is not None:
+            tls_path = os.environ.get('DOCKER_CERT_PATH')
+            tls_config = tls.TLSConfig(
+                ssl_version=ssl.PROTOCOL_TLSv1,
+                verify=True,
+                client_cert=(tls_path + '/cert.pem', tls_path + '/key.pem'),
+                ca_cert=tls_path + '/ca.pem'
+            )
+            client = Client(base_url=docker_url(), tls=tls_config)
+        else:
+            client = Client(docker_url())
         if verbose:
             version_info = six.iteritems(client.version())
             log.info("Fig version %s", __version__)
