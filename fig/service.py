@@ -58,7 +58,10 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
+        # "caps" is added here because cap_add and cap_drop is possibly ugly in
+        # yaml, but could be removed if start_container has the "caps" feature
+        # removed.
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose', 'caps']
 
         for k in options:
             if k not in supported_options:
@@ -259,6 +262,11 @@ class Service(object):
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
 
+        # see docker-py's docker/client.py Client.start
+        caps = options.get('caps', {})
+        cap_add = caps.get('add', None)
+        cap_drop = caps.get('drop', None)
+
         container.start(
             links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=ports,
@@ -267,6 +275,8 @@ class Service(object):
             privileged=privileged,
             network_mode=net,
             dns=dns,
+            cap_add=cap_add,
+            cap_drop=cap_drop,
         )
         return container
 
