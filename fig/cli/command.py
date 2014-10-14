@@ -20,13 +20,37 @@ from .. import __version__
 log = logging.getLogger(__name__)
 
 
+class ClientMaker(object):
+
+    def __init__(self, verbose=False):
+        self.clients = {}
+        self.verbose = verbose
+
+    def get_client(self, name, options=None):
+        if name in self.clients:
+            return self.clients[name]
+
+        docker_options = {'base_url' : docker_url(options)}
+        client = Client(**docker_options)
+        if self.verbose:
+            version_info = six.iteritems(client.version())
+            log.info("Fig version %s", __version__)
+            log.info("Docker base_url: %s", client.base_url)
+            log.info("Docker version: %s",
+                     ", ".join("%s=%s" % item for item in version_info))
+            self.clients[name] = verbose_proxy.VerboseProxy('docker', client)
+        else:
+            self.clients[name] = client
+        return self.clients[name]
+
+
 class Command(DocoptCommand):
     base_dir = '.'
 
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
-        except ConnectionError:
+        except ConnectionError as e:
             if call_silently(['which', 'docker']) != 0:
                 if is_mac():
                     raise errors.DockerNotFoundMac()
@@ -37,7 +61,7 @@ class Command(DocoptCommand):
             elif call_silently(['which', 'boot2docker']) == 0:
                 raise errors.ConnectionErrorBoot2Docker()
             else:
-                raise errors.ConnectionErrorGeneric(self.get_client().base_url)
+                raise errors.ConnectionErrorGeneric(e.request.url)
 
     def perform_command(self, options, handler, command_options):
         explicit_config_path = options.get('--file') or os.environ.get('FIG_FILE')
@@ -47,17 +71,6 @@ class Command(DocoptCommand):
             verbose=options.get('--verbose'))
 
         handler(project, command_options)
-
-    def get_client(self, verbose=False):
-        client = Client(docker_url())
-        if verbose:
-            version_info = six.iteritems(client.version())
-            log.info("Fig version %s", __version__)
-            log.info("Docker base_url: %s", client.base_url)
-            log.info("Docker version: %s",
-                     ", ".join("%s=%s" % item for item in version_info))
-            return verbose_proxy.VerboseProxy('docker', client)
-        return client
 
     def get_config(self, config_path):
         try:
@@ -73,7 +86,7 @@ class Command(DocoptCommand):
             return Project.from_config(
                 self.get_project_name(config_path, project_name),
                 self.get_config(config_path),
-                self.get_client(verbose=verbose))
+                ClientMaker(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
 

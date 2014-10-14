@@ -316,11 +316,11 @@ class TopLevelCommand(Command):
             print(container.name)
         else:
             service.start_container(container, ports=None, one_off=True)
-            dockerpty.start(project.client, container.id)
+            dockerpty.start(service.client, container.id)
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
-                project.client.remove_container(container.id)
+                service.client.remove_container(container.id)
             sys.exit(exit_code)
 
     def scale(self, project, options):
