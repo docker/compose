@@ -1,5 +1,12 @@
 #!/bin/sh
 set -ex
+
+target="tests"
+
+if [[ -n "$@" ]]; then
+  target="$@"
+fi
+
 docker build -t fig .
-docker run -v /var/run/docker.sock:/var/run/docker.sock fig flake8 fig
-docker run -v /var/run/docker.sock:/var/run/docker.sock fig nosetests $@
+docker run -v /var/run/docker.sock:/var/run/docker.sock fig flake8 --exclude=packages fig
+docker run -v /var/run/docker.sock:/var/run/docker.sock fig nosetests $target

@@ -7,7 +7,7 @@ import signal
 from operator import attrgetter
 
 from inspect import getdoc
-import dockerpty
+from fig.packages import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
