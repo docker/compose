@@ -8,11 +8,11 @@ Installing Fig
 
 First, install Docker version 1.3 or greater.
 
-If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/). You'll also need to set an environment variable to point at the Boot2Docker virtual machine:
+If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/) to install both Docker and boot2docker. Once boot2docker is running, set the environment variables that'll configure Docker and Fig to talk to it:
 
-    $ export DOCKER_HOST=tcp://`boot2docker ip`:2375
+    $(boot2docker shellinit)
 
-If you want this to persist across shell sessions, you can add it to your `~/.bashrc` file.
+To persist the environment variables across shell sessions, you can add that line to your `~/.bashrc` file.
 
 There are also guides for [Ubuntu](https://docs.docker.com/installation/ubuntulinux/) and [other platforms](https://docs.docker.com/installation/) in Docker’s documentation.
 

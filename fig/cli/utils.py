@@ -62,10 +62,6 @@ def mkdir(path, permissions=0o700):
     return path
 
 
-def docker_url():
-    return os.environ.get('DOCKER_HOST')
-
-
 def split_buffer(reader, separator):
     """
     Given a generator which yields strings and a separator string,

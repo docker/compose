@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from docker import Client
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, SSLError
 import errno
 import logging
 import os
@@ -12,7 +11,8 @@ import six
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
-from .utils import docker_url, call_silently, is_mac, is_ubuntu
+from .utils import call_silently, is_mac, is_ubuntu
+from .docker_client import docker_client
 from . import verbose_proxy
 from . import errors
 from .. import __version__
@@ -26,6 +26,8 @@ class Command(DocoptCommand):
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
+        except SSLError, e:
+            raise errors.UserError('SSL error: %s' % e)
         except ConnectionError:
             if call_silently(['which', 'docker']) != 0:
                 if is_mac():
@@ -49,7 +51,7 @@ class Command(DocoptCommand):
         handler(project, command_options)
 
     def get_client(self, verbose=False):
-        client = Client(docker_url())
+        client = docker_client()
         if verbose:
             version_info = six.iteritems(client.version())
             log.info("Fig version %s", __version__)
