@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/rails.html">
   </head>
   <body>
@@ -79,7 +79,7 @@ Rakefile     db           test
   pool: 5
   username: postgres
   password:
-  host: db_1
+  host: db
 
 test:
   &lt;&lt;: *default
@@ -96,7 +96,7 @@ myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick::HTTPServer#start: pid=1 port=
 <p>Finally, we just need to create the database. In another terminal, run:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web rake db:create
 </code></pre></div>
-<p>And we&#39;re rolling—see for yourself at <a href="http://localhost:3000">localhost:3000</a> (or <a href="http://localdocker:3000">localdocker:3000</a> if you&#39;re using docker-osx).</p>
+<p>And we&#39;re rolling—your app should now be running on port 3000 on your docker daemon (if you&#39;re using boot2docker, <code>boot2docker ip</code> will tell you its address).</p>
 
 <p><img src="https://orchardup.com/static/images/fig-rails-screenshot.png" alt="Screenshot of Rails&#39; stock index.html"></p>
 </div>

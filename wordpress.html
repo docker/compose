@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/wordpress.html">
   </head>
   <body>
@@ -49,7 +49,7 @@ db:
 define(&#39;DB_NAME&#39;, &#39;wordpress&#39;);
 define(&#39;DB_USER&#39;, &#39;root&#39;);
 define(&#39;DB_PASSWORD&#39;, &#39;&#39;);
-define(&#39;DB_HOST&#39;, getenv(&quot;DB_1_PORT_3306_TCP_ADDR&quot;) . &quot;:&quot; . getenv(&quot;DB_1_PORT_3306_TCP_PORT&quot;));
+define(&#39;DB_HOST&#39;, &quot;db:3306&quot;);
 define(&#39;DB_CHARSET&#39;, &#39;utf8&#39;);
 define(&#39;DB_COLLATE&#39;, &#39;&#39;);
 
@@ -89,7 +89,7 @@ if(file_exists($root.$path))
     }
 }else include_once &#39;index.php&#39;;
 </code></pre></div>
-<p>With those four files in place, run <code>fig up</code> inside your Wordpress directory and it&#39;ll pull and build the images we need, and then start the web and database containers. You&#39;ll then be able to visit Wordpress and set it up by visiting <a href="http://localhost:8000">localhost:8000</a> - or <a href="http://localdocker:8000">localdocker:8000</a> if you&#39;re using docker-osx.</p>
+<p>With those four files in place, run <code>fig up</code> inside your Wordpress directory and it&#39;ll pull and build the images we need, and then start the web and database containers. You&#39;ll then be able to visit Wordpress at port 8000 on your docker daemon (if you&#39;re using boot2docker, <code>boot2docker ip</code> will tell you its address).</p>
 </div>
 
       <div class="sidebar">

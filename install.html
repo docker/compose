@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/install.html">
   </head>
   <body>
@@ -20,22 +20,19 @@
 
       <div class="content"><h1>Installing Fig</h1>
 
-<p>First, install Docker version 1.0 or greater. If you&#39;re on OS X, you can use <a href="https://github.com/noplay/docker-osx">docker-osx</a>:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl https://raw.githubusercontent.com/noplay/docker-osx/1.1.1/docker-osx &gt; /usr/local/bin/docker-osx
-$ chmod +x /usr/local/bin/docker-osx
-$ docker-osx shell
-</code></pre></div>
-<p>Docker has guides for <a href="http://docs.docker.io/en/latest/installation/ubuntulinux/">Ubuntu</a> and <a href="http://docs.docker.io/en/latest/installation/">other platforms</a> in their documentation.</p>
+<p>First, install Docker version 1.3 or greater.</p>
 
-<p>Next, install Fig. On OS X:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl -L https://github.com/docker/fig/releases/download/0.5.2/darwin &gt; /usr/local/bin/fig
-$ chmod +x /usr/local/bin/fig
+<p>If you&#39;re on OS X, you can use the <a href="https://docs.docker.com/installation/mac/">OS X installer</a> to install both Docker and boot2docker. Once boot2docker is running, set the environment variables that&#39;ll configure Docker and Fig to talk to it:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$(boot2docker shellinit)
 </code></pre></div>
-<p>On 64-bit Linux:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl -L https://github.com/docker/fig/releases/download/0.5.2/linux &gt; /usr/local/bin/fig
-$ chmod +x /usr/local/bin/fig
+<p>To persist the environment variables across shell sessions, you can add that line to your <code>~/.bashrc</code> file.</p>
+
+<p>There are also guides for <a href="https://docs.docker.com/installation/ubuntulinux/">Ubuntu</a> and <a href="https://docs.docker.com/installation/">other platforms</a> in Docker’s documentation.</p>
+
+<p>Next, install Fig:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">curl -L https://github.com/docker/fig/releases/download/1.0.0/fig-`uname -s`-`uname -m` &gt; /usr/local/bin/fig; chmod +x /usr/local/bin/fig
 </code></pre></div>
-<p>Fig is also available as a Python package if you&#39;re on another platform (or if you prefer that sort of thing):</p>
+<p>Releases are available for OS X and 64-bit Linux. Fig is also available as a Python package if you&#39;re on another platform (or if you prefer that sort of thing):</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ sudo pip install -U fig
 </code></pre></div>
 <p>That should be all you need! Run <code>fig --version</code> to see if it worked.</p>

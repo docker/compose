@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/cli.html">
   </head>
   <body>
@@ -24,33 +24,43 @@
 
 <p>Run <code>fig [COMMAND] --help</code> for full usage.</p>
 
-<h2>build</h2>
+<h2>Commands</h2>
+
+<h3>build</h3>
 
 <p>Build or rebuild services.</p>
 
 <p>Services are built once and then tagged as <code>project_service</code>, e.g. <code>figtest_db</code>. If you change a service&#39;s <code>Dockerfile</code> or the contents of its build directory, you can run <code>fig build</code> to rebuild it.</p>
 
-<h2>help</h2>
+<h3>help</h3>
 
 <p>Get help on a command.</p>
 
-<h2>kill</h2>
+<h3>kill</h3>
 
 <p>Force stop service containers.</p>
 
-<h2>logs</h2>
+<h3>logs</h3>
 
 <p>View output from services.</p>
 
-<h2>ps</h2>
+<h3>port</h3>
+
+<p>Print the public port for a port binding</p>
+
+<h3>ps</h3>
 
 <p>List containers.</p>
 
-<h2>rm</h2>
+<h3>pull</h3>
+
+<p>Pulls service images.</p>
+
+<h3>rm</h3>
 
 <p>Remove stopped service containers.</p>
 
-<h2>run</h2>
+<h3>run</h3>
 
 <p>Run a one-off command on a service.</p>
 
@@ -62,12 +72,12 @@
 <p>One-off commands are started in new containers with the same config as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and no ports will be created in case they collide.</p>
 
 <p>Links are also created between one-off commands and the other containers for that service so you can do stuff like this:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run db /bin/sh -c &quot;psql -h \$DB_1_PORT_5432_TCP_ADDR -U docker&quot;
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run db psql -h db -U docker
 </code></pre></div>
 <p>If you do not want linked containers to be started when running the one-off command, specify the <code>--no-deps</code> flag:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run --no-deps web python manage.py shell
 </code></pre></div>
-<h2>scale</h2>
+<h3>scale</h3>
 
 <p>Set number of containers to run for a service.</p>
 
@@ -75,15 +85,15 @@
 For example:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig scale web=2 worker=3
 </code></pre></div>
-<h2>start</h2>
+<h3>start</h3>
 
 <p>Start existing containers for a service.</p>
 
-<h2>stop</h2>
+<h3>stop</h3>
 
 <p>Stop running containers without removing them. They can be started again with <code>fig start</code>.</p>
 
-<h2>up</h2>
+<h3>up</h3>
 
 <p>Build, (re)create, start and attach to containers for a service.</p>
 
@@ -92,6 +102,32 @@ For example:</p>
 <p>By default, <code>fig up</code> will aggregate the output of each container, and when it exits, all containers will be stopped. If you run <code>fig up -d</code>, it&#39;ll start the containers in the background and leave them running.</p>
 
 <p>By default if there are existing containers for a service, <code>fig up</code> will stop and recreate them (preserving mounted volumes with <a href="http://docs.docker.io/en/latest/use/working_with_volumes/">volumes-from</a>), so that changes in <code>fig.yml</code> are picked up. If you do no want containers to be stopped and recreated, use <code>fig up --no-recreate</code>. This will still start any stopped containers, if needed.</p>
+
+<h2>Environment Variables</h2>
+
+<p>Several environment variables can be used to configure Fig&#39;s behaviour.</p>
+
+<p>Variables starting with <code>DOCKER_</code> are the same as those used to configure the Docker command-line client. If you&#39;re using boot2docker, <code>$(boot2docker shellinit)</code> will set them to their correct values.</p>
+
+<h3>FIG_PROJECT_NAME</h3>
+
+<p>Set the project name, which is prepended to the name of every container started by Fig. Defaults to the <code>basename</code> of the current working directory.</p>
+
+<h3>FIG_FILE</h3>
+
+<p>Set the path to the <code>fig.yml</code> to use. Defaults to <code>fig.yml</code> in the current working directory.</p>
+
+<h3>DOCKER_HOST</h3>
+
+<p>Set the URL to the docker daemon. Defaults to <code>unix:///var/run/docker.sock</code>, as with the docker client.</p>
+
+<h3>DOCKER_TLS_VERIFY</h3>
+
+<p>When set to anything other than an empty string, enables TLS communication with the daemon.</p>
+
+<h3>DOCKER_CERT_PATH</h3>
+
+<p>Configure the path to the <code>ca.pem</code>, <code>cert.pem</code> and <code>key.pem</code> files used for TLS verification. Defaults to <code>~/.docker</code>.</p>
 </div>
 
       <div class="sidebar">

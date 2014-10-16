@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/">
   </head>
   <body>
@@ -67,7 +67,7 @@ $ cd figtest
 <span class="kn">from</span> <span class="nn">redis</span> <span class="kn">import</span> <span class="n">Redis</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
-<span class="n">redis</span> <span class="o">=</span> <span class="n">Redis</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&quot;redis_1&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">6379</span><span class="p">)</span>
+<span class="n">redis</span> <span class="o">=</span> <span class="n">Redis</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&#39;redis&#39;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">6379</span><span class="p">)</span>
 
 <span class="nd">@app.route</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">hello</span><span class="p">():</span>
@@ -118,7 +118,7 @@ Starting figtest_web_1...
 redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
 web_1   |  * Running on http://0.0.0.0:5000/
 </code></pre></div>
-<p>Open up <a href="http://localhost:5000">http://localhost:5000</a> in your browser (or <a href="http://localdocker:5000">http://localdocker:5000</a> if you&#39;re using <a href="https://github.com/noplay/docker-osx">docker-osx</a>) and you should see it running!</p>
+<p>The web app should now be listening on port 5000 on your docker daemon (if you&#39;re using boot2docker, <code>boot2docker ip</code> will tell you its address).</p>
 
 <p>If you want to run your services in the background, you can pass the <code>-d</code> flag to <code>fig up</code> and use <code>fig ps</code> to see what is currently running:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig up -d

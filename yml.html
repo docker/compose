@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/yml.html">
   </head>
   <body>
@@ -41,14 +41,23 @@ image: a4bc65fd
 <p>Override the default command.</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">command: bundle exec thin -p 3000
 </code></pre></div>
+<p><a name="links"></a></p>
+
 <h3>links</h3>
 
-<p>Link to containers in another service. Optionally specify an alternate name for the link, which will determine how environment variables are prefixed, e.g. <code>db</code> -&gt; <code>DB_1_PORT</code>, <code>db:database</code> -&gt; <code>DATABASE_1_PORT</code></p>
+<p>Link to containers in another service. Either specify both the service name and the link alias (<code>SERVICE:ALIAS</code>), or just the service name (which will also be used for the alias).</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">links:
  - db
  - db:database
  - redis
 </code></pre></div>
+<p>An entry with the alias&#39; name will be created in <code>/etc/hosts</code> inside containers for this service, e.g:</p>
+<div class="highlight"><pre><code class="text language-text" data-lang="text">172.17.2.186  db
+172.17.2.186  database
+172.17.2.187  redis
+</code></pre></div>
+<p>Environment variables will also be created - see the <a href="env.html">environment variable reference</a> for details.</p>
+
 <h3>ports</h3>
 
 <p>Expose ports. Either specify both ports (<code>HOST:CONTAINER</code>), or just the container port (a random host port will be chosen).</p>
@@ -69,12 +78,12 @@ image: a4bc65fd
 </code></pre></div>
 <h3>volumes</h3>
 
-<p>Mount paths as volumes, optionally specifying a path on the host machine (<code>HOST:CONTAINER</code>).</p>
-
-<p>Note: Mapping local volumes is currently unsupported on boot2docker. We recommend you use <a href="https://github.com/noplay/docker-osx">docker-osx</a> if want to map local volumes.</p>
+<p>Mount paths as volumes, optionally specifying a path on the host machine
+(<code>HOST:CONTAINER</code>), or an access mode (<code>HOST:CONTAINER:ro</code>).</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">volumes:
  - /var/lib/mysql
  - cache/:/tmp/cache
+ - ~/configs:/etc/configs/:ro
 </code></pre></div>
 <h3>volumes_from</h3>
 

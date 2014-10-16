@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20140808310756672680036">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
     <link rel="canonical" href="http://www.fig.sh/django.html">
   </head>
   <body>
@@ -67,7 +67,7 @@ Dockerfile       fig.yml          figexample       manage.py        requirements
         &#39;ENGINE&#39;: &#39;django.db.backends.postgresql_psycopg2&#39;,
         &#39;NAME&#39;: &#39;postgres&#39;,
         &#39;USER&#39;: &#39;postgres&#39;,
-        &#39;HOST&#39;: &#39;db_1&#39;,
+        &#39;HOST&#39;: &#39;db&#39;,
         &#39;PORT&#39;: 5432,
     }
 }
@@ -90,7 +90,7 @@ myapp_web_1 | Django version 1.6.1, using settings &#39;figexample.settings&#39;
 myapp_web_1 | Starting development server at http://0.0.0.0:8000/
 myapp_web_1 | Quit the server with CONTROL-C.
 </code></pre></div>
-<p>And your Django app should be running at <a href="http://localhost:8000">localhost:8000</a> (or <a href="http://localdocker:8000">localdocker:8000</a> if you&#39;re using docker-osx).</p>
+<p>And your Django app should be running at port 8000 on your docker daemon (if you&#39;re using boot2docker, <code>boot2docker ip</code> will tell you its address).</p>
 
 <p>You can also run management commands with Docker. To set up your database, for example, run <code>fig up</code> and in another terminal run:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">$ fig run web python manage.py syncdb
