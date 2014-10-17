@@ -43,6 +43,8 @@ Other things:
  - When starting a service where `volumes_from` points to a service without any containers running, that service will now be started.
  - Lots of docs improvements. Notably, environment variables are documented and official repositories are used throughout.
 
+Thanks @dnephin, @d11wtq, @marksteve, @rubbish, @jbalonso, @timfreund, @alunduil, @mieciu, @shuron, @moss, @suzaku and @chmouel! Whew.
+
 0.5.2 (2014-07-28)
 ------------------
 
