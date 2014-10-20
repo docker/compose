@@ -75,13 +75,15 @@ class TopLevelCommand(Command):
       fig -h|--help
 
     Options:
-      --verbose                 Show more output
-      --version                 Print version and exit
-      -f, --file FILE           Specify an alternate fig file (default: fig.yml)
-      -p, --project-name NAME   Specify an alternate project name (default: directory name)
+      --verbose                    Show more output
+      --version                    Print version and exit
+      -f, --file FILE              Specify an alternate fig file (default: fig.yml)
+      -p, --project-name NAME      Specify an alternate project name (default: directory name)
+      -r, --repository-name NAME   Specify an alternate project name (default: none)
 
     Commands:
       build     Build or rebuild services
+      push      Push built services
       help      Get help on a command
       kill      Kill containers
       logs      View output from containers
@@ -106,7 +108,7 @@ class TopLevelCommand(Command):
         """
         Build or rebuild services.
 
-        Services are built once and then tagged as `project_service`,
+        Services are built once and then tagged as `repository/project_service`,
         e.g. `figtest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `fig build` to rebuild it.
 
@@ -117,6 +119,19 @@ class TopLevelCommand(Command):
         """
         no_cache = bool(options.get('--no-cache', False))
         project.build(service_names=options['SERVICE'], no_cache=no_cache)
+
+    def push(self, project, options):
+        """
+        Push built services.
+
+        Services which have been built & tagged are pushed to repo `repository/project_service`,
+        e.g. `myrepo/figtest_db`. If you change a service's `Dockerfile` or the
+        contents of its build directory, run `fig build` to rebuild and then `fig push` to publish
+
+        Usage: push [SERVICE...]
+
+        """
+        project.push(service_names=options['SERVICE'])
 
     def help(self, project, options):
         """

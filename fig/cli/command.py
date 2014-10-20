@@ -46,6 +46,7 @@ class Command(DocoptCommand):
         project = self.get_project(
             self.get_config_path(explicit_config_path),
             project_name=options.get('--project-name'),
+            repo_name=options.get('--repository-name'),
             verbose=options.get('--verbose'))
 
         handler(project, command_options)
@@ -70,10 +71,11 @@ class Command(DocoptCommand):
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
             raise errors.UserError(six.text_type(e))
 
-    def get_project(self, config_path, project_name=None, verbose=False):
+    def get_project(self, config_path, project_name=None, repo_name='', verbose=False):
         try:
             return Project.from_config(
                 self.get_project_name(config_path, project_name),
+                repo_name,
                 self.get_config(config_path),
                 self.get_client(verbose=verbose))
         except ConfigError as e:
