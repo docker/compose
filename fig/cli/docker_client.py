@@ -11,7 +11,7 @@ def docker_client():
     """
     cert_path = os.environ.get('DOCKER_CERT_PATH', '')
     if cert_path == '':
-        cert_path = os.path.join(os.environ.get('HOME'), '.docker')
+        cert_path = os.path.join(os.environ.get('HOME', ''), '.docker')
 
     base_url = os.environ.get('DOCKER_HOST')
     tls_config = None
