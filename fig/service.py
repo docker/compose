@@ -15,7 +15,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'interactive']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -375,6 +375,12 @@ class Service(object):
             if len(self.client.images(name=self._build_tag_name())) == 0:
                 self.build()
             container_options['image'] = self._build_tag_name()
+
+        # interactive mode should set option stdin_open and tty
+        if 'interactive' in container_options:
+            container_options['stdin_open'] = container_options['interactive']
+            container_options['tty'] = container_options['interactive']
+            del container_options['interactive']
 
         # Delete options which are only used when starting
         for key in ['privileged', 'net', 'dns']:
