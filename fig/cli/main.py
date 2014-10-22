@@ -68,7 +68,7 @@ def parse_doc_section(name, source):
 
 
 class TopLevelCommand(Command):
-    """Punctual, lightweight development environments using Docker.
+    """Fast, isolated development environments using Docker.
 
     Usage:
       fig [options] [COMMAND] [ARGS...]
