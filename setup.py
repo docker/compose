@@ -49,7 +49,7 @@ if sys.version_info < (2, 7):
 setup(
     name='fig',
     version=find_version("fig", "__init__.py"),
-    description='Punctual, lightweight development environments using Docker',
+    description='Fast, isolated development environments using Docker',
     url='http://www.fig.sh/',
     author='Docker, Inc.',
     license='Apache License 2.0',
