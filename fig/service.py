@@ -168,7 +168,7 @@ class Service(object):
                 log.info("Removing %s..." % c.name)
                 c.remove(**options)
 
-    def create_container(self, one_off=False, **override_options):
+    def create_container(self, one_off=False, pull_options={}, **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
@@ -179,7 +179,7 @@ class Service(object):
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 log.info('Pulling image %s...' % container_options['image'])
-                output = self.client.pull(container_options['image'], stream=True)
+                output = self.client.pull(container_options['image'], stream=True, insecure_registry=pull_options['--allow-insecure-ssl'])
                 stream_output(output, sys.stdout)
                 return Container.create(self.client, **container_options)
             raise
@@ -270,12 +270,12 @@ class Service(object):
         )
         return container
 
-    def start_or_create_containers(self):
+    def start_or_create_containers(self, pull_options={}, **override_options):
         containers = self.containers(stopped=True)
 
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
-            new_container = self.create_container()
+            new_container = self.create_container(pull_options=pull_options, **override_options)
             return [self.start_container(new_container)]
         else:
             return [self.start_container_if_stopped(c) for c in containers]
