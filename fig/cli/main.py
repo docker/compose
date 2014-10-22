@@ -396,11 +396,12 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d             Detached mode: Run containers in the background,
-                           print new container names.
-            --no-color     Produce monochrome output.
-            --no-deps      Don't start linked services.
-            --no-recreate  If containers already exist, don't recreate them.
+            -d                    Detached mode: Run containers in the background,
+                                  print new container names.
+            --no-color            Produce monochrome output.
+            --no-deps             Don't start linked services.
+            --no-recreate         If containers already exist, don't recreate them.
+            --allow-insecure-ssl  Allow insecure connections to the docker registry.
         """
         detached = options['-d']
 
@@ -410,10 +411,13 @@ class TopLevelCommand(Command):
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
 
+        pull_options = {x: options[x] for x in options if x in ['--allow-insecure-ssl']}
+
         project.up(
             service_names=service_names,
             start_links=start_links,
-            recreate=recreate
+            recreate=recreate,
+            pull_options=pull_options
         )
 
         to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
