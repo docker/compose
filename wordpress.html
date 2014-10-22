@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20141016411875515447359">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141021421503597580549">
     <link rel="canonical" href="http://www.fig.sh/wordpress.html">
   </head>
   <body>
@@ -44,7 +44,7 @@ db:
   environment:
     MYSQL_DATABASE: wordpress
 </code></pre></div>
-<p>Two supporting files are needed to get this working - first up, <code>wp-config.php</code> is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:</p>
+<p>Two supporting files are needed to get this working - first up, <code>wp-config.php</code> is the standard Wordpress config file with a single change to point the database configuration at the <code>db</code> container:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">&lt;?php
 define(&#39;DB_NAME&#39;, &#39;wordpress&#39;);
 define(&#39;DB_USER&#39;, &#39;root&#39;);
@@ -135,7 +135,7 @@ if(file_exists($root.$path))
       m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
       })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-      ga('create', 'UA-43996733-3', 'orchardup.github.io');
+      ga('create', 'UA-43996733-3', 'auto');
       ga('send', 'pageview');
 
     </script>
