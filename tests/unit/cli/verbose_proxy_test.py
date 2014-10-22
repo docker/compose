@@ -5,7 +5,7 @@ from tests import unittest
 from fig.cli import verbose_proxy
 
 
-class VerboseProxy(unittest.TestCase):
+class VerboseProxyTestCase(unittest.TestCase):
 
     def test_format_call(self):
         expected = "(u'arg1', True, key=u'value')"

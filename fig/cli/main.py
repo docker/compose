@@ -7,7 +7,7 @@ import signal
 from operator import attrgetter
 
 from inspect import getdoc
-import dockerpty
+from fig.packages import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
@@ -68,7 +68,7 @@ def parse_doc_section(name, source):
 
 
 class TopLevelCommand(Command):
-    """Punctual, lightweight development environments using Docker.
+    """Fast, isolated development environments using Docker.
 
     Usage:
       fig [options] [COMMAND] [ARGS...]
@@ -261,12 +261,13 @@ class TopLevelCommand(Command):
         running. If you do not want to start linked services, use
         `fig run --no-deps SERVICE COMMAND [ARGS...]`.
 
-        Usage: run [options] SERVICE [COMMAND] [ARGS...]
+        Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
             -d                Detached mode: Run container in the background, print
                               new container name.
             --entrypoint CMD  Override the entrypoint of the image.
+            -e KEY=VAL        Set an environment variable (can be used multiple times)
             --no-deps         Don't start linked services.
             --rm              Remove container after run. Ignored in detached mode.
             -T                Disable pseudo-tty allocation. By default `fig run`
@@ -298,6 +299,13 @@ class TopLevelCommand(Command):
             'tty': tty,
             'stdin_open': not options['-d'],
         }
+
+        if options['-e']:
+            for option in options['-e']:
+                if 'environment' not in service.options:
+                    service.options['environment'] = {}
+                k, v = option.split('=', 1)
+                service.options['environment'][k] = v
 
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')

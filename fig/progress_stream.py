@@ -19,7 +19,9 @@ def stream_output(output, stream):
         all_events.append(event)
 
         if 'progress' in event or 'progressDetail' in event:
-            image_id = event['id']
+            image_id = event.get('id')
+            if not image_id:
+                continue
 
             if image_id in lines:
                 diff = len(lines) - lines[image_id]

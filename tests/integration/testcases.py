@@ -1,8 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from docker import Client
 from fig.service import Service
-from fig.cli.utils import docker_url
+from fig.cli.docker_client import docker_client
 from fig.progress_stream import stream_output
 from .. import unittest
 
@@ -10,7 +9,7 @@ from .. import unittest
 class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = Client(docker_url())
+        cls.client = docker_client()
 
     def setUp(self):
         for c in self.client.containers(all=True):

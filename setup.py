@@ -30,8 +30,7 @@ install_requires = [
     'requests >= 2.2.1, < 3',
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.11.0, < 0.12',
-    'dockerpty >= 0.2.3, < 0.3',
-    'docker-py >= 0.5, < 0.6',
+    'docker-py >= 0.5.3, < 0.6',
     'six >= 1.3.0, < 2',
 ]
 
@@ -50,7 +49,7 @@ if sys.version_info < (2, 7):
 setup(
     name='fig',
     version=find_version("fig", "__init__.py"),
-    description='Punctual, lightweight development environments using Docker',
+    description='Fast, isolated development environments using Docker',
     url='http://www.fig.sh/',
     author='Docker, Inc.',
     license='Apache License 2.0',
