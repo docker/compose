@@ -81,7 +81,7 @@ class Command(DocoptCommand):
 
     def get_project_name(self, config_path, project_name=None):
         def normalize_name(name):
-            return re.sub(r'[^a-zA-Z0-9]', '', name)
+            return re.sub(r'[^a-zA-Z0-9-_]', '', name)
 
         project_name = project_name or os.environ.get('FIG_PROJECT_NAME')
         if project_name is not None:
