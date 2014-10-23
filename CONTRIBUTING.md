@@ -1,5 +1,14 @@
 # Contributing to Fig
 
+## TL;DR
+
+Pull requests will need:
+
+ - Tests
+ - Documentation
+ - [To be signed off](#sign-your-work)
+ - A logical series of [well written commits](https://github.com/alphagov/styleguides/blob/master/git.md)
+
 ## Development environment
 
 If you're looking contribute to [Fig](http://www.fig.sh/)
