@@ -24,18 +24,6 @@ that should get you started.
 
     $ script/test
 
-## Building binaries
-
-Linux:
-
-    $ script/build-linux
-
-OS X:
-
-    $ script/build-osx
-
-Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyInstaller](http://www.pyinstaller.org/ticket/807).
-
 ## Sign your work
 
 The sign-off is a simple line at the end of the explanation for the
@@ -80,6 +68,17 @@ The easiest way to do this is to use the `--signoff` flag when committing. E.g.:
 
     $ git commit --signoff
 
+## Building binaries
+
+Linux:
+
+    $ script/build-linux
+
+OS X:
+
+    $ script/build-osx
+
+Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyInstaller](http://www.pyinstaller.org/ticket/807).
 
 ## Release process
 
