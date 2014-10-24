@@ -94,7 +94,7 @@ We then define a set of services using `fig.yml`:
       volumes:
        - .:/code
       links:
-       - redis:2.8
+       - redis
     redis:
       image: redis:2.8
 
