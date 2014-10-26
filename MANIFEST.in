@@ -4,7 +4,7 @@ include requirements.txt
 include requirements-dev.txt
 include tox.ini
 include *.md
-recursive-exclude tests *
+recursive-include tests *
 global-exclude *.pyc
 global-exclude *.pyo
 global-exclude *.un~
