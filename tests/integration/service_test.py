@@ -391,34 +391,34 @@ class ServiceTest(DockerClientTestCase):
 
     def test_restart_always_value(self):
         service = self.create_service('web', restart='always')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'always')
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'always')
 
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart='on-failure:5')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
-        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 5)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'on-failure')
+        self.assertEqual(container.get('HostConfig.RestartPolicy.MaximumRetryCount'), 5)
 
     def test_cap_add_list(self):
         service = self.create_service('web', cap_add=['SYS_ADMIN', 'NET_ADMIN'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['CapAdd'], ['SYS_ADMIN', 'NET_ADMIN'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.CapAdd'), ['SYS_ADMIN', 'NET_ADMIN'])
 
     def test_cap_drop_list(self):
         service = self.create_service('web', cap_drop=['SYS_ADMIN', 'NET_ADMIN'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['CapDrop'], ['SYS_ADMIN', 'NET_ADMIN'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.CapDrop'), ['SYS_ADMIN', 'NET_ADMIN'])
 
     def test_dns_search_single_value(self):
         service = self.create_service('web', dns_search='example.com')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['DnsSearch'], ['example.com'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.DnsSearch'), ['example.com'])
 
     def test_dns_search_list(self):
         service = self.create_service('web', dns_search=['dc1.example.com', 'dc2.example.com'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['DnsSearch'], ['dc1.example.com', 'dc2.example.com'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])
 
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
@@ -433,7 +433,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_env_from_file_combined_with_env(self):
         service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
-        env = service.start_container().environment
+        env = create_and_start_container(service).environment
         for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.iteritems():
             self.assertEqual(env[k], v)
 
