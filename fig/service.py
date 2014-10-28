@@ -15,7 +15,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -262,6 +262,8 @@ class Service(object):
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
 
+        restart = parse_restart_spec(options.get('restart', None))
+
         container.start(
             links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=port_bindings,
@@ -270,6 +272,7 @@ class Service(object):
             privileged=privileged,
             network_mode=net,
             dns=dns,
+            restart_policy=restart
         )
         return container
 
@@ -376,7 +379,7 @@ class Service(object):
             container_options['image'] = self._build_tag_name()
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns']:
+        for key in ['privileged', 'net', 'dns', 'restart']:
             if key in container_options:
                 del container_options[key]
 
@@ -464,6 +467,22 @@ def get_container_name(container):
     for name in container['Names']:
         if len(name.split('/')) == 2:
             return name[1:]
+
+
+def parse_restart_spec(restart_config):
+    if not restart_config:
+        return None
+    parts = restart_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Restart %s has incorrect format, should be "
+                          "mode[:max_retry]" % restart_config)
+    if len(parts) == 2:
+        name, max_retry_count = parts
+    else:
+        name, = parts
+        max_retry_count = 0
+
+    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
 
 
 def parse_volume_spec(volume_config):
