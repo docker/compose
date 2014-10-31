@@ -96,7 +96,7 @@ We then define a set of services using `fig.yml`:
       links:
        - redis
     redis:
-      image: redis
+      image: redis:2.8
 
 This defines two services:
 
