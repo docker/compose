@@ -42,6 +42,11 @@ class Command(DocoptCommand):
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
     def perform_command(self, options, handler, command_options):
+        if options['COMMAND'] == 'help':
+            # Skip looking up the figfile.
+            handler(None, command_options)
+            return
+
         explicit_config_path = options.get('--file') or os.environ.get('FIG_FILE')
         project = self.get_project(
             self.get_config_path(explicit_config_path),
