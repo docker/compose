@@ -3,6 +3,10 @@ from .. import unittest
 from fig.service import Service
 from fig.project import Project, ConfigurationError
 
+class MockClientMaker(object):
+    def get_client(self, *arg, **kwags):
+        return None
+
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
         project = Project.from_dicts('figtest', [
@@ -14,7 +18,7 @@ class ProjectTest(unittest.TestCase):
                 'name': 'db',
                 'image': 'busybox:latest'
             },
-        ], None)
+        ], MockClientMaker())
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
@@ -38,7 +42,7 @@ class ProjectTest(unittest.TestCase):
                 'image': 'busybox:latest',
                 'volumes': ['/tmp'],
             }
-        ], None)
+        ], MockClientMaker())
 
         self.assertEqual(project.services[0].name, 'volume')
         self.assertEqual(project.services[1].name, 'db')
@@ -52,7 +56,7 @@ class ProjectTest(unittest.TestCase):
             'db': {
                 'image': 'busybox:latest',
             },
-        }, None)
+        }, MockClientMaker())
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
@@ -63,7 +67,7 @@ class ProjectTest(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             project = Project.from_config('figtest', {
                 'web': 'busybox:latest',
-            }, None)
+            }, MockClientMaker())
 
     def test_get_service(self):
         web = Service(
