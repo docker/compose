@@ -212,7 +212,6 @@ class Project(object):
         for service in self.get_services(service_names):
             service.remove_stopped(**options)
 
-    #FIXME
     def containers(self, service_names=None, stopped=False, one_off=False):
         return [Container.from_ps(client, container)
                 for client in self.get_clients()
