@@ -12,7 +12,7 @@ from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
 from .utils import call_silently, is_mac, is_ubuntu
-from .docker_client import docker_client_maker
+from .docker_client_maker import docker_client_maker
 from . import verbose_proxy
 from . import errors
 from .. import __version__
