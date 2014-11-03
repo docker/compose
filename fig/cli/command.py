@@ -12,7 +12,7 @@ from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
 from .utils import call_silently, is_mac, is_ubuntu
-from .docker_client import docker_client
+from .docker_client import docker_client_maker
 from . import verbose_proxy
 from . import errors
 from .. import __version__
@@ -28,7 +28,7 @@ class Command(DocoptCommand):
             super(Command, self).dispatch(*args, **kwargs)
         except SSLError, e:
             raise errors.UserError('SSL error: %s' % e)
-        except ConnectionError:
+        except ConnectionError as e:
             if call_silently(['which', 'docker']) != 0:
                 if is_mac():
                     raise errors.DockerNotFoundMac()
@@ -39,7 +39,7 @@ class Command(DocoptCommand):
             elif call_silently(['which', 'boot2docker']) == 0:
                 raise errors.ConnectionErrorBoot2Docker()
             else:
-                raise errors.ConnectionErrorGeneric(self.get_client().base_url)
+                raise errors.ConnectionErrorGeneric(e.request_url)
 
     def perform_command(self, options, handler, command_options):
         explicit_config_path = options.get('--file') or os.environ.get('FIG_FILE')
@@ -50,16 +50,10 @@ class Command(DocoptCommand):
 
         handler(project, command_options)
 
-    def get_client(self, verbose=False):
-        client = docker_client()
-        if verbose:
-            version_info = six.iteritems(client.version())
-            log.info("Fig version %s", __version__)
-            log.info("Docker base_url: %s", client.base_url)
-            log.info("Docker version: %s",
-                     ", ".join("%s=%s" % item for item in version_info))
-            return verbose_proxy.VerboseProxy('docker', client)
-        return client
+    def get_client_maker(self, verbose=False):
+        client_maker = docker_client_maker(verbose)
+
+        return client_maker
 
     def get_config(self, config_path):
         try:
@@ -75,7 +69,7 @@ class Command(DocoptCommand):
             return Project.from_config(
                 self.get_project_name(config_path, project_name),
                 self.get_config(config_path),
-                self.get_client(verbose=verbose))
+                self.get_client_maker(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
 
