@@ -157,3 +157,16 @@ domainname: foo.com
 mem_limit: 1000000000
 privileged: true
 ```
+
+### docker\_host, docker\_cert\_path, and docker\_tls\_verify
+
+By default, fig use the environment `DOCKER_HOST`, `DOCKER_CERT_PATH`, and `DOCKER_TLS_VERIFY` to connect the docker server. To deploy to other place, you can assign `docker_host`, `docker_cert_path`, and `docker_tls_verify` to your service.
+
+```
+docker_host: tcp://192.168.100.101:2375
+docker_cert_path: /path/to/your/cert_files_directory
+docker_tls_verify: 1
+```
+
+To get the cert files and understand more about tls, you can reference [here](https://docs.docker.com/articles/https/)
+
