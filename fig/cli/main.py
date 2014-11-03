@@ -133,9 +133,15 @@ class TopLevelCommand(Command):
         """
         Force stop service containers.
 
-        Usage: kill [SERVICE...]
+        Usage: kill [options] [SERVICE...]
+
+        Options:
+            -s SIGNAL         SIGNAL to send to the container.
+                              Default signal is SIGKILL.
         """
-        project.kill(service_names=options['SERVICE'])
+        signal = options.get('-s', 'SIGKILL')
+
+        project.kill(service_names=options['SERVICE'], signal=signal)
 
     def logs(self, project, options):
         """
