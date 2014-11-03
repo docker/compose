@@ -188,16 +188,15 @@ class Service(object):
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, **override_options):
+    def recreate_containers(self, insecure_registry=False, **override_options):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
         """
         containers = self.containers(stopped=True)
-
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
-            container = self.create_container(**override_options)
+            container = self.create_container(insecure_registry=insecure_registry, **override_options)
             self.start_container(container)
             return [(None, container)]
         else:
@@ -205,7 +204,7 @@ class Service(object):
 
             for c in containers:
                 log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, **override_options))
+                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
 
             return tuples
 
