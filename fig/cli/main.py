@@ -7,7 +7,7 @@ import signal
 from operator import attrgetter
 
 from inspect import getdoc
-from fig.packages import dockerpty
+import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
@@ -264,16 +264,20 @@ class TopLevelCommand(Command):
         Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
-            -d                Detached mode: Run container in the background, print
-                              new container name.
-            --entrypoint CMD  Override the entrypoint of the image.
-            -e KEY=VAL        Set an environment variable (can be used multiple times)
-            --no-deps         Don't start linked services.
-            --rm              Remove container after run. Ignored in detached mode.
-            -T                Disable pseudo-tty allocation. By default `fig run`
-                              allocates a TTY.
+            --allow-insecure-ssl  Allow insecure connections to the docker
+                                  registry
+            -d                    Detached mode: Run container in the background, print
+                                  new container name.
+            --entrypoint CMD      Override the entrypoint of the image.
+            -e KEY=VAL            Set an environment variable (can be used multiple times)
+            --no-deps             Don't start linked services.
+            --rm                  Remove container after run. Ignored in detached mode.
+            -T                    Disable pseudo-tty allocation. By default `fig run`
+                                  allocates a TTY.
         """
         service = project.get_service(options['SERVICE'])
+
+        insecure_registry = options['--allow-insecure-ssl']
 
         if not options['--no-deps']:
             deps = service.get_linked_names()
@@ -309,14 +313,17 @@ class TopLevelCommand(Command):
 
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')
-
-        container = service.create_container(one_off=True, **container_options)
+        container = service.create_container(
+            one_off=True,
+            insecure_registry=insecure_registry,
+            **container_options
+        )
         if options['-d']:
             service.start_container(container, ports=None, one_off=True)
             print(container.name)
         else:
             service.start_container(container, ports=None, one_off=True)
-            dockerpty.start(project.client, container.id)
+            dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
@@ -396,12 +403,15 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d             Detached mode: Run containers in the background,
-                           print new container names.
-            --no-color     Produce monochrome output.
-            --no-deps      Don't start linked services.
-            --no-recreate  If containers already exist, don't recreate them.
+            --allow-insecure-ssl  Allow insecure connections to the docker
+                                  registry
+            -d                    Detached mode: Run containers in the background,
+                                  print new container names.
+            --no-color            Produce monochrome output.
+            --no-deps             Don't start linked services.
+            --no-recreate         If containers already exist, don't recreate them.
         """
+        insecure_registry = options['--allow-insecure-ssl']
         detached = options['-d']
 
         monochrome = options['--no-color']
@@ -413,7 +423,8 @@ class TopLevelCommand(Command):
         project.up(
             service_names=service_names,
             start_links=start_links,
-            recreate=recreate
+            recreate=recreate,
+            insecure_registry=insecure_registry,
         )
 
         to_attach = [c for s in project.get_services(service_names) for c in s.containers()]

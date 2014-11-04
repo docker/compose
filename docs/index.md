@@ -5,14 +5,14 @@ title: Fig | Fast, isolated development environments using Docker
 
 <strong class="strapline">Fast, isolated development environments using Docker.</strong>
 
-Define your app's environment with Docker so it can be reproduced anywhere:
+Define your app's environment with a `Dockerfile` so it can be reproduced anywhere:
 
     FROM python:2.7
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
 
-Define the services that make up your app so they can be run together in an isolated environment:
+Define the services that make up your app in `fig.yml` so they can be run together in an isolated environment:
 
 ```yaml
 web:

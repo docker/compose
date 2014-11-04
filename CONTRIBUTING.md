@@ -1,33 +1,28 @@
 # Contributing to Fig
 
+## TL;DR
+
+Pull requests will need:
+
+ - Tests
+ - Documentation
+ - [To be signed off](#sign-your-work)
+ - A logical series of [well written commits](https://github.com/alphagov/styleguides/blob/master/git.md)
+
 ## Development environment
 
 If you're looking contribute to [Fig](http://www.fig.sh/)
 but you're new to the project or maybe even to Python, here are the steps
 that should get you started.
 
-1. Fork [https://github.com/docker/fig](https://github.com/docker/fig) to your username. kvz in this example.
-1. Clone your forked repository locally `git clone git@github.com:kvz/fig.git`.
+1. Fork [https://github.com/docker/fig](https://github.com/docker/fig) to your username.
+1. Clone your forked repository locally `git clone git@github.com:yourusername/fig.git`.
 1. Enter the local directory `cd fig`.
-1. Set up a development environment `python setup.py develop`. That will install the dependencies and set up a symlink from your `fig` executable to the checkout of the repo. So from any of your fig projects, `fig` now refers to your development project. Time to start hacking : )
-1. Works for you? Run the test suite via `./script/test` to verify it won't break other usecases.
-1. All good? Commit and push to GitHub, and submit a pull request.
+1. Set up a development environment by running `python setup.py develop`. This will install the dependencies and set up a symlink from your `fig` executable to the checkout of the repository. When you now run `fig` from anywhere on your machine, it will run your development version of Fig.
 
 ## Running the test suite
 
     $ script/test
-
-## Building binaries
-
-Linux:
-
-    $ script/build-linux
-
-OS X:
-
-    $ script/build-osx
-
-Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyInstaller](http://www.pyinstaller.org/ticket/807).
 
 ## Sign your work
 
@@ -73,6 +68,17 @@ The easiest way to do this is to use the `--signoff` flag when committing. E.g.:
 
     $ git commit --signoff
 
+## Building binaries
+
+Linux:
+
+    $ script/build-linux
+
+OS X:
+
+    $ script/build-osx
+
+Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyInstaller](http://www.pyinstaller.org/ticket/807).
 
 ## Release process
 

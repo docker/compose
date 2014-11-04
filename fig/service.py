@@ -171,7 +171,7 @@ class Service(object):
                 log.info("Removing %s..." % c.name)
                 c.remove(**options)
 
-    def create_container(self, one_off=False, **override_options):
+    def create_container(self, one_off=False, insecure_registry=False, **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
@@ -182,21 +182,24 @@ class Service(object):
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 log.info('Pulling image %s...' % container_options['image'])
-                output = self.client.pull(container_options['image'], stream=True)
+                output = self.client.pull(
+                    container_options['image'],
+                    stream=True,
+                    insecure_registry=insecure_registry
+                )
                 stream_output(output, sys.stdout)
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, **override_options):
+    def recreate_containers(self, insecure_registry=False, **override_options):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
         """
         containers = self.containers(stopped=True)
-
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
-            container = self.create_container(**override_options)
+            container = self.create_container(insecure_registry=insecure_registry, **override_options)
             self.start_container(container)
             return [(None, container)]
         else:
@@ -204,7 +207,7 @@ class Service(object):
 
             for c in containers:
                 log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, **override_options))
+                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
 
             return tuples
 
@@ -280,12 +283,12 @@ class Service(object):
         )
         return container
 
-    def start_or_create_containers(self):
+    def start_or_create_containers(self, insecure_registry=False):
         containers = self.containers(stopped=True)
 
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
-            new_container = self.create_container()
+            new_container = self.create_container(insecure_registry=insecure_registry)
             return [self.start_container(new_container)]
         else:
             return [self.start_container_if_stopped(c) for c in containers]

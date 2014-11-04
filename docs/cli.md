@@ -10,6 +10,24 @@ Most commands are run against one or more services. If the service is omitted, i
 
 Run `fig [COMMAND] --help` for full usage.
 
+## Options
+
+### --verbose
+
+ Show more output
+
+### --version
+
+ Print version and exit
+
+### -f, --file FILE
+
+ Specify an alternate fig file (default: fig.yml)
+
+### -p, --project-name NAME
+
+ Specify an alternate project name (default: directory name)
+
 ## Commands
 
 ### build
