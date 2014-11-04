@@ -323,7 +323,7 @@ class TopLevelCommand(Command):
             print(container.name)
         else:
             service.start_container(container, ports=None, one_off=True)
-            dockerpty.start(project.client, container.id)
+            dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
