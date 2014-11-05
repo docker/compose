@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='http://fonts.googleapis.com/css?family=Lilita+One|Lato:300,400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="css/fig.css?20141021421503597580549">
+    <link rel="stylesheet" type="text/css" href="css/fig.css?20141104442095193681051">
     <link rel="canonical" href="http://www.fig.sh/wordpress.html">
   </head>
   <body>
@@ -21,7 +21,7 @@
       <div class="content"><h1>Getting started with Fig and Wordpress</h1>
 
 <p>Fig makes it nice and easy to run Wordpress in an isolated environment. <a href="install.html">Install Fig</a>, then download Wordpress into the current directory:</p>
-<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl http://wordpress.org/wordpress-3.8.1.tar.gz | tar -xvzf -
+<div class="highlight"><pre><code class="text language-text" data-lang="text">$ curl https://wordpress.org/latest.tar.gz | tar -xvzf -
 </code></pre></div>
 <p>This will create a directory called <code>wordpress</code>, which you can rename to the name of your project if you wish. Inside that directory, we create <code>Dockerfile</code>, a file that defines what environment your app is going to run in:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">FROM orchardup/php5
@@ -124,7 +124,7 @@ if(file_exists($root.$path))
 
         <div class="badges">
           <iframe src="http://ghbtns.com/github-btn.html?user=docker&amp;repo=fig&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="100" height="20"></iframe>
-          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://orchardup.github.io/fig/">Tweet</a>
+          <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://www.fig.sh/">Tweet</a>
         </div>
       </div>
     </div>
