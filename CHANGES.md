@@ -1,6 +1,13 @@
 Change log
 ==========
 
+1.0.1 (2014-11-04)
+------------------
+
+ - Added an `--allow-insecure-ssl` option to allow `fig up`, `fig run` and `fig pull` to pull from insecure registries.
+ - Fixed `fig run` not showing output in Jenkins.
+ - Fixed a bug where Fig couldn't build Dockerfiles with ADD statements pointing at URLs.
+
 1.0.0 (2014-10-16)
 ------------------
 
