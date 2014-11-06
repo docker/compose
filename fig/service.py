@@ -251,7 +251,12 @@ class Service(object):
     def start_container(self, container=None, intermediate_container=None, **override_options):
         container = container or self.create_container(**override_options)
         options = dict(self.options, **override_options)
-        ports = dict(split_port(port) for port in options.get('ports') or [])
+        ports = {}
+        for port in options.get('ports') or []:
+            internal, external = split_port(port)
+            if internal not in ports.keys():
+                ports[internal] = []
+            ports[internal].append(external)
 
         volume_bindings = dict(
             build_volume_binding(parse_volume_spec(volume))
