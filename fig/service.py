@@ -15,7 +15,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart', 'cap_add', 'cap_drop']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -261,6 +261,8 @@ class Service(object):
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
+        cap_add = options.get('cap_add', None)
+        cap_drop = options.get('cap_drop', None)
 
         restart = parse_restart_spec(options.get('restart', None))
 
@@ -272,7 +274,9 @@ class Service(object):
             privileged=privileged,
             network_mode=net,
             dns=dns,
-            restart_policy=restart
+            restart_policy=restart,
+            cap_add=cap_add,
+            cap_drop=cap_drop,
         )
         return container
 
@@ -379,7 +383,7 @@ class Service(object):
             container_options['image'] = self._build_tag_name()
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns', 'restart']:
+        for key in ['privileged', 'net', 'dns', 'restart', 'cap_add', 'cap_drop']:
             if key in container_options:
                 del container_options[key]
 
