@@ -14,6 +14,7 @@ from .progress_stream import stream_output, StreamOutputError
 
 log = logging.getLogger(__name__)
 
+DONT_INHERIT = ['ports', 'name', 'command']
 
 DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
@@ -50,7 +51,7 @@ ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, **options):
+    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, parent=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -73,6 +74,24 @@ class Service(object):
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.options = options
+
+        self.inherit(parent)
+
+    def inherit(self, parent):
+        if parent == None:
+            return
+
+        self.links.extend(x for x in parent.links if x not in self.links)
+        self.volumes_from.extend(x for x in parent.volumes_from if x not in self.volumes_from)
+
+        for option in parent.options:
+            if option not in DONT_INHERIT:
+                if isinstance(parent.options[option], list):
+                    self.options[option] = self.options.get(option, []) + parent.options[option]
+                elif isinstance(parent.options[option], dict):
+                    self.options[option] = dict(parent.options[option].items() + self.options.get(option, {}).items())
+                elif option not in self.options:
+                    self.options[option] = parent.options[option]
 
     def containers(self, stopped=False, one_off=False):
         return [Container.from_ps(self.client, container)

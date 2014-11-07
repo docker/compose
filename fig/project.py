@@ -27,7 +27,7 @@ def sort_service_dicts(services):
                 raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
         if n in unmarked:
             temporary_marked.add(n['name'])
-            dependents = [m for m in services if (n['name'] in get_service_names(m.get('links', []))) or (n['name'] in m.get('volumes_from', []))]
+            dependents = [m for m in services if (n['name'] in get_service_names(m.get('links', []))) or (n['name'] in m.get('volumes_from', [])) or (n['name'] == m.get('inherits', ''))]
             for m in dependents:
                 visit(m)
             temporary_marked.remove(n['name'])
@@ -58,8 +58,9 @@ class Project(object):
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
+            parent = project.get_parent(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
+            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, parent=parent, **service_dict))
         return project
 
     @classmethod
@@ -112,6 +113,17 @@ class Project(object):
             uniques = []
             [uniques.append(s) for s in services if s not in uniques]
             return uniques
+
+    def get_parent(self, service_dict):
+        parent = None
+        if 'inherits' in service_dict:
+            parent_name = service_dict.get('inherits', None)
+            try:
+                parent = self.get_service(parent_name)
+            except NoSuchService:
+                raise ConfigurationError('Service "%s" inherits service "%s" which does not exist.' % (service_dict['name'], parent_name))
+            del service_dict['inherits']
+        return parent
 
     def get_links(self, service_dict):
         links = []
