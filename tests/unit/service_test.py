@@ -13,6 +13,7 @@ from fig.container import Container
 from fig.service import (
     ConfigError,
     split_port,
+    build_port_bindings,
     parse_volume_spec,
     build_volume_binding,
     APIError,
@@ -113,6 +114,19 @@ class ServiceTest(unittest.TestCase):
     def test_split_port_invalid(self):
         with self.assertRaises(ConfigError):
             split_port("0.0.0.0:1000:2000:tcp")
+
+    def test_build_port_bindings_with_one_port(self):
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000"])
+        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000")])
+
+    def test_build_port_bindings_with_matching_internal_ports(self):
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000","127.0.0.1:2000:1000"])
+        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000"),("127.0.0.1","2000")])
+
+    def test_build_port_bindings_with_nonmatching_internal_ports(self):
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000","127.0.0.1:2000:2000"])
+        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000")])
+        self.assertEqual(port_bindings["2000"],[("127.0.0.1","2000")])
 
     def test_split_domainname_none(self):
         service = Service('foo', hostname='name', client=self.mock_client)

@@ -251,13 +251,7 @@ class Service(object):
     def start_container(self, container=None, intermediate_container=None, **override_options):
         container = container or self.create_container(**override_options)
         options = dict(self.options, **override_options)
-        ports = {}
-        for port in options.get('ports') or []:
-            internal_port, external = split_port(port)
-            if internal_port in ports:
-                ports[internal_port].append(external)
-            else:
-                ports[internal_port] = [external]
+        port_bindings = build_port_bindings(options.get('ports') or [])
 
         volume_bindings = dict(
             build_volume_binding(parse_volume_spec(volume))
@@ -270,7 +264,7 @@ class Service(object):
 
         container.start(
             links=self._get_links(link_to_self=options.get('one_off', False)),
-            port_bindings=ports,
+            port_bindings=port_bindings,
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
@@ -496,6 +490,17 @@ def build_volume_binding(volume_spec):
     internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
     external = os.path.expanduser(volume_spec.external)
     return os.path.abspath(os.path.expandvars(external)), internal
+
+
+def build_port_bindings(ports):
+    port_bindings = {}
+    for port in ports:
+        internal_port, external = split_port(port)
+        if internal_port in port_bindings:
+            port_bindings[internal_port].append(external)
+        else:
+            port_bindings[internal_port] = [external]
+    return port_bindings
 
 
 def split_port(port):
