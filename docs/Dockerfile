@@ -4,7 +4,7 @@ RUN locale-gen en_US.UTF-8
 ADD Gemfile /code/
 ADD Gemfile.lock /code/
 WORKDIR /code
-RUN bundle install
+RUN bundle install -j 4
 ADD . /code
 EXPOSE 4000
 CMD bundle exec jekyll build
