@@ -93,7 +93,7 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose', 'initial_scale']
 
         for k in options:
             if k not in supported_options:
@@ -101,6 +101,10 @@ class Service(object):
                 if k in DOCKER_CONFIG_HINTS:
                     msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
                 raise ConfigError(msg)
+
+        if options.get('initial_scale', 1) > 1:
+            if not can_be_scaled(options):
+                raise CannotBeScaledError()
 
         self.name = name
         self.client = client
@@ -164,7 +168,7 @@ class Service(object):
         - starts containers until there are at least `desired_num` running
         - removes all stopped containers
         """
-        if not self.can_be_scaled():
+        if not can_be_scaled(self.options):
             raise CannotBeScaledError()
 
         # Create enough containers
@@ -243,13 +247,12 @@ class Service(object):
         """
         containers = self.containers(stopped=True)
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
-            container = self.create_container(
-                insecure_registry=insecure_registry,
-                do_build=do_build,
-                **override_options)
-            self.start_container(container)
-            return [(None, container)]
+            new_containers = []
+            for _ in range(self.options.get("initial_scale", 1)):
+                log.info("Creating %s..." % self._next_container_name(new_containers))
+                new_container = self.create_container(insecure_registry=insecure_registry, do_build=do_build, **override_options)
+                new_containers.append(new_container)
+            return [(None, self.start_container(nc)) for nc in new_containers]
         else:
             tuples = []
 
@@ -341,13 +344,12 @@ class Service(object):
         containers = self.containers(stopped=True)
 
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
-            new_container = self.create_container(
-                insecure_registry=insecure_registry,
-                detach=detach,
-                do_build=do_build,
-            )
-            return [self.start_container(new_container)]
+            new_containers = []
+            for _ in range(self.options.get("initial_scale", 1)):
+                log.info("Creating %s..." % self._next_container_name(new_containers))
+                new_container = self.create_container(insecure_registry=insecure_registry, detach=detach, do_build=do_build)
+                new_containers.append(new_container)
+            return [self.start_container(nc) for nc in new_containers]
         else:
             return [self.start_container_if_stopped(c) for c in containers]
 
@@ -492,12 +494,6 @@ class Service(object):
         The tag to give to images built for this service.
         """
         return '%s_%s' % (self.project, self.name)
-
-    def can_be_scaled(self):
-        for port in self.options.get('ports', []):
-            if ':' in str(port):
-                return False
-        return True
 
     def pull(self, insecure_registry=False):
         if 'image' in self.options:
@@ -665,3 +661,10 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
+
+
+def can_be_scaled(options):
+    for port in options.get('ports', []):
+        if ':' in str(port):
+            return False
+    return True
