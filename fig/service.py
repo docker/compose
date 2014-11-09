@@ -58,7 +58,7 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose', 'initial_scale']
 
         for k in options:
             if k not in supported_options:
@@ -195,10 +195,15 @@ class Service(object):
         """
         containers = self.containers(stopped=True)
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
-            container = self.create_container(insecure_registry=insecure_registry, **override_options)
-            self.start_container(container)
-            return [(None, container)]
+            if self.options.get("initial_scale", 1) > 1:
+                if not self.can_be_scaled():
+                    raise CannotBeScaledError()
+            new_containers = []
+            for _ in range(self.options.get("initial_scale", 1)):
+                log.info("Creating %s..." % self._next_container_name(new_containers))
+                new_container = self.create_container(insecure_registry=insecure_registry, **override_options)
+                new_containers.append(new_container)
+            return [(None, self.start_container(new_container)) for new_container in new_containers]
         else:
             tuples = []
 
@@ -277,9 +282,15 @@ class Service(object):
         containers = self.containers(stopped=True)
 
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
-            new_container = self.create_container(insecure_registry=insecure_registry)
-            return [self.start_container(new_container)]
+            if self.options.get("initial_scale", 1) > 1:
+                if not self.can_be_scaled():
+                    raise CannotBeScaledError()
+            new_containers = []
+            for _ in range(self.options.get("initial_scale", 1)):
+                log.info("Creating %s..." % self._next_container_name(new_containers))
+                new_container = self.create_container(insecure_registry=insecure_registry)
+                new_containers.append(new_container)
+            return [self.start_container(new_container) for new_container in new_containers]
         else:
             return [self.start_container_if_stopped(c) for c in containers]
 
