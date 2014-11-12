@@ -18,7 +18,7 @@ def docker_client():
 
     if os.environ.get('DOCKER_TLS_VERIFY', '') != '':
         parts = base_url.split('://', 1)
-        base_url = '%s://%s' % ('https', parts[1])
+        base_url = '%s://%s' % ('https', parts[-1])
 
         client_cert = (os.path.join(cert_path, 'cert.pem'), os.path.join(cert_path, 'key.pem'))
         ca_cert = os.path.join(cert_path, 'ca.pem')
