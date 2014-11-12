@@ -368,7 +368,8 @@ class Service(object):
         if 'environment' in container_options:
             if isinstance(container_options['environment'], list):
                 container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
-            container_options['environment'] = dict(resolve_env(k, v) for k, v in container_options['environment'].iteritems())
+            container_options['environment'] = dict(
+                resolve_env(k, v) for k, v in container_options['environment'].iteritems() if v)
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -533,4 +534,4 @@ def resolve_env(key, val):
     elif key in os.environ:
         return key, os.environ[key]
     else:
-        return key, ''
+        return key, None
