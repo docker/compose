@@ -42,7 +42,9 @@ Get help on a command.
 
 ### kill
 
-Force stop service containers.
+Force stop running containers by sending a `SIGKILL` signal. Optionally the signal can be passed, for example:
+
+    $ fig kill -s SIGINT
 
 ### logs
 
