@@ -15,7 +15,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'tag', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -418,6 +418,9 @@ class Service(object):
         """
         The tag to give to images built for this service.
         """
+        if 'tag' in self.options:
+            return self.options['tag']
+            
         return '%s_%s' % (self.project, self.name)
 
     def can_be_scaled(self):
