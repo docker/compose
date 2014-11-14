@@ -8,7 +8,7 @@ import mock
 
 from fig.cli import main
 from fig.cli.main import TopLevelCommand
-from fig.packages.six import StringIO
+from six import StringIO
 
 
 class CLITestCase(unittest.TestCase):
@@ -34,6 +34,14 @@ class CLITestCase(unittest.TestCase):
         name = 'explicit-project-name'
         project_name = command.get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
+
+    def test_project_name_from_environment(self):
+        command = TopLevelCommand()
+        name = 'namefromenv'
+        with mock.patch.dict(os.environ):
+            os.environ['FIG_PROJECT_NAME'] = name
+            project_name = command.get_project_name(None)
+        self.assertEquals(project_name, name)
 
     def test_yaml_filename_check(self):
         command = TopLevelCommand()

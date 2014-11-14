@@ -6,23 +6,21 @@ title: Installing Fig
 Installing Fig
 ==============
 
-First, install Docker version 1.0 or greater. If you're on OS X, you can use [docker-osx](https://github.com/noplay/docker-osx):
+First, install Docker version 1.3 or greater.
 
-    $ curl https://raw.githubusercontent.com/noplay/docker-osx/1.1.1/docker-osx > /usr/local/bin/docker-osx
-    $ chmod +x /usr/local/bin/docker-osx
-    $ docker-osx shell
+If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/) to install both Docker and boot2docker. Once boot2docker is running, set the environment variables that'll configure Docker and Fig to talk to it:
 
-Docker has guides for [Ubuntu](http://docs.docker.io/en/latest/installation/ubuntulinux/) and [other platforms](http://docs.docker.io/en/latest/installation/) in their documentation.
+    $(boot2docker shellinit)
 
-Next, install Fig. On OS X:
+To persist the environment variables across shell sessions, you can add that line to your `~/.bashrc` file.
 
-    curl -L https://github.com/docker/fig/releases/download/0.5.2/darwin > /usr/local/bin/fig; chmod +x /usr/local/bin/fig
+There are also guides for [Ubuntu](https://docs.docker.com/installation/ubuntulinux/) and [other platforms](https://docs.docker.com/installation/) in Docker’s documentation.
 
-On 64-bit Linux:
+Next, install Fig:
 
-    curl -L https://github.com/docker/fig/releases/download/0.5.2/linux > /usr/local/bin/fig; chmod +x /usr/local/bin/fig
+    curl -L https://github.com/docker/fig/releases/download/1.0.1/fig-`uname -s`-`uname -m` > /usr/local/bin/fig; chmod +x /usr/local/bin/fig
 
-Fig is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
+Releases are available for OS X and 64-bit Linux. Fig is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
 
     $ sudo pip install -U fig
 

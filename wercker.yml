@@ -1,0 +1,12 @@
+box: wercker-labs/docker
+build:
+  steps:
+    - script:
+        name: validate DCO
+        code: script/validate-dco
+    - script:
+        name: run tests
+        code: script/test
+    - script:
+        name: build binary
+        code: script/build-linux

@@ -59,7 +59,7 @@ First thing we need to do is set up the database connection. Replace the `DATABA
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'postgres',
             'USER': 'postgres',
-            'HOST': 'db_1',
+            'HOST': 'db',
             'PORT': 5432,
         }
     }
@@ -83,7 +83,7 @@ Then, run `fig up`:
     myapp_web_1 | Starting development server at http://0.0.0.0:8000/
     myapp_web_1 | Quit the server with CONTROL-C.
 
-And your Django app should be running at [localhost:8000](http://localhost:8000) (or [localdocker:8000](http://localdocker:8000) if you're using docker-osx).
+And your Django app should be running at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
 
 You can also run management commands with Docker. To set up your database, for example, run `fig up` and in another terminal run:
 

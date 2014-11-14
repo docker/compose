@@ -1,16 +1,15 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from fig.packages.docker import Client
 from fig.service import Service
-from fig.cli.utils import docker_url
+from fig.cli.docker_client import docker_client
+from fig.progress_stream import stream_output
 from .. import unittest
 
 
 class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = Client(docker_url())
-        cls.client.pull('busybox', tag='latest')
+        cls.client = docker_client()
 
     def setUp(self):
         for c in self.client.containers(all=True):
@@ -32,5 +31,6 @@ class DockerClientTestCase(unittest.TestCase):
             **kwargs
         )
 
-
-
+    def check_build(self, *args, **kwargs):
+        build_output = self.client.build(*args, **kwargs)
+        stream_output(build_output, open('/dev/null', 'w'))

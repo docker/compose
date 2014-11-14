@@ -8,7 +8,7 @@ Getting started with Fig and Wordpress
 
 Fig makes it nice and easy to run Wordpress in an isolated environment. [Install Fig](install.html), then download Wordpress into the current directory:
 
-    $ curl http://wordpress.org/wordpress-3.8.1.tar.gz | tar -xvzf -
+    $ curl https://wordpress.org/latest.tar.gz | tar -xvzf -
 
 This will create a directory called `wordpress`, which you can rename to the name of your project if you wish. Inside that directory, we create `Dockerfile`, a file that defines what environment your app is going to run in:
 
@@ -37,14 +37,14 @@ db:
     MYSQL_DATABASE: wordpress
 ```
 
-Two supporting files are needed to get this working - first up, `wp-config.php` is the standard Wordpress config file with a single change to make it read the MySQL host and port from the environment variables passed in by Fig:
+Two supporting files are needed to get this working - first up, `wp-config.php` is the standard Wordpress config file with a single change to point the database configuration at the `db` container:
 
 ```
 <?php
 define('DB_NAME', 'wordpress');
 define('DB_USER', 'root');
 define('DB_PASSWORD', '');
-define('DB_HOST', getenv("DB_1_PORT_3306_TCP_ADDR") . ":" . getenv("DB_1_PORT_3306_TCP_PORT"));
+define('DB_HOST', "db:3306");
 define('DB_CHARSET', 'utf8');
 define('DB_COLLATE', '');
 
@@ -88,4 +88,4 @@ if(file_exists($root.$path))
 }else include_once 'index.php';
 ```
 
-With those four files in place, run `fig up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress and set it up by visiting [localhost:8000](http://localhost:8000) - or [localdocker:8000](http://localdocker:8000) if you're using docker-osx.
+With those four files in place, run `fig up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).

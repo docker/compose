@@ -1,18 +1,18 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from ..packages.docker import Client
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, SSLError
 import errno
 import logging
 import os
 import re
 import yaml
-from ..packages import six
+import six
 
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
-from .utils import docker_url, call_silently, is_mac, is_ubuntu
+from .utils import call_silently, is_mac, is_ubuntu
+from .docker_client import docker_client
 from . import verbose_proxy
 from . import errors
 from .. import __version__
@@ -26,6 +26,8 @@ class Command(DocoptCommand):
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
+        except SSLError, e:
+            raise errors.UserError('SSL error: %s' % e)
         except ConnectionError:
             if call_silently(['which', 'docker']) != 0:
                 if is_mac():
@@ -34,12 +36,17 @@ class Command(DocoptCommand):
                     raise errors.DockerNotFoundUbuntu()
                 else:
                     raise errors.DockerNotFoundGeneric()
-            elif call_silently(['which', 'docker-osx']) == 0:
-                raise errors.ConnectionErrorDockerOSX()
+            elif call_silently(['which', 'boot2docker']) == 0:
+                raise errors.ConnectionErrorBoot2Docker()
             else:
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
     def perform_command(self, options, handler, command_options):
+        if options['COMMAND'] == 'help':
+            # Skip looking up the figfile.
+            handler(None, command_options)
+            return
+
         explicit_config_path = options.get('--file') or os.environ.get('FIG_FILE')
         project = self.get_project(
             self.get_config_path(explicit_config_path),
@@ -49,7 +56,7 @@ class Command(DocoptCommand):
         handler(project, command_options)
 
     def get_client(self, verbose=False):
-        client = Client(docker_url())
+        client = docker_client()
         if verbose:
             version_info = six.iteritems(client.version())
             log.info("Fig version %s", __version__)
@@ -81,6 +88,7 @@ class Command(DocoptCommand):
         def normalize_name(name):
             return re.sub(r'[^a-zA-Z0-9]', '', name)
 
+        project_name = project_name or os.environ.get('FIG_PROJECT_NAME')
         if project_name is not None:
             return normalize_name(project_name)
 

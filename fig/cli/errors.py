@@ -9,6 +9,8 @@ class UserError(Exception):
     def __unicode__(self):
         return self.msg
 
+    __str__ = __unicode__
+
 
 class DockerNotFoundMac(UserError):
     def __init__(self):
@@ -37,10 +39,10 @@ class DockerNotFoundGeneric(UserError):
         """)
 
 
-class ConnectionErrorDockerOSX(UserError):
+class ConnectionErrorBoot2Docker(UserError):
     def __init__(self):
-        super(ConnectionErrorDockerOSX, self).__init__("""
-        Couldn't connect to Docker daemon - you might need to run `docker-osx shell`.
+        super(ConnectionErrorBoot2Docker, self).__init__("""
+        Couldn't connect to Docker daemon - you might need to run `boot2docker up`.
         """)
 
 

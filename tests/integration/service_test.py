@@ -5,7 +5,7 @@ import os
 from fig import Service
 from fig.service import CannotBeScaledError
 from fig.container import Container
-from fig.packages.docker.errors import APIError
+from docker.errors import APIError
 from .testcases import DockerClientTestCase
 
 
@@ -107,14 +107,16 @@ class ServiceTest(DockerClientTestCase):
         host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
         host_container = host_service.create_container()
         host_service.start_container(host_container)
-        self.assertIn(volume_container_1.id, host_container.inspect()['HostConfig']['VolumesFrom'])
-        self.assertIn(volume_container_2.id, host_container.inspect()['HostConfig']['VolumesFrom'])
+        self.assertIn(volume_container_1.id,
+                      host_container.get('HostConfig.VolumesFrom'))
+        self.assertIn(volume_container_2.id,
+                      host_container.get('HostConfig.VolumesFrom'))
 
     def test_recreate_containers(self):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=['/var/db'],
+            volumes=['/etc'],
             entrypoint=['sleep'],
             command=['300']
         )
@@ -124,7 +126,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
         self.assertEqual(old_container.name, 'figtest_db_1')
         service.start_container(old_container)
-        volume_path = old_container.inspect()['Volumes']['/var/db']
+        volume_path = old_container.inspect()['Volumes']['/etc']
 
         num_containers_before = len(self.client.containers(all=True))
 
@@ -134,13 +136,13 @@ class ServiceTest(DockerClientTestCase):
 
         intermediate_container = tuples[0][0]
         new_container = tuples[0][1]
-        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['echo'])
+        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['/bin/echo'])
 
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
-        self.assertEqual(new_container.inspect()['Volumes']['/var/db'], volume_path)
+        self.assertEqual(new_container.inspect()['Volumes']['/etc'], volume_path)
         self.assertIn(intermediate_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
@@ -175,29 +177,62 @@ class ServiceTest(DockerClientTestCase):
     def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, None)])
+
+        db.start_container()
         db.start_container()
         web.start_container()
-        self.assertIn('figtest_db_1', web.containers()[0].links())
-        self.assertIn('db_1', web.containers()[0].links())
+
+        self.assertEqual(
+            set(web.containers()[0].links()),
+            set([
+                'figtest_db_1', 'db_1',
+                'figtest_db_2', 'db_2',
+                'db',
+            ]),
+        )
 
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'custom_link_name')])
+
+        db.start_container()
         db.start_container()
         web.start_container()
-        self.assertIn('custom_link_name', web.containers()[0].links())
+
+        self.assertEqual(
+            set(web.containers()[0].links()),
+            set([
+                'figtest_db_1', 'db_1',
+                'figtest_db_2', 'db_2',
+                'custom_link_name',
+            ]),
+        )
 
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
         db = self.create_service('db')
-        c1 = db.start_container()
-        c2 = db.start_container()
-        self.assertNotIn(c1.name, c2.links())
+
+        db.start_container()
+        db.start_container()
+
+        c = db.start_container()
+        self.assertEqual(set(c.links()), set([]))
 
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
-        c1 = db.start_container()
-        c2 = db.start_container(one_off=True)
-        self.assertIn(c1.name, c2.links())
+
+        db.start_container()
+        db.start_container()
+
+        c = db.start_container(one_off=True)
+
+        self.assertEqual(
+            set(c.links()),
+            set([
+                'figtest_db_1', 'db_1',
+                'figtest_db_2', 'db_2',
+                'db',
+            ]),
+        )
 
     def test_start_container_builds_images(self):
         service = Service(
@@ -307,18 +342,18 @@ class ServiceTest(DockerClientTestCase):
 
     def test_network_mode_none(self):
         service = self.create_service('web', net='none')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['NetworkMode'], 'none')
+        container = service.start_container()
+        self.assertEqual(container.get('HostConfig.NetworkMode'), 'none')
 
     def test_network_mode_bridged(self):
         service = self.create_service('web', net='bridge')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['NetworkMode'], 'bridge')
+        container = service.start_container()
+        self.assertEqual(container.get('HostConfig.NetworkMode'), 'bridge')
 
     def test_network_mode_host(self):
         service = self.create_service('web', net='host')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['NetworkMode'], 'host')
+        container = service.start_container()
+        self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
     def test_dns_single_value(self):
         service = self.create_service('web', dns='8.8.8.8')

@@ -1,4 +1,5 @@
 #!/bin/sh
-set -e
-flake8 fig
-PYTHONIOENCODING=ascii nosetests $@
+set -ex
+docker build -t fig .
+docker run -v /var/run/docker.sock:/var/run/docker.sock fig flake8 fig
+docker run -v /var/run/docker.sock:/var/run/docker.sock fig nosetests $@

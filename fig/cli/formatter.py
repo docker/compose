@@ -9,7 +9,7 @@ def get_tty_width():
     if len(tty_size) != 2:
         return 80
     _, width = tty_size
-    return width
+    return int(width)
 
 
 class Formatter(object):

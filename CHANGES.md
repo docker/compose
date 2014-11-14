@@ -1,6 +1,57 @@
 Change log
 ==========
 
+1.0.1 (2014-11-04)
+------------------
+
+ - Added an `--allow-insecure-ssl` option to allow `fig up`, `fig run` and `fig pull` to pull from insecure registries.
+ - Fixed `fig run` not showing output in Jenkins.
+ - Fixed a bug where Fig couldn't build Dockerfiles with ADD statements pointing at URLs.
+
+1.0.0 (2014-10-16)
+------------------
+
+The highlights:
+
+ - [Fig has joined Docker.](https://www.orchardup.com/blog/orchard-is-joining-docker) Fig will continue to be maintained, but we'll also be incorporating the best bits of Fig into Docker itself.
+
+   This means the GitHub repository has moved to [https://github.com/docker/fig](https://github.com/docker/fig) and our IRC channel is now #docker-fig on Freenode.
+
+ - Fig can be used with the [official Docker OS X installer](https://docs.docker.com/installation/mac/). Boot2Docker will mount the home directory from your host machine so volumes work as expected.
+
+ - Fig supports Docker 1.3.
+
+ - It is now possible to connect to the Docker daemon using TLS by using the `DOCKER_CERT_PATH` and `DOCKER_TLS_VERIFY` environment variables.
+
+ - There is a new `fig port` command which outputs the host port binding of a service, in a similar way to `docker port`.
+
+ - There is a new `fig pull` command which pulls the latest images for a service.
+
+ - There is a new `fig restart` command which restarts a service's containers.
+
+ - Fig creates multiple containers in service by appending a number to the service name (e.g. `db_1`, `db_2`, etc). As a convenience, Fig will now give the first container an alias of the service name (e.g. `db`).
+   
+   This link alias is also a valid hostname and added to `/etc/hosts` so you can connect to linked services using their hostname. For example, instead of resolving the environment variables `DB_PORT_5432_TCP_ADDR` and `DB_PORT_5432_TCP_PORT`, you could just use the hostname `db` and port `5432` directly.
+
+ - Volume definitions now support `ro` mode, expanding `~` and expanding environment variables.
+
+ - `.dockerignore` is supported when building.
+
+ - The project name can be set with the `FIG_PROJECT_NAME` environment variable.
+
+ - The `--env` and `--entrypoint` options have been added to `fig run`.
+
+ - The Fig binary for Linux is now linked against an older version of glibc so it works on CentOS 6 and Debian Wheezy.
+
+Other things:
+
+ - `fig ps` now works on Jenkins and makes fewer API calls to the Docker daemon.
+ - `--verbose` displays more useful debugging output.
+ - When starting a service where `volumes_from` points to a service without any containers running, that service will now be started.
+ - Lots of docs improvements. Notably, environment variables are documented and official repositories are used throughout.
+
+Thanks @dnephin, @d11wtq, @marksteve, @rubbish, @jbalonso, @timfreund, @alunduil, @mieciu, @shuron, @moss, @suzaku and @chmouel! Whew.
+
 0.5.2 (2014-07-28)
 ------------------
 

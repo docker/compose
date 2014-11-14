@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import six
+
 
 class Container(object):
     """
@@ -63,47 +65,58 @@ class Container(object):
             return None
 
     @property
-    def human_readable_ports(self):
+    def ports(self):
         self.inspect_if_not_inspected()
-        if not self.dictionary['NetworkSettings']['Ports']:
-            return ''
-        ports = []
-        for private, public in list(self.dictionary['NetworkSettings']['Ports'].items()):
-            if public:
-                ports.append('%s->%s' % (public[0]['HostPort'], private))
-            else:
-                ports.append(private)
-        return ', '.join(ports)
+        return self.get('NetworkSettings.Ports') or {}
+
+    @property
+    def human_readable_ports(self):
+        def format_port(private, public):
+            if not public:
+                return private
+            return '{HostIp}:{HostPort}->{private}'.format(
+                private=private, **public[0])
+
+        return ', '.join(format_port(*item)
+                         for item in sorted(six.iteritems(self.ports)))
 
     @property
     def human_readable_state(self):
-        self.inspect_if_not_inspected()
-        if self.dictionary['State']['Running']:
-            if self.dictionary['State'].get('Ghost'):
-                return 'Ghost'
-            else:
-                return 'Up'
+        if self.is_running:
+            return 'Ghost' if self.get('State.Ghost') else 'Up'
         else:
-            return 'Exit %s' % self.dictionary['State']['ExitCode']
+            return 'Exit %s' % self.get('State.ExitCode')
 
     @property
     def human_readable_command(self):
-        self.inspect_if_not_inspected()
-        if self.dictionary['Config']['Cmd']:
-            return ' '.join(self.dictionary['Config']['Cmd'])
-        else:
-            return ''
+        entrypoint = self.get('Config.Entrypoint') or []
+        cmd = self.get('Config.Cmd') or []
+        return ' '.join(entrypoint + cmd)
 
     @property
     def environment(self):
-        self.inspect_if_not_inspected()
-        return dict(var.split("=", 1)
-                    for var in self.dictionary.get('Config', {}).get('Env', []))
+        return dict(var.split("=", 1) for var in self.get('Config.Env') or [])
 
     @property
     def is_running(self):
+        return self.get('State.Running')
+
+    def get(self, key):
+        """Return a value from the container or None if the value is not set.
+
+        :param key: a string using dotted notation for nested dictionary
+                    lookups
+        """
         self.inspect_if_not_inspected()
-        return self.dictionary['State']['Running']
+
+        def get_value(dictionary, key):
+            return (dictionary or {}).get(key)
+
+        return reduce(get_value, key.split('.'), self.dictionary)
+
+    def get_local_port(self, port, protocol='tcp'):
+        port = self.ports.get("%s/%s" % (port, protocol))
+        return "{HostIp}:{HostPort}".format(**port[0]) if port else None
 
     def start(self, **options):
         return self.client.start(self.id, **options)
@@ -111,8 +124,11 @@ class Container(object):
     def stop(self, **options):
         return self.client.stop(self.id, **options)
 
-    def kill(self):
-        return self.client.kill(self.id)
+    def kill(self, **options):
+        return self.client.kill(self.id, **options)
+
+    def restart(self):
+        return self.client.restart(self.id)
 
     def remove(self, **options):
         return self.client.remove_container(self.id, **options)

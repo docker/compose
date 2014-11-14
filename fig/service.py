@@ -1,10 +1,14 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from .packages.docker.errors import APIError
+from collections import namedtuple
 import logging
 import re
 import os
+from operator import attrgetter
 import sys
+
+from docker.errors import APIError
+
 from .container import Container
 from .progress_stream import stream_output, StreamOutputError
 
@@ -37,6 +41,12 @@ class CannotBeScaledError(Exception):
 
 class ConfigError(ValueError):
     pass
+
+
+VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
+
+
+ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 class Service(object):
@@ -74,8 +84,21 @@ class Service(object):
         name = get_container_name(container)
         if not name or not is_valid_name(name, one_off):
             return False
-        project, name, number = parse_name(name)
+        project, name, _number = parse_name(name)
         return project == self.project and name == self.name
+
+    def get_container(self, number=1):
+        """Return a :class:`fig.container.Container` for this service. The
+        container must be active, and match `number`.
+        """
+        for container in self.client.containers():
+            if not self.has_container(container):
+                continue
+            _, _, container_number = parse_name(get_container_name(container))
+            if container_number == number:
+                return Container.from_ps(self.client, container)
+
+        raise ValueError("No container found for %s_%s" % (self.name, number))
 
     def start(self, **options):
         for c in self.containers(stopped=True):
@@ -90,6 +113,11 @@ class Service(object):
         for c in self.containers():
             log.info("Killing %s..." % c.name)
             c.kill(**options)
+
+    def restart(self, **options):
+        for c in self.containers():
+            log.info("Restarting %s..." % c.name)
+            c.restart(**options)
 
     def scale(self, desired_num):
         """
@@ -140,7 +168,7 @@ class Service(object):
                 log.info("Removing %s..." % c.name)
                 c.remove(**options)
 
-    def create_container(self, one_off=False, **override_options):
+    def create_container(self, one_off=False, insecure_registry=False, **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
@@ -151,21 +179,24 @@ class Service(object):
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 log.info('Pulling image %s...' % container_options['image'])
-                output = self.client.pull(container_options['image'], stream=True)
+                output = self.client.pull(
+                    container_options['image'],
+                    stream=True,
+                    insecure_registry=insecure_registry
+                )
                 stream_output(output, sys.stdout)
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, **override_options):
+    def recreate_containers(self, insecure_registry=False, **override_options):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
         """
         containers = self.containers(stopped=True)
-
-        if len(containers) == 0:
-            log.info("Creating %s..." % self.next_container_name())
-            container = self.create_container(**override_options)
+        if not containers:
+            log.info("Creating %s..." % self._next_container_name(containers))
+            container = self.create_container(insecure_registry=insecure_registry, **override_options)
             self.start_container(container)
             return [(None, container)]
         else:
@@ -173,11 +204,15 @@ class Service(object):
 
             for c in containers:
                 log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, **override_options))
+                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
 
             return tuples
 
     def recreate_container(self, container, **override_options):
+        """Recreate a container. An intermediate container is created so that
+        the new container has the same name, while still supporting
+        `volumes-from` the original container.
+        """
         try:
             container.stop()
         except APIError as e:
@@ -191,7 +226,7 @@ class Service(object):
         intermediate_container = Container.create(
             self.client,
             image=container.image,
-            entrypoint=['echo'],
+            entrypoint=['/bin/echo'],
             command=[],
         )
         intermediate_container.start(volumes_from=container.id)
@@ -214,36 +249,21 @@ class Service(object):
             return self.start_container(container, **options)
 
     def start_container(self, container=None, intermediate_container=None, **override_options):
-        if container is None:
-            container = self.create_container(**override_options)
+        container = container or self.create_container(**override_options)
+        options = dict(self.options, **override_options)
+        port_bindings = build_port_bindings(options.get('ports') or [])
 
-        options = self.options.copy()
-        options.update(override_options)
-
-        port_bindings = {}
-
-        if options.get('ports', None) is not None:
-            for port in options['ports']:
-                internal_port, external_port = split_port(port)
-                port_bindings[internal_port] = external_port
-
-        volume_bindings = {}
-
-        if options.get('volumes', None) is not None:
-            for volume in options['volumes']:
-                if ':' in volume:
-                    external_dir, internal_dir = volume.split(':')
-                    volume_bindings[os.path.abspath(external_dir)] = {
-                        'bind': internal_dir,
-                        'ro': False,
-                    }
+        volume_bindings = dict(
+            build_volume_binding(parse_volume_spec(volume))
+            for volume in options.get('volumes') or []
+            if ':' in volume)
 
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
 
         container.start(
-            links=self._get_links(link_to_self=override_options.get('one_off', False)),
+            links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
@@ -253,12 +273,12 @@ class Service(object):
         )
         return container
 
-    def start_or_create_containers(self):
+    def start_or_create_containers(self, insecure_registry=False):
         containers = self.containers(stopped=True)
 
-        if len(containers) == 0:
-            log.info("Creating %s..." % self.next_container_name())
-            new_container = self.create_container()
+        if not containers:
+            log.info("Creating %s..." % self._next_container_name(containers))
+            new_container = self.create_container(insecure_registry=insecure_registry)
             return [self.start_container(new_container)]
         else:
             return [self.start_container_if_stopped(c) for c in containers]
@@ -266,42 +286,43 @@ class Service(object):
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
 
-    def next_container_name(self, one_off=False):
+    def _next_container_name(self, all_containers, one_off=False):
         bits = [self.project, self.name]
         if one_off:
             bits.append('run')
-        return '_'.join(bits + [str(self.next_container_number(one_off=one_off))])
+        return '_'.join(bits + [str(self._next_container_number(all_containers))])
 
-    def next_container_number(self, one_off=False):
-        numbers = [parse_name(c.name)[2] for c in self.containers(stopped=True, one_off=one_off)]
-
-        if len(numbers) == 0:
-            return 1
-        else:
-            return max(numbers) + 1
+    def _next_container_number(self, all_containers):
+        numbers = [parse_name(c.name).number for c in all_containers]
+        return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):
         links = []
         for service, link_name in self.links:
             for container in service.containers():
-                if link_name:
-                    links.append((container.name, link_name))
+                links.append((container.name, link_name or service.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         if link_to_self:
             for container in self.containers():
+                links.append((container.name, self.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
         return links
 
     def _get_volumes_from(self, intermediate_container=None):
         volumes_from = []
-        for v in self.volumes_from:
-            if isinstance(v, Service):
-                for container in v.containers(stopped=True):
-                    volumes_from.append(container.id)
-            elif isinstance(v, Container):
-                volumes_from.append(v.id)
+        for volume_source in self.volumes_from:
+            if isinstance(volume_source, Service):
+                containers = volume_source.containers(stopped=True)
+
+                if not containers:
+                    volumes_from.append(volume_source.create_container().id)
+                else:
+                    volumes_from.extend(map(attrgetter('id'), containers))
+
+            elif isinstance(volume_source, Container):
+                volumes_from.append(volume_source.id)
 
         if intermediate_container:
             volumes_from.append(intermediate_container.id)
@@ -312,7 +333,9 @@ class Service(object):
         container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        container_options['name'] = self.next_container_name(one_off)
+        container_options['name'] = self._next_container_name(
+            self.containers(stopped=True, one_off=one_off),
+            one_off)
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
@@ -338,7 +361,9 @@ class Service(object):
             container_options['ports'] = ports
 
         if 'volumes' in container_options:
-            container_options['volumes'] = dict((split_volume(v)[1], {}) for v in container_options['volumes'])
+            container_options['volumes'] = dict(
+                (parse_volume_spec(v).internal, {})
+                for v in container_options['volumes'])
 
         if 'environment' in container_options:
             if isinstance(container_options['environment'], list):
@@ -401,6 +426,14 @@ class Service(object):
                 return False
         return True
 
+    def pull(self, insecure_registry=False):
+        if 'image' in self.options:
+            log.info('Pulling %s (%s)...' % (self.name, self.options.get('image')))
+            self.client.pull(
+                self.options.get('image'),
+                insecure_registry=insecure_registry
+            )
+
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
 
@@ -415,10 +448,10 @@ def is_valid_name(name, one_off=False):
         return match.group(3) is None
 
 
-def parse_name(name, one_off=False):
+def parse_name(name):
     match = NAME_RE.match(name)
     (project, service_name, _, suffix) = match.groups()
-    return (project, service_name, int(suffix))
+    return ServiceName(project, service_name, int(suffix))
 
 
 def get_container_name(container):
@@ -433,32 +466,58 @@ def get_container_name(container):
             return name[1:]
 
 
-def split_volume(v):
-    """
-    If v is of the format EXTERNAL:INTERNAL, returns (EXTERNAL, INTERNAL).
-    If v is of the format INTERNAL, returns (None, INTERNAL).
-    """
-    if ':' in v:
-        return v.split(':', 1)
-    else:
-        return (None, v)
+def parse_volume_spec(volume_config):
+    parts = volume_config.split(':')
+    if len(parts) > 3:
+        raise ConfigError("Volume %s has incorrect format, should be "
+                          "external:internal[:mode]" % volume_config)
+
+    if len(parts) == 1:
+        return VolumeSpec(None, parts[0], 'rw')
+
+    if len(parts) == 2:
+        parts.append('rw')
+
+    external, internal, mode = parts
+    if mode not in ('rw', 'ro'):
+        raise ConfigError("Volume %s has invalid mode (%s), should be "
+                          "one of: rw, ro." % (volume_config, mode))
+
+    return VolumeSpec(external, internal, mode)
+
+
+def build_volume_binding(volume_spec):
+    internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
+    external = os.path.expanduser(volume_spec.external)
+    return os.path.abspath(os.path.expandvars(external)), internal
+
+
+def build_port_bindings(ports):
+    port_bindings = {}
+    for port in ports:
+        internal_port, external = split_port(port)
+        if internal_port in port_bindings:
+            port_bindings[internal_port].append(external)
+        else:
+            port_bindings[internal_port] = [external]
+    return port_bindings
 
 
 def split_port(port):
-    port = str(port)
-    external_ip = None
-    if ':' in port:
-        external_port, internal_port = port.rsplit(':', 1)
-        if ':' in external_port:
-            external_ip, external_port = external_port.split(':', 1)
-    else:
-        external_port, internal_port = (None, port)
-    if external_ip:
-        if external_port:
-            external_port = (external_ip, external_port)
-        else:
-            external_port = (external_ip,)
-    return internal_port, external_port
+    parts = str(port).split(':')
+    if not 1 <= len(parts) <= 3:
+        raise ConfigError('Invalid port "%s", should be '
+                          '[[remote_ip:]remote_port:]port[/protocol]' % port)
+
+    if len(parts) == 1:
+        internal_port, = parts
+        return internal_port, None
+    if len(parts) == 2:
+        external_port, internal_port = parts
+        return internal_port, external_port
+
+    external_ip, external_port, internal_port = parts
+    return internal_port, (external_ip, external_port or None)
 
 
 def split_env(env):

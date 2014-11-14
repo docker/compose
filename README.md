@@ -1,8 +1,7 @@
 Fig
 ===
 
-[![Build Status](https://travis-ci.org/docker/fig.svg?branch=master)](https://travis-ci.org/docker/fig)
-[![PyPI version](https://badge.fury.io/py/fig.png)](http://badge.fury.io/py/fig)
+[![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
 
 Fast, isolated development environments using Docker.
 
