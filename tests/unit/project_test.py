@@ -3,6 +3,7 @@ from .. import unittest
 from fig.service import Service
 from fig.project import Project, ConfigurationError
 
+
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
         project = Project.from_dicts('figtest', [
@@ -64,6 +65,15 @@ class ProjectTest(unittest.TestCase):
             project = Project.from_config('figtest', {
                 'web': 'busybox:latest',
             }, None)
+
+    def test_from_config_with_project_config(self):
+        project_name = 'theprojectnamefromconfig'
+        project = Project.from_config('default_name_not_used', {
+            'project-config': {'name': project_name},
+            'web': {'image': 'busybox:latest'}
+        }, None)
+
+        self.assertEqual(project.name, project_name)
 
     def test_get_service(self):
         web = Service(
