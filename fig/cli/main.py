@@ -319,10 +319,10 @@ class TopLevelCommand(Command):
             **container_options
         )
         if options['-d']:
-            service.start_container(container, ports=None, one_off=True)
+            service.start_container(container, one_off=True)
             print(container.name)
         else:
-            service.start_container(container, ports=None, one_off=True)
+            service.start_container(container, one_off=True)
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
