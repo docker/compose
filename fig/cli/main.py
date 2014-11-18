@@ -87,6 +87,7 @@ class TopLevelCommand(Command):
       logs      View output from containers
       port      Print the public port for a port binding
       ps        List containers
+      services  List services
       pull      Pulls service images
       rm        Remove stopped containers
       run       Run a one-off command
@@ -214,6 +215,62 @@ class TopLevelCommand(Command):
                     container.human_readable_ports,
                 ])
             print(Formatter().table(headers, rows))
+
+    def services(self, project, options):
+        """
+        List services
+        Usage: services [options] [SERVICE...]
+
+        Options:
+            --ps    List state information like ps for each service
+
+        """
+        # show_state = False
+        # show_containers = False
+
+        if options['--ps']:
+            headers = ['Service',
+                       'Pattern',
+                       'Count',
+                       'State']
+        else:
+            # short output
+            for service in project.services:
+                if len(options['SERVICE']):
+                    if service.name == options['SERVICE'][0]:
+                        print(service.name)
+                else:
+                    print(service.name)
+            return
+
+        rows = []
+        for service in project.services:
+
+            if len(options['SERVICE']):
+                if service.name == options['SERVICE'][0]:
+                    add = True
+                else:
+                    add = False
+            else:
+                add = True
+
+            if add:
+                containers = service.containers()
+                if len(containers):
+                    state = 'Up'
+                    pattern = containers[0].name.rsplit('_', 1)[0] + '_{n}'
+                else:
+                    state = 'Down'
+                    pattern = ''
+
+                rows.append([
+                            service.name,
+                            pattern,
+                            len(service.containers()),
+                            state
+                            ])
+
+        print(Formatter().table(headers, rows))
 
     def pull(self, project, options):
         """
