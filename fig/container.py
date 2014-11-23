@@ -124,8 +124,8 @@ class Container(object):
     def stop(self, **options):
         return self.client.stop(self.id, **options)
 
-    def kill(self):
-        return self.client.kill(self.id)
+    def kill(self, **options):
+        return self.client.kill(self.id, **options)
 
     def restart(self):
         return self.client.restart(self.id)

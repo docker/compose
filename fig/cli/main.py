@@ -7,7 +7,7 @@ import signal
 from operator import attrgetter
 
 from inspect import getdoc
-from fig.packages import dockerpty
+import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
@@ -133,9 +133,15 @@ class TopLevelCommand(Command):
         """
         Force stop service containers.
 
-        Usage: kill [SERVICE...]
+        Usage: kill [options] [SERVICE...]
+
+        Options:
+            -s SIGNAL         SIGNAL to send to the container.
+                              Default signal is SIGKILL.
         """
-        project.kill(service_names=options['SERVICE'])
+        signal = options.get('-s', 'SIGKILL')
+
+        project.kill(service_names=options['SERVICE'], signal=signal)
 
     def logs(self, project, options):
         """
@@ -323,7 +329,7 @@ class TopLevelCommand(Command):
             print(container.name)
         else:
             service.start_container(container, ports=None, one_off=True)
-            dockerpty.start(project.client, container.id)
+            dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)

@@ -84,6 +84,7 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['build', '--no-cache', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
+
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -139,13 +140,13 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_service_without_links(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'console', '/bin/true'], None)
         self.assertEqual(len(self.project.containers()), 0)
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_service_with_links(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'web', '/bin/true'], None)
@@ -154,14 +155,14 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_with_no_deps(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
         db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_does_not_recreate_linked_containers(self, __):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['up', '-d', 'db'], None)
@@ -177,7 +178,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_without_command(self, __):
         self.command.base_dir = 'tests/fixtures/commands-figfile'
         self.check_build('tests/fixtures/simple-dockerfile', tag='figtest_test')
@@ -201,7 +202,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_service_with_entrypoint_overridden(self, _):
         self.command.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
         name = 'service'
@@ -216,7 +217,7 @@ class CLITestCase(DockerClientTestCase):
             u'/bin/echo helloworld'
         )
 
-    @patch('fig.packages.dockerpty.start')
+    @patch('dockerpty.start')
     def test_run_service_with_environement_overridden(self, _):
         name = 'service'
         self.command.base_dir = 'tests/fixtures/environment-figfile'
@@ -243,6 +244,40 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.command.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
+
+    def test_kill(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['kill'], None)
+
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
+
+    def test_kill_signal_sigint(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+
+        self.assertEqual(len(service.containers()), 1)
+        # The container is still running. It has been only interrupted
+        self.assertTrue(service.containers()[0].is_running)
+
+    def test_kill_interrupted_service(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['kill', '-s', 'SIGKILL'], None)
+
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
 
     def test_restart(self):
         service = self.project.get_service('simple')
