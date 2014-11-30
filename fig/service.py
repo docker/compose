@@ -50,7 +50,7 @@ ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, **options):
+    def __init__(self, name, client=None, project='default', links=None, volumes_from=None, depends_on=None, net=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -72,6 +72,8 @@ class Service(object):
         self.project = project
         self.links = links or []
         self.volumes_from = volumes_from or []
+        self.depends_on = depends_on or []
+        self.net = net or ''
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -259,7 +261,6 @@ class Service(object):
             if ':' in volume)
 
         privileged = options.get('privileged', False)
-        net = options.get('net', 'bridge')
         dns = options.get('dns', None)
 
         container.start(
@@ -268,7 +269,7 @@ class Service(object):
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
-            network_mode=net,
+            network_mode=self._get_net(),
             dns=dns,
         )
         return container
@@ -285,6 +286,18 @@ class Service(object):
 
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
+
+    def get_volumes_from_names(self):
+        return [s.name for s in self.volumes_from if isinstance(s, Service)]
+
+    def get_depends_on_names(self):
+        return [s.name for s in self.depends_on]
+
+    def get_net_names(self):
+        if isinstance(self.net, list):
+            return [s.name for s in self.net if isinstance(s, Service)]
+        else:
+            return []
 
     def _next_container_name(self, all_containers, one_off=False):
         bits = [self.project, self.name]
@@ -315,11 +328,7 @@ class Service(object):
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
                 containers = volume_source.containers(stopped=True)
-
-                if not containers:
-                    volumes_from.append(volume_source.create_container().id)
-                else:
-                    volumes_from.extend(map(attrgetter('id'), containers))
+                volumes_from.extend(map(attrgetter('id'), containers))
 
             elif isinstance(volume_source, Container):
                 volumes_from.append(volume_source.id)
@@ -328,6 +337,23 @@ class Service(object):
             volumes_from.append(intermediate_container.id)
 
         return volumes_from
+
+    def _get_net(self):
+        net = 'bridge'
+        if isinstance(self.net, list):
+            net_source = self.net[0]
+            if isinstance(net_source, Service):
+                if len(net_source.containers()) > 0:
+                    container = net_source.containers()[0]
+                    net = 'container:' + container.id
+                else:
+                    net = 'bridge'
+            elif isinstance(net_source, Container):
+                net = 'container:' + net_source.id
+        else:
+            net = self.net
+
+        return net
 
     def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)

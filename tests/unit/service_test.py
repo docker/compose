@@ -63,6 +63,14 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(service._get_volumes_from(container), [container_id])
 
+    def test_get_volumes_from_container(self):
+        container_id = 'aabbccddee'
+        service = Service(
+            'test',
+            volumes_from=[mock.Mock(id=container_id, spec=Container)])
+
+        self.assertEqual(service._get_volumes_from(), [container_id])
+
     def test_get_volumes_from_service_container_exists(self):
         container_ids = ['aabbccddee', '12345']
         from_service = mock.create_autospec(Service)
@@ -73,18 +81,6 @@ class ServiceTest(unittest.TestCase):
         service = Service('test', volumes_from=[from_service])
 
         self.assertEqual(service._get_volumes_from(), container_ids)
-
-    def test_get_volumes_from_service_no_container(self):
-        container_id = 'abababab'
-        from_service = mock.create_autospec(Service)
-        from_service.containers.return_value = []
-        from_service.create_container.return_value = mock.Mock(
-            id=container_id,
-            spec=Container)
-        service = Service('test', volumes_from=[from_service])
-
-        self.assertEqual(service._get_volumes_from(), [container_id])
-        from_service.create_container.assert_called_once_with()
 
     def test_split_port_with_host_ip(self):
         internal_port, external_port = split_port("127.0.0.1:1000:2000")
