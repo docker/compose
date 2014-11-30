@@ -15,7 +15,8 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'cpuset', 'memswap_limit']
+
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -375,6 +376,8 @@ class Service(object):
                 self.build()
             container_options['image'] = self._build_tag_name()
 
+        if 'cpuset' in container_options:
+            container_options['cpuset'] = parse_cpuset(container_options['cpuset'])
         # Delete options which are only used when starting
         for key in ['privileged', 'net', 'dns']:
             if key in container_options:
@@ -436,6 +439,7 @@ class Service(object):
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
+CPUSET_RE = re.compile(r'^[0-9]+((\s*,\s*[0-9]+)*|(\s*\-\s*[0-9]+((\s*,\s*[0-9]+)+|$)))*$')
 
 
 def is_valid_name(name, one_off=False):
@@ -534,3 +538,11 @@ def resolve_env(key, val):
         return key, os.environ[key]
     else:
         return key, ''
+
+
+def parse_cpuset(cpuset):
+    if not cpuset:
+        return None
+    if not CPUSET_RE.match(cpuset):
+        raise ConfigError("cpuset has incorrect format. should contain only comma separated numbers and ranges (1-3). ")
+    return cpuset
