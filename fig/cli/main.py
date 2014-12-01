@@ -293,6 +293,7 @@ class TopLevelCommand(Command):
                     service_names=deps,
                     start_links=True,
                     recreate=False,
+                    insecure_registry=insecure_registry,
                 )
 
         tty = True
