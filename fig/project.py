@@ -181,8 +181,8 @@ class Project(object):
 
             for container in create_func(
                     insecure_registry=insecure_registry,
-                        detach=detach,
-                        do_build=do_build):
+                    detach=detach,
+                    do_build=do_build):
                 running_containers.append(container)
 
         return running_containers

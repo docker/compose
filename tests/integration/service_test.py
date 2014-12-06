@@ -98,7 +98,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', volumes=['/var/db'])
         container = service.create_container()
         service.start_container(container)
-        self.assertIn('/var/db', container.inspect()['Volumes'])
+        self.assertIn('/var/db', container.get('Volumes'))
 
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
@@ -178,6 +178,16 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         service.recreate_containers()
         self.assertEqual(len(service.containers(stopped=True)), 1)
+
+    def test_recreate_containers_with_volume_changes(self):
+        service = self.create_service('withvolumes', volumes=['/etc'])
+        old_container = create_and_start_container(service)
+        self.assertEqual(old_container.get('Volumes').keys(), ['/etc'])
+
+        service = self.create_service('withvolumes')
+        container, = service.recreate_containers()
+        service.start_container(container)
+        self.assertEqual(container.get('Volumes'), {})
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
