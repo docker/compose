@@ -53,6 +53,12 @@ def prettydate(d):
         return '{0} hours ago'.format(s / 3600)
 
 
+def trim(source, length, extra=' ...'):
+    if len(source) > length:
+        return '%s%s' % (source[:length - len(extra)], extra)
+    return source
+
+
 def mkdir(path, permissions=0o700):
     if not os.path.exists(path):
         os.mkdir(path)

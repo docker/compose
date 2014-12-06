@@ -63,6 +63,16 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplefigfiles_another_1', output)
         self.assertIn('multiplefigfiles_yetanother_1', output)
 
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_volumes(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/volumes-figfile'
+        self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['volumes'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertIn('/etc', output)
+        self.assertIn('/home', output)
+
     @patch('fig.service.log')
     def test_pull(self, mock_logging):
         self.command.dispatch(['pull'], None)

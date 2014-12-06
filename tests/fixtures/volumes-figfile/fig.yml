@@ -1,0 +1,11 @@
+
+one:
+    image: busybox
+    volumes:
+        - '/etc'
+        - '/home:/home:ro'
+
+two:
+    image: busybox
+    volumes_from:
+        - one

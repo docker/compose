@@ -1,7 +1,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from collections import namedtuple
 
 import six
+
+
+Volume = namedtuple('Volume', 'path mode host')
 
 
 class Container(object):
@@ -66,7 +70,6 @@ class Container(object):
 
     @property
     def ports(self):
-        self.inspect_if_not_inspected()
         return self.get('NetworkSettings.Ports') or {}
 
     @property
@@ -100,6 +103,19 @@ class Container(object):
     @property
     def is_running(self):
         return self.get('State.Running')
+
+    @property
+    def volumes(self):
+        def get_mode(is_rw):
+            if is_rw is None:
+                return ''
+            return 'rw' if is_rw else 'ro'
+
+        def get_volume(volume_item):
+            path, host = volume_item
+            return Volume(path, get_mode(self.get('VolumesRW').get(path)), host)
+
+        return map(get_volume, six.iteritems(self.get('Volumes')))
 
     def get(self, key):
         """Return a value from the container or None if the value is not set.
