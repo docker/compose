@@ -242,8 +242,9 @@ class Service(object):
 
     def recreate_containers(self, insecure_registry=False, do_build=True, **override_options):
         """
-        If a container for this service doesn't exist, create and start one. If there are
-        any, stop them, create+start new ones, and remove the old containers.
+        If a container for this service doesn't exist, create and start one. If
+        there are any, stop them, create+start new ones, and remove the old
+        containers.
         """
         containers = self.containers(stopped=True)
         if not containers:
@@ -253,21 +254,22 @@ class Service(object):
                 do_build=do_build,
                 **override_options)
             self.start_container(container)
-            return [(None, container)]
+            return [container]
         else:
-            tuples = []
-
-            for c in containers:
-                log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
-
-            return tuples
+            return [
+                self.recreate_container(
+                    container,
+                    insecure_registry=insecure_registry,
+                    **override_options)
+                for container in containers
+            ]
 
     def recreate_container(self, container, **override_options):
         """Recreate a container. An intermediate container is created so that
         the new container has the same name, while still supporting
         `volumes-from` the original container.
         """
+        log.info("Recreating %s..." % container.name)
         try:
             container.stop()
         except APIError as e:
@@ -295,7 +297,7 @@ class Service(object):
 
         intermediate_container.remove()
 
-        return (intermediate_container, new_container)
+        return new_container
 
     def start_container_if_stopped(self, container, **options):
         if container.is_running:
