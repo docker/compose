@@ -157,3 +157,14 @@ domainname: foo.com
 mem_limit: 1000000000
 privileged: true
 ```
+
+### restart_policy
+
+Specify the container restart policy using the same syntax as the Docker CLI.
+Supported values are "no", "always" and "on-failure[:max-retry]". The default
+is to have no restart policy.
+
+```
+restart_policy: "always"
+restart_policy: "on-failure:3"
+```

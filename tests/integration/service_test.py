@@ -389,3 +389,25 @@ class ServiceTest(DockerClientTestCase):
             del os.environ['FILE_DEF']
             del os.environ['FILE_DEF_EMPTY']
             del os.environ['ENV_DEF']
+
+    def test_restart_policy_default(self):
+        service = self.create_service('container')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], '')
+
+    def test_restart_policy_always(self):
+        service = self.create_service('container')
+        container = service.start_container(restart_policy='always').inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'always')
+
+    def test_restart_policy_on_failure(self):
+        service = self.create_service('container')
+        container = service.start_container(restart_policy='on-failure').inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
+        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 0)
+
+    def test_restart_policy_on_failure_retry_count(self):
+        service = self.create_service('container')
+        container = service.start_container(restart_policy='on-failure:3').inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
+        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 3)

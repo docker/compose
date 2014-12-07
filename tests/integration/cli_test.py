@@ -237,6 +237,16 @@ class CLITestCase(DockerClientTestCase):
         # make sure a value with a = don't crash out
         self.assertEqual('moto=bobo', container.environment['allo'])
 
+    @patch('dockerpty.start')
+    def test_run_service_with_restart_policy(self, __):
+        self.command.base_dir = 'tests/fixtures/restart-policy-figfile'
+        self.command.dispatch(['up', '-d', 'service'], None)
+        service = self.project.get_service('service')
+        containers = service.containers(stopped=True)
+        container = service.containers(stopped=True)[0].inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
+        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 3)
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
