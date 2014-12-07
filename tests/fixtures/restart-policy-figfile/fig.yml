@@ -1,0 +1,4 @@
+service:
+  image: busybox:latest
+  command: sleep 5
+  restart_policy: on-failure:3

@@ -17,6 +17,7 @@ from fig.service import (
     parse_volume_spec,
     build_volume_binding,
     APIError,
+    parse_restart_policy,
 )
 
 
@@ -204,6 +205,18 @@ class ServiceTest(unittest.TestCase):
             pass
         self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True, stream=True)
         mock_log.info.assert_called_once_with('Pulling image someimage:sometag...')
+
+    def test_parse_restart_policy(self):
+        test_args = {
+            None: None,
+            '': None,
+            'no': None,
+            'always': {'Name':'always'},
+            'on-failure': {'Name':'on-failure'},
+            'on-failure:3': {'Name':'on-failure', 'MaximumRetryCount':3},
+        }
+        for k, v in test_args.items():
+            self.assertEqual(parse_restart_policy(k), v)
 
 
 class ServiceVolumesTest(unittest.TestCase):

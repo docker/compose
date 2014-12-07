@@ -15,7 +15,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart_policy']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -24,6 +24,7 @@ DOCKER_CONFIG_HINTS = {
     'privilige' : 'privileged',
     'volume'    : 'volumes',
     'workdir'   : 'working_dir',
+    'restart'   : 'restart_policy',
 }
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -262,7 +263,7 @@ class Service(object):
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
 
-        container.start(
+        start_options = dict(
             links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
@@ -271,6 +272,10 @@ class Service(object):
             network_mode=net,
             dns=dns,
         )
+        restart_policy = parse_restart_policy(options.get('restart_policy', None))
+        if restart_policy:
+            start_options['restart_policy'] = restart_policy
+        container.start(**start_options)
         return container
 
     def start_or_create_containers(self, insecure_registry=False):
@@ -376,7 +381,7 @@ class Service(object):
             container_options['image'] = self._build_tag_name()
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns']:
+        for key in ['privileged', 'net', 'dns', 'restart_policy']:
             if key in container_options:
                 del container_options[key]
 
@@ -534,3 +539,29 @@ def resolve_env(key, val):
         return key, os.environ[key]
     else:
         return key, ''
+
+
+def parse_restart_policy(restart_policy):
+    """
+    Convert CLI/YML restart policy to a Docker API compatible dict.
+    """
+    # Support a few different alternative syntaxes for restart policy
+    if not restart_policy or restart_policy == 'no':
+        # No policy
+        return None
+    elif isinstance(restart_policy, dict):
+        # Convert specified dict keys to CamelCase so
+        # {'name':'on-failure', 'maximum_retry_count':3} becomes
+        # {'Name':'on-failure', 'MaximumRetryCount':3} for Docker API
+        return dict([(re.sub(r'(?:^|_)([a-zA-Z])', lambda m: m.group(1).upper(), k), v) for (k, v) in restart_policy.items()])
+    elif re.match(r'^on-failure:\s*', restart_policy):
+        # Convert "on-failure:<max-retry>" into proper Docker API syntax
+        return {
+            'Name': 'on-failure',
+            'MaximumRetryCount': int(re.sub(r'^on-failure:\s*', '', restart_policy)),
+        }
+    else:
+        # Use specified string as the Name parameter
+        return {
+            'Name': restart_policy,
+        }
