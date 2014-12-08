@@ -142,6 +142,20 @@ dns:
   - 9.9.9.9
 ```
 
+### cap_add, cap_drop
+
+Add or drop container capabilities.
+See `man 7 capabilities` for a full list.
+
+```
+cap_add:
+  - ALL
+
+cap_drop:
+  - NET_ADMIN
+  - SYS_ADMIN
+```
+
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.

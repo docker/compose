@@ -376,6 +376,16 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
         self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 5)
 
+    def test_cap_add_list(self):
+        service = self.create_service('web', cap_add=['SYS_ADMIN', 'NET_ADMIN'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['CapAdd'], ['SYS_ADMIN', 'NET_ADMIN'])
+
+    def test_cap_drop_list(self):
+        service = self.create_service('web', cap_drop=['SYS_ADMIN', 'NET_ADMIN'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['CapDrop'], ['SYS_ADMIN', 'NET_ADMIN'])
+
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container().inspect()
