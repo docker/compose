@@ -58,7 +58,7 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose']
+        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose', 'env-file']
 
         for k in options:
             if k not in supported_options:
@@ -336,6 +336,20 @@ class Service(object):
 
         return volumes_from
 
+    def _get_environment(self):
+        env = {}
+
+        if 'env-file' in self.options:
+            env = env_vars_from_file(self.options['env-file'])
+
+        if 'environment' in self.options:
+            if isinstance(self.options['environment'], list):
+                env.update(dict(split_env(e) for e in self.options['environment']))
+            else:
+                env.update(self.options['environment'])
+
+        return dict(resolve_env(k, v) for k, v in env.iteritems())
+
     def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
@@ -372,10 +386,7 @@ class Service(object):
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
-        if 'environment' in container_options:
-            if isinstance(container_options['environment'], list):
-                container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
-            container_options['environment'] = dict(resolve_env(k, v) for k, v in container_options['environment'].iteritems())
+        container_options['environment'] = self._get_environment()
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -557,3 +568,16 @@ def resolve_env(key, val):
         return key, os.environ[key]
     else:
         return key, ''
+
+
+def env_vars_from_file(filename):
+    """
+    Read in a line delimited file of environment variables.
+    """
+    env = {}
+    for line in open(filename, 'r'):
+        line = line.strip()
+        if line and not line.startswith('#') and '=' in line:
+            k, v = line.split('=', 1)
+            env[k] = v
+    return env
