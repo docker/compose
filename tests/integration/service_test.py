@@ -365,6 +365,17 @@ class ServiceTest(DockerClientTestCase):
         container = service.start_container().inspect()
         self.assertEqual(container['HostConfig']['Dns'], ['8.8.8.8', '9.9.9.9'])
 
+    def test_restart_always_value(self):
+        service = self.create_service('web', restart='always')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'always')
+
+    def test_restart_on_failure_value(self):
+        service = self.create_service('web', restart='on-failure:5')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
+        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 5)
+
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container().inspect()
