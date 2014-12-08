@@ -1,7 +1,7 @@
 Fig
 ===
 
-[![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
+[![wercker status](https://app.wercker.com/status/6099650fcf1bc6f490290fefb8a02009/m "wercker status")](https://app.wercker.com/project/bykey/6099650fcf1bc6f490290fefb8a02009)
 
 Fast, isolated development environments using Docker.
 
@@ -25,6 +25,24 @@ web:
    - "49100:22"
 db:
   image: postgres
+```
+
+```json
+{
+    "web": {
+        "build": ".",
+        "links": [
+            "db"
+        ],
+        "ports": [
+            "8000:8000",
+            "49100:22"
+        ]
+    },
+    "db": {
+        "image": "postgres"
+    }
+}
 ```
 
 (No more installing Postgres on your laptop!)
