@@ -23,6 +23,18 @@ class CLITestCase(unittest.TestCase):
         finally:
             os.chdir(cwd)
 
+    def test_json(self):
+        cwd = os.getcwd()
+
+        try:
+            os.chdir('tests/fixtures/json-figfile')
+            command = TopLevelCommand()
+            project_name = command.get_project_name(command.get_config_path())
+            self.assertEquals('jsonfigfile', project_name)
+        finally:
+            os.chdir(cwd)
+
+
     def test_project_name_with_explicit_base_dir(self):
         command = TopLevelCommand()
         command.base_dir = 'tests/fixtures/simple-figfile'

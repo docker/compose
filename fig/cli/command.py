@@ -83,7 +83,6 @@ class Command(DocoptCommand):
                 raise errors.FigFileBadlyFormatted(os.path.basename(config_path))
             raise errors.UserError(six.text_type(e))
 
-
     def get_project(self, config_path, project_name=None, verbose=False):
         try:
             return Project.from_config(

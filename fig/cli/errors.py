@@ -61,6 +61,7 @@ class FigFileNotFound(UserError):
         Can't find %s. Are you in the right directory?
         """ % filename)
 
+
 class FigFileBadlyFormatted(UserError):
     def __init__(self, filename):
         super(FigFileBadlyFormatted, self).__init__("""
