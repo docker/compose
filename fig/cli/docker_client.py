@@ -31,4 +31,4 @@ def docker_client():
             ca_cert=ca_cert,
         )
 
-    return Client(base_url=base_url, tls=tls_config)
+    return Client(base_url=base_url, tls=tls_config, version='1.14')
