@@ -381,6 +381,8 @@ class Service(object):
             if len(self.client.images(name=self._build_tag_name())) == 0:
                 self.build()
             container_options['image'] = self._build_tag_name()
+        else:
+            container_options['image'] = self._get_image_name(container_options['image'])
 
         # Delete options which are only used when starting
         for key in ['privileged', 'net', 'dns', 'restart', 'cap_add', 'cap_drop']:
@@ -388,6 +390,12 @@ class Service(object):
                 del container_options[key]
 
         return container_options
+
+    def _get_image_name(self, image):
+        repo, tag = parse_repository_tag(image)
+        if tag == "":
+            tag = "latest"
+        return '%s:%s' % (repo, tag)
 
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
@@ -435,9 +443,10 @@ class Service(object):
 
     def pull(self, insecure_registry=False):
         if 'image' in self.options:
-            log.info('Pulling %s (%s)...' % (self.name, self.options.get('image')))
+            image_name = self._get_image_name(self.options['image'])
+            log.info('Pulling %s (%s)...' % (self.name, image_name))
             self.client.pull(
-                self.options.get('image'),
+                image_name,
                 insecure_registry=insecure_registry
             )
 
@@ -507,6 +516,15 @@ def parse_volume_spec(volume_config):
                           "one of: rw, ro." % (volume_config, mode))
 
     return VolumeSpec(external, internal, mode)
+
+
+def parse_repository_tag(s):
+    if ":" not in s:
+        return s, ""
+    repo, tag = s.rsplit(":", 1)
+    if "/" in tag:
+        return s, ""
+    return repo, tag
 
 
 def build_volume_binding(volume_spec):
