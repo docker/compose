@@ -15,7 +15,7 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart', 'cap_add', 'cap_drop']
+DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'env_file', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart', 'cap_add', 'cap_drop']
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -372,10 +372,7 @@ class Service(object):
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
-        if 'environment' in container_options:
-            if isinstance(container_options['environment'], list):
-                container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
-            container_options['environment'] = dict(resolve_env(k, v) for k, v in container_options['environment'].iteritems())
+        container_options['environment'] = merge_environment(container_options)
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
@@ -383,7 +380,7 @@ class Service(object):
             container_options['image'] = self._build_tag_name()
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns', 'restart', 'cap_add', 'cap_drop']:
+        for key in ['privileged', 'net', 'dns', 'restart', 'cap_add', 'cap_drop', 'env_file']:
             if key in container_options:
                 del container_options[key]
 
@@ -543,6 +540,25 @@ def split_port(port):
     return internal_port, (external_ip, external_port or None)
 
 
+def merge_environment(options):
+    env = {}
+
+    if 'env_file' in options:
+        if isinstance(options['env_file'], list):
+            for f in options['env_file']:
+                env.update(env_vars_from_file(f))
+        else:
+            env.update(env_vars_from_file(options['env_file']))
+
+    if 'environment' in options:
+        if isinstance(options['environment'], list):
+            env.update(dict(split_env(e) for e in options['environment']))
+        else:
+            env.update(options['environment'])
+
+    return dict(resolve_env(k, v) for k, v in env.iteritems())
+
+
 def split_env(env):
     if '=' in env:
         return env.split('=', 1)
@@ -557,3 +573,16 @@ def resolve_env(key, val):
         return key, os.environ[key]
     else:
         return key, ''
+
+
+def env_vars_from_file(filename):
+    """
+    Read in a line delimited file of environment variables.
+    """
+    env = {}
+    for line in open(filename, 'r'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            k, v = split_env(line)
+            env[k] = v
+    return env

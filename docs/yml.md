@@ -120,6 +120,21 @@ environment:
   - SESSION_SECRET
 ```
 
+### env_file
+
+Add environment variables from a file. Can be a single value or a list.
+
+Environment variables specified in `environment` override these values.
+
+```
+env_file:
+  - .env
+```
+
+```
+RACK_ENV: development
+```
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.
