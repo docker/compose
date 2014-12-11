@@ -17,6 +17,7 @@ from fig.service import (
     parse_volume_spec,
     build_volume_binding,
     APIError,
+    parse_repository_tag,
 )
 
 
@@ -131,7 +132,7 @@ class ServiceTest(unittest.TestCase):
     def test_split_domainname_none(self):
         service = Service('foo', hostname='name', client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({})
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
@@ -140,7 +141,7 @@ class ServiceTest(unittest.TestCase):
                 hostname='name.domain.tld',
                 client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({})
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -150,7 +151,7 @@ class ServiceTest(unittest.TestCase):
                 domainname='domain.tld',
                 client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({})
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -160,7 +161,7 @@ class ServiceTest(unittest.TestCase):
                 domainname='domain.tld',
                 client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({})
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -202,6 +203,20 @@ class ServiceTest(unittest.TestCase):
             pass
         self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True, stream=True)
         mock_log.info.assert_called_once_with('Pulling image someimage:sometag...')
+
+    def test_parse_repository_tag(self):
+        self.assertEqual(parse_repository_tag("root"), ("root", ""))
+        self.assertEqual(parse_repository_tag("root:tag"), ("root", "tag"))
+        self.assertEqual(parse_repository_tag("user/repo"), ("user/repo", ""))
+        self.assertEqual(parse_repository_tag("user/repo:tag"), ("user/repo", "tag"))
+        self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", ""))
+        self.assertEqual(parse_repository_tag("url:5000/repo:tag"), ("url:5000/repo", "tag"))
+
+    def test_latest_is_used_when_tag_is_not_specified(self):
+        service = Service('foo', client=self.mock_client, image='someimage')
+        Container.create = mock.Mock()
+        service.create_container()
+        self.assertEqual(Container.create.call_args[1]['image'], 'someimage:latest')
 
 
 class ServiceVolumesTest(unittest.TestCase):
