@@ -14,3 +14,9 @@ class DockerClientTestCase(unittest.TestCase):
         with mock.patch.dict(os.environ):
             del os.environ['HOME']
             docker_client.docker_client()
+
+    def test_docker_client_with_custom_timeout(self):
+        with mock.patch.dict(os.environ):
+            os.environ['DOCKER_CLIENT_TIMEOUT'] = timeout = "300"
+            client = docker_client.docker_client()
+        self.assertEqual(client._timeout, int(timeout))

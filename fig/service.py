@@ -15,7 +15,30 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'env_file', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir', 'restart', 'cap_add', 'cap_drop']
+DOCKER_CONFIG_KEYS = [
+    'cap_add',
+    'cap_drop',
+    'command',
+    'detach',
+    'dns',
+    'domainname',
+    'entrypoint',
+    'env_file',
+    'environment',
+    'hostname',
+    'image',
+    'mem_limit',
+    'net',
+    'ports',
+    'privileged',
+    'restart',
+    'stdin_open',
+    'tty',
+    'user',
+    'volumes',
+    'volumes_from',
+    'working_dir',
+]
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -337,7 +360,9 @@ class Service(object):
         return volumes_from
 
     def _get_container_create_options(self, override_options, one_off=False):
-        container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)
+        container_options = dict(
+            (k, self.options[k])
+            for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
         container_options['name'] = self._next_container_name(
