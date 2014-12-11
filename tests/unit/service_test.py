@@ -271,6 +271,7 @@ class ServiceEnvironmentTest(unittest.TestCase):
         service = Service('foo',
                 environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='],
                 client=self.mock_client,
+                image='image_name',
             )
         options = service._get_container_create_options({})
         self.assertEqual(
@@ -286,6 +287,7 @@ class ServiceEnvironmentTest(unittest.TestCase):
         service = Service('foo',
                 environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None},
                 client=self.mock_client,
+                image='image_name',
             )
         options = service._get_container_create_options({})
         self.assertEqual(
@@ -297,6 +299,7 @@ class ServiceEnvironmentTest(unittest.TestCase):
         service = Service('foo',
                 env_file='tests/fixtures/env/one.env',
                 client=self.mock_client,
+                image='image_name',
             )
         options = service._get_container_create_options({})
         self.assertEqual(
@@ -308,6 +311,7 @@ class ServiceEnvironmentTest(unittest.TestCase):
         service = Service('foo',
                 env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'],
                 client=self.mock_client,
+                image='image_name',
             )
         options = service._get_container_create_options({})
         self.assertEqual(
@@ -323,6 +327,7 @@ class ServiceEnvironmentTest(unittest.TestCase):
         service = Service('foo',
                 env_file=['tests/fixtures/env/resolve.env'],
                 client=self.mock_client,
+                image='image_name',
             )
         options = service._get_container_create_options({})
         self.assertEqual(
