@@ -165,23 +165,21 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_get_container_not_found(self):
-        mock_client = mock.create_autospec(docker.Client)
-        mock_client.containers.return_value = []
-        service = Service('foo', client=mock_client)
+        self.mock_client.containers.return_value = []
+        service = Service('foo', client=self.mock_client)
 
         self.assertRaises(ValueError, service.get_container)
 
     @mock.patch('fig.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
-        mock_client = mock.create_autospec(docker.Client)
         container_dict = dict(Name='default_foo_2')
-        mock_client.containers.return_value = [container_dict]
-        service = Service('foo', client=mock_client)
+        self.mock_client.containers.return_value = [container_dict]
+        service = Service('foo', client=self.mock_client)
 
         container = service.get_container(number=2)
         self.assertEqual(container, mock_container_class.from_ps.return_value)
         mock_container_class.from_ps.assert_called_once_with(
-            mock_client, container_dict)
+            self.mock_client, container_dict)
 
     @mock.patch('fig.service.log', autospec=True)
     def test_pull_image(self, mock_log):
