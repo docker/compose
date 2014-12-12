@@ -184,16 +184,11 @@ class Project(object):
             net_name = get_service_name_from_net(service_dict.get('net'))
 
             if net_name:
-                net = []
                 try:
-                    service = self.get_service(net_name)
-                    net.append(service)
-                    del service_dict['net']
-                    return net
+                    net = self.get_service(net_name)
                 except NoSuchService:
                     try:
-                        container = Container.from_id(self.client, net_name)
-                        net.append(container)
+                        net = Container.from_id(self.client, net_name)
                     except APIError:
                         raise ConfigurationError('Serivce "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
             else:
@@ -256,10 +251,11 @@ class Project(object):
                 if service.has_container(container, one_off=one_off)]
 
     def _inject_deps(self, acc, service):
-        dep_names = service.get_linked_names() + \
-            service.get_volumes_from_names() + \
-            service.get_net_names() + \
-            service.get_depends_on_names()
+        net_name = service.get_net_name()
+        dep_names = (service.get_linked_names() +
+                     service.get_volumes_from_names() +
+                     ([net_name] if net_name else []) +
+                     service.get_depends_on_names())
 
         if len(dep_names) > 0:
             dep_services = self.get_services(

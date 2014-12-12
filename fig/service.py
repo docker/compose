@@ -73,7 +73,7 @@ class Service(object):
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.depends_on = depends_on or []
-        self.net = net or ''
+        self.net = net or None
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -293,11 +293,11 @@ class Service(object):
     def get_depends_on_names(self):
         return [s.name for s in self.depends_on]
 
-    def get_net_names(self):
-        if isinstance(self.net, list):
-            return [s.name for s in self.net if isinstance(s, Service)]
+    def get_net_name(self):
+        if isinstance(self.net, Service):
+            return self.net.name
         else:
-            return []
+            return
 
     def _next_container_name(self, all_containers, one_off=False):
         bits = [self.project, self.name]
@@ -328,7 +328,10 @@ class Service(object):
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
                 containers = volume_source.containers(stopped=True)
-                volumes_from.extend(map(attrgetter('id'), containers))
+                if not containers:
+                    volumes_from.append(volume_source.create_container().id)
+                else:
+                    volumes_from.extend(map(attrgetter('id'), containers))
 
             elif isinstance(volume_source, Container):
                 volumes_from.append(volume_source.id)
@@ -339,17 +342,18 @@ class Service(object):
         return volumes_from
 
     def _get_net(self):
-        net = 'bridge'
-        if isinstance(self.net, list):
-            net_source = self.net[0]
-            if isinstance(net_source, Service):
-                if len(net_source.containers()) > 0:
-                    container = net_source.containers()[0]
-                    net = 'container:' + container.id
-                else:
-                    net = 'bridge'
-            elif isinstance(net_source, Container):
-                net = 'container:' + net_source.id
+        if not self.net:
+            return "bridge"
+
+        if isinstance(self.net, Service):
+            containers = self.net.containers()
+            if len(containers) > 0:
+                net = 'container:' + containers[0].id
+            else:
+                log.warning("Warning: Service %s is trying to use reuse the network stack of another service that is not running." % (self.net.name))
+                net = None
+        elif isinstance(self.net, Container):
+            net = 'container:' + self.net.id
         else:
             net = self.net
 
