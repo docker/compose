@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
+from os import path
 
 from fig import Service
 from fig.service import CannotBeScaledError
@@ -95,10 +96,20 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('/var/db', container.inspect()['Volumes'])
 
     def test_create_container_with_specified_volume(self):
-        service = self.create_service('db', volumes=['/tmp:/host-tmp'])
+        host_path = '/tmp/host-path'
+        container_path = '/container-path'
+
+        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
         container = service.create_container()
         service.start_container(container)
-        self.assertIn('/host-tmp', container.inspect()['Volumes'])
+
+        volumes = container.inspect()['Volumes']
+        self.assertIn(container_path, volumes)
+
+        # Match the last component ("host-path"), because boot2docker symlinks /tmp
+        actual_host_path = volumes[container_path]
+        self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
+            msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
