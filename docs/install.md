@@ -25,3 +25,22 @@ Releases are available for OS X and 64-bit Linux. Fig is also available as a Pyt
     $ sudo pip install -U fig
 
 That should be all you need! Run `fig --version` to see if it worked.
+
+Development version
+-------------------
+
+To install the very latest development version of fig use
+python-pip to install directly from github
+
+
+    sudo pip install git+https://github.com/docker/fig.git@master#egg=fig-master
+
+
+or you can build a binary yourself
+
+    git clone https://github.com/docker/fig.git
+    cd fig
+    # set the version to .dev
+    sed -i -e "s/__version__ = '\(.*\)'/__version__ = '\1.dev'/" fig/__init__.py
+    ./script/build-osx # or ./script/build-linux
+    ls dist/ 
