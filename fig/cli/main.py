@@ -171,7 +171,8 @@ class TopLevelCommand(Command):
         """
         service = project.get_service(options['SERVICE'])
         try:
-            container = service.get_container(number=options.get('--index') or 1)
+            container = service.get_container(
+                number=int(options.get('--index') or 1))
         except ValueError as e:
             raise UserError(str(e))
         print(container.get_local_port(
