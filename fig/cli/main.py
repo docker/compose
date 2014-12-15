@@ -117,7 +117,7 @@ class TopLevelCommand(Command):
             --pull      Attempt to pull the image even if an older image exists locally
         """
         no_cache = bool(options.get('--no-cache', False))
-        pull = bool(options.get('--pul', False))
+        pull = bool(options.get('--pull', False))
         project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull)
 
     def help(self, project, options):
