@@ -70,7 +70,7 @@ class Command(DocoptCommand):
     def get_config(self, config_path):
         try:
             with open(config_path, 'r') as fh:
-                if config_path.endswith('json'):
+                if config_path.endswith('.json'):
                     return json.load(fh)
                 else:
                     return yaml.safe_load(fh)
