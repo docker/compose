@@ -34,7 +34,7 @@ class CLITestCase(unittest.TestCase):
         command.base_dir = 'tests/fixtures/json-figfile'
         project_name = command.get_project_name(command.get_config_path())
         self.assertEquals('jsonfigfile', project_name)
-        self.assertEqual(command.get_config_path(), 'fig.json')
+        self.assertEqual(command.get_config_path(), os.path.join(command.base_dir, 'fig.json'))
         expected = {
             "simple": {
                 "image": "busybox:latest",
