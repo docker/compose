@@ -1,11 +1,13 @@
 from __future__ import absolute_import
 import sys
 
+from docker.errors import APIError
 from six import StringIO
 from mock import patch
 
 from .testcases import DockerClientTestCase
 from fig.cli.main import TopLevelCommand
+
 
 
 class CLITestCase(DockerClientTestCase):
@@ -216,6 +218,21 @@ class CLITestCase(DockerClientTestCase):
             container.human_readable_command,
             u'/bin/echo helloworld'
         )
+
+    @patch('dockerpty.start')
+    def test_run_service_with_user_overridden(self, _):
+        name = 'service'
+        self.command.base_dir = 'tests/fixtures/user-figfile'
+        # NOTE(chmou): available in default busybox and has a shell
+        user = 'sshd'
+        args = ['run', '--user', user, name]
+
+        self.command.dispatch(args, None)
+
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        container.inspect()
+        self.assertEqual(user, container.dictionary['Config']['User'])
 
     @patch('dockerpty.start')
     def test_run_service_with_environement_overridden(self, _):
