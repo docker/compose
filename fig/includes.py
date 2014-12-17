@@ -53,6 +53,30 @@ def get_project_from_http(url, config):
     return read_config(response.text)
 
 
+# Return the connection from a function, so it can be mocked in tests
+def get_boto_conn():
+    # Local import so that boto is only a dependency if it's used
+    import boto.s3.connection
+    return boto.s3.connection.S3Connection()
+
+
+def get_project_from_s3(url):
+    import boto.exception
+    try:
+        conn = get_boto_conn()
+        bucket = conn.get_bucket(url.netloc)
+    except (boto.exception.BotoServerError, boto.exception.BotoClientError) as e:
+        raise FetchExternalConfigError(
+            "Failed to include %s: %s" % (url.geturl(), e))
+
+    key = bucket.get_key(url.path)
+    if not key:
+        raise FetchExternalConfigError(
+            "Failed to include %s: Not Found" % url.geturl())
+
+    return read_config(key.get_contents_as_string())
+
+
 def fetch_external_config(url, include_config):
     log.info("Fetching config from %s" % url.geturl())
 
@@ -61,6 +85,9 @@ def fetch_external_config(url, include_config):
 
     if url.scheme == 'file':
         return get_project_from_file(url)
+
+    if url.scheme == 's3':
+        return get_project_from_s3(url)
 
     raise ConfigError("Unsupported url scheme \"%s\" for %s." % (
         url.scheme,

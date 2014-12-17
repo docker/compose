@@ -449,6 +449,5 @@ def assert_has_links_and_volumes(
     if expected_links is not None:
         assert expected_links.issubset(set(container.links()))
 
-    # TODO: use container.get()
     if expected_volumes is not None:
-        assert expected_volumes == container.inspect()['VolumesRW'].keys()
+        assert expected_volumes == container.get('Volumes').keys()
