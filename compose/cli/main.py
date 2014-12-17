@@ -337,8 +337,14 @@ class TopLevelCommand(Command):
             service.start_container(container, ports=service_ports, one_off=True)
             print(container.name)
         else:
-            service.start_container(container, ports=service_ports, one_off=True)
-            dockerpty.start(project.client, container.id, interactive=not options['-T'])
+            dockerpty.PseudoTerminal(
+                project.client,
+                container.id,
+                interactive=not options['-T']
+            ).start(
+                **service.get_start_options(container, ports=service_ports, one_off=True)
+            )
+
             exit_code = container.wait()
             if options['--rm']:
                 log.info("Removing %s..." % container.name)

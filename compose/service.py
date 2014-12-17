@@ -304,7 +304,7 @@ class Service(object):
             log.info("Starting %s..." % container.name)
             return self.start_container(container, **options)
 
-    def start_container(self, container, intermediate_container=None, **override_options):
+    def get_start_options(self, container, intermediate_container=None, **override_options):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
 
@@ -322,7 +322,7 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
-        container.start(
+        return dict(
             links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=port_bindings,
             binds=volume_bindings,
@@ -333,7 +333,14 @@ class Service(object):
             dns_search=dns_search,
             restart_policy=restart,
             cap_add=cap_add,
-            cap_drop=cap_drop,
+            cap_drop=cap_drop
+        )
+
+    def start_container(self, container, intermediate_container=None, **override_options):
+        container = container or self.create_container(**override_options)
+
+        container.start(
+            **self.get_start_options(container, intermediate_container, **override_options)
         )
         return container
 

@@ -192,7 +192,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
-    @patch('dockerpty.start')
+    @patch('dockerpty.PseudoTerminal')
     def test_run_without_command(self, __):
         self.command.base_dir = 'tests/fixtures/commands-composefile'
         self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
@@ -216,7 +216,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    @patch('dockerpty.start')
+    @patch('dockerpty.PseudoTerminal')
     def test_run_service_with_entrypoint_overridden(self, _):
         self.command.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
         name = 'service'
