@@ -332,6 +332,14 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web')
         service.scale(1)
         self.assertEqual(len(service.containers()), 1)
+
+        # Ensure containers don't have stdout or stdin connected
+        container = service.containers()[0]
+        config = container.inspect()['Config']
+        self.assertFalse(config['AttachStderr'])
+        self.assertFalse(config['AttachStdout'])
+        self.assertFalse(config['AttachStdin'])
+
         service.scale(3)
         self.assertEqual(len(service.containers()), 3)
         service.scale(1)

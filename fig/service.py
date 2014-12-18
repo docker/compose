@@ -157,7 +157,7 @@ class Service(object):
         # Create enough containers
         containers = self.containers(stopped=True)
         while len(containers) < desired_num:
-            containers.append(self.create_container())
+            containers.append(self.create_container(detach=True))
 
         running_containers = []
         stopped_containers = []
@@ -251,6 +251,7 @@ class Service(object):
             image=container.image,
             entrypoint=['/bin/echo'],
             command=[],
+            detach=True,
         )
         intermediate_container.start(volumes_from=container.id)
         intermediate_container.wait()
@@ -303,12 +304,15 @@ class Service(object):
         )
         return container
 
-    def start_or_create_containers(self, insecure_registry=False):
+    def start_or_create_containers(self, insecure_registry=False, detach=False):
         containers = self.containers(stopped=True)
 
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
-            new_container = self.create_container(insecure_registry=insecure_registry)
+            new_container = self.create_container(
+                insecure_registry=insecure_registry,
+                detach=detach
+            )
             return [self.start_container(new_container)]
         else:
             return [self.start_container_if_stopped(c) for c in containers]
