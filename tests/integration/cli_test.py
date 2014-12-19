@@ -237,6 +237,43 @@ class CLITestCase(DockerClientTestCase):
         # make sure a value with a = don't crash out
         self.assertEqual('moto=bobo', container.environment['allo'])
 
+    @patch('dockerpty.start')
+    def test_run_service_without_map_ports(self, __):
+        # create one off container
+        self.command.base_dir = 'tests/fixtures/ports-figfile'
+        self.command.dispatch(['run', '-d', 'simple'], None)
+        container = self.project.get_service('simple').containers(one_off=True)[0]
+
+        # get port information
+        port_random = container.get_local_port(3000)
+        port_assigned = container.get_local_port(3001)
+
+        # close all one off containers we just created
+        container.stop()
+
+        # check the ports
+        self.assertEqual(port_random, None)
+        self.assertEqual(port_assigned, None)
+
+    @patch('dockerpty.start')
+    def test_run_service_with_map_ports(self, __):
+        # create one off container
+        self.command.base_dir = 'tests/fixtures/ports-figfile'
+        self.command.dispatch(['run', '-d', '--service-ports', 'simple'], None)
+        container = self.project.get_service('simple').containers(one_off=True)[0]
+
+        # get port information
+        port_random = container.get_local_port(3000)
+        port_assigned = container.get_local_port(3001)
+
+        # close all one off containers we just created
+        container.stop()
+
+        # check the ports
+        self.assertNotEqual(port_random, None)
+        self.assertIn("0.0.0.0", port_random)
+        self.assertEqual(port_assigned, "0.0.0.0:9999")
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
