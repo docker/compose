@@ -21,6 +21,7 @@ DOCKER_CONFIG_KEYS = [
     'command',
     'detach',
     'dns',
+    'dns_search',
     'domainname',
     'entrypoint',
     'env_file',
@@ -284,6 +285,7 @@ class Service(object):
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
+        dns_search = options.get('dns_search', None)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
 
@@ -297,6 +299,7 @@ class Service(object):
             privileged=privileged,
             network_mode=net,
             dns=dns,
+            dns_search=dns_search,
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
@@ -407,7 +410,7 @@ class Service(object):
             container_options['image'] = self._get_image_name(container_options['image'])
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns', 'restart', 'cap_add', 'cap_drop', 'env_file']:
+        for key in ['privileged', 'net', 'dns', 'dns_search', 'restart', 'cap_add', 'cap_drop', 'env_file']:
             if key in container_options:
                 del container_options[key]
 
