@@ -447,7 +447,7 @@ class Service(object):
                     image_id = match.group(1)
 
         if image_id is None:
-            raise BuildError(self)
+            raise BuildError(self, 'Build failed.')
 
         return image_id
 
