@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-
+from .utils import *
 import six
 
 
@@ -23,9 +23,7 @@ class Container(object):
             'Id': dictionary['Id'],
             'Image': dictionary['Image'],
         }
-        for name in dictionary.get('Names', []):
-            if len(name.split('/')) == 2:
-                new_dictionary['Name'] = name
+        new_dictionary['Name'] = find_container_name_with_host(dictionary.get('Names', []));
         return cls(client, new_dictionary, **kwargs)
 
     @classmethod
@@ -34,6 +32,8 @@ class Container(object):
 
     @classmethod
     def create(cls, client, **options):
+        if is_cluster_mode():
+            options['detach'] = True
         response = client.create_container(**options)
         return cls.from_id(client, response['Id'])
 
@@ -150,11 +150,12 @@ class Container(object):
 
     def links(self):
         links = []
-        for container in self.client.containers():
+        prefix = self.name + '/'
+        for container in self.client.containers():            
             for name in container['Names']:
-                bits = name.split('/')
-                if len(bits) > 2 and bits[1] == self.name:
-                    links.append(bits[2])
+                if name.startswith(prefix) :
+                    links.append(name[prefix.length + 1:])
+        print links
         return links
 
     def attach(self, *args, **kwargs):

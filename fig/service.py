@@ -11,6 +11,7 @@ from docker.errors import APIError
 
 from .container import Container
 from .progress_stream import stream_output, StreamOutputError
+from .utils import *
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,6 @@ VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
-
 
 class Service(object):
     def __init__(self, name, client=None, project='default', links=None, volumes_from=None, **options):
@@ -329,20 +329,23 @@ class Service(object):
         numbers = [parse_name(c.name).number for c in all_containers]
         return 1 if not numbers else max(numbers) + 1
 
+    
     def _get_links(self, link_to_self):
         links = []
         for service, link_name in self.links:
             for container in service.containers():
-                links.append((container.name, link_name or service.name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                container_name = get_container_name_without_host(container.name)
+                links.append((container_name, link_name or service.name))
+                links.append((container_name, container_name))
+                links.append((container_name, container.name_without_project))
         if link_to_self:
             for container in self.containers():
-                links.append((container.name, self.name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                container_name = get_container_name_without_host(container.name)
+                links.append((container_name, self.name))
+                links.append((container_name, container_name))
+                links.append((container_name, container.name_without_project))
         return links
-
+    
     def _get_volumes_from(self, intermediate_container=None):
         volumes_from = []
         for volume_source in self.volumes_from:
@@ -502,9 +505,7 @@ def get_container_name(container):
     if 'Name' in container:
         return container['Name']
     # ps
-    for name in container['Names']:
-        if len(name.split('/')) == 2:
-            return name[1:]
+    return find_container_name(container['Names'])
 
 
 def parse_restart_spec(restart_config):
