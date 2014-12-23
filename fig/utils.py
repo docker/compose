@@ -1,6 +1,5 @@
 from cli import docker_client
 
-
 cluster_mode = None
 
 def find_container_name(names):
@@ -14,8 +13,11 @@ def find_container_name(names):
                 return values[1]
 
 def find_container_name_with_host(names):
+    n = 2
+    if is_cluster_mode():
+        n = 3
     for name in names:
-        if len(name.split('/')) == 3:
+        if len(name.split('/')) == n:
             return name
 
 def get_container_name_without_host(name):
@@ -30,9 +32,8 @@ def is_cluster_mode():
         info = docker_client.docker_client().info()
         driverStatus = info['DriverStatus']
         for status in driverStatus:
-            print status
             if isinstance(status, list) and status[0] == u'\x08Nodes':
                 cluster_mode = True
                 break
-
     return cluster_mode
+
