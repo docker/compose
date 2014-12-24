@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
+from os import path
 
 from fig import Service
 from fig.service import CannotBeScaledError
@@ -95,10 +96,20 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('/var/db', container.inspect()['Volumes'])
 
     def test_create_container_with_specified_volume(self):
-        service = self.create_service('db', volumes=['/tmp:/host-tmp'])
+        host_path = '/tmp/host-path'
+        container_path = '/container-path'
+
+        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
         container = service.create_container()
         service.start_container(container)
-        self.assertIn('/host-tmp', container.inspect()['Volumes'])
+
+        volumes = container.inspect()['Volumes']
+        self.assertIn(container_path, volumes)
+
+        # Match the last component ("host-path"), because boot2docker symlinks /tmp
+        actual_host_path = volumes[container_path]
+        self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
+            msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
@@ -365,6 +376,37 @@ class ServiceTest(DockerClientTestCase):
         container = service.start_container().inspect()
         self.assertEqual(container['HostConfig']['Dns'], ['8.8.8.8', '9.9.9.9'])
 
+    def test_restart_always_value(self):
+        service = self.create_service('web', restart='always')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'always')
+
+    def test_restart_on_failure_value(self):
+        service = self.create_service('web', restart='on-failure:5')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
+        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 5)
+
+    def test_cap_add_list(self):
+        service = self.create_service('web', cap_add=['SYS_ADMIN', 'NET_ADMIN'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['CapAdd'], ['SYS_ADMIN', 'NET_ADMIN'])
+
+    def test_cap_drop_list(self):
+        service = self.create_service('web', cap_drop=['SYS_ADMIN', 'NET_ADMIN'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['CapDrop'], ['SYS_ADMIN', 'NET_ADMIN'])
+
+    def test_dns_search_single_value(self):
+        service = self.create_service('web', dns_search='example.com')
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['DnsSearch'], ['example.com'])
+
+    def test_dns_search_list(self):
+        service = self.create_service('web', dns_search=['dc1.example.com', 'dc2.example.com'])
+        container = service.start_container().inspect()
+        self.assertEqual(container['HostConfig']['DnsSearch'], ['dc1.example.com', 'dc2.example.com'])
+
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container().inspect()
@@ -374,6 +416,12 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
         env = service.start_container().environment
         for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.iteritems():
+            self.assertEqual(env[k], v)
+
+    def test_env_from_file_combined_with_env(self):
+        service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
+        env = service.start_container().environment
+        for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.iteritems():
             self.assertEqual(env[k], v)
 
     def test_resolve_env(self):

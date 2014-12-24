@@ -120,6 +120,21 @@ environment:
   - SESSION_SECRET
 ```
 
+### env_file
+
+Add environment variables from a file. Can be a single value or a list.
+
+Environment variables specified in `environment` override these values.
+
+```
+env_file:
+  - .env
+```
+
+```
+RACK_ENV: development
+```
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.
@@ -142,7 +157,32 @@ dns:
   - 9.9.9.9
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged
+### cap_add, cap_drop
+
+Add or drop container capabilities.
+See `man 7 capabilities` for a full list.
+
+```
+cap_add:
+  - ALL
+
+cap_drop:
+  - NET_ADMIN
+  - SYS_ADMIN
+```
+
+### dns_search
+
+Custom DNS search domains. Can be a single value or a list.
+
+```
+dns_search: example.com
+dns_search:
+  - dc1.example.com
+  - dc2.example.com
+```
+
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.
 
@@ -156,4 +196,6 @@ domainname: foo.com
 
 mem_limit: 1000000000
 privileged: true
+
+restart: always
 ```

@@ -278,6 +278,8 @@ class TopLevelCommand(Command):
             -e KEY=VAL            Set an environment variable (can be used multiple times)
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
+            --service-ports       Run command with the service's ports enabled and mapped
+                                  to the host.
             -T                    Disable pseudo-tty allocation. By default `fig run`
                                   allocates a TTY.
         """
@@ -293,6 +295,7 @@ class TopLevelCommand(Command):
                     service_names=deps,
                     start_deps=True,
                     recreate=False,
+                    insecure_registry=insecure_registry,
                 )
 
         tty = True
@@ -324,11 +327,15 @@ class TopLevelCommand(Command):
             insecure_registry=insecure_registry,
             **container_options
         )
+
+        service_ports = None
+        if options['--service-ports']:
+            service_ports = service.options['ports']
         if options['-d']:
-            service.start_container(container, ports=None, one_off=True)
+            service.start_container(container, ports=service_ports, one_off=True)
             print(container.name)
         else:
-            service.start_container(container, ports=None, one_off=True)
+            service.start_container(container, ports=service_ports, one_off=True)
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:

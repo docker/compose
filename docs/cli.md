@@ -77,7 +77,7 @@ For example:
 
 By default, linked services will be started, unless they are already running.
 
-One-off commands are started in new containers with the same config as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and no ports will be created in case they collide.
+One-off commands are started in new containers with the same config as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and by default no ports will be created in case they collide.
 
 Links are also created between one-off commands and the other containers for that service so you can do stuff like this:
 
@@ -86,6 +86,9 @@ Links are also created between one-off commands and the other containers for tha
 If you do not want linked containers to be started when running the one-off command, specify the `--no-deps` flag:
 
     $ fig run --no-deps web python manage.py shell
+
+If you want the service's ports to be created and mapped to the host, specify the `--service-ports` flag:
+	$ fig run --service-ports web python manage.py shell
 
 ### scale
 

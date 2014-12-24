@@ -15,7 +15,31 @@ from .progress_stream import stream_output, StreamOutputError
 log = logging.getLogger(__name__)
 
 
-DOCKER_CONFIG_KEYS = ['image', 'command', 'hostname', 'domainname', 'user', 'detach', 'stdin_open', 'tty', 'mem_limit', 'ports', 'environment', 'dns', 'volumes', 'entrypoint', 'privileged', 'volumes_from', 'net', 'working_dir']
+DOCKER_CONFIG_KEYS = [
+    'cap_add',
+    'cap_drop',
+    'command',
+    'detach',
+    'dns',
+    'dns_search',
+    'domainname',
+    'entrypoint',
+    'env_file',
+    'environment',
+    'hostname',
+    'image',
+    'mem_limit',
+    'net',
+    'ports',
+    'privileged',
+    'restart',
+    'stdin_open',
+    'tty',
+    'user',
+    'volumes',
+    'volumes_from',
+    'working_dir',
+]
 DOCKER_CONFIG_HINTS = {
     'link'      : 'links',
     'port'      : 'ports',
@@ -262,6 +286,11 @@ class Service(object):
 
         privileged = options.get('privileged', False)
         dns = options.get('dns', None)
+        dns_search = options.get('dns_search', None)
+        cap_add = options.get('cap_add', None)
+        cap_drop = options.get('cap_drop', None)
+
+        restart = parse_restart_spec(options.get('restart', None))
 
         container.start(
             links=self._get_links(link_to_self=options.get('one_off', False)),
@@ -271,6 +300,10 @@ class Service(object):
             privileged=privileged,
             network_mode=self._get_net(),
             dns=dns,
+            dns_search=dns_search,
+            restart_policy=restart,
+            cap_add=cap_add,
+            cap_drop=cap_drop,
         )
         return container
 
@@ -360,7 +393,9 @@ class Service(object):
         return net
 
     def _get_container_create_options(self, override_options, one_off=False):
-        container_options = dict((k, self.options[k]) for k in DOCKER_CONFIG_KEYS if k in self.options)
+        container_options = dict(
+            (k, self.options[k])
+            for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
         container_options['name'] = self._next_container_name(
@@ -395,22 +430,27 @@ class Service(object):
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
-        if 'environment' in container_options:
-            if isinstance(container_options['environment'], list):
-                container_options['environment'] = dict(split_env(e) for e in container_options['environment'])
-            container_options['environment'] = dict(resolve_env(k, v) for k, v in container_options['environment'].iteritems())
+        container_options['environment'] = merge_environment(container_options)
 
         if self.can_be_built():
             if len(self.client.images(name=self._build_tag_name())) == 0:
                 self.build()
             container_options['image'] = self._build_tag_name()
+        else:
+            container_options['image'] = self._get_image_name(container_options['image'])
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns']:
+        for key in ['privileged', 'net', 'dns', 'dns_search', 'restart', 'cap_add', 'cap_drop', 'env_file']:
             if key in container_options:
                 del container_options[key]
 
         return container_options
+
+    def _get_image_name(self, image):
+        repo, tag = parse_repository_tag(image)
+        if tag == "":
+            tag = "latest"
+        return '%s:%s' % (repo, tag)
 
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
@@ -458,9 +498,10 @@ class Service(object):
 
     def pull(self, insecure_registry=False):
         if 'image' in self.options:
-            log.info('Pulling %s (%s)...' % (self.name, self.options.get('image')))
+            image_name = self._get_image_name(self.options['image'])
+            log.info('Pulling %s (%s)...' % (self.name, image_name))
             self.client.pull(
-                self.options.get('image'),
+                image_name,
                 insecure_registry=insecure_registry
             )
 
@@ -496,6 +537,22 @@ def get_container_name(container):
             return name[1:]
 
 
+def parse_restart_spec(restart_config):
+    if not restart_config:
+        return None
+    parts = restart_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Restart %s has incorrect format, should be "
+                          "mode[:max_retry]" % restart_config)
+    if len(parts) == 2:
+        name, max_retry_count = parts
+    else:
+        name, = parts
+        max_retry_count = 0
+
+    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+
 def parse_volume_spec(volume_config):
     parts = volume_config.split(':')
     if len(parts) > 3:
@@ -514,6 +571,15 @@ def parse_volume_spec(volume_config):
                           "one of: rw, ro." % (volume_config, mode))
 
     return VolumeSpec(external, internal, mode)
+
+
+def parse_repository_tag(s):
+    if ":" not in s:
+        return s, ""
+    repo, tag = s.rsplit(":", 1)
+    if "/" in tag:
+        return s, ""
+    return repo, tag
 
 
 def build_volume_binding(volume_spec):
@@ -550,6 +616,25 @@ def split_port(port):
     return internal_port, (external_ip, external_port or None)
 
 
+def merge_environment(options):
+    env = {}
+
+    if 'env_file' in options:
+        if isinstance(options['env_file'], list):
+            for f in options['env_file']:
+                env.update(env_vars_from_file(f))
+        else:
+            env.update(env_vars_from_file(options['env_file']))
+
+    if 'environment' in options:
+        if isinstance(options['environment'], list):
+            env.update(dict(split_env(e) for e in options['environment']))
+        else:
+            env.update(options['environment'])
+
+    return dict(resolve_env(k, v) for k, v in env.iteritems())
+
+
 def split_env(env):
     if '=' in env:
         return env.split('=', 1)
@@ -564,3 +649,16 @@ def resolve_env(key, val):
         return key, os.environ[key]
     else:
         return key, ''
+
+
+def env_vars_from_file(filename):
+    """
+    Read in a line delimited file of environment variables.
+    """
+    env = {}
+    for line in open(filename, 'r'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            k, v = split_env(line)
+            env[k] = v
+    return env
