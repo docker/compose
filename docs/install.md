@@ -20,6 +20,8 @@ Next, install Fig:
 
     curl -L https://github.com/docker/fig/releases/download/1.0.1/fig-`uname -s`-`uname -m` > /usr/local/bin/fig; chmod +x /usr/local/bin/fig
 
+Optionally, install [command completion](completion.html) for the bash shell.
+
 Releases are available for OS X and 64-bit Linux. Fig is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
 
     $ sudo pip install -U fig
