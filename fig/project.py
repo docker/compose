@@ -1,17 +1,28 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from itertools import chain
 import logging
+from operator import (
+    attrgetter,
+    itemgetter,
+)
 
-from .service import Service
-from .container import Container
 from docker.errors import APIError
+import six
+
+from fig import includes
+from fig.service import (
+    Service,
+    ServiceLink,
+)
+from fig.container import Container
 
 log = logging.getLogger(__name__)
 
 
 def sort_service_dicts(services):
     # Topological sort (Cormen/Tarjan algorithm).
-    unmarked = services[:]
+    unmarked = sorted(services, key=itemgetter('name'))
     temporary_marked = set()
     sorted_services = []
 
@@ -44,44 +55,84 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client):
+    def __init__(self, name, services, client, namespace=None, external_projects=None):
         self.name = name
         self.services = services
         self.client = client
+        # The top level project name is the namespace for included projects
+        self.namespace = namespace or name
+        self.external_projects = external_projects or []
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, service_dicts, client, namespace, external_projects):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
-        project = cls(name, [], client)
+        project = cls(name, [], client, namespace, external_projects)
         for service_dict in sort_service_dicts(service_dicts):
-            links = project.get_links(service_dict)
+            links = project.get_links(service_dict.pop('links', None),
+                                      service_dict['name'])
             volumes_from = project.get_volumes_from(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
+            project.services.append(
+                Service(client=client,
+                        project=name,
+                        links=links,
+                        volumes_from=volumes_from,
+                        **service_dict))
         return project
 
     @classmethod
-    def from_config(cls, name, config, client):
-        dicts = []
+    def from_config(cls, name, config, client, namespace=None, project_cache=None):
+        services = []
+        project_config = config.pop('project-config', {})
+        external_projects = get_external_projects(
+            project_config.pop('include', {}),
+            project_config.pop('cache', {}),
+            client,
+            name,
+            project_cache)
+
         for service_name, service in list(config.items()):
             if not isinstance(service, dict):
-                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.' % service_name)
+                raise ConfigurationError(
+                    'Service "%s" doesn\'t have any configuration options. '
+                    'All top level keys in your fig.yml must map to a '
+                    'dictionary of configuration options.' % service_name)
             service['name'] = service_name
-            dicts.append(service)
-        return cls.from_dicts(name, dicts, client)
+            services.append(service)
+        return cls.from_dicts(name, services, client, namespace, external_projects)
 
     def get_service(self, name):
+        """Retrieve a service by name.
+
+        :param name: name of the service
+        :returns: :class:`fig.service.Service`
+        :raises NoSuchService: if no service was found by that name
         """
-        Retrieve a service by name. Raises NoSuchService
-        if the named service does not exist.
-        """
-        for service in self.services:
-            if service.name == name:
-                return service
+        if '_' in name:
+            project_name, service_name = name.rsplit('_', 1)
+            if project_name != self.namespace:
+                # References (link, etc) do not contain the namespace, so add it
+                project_name = self.namespace + project_name
+        else:
+            project_name, service_name = self.name, name
+
+        if project_name == self.name:
+            for service in self.services:
+                if service.name == service_name:
+                    return service
+
+        for project in self.external_projects:
+            if project.name == project_name:
+                return project.get_service(service_name)
 
         raise NoSuchService(name)
+
+    @property
+    def all_services(self):
+        return (flat_map(attrgetter('services'), self.external_projects) +
+                self.services)
 
     def get_services(self, service_names=None, include_links=False):
         """
@@ -220,6 +271,32 @@ class Project(object):
 
 def flat_map(func, seq):
     return list(chain.from_iterable(map(func, seq)))
+
+
+def get_external_projects(
+        includes_config,
+        cache_config,
+        client,
+        project_name,
+        project_cache):
+    """Recursively fetch included projects.
+
+    Cache each external project by url. If a project is encountered with the
+    same url the same instance of :class:`Project` will be returned.
+    """
+    def build_project(name, *args, **kwargs):
+        name = '%s%s' % (project_name, name)
+        kwargs['namespace'] = project_name
+        return Project.from_config(name, *args, **kwargs)
+
+    if project_cache is None:
+        project_cache = includes.ExternalProjectCache(
+            includes.LocalConfigCache.from_config(cache_config),
+            client,
+            build_project)
+
+    return [project_cache.get_project_from_include(*item)
+            for item in six.iteritems(includes_config)]
 
 
 class NoSuchService(Exception):
