@@ -148,6 +148,7 @@ class Container(object):
         self.has_been_inspected = True
         return self.dictionary
 
+    # TODO: this is only used by tests, should move to a module under tests/
     def links(self):
         links = []
         for container in self.client.containers():

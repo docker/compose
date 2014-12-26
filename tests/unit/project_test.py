@@ -65,7 +65,7 @@ class ProjectTest(unittest.TestCase):
                 'web': 'busybox:latest',
             }, None)
 
-    def test_get_service(self):
+    def test_get_service_no_external(self):
         web = Service(
             project='figtest',
             name='web',
@@ -74,6 +74,24 @@ class ProjectTest(unittest.TestCase):
         )
         project = Project('test', [web], None)
         self.assertEqual(project.get_service('web'), web)
+
+    def test_get_service_with_project_name(self):
+        web = Service( project='figtest', name='web')
+        project = Project('test', [web], None, None)
+        self.assertEqual(project.get_service('test_web'), web)
+
+    def test_get_service_not_found(self):
+        project = Project('test', [], None, None)
+        with self.assertRaises(NoSuchService):
+            project.get_service('not_found')
+
+    def test_get_service_from_external(self):
+        web = Service(project='test', name='web')
+        external_web = Service(project='other', name='web')
+        external_project = Project('other', [external_web], None, None)
+        project = Project('test', [web], None, [external_project])
+
+        self.assertEqual(project.get_service('other_web'), external_web)
 
     def test_get_services_returns_all_services_without_args(self):
         web = Service(
@@ -88,54 +106,58 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_services(), [web, console])
 
     def test_get_services_returns_listed_services_with_args(self):
-        web = Service(
-            project='figtest',
-            name='web',
-        )
-        console = Service(
-            project='figtest',
-            name='console',
-        )
+        web = Service(project='figtest', name='web')
+        console = Service(project='figtest', name='console')
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(['console']), [console])
 
     def test_get_services_with_include_links(self):
-        db = Service(
-            project='figtest',
-            name='db',
-        )
+        db = Service(project='figtest', name='db')
+        cache = Service( project='figtest', name='cache')
         web = Service(
             project='figtest',
             name='web',
-            links=[(db, 'database')]
-        )
-        cache = Service(
-            project='figtest',
-            name='cache'
+            links=[ServiceLink(db, 'database')]
         )
         console = Service(
             project='figtest',
             name='console',
-            links=[(web, 'web')]
+            links=[ServiceLink(web, 'web')]
         )
         project = Project('test', [web, db, cache, console], None)
-        self.assertEqual(
-            project.get_services(['console'], include_links=True),
-            [db, web, console]
-        )
+        services = project.get_services(['console'], include_links=True)
+        self.assertEqual(services, [db, web, console])
 
     def test_get_services_removes_duplicates_following_links(self):
-        db = Service(
-            project='figtest',
-            name='db',
-        )
+        db = Service(project='figtest', name='db')
         web = Service(
             project='figtest',
             name='web',
-            links=[(db, 'database')]
+            links=[ServiceLink(db, 'database')]
         )
         project = Project('test', [web, db], None)
         self.assertEqual(
             project.get_services(['web', 'db'], include_links=True),
             [db, web]
         )
+
+    def test_get_links(self):
+        db = Service(project='test', name='db')
+        other = Service(project='test', name='other')
+        project = Project('test', [db, other], None)
+        config_links = [
+            'db',
+            'db:alias',
+            'other',
+        ]
+        links = project.get_links(config_links, 'test')
+        expected = [
+            ServiceLink(db, None),
+            ServiceLink(db, 'alias'),
+            ServiceLink(other, None),
+        ]
+        self.assertEqual(links, expected)
+
+    def test_get_links_no_links(self):
+        project = Project('test', [], None)
+        self.assertEqual(project.get_links(None, None), [])

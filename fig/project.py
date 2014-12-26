@@ -97,51 +97,57 @@ class Project(object):
 
         Raises NoSuchService if any of the named services do not exist.
         """
-        if service_names is None or len(service_names) == 0:
-            return self.get_services(
-                service_names=[s.name for s in self.services],
-                include_links=include_links
-            )
-        else:
-            unsorted = [self.get_service(name) for name in service_names]
-            services = [s for s in self.services if s in unsorted]
 
-            if include_links:
-                services = reduce(self._inject_links, services, [])
+        def _add_linked_services(service):
+            linked_services = service.get_linked_services()
+            if not linked_services:
+                return [service]
 
-            uniques = []
-            [uniques.append(s) for s in services if s not in uniques]
-            return uniques
+            return flat_map(_add_linked_services, linked_services) + [service]
 
-    def get_links(self, service_dict):
-        links = []
-        if 'links' in service_dict:
-            for link in service_dict.get('links', []):
-                if ':' in link:
-                    service_name, link_name = link.split(':', 1)
-                else:
-                    service_name, link_name = link, None
-                try:
-                    links.append((self.get_service(service_name), link_name))
-                except NoSuchService:
-                    raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
-            del service_dict['links']
-        return links
+        if not service_names:
+            return self.all_services
+
+        services = [self.get_service(name) for name in service_names]
+        if include_links:
+            services = flat_map(_add_linked_services, services)
+
+        # TODO: use orderedset/ordereddict
+        uniques = []
+        [uniques.append(s) for s in services if s not in uniques]
+        return uniques
+
+    def get_links(self, config_links, name):
+        def get_linked_service(link):
+            if ':' in link:
+                service_name, link_name = link.split(':', 1)
+            else:
+                service_name, link_name = link, None
+
+            try:
+                return ServiceLink(self.get_service(service_name), link_name)
+            except NoSuchService:
+                raise ConfigurationError(
+                    'Service "%s" has a link to service "%s" which does not '
+                    'exist.' % (name, service_name))
+
+        return map(get_linked_service, config_links or [])
 
     def get_volumes_from(self, service_dict):
         volumes_from = []
-        if 'volumes_from' in service_dict:
-            for volume_name in service_dict.get('volumes_from', []):
+        for volume_name in service_dict.pop('volumes_from', []):
+            try:
+                service = self.get_service(volume_name)
+                volumes_from.append(service)
+            except NoSuchService:
                 try:
-                    service = self.get_service(volume_name)
-                    volumes_from.append(service)
-                except NoSuchService:
-                    try:
-                        container = Container.from_id(self.client, volume_name)
-                        volumes_from.append(container)
-                    except APIError:
-                        raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
-            del service_dict['volumes_from']
+                    container = Container.from_id(self.client, volume_name)
+                    volumes_from.append(container)
+                except APIError:
+                    raise ConfigurationError(
+                        'Service "%s" mounts volumes from "%s", which is not '
+                        'the name of a service or container.' % (
+                            service_dict['name'], volume_name))
         return volumes_from
 
     def start(self, service_names=None, **options):
@@ -205,19 +211,15 @@ class Project(object):
                 for service in self.get_services(service_names)
                 if service.has_container(container, one_off=one_off)]
 
-    def _inject_links(self, acc, service):
-        linked_names = service.get_linked_names()
+    def __repr__(self):
+        return "Project(%s, services=%s, includes=%s)" % (
+            self.name,
+            len(self.services),
+            len(self.external_projects))
 
-        if len(linked_names) > 0:
-            linked_services = self.get_services(
-                service_names=linked_names,
-                include_links=True
-            )
-        else:
-            linked_services = []
 
-        linked_services.append(service)
-        return acc + linked_services
+def flat_map(func, seq):
+    return list(chain.from_iterable(map(func, seq)))
 
 
 class NoSuchService(Exception):

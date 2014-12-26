@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
-from fig.project import Project, ConfigurationError
+
 from fig.container import Container
+from fig.project import Project, ConfigurationError
+from fig.service import ServiceLink
 from .testcases import DockerClientTestCase
 
 
@@ -184,7 +186,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_starts_links(self):
         console = self.create_service('console')
         db = self.create_service('db', volumes=['/var/db'])
-        web = self.create_service('web', links=[(db, 'db')])
+        web = self.create_service('web', links=[ServiceLink(db, 'db')])
 
         project = Project('figtest', [web, db, console], self.client)
         project.start()

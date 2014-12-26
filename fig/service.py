@@ -1,16 +1,18 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 from collections import namedtuple
 import logging
-import re
-import os
 from operator import attrgetter
+import os
+import re
 import sys
 
 from docker.errors import APIError
 
-from .container import Container
-from .progress_stream import stream_output, StreamOutputError
+from fig.container import Container
+from fig.progress_stream import stream_output, StreamOutputError
+
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +84,9 @@ VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
+
+
+ServiceLink = namedtuple('ServiceLink', 'service alias')
 
 
 class Service(object):
@@ -352,7 +357,10 @@ class Service(object):
             return [self.start_container_if_stopped(c) for c in containers]
 
     def get_linked_names(self):
-        return [s.name for (s, _) in self.links]
+        return [link.service.full_name for link in self.links]
+
+    def get_linked_services(self):
+        return [link.service for link in self.links]
 
     def _next_container_name(self, all_containers, one_off=False):
         bits = [self.project, self.name]
@@ -507,6 +515,12 @@ class Service(object):
                 image_name,
                 insecure_registry=insecure_registry
             )
+
+    def __repr__(self):
+        return "Service(%s, project='%s', links=%r)" % (
+            self.name,
+            self.project,
+            self.get_linked_names())
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')

@@ -11,7 +11,7 @@ Pull requests will need:
 
 ## Development environment
 
-If you're looking contribute to [Fig](http://www.fig.sh/)
+If you're looking to contribute to [Fig](http://www.fig.sh/)
 but you're new to the project or maybe even to Python, here are the steps
 that should get you started.
 

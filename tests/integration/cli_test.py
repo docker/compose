@@ -1,8 +1,10 @@
 from __future__ import absolute_import
+import contextlib
+import os
 import sys
 
-from six import StringIO
 from mock import patch
+from six import StringIO
 
 from .testcases import DockerClientTestCase
 from fig.cli.main import TopLevelCommand
