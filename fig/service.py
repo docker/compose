@@ -8,7 +8,7 @@ from operator import attrgetter
 import sys
 
 from docker.errors import APIError
-
+from docker import utils
 from .container import Container
 from .progress_stream import stream_output, StreamOutputError
 from .utils import *
@@ -417,6 +417,13 @@ class Service(object):
             if key in container_options:
                 del container_options[key]
 
+        if is_cluster_mode():
+            # Must run as detach mode
+            container_options['detach'] = True            
+            # Add the host_config with port bindings for placement
+            port_bindings = build_port_bindings(self.options.get('ports') or [])
+            container_options['host_config'] = utils.create_host_config(port_bindings = port_bindings)
+            
         return container_options
 
     def _get_image_name(self, image):
@@ -464,9 +471,11 @@ class Service(object):
         return '%s_%s' % (self.project, self.name)
 
     def can_be_scaled(self):
-        for port in self.options.get('ports', []):
-            if ':' in str(port):
-                return False
+        # Allow the public port in the cluster mode
+        if not is_cluster_mode():
+            for port in self.options.get('ports', []):
+                if ':' in str(port):
+                    return False
         return True
 
     def pull(self, insecure_registry=False):
@@ -633,3 +642,4 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
+

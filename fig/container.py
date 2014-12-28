@@ -32,8 +32,6 @@ class Container(object):
 
     @classmethod
     def create(cls, client, **options):
-        if is_cluster_mode():
-            options['detach'] = True
         response = client.create_container(**options)
         return cls.from_id(client, response['Id'])
 
@@ -155,7 +153,6 @@ class Container(object):
             for name in container['Names']:
                 if name.startswith(prefix) :
                     links.append(name[prefix.length + 1:])
-        print links
         return links
 
     def attach(self, *args, **kwargs):
@@ -171,3 +168,4 @@ class Container(object):
         if type(self) != type(other):
             return False
         return self.id == other.id
+
