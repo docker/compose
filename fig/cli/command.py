@@ -5,7 +5,6 @@ import errno
 import logging
 import os
 import re
-import yaml
 import six
 
 from ..project import Project
@@ -15,6 +14,7 @@ from .utils import call_silently, is_mac, is_ubuntu
 from .docker_client import docker_client
 from . import verbose_proxy
 from . import errors
+from . import templates
 from .. import __version__
 
 log = logging.getLogger(__name__)
@@ -68,8 +68,7 @@ class Command(DocoptCommand):
 
     def get_config(self, config_path):
         try:
-            with open(config_path, 'r') as fh:
-                return yaml.safe_load(fh)
+            return templates.load(config_path)
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
