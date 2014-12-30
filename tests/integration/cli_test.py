@@ -92,6 +92,12 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
         self.assertEqual(len(another.containers()), 1)
 
+        # Ensure containers don't have stdin and stdout connected in -d mode
+        config = service.containers()[0].inspect()['Config']
+        self.assertFalse(config['AttachStderr'])
+        self.assertFalse(config['AttachStdout'])
+        self.assertFalse(config['AttachStdin'])
+
     def test_up_with_links(self):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['up', '-d', 'web'], None)
@@ -145,6 +151,13 @@ class CLITestCase(DockerClientTestCase):
         self.command.base_dir = 'tests/fixtures/links-figfile'
         self.command.dispatch(['run', 'console', '/bin/true'], None)
         self.assertEqual(len(self.project.containers()), 0)
+
+        # Ensure stdin/out was open
+        container = self.project.containers(stopped=True, one_off=True)[0]
+        config = container.inspect()['Config']
+        self.assertTrue(config['AttachStderr'])
+        self.assertTrue(config['AttachStdout'])
+        self.assertTrue(config['AttachStdin'])
 
     @patch('dockerpty.start')
     def test_run_service_with_links(self, __):

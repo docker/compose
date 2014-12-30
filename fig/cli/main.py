@@ -296,6 +296,7 @@ class TopLevelCommand(Command):
                     start_links=True,
                     recreate=False,
                     insecure_registry=insecure_registry,
+                    detach=options['-d']
                 )
 
         tty = True
@@ -311,6 +312,7 @@ class TopLevelCommand(Command):
             'command': command,
             'tty': tty,
             'stdin_open': not options['-d'],
+            'detach': options['-d'],
         }
 
         if options['-e']:
@@ -438,6 +440,7 @@ class TopLevelCommand(Command):
             start_links=start_links,
             recreate=recreate,
             insecure_registry=insecure_registry,
+            detach=options['-d']
         )
 
         to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
