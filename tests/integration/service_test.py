@@ -10,19 +10,24 @@ from docker.errors import APIError
 from .testcases import DockerClientTestCase
 
 
+def create_and_start_container(service, **override_options):
+    container = service.create_container(**override_options)
+    return service.start_container(container, **override_options)
+
+
 class ServiceTest(DockerClientTestCase):
     def test_containers(self):
         foo = self.create_service('foo')
         bar = self.create_service('bar')
 
-        foo.start_container()
+        create_and_start_container(foo)
 
         self.assertEqual(len(foo.containers()), 1)
         self.assertEqual(foo.containers()[0].name, 'figtest_foo_1')
         self.assertEqual(len(bar.containers()), 0)
 
-        bar.start_container()
-        bar.start_container()
+        create_and_start_container(bar)
+        create_and_start_container(bar)
 
         self.assertEqual(len(foo.containers()), 1)
         self.assertEqual(len(bar.containers()), 2)
@@ -39,7 +44,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
-        service.start_container()
+        create_and_start_container(service)
         self.assertEqual(service.containers()[0].name, 'figtest_web_1')
 
     def test_start_stop(self):
@@ -65,7 +70,7 @@ class ServiceTest(DockerClientTestCase):
     def test_kill_remove(self):
         service = self.create_service('scalingtest')
 
-        service.start_container()
+        create_and_start_container(service)
         self.assertEqual(len(service.containers()), 1)
 
         service.remove_stopped()
@@ -177,21 +182,21 @@ class ServiceTest(DockerClientTestCase):
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
-        db.start_container(environment={'FOO': 'BAR'})
+        create_and_start_container(db, environment={'FOO': 'BAR'})
         self.assertEqual(db.containers()[0].environment['FOO'], 'BAR')
 
     def test_start_container_inherits_options_from_constructor(self):
         db = self.create_service('db', environment={'FOO': 'BAR'})
-        db.start_container()
+        create_and_start_container(db)
         self.assertEqual(db.containers()[0].environment['FOO'], 'BAR')
 
     def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, None)])
 
-        db.start_container()
-        db.start_container()
-        web.start_container()
+        create_and_start_container(db)
+        create_and_start_container(db)
+        create_and_start_container(web)
 
         self.assertEqual(
             set(web.containers()[0].links()),
@@ -206,9 +211,9 @@ class ServiceTest(DockerClientTestCase):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'custom_link_name')])
 
-        db.start_container()
-        db.start_container()
-        web.start_container()
+        create_and_start_container(db)
+        create_and_start_container(db)
+        create_and_start_container(web)
 
         self.assertEqual(
             set(web.containers()[0].links()),
@@ -222,19 +227,19 @@ class ServiceTest(DockerClientTestCase):
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
         db = self.create_service('db')
 
-        db.start_container()
-        db.start_container()
+        create_and_start_container(db)
+        create_and_start_container(db)
 
-        c = db.start_container()
+        c = create_and_start_container(db)
         self.assertEqual(set(c.links()), set([]))
 
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
 
-        db.start_container()
-        db.start_container()
+        create_and_start_container(db)
+        create_and_start_container(db)
 
-        c = db.start_container(one_off=True)
+        c = create_and_start_container(db, one_off=True)
 
         self.assertEqual(
             set(c.links()),
@@ -252,7 +257,7 @@ class ServiceTest(DockerClientTestCase):
             build='tests/fixtures/simple-dockerfile',
             project='figtest',
         )
-        container = service.start_container()
+        container = create_and_start_container(service)
         container.wait()
         self.assertIn('success', container.logs())
         self.assertEqual(len(self.client.images(name='figtest_test')), 1)
@@ -265,45 +270,45 @@ class ServiceTest(DockerClientTestCase):
             build='this/does/not/exist/and/will/throw/error',
             project='figtest',
         )
-        container = service.start_container()
+        container = create_and_start_container(service)
         container.wait()
         self.assertIn('success', container.logs())
 
     def test_start_container_creates_ports(self):
         service = self.create_service('web', ports=[8000])
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertEqual(list(container['NetworkSettings']['Ports'].keys()), ['8000/tcp'])
         self.assertNotEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8000')
 
     def test_start_container_stays_unpriviliged(self):
         service = self.create_service('web')
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], False)
 
     def test_start_container_becomes_priviliged(self):
         service = self.create_service('web', privileged = True)
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
 
     def test_expose_does_not_publish_ports(self):
         service = self.create_service('web', expose=[8000])
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertEqual(container['NetworkSettings']['Ports'], {'8000/tcp': None})
 
     def test_start_container_creates_port_with_explicit_protocol(self):
         service = self.create_service('web', ports=['8000/udp'])
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertEqual(list(container['NetworkSettings']['Ports'].keys()), ['8000/udp'])
 
     def test_start_container_creates_fixed_external_ports(self):
         service = self.create_service('web', ports=['8000:8000'])
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertIn('8000/tcp', container['NetworkSettings']['Ports'])
         self.assertEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8000')
 
     def test_start_container_creates_fixed_external_ports_when_it_is_different_to_internal_port(self):
         service = self.create_service('web', ports=['8001:8000'])
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertIn('8000/tcp', container['NetworkSettings']['Ports'])
         self.assertEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8001')
 
@@ -312,7 +317,7 @@ class ServiceTest(DockerClientTestCase):
             '127.0.0.1:8001:8000',
             '0.0.0.0:9001:9000/udp',
         ])
-        container = service.start_container().inspect()
+        container = create_and_start_container(service).inspect()
         self.assertEqual(container['NetworkSettings']['Ports'], {
             '8000/tcp': [
                 {
@@ -332,6 +337,14 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web')
         service.scale(1)
         self.assertEqual(len(service.containers()), 1)
+
+        # Ensure containers don't have stdout or stdin connected
+        container = service.containers()[0]
+        config = container.inspect()['Config']
+        self.assertFalse(config['AttachStderr'])
+        self.assertFalse(config['AttachStdout'])
+        self.assertFalse(config['AttachStdin'])
+
         service.scale(3)
         self.assertEqual(len(service.containers()), 3)
         service.scale(1)
@@ -353,74 +366,74 @@ class ServiceTest(DockerClientTestCase):
 
     def test_network_mode_none(self):
         service = self.create_service('web', net='none')
-        container = service.start_container()
+        container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'none')
 
     def test_network_mode_bridged(self):
         service = self.create_service('web', net='bridge')
-        container = service.start_container()
+        container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'bridge')
 
     def test_network_mode_host(self):
         service = self.create_service('web', net='host')
-        container = service.start_container()
+        container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
     def test_dns_single_value(self):
         service = self.create_service('web', dns='8.8.8.8')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['Dns'], ['8.8.8.8'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8'])
 
     def test_dns_list(self):
         service = self.create_service('web', dns=['8.8.8.8', '9.9.9.9'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['Dns'], ['8.8.8.8', '9.9.9.9'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8', '9.9.9.9'])
 
     def test_restart_always_value(self):
         service = self.create_service('web', restart='always')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'always')
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'always')
 
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart='on-failure:5')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['RestartPolicy']['Name'], 'on-failure')
-        self.assertEqual(container['HostConfig']['RestartPolicy']['MaximumRetryCount'], 5)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'on-failure')
+        self.assertEqual(container.get('HostConfig.RestartPolicy.MaximumRetryCount'), 5)
 
     def test_cap_add_list(self):
         service = self.create_service('web', cap_add=['SYS_ADMIN', 'NET_ADMIN'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['CapAdd'], ['SYS_ADMIN', 'NET_ADMIN'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.CapAdd'), ['SYS_ADMIN', 'NET_ADMIN'])
 
     def test_cap_drop_list(self):
         service = self.create_service('web', cap_drop=['SYS_ADMIN', 'NET_ADMIN'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['CapDrop'], ['SYS_ADMIN', 'NET_ADMIN'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.CapDrop'), ['SYS_ADMIN', 'NET_ADMIN'])
 
     def test_dns_search_single_value(self):
         service = self.create_service('web', dns_search='example.com')
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['DnsSearch'], ['example.com'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.DnsSearch'), ['example.com'])
 
     def test_dns_search_list(self):
         service = self.create_service('web', dns_search=['dc1.example.com', 'dc2.example.com'])
-        container = service.start_container().inspect()
-        self.assertEqual(container['HostConfig']['DnsSearch'], ['dc1.example.com', 'dc2.example.com'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])
 
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
-        container = service.create_container().inspect()
-        self.assertEqual(container['Config']['WorkingDir'], '/working/dir/sample')
+        container = service.create_container()
+        self.assertEqual(container.get('Config.WorkingDir'), '/working/dir/sample')
 
     def test_split_env(self):
         service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
-        env = service.start_container().environment
+        env = create_and_start_container(service).environment
         for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.iteritems():
             self.assertEqual(env[k], v)
 
     def test_env_from_file_combined_with_env(self):
         service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
-        env = service.start_container().environment
+        env = create_and_start_container(service).environment
         for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.iteritems():
             self.assertEqual(env[k], v)
 
@@ -430,7 +443,7 @@ class ServiceTest(DockerClientTestCase):
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
         try:
-            env = service.start_container().environment
+            env = create_and_start_container(service).environment
             for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.iteritems():
                 self.assertEqual(env[k], v)
         finally:
