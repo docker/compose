@@ -189,20 +189,30 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
+    @mock.patch('fig.service.Container', autospec=True)
     @mock.patch('fig.service.log', autospec=True)
-    def test_create_container_from_insecure_registry(self, mock_log):
+    def test_create_container_from_insecure_registry(
+            self,
+            mock_log,
+            mock_container):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
         mock_response = mock.Mock(Response)
         mock_response.status_code = 404
         mock_response.reason = "Not Found"
-        Container.create = mock.Mock()
-        Container.create.side_effect = APIError('Mock error', mock_response, "No such image")
-        try:
+        mock_container.create.side_effect = APIError(
+            'Mock error', mock_response, "No such image")
+
+        # We expect the APIError because our service requires a
+        # non-existent image.
+        with self.assertRaises(APIError):
             service.create_container(insecure_registry=True)
-        except APIError:  # We expect the APIError because our service requires a non-existent image.
-            pass
-        self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True, stream=True)
-        mock_log.info.assert_called_once_with('Pulling image someimage:sometag...')
+
+        self.mock_client.pull.assert_called_once_with(
+            'someimage:sometag',
+            insecure_registry=True,
+            stream=True)
+        mock_log.info.assert_called_once_with(
+            'Pulling image someimage:sometag...')
 
     def test_parse_repository_tag(self):
         self.assertEqual(parse_repository_tag("root"), ("root", ""))
@@ -217,6 +227,23 @@ class ServiceTest(unittest.TestCase):
         Container.create = mock.Mock()
         service.create_container()
         self.assertEqual(Container.create.call_args[1]['image'], 'someimage:latest')
+
+    def test_create_container_with_build(self):
+        self.mock_client.images.return_value = []
+        service = Service('foo', client=self.mock_client, build='.')
+        service.build = mock.create_autospec(service.build)
+        service.create_container(do_build=True)
+
+        self.mock_client.images.assert_called_once_with(name=service.full_name)
+        service.build.assert_called_once_with()
+
+    def test_create_container_no_build(self):
+        self.mock_client.images.return_value = []
+        service = Service('foo', client=self.mock_client, build='.')
+        service.create_container(do_build=False)
+
+        self.assertFalse(self.mock_client.images.called)
+        self.assertFalse(self.mock_client.build.called)
 
 
 class ServiceVolumesTest(unittest.TestCase):

@@ -50,6 +50,17 @@ DOCKER_CONFIG_HINTS = {
     'workdir'   : 'working_dir',
 }
 
+DOCKER_START_KEYS = [
+    'cap_add',
+    'cap_drop',
+    'dns',
+    'dns_search',
+    'env_file',
+    'net',
+    'privileged',
+    'restart',
+]
+
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
 
 
@@ -145,7 +156,8 @@ class Service(object):
 
     def scale(self, desired_num):
         """
-        Adjusts the number of containers to the specified number and ensures they are running.
+        Adjusts the number of containers to the specified number and ensures
+        they are running.
 
         - creates containers until there are at least `desired_num`
         - stops containers until there are at most `desired_num` running
@@ -192,12 +204,24 @@ class Service(object):
                 log.info("Removing %s..." % c.name)
                 c.remove(**options)
 
-    def create_container(self, one_off=False, insecure_registry=False, **override_options):
+    def create_container(self,
+                         one_off=False,
+                         insecure_registry=False,
+                         do_build=True,
+                         **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        container_options = self._get_container_create_options(override_options, one_off=one_off)
+        container_options = self._get_container_create_options(
+            override_options,
+            one_off=one_off)
+
+        if (do_build and
+                self.can_be_built() and
+                not self.client.images(name=self.full_name)):
+            self.build()
+
         try:
             return Container.create(self.client, **container_options)
         except APIError as e:
@@ -212,7 +236,7 @@ class Service(object):
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, insecure_registry=False, **override_options):
+    def recreate_containers(self, insecure_registry=False, do_build=True, **override_options):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
@@ -220,7 +244,10 @@ class Service(object):
         containers = self.containers(stopped=True)
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
-            container = self.create_container(insecure_registry=insecure_registry, **override_options)
+            container = self.create_container(
+                insecure_registry=insecure_registry,
+                do_build=do_build,
+                **override_options)
             self.start_container(container)
             return [(None, container)]
         else:
@@ -259,7 +286,7 @@ class Service(object):
         container.remove()
 
         options = dict(override_options)
-        new_container = self.create_container(**options)
+        new_container = self.create_container(do_build=False, **options)
         self.start_container(new_container, intermediate_container=intermediate_container)
 
         intermediate_container.remove()
@@ -273,8 +300,7 @@ class Service(object):
             log.info("Starting %s..." % container.name)
             return self.start_container(container, **options)
 
-    def start_container(self, container=None, intermediate_container=None, **override_options):
-        container = container or self.create_container(**override_options)
+    def start_container(self, container, intermediate_container=None, **override_options):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
 
@@ -307,14 +333,19 @@ class Service(object):
         )
         return container
 
-    def start_or_create_containers(self, insecure_registry=False, detach=False):
+    def start_or_create_containers(
+            self,
+            insecure_registry=False,
+            detach=False,
+            do_build=True):
         containers = self.containers(stopped=True)
 
         if not containers:
             log.info("Creating %s..." % self._next_container_name(containers))
             new_container = self.create_container(
                 insecure_registry=insecure_registry,
-                detach=detach
+                detach=detach,
+                do_build=do_build,
             )
             return [self.start_container(new_container)]
         else:
@@ -407,16 +438,13 @@ class Service(object):
         container_options['environment'] = merge_environment(container_options)
 
         if self.can_be_built():
-            if len(self.client.images(name=self._build_tag_name())) == 0:
-                self.build()
-            container_options['image'] = self._build_tag_name()
+            container_options['image'] = self.full_name
         else:
             container_options['image'] = self._get_image_name(container_options['image'])
 
         # Delete options which are only used when starting
-        for key in ['privileged', 'net', 'dns', 'dns_search', 'restart', 'cap_add', 'cap_drop', 'env_file']:
-            if key in container_options:
-                del container_options[key]
+        for key in DOCKER_START_KEYS:
+            container_options.pop(key, None)
 
         return container_options
 
@@ -431,7 +459,7 @@ class Service(object):
 
         build_output = self.client.build(
             self.options['build'],
-            tag=self._build_tag_name(),
+            tag=self.full_name,
             stream=True,
             rm=True,
             nocache=no_cache,
@@ -451,14 +479,15 @@ class Service(object):
                     image_id = match.group(1)
 
         if image_id is None:
-            raise BuildError(self)
+            raise BuildError(self, event if all_events else 'Unknown')
 
         return image_id
 
     def can_be_built(self):
         return 'build' in self.options
 
-    def _build_tag_name(self):
+    @property
+    def full_name(self):
         """
         The tag to give to images built for this service.
         """
