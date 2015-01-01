@@ -68,7 +68,7 @@ class Command(DocoptCommand):
 
     def get_config(self, config_path):
         try:
-            return templates.load(config_path)
+            return templates.TemplateLoader().load(config_path)
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
