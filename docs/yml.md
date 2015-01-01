@@ -199,3 +199,19 @@ privileged: true
 
 restart: always
 ```
+
+<a name="template"></a>
+### template
+
+Override another service, optionally in another fig file. `template` can either be a string or dictionary.
+
+When `template` is a string, it specifies the path to a fig file, where the same service name will be used.
+
+When `template` is a dictionary, you may specify `path` and `service` as the keys. `path` or `service` may be omitted defaulting to the same template file, or same service name.
+
+```
+template:
+  service: redis_template
+  path: templates.yml
+```
+
