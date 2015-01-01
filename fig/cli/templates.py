@@ -60,9 +60,6 @@ class TemplateLoader(object):
 
         This will use the defaults specified if the values are empty, i.e.
         name and config_path.
-
-        >>> TemplateLoader.get_template_values({}, 'service', 'fig.yml')
-        ... 5
         '''
         if isinstance(value, six.string_types):
             path = value
