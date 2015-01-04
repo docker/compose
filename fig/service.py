@@ -8,9 +8,10 @@ from operator import attrgetter
 import sys
 
 from docker.errors import APIError
-
+from docker import utils
 from .container import Container
 from .progress_stream import stream_output, StreamOutputError
+from .utils import find_container_name, get_container_name_without_host, is_cluster_mode
 
 log = logging.getLogger(__name__)
 
@@ -368,14 +369,16 @@ class Service(object):
         links = []
         for service, link_name in self.links:
             for container in service.containers():
-                links.append((container.name, link_name or service.name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                container_name = get_container_name_without_host(container.name)
+                links.append((container_name, link_name or service.name))
+                links.append((container_name, container_name))
+                links.append((container_name, container.name_without_project))
         if link_to_self:
             for container in self.containers():
-                links.append((container.name, self.name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                container_name = get_container_name_without_host(container.name)
+                links.append((container_name, self.name))
+                links.append((container_name, container_name))
+                links.append((container_name, container.name_without_project))
         return links
 
     def _get_volumes_from(self, intermediate_container=None):
@@ -446,6 +449,13 @@ class Service(object):
         for key in DOCKER_START_KEYS:
             container_options.pop(key, None)
 
+        if is_cluster_mode():
+            # Must run as detach mode
+            container_options['detach'] = True
+            # Add the host_config with port bindings for placement
+            port_bindings = build_port_bindings(self.options.get('ports') or [])
+            container_options['host_config'] = utils.create_host_config(port_bindings=port_bindings)
+
         return container_options
 
     def _get_image_name(self, image):
@@ -494,9 +504,11 @@ class Service(object):
         return '%s_%s' % (self.project, self.name)
 
     def can_be_scaled(self):
-        for port in self.options.get('ports', []):
-            if ':' in str(port):
-                return False
+        # Allow the public port in the cluster mode
+        if not is_cluster_mode():
+            for port in self.options.get('ports', []):
+                if ':' in str(port):
+                    return False
         return True
 
     def pull(self, insecure_registry=False):
@@ -535,9 +547,7 @@ def get_container_name(container):
     if 'Name' in container:
         return container['Name']
     # ps
-    for name in container['Names']:
-        if len(name.split('/')) == 2:
-            return name[1:]
+    return find_container_name(container['Names'])
 
 
 def parse_restart_spec(restart_config):
