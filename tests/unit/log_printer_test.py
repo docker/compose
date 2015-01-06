@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
+import time
 
 from compose.cli.log_printer import LogPrinter
 from .. import unittest
@@ -40,11 +41,20 @@ class LogPrinterTest(unittest.TestCase):
 
         self.assertIn(glyph, output)
 
+    def test_notail(self):
+        def reader(*args, **kwargs):
+            for count in xrange(3):
+                yield "keep going\n"
+                time.sleep(1)
 
-def run_log_printer(containers, monochrome=False):
+        container = MockContainer(reader)
+        output = run_log_printer([container], monochrome=False, tail=False)
+        self.assertEqual(output.count('\n'), 1)
+        
+def run_log_printer(containers, monochrome=False, tail=True):
     r, w = os.pipe()
     reader, writer = os.fdopen(r, 'r'), os.fdopen(w, 'w')
-    printer = LogPrinter(containers, output=writer, monochrome=monochrome)
+    printer = LogPrinter(containers, output=writer, monochrome=monochrome, tail=tail)
     printer.run()
     writer.close()
     return reader.read()
