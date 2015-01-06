@@ -28,10 +28,8 @@ class Multiplexer(object):
                 else:
                     yield item
             except Empty:
-                if tail:
-                    pass
-                else:
-                    break
+                if not tail:
+                    return
 
     def _init_readers(self):
         for generator in self.generators:

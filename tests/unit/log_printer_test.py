@@ -45,7 +45,7 @@ class LogPrinterTest(unittest.TestCase):
         def reader(*args, **kwargs):
             for count in xrange(3):
                 yield "keep going\n"
-                time.sleep(1)
+                time.sleep(0.2)
 
         container = MockContainer(reader)
         output = run_log_printer([container], monochrome=False, tail=False)
@@ -55,7 +55,7 @@ class LogPrinterTest(unittest.TestCase):
         def reader(*args, **kwargs):
             for count in xrange(3):
                 yield "keep going\n"
-                time.sleep(1)
+                time.sleep(0.2)
 
         container = MockContainer(reader)
         output = run_log_printer([container], monochrome=False, tail=True)
