@@ -49,7 +49,17 @@ class LogPrinterTest(unittest.TestCase):
 
         container = MockContainer(reader)
         output = run_log_printer([container], monochrome=False, tail=False)
-        self.assertEqual(output.count('\n'), 1)
+        self.assertEqual(output.count('keep going'), 1)
+
+    def test_tail(self):
+        def reader(*args, **kwargs):
+            for count in xrange(3):
+                yield "keep going\n"
+                time.sleep(1)
+
+        container = MockContainer(reader)
+        output = run_log_printer([container], monochrome=False, tail=True)
+        self.assertEqual(output.count('keep going'), 3)
         
 def run_log_printer(containers, monochrome=False, tail=True):
     r, w = os.pipe()

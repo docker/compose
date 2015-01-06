@@ -10,7 +10,7 @@ from .utils import split_buffer
 
 
 class LogPrinter(object):
-    def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False, tail=True):
+    def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False, tail=False):
         self.containers = containers
         self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
