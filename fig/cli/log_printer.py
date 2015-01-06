@@ -10,16 +10,17 @@ from .utils import split_buffer
 
 
 class LogPrinter(object):
-    def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False):
+    def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False, tail=True):
         self.containers = containers
         self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
         self.generators = self._make_log_generators(monochrome)
+        self.tail = tail
         self.output = output
 
     def run(self):
         mux = Multiplexer(self.generators)
-        for line in mux.loop():
+        for line in mux.loop(self.tail):
             self.output.write(line)
 
     def _calculate_prefix_width(self, containers):
