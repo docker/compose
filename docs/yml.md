@@ -202,3 +202,12 @@ restart: always
 stdin_open: true
 tty: true
 ```
+
+### initial_scale
+
+Specify inital scale for container. Upon service creation or recreation, `initial_scale`
+instances of the service container will be created (and started).
+
+```
+initial_scale: 3
+```

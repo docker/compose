@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
+import functools
 
 from .. import unittest
 import mock
@@ -18,6 +19,7 @@ from fig.service import (
     build_volume_binding,
     APIError,
     parse_repository_tag,
+    CannotBeScaledError,
 )
 
 
@@ -244,6 +246,37 @@ class ServiceTest(unittest.TestCase):
 
         self.assertFalse(self.mock_client.images.called)
         self.assertFalse(self.mock_client.build.called)
+
+    def test_initial_scale_recreate(self):
+        def _side_effect(nd, *args, **kwargs):
+            nd['num'] = num = nd.get('num', 0) + 1
+            return {'Id': 'aabbccdd%d' % num, 'Name': '/default_foo_%d' % num}
+        mock_client = mock.create_autospec(docker.Client)
+        mock_client.create_container.side_effect = functools.partial(_side_effect, {})
+        mock_client.inspect_container.side_effect = functools.partial(_side_effect, {})
+        service = Service('foo', image='redis', client=mock_client, initial_scale=3)
+        ret = service.recreate_containers()
+        self.assertEqual(3, len(ret))
+        for intermediate, new in ret:
+            self.assertIsNone(intermediate)
+            self.assertIsInstance(new, Container)
+
+    def test_initial_scale_start_or_create(self):
+        def _side_effect(nd, *args, **kwargs):
+            nd['num'] = num = nd.get('num', 0) + 1
+            return {'Id': 'aabbccdd%d' % num, 'Name': '/default_foo_%d' % num}
+        mock_client = mock.create_autospec(docker.Client)
+        mock_client.create_container.side_effect = functools.partial(_side_effect, {})
+        mock_client.inspect_container.side_effect = functools.partial(_side_effect, {})
+        service = Service('foo', image='redis', client=mock_client, initial_scale=3)
+        ret = service.start_or_create_containers()
+        self.assertEqual(3, len(ret))
+        for c in ret:
+            self.assertIsInstance(c, Container)
+
+    def test_initial_scale_cannot_be_scaled(self):
+        with self.assertRaises(CannotBeScaledError):
+            service = Service('foo', client=self.mock_client, initial_scale=3, ports=["80:80"])
 
 
 class ServiceVolumesTest(unittest.TestCase):
