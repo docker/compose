@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-
+from .utils import find_container_name_with_host, is_cluster_mode
 import six
 
 
@@ -23,9 +23,7 @@ class Container(object):
             'Id': dictionary['Id'],
             'Image': dictionary['Image'],
         }
-        for name in dictionary.get('Names', []):
-            if len(name.split('/')) == 2:
-                new_dictionary['Name'] = name
+        new_dictionary['Name'] = find_container_name_with_host(dictionary.get('Names', []))
         return cls(client, new_dictionary, **kwargs)
 
     @classmethod
@@ -150,11 +148,14 @@ class Container(object):
 
     def links(self):
         links = []
+        n = 2
+        if is_cluster_mode():
+            n = 3
         for container in self.client.containers():
             for name in container['Names']:
                 bits = name.split('/')
-                if len(bits) > 2 and bits[1] == self.name:
-                    links.append(bits[2])
+                if len(bits) > n and bits[n - 1] == self.name:
+                    links.append(bits[n])
         return links
 
     def attach(self, *args, **kwargs):
