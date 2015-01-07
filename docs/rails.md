@@ -10,7 +10,7 @@ We're going to use Fig to set up and run a Rails/PostgreSQL app. Before starting
 
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
-    FROM ruby
+    FROM ruby:2.2.0
     RUN apt-get update -qq && apt-get install -y build-essential libpq-dev
     RUN mkdir /myapp
     WORKDIR /myapp
