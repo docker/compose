@@ -23,7 +23,7 @@ That'll put our application code inside an image with Ruby, Bundler and all our 
 Next, we have a bootstrap `Gemfile` which just loads Rails. It'll be overwritten in a moment by `rails new`.
 
     source 'https://rubygems.org'
-    gem 'rails', '4.0.2'
+    gem 'rails', '4.2.0'
 
 Finally, `fig.yml` is where the magic happens. It describes what services our app comprises (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration we need to link them together and expose the web app's port.
 
@@ -33,7 +33,7 @@ Finally, `fig.yml` is where the magic happens. It describes what services our ap
         - "5432"
     web:
       build: .
-      command: bundle exec rackup -p 3000
+      command: bundle exec rails s -p 3000 -b '0.0.0.0'
       volumes:
         - .:/myapp
       ports:
@@ -86,7 +86,7 @@ We can now boot the app.
 If all's well, you should see some PostgreSQL output, and then—after a few seconds—the familiar refrain:
 
     myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick 1.3.1
-    myapp_web_1 | [2014-01-17 17:16:29] INFO  ruby 2.0.0 (2013-11-22) [x86_64-linux-gnu]
+    myapp_web_1 | [2014-01-17 17:16:29] INFO  ruby 2.2.0 (2014-12-25) [x86_64-linux-gnu]
     myapp_web_1 | [2014-01-17 17:16:29] INFO  WEBrick::HTTPServer#start: pid=1 port=3000
 
 Finally, we just need to create the database. In another terminal, run:
