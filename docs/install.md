@@ -23,5 +23,13 @@ Next, install Fig:
 Releases are available for OS X and 64-bit Linux. Fig is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
 
     $ sudo pip install -U fig
+    
+If, during the install of the PyYAML dependency, you get the following error:
+
+```
+ext/_yaml.c:4:20: fatal error: Python.h: No such file or directory
+```
+
+you should install the Python development package for your distro (`apt-get install python-dev`, `yum install python-devel`, etc.)
 
 That should be all you need! Run `fig --version` to see if it worked.
