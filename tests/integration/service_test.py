@@ -230,10 +230,9 @@ class ServiceTest(DockerClientTestCase):
                                                          'figtest_db_2',
                                                          'figtest_db_3:db_3'])
 
-        db.start_container()
-        db.start_container()
-        db.start_container()
-        web.start_container()
+        for _ in range(3):
+            create_and_start_container(db)
+        create_and_start_container(web)
 
         self.assertEqual(
             set(web.containers()[0].links()),
