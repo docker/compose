@@ -517,7 +517,7 @@ class Service(object):
             )
 
 
-NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
+NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?([\da-f]+]+)$')
 
 
 def is_valid_name(name, one_off=False):
