@@ -71,13 +71,13 @@ class TopLevelCommand(Command):
     """Fast, isolated development environments using Docker.
 
     Usage:
-      fig [options] [COMMAND] [ARGS...]
-      fig -h|--help
+      compose [options] [COMMAND] [ARGS...]
+      compose -h|--help
 
     Options:
       --verbose                 Show more output
       --version                 Print version and exit
-      -f, --file FILE           Specify an alternate fig file (default: fig.yml)
+      -f, --file FILE           Specify an alternate compose file (default: compose.yml)
       -p, --project-name NAME   Specify an alternate project name (default: directory name)
 
     Commands:
@@ -99,7 +99,7 @@ class TopLevelCommand(Command):
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = "fig %s" % __version__
+        options['version'] = "compose %s" % __version__
         return options
 
     def build(self, project, options):
@@ -107,8 +107,8 @@ class TopLevelCommand(Command):
         Build or rebuild services.
 
         Services are built once and then tagged as `project_service`,
-        e.g. `figtest_db`. If you change a service's `Dockerfile` or the
-        contents of its build directory, you can run `fig build` to rebuild it.
+        e.g. `composetest_db`. If you change a service's `Dockerfile` or the
+        contents of its build directory, you can run `compose build` to rebuild it.
 
         Usage: build [options] [SERVICE...]
 
@@ -261,11 +261,11 @@ class TopLevelCommand(Command):
 
         For example:
 
-            $ fig run web python manage.py shell
+            $ compose run web python manage.py shell
 
         By default, linked services will be started, unless they are already
         running. If you do not want to start linked services, use
-        `fig run --no-deps SERVICE COMMAND [ARGS...]`.
+        `compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
         Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
@@ -280,7 +280,7 @@ class TopLevelCommand(Command):
             --rm                  Remove container after run. Ignored in detached mode.
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
-            -T                    Disable pseudo-tty allocation. By default `fig run`
+            -T                    Disable pseudo-tty allocation. By default `compose run`
                                   allocates a TTY.
         """
         service = project.get_service(options['SERVICE'])
@@ -352,7 +352,7 @@ class TopLevelCommand(Command):
         Numbers are specified in the form `service=num` as arguments.
         For example:
 
-            $ fig scale web=2 worker=3
+            $ compose scale web=2 worker=3
 
         Usage: scale [SERVICE=NUM...]
         """
@@ -372,7 +372,7 @@ class TopLevelCommand(Command):
                     'Service "%s" cannot be scaled because it specifies a port '
                     'on the host. If multiple containers for this service were '
                     'created, the port would clash.\n\nRemove the ":" from the '
-                    'port definition in fig.yml so Docker can choose a random '
+                    'port definition in compose.yml so Docker can choose a random '
                     'port for each container.' % service_name)
 
     def start(self, project, options):
@@ -387,7 +387,7 @@ class TopLevelCommand(Command):
         """
         Stop running containers without removing them.
 
-        They can be started again with `fig start`.
+        They can be started again with `compose start`.
 
         Usage: stop [SERVICE...]
         """
@@ -405,14 +405,14 @@ class TopLevelCommand(Command):
         """
         Build, (re)create, start and attach to containers for a service.
 
-        By default, `fig up` will aggregate the output of each container, and
-        when it exits, all containers will be stopped. If you run `fig up -d`,
+        By default, `compose up` will aggregate the output of each container, and
+        when it exits, all containers will be stopped. If you run `compose up -d`,
         it'll start the containers in the background and leave them running.
 
-        If there are existing containers for a service, `fig up` will stop
+        If there are existing containers for a service, `compose up` will stop
         and recreate them (preserving mounted volumes with volumes-from),
-        so that changes in `fig.yml` are picked up. If you do not want existing
-        containers to be recreated, `fig up --no-recreate` will re-use existing
+        so that changes in `compose.yml` are picked up. If you do not want existing
+        containers to be recreated, `compose up --no-recreate` will re-use existing
         containers.
 
         Usage: up [options] [SERVICE...]

@@ -4,7 +4,7 @@ from .. import unittest
 import mock
 import docker
 
-from fig.container import Container
+from compose.container import Container
 
 
 class ContainerTest(unittest.TestCase):
@@ -20,7 +20,7 @@ class ContainerTest(unittest.TestCase):
             "Ports": None,
             "SizeRw": 0,
             "SizeRootFs": 0,
-            "Names": ["/figtest_db_1", "/figtest_web_1/db"],
+            "Names": ["/composetest_db_1", "/composetest_web_1/db"],
             "NetworkSettings": {
                 "Ports": {},
             },
@@ -33,7 +33,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.dictionary, {
             "Id": "abc",
             "Image":"busybox:latest",
-            "Name": "/figtest_db_1",
+            "Name": "/composetest_db_1",
         })
 
     def test_from_ps_prefixed(self):
@@ -45,7 +45,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.dictionary, {
             "Id": "abc",
             "Image":"busybox:latest",
-            "Name": "/figtest_db_1",
+            "Name": "/composetest_db_1",
         })
 
     def test_environment(self):
@@ -73,7 +73,7 @@ class ContainerTest(unittest.TestCase):
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
-        self.assertEqual(container.name, "figtest_db_1")
+        self.assertEqual(container.name, "composetest_db_1")
 
     def test_name_without_project(self):
         container = Container.from_ps(None,

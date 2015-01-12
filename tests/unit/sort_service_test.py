@@ -1,4 +1,4 @@
-from fig.project import sort_service_dicts, DependencyError
+from compose.project import sort_service_dicts, DependencyError
 from .. import unittest
 
 

@@ -43,11 +43,15 @@ class Command(DocoptCommand):
 
     def perform_command(self, options, handler, command_options):
         if options['COMMAND'] == 'help':
-            # Skip looking up the figfile.
+            # Skip looking up the compose file.
             handler(None, command_options)
             return
 
-        explicit_config_path = options.get('--file') or os.environ.get('FIG_FILE')
+        if 'FIG_FILE' in os.environ:
+            log.warn('The FIG_FILE environment variable is deprecated.')
+            log.warn('Please use COMPOSE_FILE instead.')
+
+        explicit_config_path = options.get('--file') or os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')
         project = self.get_project(
             self.get_config_path(explicit_config_path),
             project_name=options.get('--project-name'),
@@ -59,7 +63,7 @@ class Command(DocoptCommand):
         client = docker_client()
         if verbose:
             version_info = six.iteritems(client.version())
-            log.info("Fig version %s", __version__)
+            log.info("Compose version %s", __version__)
             log.info("Docker base_url: %s", client.base_url)
             log.info("Docker version: %s",
                      ", ".join("%s=%s" % item for item in version_info))
@@ -72,7 +76,7 @@ class Command(DocoptCommand):
                 return yaml.safe_load(fh)
         except IOError as e:
             if e.errno == errno.ENOENT:
-                raise errors.FigFileNotFound(os.path.basename(e.filename))
+                raise errors.ComposeFileNotFound(os.path.basename(e.filename))
             raise errors.UserError(six.text_type(e))
 
     def get_project(self, config_path, project_name=None, verbose=False):
@@ -88,7 +92,11 @@ class Command(DocoptCommand):
         def normalize_name(name):
             return re.sub(r'[^a-z0-9]', '', name.lower())
 
-        project_name = project_name or os.environ.get('FIG_PROJECT_NAME')
+        if 'FIG_PROJECT_NAME' in os.environ:
+            log.warn('The FIG_PROJECT_NAME environment variable is deprecated.')
+            log.warn('Please use COMPOSE_PROJECT_NAME instead.')
+
+        project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME') or os.environ.get('FIG_PROJECT_NAME')
         if project_name is not None:
             return normalize_name(project_name)
 
@@ -102,13 +110,13 @@ class Command(DocoptCommand):
         if file_path:
             return os.path.join(self.base_dir, file_path)
 
-        if os.path.exists(os.path.join(self.base_dir, 'fig.yaml')):
-            log.warning("Fig just read the file 'fig.yaml' on startup, rather "
-                        "than 'fig.yml'")
-            log.warning("Please be aware that fig.yml the expected extension "
+        if os.path.exists(os.path.join(self.base_dir, 'compose.yaml')):
+            log.warning("Fig just read the file 'compose.yaml' on startup, rather "
+                        "than 'compose.yml'")
+            log.warning("Please be aware that .yml is the expected extension "
                         "in most cases, and using .yaml can cause compatibility "
                         "issues in future")
 
-            return os.path.join(self.base_dir, 'fig.yaml')
+            return os.path.join(self.base_dir, 'compose.yaml')
 
-        return os.path.join(self.base_dir, 'fig.yml')
+        return os.path.join(self.base_dir, 'compose.yml')

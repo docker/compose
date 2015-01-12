@@ -1,5 +1,5 @@
 #!/bin/sh
 set -ex
-docker build -t fig .
-docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint flake8 fig fig
-docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint nosetests fig $@
+docker build -t compose .
+docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint flake8 compose compose
+docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint nosetests compose $@

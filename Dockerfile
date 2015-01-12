@@ -14,4 +14,4 @@ RUN python setup.py install
 
 RUN chown -R user /code/
 
-ENTRYPOINT ["/usr/local/bin/fig"]
+ENTRYPOINT ["/usr/local/bin/compose"]

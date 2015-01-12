@@ -5,6 +5,6 @@ virtualenv venv
 venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-dev.txt
 venv/bin/pip install .
-venv/bin/pyinstaller -F bin/fig
-mv dist/fig dist/fig-Darwin-x86_64
-dist/fig-Darwin-x86_64 --version
+venv/bin/pyinstaller -F bin/compose
+mv dist/compose dist/compose-Darwin-x86_64
+dist/compose-Darwin-x86_64 --version

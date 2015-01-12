@@ -48,10 +48,10 @@ if sys.version_info < (2, 7):
 
 
 setup(
-    name='fig',
-    version=find_version("fig", "__init__.py"),
-    description='Fast, isolated development environments using Docker',
-    url='http://www.fig.sh/',
+    name='compose',
+    version=find_version("compose", "__init__.py"),
+    description='Multi-container orchestration for Docker',
+    url='https://www.docker.com/',
     author='Docker, Inc.',
     license='Apache License 2.0',
     packages=find_packages(exclude=[ 'tests.*', 'tests' ]),
@@ -61,6 +61,6 @@ setup(
     tests_require=tests_require,
     entry_points="""
     [console_scripts]
-    fig=fig.cli.main:main
+    compose=compose.cli.main:main
     """,
 )

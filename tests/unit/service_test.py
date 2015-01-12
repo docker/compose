@@ -8,9 +8,9 @@ import mock
 import docker
 from requests import Response
 
-from fig import Service
-from fig.container import Container
-from fig.service import (
+from compose import Service
+from compose.container import Container
+from compose.service import (
     ConfigError,
     split_port,
     build_port_bindings,
@@ -203,7 +203,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertRaises(ValueError, service.get_container)
 
-    @mock.patch('fig.service.Container', autospec=True)
+    @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
         container_dict = dict(Name='default_foo_2')
         self.mock_client.containers.return_value = [container_dict]
@@ -214,15 +214,15 @@ class ServiceTest(unittest.TestCase):
         mock_container_class.from_ps.assert_called_once_with(
             self.mock_client, container_dict)
 
-    @mock.patch('fig.service.log', autospec=True)
+    @mock.patch('compose.service.log', autospec=True)
     def test_pull_image(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
         service.pull(insecure_registry=True)
         self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
-    @mock.patch('fig.service.Container', autospec=True)
-    @mock.patch('fig.service.log', autospec=True)
+    @mock.patch('compose.service.Container', autospec=True)
+    @mock.patch('compose.service.log', autospec=True)
     def test_create_container_from_insecure_registry(
             self,
             mock_log,

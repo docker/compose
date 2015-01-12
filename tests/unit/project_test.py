@@ -1,11 +1,11 @@
 from __future__ import unicode_literals
 from .. import unittest
-from fig.service import Service
-from fig.project import Project, ConfigurationError
+from compose.service import Service
+from compose.project import Project, ConfigurationError
 
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
-        project = Project.from_dicts('figtest', [
+        project = Project.from_dicts('composetest', [
             {
                 'name': 'web',
                 'image': 'busybox:latest'
@@ -22,7 +22,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
     def test_from_dict_sorts_in_dependency_order(self):
-        project = Project.from_dicts('figtest', [
+        project = Project.from_dicts('composetest', [
             {
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -45,7 +45,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.services[2].name, 'web')
 
     def test_from_config(self):
-        project = Project.from_config('figtest', {
+        project = Project.from_config('composetest', {
             'web': {
                 'image': 'busybox:latest',
             },
@@ -61,13 +61,13 @@ class ProjectTest(unittest.TestCase):
 
     def test_from_config_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
-            project = Project.from_config('figtest', {
+            project = Project.from_config('composetest', {
                 'web': 'busybox:latest',
             }, None)
 
     def test_get_service(self):
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
             client=None,
             image="busybox:latest",
@@ -77,11 +77,11 @@ class ProjectTest(unittest.TestCase):
 
     def test_get_services_returns_all_services_without_args(self):
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
         )
         console = Service(
-            project='figtest',
+            project='composetest',
             name='console',
         )
         project = Project('test', [web, console], None)
@@ -89,11 +89,11 @@ class ProjectTest(unittest.TestCase):
 
     def test_get_services_returns_listed_services_with_args(self):
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
         )
         console = Service(
-            project='figtest',
+            project='composetest',
             name='console',
         )
         project = Project('test', [web, console], None)
@@ -101,20 +101,20 @@ class ProjectTest(unittest.TestCase):
 
     def test_get_services_with_include_links(self):
         db = Service(
-            project='figtest',
+            project='composetest',
             name='db',
         )
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
             links=[(db, 'database')]
         )
         cache = Service(
-            project='figtest',
+            project='composetest',
             name='cache'
         )
         console = Service(
-            project='figtest',
+            project='composetest',
             name='console',
             links=[(web, 'web')]
         )
@@ -126,11 +126,11 @@ class ProjectTest(unittest.TestCase):
 
     def test_get_services_removes_duplicates_following_links(self):
         db = Service(
-            project='figtest',
+            project='composetest',
             name='db',
         )
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
             links=[(db, 'database')]
         )
