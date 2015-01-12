@@ -100,6 +100,12 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertIn('/var/db', container.inspect()['Volumes'])
 
+    def test_create_container_with_cpu_shares(self):
+        service = self.create_service('db', cpu_shares=73)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'

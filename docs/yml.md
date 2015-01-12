@@ -194,11 +194,13 @@ dns_search:
   - dc2.example.com
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
 
 Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.
 
 ```
+cpu_shares: 73
+
 working_dir: /code
 entrypoint: /code/entrypoint.sh
 user: postgresql

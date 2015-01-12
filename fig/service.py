@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
+    'cpu_shares',
     'command',
     'detach',
     'dns',
@@ -41,6 +42,7 @@ DOCKER_CONFIG_KEYS = [
     'working_dir',
 ]
 DOCKER_CONFIG_HINTS = {
+    'cpu_share' : 'cpu_shares',
     'link'      : 'links',
     'port'      : 'ports',
     'privilege' : 'privileged',
