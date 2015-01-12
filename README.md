@@ -27,6 +27,24 @@ db:
   image: postgres
 ```
 
+```json
+{
+    "web": {
+        "build": ".",
+        "links": [
+            "db"
+        ],
+        "ports": [
+            "8000:8000",
+            "49100:22"
+        ]
+    },
+    "db": {
+        "image": "postgres"
+    }
+}
+```
+
 (No more installing Postgres on your laptop!)
 
 Then type `fig up`, and Fig will start and run your entire app:

@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import yaml
+import json
 import six
 
 from ..project import Project
@@ -69,10 +70,17 @@ class Command(DocoptCommand):
     def get_config(self, config_path):
         try:
             with open(config_path, 'r') as fh:
-                return yaml.safe_load(fh)
+                if config_path.endswith('.json'):
+                    return json.load(fh)
+                else:
+                    return yaml.safe_load(fh)
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise errors.FigFileNotFound(os.path.basename(e.filename))
+            raise errors.UserError(six.text_type(e))
+        except ValueError as e:
+            if 'No JSON object could be decoded' in e.message:
+                raise errors.FigFileBadlyFormatted(os.path.basename(config_path))
             raise errors.UserError(six.text_type(e))
 
     def get_project(self, config_path, project_name=None, verbose=False):
@@ -110,5 +118,8 @@ class Command(DocoptCommand):
                         "issues in future")
 
             return os.path.join(self.base_dir, 'fig.yaml')
+
+        if os.path.exists(os.path.join(self.base_dir, 'fig.json')):
+            return os.path.join(self.base_dir, 'fig.json')
 
         return os.path.join(self.base_dir, 'fig.yml')

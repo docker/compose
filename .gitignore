@@ -6,3 +6,5 @@
 /docs/_site
 /venv
 fig.spec
+
+.idea/

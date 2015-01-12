@@ -29,6 +29,24 @@ class CLITestCase(unittest.TestCase):
         project_name = command.get_project_name(command.get_config_path())
         self.assertEquals('simplefigfile', project_name)
 
+    def test_json(self):
+        command = TopLevelCommand()
+        command.base_dir = 'tests/fixtures/json-figfile'
+        project_name = command.get_project_name(command.get_config_path())
+        self.assertEquals('jsonfigfile', project_name)
+        self.assertEqual(command.get_config_path(), os.path.join(command.base_dir, 'fig.json'))
+        expected = {
+            "simple": {
+                "image": "busybox:latest",
+                "command": "/bin/sleep 300"
+            },
+            "another": {
+                "image": "busybox:latest",
+                "command": "/bin/sleep 300"
+            }
+        }
+        self.assertEqual(command.get_config(command.get_config_path()), expected)
+
     def test_project_name_with_explicit_project_name(self):
         command = TopLevelCommand()
         name = 'explicit-project-name'
