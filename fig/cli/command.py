@@ -26,7 +26,7 @@ class Command(DocoptCommand):
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
-        except SSLError, e:
+        except SSLError as e:
             raise errors.UserError('SSL error: %s' % e)
         except ConnectionError:
             if call_silently(['which', 'docker']) != 0:
