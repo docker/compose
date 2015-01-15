@@ -17,7 +17,7 @@ class Multiplexer(object):
         self.generators = generators
         self.queue = Queue()
 
-    def loop(self):
+    def loop(self, tail=True):
         self._init_readers()
 
         while True:
@@ -28,7 +28,10 @@ class Multiplexer(object):
                 else:
                     yield item
             except Empty:
-                pass
+                if tail:
+                    pass
+                else:
+                    break
 
     def _init_readers(self):
         for generator in self.generators:
