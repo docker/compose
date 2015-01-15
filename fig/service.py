@@ -465,7 +465,7 @@ class Service(object):
             tag = "latest"
         return '%s:%s' % (repo, tag)
 
-    def build(self, no_cache=False):
+    def build(self, no_cache=False, pull=False):
         log.info('Building %s...' % self.name)
 
         build_output = self.client.build(
@@ -474,6 +474,7 @@ class Service(object):
             stream=True,
             rm=True,
             nocache=no_cache,
+            pull=pull,
         )
 
         try:

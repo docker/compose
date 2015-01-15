@@ -160,10 +160,10 @@ class Project(object):
         for service in self.get_services(service_names):
             service.restart(**options)
 
-    def build(self, service_names=None, no_cache=False):
+    def build(self, service_names=None, no_cache=False, pull=False):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache)
+                service.build(no_cache, pull)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 

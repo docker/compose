@@ -114,9 +114,11 @@ class TopLevelCommand(Command):
 
         Options:
             --no-cache  Do not use cache when building the image.
+            --pull      Attempt to pull the image even if an older image exists locally
         """
         no_cache = bool(options.get('--no-cache', False))
-        project.build(service_names=options['SERVICE'], no_cache=no_cache)
+        pull = bool(options.get('--pull', False))
+        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull)
 
     def help(self, project, options):
         """
