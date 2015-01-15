@@ -23,6 +23,7 @@ DOCKER_START_KEYS = [
     'dns',
     'dns_search',
     'env_file',
+    'extra_hosts',
     'net',
     'pid',
     'privileged',
@@ -448,6 +449,8 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
+        extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
+
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
@@ -460,6 +463,7 @@ class Service(object):
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            extra_hosts=extra_hosts,
             pid_mode=pid
         )
 
@@ -619,3 +623,13 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
+
+
+def build_extra_hosts(extra_hosts_config):
+    if extra_hosts_config is None:
+        return None
+
+    if isinstance(extra_hosts_config, list):
+        return dict(r.split(':') for r in extra_hosts_config)
+    else:
+        return dict([extra_hosts_config.split(':')])

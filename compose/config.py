@@ -15,6 +15,7 @@ DOCKER_CONFIG_KEYS = [
     'entrypoint',
     'env_file',
     'environment',
+    'extra_hosts',
     'hostname',
     'image',
     'links',
@@ -41,6 +42,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
 
 DOCKER_CONFIG_HINTS = {
     'cpu_share': 'cpu_shares',
+    'add_host': 'extra_hosts',
     'link': 'links',
     'port': 'ports',
     'privilege': 'privileged',

@@ -107,6 +107,20 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
 
+    def test_create_container_with_extra_hosts_list(self):
+        extra_hosts = ['docker:162.242.195.82', 'fig:50.31.209.229']
+        service = self.create_service('db', extra_hosts=extra_hosts)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.ExtraHosts'), extra_hosts)
+
+    def test_create_container_with_extra_hosts_string(self):
+        extra_hosts = 'docker:162.242.195.82'
+        service = self.create_service('db', extra_hosts=extra_hosts)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.ExtraHosts'), [extra_hosts])
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
