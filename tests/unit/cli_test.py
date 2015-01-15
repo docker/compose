@@ -72,4 +72,5 @@ class CLITestCase(unittest.TestCase):
     def test_setup_logging(self):
         main.setup_logging()
         self.assertEqual(logging.getLogger().level, logging.DEBUG)
-        self.assertEqual(logging.getLogger('requests').propagate, False)
+        self.assertEqual(logging.getLogger('requests').level, logging.WARN)
+        self.assertEqual(logging.getLogger('boto').level, logging.WARN)

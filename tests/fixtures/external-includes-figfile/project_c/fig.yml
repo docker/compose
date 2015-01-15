@@ -1,0 +1,14 @@
+
+configs:
+  image: busybox:latest
+  volumes:
+    - /home
+
+webapp:
+  image: busybox:latest
+  command: /bin/sleep 300
+  volumes_from:
+    - configs
+
+unrelated:
+  image: busybox:latest

@@ -1,8 +1,10 @@
 from __future__ import absolute_import
+import contextlib
+import os
 import sys
 
-from six import StringIO
 from mock import patch
+from six import StringIO
 
 from .testcases import DockerClientTestCase
 from fig.cli.main import TopLevelCommand
@@ -117,6 +119,60 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 0)
         self.assertEqual(len(console.containers()), 0)
+
+    def test_up_with_includes(self):
+        self.command.base_dir = 'tests/fixtures/external-includes-figfile'
+
+        self.assertEqual(
+            [s.full_name for s in self.project.get_services()],
+            [
+                'externalincludesfigfileprojectc_configs',
+                'externalincludesfigfileprojectc_unrelated',
+                'externalincludesfigfileprojectc_webapp',
+                'externalincludesfigfileprojectb_configs',
+                'externalincludesfigfileprojectb_db',
+                'externalincludesfigfileprojectb_webapp',
+                'externalincludesfigfile_db',
+                'externalincludesfigfile_webapp',
+            ])
+
+        self.command.dispatch(['up', '-d'], None)
+
+        self.assertEqual(
+            set(c.name for c in self.project.containers(stopped=True)),
+            set([
+                'externalincludesfigfile_db_1',
+                'externalincludesfigfile_webapp_1',
+                'externalincludesfigfileprojectb_configs_1',
+                'externalincludesfigfileprojectb_db_1',
+                'externalincludesfigfileprojectb_webapp_1',
+                'externalincludesfigfileprojectc_configs_1',
+                'externalincludesfigfileprojectc_unrelated_1',
+                'externalincludesfigfileprojectc_webapp_1',
+            ]))
+
+        assert_has_links_and_volumes(
+            self.project,
+            'webapp',
+            set([
+                'externalincludesfigfile_db_1',
+                'externalincludesfigfileprojectb_webapp_1',
+                'externalincludesfigfileprojectc_webapp_1',
+            ]))
+
+        assert_has_links_and_volumes(
+            self.project,
+            'projectb_webapp',
+            set([
+                'externalincludesfigfileprojectb_db_1',
+                'externalincludesfigfileprojectc_webapp_1'
+            ]),
+            ['/home'])
+
+        assert_has_links_and_volumes(
+            self.project,
+            'projectc_webapp',
+            expected_volumes=['/home'])
 
     def test_up_with_recreate(self):
         self.command.dispatch(['up', '-d'], None)
@@ -380,3 +436,18 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(get_port(3000), container.get_local_port(3000))
         self.assertEqual(get_port(3001), "0.0.0.0:9999")
         self.assertEqual(get_port(3002), "")
+
+
+def assert_has_links_and_volumes(
+        project,
+        service_name,
+        expected_links=None,
+        expected_volumes=None):
+
+    container = project.get_service(service_name).get_container()
+
+    if expected_links is not None:
+        assert expected_links.issubset(set(container.links()))
+
+    if expected_volumes is not None:
+        assert expected_volumes == container.get('Volumes').keys()

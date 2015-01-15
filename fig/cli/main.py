@@ -56,8 +56,8 @@ def setup_logging():
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.DEBUG)
 
-    # Disable requests logging
-    logging.getLogger("requests").propagate = False
+    logging.getLogger("requests").setLevel(logging.WARN)
+    logging.getLogger("boto").setLevel(logging.WARN)
 
 
 # stolen from docopt master

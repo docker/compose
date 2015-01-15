@@ -1,0 +1,20 @@
+
+project-config:
+  include:
+    projectb:
+      url: ./tests/fixtures/external-includes-figfile/project_b/fig.yml
+
+    projectc:
+      url: ./tests/fixtures/external-includes-figfile/project_c/fig.yml
+
+db:
+  image: busybox:latest
+  command: /bin/sleep 300
+
+webapp:
+  image: busybox:latest
+  command: /bin/sleep 300
+  links:
+    - db
+    - projectb_webapp
+    - projectc_webapp

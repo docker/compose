@@ -1,17 +1,28 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from itertools import chain
 import logging
+from operator import (
+    attrgetter,
+    itemgetter,
+)
 
-from .service import Service
-from .container import Container
 from docker.errors import APIError
+import six
+
+from fig import includes
+from fig.service import (
+    Service,
+    ServiceLink,
+)
+from fig.container import Container
 
 log = logging.getLogger(__name__)
 
 
 def sort_service_dicts(services):
     # Topological sort (Cormen/Tarjan algorithm).
-    unmarked = services[:]
+    unmarked = sorted(services, key=itemgetter('name'))
     temporary_marked = set()
     sorted_services = []
 
@@ -44,44 +55,84 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client):
+    def __init__(self, name, services, client, namespace=None, external_projects=None):
         self.name = name
         self.services = services
         self.client = client
+        # The top level project name is the namespace for included projects
+        self.namespace = namespace or name
+        self.external_projects = external_projects or []
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, service_dicts, client, namespace, external_projects):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
-        project = cls(name, [], client)
+        project = cls(name, [], client, namespace, external_projects)
         for service_dict in sort_service_dicts(service_dicts):
-            links = project.get_links(service_dict)
+            links = project.get_links(service_dict.pop('links', None),
+                                      service_dict['name'])
             volumes_from = project.get_volumes_from(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
+            project.services.append(
+                Service(client=client,
+                        project=name,
+                        links=links,
+                        volumes_from=volumes_from,
+                        **service_dict))
         return project
 
     @classmethod
-    def from_config(cls, name, config, client):
-        dicts = []
+    def from_config(cls, name, config, client, namespace=None, project_cache=None):
+        services = []
+        project_config = config.pop('project-config', {})
+        external_projects = get_external_projects(
+            project_config.pop('include', {}),
+            project_config.pop('cache', {}),
+            client,
+            name,
+            project_cache)
+
         for service_name, service in list(config.items()):
             if not isinstance(service, dict):
-                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.' % service_name)
+                raise ConfigurationError(
+                    'Service "%s" doesn\'t have any configuration options. '
+                    'All top level keys in your fig.yml must map to a '
+                    'dictionary of configuration options.' % service_name)
             service['name'] = service_name
-            dicts.append(service)
-        return cls.from_dicts(name, dicts, client)
+            services.append(service)
+        return cls.from_dicts(name, services, client, namespace, external_projects)
 
     def get_service(self, name):
+        """Retrieve a service by name.
+
+        :param name: name of the service
+        :returns: :class:`fig.service.Service`
+        :raises NoSuchService: if no service was found by that name
         """
-        Retrieve a service by name. Raises NoSuchService
-        if the named service does not exist.
-        """
-        for service in self.services:
-            if service.name == name:
-                return service
+        if '_' in name:
+            project_name, service_name = name.rsplit('_', 1)
+            if project_name != self.namespace:
+                # References (link, etc) do not contain the namespace, so add it
+                project_name = self.namespace + project_name
+        else:
+            project_name, service_name = self.name, name
+
+        if project_name == self.name:
+            for service in self.services:
+                if service.name == service_name:
+                    return service
+
+        for project in self.external_projects:
+            if project.name == project_name:
+                return project.get_service(service_name)
 
         raise NoSuchService(name)
+
+    @property
+    def all_services(self):
+        return (flat_map(attrgetter('services'), self.external_projects) +
+                self.services)
 
     def get_services(self, service_names=None, include_links=False):
         """
@@ -97,51 +148,57 @@ class Project(object):
 
         Raises NoSuchService if any of the named services do not exist.
         """
-        if service_names is None or len(service_names) == 0:
-            return self.get_services(
-                service_names=[s.name for s in self.services],
-                include_links=include_links
-            )
-        else:
-            unsorted = [self.get_service(name) for name in service_names]
-            services = [s for s in self.services if s in unsorted]
 
-            if include_links:
-                services = reduce(self._inject_links, services, [])
+        def _add_linked_services(service):
+            linked_services = service.get_linked_services()
+            if not linked_services:
+                return [service]
 
-            uniques = []
-            [uniques.append(s) for s in services if s not in uniques]
-            return uniques
+            return flat_map(_add_linked_services, linked_services) + [service]
 
-    def get_links(self, service_dict):
-        links = []
-        if 'links' in service_dict:
-            for link in service_dict.get('links', []):
-                if ':' in link:
-                    service_name, link_name = link.split(':', 1)
-                else:
-                    service_name, link_name = link, None
-                try:
-                    links.append((self.get_service(service_name), link_name))
-                except NoSuchService:
-                    raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
-            del service_dict['links']
-        return links
+        if not service_names:
+            return self.all_services
+
+        services = [self.get_service(name) for name in service_names]
+        if include_links:
+            services = flat_map(_add_linked_services, services)
+
+        # TODO: use orderedset/ordereddict
+        uniques = []
+        [uniques.append(s) for s in services if s not in uniques]
+        return uniques
+
+    def get_links(self, config_links, name):
+        def get_linked_service(link):
+            if ':' in link:
+                service_name, link_name = link.split(':', 1)
+            else:
+                service_name, link_name = link, None
+
+            try:
+                return ServiceLink(self.get_service(service_name), link_name)
+            except NoSuchService:
+                raise ConfigurationError(
+                    'Service "%s" has a link to service "%s" which does not '
+                    'exist.' % (name, service_name))
+
+        return map(get_linked_service, config_links or [])
 
     def get_volumes_from(self, service_dict):
         volumes_from = []
-        if 'volumes_from' in service_dict:
-            for volume_name in service_dict.get('volumes_from', []):
+        for volume_name in service_dict.pop('volumes_from', []):
+            try:
+                service = self.get_service(volume_name)
+                volumes_from.append(service)
+            except NoSuchService:
                 try:
-                    service = self.get_service(volume_name)
-                    volumes_from.append(service)
-                except NoSuchService:
-                    try:
-                        container = Container.from_id(self.client, volume_name)
-                        volumes_from.append(container)
-                    except APIError:
-                        raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
-            del service_dict['volumes_from']
+                    container = Container.from_id(self.client, volume_name)
+                    volumes_from.append(container)
+                except APIError:
+                    raise ConfigurationError(
+                        'Service "%s" mounts volumes from "%s", which is not '
+                        'the name of a service or container.' % (
+                            service_dict['name'], volume_name))
         return volumes_from
 
     def start(self, service_names=None, **options):
@@ -201,19 +258,41 @@ class Project(object):
                 for service in self.get_services(service_names)
                 if service.has_container(container, one_off=one_off)]
 
-    def _inject_links(self, acc, service):
-        linked_names = service.get_linked_names()
+    def __repr__(self):
+        return "Project(%s, services=%s, includes=%s)" % (
+            self.name,
+            len(self.services),
+            len(self.external_projects))
 
-        if len(linked_names) > 0:
-            linked_services = self.get_services(
-                service_names=linked_names,
-                include_links=True
-            )
-        else:
-            linked_services = []
 
-        linked_services.append(service)
-        return acc + linked_services
+def flat_map(func, seq):
+    return list(chain.from_iterable(map(func, seq)))
+
+
+def get_external_projects(
+        includes_config,
+        cache_config,
+        client,
+        project_name,
+        project_cache):
+    """Recursively fetch included projects.
+
+    Cache each external project by url. If a project is encountered with the
+    same url the same instance of :class:`Project` will be returned.
+    """
+    def build_project(name, *args, **kwargs):
+        name = '%s%s' % (project_name, name)
+        kwargs['namespace'] = project_name
+        return Project.from_config(name, *args, **kwargs)
+
+    if project_cache is None:
+        project_cache = includes.ExternalProjectCache(
+            includes.LocalConfigCache.from_config(cache_config),
+            client,
+            build_project)
+
+    return [project_cache.get_project_from_include(*item)
+            for item in six.iteritems(includes_config)]
 
 
 class NoSuchService(Exception):

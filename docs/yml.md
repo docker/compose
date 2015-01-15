@@ -216,3 +216,42 @@ restart: always
 stdin_open: true
 tty: true
 ```
+
+## Project Includes
+
+External projects can be included by specifying a url to the projects `fig.yml`
+file. Only services with `image` may be included (because there would be no way
+to build the service without the full project).
+
+Urls may be filepaths, http/https or s3.  Remote files will be cached locally
+using the specified cache settings (defaults to a path of ~/.fig-cache/ with
+a ttl of 5 minutes).
+
+Example:
+
+```yaml
+
+project-config:
+
+    include:
+        projecta:
+            url: 's3://bucket/path/to/key/projecta.yml'
+        projectb:
+            url: 'http://example.com/projectb/fig.yml'
+        projectc:
+            url: './path/to/projectc/fig.yml'
+
+    # This section is optional, below are the default values
+    cache:
+        enable: True
+        path: ~/.fig-cache/
+        ttl: 5min
+
+webapp:
+    build: .
+    links:
+        - projecta_webapp
+        - pojrectb_webapp
+    volumes_from:
+        - projectc_data
+```

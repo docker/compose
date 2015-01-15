@@ -1,0 +1,23 @@
+
+project-config:
+  include:
+    proejctc:
+      url: ./tests/fixtures/external-includes-figfile/project_c/fig.yml
+
+db:
+  image: busybox:latest
+  command: /bin/sleep 300
+
+configs:
+  image: busybox:latest
+  volumes:
+    - /home
+
+webapp:
+  image: busybox:latest
+  command: /bin/sleep 300
+  links:
+    - db
+    - projectc_webapp
+  volumes_from:
+    - configs
