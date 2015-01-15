@@ -1,0 +1,7 @@
+template_service:
+  image: busybox:latest
+  command: /bin/sleep 10
+myservice:
+  command: /bin/bash
+  template:
+    service: template_service

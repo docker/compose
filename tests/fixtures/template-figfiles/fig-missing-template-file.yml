@@ -1,0 +1,2 @@
+service:
+  template: does-not-exist.fig

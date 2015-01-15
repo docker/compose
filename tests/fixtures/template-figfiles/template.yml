@@ -1,0 +1,3 @@
+simple:
+  image: busybox:latest
+  command: /bin/sleep 300

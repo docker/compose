@@ -1,0 +1,9 @@
+simple:
+  template: template.yml
+  command: /bin/sleep 5
+another:
+  template:
+    path: template.yml
+    service: simple
+  ports:
+    - '3000'
