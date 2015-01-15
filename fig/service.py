@@ -27,6 +27,7 @@ DOCKER_CONFIG_KEYS = [
     'entrypoint',
     'env_file',
     'environment',
+    'extra_hosts',
     'hostname',
     'image',
     'mem_limit',
@@ -43,6 +44,7 @@ DOCKER_CONFIG_KEYS = [
 ]
 DOCKER_CONFIG_HINTS = {
     'cpu_share' : 'cpu_shares',
+    'add_host'  : 'extra_hosts',
     'link'      : 'links',
     'port'      : 'ports',
     'privilege' : 'privileged',
@@ -58,6 +60,7 @@ DOCKER_START_KEYS = [
     'dns',
     'dns_search',
     'env_file',
+    'extra_hosts',
     'net',
     'privileged',
     'restart',
@@ -97,7 +100,6 @@ class Service(object):
 
         supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose',
                                                   'external_links']
-
         for k in options:
             if k not in supported_options:
                 msg = "Unsupported config option for %s service: '%s'" % (name, k)
@@ -322,6 +324,8 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
+        extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
+
         container.start(
             links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=port_bindings,
@@ -334,6 +338,7 @@ class Service(object):
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            extra_hosts=extra_hosts,
         )
         return container
 
@@ -627,6 +632,16 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
+
+
+def build_extra_hosts(extra_hosts_config):
+    if extra_hosts_config is None:
+        return None
+
+    if isinstance(extra_hosts_config, list):
+        return dict(r.split(':') for r in extra_hosts_config)
+    else:
+        return dict([extra_hosts_config.split(':')])
 
 
 def merge_environment(options):
