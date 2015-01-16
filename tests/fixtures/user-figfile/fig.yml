@@ -1,0 +1,3 @@
+service:
+  image: busybox:latest
+  command: id
