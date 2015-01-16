@@ -442,9 +442,8 @@ class Service(object):
             container_options['ports'] = ports
 
         if 'volumes' in container_options:
-            container_options['volumes'] = dict(
-                (parse_volume_spec(v).internal, {})
-                for v in container_options['volumes'])
+            vols = (parse_volume_spec(v) for v in container_options['volumes'])
+            container_options['volumes'] = [v.internal for v in vols if not v.external]
 
         container_options['environment'] = merge_environment(container_options)
 
