@@ -9,7 +9,7 @@ import sys
 
 from docker.errors import APIError
 
-from .container import Container
+from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
 log = logging.getLogger(__name__)
@@ -536,17 +536,6 @@ def parse_name(name):
     match = NAME_RE.match(name)
     (project, service_name, _, suffix) = match.groups()
     return ServiceName(project, service_name, int(suffix))
-
-
-def get_container_name(container):
-    if not container.get('Name') and not container.get('Names'):
-        return None
-    # inspect
-    if 'Name' in container:
-        return container['Name']
-    # ps
-    shortest_name = min(container['Names'], key=lambda n: len(n.split('/')))
-    return shortest_name.split('/')[-1]
 
 
 def parse_restart_spec(restart_config):

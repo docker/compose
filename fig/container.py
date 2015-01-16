@@ -22,10 +22,8 @@ class Container(object):
         new_dictionary = {
             'Id': dictionary['Id'],
             'Image': dictionary['Image'],
+            'Name': '/' + get_container_name(dictionary),
         }
-        for name in dictionary.get('Names', []):
-            if len(name.split('/')) == 2:
-                new_dictionary['Name'] = name
         return cls(client, new_dictionary, **kwargs)
 
     @classmethod
@@ -170,3 +168,14 @@ class Container(object):
         if type(self) != type(other):
             return False
         return self.id == other.id
+
+
+def get_container_name(container):
+    if not container.get('Name') and not container.get('Names'):
+        return None
+    # inspect
+    if 'Name' in container:
+        return container['Name']
+    # ps
+    shortest_name = min(container['Names'], key=lambda n: len(n.split('/')))
+    return shortest_name.split('/')[-1]
