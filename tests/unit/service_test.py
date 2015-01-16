@@ -17,6 +17,7 @@ from fig.service import (
     parse_volume_spec,
     build_volume_binding,
     APIError,
+    get_container_name,
     parse_repository_tag,
 )
 
@@ -48,6 +49,25 @@ class ServiceTest(unittest.TestCase):
     def test_config_validation(self):
         self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
         Service(name='foo', ports=['8000'])
+
+    def test_get_container_name(self):
+        self.assertIsNone(get_container_name({}))
+        self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
+
+    def test_containers(self):
+        service = Service('db', client=self.mock_client, project='myproject')
+
+        self.mock_client.containers.return_value = []
+        self.assertEqual(service.containers(), [])
+
+        self.mock_client.containers.return_value = [
+            {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/myproject', '/foo/bar']},
+            {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/myproject_db']},
+            {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/db_1']},
+            {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/myproject_db_1', '/myproject_web_1/db']},
+        ]
+        self.assertEqual([c.id for c in service.containers()], ['IN_1'])
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
