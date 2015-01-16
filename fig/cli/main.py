@@ -165,18 +165,19 @@ class TopLevelCommand(Command):
         Usage: port [options] SERVICE PRIVATE_PORT
 
         Options:
-            --protocol=proto  tcp or udp (defaults to tcp)
+            --protocol=proto  tcp or udp [default: tcp]
             --index=index     index of the container if there are multiple
-                              instances of a service (defaults to 1)
+                              instances of a service [default: 1]
         """
         service = project.get_service(options['SERVICE'])
         try:
-            container = service.get_container(number=options.get('--index') or 1)
+            container = service.get_container(
+                number=int(options.get('--index')))
         except ValueError as e:
             raise UserError(str(e))
         print(container.get_local_port(
             options['PRIVATE_PORT'],
-            protocol=options.get('--protocol') or 'tcp') or '')
+            protocol=options.get('--protocol')) or '')
 
     def ps(self, project, options):
         """
