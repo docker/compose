@@ -54,6 +54,7 @@ class ServiceTest(unittest.TestCase):
         self.assertIsNone(get_container_name({}))
         self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
         self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')
 
     def test_containers(self):
         service = Service('db', client=self.mock_client, project='myproject')
@@ -66,6 +67,17 @@ class ServiceTest(unittest.TestCase):
             {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/myproject_db']},
             {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/db_1']},
             {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/myproject_db_1', '/myproject_web_1/db']},
+        ]
+        self.assertEqual([c.id for c in service.containers()], ['IN_1'])
+
+    def test_containers_prefixed(self):
+        service = Service('db', client=self.mock_client, project='myproject')
+
+        self.mock_client.containers.return_value = [
+            {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/swarm-host-1/myproject', '/swarm-host-1/foo/bar']},
+            {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/swarm-host-1/myproject_db']},
+            {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/swarm-host-1/db_1']},
+            {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']},
         ]
         self.assertEqual([c.id for c in service.containers()], ['IN_1'])
 

@@ -545,9 +545,8 @@ def get_container_name(container):
     if 'Name' in container:
         return container['Name']
     # ps
-    for name in container['Names']:
-        if len(name.split('/')) == 2:
-            return name[1:]
+    shortest_name = min(container['Names'], key=lambda n: len(n.split('/')))
+    return shortest_name.split('/')[-1]
 
 
 def parse_restart_spec(restart_config):
