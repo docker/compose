@@ -78,7 +78,7 @@ We define our Python dependencies in a file called `requirements.txt`:
 Next, we want to create a Docker image containing all of our app's dependencies. We specify how to build one using a file called `Dockerfile`:
 
     FROM python:2.7
-    ADD . /code
+    RUN mkdir /code
     WORKDIR /code
     RUN pip install -r requirements.txt
 
