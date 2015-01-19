@@ -1,20 +1,26 @@
 ---
 layout: default
 title: Installing Compose
+page_title: Installing Compose
+page_description: Installing Compose
+page_keywords: fig, composition, compose, docker
 ---
 
-Installing Compose
-==============
+# Installing Compose
 
 First, install Docker version 1.3 or greater.
 
-If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/) to install both Docker and boot2docker. Once boot2docker is running, set the environment variables that'll configure Docker and Compose to talk to it:
+If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/)
+to install both Docker and boot2docker. Once boot2docker is running, set the environment
+variables that'll configure Docker and Compose to talk to it:
 
     $(boot2docker shellinit)
 
-To persist the environment variables across shell sessions, you can add that line to your `~/.bashrc` file.
+To persist the environment variables across shell sessions, you can add that line
+to your `~/.bashrc` file.
 
-There are also guides for [Ubuntu](https://docs.docker.com/installation/ubuntulinux/) and [other platforms](https://docs.docker.com/installation/) in Docker’s documentation.
+There are also guides for [Ubuntu](https://docs.docker.com/installation/ubuntulinux/)
+and [other platforms](https://docs.docker.com/installation/) in Docker`s documentation.
 
 Next, install Compose:
 
@@ -22,7 +28,8 @@ Next, install Compose:
 
 Optionally, install [command completion](completion.html) for the bash shell.
 
-Releases are available for OS X and 64-bit Linux. Compose is also available as a Python package if you're on another platform (or if you prefer that sort of thing):
+Releases are available for OS X and 64-bit Linux. Compose is also available as a Python
+package if you're on another platform (or if you prefer that sort of thing):
 
     $ sudo pip install -U docker-compose
 

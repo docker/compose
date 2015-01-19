@@ -1,18 +1,25 @@
 ---
 layout: default
 title: docker-compose.yml reference
+page_title: docker-compose.yml reference
+page_description: docker-compose.yml reference
+page_keywords: fig, composition, compose, docker
 ---
 
-docker-compose.yml reference
-=================
+# docker-compose.yml reference
 
-Each service defined in `docker-compose.yml` must specify exactly one of `image` or `build`. Other keys are optional, and are analogous to their `docker run` command-line counterparts.
+Each service defined in `docker-compose.yml` must specify exactly one of
+`image` or `build`. Other keys are optional, and are analogous to their
+`docker run` command-line counterparts.
 
-As with `docker run`, options specified in the Dockerfile (e.g. `CMD`, `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to specify them again in `docker-compose.yml`.
+As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
+`EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
+specify them again in `docker-compose.yml`.
 
-###image
+### image
 
-Tag or partial image ID. Can be local or remote - Compose will attempt to pull if it doesn't exist locally.
+Tag or partial image ID. Can be local or remote - Compose will attempt to
+pull if it doesn't exist locally.
 
 ```
 image: ubuntu
@@ -22,7 +29,8 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. Compose will build and tag it with a generated name, and use that image thereafter.
+Path to a directory containing a Dockerfile. Compose will build and tag it
+with a generated name, and use that image thereafter.
 
 ```
 build: /path/to/build/dir
@@ -39,7 +47,9 @@ command: bundle exec thin -p 3000
 <a name="links"></a>
 ### links
 
-Link to containers in another service. Either specify both the service name and the link alias (`SERVICE:ALIAS`), or just the service name (which will also be used for the alias).
+Link to containers in another service. Either specify both the service name and
+the link alias (`SERVICE:ALIAS`), or just the service name (which will also be
+used for the alias).
 
 ```
 links:
@@ -48,7 +58,8 @@ links:
  - redis
 ```
 
-An entry with the alias' name will be created in `/etc/hosts` inside containers for this service, e.g:
+An entry with the alias' name will be created in `/etc/hosts` inside containers
+for this service, e.g:
 
 ```
 172.17.2.186  db
@@ -56,12 +67,15 @@ An entry with the alias' name will be created in `/etc/hosts` inside containers 
 172.17.2.187  redis
 ```
 
-Environment variables will also be created - see the [environment variable reference](env.html) for details.
+Environment variables will also be created - see the [environment variable
+reference](env.html) for details.
 
 ### external_links
 
-Link to containers started outside this `docker-compose.yml` or even outside of Compose, especially for containers that provide shared or common services.
-`external_links` follow semantics similar to `links` when specifying both the container name and the link alias (`CONTAINER:ALIAS`).
+Link to containers started outside this `docker-compose.yml` or even outside
+of Compose, especially for containers that provide shared or common services.
+`external_links` follow semantics similar to `links` when specifying both the
+container name and the link alias (`CONTAINER:ALIAS`).
 
 ```
 external_links:
@@ -72,9 +86,13 @@ external_links:
 
 ### ports
 
-Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container port (a random host port will be chosen).
+Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container
+port (a random host port will be chosen).
 
-**Note:** When mapping ports in the `HOST:CONTAINER` format, you may experience erroneous results when using a container port lower than 60, because YAML will parse numbers in the format `xx:yy` as sexagesimal (base 60). For this reason, we recommend always explicitly specifying your port mappings as strings.
+> **Note:** When mapping ports in the `HOST:CONTAINER` format, you may experience
+> erroneous results when using a container port lower than 60, because YAML will
+> parse numbers in the format `xx:yy` as sexagesimal (base 60). For this reason,
+> we recommend always explicitly specifying your port mappings as strings.
 
 ```
 ports:
@@ -86,7 +104,8 @@ ports:
 
 ### expose
 
-Expose ports without publishing them to the host machine - they'll only be accessible to linked services. Only the internal port can be specified.
+Expose ports without publishing them to the host machine - they'll only be
+accessible to linked services. Only the internal port can be specified.
 
 ```
 expose:
@@ -120,7 +139,8 @@ volumes_from:
 
 Add environment variables. You can use either an array or a dictionary.
 
-Environment variables with only a key are resolved to their values on the machine Compose is running on, which can be helpful for secret or host-specific values.
+Environment variables with only a key are resolved to their values on the
+machine Compose is running on, which can be helpful for secret or host-specific values.
 
 ```
 environment:
@@ -196,7 +216,8 @@ dns_search:
 
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
 
-Each of these is a single value, analogous to its [docker run](https://docs.docker.com/reference/run/) counterpart.
+Each of these is a single value, analogous to its
+[docker run](https://docs.docker.com/reference/run/) counterpart.
 
 ```
 cpu_shares: 73
