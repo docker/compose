@@ -186,6 +186,25 @@ class ServiceTest(DockerClientTestCase):
         service.recreate_containers()
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
+
+    def test_recreate_containers_with_image_declared_volume(self):
+        service = Service(
+            project='figtest',
+            name='db',
+            client=self.client,
+            build='tests/fixtures/dockerfile-with-volume',
+        )
+
+        old_container = create_and_start_container(service)
+        self.assertEqual(old_container.get('Volumes').keys(), ['/data'])
+        volume_path = old_container.get('Volumes')['/data']
+
+        service.recreate_containers()
+        new_container = service.containers()[0]
+        service.start_container(new_container)
+        self.assertEqual(new_container.get('Volumes').keys(), ['/data'])
+        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         create_and_start_container(db, environment={'FOO': 'BAR'})
