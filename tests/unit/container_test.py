@@ -20,13 +20,25 @@ class ContainerTest(unittest.TestCase):
             "Ports": None,
             "SizeRw": 0,
             "SizeRootFs": 0,
-            "Names": ["/figtest_db_1"],
+            "Names": ["/figtest_db_1", "/figtest_web_1/db"],
             "NetworkSettings": {
                 "Ports": {},
             },
         }
 
     def test_from_ps(self):
+        container = Container.from_ps(None,
+                                      self.container_dict,
+                                      has_been_inspected=True)
+        self.assertEqual(container.dictionary, {
+            "Id": "abc",
+            "Image":"busybox:latest",
+            "Name": "/figtest_db_1",
+        })
+
+    def test_from_ps_prefixed(self):
+        self.container_dict['Names'] = ['/swarm-host-1' + n for n in self.container_dict['Names']]
+
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
