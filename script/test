@@ -1,5 +1,5 @@
 #!/bin/sh
 set -ex
-docker build -t compose .
-docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint flake8 compose compose
-docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint nosetests compose $@
+docker build -t docker-compose .
+docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint flake8 docker-compose compose
+docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint nosetests docker-compose $@

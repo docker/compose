@@ -48,7 +48,7 @@ if sys.version_info < (2, 7):
 
 
 setup(
-    name='compose',
+    name='docker-compose',
     version=find_version("compose", "__init__.py"),
     description='Multi-container orchestration for Docker',
     url='https://www.docker.com/',
@@ -61,6 +61,6 @@ setup(
     tests_require=tests_require,
     entry_points="""
     [console_scripts]
-    compose=compose.cli.main:main
+    docker-compose=compose.cli.main:main
     """,
 )

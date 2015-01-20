@@ -110,13 +110,13 @@ class Command(DocoptCommand):
         if file_path:
             return os.path.join(self.base_dir, file_path)
 
-        if os.path.exists(os.path.join(self.base_dir, 'compose.yaml')):
-            log.warning("Fig just read the file 'compose.yaml' on startup, rather "
-                        "than 'compose.yml'")
+        if os.path.exists(os.path.join(self.base_dir, 'docker-compose.yaml')):
+            log.warning("Fig just read the file 'docker-compose.yaml' on startup, rather "
+                        "than 'docker-compose.yml'")
             log.warning("Please be aware that .yml is the expected extension "
                         "in most cases, and using .yaml can cause compatibility "
                         "issues in future")
 
-            return os.path.join(self.base_dir, 'compose.yaml')
+            return os.path.join(self.base_dir, 'docker-compose.yaml')
 
-        return os.path.join(self.base_dir, 'compose.yml')
+        return os.path.join(self.base_dir, 'docker-compose.yml')

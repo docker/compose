@@ -5,4 +5,4 @@
 /dist
 /docs/_site
 /venv
-compose.spec
+docker-compose.spec
