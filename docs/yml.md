@@ -60,7 +60,7 @@ Environment variables will also be created - see the [environment variable refer
 
 ### external_links
 
-Link to containers started outside this `docker-compose.yml` or even outside of docker-compose, especially for containers that provide shared or common services.
+Link to containers started outside this `docker-compose.yml` or even outside of Compose, especially for containers that provide shared or common services.
 `external_links` follow semantics similar to `links` when specifying both the container name and the link alias (`CONTAINER:ALIAS`).
 
 ```
@@ -103,7 +103,7 @@ Mount paths as volumes, optionally specifying a path on the host machine
 volumes:
  - /var/lib/mysql
  - cache/:/tmp/cache
- - ~/condocker-composes:/etc/condocker-composes/:ro
+ - ~/configs:/etc/configs/:ro
 ```
 
 ### volumes_from

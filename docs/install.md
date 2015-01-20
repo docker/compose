@@ -8,7 +8,7 @@ Installing Compose
 
 First, install Docker version 1.3 or greater.
 
-If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/) to install both Docker and boot2docker. Once boot2docker is running, set the environment variables that'll condocker-composeure Docker and Compose to talk to it:
+If you're on OS X, you can use the [OS X installer](https://docs.docker.com/installation/mac/) to install both Docker and boot2docker. Once boot2docker is running, set the environment variables that'll configure Docker and Compose to talk to it:
 
     $(boot2docker shellinit)
 

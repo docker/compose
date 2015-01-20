@@ -25,7 +25,7 @@ Next, we have a bootstrap `Gemfile` which just loads Rails. It'll be overwritten
     source 'https://rubygems.org'
     gem 'rails', '4.0.2'
 
-Finally, `docker-compose.yml` is where the magic happens. It describes what services our app comprises (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the condocker-composeuration we need to link them together and expose the web app's port.
+Finally, `docker-compose.yml` is where the magic happens. It describes what services our app comprises (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration we need to link them together and expose the web app's port.
 
     db:
       image: postgres
@@ -50,8 +50,8 @@ First, Compose will build the image for the `web` service using the `Dockerfile`
     $ ls
     Dockerfile   app          docker-compose.yml      tmp
     Gemfile      bin          lib          vendor
-    Gemfile.lock condocker-compose       log
-    README.rdoc  condocker-compose.ru    public
+    Gemfile.lock config       log
+    README.rdoc  config.ru    public
     Rakefile     db           test
 
 Uncomment the line in your new `Gemfile` which loads `therubyracer`, so we've got a Javascript runtime:
@@ -94,5 +94,3 @@ Finally, we just need to create the database. In another terminal, run:
     $ docker-compose run web rake db:create
 
 And we're rolling—your app should now be running on port 3000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
-
-![Screenshot of Rails' stock index.html](https://orchardup.com/static/images/docker-compose-rails-screenshot.png)

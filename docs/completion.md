@@ -30,4 +30,4 @@ Depending on what you typed on the command line so far, it will complete
  - service names that make sense in a given context (e.g. services with running or stopped instances or services based on images vs. services based on Dockerfiles). For `docker-compose scale`, completed service names will automatically have "=" appended.
  - arguments for selected options, e.g. `docker-compose kill -s` will complete some signals like SIGHUP and SIGUSR1.
 
-Enjoy working with docker-compose faster and with less typos!
+Enjoy working with Compose faster and with less typos!

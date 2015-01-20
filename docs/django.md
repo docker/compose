@@ -43,16 +43,16 @@ See the [`docker-compose.yml` reference](yml.html) for more information on how i
 
 We can now start a Django project using `docker-compose run`:
 
-    $ docker-compose run web django-admin.py startproject docker-composeexample .
+    $ docker-compose run web django-admin.py startproject composeexample .
 
-First, Compose will build an image for the `web` service using the `Dockerfile`. It will then run `django-admin.py startproject docker-composeexample .` inside a container using that image.
+First, Compose will build an image for the `web` service using the `Dockerfile`. It will then run `django-admin.py startproject composeexample .` inside a container using that image.
 
 This will generate a Django app inside the current directory:
 
     $ ls
-    Dockerfile       docker-compose.yml          docker-composeexample       manage.py        requirements.txt
+    Dockerfile       docker-compose.yml          composeexample       manage.py        requirements.txt
 
-First thing we need to do is set up the database connection. Replace the `DATABASES = ...` definition in `docker-composeexample/settings.py` to read:
+First thing we need to do is set up the database connection. Replace the `DATABASES = ...` definition in `composeexample/settings.py` to read:
 
     DATABASES = {
         'default': {
@@ -79,7 +79,7 @@ Then, run `docker-compose up`:
     myapp_web_1 |
     myapp_web_1 | 0 errors found
     myapp_web_1 | January 27, 2014 - 12:12:40
-    myapp_web_1 | Django version 1.6.1, using settings 'docker-composeexample.settings'
+    myapp_web_1 | Django version 1.6.1, using settings 'composeexample.settings'
     myapp_web_1 | Starting development server at http://0.0.0.0:8000/
     myapp_web_1 | Quit the server with CONTROL-C.
 

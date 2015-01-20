@@ -1,9 +1,7 @@
 ---
 layout: default
-title: Compose | Fast, isolated development environments using Docker
+title: Compose: Multi-container orchestration for Docker
 ---
-
-<strong class="strapline">Fast, isolated development environments using Docker.</strong>
 
 Define your app's environment with a `Dockerfile` so it can be reproduced anywhere:
 
@@ -28,9 +26,7 @@ db:
 
 (No more installing Postgres on your laptop!)
 
-Then type `docker-compose up`, and Compose will start and run your entire app:
-
-![example docker-compose run](https://orchardup.com/static/images/docker-compose-example-large.gif)
+Then type `docker-compose up`, and Compose will start and run your entire app.
 
 There are commands to:
 
@@ -49,8 +45,8 @@ First, [install Docker and Compose](install.html).
 
 You'll want to make a directory for the project:
 
-    $ mkdir docker-composetest
-    $ cd docker-composetest
+    $ mkdir composetest
+    $ cd composetest
 
 Inside this directory, create `app.py`, a simple web app that uses the Flask framework and increments a value in Redis:
 
@@ -108,8 +104,8 @@ Now if we run `docker-compose up`, it'll pull a Redis image, build an image for 
     $ docker-compose up
     Pulling image redis...
     Building web...
-    Starting docker-composetest_redis_1...
-    Starting docker-composetest_web_1...
+    Starting composetest_redis_1...
+    Starting composetest_web_1...
     redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     web_1   |  * Running on http://0.0.0.0:5000/
 
@@ -118,13 +114,13 @@ The web app should now be listening on port 5000 on your docker daemon (if you'r
 If you want to run your services in the background, you can pass the `-d` flag to `docker-compose up` and use `docker-compose ps` to see what is currently running:
 
     $ docker-compose up -d
-    Starting docker-composetest_redis_1...
-    Starting docker-composetest_web_1...
+    Starting composetest_redis_1...
+    Starting composetest_web_1...
     $ docker-compose ps
             Name                 Command            State       Ports
     -------------------------------------------------------------------
-    docker-composetest_redis_1   /usr/local/bin/run         Up
-    docker-composetest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
+    composetest_redis_1   /usr/local/bin/run         Up
+    composetest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
 
 `docker-compose run` allows you to run one-off commands for your services. For example, to see what environment variables are available to the `web` service:
 
@@ -137,4 +133,4 @@ If you started Compose with `docker-compose up -d`, you'll probably want to stop
 
     $ docker-compose stop
 
-That's more-or-less how Compose works. See the reference section below for full details on the commands, condocker-composeuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/docker/docker-compose).
+That's more-or-less how Compose works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/docker/docker-compose).

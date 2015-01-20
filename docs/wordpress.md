@@ -37,7 +37,7 @@ db:
     MYSQL_DATABASE: wordpress
 ```
 
-Two supporting files are needed to get this working - first up, `wp-condocker-compose.php` is the standard Wordpress condocker-compose file with a single change to point the database condocker-composeuration at the `db` container:
+Two supporting files are needed to get this working - first up, `wp-config.php` is the standard Wordpress config file with a single change to point the database configuration at the `db` container:
 
 ```
 <?php

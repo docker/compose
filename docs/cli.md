@@ -22,7 +22,7 @@ Run `docker-compose [COMMAND] --help` for full usage.
 
 ### -f, --file FILE
 
- Specify an alternate docker-compose file (default: docker-compose.yml)
+ Specify an alternate compose file (default: docker-compose.yml)
 
 ### -p, --project-name NAME
 
@@ -34,7 +34,7 @@ Run `docker-compose [COMMAND] --help` for full usage.
 
 Build or rebuild services.
 
-Services are built once and then tagged as `project_service`, e.g. `docker-composetest_db`. If you change a service's `Dockerfile` or the contents of its build directory, you can run `docker-compose build` to rebuild it.
+Services are built once and then tagged as `project_service`, e.g. `composetest_db`. If you change a service's `Dockerfile` or the contents of its build directory, you can run `docker-compose build` to rebuild it.
 
 ### help
 
@@ -77,7 +77,7 @@ For example:
 
 By default, linked services will be started, unless they are already running.
 
-One-off commands are started in new containers with the same condocker-compose as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and by default no ports will be created in case they collide.
+One-off commands are started in new containers with the same configuration as a normal container for that service, so volumes, links, etc will all be created as expected. The only thing different to a normal container is the command will be overridden with the one specified and by default no ports will be created in case they collide.
 
 Links are also created between one-off commands and the other containers for that service so you can do stuff like this:
 
@@ -122,9 +122,9 @@ By default if there are existing containers for a service, `docker-compose up` w
 
 ## Environment Variables
 
-Several environment variables can be used to condocker-composeure Compose's behaviour.
+Several environment variables can be used to configure Compose's behaviour.
 
-Variables starting with `DOCKER_` are the same as those used to condocker-composeure the Docker command-line client. If you're using boot2docker, `$(boot2docker shellinit)` will set them to their correct values.
+Variables starting with `DOCKER_` are the same as those used to configure the Docker command-line client. If you're using boot2docker, `$(boot2docker shellinit)` will set them to their correct values.
 
 ### FIG\_PROJECT\_NAME
 
@@ -144,4 +144,4 @@ When set to anything other than an empty string, enables TLS communication with 
 
 ### DOCKER\_CERT\_PATH
 
-Condocker-composeure the path to the `ca.pem`, `cert.pem` and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
+Configure the path to the `ca.pem`, `cert.pem` and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
