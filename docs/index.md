@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Fig | Fast, isolated development environments using Docker
+title: Compose | Fast, isolated development environments using Docker
 ---
 
 <strong class="strapline">Fast, isolated development environments using Docker.</strong>
@@ -12,7 +12,7 @@ Define your app's environment with a `Dockerfile` so it can be reproduced anywhe
     WORKDIR /code
     RUN pip install -r requirements.txt
 
-Define the services that make up your app in `fig.yml` so they can be run together in an isolated environment:
+Define the services that make up your app in `docker-compose.yml` so they can be run together in an isolated environment:
 
 ```yaml
 web:
@@ -28,9 +28,9 @@ db:
 
 (No more installing Postgres on your laptop!)
 
-Then type `fig up`, and Fig will start and run your entire app:
+Then type `docker-compose up`, and Compose will start and run your entire app:
 
-![example fig run](https://orchardup.com/static/images/fig-example-large.gif)
+![example docker-compose run](https://orchardup.com/static/images/docker-compose-example-large.gif)
 
 There are commands to:
 
@@ -43,14 +43,14 @@ There are commands to:
 Quick start
 -----------
 
-Let's get a basic Python web app running on Fig. It assumes a little knowledge of Python, but the concepts should be clear if you're not familiar with it.
+Let's get a basic Python web app running on Compose. It assumes a little knowledge of Python, but the concepts should be clear if you're not familiar with it.
 
-First, [install Docker and Fig](install.html).
+First, [install Docker and Compose](install.html).
 
 You'll want to make a directory for the project:
 
-    $ mkdir figtest
-    $ cd figtest
+    $ mkdir docker-composetest
+    $ cd docker-composetest
 
 Inside this directory, create `app.py`, a simple web app that uses the Flask framework and increments a value in Redis:
 
@@ -84,7 +84,7 @@ Next, we want to create a Docker image containing all of our app's dependencies.
 
 This tells Docker to install Python, our code and our Python dependencies inside a Docker image. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
-We then define a set of services using `fig.yml`:
+We then define a set of services using `docker-compose.yml`:
 
     web:
       build: .
@@ -103,38 +103,38 @@ This defines two services:
  - `web`, which is built from `Dockerfile` in the current directory. It also says to run the command `python app.py` inside the image, forward the exposed port 5000 on the container to port 5000 on the host machine, connect up the Redis service, and mount the current directory inside the container so we can work on code without having to rebuild the image.
  - `redis`, which uses the public image [redis](https://registry.hub.docker.com/_/redis/). 
 
-Now if we run `fig up`, it'll pull a Redis image, build an image for our own code, and start everything up:
+Now if we run `docker-compose up`, it'll pull a Redis image, build an image for our own code, and start everything up:
 
-    $ fig up
+    $ docker-compose up
     Pulling image redis...
     Building web...
-    Starting figtest_redis_1...
-    Starting figtest_web_1...
+    Starting docker-composetest_redis_1...
+    Starting docker-composetest_web_1...
     redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     web_1   |  * Running on http://0.0.0.0:5000/
 
 The web app should now be listening on port 5000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
 
-If you want to run your services in the background, you can pass the `-d` flag to `fig up` and use `fig ps` to see what is currently running:
+If you want to run your services in the background, you can pass the `-d` flag to `docker-compose up` and use `docker-compose ps` to see what is currently running:
 
-    $ fig up -d
-    Starting figtest_redis_1...
-    Starting figtest_web_1...
-    $ fig ps
+    $ docker-compose up -d
+    Starting docker-composetest_redis_1...
+    Starting docker-composetest_web_1...
+    $ docker-compose ps
             Name                 Command            State       Ports
     -------------------------------------------------------------------
-    figtest_redis_1   /usr/local/bin/run         Up
-    figtest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
+    docker-composetest_redis_1   /usr/local/bin/run         Up
+    docker-composetest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
 
-`fig run` allows you to run one-off commands for your services. For example, to see what environment variables are available to the `web` service:
+`docker-compose run` allows you to run one-off commands for your services. For example, to see what environment variables are available to the `web` service:
 
-    $ fig run web env
+    $ docker-compose run web env
 
 
-See `fig --help` other commands that are available.
+See `docker-compose --help` other commands that are available.
 
-If you started Fig with `fig up -d`, you'll probably want to stop your services once you've finished with them:
+If you started Compose with `docker-compose up -d`, you'll probably want to stop your services once you've finished with them:
 
-    $ fig stop
+    $ docker-compose stop
 
-That's more-or-less how Fig works. See the reference section below for full details on the commands, configuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/docker/fig).
+That's more-or-less how Compose works. See the reference section below for full details on the commands, condocker-composeuration file and environment variables. If you have any thoughts or suggestions, [open an issue on GitHub](https://github.com/docker/docker-compose).

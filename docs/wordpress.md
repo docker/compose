@@ -1,12 +1,12 @@
 ---
 layout: default
-title: Getting started with Fig and Wordpress
+title: Getting started with Compose and Wordpress
 ---
 
-Getting started with Fig and Wordpress
+Getting started with Compose and Wordpress
 ======================================
 
-Fig makes it nice and easy to run Wordpress in an isolated environment. [Install Fig](install.html), then download Wordpress into the current directory:
+Compose makes it nice and easy to run Wordpress in an isolated environment. [Install Compose](install.html), then download Wordpress into the current directory:
 
     $ curl https://wordpress.org/latest.tar.gz | tar -xvzf -
 
@@ -19,7 +19,7 @@ ADD . /code
 
 This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
-Next up, `fig.yml` starts our web service and a separate MySQL instance:
+Next up, `docker-compose.yml` starts our web service and a separate MySQL instance:
 
 ```
 web:
@@ -37,7 +37,7 @@ db:
     MYSQL_DATABASE: wordpress
 ```
 
-Two supporting files are needed to get this working - first up, `wp-config.php` is the standard Wordpress config file with a single change to point the database configuration at the `db` container:
+Two supporting files are needed to get this working - first up, `wp-condocker-compose.php` is the standard Wordpress condocker-compose file with a single change to point the database condocker-composeuration at the `db` container:
 
 ```
 <?php
@@ -88,4 +88,4 @@ if(file_exists($root.$path))
 }else include_once 'index.php';
 ```
 
-With those four files in place, run `fig up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
+With those four files in place, run `docker-compose up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).

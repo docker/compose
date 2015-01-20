@@ -1,12 +1,12 @@
 ---
 layout: default
-title: Getting started with Fig and Rails
+title: Getting started with Compose and Rails
 ---
 
-Getting started with Fig and Rails
+Getting started with Compose and Rails
 ==================================
 
-We're going to use Fig to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Fig installed](install.html).
+We're going to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.html).
 
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
@@ -25,7 +25,7 @@ Next, we have a bootstrap `Gemfile` which just loads Rails. It'll be overwritten
     source 'https://rubygems.org'
     gem 'rails', '4.0.2'
 
-Finally, `fig.yml` is where the magic happens. It describes what services our app comprises (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration we need to link them together and expose the web app's port.
+Finally, `docker-compose.yml` is where the magic happens. It describes what services our app comprises (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the condocker-composeuration we need to link them together and expose the web app's port.
 
     db:
       image: postgres
@@ -41,17 +41,17 @@ Finally, `fig.yml` is where the magic happens. It describes what services our ap
       links:
         - db
 
-With those files in place, we can now generate the Rails skeleton app using `fig run`:
+With those files in place, we can now generate the Rails skeleton app using `docker-compose run`:
 
-    $ fig run web rails new . --force --database=postgresql --skip-bundle
+    $ docker-compose run web rails new . --force --database=postgresql --skip-bundle
 
-First, Fig will build the image for the `web` service using the `Dockerfile`. Then it'll run `rails new` inside a new container, using that image. Once it's done, you should have a fresh app generated:
+First, Compose will build the image for the `web` service using the `Dockerfile`. Then it'll run `rails new` inside a new container, using that image. Once it's done, you should have a fresh app generated:
 
     $ ls
-    Dockerfile   app          fig.yml      tmp
+    Dockerfile   app          docker-compose.yml      tmp
     Gemfile      bin          lib          vendor
-    Gemfile.lock config       log
-    README.rdoc  config.ru    public
+    Gemfile.lock condocker-compose       log
+    README.rdoc  condocker-compose.ru    public
     Rakefile     db           test
 
 Uncomment the line in your new `Gemfile` which loads `therubyracer`, so we've got a Javascript runtime:
@@ -60,7 +60,7 @@ Uncomment the line in your new `Gemfile` which loads `therubyracer`, so we've go
 
 Now that we've got a new `Gemfile`, we need to build the image again. (This, and changes to the Dockerfile itself, should be the only times you'll need to rebuild).
 
-    $ fig build
+    $ docker-compose build
 
 The app is now bootable, but we're not quite there yet. By default, Rails expects a database to be running on `localhost` - we need to point it at the `db` container instead. We also need to change the database and username to align with the defaults set by the `postgres` image.
 
@@ -81,7 +81,7 @@ Open up your newly-generated `database.yml`. Replace its contents with the follo
 
 We can now boot the app.
 
-    $ fig up
+    $ docker-compose up
 
 If all's well, you should see some PostgreSQL output, and then—after a few seconds—the familiar refrain:
 
@@ -91,8 +91,8 @@ If all's well, you should see some PostgreSQL output, and then—after a few sec
 
 Finally, we just need to create the database. In another terminal, run:
 
-    $ fig run web rake db:create
+    $ docker-compose run web rake db:create
 
 And we're rolling—your app should now be running on port 3000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
 
-![Screenshot of Rails' stock index.html](https://orchardup.com/static/images/fig-rails-screenshot.png)
+![Screenshot of Rails' stock index.html](https://orchardup.com/static/images/docker-compose-rails-screenshot.png)
