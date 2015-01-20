@@ -242,9 +242,8 @@ class Service(object):
 
     def recreate_containers(self, insecure_registry=False, do_build=True, **override_options):
         """
-        If a container for this service doesn't exist, create and start one. If
-        there are any, stop them, create+start new ones, and remove the old
-        containers.
+        If a container for this service doesn't exist, create and start one. If there are
+        any, stop them, create+start new ones, and remove the old containers.
         """
         containers = self.containers(stopped=True)
         if not containers:
@@ -254,22 +253,21 @@ class Service(object):
                 do_build=do_build,
                 **override_options)
             self.start_container(container)
-            return [container]
+            return [(None, container)]
         else:
-            return [
-                self.recreate_container(
-                    container,
-                    insecure_registry=insecure_registry,
-                    **override_options)
-                for container in containers
-            ]
+            tuples = []
+
+            for c in containers:
+                log.info("Recreating %s..." % c.name)
+                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
+
+            return tuples
 
     def recreate_container(self, container, **override_options):
         """Recreate a container. An intermediate container is created so that
         the new container has the same name, while still supporting
         `volumes-from` the original container.
         """
-        log.info("Recreating %s..." % container.name)
         try:
             container.stop()
         except APIError as e:
@@ -280,7 +278,6 @@ class Service(object):
             else:
                 raise
 
-        intermediate_options = dict(self.options, **override_options)
         intermediate_container = Container.create(
             self.client,
             image=container.image,
@@ -288,22 +285,17 @@ class Service(object):
             command=[],
             detach=True,
         )
-        intermediate_container.start(
-            binds=get_container_data_volumes(
-                container, intermediate_options.get('volumes')))
+        intermediate_container.start(volumes_from=container.id)
         intermediate_container.wait()
         container.remove()
 
-        # TODO: volumes are being passed to both start and create, this is
-        # probably unnecessary
         options = dict(override_options)
         new_container = self.create_container(do_build=False, **options)
-        self.start_container(
-            new_container,
-            intermediate_container=intermediate_container)
+        self.start_container(new_container, intermediate_container=intermediate_container)
 
         intermediate_container.remove()
-        return new_container
+
+        return (intermediate_container, new_container)
 
     def start_container_if_stopped(self, container, **options):
         if container.is_running:
@@ -315,6 +307,12 @@ class Service(object):
     def start_container(self, container, intermediate_container=None, **override_options):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
+
+        volume_bindings = dict(
+            build_volume_binding(parse_volume_spec(volume))
+            for volume in options.get('volumes') or []
+            if ':' in volume)
+
         privileged = options.get('privileged', False)
         net = options.get('net', 'bridge')
         dns = options.get('dns', None)
@@ -323,14 +321,12 @@ class Service(object):
         cap_drop = options.get('cap_drop', None)
 
         restart = parse_restart_spec(options.get('restart', None))
-        binds = get_volume_bindings(
-            options.get('volumes'), intermediate_container)
 
         container.start(
             links=self._get_links(link_to_self=options.get('one_off', False)),
             port_bindings=port_bindings,
-            binds=binds,
-            volumes_from=self._get_volumes_from(),
+            binds=volume_bindings,
+            volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=net,
             dns=dns,
@@ -392,7 +388,7 @@ class Service(object):
             links.append((external_link, link_name))
         return links
 
-    def _get_volumes_from(self):
+    def _get_volumes_from(self, intermediate_container=None):
         volumes_from = []
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
@@ -405,6 +401,9 @@ class Service(object):
 
             elif isinstance(volume_source, Container):
                 volumes_from.append(volume_source.id)
+
+        if intermediate_container:
+            volumes_from.append(intermediate_container.id)
 
         return volumes_from
 
@@ -518,45 +517,6 @@ class Service(object):
                 image_name,
                 insecure_registry=insecure_registry
             )
-
-
-def get_container_data_volumes(container, volumes_option):
-    """Find the container data volumes that are in `volumes_option`, and return
-    a mapping of volume bindings for those volumes.
-    """
-    volumes = []
-    for volume in volumes_option or []:
-        volume = parse_volume_spec(volume)
-        # No need to preserve host volumes
-        if volume.external:
-            continue
-
-        volume_path = (container.get('Volumes') or {}).get(volume.internal)
-        # New volume, doesn't exist in the old container
-        if not volume_path:
-            continue
-
-        # Copy existing volume from old container
-        volume = volume._replace(external=volume_path)
-        volumes.append(build_volume_binding(volume))
-
-    return dict(volumes)
-
-
-def get_volume_bindings(volumes_option, intermediate_container):
-    """Return a list of volume bindings for a container. Container data volume
-    bindings are replaced by those in the intermediate container.
-    """
-    volume_bindings = dict(
-        build_volume_binding(parse_volume_spec(volume))
-        for volume in volumes_option or []
-        if ':' in volume)
-
-    if intermediate_container:
-        volume_bindings.update(
-            get_container_data_volumes(intermediate_container, volumes_option))
-
-    return volume_bindings
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')

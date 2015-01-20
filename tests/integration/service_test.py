@@ -98,7 +98,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', volumes=['/var/db'])
         container = service.create_container()
         service.start_container(container)
-        self.assertIn('/var/db', container.get('Volumes'))
+        self.assertIn('/var/db', container.inspect()['Volumes'])
 
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
@@ -148,23 +148,30 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
         self.assertEqual(old_container.name, 'figtest_db_1')
         service.start_container(old_container)
-        volume_path = old_container.get('Volumes')['/etc']
+        volume_path = old_container.inspect()['Volumes']['/etc']
 
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
-        containers = service.recreate_containers()
-        self.assertEqual(len(containers), 1)
+        tuples = service.recreate_containers()
+        self.assertEqual(len(tuples), 1)
 
-        new_container = containers[0]
-        self.assertEqual(new_container.get('Config.Entrypoint'), ['sleep'])
-        self.assertEqual(new_container.get('Config.Cmd'), ['300'])
-        self.assertIn('FOO=2', new_container.get('Config.Env'))
+        intermediate_container = tuples[0][0]
+        new_container = tuples[0][1]
+        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['/bin/echo'])
+
+        self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
+        self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
+        self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'figtest_db_1')
-        self.assertEqual(new_container.get('Volumes')['/etc'], volume_path)
+        self.assertEqual(new_container.inspect()['Volumes']['/etc'], volume_path)
+        self.assertIn(intermediate_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
+        self.assertRaises(APIError,
+                          self.client.inspect_container,
+                          intermediate_container.id)
 
     def test_recreate_containers_when_containers_are_stopped(self):
         service = self.create_service(
@@ -178,16 +185,6 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         service.recreate_containers()
         self.assertEqual(len(service.containers(stopped=True)), 1)
-
-    def test_recreate_containers_with_volume_changes(self):
-        service = self.create_service('withvolumes', volumes=['/etc'])
-        old_container = create_and_start_container(service)
-        self.assertEqual(old_container.get('Volumes').keys(), ['/etc'])
-
-        service = self.create_service('withvolumes')
-        container, = service.recreate_containers()
-        service.start_container(container)
-        self.assertEqual(container.get('Volumes'), {})
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
