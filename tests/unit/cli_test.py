@@ -6,8 +6,8 @@ from .. import unittest
 
 import mock
 
-from fig.cli import main
-from fig.cli.main import TopLevelCommand
+from compose.cli import main
+from compose.cli.main import TopLevelCommand
 from six import StringIO
 
 
@@ -16,18 +16,18 @@ class CLITestCase(unittest.TestCase):
         cwd = os.getcwd()
 
         try:
-            os.chdir('tests/fixtures/simple-figfile')
+            os.chdir('tests/fixtures/simple-composefile')
             command = TopLevelCommand()
             project_name = command.get_project_name(command.get_config_path())
-            self.assertEquals('simplefigfile', project_name)
+            self.assertEquals('simplecomposefile', project_name)
         finally:
             os.chdir(cwd)
 
     def test_project_name_with_explicit_base_dir(self):
         command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/simple-figfile'
+        command.base_dir = 'tests/fixtures/simple-composefile'
         project_name = command.get_project_name(command.get_config_path())
-        self.assertEquals('simplefigfile', project_name)
+        self.assertEquals('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         command = TopLevelCommand()
@@ -41,7 +41,7 @@ class CLITestCase(unittest.TestCase):
         project_name = command.get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
-    def test_project_name_from_environment(self):
+    def test_project_name_from_environment_old_var(self):
         command = TopLevelCommand()
         name = 'namefromenv'
         with mock.patch.dict(os.environ):
@@ -49,18 +49,26 @@ class CLITestCase(unittest.TestCase):
             project_name = command.get_project_name(None)
         self.assertEquals(project_name, name)
 
+    def test_project_name_from_environment_new_var(self):
+        command = TopLevelCommand()
+        name = 'namefromenv'
+        with mock.patch.dict(os.environ):
+            os.environ['COMPOSE_PROJECT_NAME'] = name
+            project_name = command.get_project_name(None)
+        self.assertEquals(project_name, name)
+
     def test_yaml_filename_check(self):
         command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/longer-filename-figfile'
-        with mock.patch('fig.cli.command.log', autospec=True) as mock_log:
+        command.base_dir = 'tests/fixtures/longer-filename-composefile'
+        with mock.patch('compose.cli.command.log', autospec=True) as mock_log:
             self.assertTrue(command.get_config_path())
         self.assertEqual(mock_log.warning.call_count, 2)
 
     def test_get_project(self):
         command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/longer-filename-figfile'
+        command.base_dir = 'tests/fixtures/longer-filename-composefile'
         project = command.get_project(command.get_config_path())
-        self.assertEqual(project.name, 'longerfilenamefigfile')
+        self.assertEqual(project.name, 'longerfilenamecomposefile')
         self.assertTrue(project.client)
         self.assertTrue(project.services)
 

@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
 
-from fig.cli.log_printer import LogPrinter
+from compose.cli.log_printer import LogPrinter
 from .. import unittest
 
 

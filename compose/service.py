@@ -127,7 +127,7 @@ class Service(object):
         return project == self.project and name == self.name
 
     def get_container(self, number=1):
-        """Return a :class:`fig.container.Container` for this service. The
+        """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
         for container in self.client.containers():

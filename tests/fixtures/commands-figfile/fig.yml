@@ -1,5 +1,0 @@
-implicit:
-  image: figtest_test
-explicit:
-  image: figtest_test
-  command: [ "/bin/true" ]

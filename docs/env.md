@@ -1,16 +1,16 @@
 ---
 layout: default
-title: Fig environment variables reference
+title: Compose environment variables reference
 ---
 
 Environment variables reference
 ===============================
 
-**Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, the name of the linked service) as the hostname to connect to. See the [fig.yml documentation](yml.html#links) for details.
+**Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, the name of the linked service) as the hostname to connect to. See the [docker-compose.yml documentation](yml.html#links) for details.
 
-Fig uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
+Compose uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
 
-To see what environment variables are available to a service, run `fig run SERVICE env`.
+To see what environment variables are available to a service, run `docker-compose run SERVICE env`.
 
 <b><i>name</i>\_PORT</b><br>
 Full URL, e.g. `DB_PORT=tcp://172.17.0.5:5432`

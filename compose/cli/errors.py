@@ -55,8 +55,8 @@ class ConnectionErrorGeneric(UserError):
         """ % url)
 
 
-class FigFileNotFound(UserError):
+class ComposeFileNotFound(UserError):
     def __init__(self, filename):
-        super(FigFileNotFound, self).__init__("""
+        super(ComposeFileNotFound, self).__init__("""
         Can't find %s. Are you in the right directory?
         """ % filename)
