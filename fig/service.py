@@ -284,7 +284,7 @@ class Service(object):
         intermediate_container = Container.create(
             self.client,
             image=container.image,
-            entrypoint=['/bin/echo'],
+            entrypoint=intermediate_options.get('entrypoint', '/bin/echo'),
             command=[],
             detach=True,
         )
