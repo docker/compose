@@ -18,7 +18,7 @@ There are also guides for [Ubuntu](https://docs.docker.com/installation/ubuntuli
 
 Next, install Compose:
 
-    curl -L https://github.com/docker/docker-compose/releases/download/1.0.1/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose; chmod +x /usr/local/bin/docker-compose
+    curl -L https://github.com/docker/docker-compose/releases/download/1.1.0-rc1/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose; chmod +x /usr/local/bin/docker-compose
 
 Optionally, install [command completion](completion.html) for the bash shell.
 
