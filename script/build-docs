@@ -1,5 +1,0 @@
-#!/bin/bash
-set -ex
-pushd docs
-docker-compose run --rm jekyll jekyll build
-popd
