@@ -629,7 +629,17 @@ def build_extra_hosts(extra_hosts_config):
     if extra_hosts_config is None:
         return None
 
-    if isinstance(extra_hosts_config, list):
-        return dict(r.split(':') for r in extra_hosts_config)
-    else:
-        return dict([extra_hosts_config.split(':')])
+    if isinstance(extra_hosts_config, basestring):
+        extra_hosts_config = [extra_hosts_config]
+
+    extra_hosts_dict = {}
+    for extra_hosts_line in extra_hosts_config:
+        if isinstance(extra_hosts_line, dict):
+            # already interpreted as a dict (depends on pyyaml version)
+            extra_hosts_dict.update(extra_hosts_line)
+        else:
+            # not already interpreted as a dict
+            host, ip = extra_hosts_line.split(':')
+            extra_hosts_dict.update({host.strip(): ip.strip()})
+
+    return extra_hosts_dict

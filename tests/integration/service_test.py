@@ -6,6 +6,7 @@ import mock
 
 from compose import Service
 from compose.service import CannotBeScaledError
+from compose.service import build_extra_hosts
 from compose.container import Container
 from docker.errors import APIError
 from .testcases import DockerClientTestCase
@@ -106,6 +107,28 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
+
+    def test_build_extra_hosts(self):
+        # string
+        self.assertEqual(build_extra_hosts("www.example.com: 192.168.0.17"),
+                         {'www.example.com': '192.168.0.17'})
+
+        # list of strings
+        self.assertEqual(build_extra_hosts(
+                          ["www.example.com: 192.168.0.17"]),
+                         {'www.example.com': '192.168.0.17'})
+        self.assertEqual(build_extra_hosts(
+                          ["www.example.com: 192.168.0.17",
+                           "api.example.com: 192.168.0.18"]),
+                         {'www.example.com': '192.168.0.17',
+                          'api.example.com': '192.168.0.18'})
+        # list of dictionaries
+        self.assertEqual(build_extra_hosts(
+                          [{'www.example.com': '192.168.0.17'},
+                           {'api.example.com': '192.168.0.18'}
+                          ]),
+                          {'www.example.com': '192.168.0.17',
+                           'api.example.com': '192.168.0.18'})
 
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['docker:162.242.195.82', 'fig:50.31.209.229']
