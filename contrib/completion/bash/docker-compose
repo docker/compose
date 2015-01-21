@@ -1,6 +1,6 @@
 #!bash
 #
-# bash completion for fig commands
+# bash completion for docker-compose
 # 
 # This work is based on the completion for the docker command.
 #
@@ -12,46 +12,42 @@
 # To enable the completions either:
 #  - place this file in /etc/bash_completion.d
 #  or
-#  - copy this file and add the line below to your .bashrc after
-#    bash completion features are loaded
-#     . docker.bash
-#
-# Note:
-# Some completions require the current user to have sufficient permissions
-# to execute the docker command.
+#  - copy this file to e.g. ~/.docker-compose-completion.sh and add the line
+#    below to your .bashrc after bash completion features are loaded
+#    . ~/.docker-compose-completion.sh
 
 
-# Extracts all service names from the figfile.
-___fig_all_services_in_figfile() {
-	awk -F: '/^[a-zA-Z0-9]/{print $1}' "${fig_file:-fig.yml}"
+# Extracts all service names from docker-compose.yml.
+___docker-compose_all_services_in_compose_file() {
+	awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-docker-compose.yml}"
 }
 
 # All services, even those without an existing container
-__fig_services_all() {
-	COMPREPLY=( $(compgen -W "$(___fig_all_services_in_figfile)" -- "$cur") )
+__docker-compose_services_all() {
+	COMPREPLY=( $(compgen -W "$(___docker-compose_all_services_in_compose_file)" -- "$cur") )
 }
 
-# All services that have an entry with the given key in their figfile section
-___fig_services_with_key() {
+# All services that have an entry with the given key in their docker-compose.yml section
+___docker-compose_services_with_key() {
 	# flatten sections to one line, then filter lines containing the key and return section name.
-	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' fig.yml | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
+	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-docker-compose.yml}" | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
 }
 
 # All services that are defined by a Dockerfile reference
-__fig_services_from_build() {
-	COMPREPLY=( $(compgen -W "$(___fig_services_with_key build)" -- "$cur") )
+__docker-compose_services_from_build() {
+	COMPREPLY=( $(compgen -W "$(___docker-compose_services_with_key build)" -- "$cur") )
 }
 
 # All services that are defined by an image
-__fig_services_from_image() {
-	COMPREPLY=( $(compgen -W "$(___fig_services_with_key image)" -- "$cur") )
+__docker-compose_services_from_image() {
+	COMPREPLY=( $(compgen -W "$(___docker-compose_services_with_key image)" -- "$cur") )
 }
 
 # The services for which containers have been created, optionally filtered
 # by a boolean expression passed in as argument.
-__fig_services_with() {
+__docker-compose_services_with() {
 	local containers names
-	containers="$(fig 2>/dev/null ${fig_file:+-f $fig_file} ${fig_project:+-p $fig_project} ps -q)"
+	containers="$(docker-compose 2>/dev/null ${compose_file:+-f $compose_file} ${compose_project:+-p $compose_project} ps -q)"
 	names=( $(docker 2>/dev/null inspect --format "{{if ${1:-true}}} {{ .Name }} {{end}}" $containers) )
 	names=( ${names[@]%_*} )  # strip trailing numbers
 	names=( ${names[@]#*_} )  # strip project name
@@ -59,29 +55,29 @@ __fig_services_with() {
 }
 
 # The services for which at least one running container exists
-__fig_services_running() {
-	__fig_services_with '.State.Running'
+__docker-compose_services_running() {
+	__docker-compose_services_with '.State.Running'
 }
 
 # The services for which at least one stopped container exists
-__fig_services_stopped() {
-	__fig_services_with 'not .State.Running'
+__docker-compose_services_stopped() {
+	__docker-compose_services_with 'not .State.Running'
 }
 
 
-_fig_build() {
+_docker-compose_build() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--no-cache" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_from_build
+			__docker-compose_services_from_build
 			;;
 	esac
 }
 
 
-_fig_fig() {
+_docker-compose_docker-compose() {
 	case "$prev" in
 		--file|-f)
 			_filedir
@@ -103,12 +99,12 @@ _fig_fig() {
 }
 
 
-_fig_help() {
+_docker-compose_help() {
 	COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
 }
 
 
-_fig_kill() {
+_docker-compose_kill() {
 	case "$prev" in
 		-s)
 			COMPREPLY=( $( compgen -W "SIGHUP SIGINT SIGKILL SIGUSR1 SIGUSR2" -- "$(echo $cur | tr '[:lower:]' '[:upper:]')" ) )
@@ -121,25 +117,25 @@ _fig_kill() {
 			COMPREPLY=( $( compgen -W "-s" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_running
+			__docker-compose_services_running
 			;;
 	esac
 }
 
 
-_fig_logs() {
+_docker-compose_logs() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--no-color" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_all
+			__docker-compose_services_all
 			;;
 	esac
 }
 
 
-_fig_port() {
+_docker-compose_port() {
 	case "$prev" in
 		--protocol)
 			COMPREPLY=( $( compgen -W "tcp udp" -- "$cur" ) )
@@ -155,54 +151,54 @@ _fig_port() {
 			COMPREPLY=( $( compgen -W "--protocol --index" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_all
+			__docker-compose_services_all
 			;;
 	esac
 }
 
 
-_fig_ps() {
+_docker-compose_ps() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "-q" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_all
+			__docker-compose_services_all
 			;;
 	esac
 }
 
 
-_fig_pull() {
+_docker-compose_pull() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--allow-insecure-ssl" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_from_image
+			__docker-compose_services_from_image
 			;;
 	esac
 }
 
 
-_fig_restart() {
-	__fig_services_running
+_docker-compose_restart() {
+	__docker-compose_services_running
 }
 
 
-_fig_rm() {
+_docker-compose_rm() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--force -v" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_stopped
+			__docker-compose_services_stopped
 			;;
 	esac
 }
 
 
-_fig_run() {
+_docker-compose_run() {
 	case "$prev" in
 		-e)
 			COMPREPLY=( $( compgen -e -- "$cur" ) )
@@ -219,48 +215,48 @@ _fig_run() {
 			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm -T" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_all
+			__docker-compose_services_all
 			;;
 	esac
 }
 
 
-_fig_scale() {
+_docker-compose_scale() {
 	case "$prev" in
 		=)
 			COMPREPLY=("$cur")
 			;;
 		*)
-			COMPREPLY=( $(compgen -S "=" -W "$(___fig_all_services_in_figfile)" -- "$cur") )
+			COMPREPLY=( $(compgen -S "=" -W "$(___docker-compose_all_services_in_compose_file)" -- "$cur") )
 			compopt -o nospace
 			;;
 	esac
 }
 
 
-_fig_start() {
-	__fig_services_stopped
+_docker-compose_start() {
+	__docker-compose_services_stopped
 }
 
 
-_fig_stop() {
-	__fig_services_running
+_docker-compose_stop() {
+	__docker-compose_services_running
 }
 
 
-_fig_up() {
+_docker-compose_up() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate" -- "$cur" ) )
 			;;
 		*)
-			__fig_services_all
+			__docker-compose_services_all
 			;;
 	esac
 }
 
 
-_fig() {
+_docker-compose() {
 	local commands=(
 		build
 		help
@@ -284,18 +280,18 @@ _fig() {
 
 	# search subcommand and invoke its handler.
 	# special treatment of some top-level options
-	local command='fig'
+	local command='docker-compose'
 	local counter=1
-	local fig_file fig_project
+	local compose_file compose_project
 	while [ $counter -lt $cword ]; do
 		case "${words[$counter]}" in
 			-f|--file)
 				(( counter++ ))
-				fig_file="${words[$counter]}"
+				compose_file="${words[$counter]}"
 				;;
 			-p|--project-name)
 				(( counter++ ))
-				fig_project="${words[$counter]}"
+				compose_project="${words[$counter]}"
 				;;
 			-*)
 				;;
@@ -307,10 +303,10 @@ _fig() {
 		(( counter++ ))
 	done
 
-	local completions_func=_fig_${command}
+	local completions_func=_docker-compose_${command}
 	declare -F $completions_func >/dev/null && $completions_func
 
 	return 0
 }
 
-complete -F _fig fig
+complete -F _docker-compose docker-compose
