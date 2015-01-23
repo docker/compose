@@ -1,10 +1,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import division
+
+from .. import __version__
 import datetime
+from docker import version as docker_py_version
 import os
-import subprocess
 import platform
+import subprocess
 
 
 def yesno(prompt, default=None):
@@ -101,3 +104,10 @@ def is_mac():
 
 def is_ubuntu():
     return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
+
+
+def get_versions():
+    return "Docker-Compose version: {}\n".format(__version__) \
+            + "docker-py version: {}\n".format(docker_py_version) \
+            + "{} version: {}".format \
+                                (platform.python_implementation(), platform.python_version())

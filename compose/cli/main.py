@@ -15,7 +15,7 @@ from ..service import BuildError, CannotBeScaledError
 from .command import Command
 from .formatter import Formatter
 from .log_printer import LogPrinter
-from .utils import yesno
+from .utils import yesno, get_versions
 
 from docker.errors import APIError
 from .errors import UserError
@@ -95,11 +95,12 @@ class TopLevelCommand(Command):
       stop      Stop services
       restart   Restart services
       up        Create and start containers
+      version   Show the Docker-Compose version information
 
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = "docker-compose %s" % __version__
+        options['version'] = get_versions()
         return options
 
     def build(self, project, options):
@@ -461,6 +462,17 @@ class TopLevelCommand(Command):
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
                 project.stop(service_names=service_names)
+
+    def version(self, project, options):
+        """
+        Show the Docker-Compose version information.
+
+        Usage: version [--short]
+        """
+        if options['--short']:
+            print(__version__)
+        else:
+            print(get_versions())
 
 
 def list_containers(containers):
