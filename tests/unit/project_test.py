@@ -1,15 +1,15 @@
 from __future__ import unicode_literals
 from .. import unittest
-from fig.service import Service
-from fig.container import Container
-from fig.project import Project, ConfigurationError
-import mock
+from compose.service import Service
+from compose.project import Project, ConfigurationError
+from compose.container import Container
 
+import mock
 import docker
 
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
-        project = Project.from_dicts('figtest', [
+        project = Project.from_dicts('composetest', [
             {
                 'name': 'web',
                 'image': 'busybox:latest'
@@ -26,7 +26,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
     def test_from_dict_sorts_in_dependency_order(self):
-        project = Project.from_dicts('figtest', [
+        project = Project.from_dicts('composetest', [
             {
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -49,7 +49,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.services[2].name, 'web')
 
     def test_from_config(self):
-        project = Project.from_config('figtest', {
+        project = Project.from_config('composetest', {
             'web': {
                 'image': 'busybox:latest',
             },
@@ -65,13 +65,13 @@ class ProjectTest(unittest.TestCase):
 
     def test_from_config_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
-            project = Project.from_config('figtest', {
+            project = Project.from_config('composetest', {
                 'web': 'busybox:latest',
             }, None)
 
     def test_get_service(self):
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
             client=None,
             image="busybox:latest",
@@ -81,11 +81,11 @@ class ProjectTest(unittest.TestCase):
 
     def test_get_services_returns_all_services_without_args(self):
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
         )
         console = Service(
-            project='figtest',
+            project='composetest',
             name='console',
         )
         project = Project('test', [web, console], None)
@@ -93,32 +93,32 @@ class ProjectTest(unittest.TestCase):
 
     def test_get_services_returns_listed_services_with_args(self):
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
         )
         console = Service(
-            project='figtest',
+            project='composetest',
             name='console',
         )
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(['console']), [console])
 
-    def test_get_services_with_include_links_service(self):
+    def test_get_services_with_include_links(self):
         db = Service(
-            project='figtest',
+            project='composetest',
             name='db',
         )
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
             links=[(db, 'database')]
         )
         cache = Service(
-            project='figtest',
+            project='composetest',
             name='cache'
         )
         console = Service(
-            project='figtest',
+            project='composetest',
             name='console',
             links=[(web, 'web')]
         )
@@ -128,56 +128,13 @@ class ProjectTest(unittest.TestCase):
             [db, web, console]
         )
 
-    def test_get_services_with_include_links_project(self):
-        project = Project.from_dicts('figtest', [
-            {
-                'name': 'db',
-                'image': 'busybox:latest'
-            },
-            {
-                'name': 'web',
-                'image': 'busybox:latest',
-                'links': ['db:database'],
-            },
-            {
-                'name': 'cache',
-                'image': 'busybox'
-            },
-            {
-                'name': 'console',
-                'image': 'busybox:latest',
-                'links': ['web:web']
-            }
-        ], None)
-        self.assertEqual(
-            [s.name for s in project.get_services(['console'], include_deps=True)],
-            [s for s in ['db', 'web', 'console']]
-        )
-
-    def test_get_services_removes_duplicates_following_links_project(self):
-        project = Project.from_dicts('test', [
-            {
-                'name': 'db',
-                'image': 'busybox:latest',
-            },
-            {
-                'name': 'web',
-                'image': 'busybox:latest',
-                'links': ['db:database'],
-            }
-        ], None)
-        self.assertEqual(
-            [s.name for s in project.get_services(['web', 'db'], include_deps=True)],
-            [s for s in ['db', 'web']]
-        )
-
-    def test_get_services_removes_duplicates_following_links_service(self):
+    def test_get_services_removes_duplicates_following_links(self):
         db = Service(
-            project='figtest',
+            project='composetest',
             name='db',
         )
         web = Service(
-            project='figtest',
+            project='composetest',
             name='web',
             links=[(db, 'database')]
         )
@@ -199,7 +156,6 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['aaa']
             }
         ], mock_client)
-
         self.assertEqual(project.get_service('test')._get_volumes_from(), [container_id])
 
     def test_use_volumes_from_service_no_container(self):
@@ -224,7 +180,6 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['vol']
             }
         ], mock_client)
-
         self.assertEqual(project.get_service('test')._get_volumes_from(), [container_name])
 
     @mock.patch.object(Service, 'containers')
@@ -245,7 +200,6 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['vol']
             }
         ], None)
-
         self.assertEqual(project.get_service('test')._get_volumes_from(), container_ids)
 
     def test_use_net_from_container(self):
@@ -260,7 +214,6 @@ class ProjectTest(unittest.TestCase):
                 'net': 'container:aaa'
             }
         ], mock_client)
-
         service = project.get_service('test')
         self.assertEqual(service._get_net(), 'container:'+container_id)
 

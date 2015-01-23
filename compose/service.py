@@ -9,7 +9,7 @@ import sys
 
 from docker.errors import APIError
 
-from .container import Container
+from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
 log = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
+    'cpu_shares',
     'command',
     'detach',
     'dns',
@@ -41,6 +42,7 @@ DOCKER_CONFIG_KEYS = [
     'working_dir',
 ]
 DOCKER_CONFIG_HINTS = {
+    'cpu_share' : 'cpu_shares',
     'link'      : 'links',
     'port'      : 'ports',
     'privilege' : 'privileged',
@@ -127,7 +129,7 @@ class Service(object):
         return project == self.project and name == self.name
 
     def get_container(self, number=1):
-        """Return a :class:`fig.container.Container` for this service. The
+        """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
         for container in self.client.containers():
@@ -565,18 +567,6 @@ def parse_name(name):
     match = NAME_RE.match(name)
     (project, service_name, _, suffix) = match.groups()
     return ServiceName(project, service_name, int(suffix))
-
-
-def get_container_name(container):
-    if not container.get('Name') and not container.get('Names'):
-        return None
-    # inspect
-    if 'Name' in container:
-        return container['Name']
-    # ps
-    for name in container['Names']:
-        if len(name.split('/')) == 2:
-            return name[1:]
 
 
 def parse_restart_spec(restart_config):

@@ -1,8 +1,0 @@
-jekyll:
-  build: .
-  ports:
-   - "4000:4000"
-  volumes:
-   - .:/code
-  environment:
-   - LANG=en_US.UTF-8

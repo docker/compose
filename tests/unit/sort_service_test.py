@@ -1,4 +1,4 @@
-from fig.project import sort_service_dicts, DependencyError, Project
+from compose.project import sort_service_dicts, DependencyError
 from .. import unittest
 
 
@@ -18,7 +18,6 @@ class SortServiceTest(unittest.TestCase):
         ]
 
         sorted_services = sort_service_dicts(services)
-
         self.assertEqual(len(sorted_services), 3)
         self.assertEqual(sorted_services[0]['name'], 'grunt')
         self.assertEqual(sorted_services[1]['name'], 'redis')
