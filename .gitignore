@@ -1,4 +1,5 @@
 *.egg-info
+*.orig
 *.pyc
 .tox
 /build
@@ -6,3 +7,4 @@
 /docs/_site
 /venv
 fig.spec
+.idea/
