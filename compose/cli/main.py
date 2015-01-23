@@ -281,7 +281,7 @@ class TopLevelCommand(Command):
             --rm                  Remove container after run. Ignored in detached mode.
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
-            -T                    Disable pseudo-tty allocation. By default `fig run`
+            -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
         """
         service = project.get_service(options['SERVICE'])
