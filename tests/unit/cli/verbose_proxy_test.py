@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from tests import unittest
 
-from fig.cli import verbose_proxy
+from compose.cli import verbose_proxy
 
 
 class VerboseProxyTestCase(unittest.TestCase):

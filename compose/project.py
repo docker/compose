@@ -67,7 +67,7 @@ class Project(object):
         dicts = []
         for service_name, service in list(config.items()):
             if not isinstance(service, dict):
-                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your fig.yml must map to a dictionary of configuration options.' % service_name)
+                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
             service['name'] = service_name
             dicts.append(service)
         return cls.from_dicts(name, dicts, client)
@@ -167,14 +167,26 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def up(self, service_names=None, start_links=True, recreate=True, insecure_registry=False):
+    def up(self,
+           service_names=None,
+           start_links=True,
+           recreate=True,
+           insecure_registry=False,
+           detach=False,
+           do_build=True):
         running_containers = []
         for service in self.get_services(service_names, include_links=start_links):
             if recreate:
-                for (_, container) in service.recreate_containers(insecure_registry=insecure_registry):
+                for (_, container) in service.recreate_containers(
+                        insecure_registry=insecure_registry,
+                        detach=detach,
+                        do_build=do_build):
                     running_containers.append(container)
             else:
-                for container in service.start_or_create_containers(insecure_registry=insecure_registry):
+                for container in service.start_or_create_containers(
+                        insecure_registry=insecure_registry,
+                        detach=detach,
+                        do_build=do_build):
                     running_containers.append(container)
 
         return running_containers

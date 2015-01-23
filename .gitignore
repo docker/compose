@@ -6,5 +6,5 @@
 /dist
 /docs/_site
 /venv
-fig.spec
+docker-compose.spec
 .idea/

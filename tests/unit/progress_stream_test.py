@@ -5,7 +5,7 @@ from tests import unittest
 import mock
 from six import StringIO
 
-from fig import progress_stream 
+from compose import progress_stream 
 
 
 class ProgressStreamTestCase(unittest.TestCase):

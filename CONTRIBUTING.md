@@ -1,4 +1,4 @@
-# Contributing to Fig
+# Contributing to Compose
 
 ## TL;DR
 
@@ -11,14 +11,14 @@ Pull requests will need:
 
 ## Development environment
 
-If you're looking contribute to [Fig](http://www.fig.sh/)
+If you're looking contribute to Compose
 but you're new to the project or maybe even to Python, here are the steps
 that should get you started.
 
-1. Fork [https://github.com/docker/fig](https://github.com/docker/fig) to your username.
-1. Clone your forked repository locally `git clone git@github.com:yourusername/fig.git`.
-1. Enter the local directory `cd fig`.
-1. Set up a development environment by running `python setup.py develop`. This will install the dependencies and set up a symlink from your `fig` executable to the checkout of the repository. When you now run `fig` from anywhere on your machine, it will run your development version of Fig.
+1. Fork [https://github.com/docker/compose](https://github.com/docker/compose) to your username.
+1. Clone your forked repository locally `git clone git@github.com:yourusername/compose.git`.
+1. Enter the local directory `cd compose`.
+1. Set up a development environment by running `python setup.py develop`. This will install the dependencies and set up a symlink from your `docker-compose` executable to the checkout of the repository. When you now run `docker-compose` from anywhere on your machine, it will run your development version of Compose.
 
 ## Running the test suite
 
@@ -84,7 +84,7 @@ Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyIn
 
 1. Open pull request that:
 
- - Updates version in `fig/__init__.py`
+ - Updates version in `compose/__init__.py`
  - Updates version in `docs/install.md`
  - Adds release notes to `CHANGES.md`
 
@@ -92,7 +92,7 @@ Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyIn
 
 3. Build Linux version on any Docker host with `script/build-linux` and attach to release
 
-4. Build OS X version on Mountain Lion with `script/build-osx` and attach to release as `fig-Darwin-x86_64` and `fig-Linux-x86_64`.
+4. Build OS X version on Mountain Lion with `script/build-osx` and attach to release as `docker-compose-Darwin-x86_64` and `docker-compose-Linux-x86_64`.
 
 5. Publish GitHub release, creating tag
 

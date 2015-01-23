@@ -8,15 +8,16 @@ import mock
 import docker
 from requests import Response
 
-from fig import Service
-from fig.container import Container
-from fig.service import (
+from compose import Service
+from compose.container import Container
+from compose.service import (
     ConfigError,
     split_port,
     build_port_bindings,
     parse_volume_spec,
     build_volume_binding,
     APIError,
+    get_container_name,
     parse_repository_tag,
 )
 
@@ -48,6 +49,37 @@ class ServiceTest(unittest.TestCase):
     def test_config_validation(self):
         self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
         Service(name='foo', ports=['8000'])
+
+    def test_get_container_name(self):
+        self.assertIsNone(get_container_name({}))
+        self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')
+
+    def test_containers(self):
+        service = Service('db', client=self.mock_client, project='myproject')
+
+        self.mock_client.containers.return_value = []
+        self.assertEqual(service.containers(), [])
+
+        self.mock_client.containers.return_value = [
+            {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/myproject', '/foo/bar']},
+            {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/myproject_db']},
+            {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/db_1']},
+            {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/myproject_db_1', '/myproject_web_1/db']},
+        ]
+        self.assertEqual([c.id for c in service.containers()], ['IN_1'])
+
+    def test_containers_prefixed(self):
+        service = Service('db', client=self.mock_client, project='myproject')
+
+        self.mock_client.containers.return_value = [
+            {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/swarm-host-1/myproject', '/swarm-host-1/foo/bar']},
+            {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/swarm-host-1/myproject_db']},
+            {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/swarm-host-1/db_1']},
+            {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']},
+        ]
+        self.assertEqual([c.id for c in service.containers()], ['IN_1'])
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -171,7 +203,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertRaises(ValueError, service.get_container)
 
-    @mock.patch('fig.service.Container', autospec=True)
+    @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
         container_dict = dict(Name='default_foo_2')
         self.mock_client.containers.return_value = [container_dict]
@@ -182,27 +214,37 @@ class ServiceTest(unittest.TestCase):
         mock_container_class.from_ps.assert_called_once_with(
             self.mock_client, container_dict)
 
-    @mock.patch('fig.service.log', autospec=True)
+    @mock.patch('compose.service.log', autospec=True)
     def test_pull_image(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
         service.pull(insecure_registry=True)
         self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
-    @mock.patch('fig.service.log', autospec=True)
-    def test_create_container_from_insecure_registry(self, mock_log):
+    @mock.patch('compose.service.Container', autospec=True)
+    @mock.patch('compose.service.log', autospec=True)
+    def test_create_container_from_insecure_registry(
+            self,
+            mock_log,
+            mock_container):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
         mock_response = mock.Mock(Response)
         mock_response.status_code = 404
         mock_response.reason = "Not Found"
-        Container.create = mock.Mock()
-        Container.create.side_effect = APIError('Mock error', mock_response, "No such image")
-        try:
+        mock_container.create.side_effect = APIError(
+            'Mock error', mock_response, "No such image")
+
+        # We expect the APIError because our service requires a
+        # non-existent image.
+        with self.assertRaises(APIError):
             service.create_container(insecure_registry=True)
-        except APIError:  # We expect the APIError because our service requires a non-existent image.
-            pass
-        self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True, stream=True)
-        mock_log.info.assert_called_once_with('Pulling image someimage:sometag...')
+
+        self.mock_client.pull.assert_called_once_with(
+            'someimage:sometag',
+            insecure_registry=True,
+            stream=True)
+        mock_log.info.assert_called_once_with(
+            'Pulling image someimage:sometag...')
 
     def test_parse_repository_tag(self):
         self.assertEqual(parse_repository_tag("root"), ("root", ""))
@@ -217,6 +259,23 @@ class ServiceTest(unittest.TestCase):
         Container.create = mock.Mock()
         service.create_container()
         self.assertEqual(Container.create.call_args[1]['image'], 'someimage:latest')
+
+    def test_create_container_with_build(self):
+        self.mock_client.images.return_value = []
+        service = Service('foo', client=self.mock_client, build='.')
+        service.build = mock.create_autospec(service.build)
+        service.create_container(do_build=True)
+
+        self.mock_client.images.assert_called_once_with(name=service.full_name)
+        service.build.assert_called_once_with()
+
+    def test_create_container_no_build(self):
+        self.mock_client.images.return_value = []
+        service = Service('foo', client=self.mock_client, build='.')
+        service.create_container(do_build=False)
+
+        self.assertFalse(self.mock_client.images.called)
+        self.assertFalse(self.mock_client.build.called)
 
 
 class ServiceVolumesTest(unittest.TestCase):

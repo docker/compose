@@ -1,6 +1,35 @@
 Change log
 ==========
 
+1.1.0-rc1 (2015-01-20)
+----------------------
+
+Fig has been renamed to Docker Compose, or just Compose for short. This has several implications for you:
+
+- The command you type is now `docker-compose`, not `fig`.
+- You should rename your fig.yml to docker-compose.yml.
+- If you’re installing via PyPi, the package is now `docker-compose`, so install it with `pip install docker-compose`.
+
+Besides that, there’s a lot of new stuff in this release:
+
+- We’ve made a few small changes to ensure that Compose will work with Swarm, Docker’s new clustering tool (https://github.com/docker/swarm). Eventually you'll be able to point Compose at a Swarm cluster instead of a standalone Docker host and it’ll run your containers on the cluster with no extra work from you. As Swarm is still developing, integration is rough and lots of Compose features don't work yet.
+
+- `docker-compose run` now has a `--service-ports` flag for exposing ports on the given service. This is useful for e.g. running your webapp with an interactive debugger.
+
+- You can now link to containers outside your app with the `external_links` option in docker-compose.yml.
+
+- You can now prevent `docker-compose up` from automatically building images with the `--no-build` option. This will make fewer API calls and run faster.
+
+- If you don’t specify a tag when using the `image` key, Compose will default to the `latest` tag, rather than pulling all tags.
+
+- `docker-compose kill` now supports the `-s` flag, allowing you to specify the exact signal you want to send to a service’s containers.
+
+- docker-compose.yml now has an `env_file` key, analogous to `docker run --env-file`, letting you specify multiple environment variables in a separate file. This is great if you have a lot of them, or if you want to keep sensitive information out of version control.
+
+- docker-compose.yml now supports the `dns_search`, `cap_add`, `cap_drop` and `restart` options, analogous to `docker run`’s `--dns-search`, `--cap-add`, `--cap-drop` and `--restart` options.
+
+- A number of bugs have been fixed - see the milestone for details: https://github.com/docker/fig/issues?q=milestone%3A1.1.0+
+
 1.0.1 (2014-11-04)
 ------------------
 

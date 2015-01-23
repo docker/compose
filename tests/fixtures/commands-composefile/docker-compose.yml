@@ -1,0 +1,5 @@
+implicit:
+  image: composetest_test
+explicit:
+  image: composetest_test
+  command: [ "/bin/true" ]
