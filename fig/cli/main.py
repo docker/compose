@@ -1,6 +1,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 import logging
+import platform
 import sys
 import re
 import signal
@@ -18,6 +19,7 @@ from .log_printer import LogPrinter
 from .utils import yesno
 
 from docker.errors import APIError
+from docker import version as docker_py_version
 from .errors import UserError
 from .docopt_command import NoSuchCommand
 
@@ -99,7 +101,10 @@ class TopLevelCommand(Command):
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = "fig %s" % __version__
+        options['version'] = "fig version: {}\n".format(__version__) \
+                           + "docker-py version: {}\n".format(docker_py_version) \
+                           + "{} version: {}".format \
+                             (platform.python_implementation(), platform.python_version())
         return options
 
     def build(self, project, options):
