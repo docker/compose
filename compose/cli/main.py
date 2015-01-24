@@ -10,8 +10,7 @@ import sys
 from docker.errors import APIError
 import dockerpty
 
-from .. import __version__
-from .. import legacy
+from .. import __version__, legacy
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, CannotBeScaledError, NeedsBuildError
 from ..config import parse_environment
@@ -20,7 +19,7 @@ from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import Formatter
 from .log_printer import LogPrinter
-from .utils import yesno
+from .utils import yesno, get_version_info
 
 log = logging.getLogger(__name__)
 
@@ -100,11 +99,12 @@ class TopLevelCommand(Command):
       stop               Stop services
       up                 Create and start containers
       migrate-to-labels  Recreate containers to add labels
+      version            Show the Docker-Compose version information
 
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = "docker-compose %s" % __version__
+        options['version'] = get_version_info('compose')
         return options
 
     def build(self, project, options):
@@ -496,6 +496,20 @@ class TopLevelCommand(Command):
         Usage: migrate-to-labels
         """
         legacy.migrate_project_to_labels(project)
+
+    def version(self, project, options):
+        """
+        Show version informations
+
+        Usage: version [--short]
+
+        Options:
+            --short     Shows only Compose's version number.
+        """
+        if options['--short']:
+            print(__version__)
+        else:
+            print(get_version_info('full'))
 
 
 def list_containers(containers):

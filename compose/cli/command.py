@@ -48,7 +48,7 @@ class Command(DocoptCommand):
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
     def perform_command(self, options, handler, command_options):
-        if options['COMMAND'] == 'help':
+        if options['COMMAND'] in ('help', 'version'):
             # Skip looking up the compose file.
             handler(None, command_options)
             return
