@@ -34,13 +34,15 @@ Finally, `fig.yml` is where the magic happens. It describes what services our ap
         - "5432"
     web:
       build: .
-      command: bundle exec rackup -p 3000
+      command: bundle exec rackup -p 3000 --host 0.0.0.0
       volumes:
         - .:/myapp
       ports:
         - "3000:3000"
       links:
         - db
+
+(Binding to 0.0.0.0 interface is important, otherwise the service won't be reachable from the outside)
 
 With those files in place, we can now generate the Rails skeleton app using `fig run`:
 
