@@ -212,7 +212,7 @@ _docker-compose_run() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm -T" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm --service-ports -T" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
