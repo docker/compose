@@ -189,7 +189,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_recreate_containers_with_image_declared_volume(self):
         service = Service(
-            project='figtest',
+            project='composetest',
             name='db',
             client=self.client,
             build='tests/fixtures/dockerfile-with-volume',
