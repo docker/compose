@@ -69,11 +69,11 @@ Open up your newly-generated `database.yml`. Replace its contents with the follo
     development: &default
       adapter: postgresql
       encoding: unicode
-      database: postgres
+      database: myapp
       pool: 5
       username: postgres
-      password:
       host: db
+      port: 5432
 
     test:
       <<: *default
