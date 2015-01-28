@@ -95,6 +95,10 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
+        for filename in get_env_files(options):
+            if not os.path.exists(filename):
+                raise ConfigError("Couldn't find env file for service %s: %s" % (name, filename))
+
         supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose',
                                                   'external_links']
 
