@@ -17,9 +17,23 @@
 #    . ~/.docker-compose-completion.sh
 
 
-# Extracts all service names from docker-compose.yml.
+# For compatibility reasons, Compose and therefore its completion supports several
+# stack compositon files as listed here, in descending priority.
+# Support for these filenames might be dropped in some future version.
+__docker-compose_compose_file() {
+	local file
+	for file in docker-compose.y{,a}ml fig.y{,a}ml ; do
+		[ -e $file ] && {
+			echo $file
+			return
+		}
+	done
+	echo docker-compose.yml
+}
+
+# Extracts all service names from the compose file.
 ___docker-compose_all_services_in_compose_file() {
-	awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-docker-compose.yml}"
+	awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-$(__docker-compose_compose_file)}" 2>/dev/null
 }
 
 # All services, even those without an existing container
@@ -27,10 +41,10 @@ __docker-compose_services_all() {
 	COMPREPLY=( $(compgen -W "$(___docker-compose_all_services_in_compose_file)" -- "$cur") )
 }
 
-# All services that have an entry with the given key in their docker-compose.yml section
+# All services that have an entry with the given key in their compose_file section
 ___docker-compose_services_with_key() {
 	# flatten sections to one line, then filter lines containing the key and return section name.
-	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-docker-compose.yml}" | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
+	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker-compose_compose_file)}" | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
 }
 
 # All services that are defined by a Dockerfile reference
