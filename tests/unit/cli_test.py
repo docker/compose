@@ -31,9 +31,9 @@ class CLITestCase(unittest.TestCase):
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/Simple-figfile'
+        command.base_dir = 'tests/fixtures/UpperCaseDir'
         project_name = command.get_project_name(command.get_config_path())
-        self.assertEquals('simplefigfile', project_name)
+        self.assertEquals('uppercasedir', project_name)
 
     def test_project_name_with_explicit_project_name(self):
         command = TopLevelCommand()
