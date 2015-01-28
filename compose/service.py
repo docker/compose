@@ -617,15 +617,18 @@ def split_port(port):
     return internal_port, (external_ip, external_port or None)
 
 
+def get_env_files(options):
+    env_files = options.get('env_file', [])
+    if not isinstance(env_files, list):
+        env_files = [env_files]
+    return env_files
+
+
 def merge_environment(options):
     env = {}
 
-    if 'env_file' in options:
-        if isinstance(options['env_file'], list):
-            for f in options['env_file']:
-                env.update(env_vars_from_file(f))
-        else:
-            env.update(env_vars_from_file(options['env_file']))
+    for f in get_env_files(options):
+        env.update(env_vars_from_file(f))
 
     if 'environment' in options:
         if isinstance(options['environment'], list):
