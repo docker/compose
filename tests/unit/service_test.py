@@ -378,6 +378,10 @@ class ServiceEnvironmentTest(unittest.TestCase):
             {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}
             )
 
+    def test_env_nonexistent_file(self):
+        self.assertRaises(ConfigError, lambda: Service('foo', env_file='tests/fixtures/env/nonexistent.env'))
+
+
     @mock.patch.dict(os.environ)
     def test_resolve_environment_from_file(self):
         os.environ['FILE_DEF'] = 'E1'
