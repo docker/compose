@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from requests.exceptions import ConnectionError, SSLError
-import errno
 import logging
 import os
 import re
@@ -75,8 +74,6 @@ class Command(DocoptCommand):
             with open(config_path, 'r') as fh:
                 return yaml.safe_load(fh)
         except IOError as e:
-            if e.errno == errno.ENOENT:
-                raise errors.ComposeFileNotFound(os.path.basename(e.filename))
             raise errors.UserError(six.text_type(e))
 
     def get_project(self, config_path, project_name=None, verbose=False):
@@ -110,13 +107,34 @@ class Command(DocoptCommand):
         if file_path:
             return os.path.join(self.base_dir, file_path)
 
-        if os.path.exists(os.path.join(self.base_dir, 'docker-compose.yaml')):
-            log.warning("Compose just read the file 'docker-compose.yaml' on startup, rather "
-                        "than 'docker-compose.yml'")
+        supported_filenames = [
+            'docker-compose.yml',
+            'docker-compose.yaml',
+            'fig.yml',
+            'fig.yaml',
+        ]
+
+        def expand(filename):
+            return os.path.join(self.base_dir, filename)
+
+        candidates = [filename for filename in supported_filenames if os.path.exists(expand(filename))]
+
+        if len(candidates) == 0:
+            raise errors.ComposeFileNotFound(supported_filenames)
+
+        winner = candidates[0]
+
+        if len(candidates) > 1:
+            log.warning("Found multiple config files with supported names: %s", ", ".join(candidates))
+            log.warning("Using %s\n", winner)
+
+        if winner == 'docker-compose.yaml':
             log.warning("Please be aware that .yml is the expected extension "
                         "in most cases, and using .yaml can cause compatibility "
-                        "issues in future")
+                        "issues in future.\n")
 
-            return os.path.join(self.base_dir, 'docker-compose.yaml')
+        if winner.startswith("fig."):
+            log.warning("%s is deprecated and will not be supported in future. "
+                        "Please rename your config file to docker-compose.yml\n" % winner)
 
-        return os.path.join(self.base_dir, 'docker-compose.yml')
+        return expand(winner)

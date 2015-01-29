@@ -1,0 +1,6 @@
+simple:
+  image: busybox:latest
+  command: /bin/sleep 300
+another:
+  image: busybox:latest
+  command: /bin/sleep 300
