@@ -95,6 +95,10 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
+        for filename in get_env_files(options):
+            if not os.path.exists(filename):
+                raise ConfigError("Couldn't find env file for service %s: %s" % (name, filename))
+
         supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose',
                                                   'external_links']
 
@@ -648,15 +652,18 @@ def split_port(port):
     return internal_port, (external_ip, external_port or None)
 
 
+def get_env_files(options):
+    env_files = options.get('env_file', [])
+    if not isinstance(env_files, list):
+        env_files = [env_files]
+    return env_files
+
+
 def merge_environment(options):
     env = {}
 
-    if 'env_file' in options:
-        if isinstance(options['env_file'], list):
-            for f in options['env_file']:
-                env.update(env_vars_from_file(f))
-        else:
-            env.update(env_vars_from_file(options['env_file']))
+    for f in get_env_files(options):
+        env.update(env_vars_from_file(f))
 
     if 'environment' in options:
         if isinstance(options['environment'], list):
