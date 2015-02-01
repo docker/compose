@@ -134,7 +134,6 @@ class TopLevelCommand(Command):
         print("Use the following as your key's value in your yml configuration(this may take a moment):")
         print("encrypted:%s" % base64.urlsafe_b64encode(enc(os.environ.get('FIG_CRYPT_KEY'), string)))
 
-
     def help(self, project, options):
         """
         Get help on a command.

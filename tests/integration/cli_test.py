@@ -46,26 +46,14 @@ class CLITestCase(DockerClientTestCase):
     @patch('sys.stdout', new_callable=StringIO)
     def test_encrypt(self, mock_stdout):
         self.project.get_service('simple').create_container()
-        secret='this is only a test'
+        secret = 'this is only a test'
         with self.assertRaises(SystemExit) as exc_context:
             self.command.dispatch(['encrypt', secret], None)
             self.assertIn('You must set', str(exc_context.exception))
-        testphrase='Any sufficiently advanced technology is indistinguishable from magic.'
+        testphrase = 'Any sufficiently advanced technology is indistinguishable from magic.'
         os.environ['FIG_CRYPT_KEY'] = secret
         self.command.dispatch(['encrypt', testphrase], None)
-        self.assertIn('encrypted:',mock_stdout.getvalue())
-
-    @patch('dockerpty.start')
-    def test_encrypt_var_gets_encrypted(self, _):
-        self.command.base_dir = 'tests/fixtures/encrypted-environment-composefile'
-        secret='this is only a test'
-        os.environ['FIG_CRYPT_KEY'] = secret
-        name='service'
-        self.command.dispatch(['run', name, 'env'], None)
-        service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=True)[0]
-        # env overriden
-        self.assertEqual('Any sufficiently advanced technology is indistinguishable from magic.', container.environment['encrypted_foo'])
+        self.assertIn('encrypted:', mock_stdout.getvalue())
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_default_composefile(self, mock_stdout):
@@ -312,6 +300,28 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotEqual(port_random, None)
         self.assertIn("0.0.0.0", port_random)
         self.assertEqual(port_assigned, "0.0.0.0:9999")
+
+    @patch('dockerpty.start')
+    def test_run_with_encrypted_var(self, _):
+        self.command.base_dir = 'tests/fixtures/encrypted-environment-composefile'
+        secret = 'this is only a test'
+        os.environ['FIG_CRYPT_KEY'] = secret
+        name = 'service'
+        self.command.dispatch(['run', name, 'env'], None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual('Any sufficiently advanced technology is indistinguishable from magic.', container.environment['encrypted_foo'])
+
+    @patch('dockerpty.start')
+    def test_run_bad_decrypt(self, _):
+        self.command.base_dir = 'tests/fixtures/encrypted-environment-composefile'
+        secret = 'this is a bad key'
+        os.environ['FIG_CRYPT_KEY'] = secret
+        name = 'service'
+        self.command.dispatch(['run', name, 'env'], None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual('BAD_DECRYPT', container.environment['encrypted_foo'])
 
     def test_rm(self):
         service = self.project.get_service('simple')

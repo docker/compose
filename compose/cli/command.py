@@ -9,6 +9,7 @@ import six
 import base64
 
 from simplecrypt import decrypt
+from simplecrypt import DecryptionException
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
@@ -77,12 +78,16 @@ class Command(DocoptCommand):
                 config = yaml.safe_load(fh)
                 for project in config:
                     if 'environment' in config[project]:
-                        for key,var in config[project]['environment'].items():
+                        for key, var in config[project]['environment'].items():
                             if var.startswith('encrypted:'):
-                                secret=os.environ.get('FIG_CRYPT_KEY')
+                                secret = os.environ.get('FIG_CRYPT_KEY')
                                 if secret is None:
                                     raise SystemExit("Your yml configuration has encrypted environmental variables but you haven't set 'FIG_CRYPT_KEY in your environment.  Please set it and try again.")
-                                config[project]['environment'][key] = decrypt(secret, base64.urlsafe_b64decode(var.replace('encrypted:','').encode('utf8')))
+                                try:
+                                    config[project]['environment'][key] = decrypt(secret, base64.urlsafe_b64decode(var.replace('encrypted:', '').encode('utf8')))
+                                except DecryptionException:
+                                    log.fatal("Decryption Error: We couldn't decrypt the environmental variable %s in your yml config with the given FIG_CRYPT_KEY.  The value has been set to BAD_DECRYPT." % key)
+                                    config[project]['environment'][key] = "BAD_DECRYPT"
                 return config
 
         except IOError as e:
