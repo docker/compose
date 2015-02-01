@@ -6,3 +6,5 @@ requests==2.2.1
 six==1.7.3
 texttable==0.8.1
 websocket-client==0.11.0
+simple-crypt==4.0.0
+pycrypto==2.6.1

@@ -6,7 +6,9 @@ import os
 import re
 import yaml
 import six
+import base64
 
+from simplecrypt import decrypt
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
@@ -41,7 +43,7 @@ class Command(DocoptCommand):
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
     def perform_command(self, options, handler, command_options):
-        if options['COMMAND'] == 'help':
+        if options['COMMAND'] == 'help' or options['COMMAND'] == 'encrypt':
             # Skip looking up the compose file.
             handler(None, command_options)
             return
@@ -72,7 +74,17 @@ class Command(DocoptCommand):
     def get_config(self, config_path):
         try:
             with open(config_path, 'r') as fh:
-                return yaml.safe_load(fh)
+                config = yaml.safe_load(fh)
+                for project in config:
+                    if 'environment' in config[project]:
+                        for key,var in config[project]['environment'].items():
+                            if var.startswith('encrypted:'):
+                                secret=os.environ.get('FIG_CRYPT_KEY')
+                                if secret is None:
+                                    raise SystemExit("Your yml configuration has encrypted environmental variables but you haven't set 'FIG_CRYPT_KEY in your environment.  Please set it and try again.")
+                                config[project]['environment'][key] = decrypt(secret, base64.urlsafe_b64decode(var.replace('encrypted:','').encode('utf8')))
+                return config
+
         except IOError as e:
             raise errors.UserError(six.text_type(e))
 
