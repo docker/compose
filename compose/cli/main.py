@@ -141,7 +141,6 @@ class TopLevelCommand(Command):
 
         Usage: help COMMAND
         """
-        import ipdb; ipdb.set_trace()
         command = options['COMMAND']
         if not hasattr(self, command):
             raise NoSuchCommand(command, self)

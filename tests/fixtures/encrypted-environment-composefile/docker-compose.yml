@@ -1,0 +1,6 @@
+service:
+  image: busybox:latest
+  command: sleep 5
+
+  environment:
+      encrypted_foo: encrypted:c2MAAqVVdUbUUFfIpxi60K5CscqSH_2x0g4NqNpvIE9vwf8NmAaThh55ZFzd1F8TQbe5BFKSow7-l0EasOLPHt9FhtbJGmVJHOfYO1JnjGqYeld40Fqv9Y_ZhLG8gEMGCb9EBt2uhBQYP_vXQ782ZJ-iLnIEaRgCcnTjKJwq4ZN_NaGMqP3K1yY=
