@@ -84,8 +84,9 @@ Note that this only works on Mountain Lion, not Mavericks, due to a [bug in PyIn
 
 1. Open pull request that:
 
- - Updates version in `compose/__init__.py`
- - Updates version in `docs/install.md`
+ - Updates the version in `compose/__init__.py`
+ - Updates the binary URL in `docs/install.md`
+ - Updates the script URL in `docs/completion.md`
  - Adds release notes to `CHANGES.md`
 
 2. Create unpublished GitHub release with release notes
