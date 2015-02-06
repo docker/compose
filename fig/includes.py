@@ -109,7 +109,13 @@ class LocalConfigCache(object):
         ttl = timeparse.timeparse(cache_config.get('ttl', '5 min'))
 
         if not os.path.isdir(path):
-            os.makedirs(path)
+            try:
+                os.makedirs(path)
+            except OSError:
+                # Handle the race condition where some other process creates
+                # this directory after the isdir check
+                if not os.path.isdir(path):
+                    raise
 
         if ttl is None:
             raise ConfigError("Cache ttl \'%s\' could not be parsed" %
