@@ -26,7 +26,7 @@ Next, install Compose:
 
     curl -L https://github.com/docker/fig/releases/download/1.1.0-rc2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose; chmod +x /usr/local/bin/docker-compose
 
-Optionally, install [command completion](completion.html) for the bash shell.
+Optionally, install [command completion](completion.md) for the bash shell.
 
 Releases are available for OS X and 64-bit Linux. Compose is also available as a Python
 package if you're on another platform (or if you prefer that sort of thing):
