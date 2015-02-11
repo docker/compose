@@ -1,4 +1,4 @@
-Docker Compose
+Fig
 ==============
 
 [![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
@@ -29,7 +29,7 @@ db:
 
 (No more installing Postgres on your laptop!)
 
-Then type `docker-compose up`, and Compose will start and run your entire app.
+Then type `fig up`, and fig will start and run your entire app.
 
 There are commands to:
 
