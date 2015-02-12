@@ -344,7 +344,7 @@ dns_search:
 
 ### devices
 
-List of device mappings.  Uses the same format as the `--device` docker 
+List of device mappings.  Uses the same format as the `--device` docker
 client create option.
 
 ```
@@ -388,3 +388,13 @@ read_only: true
 - [Command line reference](cli.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
+
+
+### extra_hosts
+
+Add custom entry in /etc/hosts file.
+
+```
+extra_hosts:
+  mymemcacheserver: 192.168.0.10
+```

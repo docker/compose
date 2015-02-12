@@ -230,6 +230,15 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn(volume_container_2.id,
                       host_container.get('HostConfig.VolumesFrom'))
 
+    def test_create_container_with_extra_hosts(self):
+        extra_hosts = {'myserver': '192.168.2.90',
+                     'myserver2': '10.55.32.12'}
+        service = self.create_service('database', extra_hosts=extra_hosts)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.ExtraHosts'),
+                         ['myserver:192.168.2.90', 'myserver2:10.55.32.12'])
+
     def test_recreate_containers(self):
         service = self.create_service(
             'db',
