@@ -26,7 +26,8 @@ def sort_service_dicts(services):
     temporary_marked = set()
     sorted_services = []
 
-    get_service_names = lambda links: [link.split(':')[0] for link in links]
+    def get_service_names(links):
+        return [link.split(':')[0] for link in links]
 
     def get_service_dependents(service_dict, services):
         name = service_dict['name']

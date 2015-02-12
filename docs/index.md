@@ -11,8 +11,9 @@ With Compose, you can build clusters of containers which provide the resources
 application.
 
 You can use Compose to build your app with containers hosted locally, or on a
-remote server, including cloud-based instances. Compose can also be used to
-deploy code to production.
+remote server, including cloud-based instances - anywhere a Docker daemon can
+run. Its primary use case is for development environments, but it can be used
+just as easily for staging or CI.
 
 Using Compose is basically a three-step process.
 
@@ -21,7 +22,7 @@ reproduced anywhere:
 
     FROM python:2.7
     WORKDIR /code
-    ADD rements.txt /code/
+    ADD requirements.txt /code/
     RUN pip install -r requirements.txt
     ADD . /code
 
