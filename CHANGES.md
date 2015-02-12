@@ -37,7 +37,7 @@ Besides that, there’s a lot of new stuff in this release:
 
 - docker-compose.yml now has an `env_file` key, analogous to `docker run --env-file`, letting you specify multiple environment variables in a separate file. This is great if you have a lot of them, or if you want to keep sensitive information out of version control.
 
-- docker-compose.yml now supports the `dns_search`, `cap_add`, `cap_drop` and `restart` options, analogous to `docker run`’s `--dns-search`, `--cap-add`, `--cap-drop` and `--restart` options.
+- docker-compose.yml now supports the `dns_search`, `cap_add`, `cap_drop`, `cpu_shares` and `restart` options, analogous to `docker run`’s `--dns-search`, `--cap-add`, `--cap-drop`, `--cpu-shares` and `--restart` options.
 
 - Compose now ships with Bash tab completion - see the installation and usage docs at https://github.com/docker/fig/blob/1.1.0-rc1/docs/completion.md
 

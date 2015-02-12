@@ -39,9 +39,12 @@ class LogPrinter(object):
         color_fns = cycle(colors.rainbow())
         generators = []
 
+        def no_color(text):
+            return text
+
         for container in self.containers:
             if monochrome:
-                color_fn = lambda s: s
+                color_fn = no_color
             else:
                 color_fn = color_fns.next()
             generators.append(self._make_log_generator(container, color_fn))
