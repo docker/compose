@@ -94,7 +94,7 @@ _docker-compose_build() {
 _docker-compose_docker-compose() {
 	case "$prev" in
 		--file|-f)
-			_filedir
+			_filedir y?(a)ml
 			return
 			;;
 		--project-name|-p)
