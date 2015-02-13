@@ -7,11 +7,13 @@ Fast, isolated development environments using Docker.
 
 Define your app's environment with Docker so it can be reproduced anywhere:
 
-    FROM python:2.7
-    ADD . /code
-    WORKDIR /code
-    RUN pip install -r requirements.txt
-    CMD python app.py
+```Dockerfile
+FROM python:2.7
+ADD . /code
+WORKDIR /code
+RUN pip install -r requirements.txt
+CMD python app.py
+```
 
 Define the services that make up your app so they can be run together in an isolated environment:
 
