@@ -120,6 +120,7 @@ class CLITestCase(unittest.TestCase):
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': ['BAR=NEW', 'OTHER=THREE'],
+            '--user': None,
             '--no-deps': None,
             '--allow-insecure-ssl': None,
             '-d': True,

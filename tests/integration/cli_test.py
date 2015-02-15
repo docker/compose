@@ -232,6 +232,28 @@ class CLITestCase(DockerClientTestCase):
         )
 
     @patch('dockerpty.start')
+    def test_run_service_with_user_overridden(self, _):
+        self.command.base_dir = 'tests/fixtures/user-composefile'
+        name = 'service'
+        user = 'sshd'
+        args = ['run', '--user={}'.format(user), name]
+        self.command.dispatch(args, None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(user, container.get('Config.User'))
+
+    @patch('dockerpty.start')
+    def test_run_service_with_user_overridden_short_form(self, _):
+        self.command.base_dir = 'tests/fixtures/user-composefile'
+        name = 'service'
+        user = 'sshd'
+        args = ['run', '-u', user, name]
+        self.command.dispatch(args, None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(user, container.get('Config.User'))
+
+    @patch('dockerpty.start')
     def test_run_service_with_environement_overridden(self, _):
         name = 'service'
         self.command.base_dir = 'tests/fixtures/environment-composefile'

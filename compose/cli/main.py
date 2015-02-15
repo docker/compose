@@ -275,6 +275,7 @@ class TopLevelCommand(Command):
                                   new container name.
             --entrypoint CMD      Override the entrypoint of the image.
             -e KEY=VAL            Set an environment variable (can be used multiple times)
+            -u, --user=""         Run as specified username or uid
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
             --service-ports       Run command with the service's ports enabled and mapped
@@ -322,6 +323,10 @@ class TopLevelCommand(Command):
 
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')
+
+        if options['--user']:
+            container_options['user'] = options.get('--user')
+
         container = service.create_container(
             one_off=True,
             insecure_registry=insecure_registry,
