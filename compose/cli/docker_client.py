@@ -21,7 +21,7 @@ def docker_client():
     try:
         tls_verify = int(tls_verify) > 0
     except ValueError:
-        tls_verify = tls_verify in ["true", "yes", "on", "enabled", "enable"]
+        tls_verify = tls_verify.lower() in ["true", "yes", "on", "enabled", "enable"]
 
     if tls_verify:
         parts = base_url.split('://', 1)
