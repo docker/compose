@@ -2,7 +2,6 @@ from docker import Client
 from docker import tls
 import ssl
 import os
-from .errors import UserError
 
 def docker_client():
     """
