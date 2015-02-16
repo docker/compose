@@ -3,6 +3,7 @@ from docker import tls
 import ssl
 import os
 
+
 def docker_client():
     """
     Returns a docker-py client configured using environment variables
