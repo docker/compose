@@ -13,7 +13,7 @@ from .testcases import DockerClientTestCase
 
 def create_and_start_container(service, **override_options):
     container = service.create_container(**override_options)
-    return service.start_container(container, **override_options)
+    return service.start_container(container)
 
 
 class ServiceTest(DockerClientTestCase):
