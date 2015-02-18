@@ -1,68 +1,47 @@
----
-layout: default
-title: Compose CLI reference
 page_title: Compose CLI reference
 page_description: Compose CLI reference
-page_keywords: fig, composition, compose, docker
----
+page_keywords: fig, composition, compose, docker, orchestration, cli, reference
+
 
 # CLI reference
 
-Most commands are run against one or more services. If the service is omitted,
-it will apply to all services.
+Most commands are run against one or more services. If the service is not
+specified, the command will apply to all services.
 
-Run `docker-compose [COMMAND] --help` for full usage.
-
-## Options
-
-### --verbose
-
- Show more output
-
-### --version
-
- Print version and exit
-
-### -f, --file FILE
-
- Specify an alternate compose file (default: docker-compose.yml)
-
-### -p, --project-name NAME
-
- Specify an alternate project name (default: directory name)
+For full usage information, run `docker-compose [COMMAND] --help`.
 
 ## Commands
 
 ### build
 
-Build or rebuild services.
+Builds or rebuilds services.
 
-Services are built once and then tagged as `project_service`, e.g.,`composetest_db`.
-If you change a service's `Dockerfile` or the contents of its build directory, you
-can run `docker-compose build` to rebuild it.
+Services are built once and then tagged as `project_service`, e.g.,
+`composetest_db`. If you change a service's Dockerfile or the contents of its
+build directory, run `docker-compose build` to rebuild it.
 
 ### help
 
-Get help on a command.
+Displays help and usage instructions for a command.
 
 ### kill
 
-Force stop running containers by sending a `SIGKILL` signal. Optionally the signal
-can be passed, for example:
+Forces running containers to stop by sending a `SIGKILL` signal. Optionally the
+signal can be passed, for example:
 
     $ docker-compose kill -s SIGINT
 
 ### logs
 
-View output from services.
+Displays log output from services.
 
 ### port
 
-Print the public port for a port binding
+Prints the public port for a port binding
 
 ### ps
 
-List containers.
+Lists containers.
 
 ### pull
 
@@ -70,79 +49,103 @@ Pulls service images.
 
 ### rm
 
-Remove stopped service containers.
+Removes stopped service containers.
 
 
 ### run
 
-Run a one-off command on a service.
+Runs a one-off command on a service.
 
-For example:
+For example,
 
     $ docker-compose run web python manage.py shell
 
-By default, linked services will be started, unless they are already running.
+will start the `web` service and then run `manage.py shell` in python.
+Note that by default, linked services will also be started, unless they are
+already running.
 
 One-off commands are started in new containers with the same configuration as a
 normal container for that service, so volumes, links, etc will all be created as
-expected. The only thing different to a normal container is the command will be
-overridden with the one specified and by default no ports will be created in case
-they collide.
+expected. When using `run`, there are two differences from bringing up a
+container normally:
 
-Links are also created between one-off commands and the other containers for that
-service so you can do stuff like this:
+1. the command will be overridden with the one specified. So, if you run
+`docker-compose run web bash`, the container's web command (which could default
+to, e.g., `python app.py`) will be overridden to `bash`
+
+2. by default no ports will be created in case they collide with already opened
+ports.
+
+Links are also created between one-off commands and the other containers which
+are part of that service. So, for example, you could run:
 
     $ docker-compose run db psql -h db -U docker
 
-If you do not want linked containers to be started when running the one-off command,
+This would open up an interactive PostgreSQL shell for the linked `db` container
+(which would get created or started as needed).
+
+If you do not want linked containers to start when running the one-off command,
 specify the `--no-deps` flag:
 
     $ docker-compose run --no-deps web python manage.py shell
 
-If you want the service's ports to be created and mapped to the host, specify the
-`--service-ports` flag:
+Similarly, if you do want the service's ports to be created and mapped to the
+host, specify the `--service-ports` flag:
 	$ docker-compose run --service-ports web python manage.py shell
 
 ### scale
 
-Set number of containers to run for a service.
+Sets the number of containers to run for a service.
 
-Numbers are specified in the form `service=num` as arguments.
-For example:
+Numbers are specified as arguments in the form `service=num`. For example:
 
     $ docker-compose scale web=2 worker=3
 
 ### start
 
-Start existing containers for a service.
+Starts existing containers for a service.
 
 ### stop
 
-Stop running containers without removing them. They can be started again with
+Stops running containers without removing them. They can be started again with
 `docker-compose start`.
 
 ### up
 
-Build, (re)create, start and attach to containers for a service.
+Builds, (re)creates, starts, and attaches to containers for a service.
 
 Linked services will be started, unless they are already running.
 
-By default, `docker-compose up` will aggregate the output of each container, and when
-it exits, all containers will be stopped. If you run `docker-compose up -d`, it'll
-start the containers in the background and leave them running.
+By default, `docker-compose up` will aggregate the output of each container and,
+when it exits, all containers will be stopped. Running `docker-compose up -d`,
+will start the containers in the background and leave them running.
 
-By default if there are existing containers for a service, `docker-compose up` will
-stop and recreate them (preserving mounted volumes with [volumes-from]), so that
-changes in `docker-compose.yml` are picked up. If you do not want containers to be
-stopped and recreated, use `docker-compose up --no-recreate`. This will still start
-any stopped containers, if needed.
+By default, if there are existing containers for a service, `docker-compose up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `docker-compose.yml` are picked up. If you do not want containers stopped and recreated, use `docker-compose up --no-recreate`. This will still start any stopped containers, if needed.
 
 [volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/
+
+## Options
+
+### --verbose
+
+ Shows more output
+
+### --version
+
+ Prints version and exits
+
+### -f, --file FILE
+
+ Specifies an alternate Compose yaml file (default: `docker-compose.yml`)
+
+### -p, --project-name NAME
+
+ Specifies an alternate project name (default: current directory name)
 
 
 ## Environment Variables
 
-Several environment variables can be used to configure Compose's behaviour.
+Several environment variables are available for you to configure Compose's behaviour.
 
 Variables starting with `DOCKER_` are the same as those used to configure the
 Docker command-line client. If you're using boot2docker, `$(boot2docker shellinit)`
@@ -150,18 +153,15 @@ will set them to their correct values.
 
 ### FIG\_PROJECT\_NAME
 
-Set the project name, which is prepended to the name of every container started by
-Compose. Defaults to the `basename` of the current working directory.
+Sets the project name, which is prepended to the name of every container started by Compose. Defaults to the `basename` of the current working directory.
 
 ### FIG\_FILE
 
-Set the path to the `docker-compose.yml` to use. Defaults to `docker-compose.yml`
-in the current working directory.
+Sets the path to the `docker-compose.yml` to use. Defaults to `docker-compose.yml` in the current working directory.
 
 ### DOCKER\_HOST
 
-Set the URL to the docker daemon. Defaults to `unix:///var/run/docker.sock`, as
-with the docker client.
+Sets the URL of the docker daemon. As with the Docker client, defaults to `unix:///var/run/docker.sock`.
 
 ### DOCKER\_TLS\_VERIFY
 
@@ -170,5 +170,11 @@ the daemon.
 
 ### DOCKER\_CERT\_PATH
 
-Configure the path to the `ca.pem`, `cert.pem` and `key.pem` files used for TLS
-verification. Defaults to `~/.docker`.
+Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
+
+## Compose Docs
+
+[Installing Compose](http://docs.docker.com/compose/install)
+[Intro & Overview]((http://docs.docker.com/compose/userguide)
+[Yaml file reference]((http://docs.docker.com/compose/yml)
+
