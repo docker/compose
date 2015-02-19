@@ -12,6 +12,8 @@ On top of the changelog for 1.1.0-rc1 (see below), the following bugs have been 
 
 - Bash tab completion now reads `fig.yml` if it's present.
 
+Thanks, @dnephin and @albers!
+
 1.1.0-rc1 (2015-01-20)
 ----------------------
 
@@ -42,6 +44,8 @@ Besides that, there’s a lot of new stuff in this release:
 - Compose now ships with Bash tab completion - see the installation and usage docs at https://github.com/docker/fig/blob/1.1.0-rc1/docs/completion.md
 
 - A number of bugs have been fixed - see the milestone for details: https://github.com/docker/fig/issues?q=milestone%3A1.1.0+
+
+Thanks @dnephin, @squebe, @jbalonso, @raulcd, @benlangfield, @albers, @ggtools, @bersace, @dtenenba, @petercv, @drewkett, @TFenby, @paulRbr, @Aigeruth and @salehe!
 
 1.0.1 (2014-11-04)
 ------------------
