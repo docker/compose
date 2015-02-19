@@ -151,11 +151,11 @@ Variables starting with `DOCKER_` are the same as those used to configure the
 Docker command-line client. If you're using boot2docker, `$(boot2docker shellinit)`
 will set them to their correct values.
 
-### FIG\_PROJECT\_NAME
+### COMPOSE\_PROJECT\_NAME
 
 Sets the project name, which is prepended to the name of every container started by Compose. Defaults to the `basename` of the current working directory.
 
-### FIG\_FILE
+### COMPOSE\_FILE
 
 Sets the path to the `docker-compose.yml` to use. Defaults to `docker-compose.yml` in the current working directory.
 
