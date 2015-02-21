@@ -62,3 +62,12 @@ class ComposeFileNotFound(UserError):
 
         Supported filenames: %s
         """ % ", ".join(supported_filenames))
+
+
+class TLSParameterError(UserError):
+    def __init__(self):
+        super(TLSParameterError, self).__init__("""
+        TLS configured but no DOCKER_HOST is set.
+
+        See http://docs.docker.com/examples/https/ for client configurations.
+        """)
