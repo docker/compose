@@ -238,8 +238,8 @@ class TopLevelCommand(Command):
         Usage: rm [options] [SERVICE...]
 
         Options:
-            --force   Don't ask to confirm removal
-            -v        Remove volumes associated with containers
+            -f, --force   Don't ask to confirm removal
+            -v            Remove volumes associated with containers
         """
         all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
