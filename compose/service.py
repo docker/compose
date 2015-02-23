@@ -428,12 +428,12 @@ class Service(object):
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
- 
+
         # Get the container_number and replace the
         # placeholder %%id%% and %%hostname%% in
         # the order-aware REPLACEABLE_OPTIONS.
         # This approach is
-        #  - quite safe (avoids messing with env) 
+        #  - quite safe (avoids messing with env)
         #  - allows scaling nodes to be identified by
         #     some id in the command line
         REPLACEABLE_OPTIONS = ['hostname', 'command']
@@ -448,8 +448,7 @@ class Service(object):
                 # Note that:
                 #  - 'hostname' have been already processed
                 #  - don't replace %%hostname%% in hostname
-                container_options[k] = self._safe_replace(r"%%hostname%%", container_options['hostname'],  container_options[k])
-        
+                container_options[k] = self._safe_replace(r"%%hostname%%", container_options['hostname'], container_options[k])
 
         container_options['name'] = self._next_container_name(
             self.containers(stopped=True, one_off=one_off),
