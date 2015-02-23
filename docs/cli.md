@@ -172,9 +172,9 @@ the daemon.
 
 Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
 
-## Compose Docs
+## Compose Documentation
 
-[Installing Compose](http://docs.docker.com/compose/install)
-[Intro & Overview]((http://docs.docker.com/compose/userguide)
-[Yaml file reference]((http://docs.docker.com/compose/yml)
+- [Installing Compose](install.md)
+- [Intro & Overview](index.md)
+- [Yaml file reference](yml.md)
 

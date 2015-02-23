@@ -6,7 +6,7 @@ title: Getting started with Compose and Wordpress
 Getting started with Compose and Wordpress
 ======================================
 
-Compose makes it nice and easy to run Wordpress in an isolated environment. [Install Compose](install.html), then download Wordpress into the current directory:
+Compose makes it nice and easy to run Wordpress in an isolated environment. [Install Compose](install.md), then download Wordpress into the current directory:
 
     $ curl https://wordpress.org/latest.tar.gz | tar -xvzf -
 
