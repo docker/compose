@@ -411,11 +411,44 @@ class Service(object):
 
         return volumes_from
 
+    def _safe_replace(self, old, new, haystack):
+        '''
+        Replace old with new in haystack (or in its elements).
+        :param old: The string to search
+        :param new: The replacement
+        :param haystack: A list or a string
+        :return: a copy of haystack with all the occurrencies of old are replaced with new
+        '''
+        if isinstance(haystack, list):
+            return [x.replace(old, new) for x in haystack]
+        return haystack.replace(old, new)
+
     def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
+
+        # Get the container_number and replace the
+        # placeholder %%id%% and %%hostname%% in
+        # the order-aware REPLACEABLE_OPTIONS.
+        # This approach is
+        #  - quite safe (avoids messing with env)
+        #  - allows scaling nodes to be identified by
+        #     some id in the command line
+        REPLACEABLE_OPTIONS = ['hostname', 'command']
+        container_number = self._next_container_number(
+            self.containers(stopped=True, one_off=one_off))
+        for k in REPLACEABLE_OPTIONS:
+            if not container_options.get(k):
+                continue
+
+            container_options[k] = self._safe_replace(r"%%id%%", str(container_number), container_options[k])
+            if 'hostname' in container_options and k is not 'hostname':
+                # Note that:
+                #  - 'hostname' have been already processed
+                #  - don't replace %%hostname%% in hostname
+                container_options[k] = self._safe_replace(r"%%hostname%%", container_options['hostname'], container_options[k])
 
         container_options['name'] = self._next_container_name(
             self.containers(stopped=True, one_off=one_off),
