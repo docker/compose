@@ -32,7 +32,7 @@ To install Compose, run the following commands:
     curl -L https://github.com/docker/docker-compose/releases/download/1.1.0-rc2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
 
-Optionally, you can also install [command completion](completion.html) for the
+Optionally, you can also install [command completion](completion.md) for the
 bash shell.
 
 Compose is available for OS X and 64-bit Linux. If you're on another platform,

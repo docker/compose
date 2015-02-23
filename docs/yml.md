@@ -68,7 +68,7 @@ for this service, e.g:
 ```
 
 Environment variables will also be created - see the [environment variable
-reference](env.html) for details.
+reference](env.md) for details.
 
 ### external_links
 

@@ -60,7 +60,7 @@ Python.
 
 ### Installation and set-up
 
-First, [install Docker and Compose](install.html).
+First, [install Docker and Compose](install.md).
 
 Next, you'll want to make a directory for the project:
 

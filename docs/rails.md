@@ -6,7 +6,7 @@ title: Getting started with Compose and Rails
 Getting started with Compose and Rails
 ==================================
 
-We're going to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.html).
+We're going to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
 
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
