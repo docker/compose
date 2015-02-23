@@ -1,5 +1,19 @@
-#!/bin/sh
+#!/bin/bash
+# See CONTRIBUTING.md for usage.
+
 set -ex
+
 docker build -t docker-compose .
-docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint flake8 docker-compose compose
-docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --entrypoint nosetests docker-compose $@
+docker run --privileged --rm --entrypoint flake8 docker-compose compose
+
+docker build -f Dockerfile.tests -t docker-compose-tests .
+
+if [ "$DOCKER_VERSIONS" == "" ]; then
+  DOCKER_VERSIONS="1.5.0"
+elif [ "$DOCKER_VERSIONS" == "all" ]; then
+  DOCKER_VERSIONS="1.3.3 1.4.1 1.5.0"
+fi
+
+for version in $DOCKER_VERSIONS; do
+  docker run --privileged --rm -e "DOCKER_VERSION=$version" docker-compose-tests nosetests "$@"
+done

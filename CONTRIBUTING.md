@@ -24,7 +24,20 @@ that should get you started.
 
 ## Running the test suite
 
+Use the test script to run linting checks and then the full test suite:
+
     $ script/test
+
+Tests are run against a Docker daemon inside a container, so that we can test against multiple Docker versions. By default they'll run against only the latest Docker version - set the `DOCKER_VERSIONS` environment variable to "all" to run against all supported versions:
+
+    $ DOCKER_VERSIONS=all script/test
+
+Arguments to `script/test` are passed through to the `nosetests` executable, so you can specify a test directory, file, module, class or method:
+
+    $ script/test tests/unit
+    $ script/test tests/unit/cli_test.py
+    $ script/test tests.integration.service_test
+    $ script/test tests.integration.service_test:ServiceTest.test_containers
 
 ## Building binaries
 
