@@ -237,3 +237,31 @@ restart: always
 stdin_open: true
 tty: true
 ```
+
+### reusing blocks of yaml across images
+
+YAML has a built in feature called [anchors and aliases](http://yaml.org/YAML_for_ruby.html#simple_alias_example).
+
+Let's walk through an example of sharing links and environment variables between 2 images:
+
+```
+website:
+  build: .
+  ports:
+    - 3000:3000
+  links: &website_links
+    - postgresql:postgresql
+    - redis:redis
+  environment: &website_env
+    FOO: bar
+    HELLO: world
+
+worker:
+  build: .
+  command: bundle exec sidekiq -C config/sidekiq.yml
+  links: *website_links
+  environment:
+    <<: *website_env
+```
+
+Notice the difference between how you link lists and dicts.
