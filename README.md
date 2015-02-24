@@ -1,17 +1,17 @@
-Docker Compose
+Fig
 ==============
 
 [![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
 
-Compose is a tool for defining and running complex applications with Docker.
-With Compose, you define a multi-container application in a single file, then
+Fig is a tool for defining and running complex applications with Docker.
+With Fig, you define a multi-container application in a single file, then
 spin your application up in a single command which does everything that needs to
 be done to get it running.
 
-Compose is great for development environments, staging servers, and CI. We don't
+Fig is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
 
-Using Compose is basically a three-step process.
+Using Fig is basically a three-step process.
 
 First, you define your app's environment with a `Dockerfile` so it can be
 reproduced anywhere:
@@ -25,7 +25,7 @@ ADD . /code
 CMD python app.py
 ```
 
-Next, you define the services that make up your app in `docker-compose.yml` so
+Next, you define the services that make up your app in `fig.yml` so
 they can be run together in an isolated environment:
 
 ```yaml
@@ -39,9 +39,9 @@ db:
   image: postgres
 ```
 
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
+Lastly, run `fig up` and Fig will start and run your entire app.
 
-Compose has commands for managing the whole lifecycle of your application:
+Fig has commands for managing the whole lifecycle of your application:
 
  * Start, stop and rebuild services
  * View the status of running services
