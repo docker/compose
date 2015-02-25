@@ -12,6 +12,8 @@ Over time we will extend Compose's remit to cover test, staging and production e
 
 Compose should integrate really well with Swarm so you can take an application you've developed on your laptop and run it on a Swarm cluster.
 
+The current state of integration is documented in [SWARM.md](SWARM.md).
+
 ## Applications spanning multiple teams
 
 Compose works well for applications that are in a single repository and depend on services that are hosted on Docker Hub. If your application depends on another application within your organisation, Compose doesn't work as well.
