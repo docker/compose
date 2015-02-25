@@ -89,3 +89,12 @@ if(file_exists($root.$path))
 ```
 
 With those four files in place, run `docker-compose up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)

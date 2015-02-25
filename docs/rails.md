@@ -94,3 +94,12 @@ Finally, we just need to create the database. In another terminal, run:
     $ docker-compose run web rake db:create
 
 And we're rolling—your app should now be running on port 3000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)

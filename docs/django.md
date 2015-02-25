@@ -89,3 +89,11 @@ You can also run management commands with Docker. To set up your database, for e
 
     $ docker-compose run web python manage.py syncdb
 
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)

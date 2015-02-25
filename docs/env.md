@@ -31,3 +31,11 @@ Protocol (tcp or udp), e.g. `DB_PORT_5432_TCP_PROTO=tcp`
 Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 
 [Docker links]: http://docs.docker.com/userguide/dockerlinks/
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose command line completion](completion.md)

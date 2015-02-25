@@ -178,6 +178,12 @@ your services once you've finished with them:
 
     $ docker-compose stop
 
-At this point, you have seen the basics of how Compose works. See the reference
-guides for complete details on the [commands](cli.md), the [configuration
-file](yml.md) and [environment variables](env.md).
+At this point, you have seen the basics of how Compose works. 
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
