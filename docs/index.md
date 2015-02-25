@@ -50,6 +50,13 @@ Compose has commands for managing the whole lifecycle of your application:
  * Stream the log output of running services
  * Run a one-off command on a service
 
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
 
 ## Quick start
 
@@ -180,10 +187,4 @@ your services once you've finished with them:
 
 At this point, you have seen the basics of how Compose works. 
 
-## Compose documentation
 
-- [Installing Compose](install.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
