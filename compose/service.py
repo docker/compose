@@ -25,6 +25,7 @@ DOCKER_START_KEYS = [
     'dns_search',
     'env_file',
     'net',
+    'pid',
     'privileged',
     'restart',
 ]
@@ -434,6 +435,7 @@ class Service(object):
         privileged = options.get('privileged', False)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
+        pid = options.get('pid', None)
 
         dns = options.get('dns', None)
         if isinstance(dns, six.string_types):
@@ -457,6 +459,7 @@ class Service(object):
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            pid_mode=pid
         )
 
     def _get_image_name(self, image):
