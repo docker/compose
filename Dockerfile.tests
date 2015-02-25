@@ -1,5 +1,0 @@
-FROM docker-compose
-
-ADD script/wrapdocker /usr/local/bin/wrapdocker
-VOLUME /var/lib/docker
-ENTRYPOINT ["/usr/local/bin/wrapdocker"]

@@ -1,17 +1,27 @@
 FROM debian:wheezy
 
-RUN apt-get update -qq
+RUN set -ex; \
+    apt-get update -qq; \
+    apt-get install -y \
+        python \
+        python-pip \
+        python-dev \
+        git \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        lxc \
+        iptables \
+    ; \
+    rm -rf /var/lib/apt/lists/*
 
-# Compose dependencies
-RUN apt-get install -qqy python python-pip python-dev git
+ENV ALL_DOCKER_VERSIONS 1.3.3 1.4.1 1.5.0
 
-# Test dependencies
-RUN apt-get install -qqy apt-transport-https ca-certificates curl lxc iptables
-RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.3.3 > /usr/local/bin/docker-1.3.3 && chmod +x /usr/local/bin/docker-1.3.3
-RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.4.1 > /usr/local/bin/docker-1.4.1 && chmod +x /usr/local/bin/docker-1.4.1
-RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.5.0 > /usr/local/bin/docker-1.5.0 && chmod +x /usr/local/bin/docker-1.5.0
-
-RUN apt-get clean
+RUN set -ex; \
+    for v in ${ALL_DOCKER_VERSIONS}; do \
+        curl https://get.docker.com/builds/Linux/x86_64/docker-$v -o /usr/local/bin/docker-$v; \
+        chmod +x /usr/local/bin/docker-$v; \
+    done
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
