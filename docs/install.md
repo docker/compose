@@ -42,3 +42,11 @@ Compose can also be installed as a Python package:
 
 No further steps are required; Compose should now be successfully  installed.
 You can test the installation by running `docker-compose --version`.
+
+## Compose documentation
+
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)

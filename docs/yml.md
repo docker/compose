@@ -29,8 +29,10 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. Compose will build and tag it
-with a generated name, and use that image thereafter.
+Path to a directory containing a Dockerfile. This directory is also the
+build context that is sent to the Docker daemon.
+
+Compose will build and tag it with a generated name, and use that image thereafter.
 
 ```
 build: /path/to/build/dir
@@ -237,3 +239,11 @@ restart: always
 stdin_open: true
 tty: true
 ```
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
