@@ -11,6 +11,10 @@
   </head>
   <body>
     <div class="container">
+      <nav class="deprecation">
+        <p>Fig has been replaced by Docker Compose, and is now deprecated. The new documentation is on the <a href="http://docs.docker.com/compose{% if page.url =="/index.html" %}/{% else %}{{ page.url | remove:'.html' }}{% endif %}">Docker website</a>.</p>
+      </nav>
+
       <div class="logo mobile-logo">
         <a href="index.html">
           <img src="img/logo.png">
