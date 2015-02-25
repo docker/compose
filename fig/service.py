@@ -648,7 +648,8 @@ def build_extra_hosts(extra_hosts_config):
             extra_hosts_dict.update(extra_hosts_line)
         else:
             # not already interpreted as a dict
-            extra_hosts_dict.update(extra_hosts_line.split(':'))
+            host, ip = extra_hosts_line.split(':')
+            extra_hosts_dict.update({host.strip(): ip.strip()})
 
     return extra_hosts_dict
 
