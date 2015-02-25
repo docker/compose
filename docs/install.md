@@ -29,7 +29,7 @@ For complete instructions, or if you are on another platform, consult Docker's
 
 To install Compose, run the following commands:
 
-    curl -L https://github.com/docker/docker-compose/releases/download/1.1.0-rc2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+    curl -L https://github.com/docker/compose/releases/download/1.1.0-rc2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
 
 Optionally, you can also install [command completion](completion.md) for the
