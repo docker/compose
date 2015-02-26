@@ -53,4 +53,5 @@ Compose has commands for managing the whole lifecycle of your application:
 Installation and documentation
 ------------------------------
 
-Full documentation is available on [Fig's website](http://www.fig.sh/).
+- Full documentation is available on [Docker's website](http://docs.docker.com/compose/).
+- Hop into #docker-compose on Freenode if you have any questions.
