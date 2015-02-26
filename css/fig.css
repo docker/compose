@@ -56,6 +56,15 @@ img {
   margin-left: 0;
 }
 
+.deprecation {
+  background: #EDCAAC;
+  padding: 1px 30px;
+}
+
+.deprecation, .deprecation a {
+  color: #a41211;
+}
+
 .logo {
   font-family: 'Lilita One', sans-serif;
   font-size: 64px;
@@ -126,7 +135,7 @@ img {
     border-right: 1px solid #ccc;
   }
 
-  .content {
+  .deprecation, .content {
     margin-left: 320px;
     max-width: 650px;
   }
