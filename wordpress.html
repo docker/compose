@@ -36,7 +36,7 @@ ADD . /code
 <p>Next up, <code>fig.yml</code> starts our web service and a separate MySQL instance:</p>
 <div class="highlight"><pre><code class="text language-text" data-lang="text">web:
   build: .
-  command: php -S 0.0.0.0:8000 -t /code
+  command: php -S 0.0.0.0:8000 -t /code /code/router.php
   ports:
     - &quot;8000:8000&quot;
   links:
