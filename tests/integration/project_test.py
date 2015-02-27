@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from compose import config
 from compose.project import Project, ConfigurationError
 from compose.container import Container
 from .testcases import DockerClientTestCase
@@ -6,9 +7,9 @@ from .testcases import DockerClientTestCase
 
 class ProjectTest(DockerClientTestCase):
     def test_volumes_from_service(self):
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'data': {
                     'image': 'busybox:latest',
                     'volumes': ['/var/data'],
@@ -17,7 +18,7 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'volumes_from': ['data'],
                 },
-            },
+            }),
             client=self.client,
         )
         db = project.get_service('db')
@@ -31,14 +32,14 @@ class ProjectTest(DockerClientTestCase):
             volumes=['/var/data'],
             name='composetest_data_container',
         )
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
                 },
-            },
+            }),
             client=self.client,
         )
         db = project.get_service('db')

@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import logging
 
 from functools import reduce
+from .config import ConfigurationError
 from .service import Service
 from .container import Container
 from docker.errors import APIError
@@ -63,16 +64,6 @@ class Project(object):
 
             project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
         return project
-
-    @classmethod
-    def from_config(cls, name, config, client):
-        dicts = []
-        for service_name, service in list(config.items()):
-            if not isinstance(service, dict):
-                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
-            service['name'] = service_name
-            dicts.append(service)
-        return cls.from_dicts(name, dicts, client)
 
     def get_service(self, name):
         """
@@ -226,14 +217,6 @@ class NoSuchService(Exception):
     def __init__(self, name):
         self.name = name
         self.msg = "No such service: %s" % self.name
-
-    def __str__(self):
-        return self.msg
-
-
-class ConfigurationError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
 
     def __str__(self):
         return self.msg
