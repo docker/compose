@@ -1,5 +1,6 @@
 from docker import Client
 from docker import tls
+from . import errors
 import ssl
 import os
 
@@ -17,6 +18,8 @@ def docker_client():
     tls_config = None
 
     if os.environ.get('DOCKER_TLS_VERIFY', '') != '':
+        if not base_url and not base_url.strip():
+            raise errors.TLSParameterError()
         parts = base_url.split('://', 1)
         base_url = '%s://%s' % ('https', parts[1])
 
