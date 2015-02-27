@@ -482,7 +482,7 @@ class Service(object):
 
         try:
             all_events = stream_output(build_output, sys.stdout)
-        except StreamOutputError, e:
+        except StreamOutputError as e:
             raise BuildError(self, unicode(e))
 
         image_id = None
