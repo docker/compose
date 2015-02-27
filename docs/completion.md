@@ -17,7 +17,7 @@ On a Mac, install with `brew install bash-completion`
  
 Place the completion script in `/etc/bash_completion.d/` (`/usr/local/etc/bash_completion.d/` on a Mac), using e.g. 
 
-     curl -L https://raw.githubusercontent.com/docker/fig/1.1.0-rc2/contrib/completion/bash/docker-compose > /etc/bash_completion.d/docker-compose
+     curl -L https://raw.githubusercontent.com/docker/compose/1.1.0/contrib/completion/bash/docker-compose > /etc/bash_completion.d/docker-compose
  
 Completion will be available upon next login.
 
@@ -31,3 +31,11 @@ Depending on what you typed on the command line so far, it will complete
  - arguments for selected options, e.g. `docker-compose kill -s` will complete some signals like SIGHUP and SIGUSR1.
 
 Enjoy working with Compose faster and with less typos!
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)

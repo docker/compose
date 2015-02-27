@@ -6,7 +6,7 @@ title: Getting started with Compose and Rails
 Getting started with Compose and Rails
 ==================================
 
-We're going to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.html).
+We're going to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
 
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
@@ -94,3 +94,12 @@ Finally, we just need to create the database. In another terminal, run:
     $ docker-compose run web rake db:create
 
 And we're rolling—your app should now be running on port 3000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)

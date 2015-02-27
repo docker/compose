@@ -1,21 +1,8 @@
 Change log
 ==========
 
-1.1.0-rc2 (2015-01-29)
-----------------------
-
-On top of the changelog for 1.1.0-rc1 (see below), the following bugs have been fixed:
-
-- When an environment variables file specified with `env_file` doesn't exist, Compose was showing a stack trace instead of a helpful error.
-
-- Configuration files using the old name (`fig.yml`) were not being read unless explicitly specified with `docker-compose -f`. Compose now reads them and prints a deprecation warning.
-
-- Bash tab completion now reads `fig.yml` if it's present.
-
-Thanks, @dnephin and @albers!
-
-1.1.0-rc1 (2015-01-20)
-----------------------
+1.1.0 (2015-02-25)
+------------------
 
 Fig has been renamed to Docker Compose, or just Compose for short. This has several implications for you:
 
@@ -41,9 +28,9 @@ Besides that, there’s a lot of new stuff in this release:
 
 - docker-compose.yml now supports the `dns_search`, `cap_add`, `cap_drop`, `cpu_shares` and `restart` options, analogous to `docker run`’s `--dns-search`, `--cap-add`, `--cap-drop`, `--cpu-shares` and `--restart` options.
 
-- Compose now ships with Bash tab completion - see the installation and usage docs at https://github.com/docker/fig/blob/1.1.0-rc1/docs/completion.md
+- Compose now ships with Bash tab completion - see the installation and usage docs at https://github.com/docker/compose/blob/1.1.0/docs/completion.md
 
-- A number of bugs have been fixed - see the milestone for details: https://github.com/docker/fig/issues?q=milestone%3A1.1.0+
+- A number of bugs have been fixed - see the milestone for details: https://github.com/docker/compose/issues?q=milestone%3A1.1.0+
 
 Thanks @dnephin, @squebe, @jbalonso, @raulcd, @benlangfield, @albers, @ggtools, @bersace, @dtenenba, @petercv, @drewkett, @TFenby, @paulRbr, @Aigeruth and @salehe!
 

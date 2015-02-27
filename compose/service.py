@@ -180,6 +180,7 @@ class Service(object):
         # Create enough containers
         containers = self.containers(stopped=True)
         while len(containers) < desired_num:
+            log.info("Creating %s..." % self._next_container_name(containers))
             containers.append(self.create_container(detach=True))
 
         running_containers = []

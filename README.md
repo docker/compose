@@ -3,6 +3,8 @@ Docker Compose
 
 [![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
 
+*(Previously known as Fig)*
+
 Compose is a tool for defining and running complex applications with Docker.
 With Compose, you define a multi-container application in a single file, then
 spin your application up in a single command which does everything that needs to
@@ -51,4 +53,5 @@ Compose has commands for managing the whole lifecycle of your application:
 Installation and documentation
 ------------------------------
 
-Full documentation is available on [Fig's website](http://www.fig.sh/).
+- Full documentation is available on [Docker's website](http://docs.docker.com/compose/).
+- Hop into #docker-compose on Freenode if you have any questions.

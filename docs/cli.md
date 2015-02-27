@@ -5,8 +5,8 @@ page_keywords: fig, composition, compose, docker, orchestration, cli, reference
 
 # CLI reference
 
-Most commands are run against one or more services. If the service is not
-specified, the command will apply to all services.
+Most Docker Compose commands are run against one or more services. If
+the service is not specified, the command will apply to all services.
 
 For full usage information, run `docker-compose [COMMAND] --help`.
 
@@ -172,9 +172,10 @@ the daemon.
 
 Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
 
-## Compose Docs
+## Compose documentation
 
-[Installing Compose](http://docs.docker.com/compose/install)
-[Intro & Overview]((http://docs.docker.com/compose/userguide)
-[Yaml file reference]((http://docs.docker.com/compose/yml)
-
+- [Installing Compose](install.md)
+- [User guide](index.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)

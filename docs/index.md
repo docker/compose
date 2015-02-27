@@ -50,6 +50,13 @@ Compose has commands for managing the whole lifecycle of your application:
  * Stream the log output of running services
  * Run a one-off command on a service
 
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
 
 ## Quick start
 
@@ -60,7 +67,7 @@ Python.
 
 ### Installation and set-up
 
-First, [install Docker and Compose](install.html).
+First, [install Docker and Compose](install.md).
 
 Next, you'll want to make a directory for the project:
 
@@ -178,6 +185,9 @@ your services once you've finished with them:
 
     $ docker-compose stop
 
-At this point, you have seen the basics of how Compose works. See the reference
-section for complete details on the commands, configuration file and environment
-variables.
+At this point, you have seen the basics of how Compose works.
+
+- Next, try the quick start guide for [Django](django.md),
+  [Rails](rails.md), or [Wordpress](wordpress.md).
+- See the reference guides for complete details on the [commands](cli.md), the
+  [configuration file](yml.md) and [environment variables](env.md).
