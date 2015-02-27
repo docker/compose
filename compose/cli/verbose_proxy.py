@@ -9,7 +9,7 @@ import six
 
 def format_call(args, kwargs):
     args = (repr(a) for a in args)
-    kwargs = ("{0!s}={1!r}".format(*item) for item in six.iteritems(kwargs))
+    kwargs = ("{0!s}={1!r}".format(*item) for item in six.items(kwargs))
     return "({0})".format(", ".join(chain(args, kwargs)))
 
 

@@ -641,7 +641,7 @@ def merge_environment(options):
         else:
             env.update(options['environment'])
 
-    return dict(resolve_env(k, v) for k, v in env.iteritems())
+    return dict(resolve_env(k, v) for k, v in env.items())
 
 
 def split_env(env):
