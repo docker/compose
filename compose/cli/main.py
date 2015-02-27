@@ -200,6 +200,7 @@ class TopLevelCommand(Command):
                 'Name',
                 'Command',
                 'State',
+                'IP',
                 'Ports',
             ]
             rows = []
@@ -211,6 +212,7 @@ class TopLevelCommand(Command):
                     container.name,
                     command,
                     container.human_readable_state,
+                    container.ip,
                     container.human_readable_ports,
                 ])
             print(Formatter().table(headers, rows))

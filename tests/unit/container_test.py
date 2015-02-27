@@ -23,6 +23,7 @@ class ContainerTest(unittest.TestCase):
             "Names": ["/composetest_db_1", "/composetest_web_1/db"],
             "NetworkSettings": {
                 "Ports": {},
+                "IPAddress": None,
             },
         }
 
@@ -107,6 +108,17 @@ class ContainerTest(unittest.TestCase):
 
         expected = "45453/tcp, 0.0.0.0:49197->45454/tcp"
         self.assertEqual(container.human_readable_ports, expected)
+
+    def test_ipaddress(self):
+        self.container_dict['NetworkSettings']['IPAddress'] = "0.0.0.0"
+        container = Container(None, self.container_dict, has_been_inspected=True)
+
+        expected = "0.0.0.0"
+        self.assertEqual(container.ip, expected)
+
+    def test_ipaddress_none(self):
+        container = Container(None, self.container_dict, has_been_inspected=True)
+        self.assertEqual(container.ip, '')
 
     def test_get_local_port(self):
         self.container_dict['NetworkSettings']['Ports'].update({
