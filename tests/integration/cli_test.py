@@ -295,6 +295,12 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.command.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
+        service = self.project.get_service('simple')
+        service.create_container()
+        service.kill()
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.command.dispatch(['rm', '-f'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 0)
 
     def test_kill(self):
         self.command.dispatch(['up', '-d'], None)
