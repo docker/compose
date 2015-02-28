@@ -57,7 +57,7 @@ class LogPrinter(object):
         line_generator = split_buffer(self._attach(container), '\n')
 
         for line in line_generator:
-            yield prefix + line
+            yield prefix + line.encode('utf-8')
 
         exit_code = container.wait()
         yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
