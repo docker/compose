@@ -3,27 +3,29 @@ page_description: Introduction and Overview of Compose
 page_keywords: documentation, docs,  docker, compose, orchestration, containers
 
 
-## Overview
+# Docker Compose
 
-Compose is a tool that allows you to orchestrate multiple Docker containers.
-With Compose, you can build clusters of containers which provide the resources
-(services, volumes, etc.) needed to build and run a complete distributed
-application.
+Compose is a tool for defining and running complex applications with Docker.
+With Compose, you define a multi-container application in a single file, then
+spin your application up in a single command which does everything that needs to
+be done to get it running.
 
-You can use Compose to build your app with containers hosted locally, or on a
-remote server, including cloud-based instances. Compose can also be used to
-deploy code to production.
+Compose is great for development environments, staging servers, and CI. We don't
+recommend that you use it in production yet.
 
 Using Compose is basically a three-step process.
 
 First, you define your app's environment with a `Dockerfile` so it can be
 reproduced anywhere:
 
-    FROM python:2.7
-    WORKDIR /code
-    ADD rements.txt /code/
-    RUN pip install -r requirements.txt
-    ADD . /code
+```Dockerfile
+FROM python:2.7
+WORKDIR /code
+ADD requirements.txt /code/
+RUN pip install -r requirements.txt
+ADD . /code
+CMD python app.py
+```
 
 Next, you define the services that make up your app in `docker-compose.yml` so
 they can be run together in an isolated environment:
@@ -31,7 +33,6 @@ they can be run together in an isolated environment:
 ```yaml
 web:
   build: .
-  command: python app.py
   links:
    - db
   ports:
@@ -40,17 +41,22 @@ db:
   image: postgres
 ```
 
-(No more installing Postgres on your laptop!)
-
 Lastly, run `docker-compose up` and Compose will start and run your entire app.
 
-Compose includes commands to:
+Compose has commands for managing the whole lifecycle of your application:
 
  * Start, stop and rebuild services
  * View the status of running services
- * tail the log output of running services
- * run a one-off command on a service
+ * Stream the log output of running services
+ * Run a one-off command on a service
 
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
 
 ## Quick start
 
@@ -61,7 +67,7 @@ Python.
 
 ### Installation and set-up
 
-First, [install Docker and Compose](install.html).
+First, [install Docker and Compose](install.md).
 
 Next, you'll want to make a directory for the project:
 
@@ -179,6 +185,9 @@ your services once you've finished with them:
 
     $ docker-compose stop
 
-At this point, you have seen the basics of how Compose works. See the reference
-section for complete details on the commands, configuration file and environment
-variables.
+At this point, you have seen the basics of how Compose works.
+
+- Next, try the quick start guide for [Django](django.md),
+  [Rails](rails.md), or [Wordpress](wordpress.md).
+- See the reference guides for complete details on the [commands](cli.md), the
+  [configuration file](yml.md) and [environment variables](env.md).
