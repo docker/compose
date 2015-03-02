@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import logging
 
+from functools import reduce
 from .service import Service
 from .container import Container
 from docker.errors import APIError

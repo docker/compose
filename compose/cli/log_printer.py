@@ -46,7 +46,7 @@ class LogPrinter(object):
             if monochrome:
                 color_fn = no_color
             else:
-                color_fn = color_fns.next()
+                color_fn = next(color_fns)
             generators.append(self._make_log_generator(container, color_fn))
 
         return generators

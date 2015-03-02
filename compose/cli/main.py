@@ -1,25 +1,24 @@
 from __future__ import print_function
 from __future__ import unicode_literals
+from inspect import getdoc
+from operator import attrgetter
 import logging
-import sys
 import re
 import signal
-from operator import attrgetter
+import sys
 
-from inspect import getdoc
+from docker.errors import APIError
 import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
-from ..service import BuildError, CannotBeScaledError
+from ..service import BuildError, CannotBeScaledError, parse_environment
 from .command import Command
+from .docopt_command import NoSuchCommand
+from .errors import UserError
 from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import yesno
-
-from docker.errors import APIError
-from .errors import UserError
-from .docopt_command import NoSuchCommand
 
 log = logging.getLogger(__name__)
 
@@ -238,8 +237,8 @@ class TopLevelCommand(Command):
         Usage: rm [options] [SERVICE...]
 
         Options:
-            --force   Don't ask to confirm removal
-            -v        Remove volumes associated with containers
+            -f, --force   Don't ask to confirm removal
+            -v            Remove volumes associated with containers
         """
         all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
@@ -316,11 +315,10 @@ class TopLevelCommand(Command):
         }
 
         if options['-e']:
-            for option in options['-e']:
-                if 'environment' not in service.options:
-                    service.options['environment'] = {}
-                k, v = option.split('=', 1)
-                service.options['environment'][k] = v
+            # Merge environment from config with -e command line
+            container_options['environment'] = dict(
+                parse_environment(service.options.get('environment')),
+                **parse_environment(options['-e']))
 
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')
