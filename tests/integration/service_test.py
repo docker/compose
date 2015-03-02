@@ -472,13 +472,13 @@ class ServiceTest(DockerClientTestCase):
     def test_split_env(self):
         service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
         env = create_and_start_container(service).environment
-        for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.iteritems():
+        for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.items():
             self.assertEqual(env[k], v)
 
     def test_env_from_file_combined_with_env(self):
         service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
-        for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.iteritems():
+        for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
     def test_resolve_env(self):
@@ -488,7 +488,7 @@ class ServiceTest(DockerClientTestCase):
         os.environ['ENV_DEF'] = 'E3'
         try:
             env = create_and_start_container(service).environment
-            for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.iteritems():
+            for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
                 self.assertEqual(env[k], v)
         finally:
             del os.environ['FILE_DEF']
