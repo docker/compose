@@ -6,12 +6,14 @@ import tempfile
 import shutil
 from .. import unittest
 
+import docker
 import mock
+from six import StringIO
 
 from compose.cli import main
 from compose.cli.main import TopLevelCommand
 from compose.cli.errors import ComposeFileNotFound
-from six import StringIO
+from compose.service import Service
 
 
 class CLITestCase(unittest.TestCase):
@@ -102,6 +104,35 @@ class CLITestCase(unittest.TestCase):
         main.setup_logging()
         self.assertEqual(logging.getLogger().level, logging.DEBUG)
         self.assertEqual(logging.getLogger('requests').propagate, False)
+
+    @mock.patch('compose.cli.main.dockerpty', autospec=True)
+    def test_run_with_environment_merged_with_options_list(self, mock_dockerpty):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock()
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            environment=['FOO=ONE', 'BAR=TWO'],
+            image='someimage')
+
+        command.run(mock_project, {
+            'SERVICE': 'service',
+            'COMMAND': None,
+            '-e': ['BAR=NEW', 'OTHER=THREE'],
+            '--no-deps': None,
+            '--allow-insecure-ssl': None,
+            '-d': True,
+            '-T': None,
+            '--entrypoint': None,
+            '--service-ports': None,
+            '--rm': None,
+        })
+
+        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
+        self.assertEqual(
+            call_kwargs['environment'],
+            {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE'})
 
 
 def get_config_filename_for_files(filenames):
