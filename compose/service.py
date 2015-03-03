@@ -88,7 +88,7 @@ ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, depends_on=None, net=None, **options):
+    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, net=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -116,7 +116,6 @@ class Service(object):
         self.links = links or []
         self.external_links = external_links or []
         self.volumes_from = volumes_from or []
-        self.depends_on = depends_on or []
         self.net = net or None
         self.options = options
 
@@ -367,9 +366,6 @@ class Service(object):
 
     def get_volumes_from_names(self):
         return [s.name for s in self.volumes_from if isinstance(s, Service)]
-
-    def get_depends_on_names(self):
-        return [s.name for s in self.depends_on]
 
     def get_net_name(self):
         if isinstance(self.net, Service):

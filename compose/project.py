@@ -36,7 +36,6 @@ def sort_service_dicts(services):
             service for service in services
             if (name in get_service_names(service.get('links', [])) or
                 name in service.get('volumes_from', []) or
-                name in service.get('depends_on', []) or
                 name == get_service_name_from_net(service.get('net')))
         ]
 
@@ -81,10 +80,9 @@ class Project(object):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)
-            depends_on = project.get_depends_on(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, net=net, volumes_from=volumes_from,
-                                            depends_on=depends_on, **service_dict))
+            project.services.append(Service(client=client, project=name, links=links, net=net,
+                                            volumes_from=volumes_from, **service_dict))
         return project
 
     @classmethod
@@ -168,18 +166,6 @@ class Project(object):
                         raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
             del service_dict['volumes_from']
         return volumes_from
-
-    def get_depends_on(self, service_dict):
-        depends_on = []
-        if 'depends_on' in service_dict:
-            for dep_name in service_dict.get('depends_on', []):
-                try:
-                    service = self.get_service(dep_name)
-                    depends_on.append(service)
-                except NoSuchService:
-                    raise ConfigurationError('Service "%s" depends on "%s", which is not the name of a service.' % (service_dict['name'], dep_name))
-            del service_dict['depends_on']
-        return depends_on
 
     def get_net(self, service_dict):
         if 'net' in service_dict:
@@ -268,8 +254,7 @@ class Project(object):
         net_name = service.get_net_name()
         dep_names = (service.get_linked_names() +
                      service.get_volumes_from_names() +
-                     ([net_name] if net_name else []) +
-                     service.get_depends_on_names())
+                     ([net_name] if net_name else []))
 
         if len(dep_names) > 0:
             dep_services = self.get_services(

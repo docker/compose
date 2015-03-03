@@ -131,10 +131,6 @@ class SortServiceTest(unittest.TestCase):
     def test_sort_service_dicts_7(self):
         services = [
             {
-                'depends_on': ['four'],
-                'name': 'five'
-            },
-            {
                 'net': 'container:three',
                 'name': 'four'
             },
@@ -152,12 +148,11 @@ class SortServiceTest(unittest.TestCase):
         ]
 
         sorted_services = sort_service_dicts(services)
-        self.assertEqual(len(sorted_services), 5)
+        self.assertEqual(len(sorted_services), 4)
         self.assertEqual(sorted_services[0]['name'], 'one')
         self.assertEqual(sorted_services[1]['name'], 'two')
         self.assertEqual(sorted_services[2]['name'], 'three')
         self.assertEqual(sorted_services[3]['name'], 'four')
-        self.assertEqual(sorted_services[4]['name'], 'five')
 
     def test_sort_service_dicts_circular_imports(self):
         services = [

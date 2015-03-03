@@ -277,7 +277,7 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
                     'net': 'container:net',
-                    'depends_on': ['app']
+                    'links': ['app']
                 },
             },
             client=self.client,
@@ -296,19 +296,46 @@ class ProjectTest(DockerClientTestCase):
         project.remove_stopped()
 
     def test_project_up_with_no_deps(self):
-        console = self.create_service('console')
-        db = self.create_service('db', volumes=['/var/db'])
-        web = self.create_service('web', links=[(db, 'db')])
-
-        project = Project('composetest', [web, db, console], self.client)
+        project = Project.from_config(
+            name='composetest',
+            config={
+                'console': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                },
+                'net' : {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"]
+                },
+                'vol': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'volumes': ["/tmp"]
+                },
+                'app': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'net': 'container:net'
+                },
+                'web': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'net': 'container:net',
+                    'links': ['app'],
+                    'volumes_from': ['vol']
+                },
+            },
+            client=self.client,
+        )
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
         project.up(['web'], start_deps=False)
-        self.assertEqual(len(project.containers()), 1)
-        self.assertEqual(len(web.containers()), 1)
-        self.assertEqual(len(db.containers()), 0)
-        self.assertEqual(len(console.containers()), 0)
+        self.assertEqual(len(project.containers(stopped=True)), 2)
+        self.assertEqual(len(project.get_service('web').containers()), 1)
+        self.assertEqual(len(project.get_service('vol').containers(stopped=True)), 1)
+        self.assertEqual(len(project.get_service('net').containers()), 0)
+        self.assertEqual(len(project.get_service('console').containers()), 0)
 
         project.kill()
         project.remove_stopped()
