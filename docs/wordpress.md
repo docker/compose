@@ -1,25 +1,40 @@
----
-layout: default
-title: Getting started with Compose and Wordpress
----
+page_title: Quickstart Guide: Compose and Wordpress
+page_description: Getting started with Docker Compose and Rails
+page_keywords: documentation, docs,  docker, compose, orchestration, containers,
+wordpress
 
-Getting started with Compose and Wordpress
-======================================
+## Getting started with Compose and Wordpress
 
-Compose makes it nice and easy to run Wordpress in an isolated environment. [Install Compose](install.md), then download Wordpress into the current directory:
+You can use Compose to easily run Wordpress in an isolated environment built
+with Docker containers. 
+
+### Define the project
+
+First, [Install Compose](install.md) and then download Wordpress into the
+current directory:
 
     $ curl https://wordpress.org/latest.tar.gz | tar -xvzf -
 
-This will create a directory called `wordpress`, which you can rename to the name of your project if you wish. Inside that directory, we create `Dockerfile`, a file that defines what environment your app is going to run in:
+This will create a directory called `wordpress`. If you wish, you can rename it
+to the name of your project.
+
+Next, inside that directory, create a `Dockerfile`, a file that defines what
+environment your app is going to run in. For more information on how to write
+Dockerfiles, see the
+[Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the
+[Dockerfile reference](http://docs.docker.com/reference/builder/). In this case,
+your Dockerfile should be:
 
 ```
 FROM orchardup/php5
 ADD . /code
 ```
 
-This instructs Docker on how to build an image that contains PHP and Wordpress. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+This tells Docker how to build an image defining a container that contains PHP
+and Wordpress. 
 
-Next up, `docker-compose.yml` starts our web service and a separate MySQL instance:
+Next you'll create a `docker-compose.yml` file that will start your web service
+and a separate MySQL instance:
 
 ```
 web:
@@ -37,7 +52,9 @@ db:
     MYSQL_DATABASE: wordpress
 ```
 
-Two supporting files are needed to get this working - first up, `wp-config.php` is the standard Wordpress config file with a single change to point the database configuration at the `db` container:
+Two supporting files are needed to get this working - first, `wp-config.php` is
+the standard Wordpress config file with a single change to point the database
+configuration at the `db` container:
 
 ```
 <?php
@@ -67,7 +84,7 @@ if ( !defined('ABSPATH') )
 require_once(ABSPATH . 'wp-settings.php');
 ```
 
-Finally, `router.php` tells PHP's built-in web server how to run Wordpress:
+Second, `router.php` tells PHP's built-in web server how to run Wordpress:
 
 ```
 <?php
@@ -87,10 +104,15 @@ if(file_exists($root.$path))
     }
 }else include_once 'index.php';
 ```
+### Build the project
 
-With those four files in place, run `docker-compose up` inside your Wordpress directory and it'll pull and build the images we need, and then start the web and database containers. You'll then be able to visit Wordpress at port 8000 on your docker daemon (if you're using boot2docker, `boot2docker ip` will tell you its address).
+With those four files in place, run `docker-compose up` inside your Wordpress
+directory and it'll pull and build the needed images, and then start the web and
+database containers. You'll then be able to visit Wordpress at port 8000 on your
+Docker daemon (if you're using Boot2docker, `boot2docker ip` will tell you its
+address).
 
-## Compose documentation
+## More Compose documentation
 
 - [Installing Compose](install.md)
 - [User guide](index.md)
