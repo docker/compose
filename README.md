@@ -1,7 +1,7 @@
 Docker Compose
 ==============
 [![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
-*(Previously known as Fig)*
+*(Previously known as Fig - [upgrade instructions](https://github.com/docker/compose/releases/tag/1.1.0))*
 
 Compose is a tool for defining and running complex applications with Docker.
 With Compose, you define a multi-container application in a single file, then
