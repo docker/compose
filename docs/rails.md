@@ -83,7 +83,7 @@ expects a database to be running on `localhost` - so you need to point it at the
 `db` container instead. You also need to change the database and username to
 align with the defaults set by the `postgres` image.
 
-Open up your newly-generated `database.yml`file. Replace its contents with the
+Open up your newly-generated `database.yml` file. Replace its contents with the
 following:
 
     development: &default
