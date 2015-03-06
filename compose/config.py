@@ -51,7 +51,8 @@ DOCKER_CONFIG_HINTS = {
 
 
 def load(filename):
-    return from_dictionary(load_yaml(filename))
+    working_dir = os.path.dirname(filename)
+    return from_dictionary(load_yaml(filename), working_dir=working_dir)
 
 
 def load_yaml(filename):
@@ -62,22 +63,49 @@ def load_yaml(filename):
         raise ConfigurationError(six.text_type(e))
 
 
-def from_dictionary(dictionary):
+def from_dictionary(dictionary, working_dir=None):
     service_dicts = []
 
     for service_name, service_dict in list(dictionary.items()):
         if not isinstance(service_dict, dict):
             raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
-        service_dict = make_service_dict(service_name, service_dict)
+        service_dict = make_service_dict(service_name, service_dict, working_dir=working_dir)
         service_dicts.append(service_dict)
 
     return service_dicts
 
 
-def make_service_dict(name, options):
+def make_service_dict(name, options, working_dir=None):
     service_dict = options.copy()
     service_dict['name'] = name
-    return process_container_options(service_dict)
+    return resolve_service_type(service_dict, working_dir=working_dir)
+
+
+def resolve_service_type(service_dict, working_dir=None):
+    service_dict = service_dict.copy()
+    service_type = service_dict.pop('type', 'container')
+
+    if service_type == 'container':
+        return process_container_options(service_dict)
+    elif service_type == 'copy':
+        if working_dir is None:
+            raise Exception("No working_dir passed to resolve_service_type()")
+
+        other_config_path = os.path.abspath(
+            os.path.join(working_dir, service_dict['path']))
+
+        other_config = load_yaml(other_config_path)
+        other_service_dict = other_config[service_dict['service']]
+        other_service_dict['name'] = service_dict['name']
+
+        new_service_dict = resolve_service_type(
+            other_service_dict,
+            working_dir=os.path.dirname(other_config_path),
+        )
+
+        return merge_service_dicts(new_service_dict, service_dict)
+    else:
+        raise ConfigurationError('Unsupported service type for %s: %s' % (service_dict['name'], repr(service_type)))
 
 
 def process_container_options(service_dict):

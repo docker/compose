@@ -161,3 +161,30 @@ class ConfigTest(unittest.TestCase):
             service_dict['environment'],
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
+
+    def test_copy(self):
+        service_dicts = config.load('tests/fixtures/copy/docker-compose.yml')
+
+        service_dicts = sorted(
+            service_dicts,
+            key=lambda sd: sd['name'],
+        )
+
+        self.assertEqual(service_dicts, [
+            {
+                'name': 'mydb',
+                'image': 'busybox',
+                'command': 'sleep 300',
+            },
+            {
+                'name': 'myweb',
+                'image': 'busybox',
+                'command': 'sleep 300',
+                'links': ['mydb:db'],
+                'environment': {
+                    "FOO": "1",
+                    "BAR": "2",
+                    "BAZ": "2",
+                },
+            }
+        ])
