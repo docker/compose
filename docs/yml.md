@@ -39,6 +39,16 @@ Compose will build and tag it with a generated name, and use that image thereaft
 build: /path/to/build/dir
 ```
 
+### dockerfile
+
+Alternate Dockerfile.
+
+Compose will use an alternate file to build with.
+
+```
+dockerfile: Dockerfile-alternate
+```
+
 ### command
 
 Override the default command.

@@ -32,4 +32,4 @@ def docker_client():
         )
 
     timeout = int(os.environ.get('DOCKER_CLIENT_TIMEOUT', 60))
-    return Client(base_url=base_url, tls=tls_config, version='1.15', timeout=timeout)
+    return Client(base_url=base_url, tls=tls_config, version='1.17', timeout=timeout)
