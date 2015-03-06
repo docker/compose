@@ -43,6 +43,13 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn('simplecomposefile_simple_1', mock_stdout.getvalue())
 
     @patch('sys.stdout', new_callable=StringIO)
+    def test_ps_with_s_option(self, mock_stdout):
+        self.project.get_service('simple').create_container()
+        self.command.dispatch(['ps', '-s'], None)
+        self.assertIn('simple', mock_stdout.getvalue())
+        self.assertNotIn('simplecomposefile_simple_1', mock_stdout.getvalue())
+
+    @patch('sys.stdout', new_callable=StringIO)
     def test_ps_default_composefile(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         self.command.dispatch(['up', '-d'], None)
