@@ -185,6 +185,7 @@ class TopLevelCommand(Command):
 
         Options:
             -q    Only display IDs
+            -s    Only display service names
         """
         containers = sorted(
             project.containers(service_names=options['SERVICE'], stopped=True) +
@@ -194,6 +195,9 @@ class TopLevelCommand(Command):
         if options['-q']:
             for container in containers:
                 print(container.id)
+        elif options['-s']:
+            for service in project.get_services(service_names=options['SERVICE']):
+                print(service.name)
         else:
             headers = [
                 'Name',
