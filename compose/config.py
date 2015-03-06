@@ -31,11 +31,10 @@ DOCKER_CONFIG_KEYS = [
     'working_dir',
 ]
 
-ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
+CONTAINER_SERVICE_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
     'expose',
     'external_links',
-    'name',
 ]
 
 DOCKER_CONFIG_HINTS = {
@@ -83,7 +82,11 @@ def make_service_dict(name, options, working_dir=None):
 
 def resolve_service_type(service_dict, working_dir=None):
     service_dict = service_dict.copy()
-    service_type = service_dict.pop('type', 'container')
+
+    if 'type' not in service_dict:
+        service_dict['type'] = 'container'
+
+    service_type = service_dict['type']
 
     if service_type == 'container':
         return process_container_options(service_dict)
@@ -104,13 +107,15 @@ def resolve_service_type(service_dict, working_dir=None):
         )
 
         return merge_service_dicts(new_service_dict, service_dict)
+    elif service_type == 'remote':
+        return process_remote_options(service_dict)
     else:
         raise ConfigurationError('Unsupported service type for %s: %s' % (service_dict['name'], repr(service_type)))
 
 
 def process_container_options(service_dict):
     for k in service_dict:
-        if k not in ALLOWED_KEYS:
+        if k not in CONTAINER_SERVICE_KEYS + ['name', 'type']:
             msg = "Unsupported config option for %s service: '%s'" % (service_dict['name'], k)
             if k in DOCKER_CONFIG_HINTS:
                 msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
@@ -126,6 +131,13 @@ def process_container_options(service_dict):
     return service_dict
 
 
+def process_remote_options(service_dict):
+    if 'environment' in service_dict:
+        service_dict['environment'] = parse_environment(service_dict['environment'])
+
+    return service_dict
+
+
 def merge_service_dicts(base, override):
     d = base.copy()
 
@@ -135,7 +147,7 @@ def merge_service_dicts(base, override):
     if 'links' in base or 'links' in override:
         d['links'] = merge_links(base, override)
 
-    for k in ALLOWED_KEYS:
+    for k in CONTAINER_SERVICE_KEYS:
         if k not in ['links', 'environment']:
             if k in override:
                 d[k] = override[k]

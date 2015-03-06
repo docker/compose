@@ -15,10 +15,12 @@ class ConfigTest(unittest.TestCase):
             sorted(service_dicts, key=lambda d: d['name']),
             sorted([
                 {
+                    'type': 'container',
                     'name': 'bar',
                     'environment': {'FOO': '1'},
                 },
                 {
+                    'type': 'container',
                     'name': 'foo',
                     'image': 'busybox',
                 }
@@ -37,6 +39,17 @@ class ConfigTest(unittest.TestCase):
             lambda: config.make_service_dict('foo', {'port': ['8000']})
         )
         config.make_service_dict('foo', {'ports': ['8000']})
+
+    def test_remote_env(self):
+        service_dict = config.make_service_dict('db', {
+            'type': 'remote',
+            'host': '1.2.3.4',
+            'environment': [
+                'FOO=1',
+            ]
+        })
+
+        self.assertEqual(service_dict['environment'], {'FOO': '1'})
 
     def test_merge_links(self):
         base = {"links": [
@@ -172,11 +185,13 @@ class ConfigTest(unittest.TestCase):
 
         self.assertEqual(service_dicts, [
             {
+                'type': 'container',
                 'name': 'mydb',
                 'image': 'busybox',
                 'command': 'sleep 300',
             },
             {
+                'type': 'container',
                 'name': 'myweb',
                 'image': 'busybox',
                 'command': 'sleep 300',

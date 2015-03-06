@@ -10,6 +10,7 @@ from requests import Response
 
 from compose import Service
 from compose.container import Container
+from compose.remote_service import RemoteService
 from compose.service import (
     APIError,
     ConfigError,
@@ -316,3 +317,61 @@ class ServiceVolumesTest(unittest.TestCase):
             binding,
             ('/home/user', dict(bind='/home/user', ro=False)))
 
+
+class ServiceLinksTest(unittest.TestCase):
+    def test_container_links(self):
+        db = Service(
+            'db',
+            project='myproject',
+            client=mock.Mock(
+                containers=lambda *_, **__: [
+                    {
+                        'Id': '123',
+                        'Image': 'busybox',
+                        'Names': ['/myproject_db_1'],
+                    },
+                ],
+            ),
+        )
+
+        web = Service('foo', links=[(db, 'db')])
+
+        self.assertEqual(web._get_environment({}), {})
+
+        start_options = web._get_container_start_options()
+        self.assertEqual(start_options['extra_hosts'], {})
+        self.assertEqual(
+            set(start_options['links']),
+            set([
+                ('myproject_db_1', 'myproject_db_1'),
+                ('myproject_db_1', 'db_1'),
+                ('myproject_db_1', 'db'),
+            ])
+        )
+
+    def test_remote_links(self):
+        db = RemoteService(
+            'db',
+            project='myproject',
+            host='1.2.3.4',
+            port='5678',
+            environment={
+                'USERNAME': 'devuser',
+                'PASSWORD': 'devpass',
+            },
+        )
+
+        web = Service('foo', links=[(db, 'db')])
+
+        env = web._get_environment({})
+        self.assertEqual(env["DB_PORT"], "tcp://1.2.3.4:5678")
+        self.assertEqual(env["DB_PORT_5678_TCP"], "tcp://1.2.3.4:5678")
+        self.assertEqual(env["DB_PORT_5678_TCP_ADDR"], "1.2.3.4")
+        self.assertEqual(env["DB_PORT_5678_TCP_PORT"], "5678")
+        self.assertEqual(env["DB_PORT_5678_TCP_PROTO"], "tcp")
+        self.assertEqual(env["DB_ENV_USERNAME"], "devuser")
+        self.assertEqual(env["DB_ENV_PASSWORD"], "devpass")
+
+        start_options = web._get_container_start_options()
+        self.assertEqual(start_options['extra_hosts'], {'db': '1.2.3.4'})
+        self.assertEqual(start_options['links'], [])

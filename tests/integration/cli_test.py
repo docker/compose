@@ -414,3 +414,31 @@ class CLITestCase(DockerClientTestCase):
             "BAZ=2",
         ])
         self.assertTrue(expected_env <= set(web.get('Config.Env')))
+
+    def test_up_with_remote(self):
+        self.command.base_dir = 'tests/fixtures/remote'
+        self.command.dispatch(['up', '-d'], None)
+
+        self.assertEqual([s.name for s in self.project.services], ['web'])
+
+        containers = self.project.containers(stopped=True)
+        self.assertEqual(len(containers), 1)
+        web = containers[0]
+
+        self.assertEqual(web.get('HostConfig.ExtraHosts'), ['db:1.2.3.4'])
+
+        expected_env = [
+            "DB_PORT=tcp://1.2.3.4:5678",
+            "DB_PORT_5678_TCP=tcp://1.2.3.4:5678",
+            "DB_PORT_5678_TCP_ADDR=1.2.3.4",
+            "DB_PORT_5678_TCP_PORT=5678",
+            "DB_PORT_5678_TCP_PROTO=tcp",
+            "DB_ENV_USERNAME=devuser",
+            "DB_ENV_PASSWORD=devpass",
+        ]
+
+        env = web.get('Config.Env')
+
+        for e in expected_env:
+            self.assertIn(e, env)
+

@@ -8,10 +8,12 @@ class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
         project = Project.from_dicts('composetest', [
             {
+                'type': 'container',
                 'name': 'web',
                 'image': 'busybox:latest'
             },
             {
+                'type': 'container',
                 'name': 'db',
                 'image': 'busybox:latest'
             },
@@ -25,16 +27,19 @@ class ProjectTest(unittest.TestCase):
     def test_from_dict_sorts_in_dependency_order(self):
         project = Project.from_dicts('composetest', [
             {
+                'type': 'container',
                 'name': 'web',
                 'image': 'busybox:latest',
                 'links': ['db'],
             },
             {
+                'type': 'container',
                 'name': 'db',
                 'image': 'busybox:latest',
                 'volumes_from': ['volume']
             },
             {
+                'type': 'container',
                 'name': 'volume',
                 'image': 'busybox:latest',
                 'volumes': ['/tmp'],

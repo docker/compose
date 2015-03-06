@@ -1,0 +1,12 @@
+web:
+  image: busybox
+  command: sleep 300
+  links:
+    - db
+db:
+  type: remote
+  host: 1.2.3.4
+  port: 5678
+  environment:
+    - USERNAME=devuser
+    - PASSWORD=devpass

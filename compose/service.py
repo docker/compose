@@ -259,7 +259,18 @@ class Service(object):
             log.info("Starting %s..." % container.name)
             return self.start_container(container, **options)
 
-    def start_container(self, container, intermediate_container=None, **override_options):
+    def start_container(self, container, **kwargs):
+        start_options = self._get_container_start_options(**kwargs)
+        container.start(**start_options)
+        return container
+
+    def link_environment_variables(self):
+        return {}
+
+    def link_hostnames(self):
+        return {}
+
+    def _get_container_start_options(self, intermediate_container=None, **override_options):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
 
@@ -277,8 +288,9 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
-        container.start(
+        return dict(
             links=self._get_links(link_to_self=options.get('one_off', False)),
+            extra_hosts=self._get_extra_hosts(),
             port_bindings=port_bindings,
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
@@ -290,7 +302,6 @@ class Service(object):
             cap_add=cap_add,
             cap_drop=cap_drop,
         )
-        return container
 
     def start_or_create_containers(
             self,
@@ -342,6 +353,15 @@ class Service(object):
                 external_link, link_name = external_link.split(':')
             links.append((external_link, link_name))
         return links
+
+    def _get_extra_hosts(self):
+        extra_hosts = {}
+
+        for service, link_name in self.links:
+            for host in service.link_hostnames():
+                extra_hosts[link_name or service.name] = host
+
+        return extra_hosts
 
     def _get_volumes_from(self, intermediate_container=None):
         volumes_from = []
@@ -400,6 +420,8 @@ class Service(object):
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
+        container_options['environment'] = self._get_environment(container_options)
+
         if self.can_be_built():
             container_options['image'] = self.full_name
         else:
@@ -410,6 +432,17 @@ class Service(object):
             container_options.pop(key, None)
 
         return container_options
+
+    def _get_environment(self, options):
+        env = options.get('environment', {}).copy()
+
+        for (service, link_name) in self.links:
+            if link_name is None:
+                link_name = service.name
+            for (key, value) in service.link_environment_variables().items():
+                env["%s_%s" % (link_name.upper(), key)] = value
+
+        return env
 
     def _get_image_name(self, image):
         repo, tag = parse_repository_tag(image)
