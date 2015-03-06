@@ -10,6 +10,17 @@ from docker.errors import APIError
 log = logging.getLogger(__name__)
 
 
+def get_service_name_from_net(net_config):
+    if not net_config:
+        return
+
+    if not net_config.startswith('container:'):
+        return
+
+    _, net_name = net_config.split(':', 1)
+    return net_name
+
+
 def sort_service_dicts(services):
     # Topological sort (Cormen/Tarjan algorithm).
     unmarked = services[:]
@@ -18,6 +29,15 @@ def sort_service_dicts(services):
 
     def get_service_names(links):
         return [link.split(':')[0] for link in links]
+
+    def get_service_dependents(service_dict, services):
+        name = service_dict['name']
+        return [
+            service for service in services
+            if (name in get_service_names(service.get('links', [])) or
+                name in service.get('volumes_from', []) or
+                name == get_service_name_from_net(service.get('net')))
+        ]
 
     def visit(n):
         if n['name'] in temporary_marked:
@@ -29,8 +49,7 @@ def sort_service_dicts(services):
                 raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
         if n in unmarked:
             temporary_marked.add(n['name'])
-            dependents = [m for m in services if (n['name'] in get_service_names(m.get('links', []))) or (n['name'] in m.get('volumes_from', []))]
-            for m in dependents:
+            for m in get_service_dependents(n, services):
                 visit(m)
             temporary_marked.remove(n['name'])
             unmarked.remove(n)
@@ -60,8 +79,10 @@ class Project(object):
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
+            net = project.get_net(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
+            project.services.append(Service(client=client, project=name, links=links, net=net,
+                                            volumes_from=volumes_from, **service_dict))
         return project
 
     @classmethod
@@ -85,31 +106,31 @@ class Project(object):
 
         raise NoSuchService(name)
 
-    def get_services(self, service_names=None, include_links=False):
+    def get_services(self, service_names=None, include_deps=False):
         """
         Returns a list of this project's services filtered
         by the provided list of names, or all services if service_names is None
         or [].
 
-        If include_links is specified, returns a list including the links for
+        If include_deps is specified, returns a list including the dependencies for
         service_names, in order of dependency.
 
         Preserves the original order of self.services where possible,
-        reordering as needed to resolve links.
+        reordering as needed to resolve dependencies.
 
         Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
             return self.get_services(
                 service_names=[s.name for s in self.services],
-                include_links=include_links
+                include_deps=include_deps
             )
         else:
             unsorted = [self.get_service(name) for name in service_names]
             services = [s for s in self.services if s in unsorted]
 
-            if include_links:
-                services = reduce(self._inject_links, services, [])
+            if include_deps:
+                services = reduce(self._inject_deps, services, [])
 
             uniques = []
             [uniques.append(s) for s in services if s not in uniques]
@@ -146,6 +167,28 @@ class Project(object):
             del service_dict['volumes_from']
         return volumes_from
 
+    def get_net(self, service_dict):
+        if 'net' in service_dict:
+            net_name = get_service_name_from_net(service_dict.get('net'))
+
+            if net_name:
+                try:
+                    net = self.get_service(net_name)
+                except NoSuchService:
+                    try:
+                        net = Container.from_id(self.client, net_name)
+                    except APIError:
+                        raise ConfigurationError('Serivce "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
+            else:
+                net = service_dict['net']
+
+            del service_dict['net']
+
+        else:
+            net = 'bridge'
+
+        return net
+
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.start(**options)
@@ -171,13 +214,13 @@ class Project(object):
 
     def up(self,
            service_names=None,
-           start_links=True,
+           start_deps=True,
            recreate=True,
            insecure_registry=False,
            detach=False,
            do_build=True):
         running_containers = []
-        for service in self.get_services(service_names, include_links=start_links):
+        for service in self.get_services(service_names, include_deps=start_deps):
             if recreate:
                 for (_, container) in service.recreate_containers(
                         insecure_registry=insecure_registry,
@@ -194,7 +237,7 @@ class Project(object):
         return running_containers
 
     def pull(self, service_names=None, insecure_registry=False):
-        for service in self.get_services(service_names, include_links=True):
+        for service in self.get_services(service_names, include_deps=True):
             service.pull(insecure_registry=insecure_registry)
 
     def remove_stopped(self, service_names=None, **options):
@@ -207,19 +250,22 @@ class Project(object):
                 for service in self.get_services(service_names)
                 if service.has_container(container, one_off=one_off)]
 
-    def _inject_links(self, acc, service):
-        linked_names = service.get_linked_names()
+    def _inject_deps(self, acc, service):
+        net_name = service.get_net_name()
+        dep_names = (service.get_linked_names() +
+                     service.get_volumes_from_names() +
+                     ([net_name] if net_name else []))
 
-        if len(linked_names) > 0:
-            linked_services = self.get_services(
-                service_names=linked_names,
-                include_links=True
+        if len(dep_names) > 0:
+            dep_services = self.get_services(
+                service_names=list(set(dep_names)),
+                include_deps=True
             )
         else:
-            linked_services = []
+            dep_services = []
 
-        linked_services.append(service)
-        return acc + linked_services
+        dep_services.append(service)
+        return acc + dep_services
 
 
 class NoSuchService(Exception):
