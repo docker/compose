@@ -216,7 +216,7 @@ dns_search:
   - dc2.example.com
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, read\_only, restart, stdin\_open, tty, cpu\_shares
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -233,6 +233,8 @@ domainname: foo.com
 
 mem_limit: 1000000000
 privileged: true
+
+read_only: true
 
 restart: always
 
