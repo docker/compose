@@ -41,6 +41,7 @@ DOCKER_CONFIG_KEYS = [
     'volumes',
     'volumes_from',
     'working_dir',
+    'read_only',
 ]
 DOCKER_CONFIG_HINTS = {
     'cpu_share' : 'cpu_shares',
@@ -62,6 +63,7 @@ DOCKER_START_KEYS = [
     'net',
     'privileged',
     'restart',
+    'read_only',
 ]
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -325,6 +327,7 @@ class Service(object):
         dns_search = options.get('dns_search', None)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
+        read_only = options.get('read_only', None)
 
         restart = parse_restart_spec(options.get('restart', None))
 
@@ -340,6 +343,7 @@ class Service(object):
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            read_only=read_only,
         )
         return container
 
