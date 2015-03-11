@@ -10,13 +10,13 @@ from requests import Response
 
 from compose import Service
 from compose.container import Container
+from compose.remote_service import RemoteService
 from compose.service import (
     APIError,
     ConfigError,
     build_port_bindings,
     build_volume_binding,
     get_container_name,
-    parse_environment,
     parse_repository_tag,
     parse_volume_spec,
     split_port,
@@ -46,10 +46,6 @@ class ServiceTest(unittest.TestCase):
     def test_project_validation(self):
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
         Service(name='foo', project='bar')
-
-    def test_config_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
-        Service(name='foo', ports=['8000'])
 
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
@@ -321,98 +317,61 @@ class ServiceVolumesTest(unittest.TestCase):
             binding,
             ('/home/user', dict(bind='/home/user', ro=False)))
 
-class ServiceEnvironmentTest(unittest.TestCase):
 
-    def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
-        self.mock_client.containers.return_value = []
-
-    def test_parse_environment_as_list(self):
-        environment =[
-            'NORMAL=F1',
-            'CONTAINS_EQUALS=F=2',
-            'TRAILING_EQUALS='
-        ]
-        self.assertEqual(
-            parse_environment(environment),
-            {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''})
-
-    def test_parse_environment_as_dict(self):
-        environment = {
-            'NORMAL': 'F1',
-            'CONTAINS_EQUALS': 'F=2',
-            'TRAILING_EQUALS': None,
-        }
-        self.assertEqual(parse_environment(environment), environment)
-
-    def test_parse_environment_invalid(self):
-        with self.assertRaises(ConfigError):
-            parse_environment('a=b')
-
-    def test_parse_environment_empty(self):
-        self.assertEqual(parse_environment(None), {})
-
-    @mock.patch.dict(os.environ)
-    def test_resolve_environment(self):
-        os.environ['FILE_DEF'] = 'E1'
-        os.environ['FILE_DEF_EMPTY'] = 'E2'
-        os.environ['ENV_DEF'] = 'E3'
-        service = Service(
-            'foo',
-            environment={
-                'FILE_DEF': 'F1',
-                'FILE_DEF_EMPTY': '',
-                'ENV_DEF': None,
-                'NO_DEF': None
-            },
-            client=self.mock_client,
-            image='image_name',
+class ServiceLinksTest(unittest.TestCase):
+    def test_container_links(self):
+        db = Service(
+            'db',
+            project='myproject',
+            client=mock.Mock(
+                containers=lambda *_, **__: [
+                    {
+                        'Id': '123',
+                        'Image': 'busybox',
+                        'Names': ['/myproject_db_1'],
+                    },
+                ],
+            ),
         )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}
-            )
 
-    def test_env_from_file(self):
-        service = Service('foo',
-                env_file='tests/fixtures/env/one.env',
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'}
-            )
+        web = Service('foo', links=[(db, 'db')])
 
-    def test_env_from_multiple_files(self):
-        service = Service('foo',
-                env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}
-            )
+        self.assertEqual(web._get_environment({}), {})
 
-    def test_env_nonexistent_file(self):
-        self.assertRaises(ConfigError, lambda: Service('foo', env_file='tests/fixtures/env/nonexistent.env'))
-
-    @mock.patch.dict(os.environ)
-    def test_resolve_environment_from_file(self):
-        os.environ['FILE_DEF'] = 'E1'
-        os.environ['FILE_DEF_EMPTY'] = 'E2'
-        os.environ['ENV_DEF'] = 'E3'
-        service = Service('foo',
-                env_file=['tests/fixtures/env/resolve.env'],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
+        start_options = web._get_container_start_options()
+        self.assertEqual(start_options['extra_hosts'], {})
         self.assertEqual(
-            options['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}
-            )
+            set(start_options['links']),
+            set([
+                ('myproject_db_1', 'myproject_db_1'),
+                ('myproject_db_1', 'db_1'),
+                ('myproject_db_1', 'db'),
+            ])
+        )
+
+    def test_remote_links(self):
+        db = RemoteService(
+            'db',
+            project='myproject',
+            host='1.2.3.4',
+            port='5678',
+            environment={
+                'USERNAME': 'devuser',
+                'PASSWORD': 'devpass',
+            },
+        )
+
+        web = Service('foo', links=[(db, 'db')])
+
+        env = web._get_environment({})
+        self.assertEqual(env["DB_PORT"], "tcp://1.2.3.4:5678")
+        self.assertEqual(env["DB_PORT_5678_TCP"], "tcp://1.2.3.4:5678")
+        self.assertEqual(env["DB_PORT_5678_TCP_ADDR"], "1.2.3.4")
+        self.assertEqual(env["DB_PORT_5678_TCP_PORT"], "5678")
+        self.assertEqual(env["DB_PORT_5678_TCP_PROTO"], "tcp")
+        self.assertEqual(env["DB_ENV_USERNAME"], "devuser")
+        self.assertEqual(env["DB_ENV_PASSWORD"], "devpass")
+
+        start_options = web._get_container_start_options()
+        self.assertEqual(start_options['extra_hosts'], {'db': '1.2.3.4'})
+        self.assertEqual(start_options['links'], [])

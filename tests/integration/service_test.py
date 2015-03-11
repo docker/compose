@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
 from os import path
+import mock
 
 from compose import Service
 from compose.service import CannotBeScaledError
@@ -481,16 +482,12 @@ class ServiceTest(DockerClientTestCase):
         for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
+    @mock.patch.dict(os.environ)
     def test_resolve_env(self):
-        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
-        try:
-            env = create_and_start_container(service).environment
-            for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
-                self.assertEqual(env[k], v)
-        finally:
-            del os.environ['FILE_DEF']
-            del os.environ['FILE_DEF_EMPTY']
-            del os.environ['ENV_DEF']
+        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
+        env = create_and_start_container(service).environment
+        for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
+            self.assertEqual(env[k], v)

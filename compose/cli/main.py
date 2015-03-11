@@ -12,7 +12,8 @@ import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
-from ..service import BuildError, CannotBeScaledError, parse_environment
+from ..service import BuildError, CannotBeScaledError
+from ..config import parse_environment
 from .command import Command
 from .docopt_command import NoSuchCommand
 from .errors import UserError

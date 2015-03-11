@@ -3,7 +3,9 @@ from __future__ import absolute_import
 import logging
 
 from functools import reduce
+from .config import ConfigurationError
 from .service import Service
+from .remote_service import RemoteService
 from .container import Container
 from docker.errors import APIError
 
@@ -48,7 +50,7 @@ class Project(object):
     """
     def __init__(self, name, services, client):
         self.name = name
-        self.services = services
+        self._services = services
         self.client = client
 
     @classmethod
@@ -57,22 +59,26 @@ class Project(object):
         Construct a ServiceCollection from a list of dicts representing services.
         """
         project = cls(name, [], client)
-        for service_dict in sort_service_dicts(service_dicts):
-            links = project.get_links(service_dict)
-            volumes_from = project.get_volumes_from(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict))
+        for service_dict in sort_service_dicts(service_dicts):
+            service_type = service_dict.pop('type')
+
+            if service_type == 'container':
+                links = project.get_links(service_dict)
+                volumes_from = project.get_volumes_from(service_dict)
+                service = Service(client=client, project=name, links=links, volumes_from=volumes_from, **service_dict)
+            elif service_type == 'remote':
+                service = RemoteService(client=client, project=name, **service_dict)
+            else:
+                raise Exception('Unexpected service type: %s' % service_dict['type'])
+
+            project._services.append(service)
+
         return project
 
-    @classmethod
-    def from_config(cls, name, config, client):
-        dicts = []
-        for service_name, service in list(config.items()):
-            if not isinstance(service, dict):
-                raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
-            service['name'] = service_name
-            dicts.append(service)
-        return cls.from_dicts(name, dicts, client)
+    @property
+    def services(self):
+        return [s for s in self._services if isinstance(s, Service)]
 
     def get_service(self, name):
         """
@@ -80,6 +86,17 @@ class Project(object):
         if the named service does not exist.
         """
         for service in self.services:
+            if service.name == name:
+                return service
+
+        raise NoSuchService(name)
+
+    def _get_service(self, name):
+        """
+        Retrieve a service by name, including remote "services".
+        Raises NoSuchService if the named service does not exist.
+        """
+        for service in self._services:
             if service.name == name:
                 return service
 
@@ -124,7 +141,7 @@ class Project(object):
                 else:
                     service_name, link_name = link, None
                 try:
-                    links.append((self.get_service(service_name), link_name))
+                    links.append((self._get_service(service_name), link_name))
                 except NoSuchService:
                     raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
             del service_dict['links']
@@ -209,6 +226,8 @@ class Project(object):
 
     def _inject_links(self, acc, service):
         linked_names = service.get_linked_names()
+        # Don't include links to remote services
+        linked_names = [n for n in linked_names if isinstance(self._get_service(n), Service)]
 
         if len(linked_names) > 0:
             linked_services = self.get_services(
@@ -226,14 +245,6 @@ class NoSuchService(Exception):
     def __init__(self, name):
         self.name = name
         self.msg = "No such service: %s" % self.name
-
-    def __str__(self):
-        return self.msg
-
-
-class ConfigurationError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
 
     def __str__(self):
         return self.msg

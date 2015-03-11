@@ -1,0 +1,17 @@
+myweb:
+  type: copy
+  path: common.yml
+  service: web
+  command: sleep 300
+  links:
+    # override link
+    - "mydb:db"
+  environment:
+    # leave FOO alone
+    # override BAR
+    BAR: "2"
+    # add BAZ
+    BAZ: "2"
+mydb:
+  image: busybox
+  command: sleep 300

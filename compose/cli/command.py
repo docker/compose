@@ -4,9 +4,9 @@ from requests.exceptions import ConnectionError, SSLError
 import logging
 import os
 import re
-import yaml
 import six
 
+from .. import config
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
@@ -69,18 +69,11 @@ class Command(DocoptCommand):
             return verbose_proxy.VerboseProxy('docker', client)
         return client
 
-    def get_config(self, config_path):
-        try:
-            with open(config_path, 'r') as fh:
-                return yaml.safe_load(fh)
-        except IOError as e:
-            raise errors.UserError(six.text_type(e))
-
     def get_project(self, config_path, project_name=None, verbose=False):
         try:
-            return Project.from_config(
+            return Project.from_dicts(
                 self.get_project_name(config_path, project_name),
-                self.get_config(config_path),
+                config.load(config_path),
                 self.get_client(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
