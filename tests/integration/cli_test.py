@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import sys
+import os
 
 from six import StringIO
 from mock import patch
@@ -23,6 +24,12 @@ class CLITestCase(DockerClientTestCase):
 
     @property
     def project(self):
+        # Hack: allow project to be overridden. This needs refactoring so that
+        # the project object is built exactly once, by the command object, and
+        # accessed by the test case object.
+        if hasattr(self, '_project'):
+            return self._project
+
         return self.command.get_project(self.command.get_config_path())
 
     def test_help(self):
@@ -409,3 +416,12 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(get_port(3000), container.get_local_port(3000))
         self.assertEqual(get_port(3001), "0.0.0.0:9999")
         self.assertEqual(get_port(3002), "")
+
+    def test_env_file_relative_to_compose_file(self):
+        config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
+        self.command.dispatch(['-f', config_path, 'up', '-d'], None)
+        self._project = self.command.get_project(config_path)
+
+        containers = self.project.containers(stopped=True)
+        self.assertEqual(len(containers), 1)
+        self.assertIn("FOO=1", containers[0].get('Config.Env'))

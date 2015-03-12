@@ -30,7 +30,7 @@ class DockerClientTestCase(unittest.TestCase):
         return Service(
             project='composetest',
             client=self.client,
-            **make_service_dict(name, kwargs)
+            **make_service_dict(name, kwargs, working_dir='.')
         )
 
     def check_build(self, *args, **kwargs):

@@ -51,7 +51,8 @@ DOCKER_CONFIG_HINTS = {
 
 
 def load(filename):
-    return from_dictionary(load_yaml(filename))
+    working_dir = os.path.dirname(filename)
+    return from_dictionary(load_yaml(filename), working_dir=working_dir)
 
 
 def load_yaml(filename):
@@ -62,38 +63,32 @@ def load_yaml(filename):
         raise ConfigurationError(six.text_type(e))
 
 
-def from_dictionary(dictionary):
+def from_dictionary(dictionary, working_dir=None):
     service_dicts = []
 
     for service_name, service_dict in list(dictionary.items()):
         if not isinstance(service_dict, dict):
             raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
-        service_dict = make_service_dict(service_name, service_dict)
+        service_dict = make_service_dict(service_name, service_dict, working_dir=working_dir)
         service_dicts.append(service_dict)
 
     return service_dicts
 
 
-def make_service_dict(name, options):
+def make_service_dict(name, options, working_dir=None):
     service_dict = options.copy()
     service_dict['name'] = name
-    return process_container_options(service_dict)
+    service_dict = resolve_environment(service_dict, working_dir=working_dir)
+    return process_container_options(service_dict, working_dir=working_dir)
 
 
-def process_container_options(service_dict):
+def process_container_options(service_dict, working_dir=None):
     for k in service_dict:
         if k not in ALLOWED_KEYS:
             msg = "Unsupported config option for %s service: '%s'" % (service_dict['name'], k)
             if k in DOCKER_CONFIG_HINTS:
                 msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
             raise ConfigurationError(msg)
-
-    for filename in get_env_files(service_dict):
-        if not os.path.exists(filename):
-            raise ConfigurationError("Couldn't find env file for service %s: %s" % (service_dict['name'], filename))
-
-    if 'environment' in service_dict or 'env_file' in service_dict:
-        service_dict['environment'] = build_environment(service_dict)
 
     return service_dict
 
@@ -110,21 +105,38 @@ def parse_link(link):
         return (link, link)
 
 
-def get_env_files(options):
+def get_env_files(options, working_dir=None):
+    if 'env_file' not in options:
+        return {}
+
+    if working_dir is None:
+        raise Exception("No working_dir passed to get_env_files()")
+
     env_files = options.get('env_file', [])
     if not isinstance(env_files, list):
         env_files = [env_files]
-    return env_files
+
+    return [expand_path(working_dir, path) for path in env_files]
 
 
-def build_environment(options):
+def resolve_environment(service_dict, working_dir=None):
+    service_dict = service_dict.copy()
+
+    if 'environment' not in service_dict and 'env_file' not in service_dict:
+        return service_dict
+
     env = {}
 
-    for f in get_env_files(options):
-        env.update(env_vars_from_file(f))
+    if 'env_file' in service_dict:
+        for f in get_env_files(service_dict, working_dir=working_dir):
+            env.update(env_vars_from_file(f))
+        del service_dict['env_file']
 
-    env.update(parse_environment(options.get('environment')))
-    return dict(resolve_env(k, v) for k, v in six.iteritems(env))
+    env.update(parse_environment(service_dict.get('environment')))
+    env = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
+
+    service_dict['environment'] = env
+    return service_dict
 
 
 def parse_environment(environment):
@@ -150,7 +162,7 @@ def split_env(env):
         return env, None
 
 
-def resolve_env(key, val):
+def resolve_env_var(key, val):
     if val is not None:
         return key, val
     elif key in os.environ:
@@ -163,6 +175,8 @@ def env_vars_from_file(filename):
     """
     Read in a line delimited file of environment variables.
     """
+    if not os.path.exists(filename):
+        raise ConfigurationError("Couldn't find env file: %s" % filename)
     env = {}
     for line in open(filename, 'r'):
         line = line.strip()
@@ -170,6 +184,10 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
+
+
+def expand_path(working_dir, path):
+    return os.path.abspath(os.path.join(working_dir, path))
 
 
 class ConfigurationError(Exception):

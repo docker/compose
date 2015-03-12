@@ -90,7 +90,8 @@ class ConfigTest(unittest.TestCase):
     def test_env_from_file(self):
         service_dict = config.make_service_dict(
             'foo',
-            {'env_file': 'tests/fixtures/env/one.env'},
+            {'env_file': 'one.env'},
+            'tests/fixtures/env',
         )
         self.assertEqual(
             service_dict['environment'],
@@ -100,12 +101,8 @@ class ConfigTest(unittest.TestCase):
     def test_env_from_multiple_files(self):
         service_dict = config.make_service_dict(
             'foo',
-            {
-                'env_file': [
-                    'tests/fixtures/env/one.env',
-                    'tests/fixtures/env/two.env',
-                ],
-            },
+            {'env_file': ['one.env', 'two.env']},
+            'tests/fixtures/env',
         )
         self.assertEqual(
             service_dict['environment'],
@@ -113,10 +110,10 @@ class ConfigTest(unittest.TestCase):
         )
 
     def test_env_nonexistent_file(self):
-        options = {'env_file': 'tests/fixtures/env/nonexistent.env'}
+        options = {'env_file': 'nonexistent.env'}
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.make_service_dict('foo', options),
+            lambda: config.make_service_dict('foo', options, 'tests/fixtures/env'),
         )
 
     @mock.patch.dict(os.environ)
@@ -126,7 +123,8 @@ class ConfigTest(unittest.TestCase):
         os.environ['ENV_DEF'] = 'E3'
         service_dict = config.make_service_dict(
             'foo',
-            {'env_file': 'tests/fixtures/env/resolve.env'},
+            {'env_file': 'resolve.env'},
+            'tests/fixtures/env',
         )
         self.assertEqual(
             service_dict['environment'],
