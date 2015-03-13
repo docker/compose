@@ -4,7 +4,6 @@ from requests.exceptions import ConnectionError, SSLError
 import logging
 import os
 import re
-import yaml
 import six
 
 from ..project import Project
@@ -14,6 +13,7 @@ from .utils import call_silently, is_mac, is_ubuntu
 from .docker_client import docker_client
 from . import verbose_proxy
 from . import errors
+from .config import from_yaml_with_environment_vars
 from .. import __version__
 
 log = logging.getLogger(__name__)
@@ -70,11 +70,17 @@ class Command(DocoptCommand):
         return client
 
     def get_config(self, config_path):
-        try:
-            with open(config_path, 'r') as fh:
-                return yaml.safe_load(fh)
-        except IOError as e:
-            raise errors.UserError(six.text_type(e))
+        """
+        Access a :class:fig.cli.config.Config object from string representing a file location,
+        returned as a dict with any variables appropriately interpolated
+
+        :param config_path: the full path, including filename where fig.yml lives
+        :type config_path: str
+
+        :return: dict
+        :rtype: dict
+        """
+        return from_yaml_with_environment_vars(config_path)
 
     def get_project(self, config_path, project_name=None, verbose=False):
         try:

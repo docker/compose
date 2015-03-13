@@ -16,6 +16,14 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
+Fig supports using environment variables with optional defaults as values. The accepted patterns are as follows:
+
+```
+${ENVIRONMENT_VARIABLE:default}
+or simply
+${ENVIRONMENT_VARIABLE}
+```
+
 ### image
 
 Tag or partial image ID. Can be local or remote - Compose will attempt to
@@ -25,6 +33,7 @@ pull if it doesn't exist locally.
 image: ubuntu
 image: orchardup/postgresql
 image: a4bc65fd
+image: ${SPECIFIED_OS:ubuntu}
 ```
 
 ### build
@@ -36,6 +45,8 @@ Compose will build and tag it with a generated name, and use that image thereaft
 
 ```
 build: /path/to/build/dir
+or
+build: ${BUILD_PATH:/path/to/build/dir}
 ```
 
 ### command
@@ -44,6 +55,7 @@ Override the default command.
 
 ```
 command: bundle exec thin -p 3000
+command: RACK_ENV=${RACK_ENV:production} bundle exec rackup -p 80
 ```
 
 <a name="links"></a>
@@ -58,6 +70,7 @@ links:
  - db
  - db:database
  - redis
+ - ${SEARCH_SERVICE:solr}:search
 ```
 
 An entry with the alias' name will be created in `/etc/hosts` inside containers
@@ -67,6 +80,7 @@ for this service, e.g:
 172.17.2.186  db
 172.17.2.186  database
 172.17.2.187  redis
+172.17.2.188  search
 ```
 
 Environment variables will also be created - see the [environment variable
@@ -102,6 +116,7 @@ ports:
  - "8000:8000"
  - "49100:22"
  - "127.0.0.1:8001:8001"
+ - ${DEFAULT_PORT:"80:800"}
 ```
 
 ### expose
@@ -113,6 +128,7 @@ accessible to linked services. Only the internal port can be specified.
 expose:
  - "3000"
  - "8000"
+ - ${EXPOSE_PORT}
 ```
 
 ### volumes
@@ -125,6 +141,7 @@ volumes:
  - /var/lib/mysql
  - cache/:/tmp/cache
  - ~/configs:/etc/configs/:ro
+ - ${JAVA_HOME:/usr/lib/jvm/jdk1.7.0/}/lib
 ```
 
 ### volumes_from
@@ -135,6 +152,7 @@ Mount all of the volumes from another service or container.
 volumes_from:
  - service_name
  - container_name
+ - ${SELECTED_SERVICE_VOLUME:service_name}
 ```
 
 ### environment
@@ -147,10 +165,12 @@ machine Compose is running on, which can be helpful for secret or host-specific 
 ```
 environment:
   RACK_ENV: development
+  LOGLEVEL: ${APP_LOGLEVEL:INFO}
   SESSION_SECRET:
 
 environment:
   - RACK_ENV=development
+  - LOGLEVEL=${APP_LOGLEVEL:INFO}
   - SESSION_SECRET
 ```
 
@@ -178,6 +198,7 @@ net: "bridge"
 net: "none"
 net: "container:[name or id]"
 net: "host"
+net: ${NET_MODE:"bridge"}
 ```
 
 ### dns
@@ -186,6 +207,7 @@ Custom DNS servers. Can be a single value or a list.
 
 ```
 dns: 8.8.8.8
+dns: ${DNS_SERVER:8.8.8.8}
 dns:
   - 8.8.8.8
   - 9.9.9.9
@@ -220,6 +242,7 @@ dns_search:
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
+Each entry can use environment variables.
 
 ```
 cpu_shares: 73
