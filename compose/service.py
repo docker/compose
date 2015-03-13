@@ -8,50 +8,13 @@ from operator import attrgetter
 import sys
 
 from docker.errors import APIError
-import six
 
+from .config import DOCKER_CONFIG_KEYS
 from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
 log = logging.getLogger(__name__)
 
-
-DOCKER_CONFIG_KEYS = [
-    'cap_add',
-    'cap_drop',
-    'cpu_shares',
-    'command',
-    'detach',
-    'dns',
-    'dns_search',
-    'domainname',
-    'entrypoint',
-    'env_file',
-    'environment',
-    'hostname',
-    'image',
-    'mem_limit',
-    'net',
-    'ports',
-    'privileged',
-    'restart',
-    'stdin_open',
-    'tty',
-    'user',
-    'volumes',
-    'volumes_from',
-    'working_dir',
-]
-DOCKER_CONFIG_HINTS = {
-    'cpu_share' : 'cpu_shares',
-    'link'      : 'links',
-    'port'      : 'ports',
-    'privilege' : 'privileged',
-    'priviliged': 'privileged',
-    'privilige' : 'privileged',
-    'volume'    : 'volumes',
-    'workdir'   : 'working_dir',
-}
 
 DOCKER_START_KEYS = [
     'cap_add',
@@ -95,20 +58,6 @@ class Service(object):
             raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
-
-        for filename in get_env_files(options):
-            if not os.path.exists(filename):
-                raise ConfigError("Couldn't find env file for service %s: %s" % (name, filename))
-
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose',
-                                                  'external_links']
-
-        for k in options:
-            if k not in supported_options:
-                msg = "Unsupported config option for %s service: '%s'" % (name, k)
-                if k in DOCKER_CONFIG_HINTS:
-                    msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
-                raise ConfigError(msg)
 
         self.name = name
         self.client = client
@@ -478,8 +427,6 @@ class Service(object):
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
-        container_options['environment'] = build_environment(container_options)
-
         if self.can_be_built():
             container_options['image'] = self.full_name
         else:
@@ -648,63 +595,3 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
-
-
-def get_env_files(options):
-    env_files = options.get('env_file', [])
-    if not isinstance(env_files, list):
-        env_files = [env_files]
-    return env_files
-
-
-def build_environment(options):
-    env = {}
-
-    for f in get_env_files(options):
-        env.update(env_vars_from_file(f))
-
-    env.update(parse_environment(options.get('environment')))
-    return dict(resolve_env(k, v) for k, v in six.iteritems(env))
-
-
-def parse_environment(environment):
-    if not environment:
-        return {}
-
-    if isinstance(environment, list):
-        return dict(split_env(e) for e in environment)
-
-    if isinstance(environment, dict):
-        return environment
-
-    raise ConfigError("environment \"%s\" must be a list or mapping," %
-                      environment)
-
-
-def split_env(env):
-    if '=' in env:
-        return env.split('=', 1)
-    else:
-        return env, None
-
-
-def resolve_env(key, val):
-    if val is not None:
-        return key, val
-    elif key in os.environ:
-        return key, os.environ[key]
-    else:
-        return key, ''
-
-
-def env_vars_from_file(filename):
-    """
-    Read in a line delimited file of environment variables.
-    """
-    env = {}
-    for line in open(filename, 'r'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            k, v = split_env(line)
-            env[k] = v
-    return env

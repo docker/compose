@@ -1,8 +1,9 @@
 from __future__ import unicode_literals
 from .. import unittest
 from compose.service import Service
-from compose.project import Project, ConfigurationError
+from compose.project import Project
 from compose.container import Container
+from compose import config
 
 import mock
 import docker
@@ -49,25 +50,20 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.services[2].name, 'web')
 
     def test_from_config(self):
-        project = Project.from_config('composetest', {
+        dicts = config.from_dictionary({
             'web': {
                 'image': 'busybox:latest',
             },
             'db': {
                 'image': 'busybox:latest',
             },
-        }, None)
+        })
+        project = Project.from_dicts('composetest', dicts, None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
         self.assertEqual(project.get_service('db').name, 'db')
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
-
-    def test_from_config_throws_error_when_not_dict(self):
-        with self.assertRaises(ConfigurationError):
-            project = Project.from_config('composetest', {
-                'web': 'busybox:latest',
-            }, None)
 
     def test_get_service(self):
         web = Service(

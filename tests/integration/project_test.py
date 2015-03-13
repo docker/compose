@@ -1,14 +1,15 @@
 from __future__ import unicode_literals
-from compose.project import Project, ConfigurationError
+from compose import config
+from compose.project import Project
 from compose.container import Container
 from .testcases import DockerClientTestCase
 
 
 class ProjectTest(DockerClientTestCase):
     def test_volumes_from_service(self):
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'data': {
                     'image': 'busybox:latest',
                     'volumes': ['/var/data'],
@@ -17,7 +18,7 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'volumes_from': ['data'],
                 },
-            },
+            }),
             client=self.client,
         )
         db = project.get_service('db')
@@ -31,14 +32,14 @@ class ProjectTest(DockerClientTestCase):
             volumes=['/var/data'],
             name='composetest_data_container',
         )
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
                 },
-            },
+            }),
             client=self.client,
         )
         db = project.get_service('db')
@@ -48,9 +49,9 @@ class ProjectTest(DockerClientTestCase):
         project.remove_stopped()
 
     def test_net_from_service(self):
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'net': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"]
@@ -59,8 +60,8 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'net': 'container:net',
                     'command': ["/bin/sleep", "300"]
-                },  
-            },
+                },
+            }),
             client=self.client,
         )
 
@@ -82,14 +83,14 @@ class ProjectTest(DockerClientTestCase):
         )
         net_container.start()
 
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:composetest_net_container'
                 },
-            },
+            }),
             client=self.client,
         )
 
@@ -257,9 +258,9 @@ class ProjectTest(DockerClientTestCase):
         project.remove_stopped()
 
     def test_project_up_starts_depends(self):
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
@@ -278,7 +279,7 @@ class ProjectTest(DockerClientTestCase):
                     'command': ["/bin/sleep", "300"],
                     'links': ['db'],
                 },
-            },
+            }),
             client=self.client,
         )
         project.start()
@@ -295,9 +296,9 @@ class ProjectTest(DockerClientTestCase):
         project.remove_stopped()
 
     def test_project_up_with_no_deps(self):
-        project = Project.from_config(
+        project = Project.from_dicts(
             name='composetest',
-            config={
+            service_dicts=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
@@ -316,7 +317,7 @@ class ProjectTest(DockerClientTestCase):
                     'command': ["/bin/sleep", "300"],
                     'links': ['db'],
                 },
-            },
+            }),
             client=self.client,
         )
         project.start()
