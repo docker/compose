@@ -264,20 +264,19 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
                 },
-                'net' : {
+                'data' : {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"]
                 },
-                'app': {
+                'db': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
-                    'net': 'container:net'
+                    'volumes_from': ['data'],
                 },
                 'web': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
-                    'net': 'container:net',
-                    'links': ['app']
+                    'links': ['db'],
                 },
             },
             client=self.client,
@@ -288,8 +287,8 @@ class ProjectTest(DockerClientTestCase):
         project.up(['web'])
         self.assertEqual(len(project.containers()), 3)
         self.assertEqual(len(project.get_service('web').containers()), 1)
-        self.assertEqual(len(project.get_service('app').containers()), 1)
-        self.assertEqual(len(project.get_service('net').containers()), 1)
+        self.assertEqual(len(project.get_service('db').containers()), 1)
+        self.assertEqual(len(project.get_service('data').containers()), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
         project.kill()
@@ -303,26 +302,19 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
                 },
-                'net' : {
+                'data' : {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"]
                 },
-                'vol': {
+                'db': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
-                    'volumes': ["/tmp"]
-                },
-                'app': {
-                    'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
-                    'net': 'container:net'
+                    'volumes_from': ['data'],
                 },
                 'web': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
-                    'net': 'container:net',
-                    'links': ['app'],
-                    'volumes_from': ['vol']
+                    'links': ['db'],
                 },
             },
             client=self.client,
@@ -330,11 +322,12 @@ class ProjectTest(DockerClientTestCase):
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
-        project.up(['web'], start_deps=False)
+        project.up(['db'], start_deps=False)
         self.assertEqual(len(project.containers(stopped=True)), 2)
-        self.assertEqual(len(project.get_service('web').containers()), 1)
-        self.assertEqual(len(project.get_service('vol').containers(stopped=True)), 1)
-        self.assertEqual(len(project.get_service('net').containers()), 0)
+        self.assertEqual(len(project.get_service('web').containers()), 0)
+        self.assertEqual(len(project.get_service('db').containers()), 1)
+        self.assertEqual(len(project.get_service('data').containers()), 0)
+        self.assertEqual(len(project.get_service('data').containers(stopped=True)), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
         project.kill()
