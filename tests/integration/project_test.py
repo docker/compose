@@ -44,6 +44,63 @@ class ProjectTest(DockerClientTestCase):
         db = project.get_service('db')
         self.assertEqual(db.volumes_from, [data_container])
 
+        project.kill()
+        project.remove_stopped()
+
+    def test_net_from_service(self):
+        project = Project.from_config(
+            name='composetest',
+            config={
+                'net': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"]
+                },
+                'web': {
+                    'image': 'busybox:latest',
+                    'net': 'container:net',
+                    'command': ["/bin/sleep", "300"]
+                },  
+            },
+            client=self.client,
+        )
+
+        project.up()
+
+        web = project.get_service('web')
+        net = project.get_service('net')
+        self.assertEqual(web._get_net(), 'container:'+net.containers()[0].id)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_net_from_container(self):
+        net_container = Container.create(
+            self.client,
+            image='busybox:latest',
+            name='composetest_net_container',
+            command='/bin/sleep 300'
+        )
+        net_container.start()
+
+        project = Project.from_config(
+            name='composetest',
+            config={
+                'web': {
+                    'image': 'busybox:latest',
+                    'net': 'container:composetest_net_container'
+                },
+            },
+            client=self.client,
+        )
+
+        project.up()
+
+        web = project.get_service('web')
+        self.assertEqual(web._get_net(), 'container:'+net_container.id)
+
+        project.kill()
+        project.remove_stopped()
+
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
@@ -199,20 +256,86 @@ class ProjectTest(DockerClientTestCase):
         project.kill()
         project.remove_stopped()
 
-    def test_project_up_with_no_deps(self):
-        console = self.create_service('console')
-        db = self.create_service('db', volumes=['/var/db'])
-        web = self.create_service('web', links=[(db, 'db')])
-
-        project = Project('composetest', [web, db, console], self.client)
+    def test_project_up_starts_depends(self):
+        project = Project.from_config(
+            name='composetest',
+            config={
+                'console': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                },
+                'net' : {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"]
+                },
+                'app': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'net': 'container:net'
+                },
+                'web': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'net': 'container:net',
+                    'links': ['app']
+                },
+            },
+            client=self.client,
+        )
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
-        project.up(['web'], start_links=False)
-        self.assertEqual(len(project.containers()), 1)
-        self.assertEqual(len(web.containers()), 1)
-        self.assertEqual(len(db.containers()), 0)
-        self.assertEqual(len(console.containers()), 0)
+        project.up(['web'])
+        self.assertEqual(len(project.containers()), 3)
+        self.assertEqual(len(project.get_service('web').containers()), 1)
+        self.assertEqual(len(project.get_service('app').containers()), 1)
+        self.assertEqual(len(project.get_service('net').containers()), 1)
+        self.assertEqual(len(project.get_service('console').containers()), 0)
+
+        project.kill()
+        project.remove_stopped()
+
+    def test_project_up_with_no_deps(self):
+        project = Project.from_config(
+            name='composetest',
+            config={
+                'console': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                },
+                'net' : {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"]
+                },
+                'vol': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'volumes': ["/tmp"]
+                },
+                'app': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'net': 'container:net'
+                },
+                'web': {
+                    'image': 'busybox:latest',
+                    'command': ["/bin/sleep", "300"],
+                    'net': 'container:net',
+                    'links': ['app'],
+                    'volumes_from': ['vol']
+                },
+            },
+            client=self.client,
+        )
+        project.start()
+        self.assertEqual(len(project.containers()), 0)
+
+        project.up(['web'], start_deps=False)
+        self.assertEqual(len(project.containers(stopped=True)), 2)
+        self.assertEqual(len(project.get_service('web').containers()), 1)
+        self.assertEqual(len(project.get_service('vol').containers(stopped=True)), 1)
+        self.assertEqual(len(project.get_service('net').containers()), 0)
+        self.assertEqual(len(project.get_service('console').containers()), 0)
 
         project.kill()
         project.remove_stopped()

@@ -88,7 +88,7 @@ ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, **options):
+    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, net=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -116,6 +116,7 @@ class Service(object):
         self.links = links or []
         self.external_links = external_links or []
         self.volumes_from = volumes_from or []
+        self.net = net or None
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -320,7 +321,6 @@ class Service(object):
             if ':' in volume)
 
         privileged = options.get('privileged', False)
-        net = options.get('net', 'bridge')
         dns = options.get('dns', None)
         dns_search = options.get('dns_search', None)
         cap_add = options.get('cap_add', None)
@@ -334,7 +334,7 @@ class Service(object):
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
-            network_mode=net,
+            network_mode=self._get_net(),
             dns=dns,
             dns_search=dns_search,
             restart_policy=restart,
@@ -363,6 +363,15 @@ class Service(object):
 
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
+
+    def get_volumes_from_names(self):
+        return [s.name for s in self.volumes_from if isinstance(s, Service)]
+
+    def get_net_name(self):
+        if isinstance(self.net, Service):
+            return self.net.name
+        else:
+            return
 
     def _next_container_name(self, all_containers, one_off=False):
         bits = [self.project, self.name]
@@ -399,7 +408,6 @@ class Service(object):
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
                 containers = volume_source.containers(stopped=True)
-
                 if not containers:
                     volumes_from.append(volume_source.create_container().id)
                 else:
@@ -412,6 +420,25 @@ class Service(object):
             volumes_from.append(intermediate_container.id)
 
         return volumes_from
+
+    def _get_net(self):
+        if not self.net:
+            return "bridge"
+
+        if isinstance(self.net, Service):
+            containers = self.net.containers()
+            if len(containers) > 0:
+                net = 'container:' + containers[0].id
+            else:
+                log.warning("Warning: Service %s is trying to use reuse the network stack "
+                            "of another service that is not running." % (self.net.name))
+                net = None
+        elif isinstance(self.net, Container):
+            net = 'container:' + self.net.id
+        else:
+            net = self.net
+
+        return net
 
     def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict(

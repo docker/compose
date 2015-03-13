@@ -293,7 +293,7 @@ class TopLevelCommand(Command):
             if len(deps) > 0:
                 project.up(
                     service_names=deps,
-                    start_links=True,
+                    start_deps=True,
                     recreate=False,
                     insecure_registry=insecure_registry,
                     detach=options['-d']
@@ -435,13 +435,13 @@ class TopLevelCommand(Command):
 
         monochrome = options['--no-color']
 
-        start_links = not options['--no-deps']
+        start_deps = not options['--no-deps']
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
 
         project.up(
             service_names=service_names,
-            start_links=start_links,
+            start_deps=start_deps,
             recreate=recreate,
             insecure_registry=insecure_registry,
             detach=options['-d'],
