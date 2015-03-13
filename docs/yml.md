@@ -21,7 +21,7 @@ specify them again in `docker-compose.yml`.
 Tag or partial image ID. Can be local or remote - Compose will attempt to
 pull if it doesn't exist locally.
 
-```
+```yml
 image: ubuntu
 image: orchardup/postgresql
 image: a4bc65fd
@@ -34,7 +34,7 @@ build context that is sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 
-```
+```yml
 build: /path/to/build/dir
 ```
 
@@ -42,7 +42,7 @@ build: /path/to/build/dir
 
 Override the default command.
 
-```
+```yml
 command: bundle exec thin -p 3000
 ```
 
@@ -53,7 +53,7 @@ Link to containers in another service. Either specify both the service name and
 the link alias (`SERVICE:ALIAS`), or just the service name (which will also be
 used for the alias).
 
-```
+```yml
 links:
  - db
  - db:database
@@ -79,7 +79,7 @@ of Compose, especially for containers that provide shared or common services.
 `external_links` follow semantics similar to `links` when specifying both the
 container name and the link alias (`CONTAINER:ALIAS`).
 
-```
+```yml
 external_links:
  - redis_1
  - project_db_1:mysql
@@ -96,7 +96,7 @@ port (a random host port will be chosen).
 > parse numbers in the format `xx:yy` as sexagesimal (base 60). For this reason,
 > we recommend always explicitly specifying your port mappings as strings.
 
-```
+```yml
 ports:
  - "3000"
  - "8000:8000"
@@ -109,7 +109,7 @@ ports:
 Expose ports without publishing them to the host machine - they'll only be
 accessible to linked services. Only the internal port can be specified.
 
-```
+```yml
 expose:
  - "3000"
  - "8000"
@@ -120,7 +120,7 @@ expose:
 Mount paths as volumes, optionally specifying a path on the host machine
 (`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
 
-```
+```yml
 volumes:
  - /var/lib/mysql
  - cache/:/tmp/cache
@@ -131,7 +131,7 @@ volumes:
 
 Mount all of the volumes from another service or container.
 
-```
+```yml
 volumes_from:
  - service_name
  - container_name
@@ -144,7 +144,7 @@ Add environment variables. You can use either an array or a dictionary.
 Environment variables with only a key are resolved to their values on the
 machine Compose is running on, which can be helpful for secret or host-specific values.
 
-```
+```yml
 environment:
   RACK_ENV: development
   SESSION_SECRET:
@@ -160,12 +160,12 @@ Add environment variables from a file. Can be a single value or a list.
 
 Environment variables specified in `environment` override these values.
 
-```
+```yml
 env_file:
   - .env
 ```
 
-```
+```yml
 RACK_ENV: development
 ```
 
@@ -173,7 +173,7 @@ RACK_ENV: development
 
 Networking mode. Use the same values as the docker client `--net` parameter.
 
-```
+```yml
 net: "bridge"
 net: "none"
 net: "container:[name or id]"
@@ -184,7 +184,7 @@ net: "host"
 
 Custom DNS servers. Can be a single value or a list.
 
-```
+```yml
 dns: 8.8.8.8
 dns:
   - 8.8.8.8
@@ -196,7 +196,7 @@ dns:
 Add or drop container capabilities.
 See `man 7 capabilities` for a full list.
 
-```
+```yml
 cap_add:
   - ALL
 
@@ -209,7 +209,7 @@ cap_drop:
 
 Custom DNS search domains. Can be a single value or a list.
 
-```
+```yml
 dns_search: example.com
 dns_search:
   - dc1.example.com
@@ -221,7 +221,7 @@ dns_search:
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
 
-```
+```yml
 cpu_shares: 73
 
 working_dir: /code
