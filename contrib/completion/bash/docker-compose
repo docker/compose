@@ -174,7 +174,7 @@ _docker-compose_port() {
 _docker-compose_ps() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-s -q" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
