@@ -1,8 +1,6 @@
 Docker Compose
 ==============
 
-[![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
-
 *(Previously known as Fig)*
 
 Compose is a tool for defining and running complex applications with Docker.
