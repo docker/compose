@@ -4,4 +4,4 @@ simple:
   command: /bin/sleep 300
   ports:
     - '3000'
-    - '9999:3001'
+    - '49152:3001'
