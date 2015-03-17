@@ -17,6 +17,7 @@ DOCKER_CONFIG_KEYS = [
     'environment',
     'hostname',
     'image',
+    'labels',
     'links',
     'mem_limit',
     'net',
@@ -138,7 +139,6 @@ def resolve_environment(service_dict, working_dir=None):
     service_dict['environment'] = env
     return service_dict
 
-
 def parse_environment(environment):
     if not environment:
         return {}
@@ -153,7 +153,6 @@ def parse_environment(environment):
         "environment \"%s\" must be a list or mapping," %
         environment
     )
-
 
 def split_env(env):
     if '=' in env:

@@ -9,7 +9,7 @@ import sys
 
 from docker.errors import APIError
 
-from .config import DOCKER_CONFIG_KEYS
+from .config import DOCKER_CONFIG_KEYS, load
 from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
@@ -29,6 +29,7 @@ DOCKER_START_KEYS = [
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
 
+LABEL_PREFIX = ''
 
 class BuildError(Exception):
     def __init__(self, service, reason):
@@ -48,6 +49,9 @@ VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
+
+
+LabelSpec = namedtuple('LabelSpec', 'key value')
 
 
 class Service(object):
@@ -181,7 +185,6 @@ class Service(object):
                 self.can_be_built() and
                 not self.client.images(name=self.full_name)):
             self.build()
-
         try:
             return Container.create(self.client, **container_options)
         except APIError as e:
@@ -296,7 +299,8 @@ class Service(object):
             self,
             insecure_registry=False,
             detach=False,
-            do_build=True):
+            do_build=True,
+            **override_options):
         containers = self.containers(stopped=True)
 
         if not containers:
@@ -305,6 +309,7 @@ class Service(object):
                 insecure_registry=insecure_registry,
                 detach=detach,
                 do_build=do_build,
+                **override_options
             )
             return [self.start_container(new_container)]
         else:
@@ -398,6 +403,51 @@ class Service(object):
         container_options['name'] = self._next_container_name(
             self.containers(stopped=True, one_off=one_off),
             one_off)
+
+        if 'labels' in container_options:
+            container_options['labels'] = dict(
+                (LABEL_PREFIX + key, container_options['labels'][key])
+                for key in container_options['labels'])
+
+        if 'remove_labels' in container_options:
+            service_cfg_lbls = container_options.get('labels')
+            if service_cfg_lbls is not None:
+                regex = container_options.get('remove_labels')
+                a = re.compile(regex)
+                container_options['labels'] = dict(
+                    (k, v) for (k,v) in service_cfg_lbls.iteritems()
+                    if not a.match(k))
+            del container_options['remove_labels']
+
+        if 'labels_file' in container_options:
+            # Merge labels from config with labels from --labels-file
+            label_cfg_file = container_options.get('labels_file')
+            label_list_cfg_file = load(label_cfg_file)
+            service_cmd_opts = [a_serv_lbl for a_serv_lbl in label_list_cfg_file
+                                if a_serv_lbl.get('name') == self.name
+                                and a_serv_lbl.get('labels') is not None]
+            if len(service_cmd_opts) == 0:
+                raise ConfigError ('No labels defined for service \'' +
+                                   self.name + '\' in ' +
+                                   container_options.get('labels_file'))
+            service_cmd_lbls = service_cmd_opts[0]['labels']
+            service_cfg_lbls = container_options.get('labels')
+            prefix_cmd = ""
+            prefix_cfg = ""
+            if 'prefix_labels' in container_options:
+                prefix_cmd = ".cmd:"
+                prefix_cfg = ".cfg:"
+                del container_options['prefix_labels']
+            temp_labels = dict()
+            if service_cfg_lbls is not None:
+                temp_labels.update(
+                    (prefix_cfg + key, service_cfg_lbls[key]) for key in service_cfg_lbls)
+            temp_labels.update(
+                (prefix_cmd + key, service_cmd_lbls[key]) for key in service_cmd_lbls)
+
+            container_options['labels'] = temp_labels
+            del container_options['labels_file']
+
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
@@ -552,7 +602,6 @@ def parse_volume_spec(volume_config):
                           "one of: rw, ro." % (volume_config, mode))
 
     return VolumeSpec(external, internal, mode)
-
 
 def parse_repository_tag(s):
     if ":" not in s:

@@ -209,20 +209,30 @@ class Project(object):
            recreate=True,
            insecure_registry=False,
            detach=False,
-           do_build=True):
+           do_build=True,
+           prefix_labels=False,
+           remove_labels='',
+           labels_file=None
+           ):
         running_containers = []
         for service in self.get_services(service_names, include_deps=start_deps):
             if recreate:
                 for (_, container) in service.recreate_containers(
                         insecure_registry=insecure_registry,
                         detach=detach,
-                        do_build=do_build):
+                        do_build=do_build,
+                        prefix_labels=prefix_labels,
+                        remove_labels=remove_labels,
+                        labels_file=labels_file):
                     running_containers.append(container)
             else:
                 for container in service.start_or_create_containers(
                         insecure_registry=insecure_registry,
                         detach=detach,
-                        do_build=do_build):
+                        do_build=do_build,
+                        prefix_labels=prefix_labels,
+                        remove_labels=remove_labels,
+                        labels_file=labels_file):
                     running_containers.append(container)
 
         return running_containers
