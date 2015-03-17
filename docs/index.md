@@ -105,7 +105,7 @@ specify how to build the image using a file called
 [`Dockerfile`](http://docs.docker.com/reference/builder/):
 
     FROM python:2.7
-    ADD . /code
+    RUN mkdir /code
     WORKDIR /code
     RUN pip install -r requirements.txt
 
