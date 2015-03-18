@@ -4,6 +4,9 @@
 
 set -e
 
+>&2 echo "Validating DCO"
+script/validate-dco
+
 >&2 echo "Running lint checks"
 flake8 compose
 
