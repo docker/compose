@@ -26,3 +26,12 @@ Compose is a great tool for development environments, but it could be even bette
 
 - [Compose could watch your code and automatically kick off builds when something changes.](https://github.com/docker/fig/issues/184)
 - It should be possible to define hostnames for containers which work from the host machine, e.g. “mywebcontainer.local”. This is needed by apps comprising multiple web services which generate links to one another (e.g. a frontend website and a separate admin webapp)
+
+# Project Planning
+
+An [Open-Source Planning Process](https://github.com/docker/compose/wiki/Open-Source-Planning-Process) is used to define the Roadmap. [Project Pages](https://github.com/docker/compose/wiki) define the goals for each Milestone and identify current progress.
+
+| Platform Version | Compose Milestone | Planning |
+|-----------|------|-----|------|
+| Docker 1.6.0 |  [1.2.0](https://github.com/docker/compose/issues?q=milestone%3A1.2.0+) | [Project Page](https://github.com/amylindburg/compose/wiki/1.2.0-Milestone-Project-Page) |
+| Docker 1.7.0 | 1.3.0  | [Project Page](https://github.com/amylindburg/compose/wiki/1.3.0-Milestone-Project-Page) |
