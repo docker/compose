@@ -176,6 +176,83 @@ env_file:
 RACK_ENV: development
 ```
 
+### extends
+
+Extend another service, in the current file or another, optionally overriding
+configuration.
+
+Here's a simple example. Suppose we have 2 files - **common.yml** and
+**development.yml**. We can use `extends` to define a service in
+**development.yml** which uses configuration defined in **common.yml**:
+
+**common.yml**
+
+```
+webapp:
+  build: ./webapp
+  environment:
+    - DEBUG=false
+    - SEND_EMAILS=false
+```
+
+**development.yml**
+
+```
+web:
+  extends:
+    file: common.yml
+    service: webapp
+  ports:
+    - "8000:8000"
+  links:
+    - db
+  environment:
+    - DEBUG=true
+db:
+  image: postgres
+```
+
+Here, the `web` service in **development.yml** inherits the configuration of
+the `webapp` service in **common.yml** - the `build` and `environment` keys -
+and adds `ports` and `links` configuration. It overrides one of the defined
+environment variables (DEBUG) with a new value, and the other one
+(SEND_EMAILS) is left untouched. It's exactly as if you defined `web` like
+this:
+
+```yaml
+web:
+  build: ./webapp
+  ports:
+    - "8000:8000"
+  links:
+    - db
+  environment:
+    - DEBUG=true
+    - SEND_EMAILS=false
+```
+
+The `extends` option is great for sharing configuration between different
+apps, or for configuring the same app differently for different environments.
+You could write a new file for a staging environment, **staging.yml**, which
+binds to a different port and doesn't turn on debugging:
+
+```
+web:
+  extends:
+    file: common.yml
+    service: webapp
+  ports:
+    - "80:8000"
+  links:
+    - db
+db:
+  image: postgres
+```
+
+> **Note:** When you extend a service, `links` and `volumes_from`
+> configuration options are **not** inherited - you will have to define
+> those manually each time you extend it.
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.
