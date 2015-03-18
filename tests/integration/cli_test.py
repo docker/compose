@@ -300,6 +300,7 @@ class CLITestCase(DockerClientTestCase):
 
     @patch('dockerpty.start')
     def test_run_service_with_map_ports(self, __):
+
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['run', '-d', '--service-ports', 'simple'], None)
@@ -315,7 +316,7 @@ class CLITestCase(DockerClientTestCase):
         # check the ports
         self.assertNotEqual(port_random, None)
         self.assertIn("0.0.0.0", port_random)
-        self.assertEqual(port_assigned, "0.0.0.0:9999")
+        self.assertEqual(port_assigned, "0.0.0.0:49152")
 
     def test_rm(self):
         service = self.project.get_service('simple')
@@ -404,6 +405,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
     def test_port(self):
+
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['up', '-d'], None)
         container = self.project.get_service('simple').get_container()
@@ -414,7 +416,7 @@ class CLITestCase(DockerClientTestCase):
             return mock_stdout.getvalue().rstrip()
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
-        self.assertEqual(get_port(3001), "0.0.0.0:9999")
+        self.assertEqual(get_port(3001), "0.0.0.0:49152")
         self.assertEqual(get_port(3002), "")
 
     def test_env_file_relative_to_compose_file(self):
