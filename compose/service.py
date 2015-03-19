@@ -270,7 +270,7 @@ class Service(object):
             if ':' in volume)
 
         privileged = options.get('privileged', False)
-        dns = options.get('dns', None)
+        dns = options.get('dns', [])
         dns_search = options.get('dns_search', None)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
@@ -284,7 +284,7 @@ class Service(object):
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,
             network_mode=self._get_net(),
-            dns=dns,
+            dns=self._get_dns_resolved(dns),
             dns_search=dns_search,
             restart_policy=restart,
             cap_add=cap_add,
@@ -331,6 +331,18 @@ class Service(object):
     def _next_container_number(self, all_containers):
         numbers = [parse_name(c.name).number for c in all_containers]
         return 1 if not numbers else max(numbers) + 1
+
+    def _get_dns_resolved(self, dns):
+        if type(dns) != list:
+            dns = [dns]
+        containers = dict([(link_name, service.containers()) for service, link_name in self.links])
+        dns_resolved = []
+        for d in dns:
+            if d in containers.keys():
+                dns_resolved.extend([c.get('NetworkSettings.IPAddress') for c in containers[d]])
+            else:
+                dns_resolved.append(d)
+        return dns_resolved
 
     def _get_links(self, link_to_self):
         links = []
