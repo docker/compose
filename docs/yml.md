@@ -253,6 +253,24 @@ environment variables (DEBUG) with a new value, and the other one
 For more on `extends`, see the [tutorial](extends.md#example) and
 [reference](extends.md#reference).
 
+### labels
+
+Add metadata to containers using [Docker labels](http://docs.docker.com/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
+
+It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
+
+```
+labels:
+  com.example.description: "Accounting webapp"
+  com.example.department: "Finance"
+  com.example.label-with-empty-value: ""
+
+labels:
+  - "com.example.description=Accounting webapp"
+  - "com.example.department=Finance"
+  - "com.example.label-with-empty-value"
+```
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.

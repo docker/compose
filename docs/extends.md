@@ -321,8 +321,8 @@ expose:
   - "5000"
 ```
 
-In the case of `environment`, Compose "merges" entries together with
-locally-defined values taking precedence:
+In the case of `environment` and `labels`, Compose "merges" entries together
+with locally-defined values taking precedence:
 
 ```yaml
 # original service
