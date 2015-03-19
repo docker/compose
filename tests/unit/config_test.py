@@ -133,7 +133,6 @@ class EnvTest(unittest.TestCase):
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
 
-
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
         service_dicts = config.load('tests/fixtures/extends/docker-compose.yml')
@@ -241,3 +240,13 @@ class ExtendsTest(unittest.TestCase):
 
         with mock.patch.object(config, 'load_yaml', return_value=other_config):
             print load_config()
+
+    def test_volume_path(self):
+        dicts = config.load('tests/fixtures/volume-path/docker-compose.yml')
+
+        paths = [
+            '%s:/foo' % os.path.abspath('tests/fixtures/volume-path/common/foo'),
+            '%s:/bar' % os.path.abspath('tests/fixtures/volume-path/bar'),
+        ]
+
+        self.assertEqual(set(dicts[0]['volumes']), set(paths))

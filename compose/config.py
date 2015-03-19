@@ -166,6 +166,11 @@ def process_container_options(service_dict, working_dir=None):
                 msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
             raise ConfigurationError(msg)
 
+    service_dict = service_dict.copy()
+
+    if 'volumes' in service_dict:
+        service_dict['volumes'] = resolve_host_paths(service_dict['volumes'], working_dir=working_dir)
+
     return service_dict
 
 
@@ -178,8 +183,14 @@ def merge_service_dicts(base, override):
             override.get('environment'),
         )
 
+    if 'volumes' in base or 'volumes' in override:
+        d['volumes'] = merge_volumes(
+            base.get('volumes'),
+            override.get('volumes'),
+        )
+
     for k in ALLOWED_KEYS:
-        if k not in ['environment']:
+        if k not in ['environment', 'volumes']:
             if k in override:
                 d[k] = override[k]
 
@@ -283,6 +294,42 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
+
+
+def resolve_host_paths(volumes, working_dir=None):
+    if working_dir is None:
+        raise Exception("No working_dir passed to resolve_host_paths()")
+
+    return [resolve_host_path(v, working_dir) for v in volumes]
+
+
+def resolve_host_path(volume, working_dir):
+    container_path, host_path = split_volume(volume)
+    if host_path is not None:
+        return "%s:%s" % (expand_path(working_dir, host_path), container_path)
+    else:
+        return container_path
+
+
+def merge_volumes(base, override):
+    d = dict_from_volumes(base)
+    d.update(dict_from_volumes(override))
+    return volumes_from_dict(d)
+
+
+def dict_from_volumes(volumes):
+    return dict(split_volume(v) for v in volumes)
+
+
+def split_volume(volume):
+    if ':' in volume:
+        return reversed(volume.split(':', 1))
+    else:
+        return (volume, None)
+
+
+def volumes_from_dict(d):
+    return ["%s:%s" % (host_path, container_path) for (container_path, host_path) in d.items()]
 
 
 def expand_path(working_dir, path):
