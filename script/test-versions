@@ -11,14 +11,14 @@ script/validate-dco
 flake8 compose
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="1.5.0"
+  DOCKER_VERSIONS="dev"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
 fi
 
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
-  docker-1.5.0 run \
+  docker-$version run \
     --rm \
     --privileged \
     --volume="/var/lib/docker" \
