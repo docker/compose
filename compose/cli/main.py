@@ -13,7 +13,7 @@ import dockerpty
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, CannotBeScaledError
-from ..config import parse_environment
+from ..config import parse_environment, load
 from .command import Command
 from .docopt_command import NoSuchCommand
 from .errors import UserError
@@ -270,19 +270,29 @@ class TopLevelCommand(Command):
         Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
-            --allow-insecure-ssl  Allow insecure connections to the docker
-                                  registry
-            -d                    Detached mode: Run container in the background, print
-                                  new container name.
-            --entrypoint CMD      Override the entrypoint of the image.
-            -e KEY=VAL            Set an environment variable (can be used multiple times)
-            -u, --user=""         Run as specified username or uid
-            --no-deps             Don't start linked services.
-            --rm                  Remove container after run. Ignored in detached mode.
-            --service-ports       Run command with the service's ports enabled and mapped
-                                  to the host.
-            -T                    Disable pseudo-tty allocation. By default `docker-compose run`
-                                  allocates a TTY.
+            --allow-insecure-ssl        Allow insecure connections to the docker
+                                        registry
+            -d                          Detached mode: Run container in the background,
+                                        print new container name.
+            --entrypoint CMD            Override the entrypoint of the image.
+            -e KEY=VAL                  Set an environment variable (can be used multiple
+                                        times)
+            --labels-file FILE          Uses all labels, in the given yaml FILE for the
+                                        SERVICE to be run.
+            --no-deps                   Don't start linked services.
+            --no-prefix-labels          Don't prefix '.cfg' and '.cmd' when --labels-file
+                                        is used.
+            --remove-labels [REGEX]     Removes all labels. If REGEX is given, removes
+                                        labels that match the given REGular EXpression.
+                                        (Note: This option has less priority than the
+                                        given --labels-file)
+            --rm                        Remove container after run. Ignored in detached
+                                        mode.
+            --service-ports             Run command with the service's ports enabled and
+                                        mapped to the host.
+            -T                          Disable pseudo-tty allocation. By default
+                                        `docker-compose run` allocates a TTY.
+            -u, --user=""               Run as specified username or uid.
         """
         service = project.get_service(options['SERVICE'])
 
@@ -314,7 +324,41 @@ class TopLevelCommand(Command):
             'tty': tty,
             'stdin_open': not options['-d'],
             'detach': options['-d'],
+            'labels': dict(),
         }
+
+        if options['--remove-labels']:
+            service_cfg_lbls = service.options.get('labels')
+            if service_cfg_lbls is not None:
+                regex = options.get('--remove-labels')
+                a = re.compile(regex)
+                service.options['labels'] = dict(
+                    (k, v) for (k,v) in service_cfg_lbls.iteritems()
+                    if not a.match(k))
+
+        if options['--labels-file']:
+            # Merge labels from config with labels from --labels-file
+            label_cfg_file = self.get_config_path(options.get('--labels-file'))
+            label_list_cfg_file = load(label_cfg_file)
+            service_cmd_opts = [a_serv_lbl for a_serv_lbl in label_list_cfg_file
+                            if a_serv_lbl.get('name') == service.name
+                            and a_serv_lbl.get('labels') is not None]
+            if len(service_cmd_opts) == 0:
+                raise UserError('No labels defined for service \'' + service.name +
+                                '\' in ' + options.get('--labels-file'))
+            service_cmd_lbls = service_cmd_opts[0]['labels']
+            service_cfg_lbls = service.options.get('labels')
+            prefix_cmd = ""
+            prefix_cfg = ""
+            if not options['--no-prefix-labels']:
+                prefix_cmd = ".cmd:"
+                prefix_cfg = ".cfg:"
+
+            if service_cfg_lbls is not None:
+                container_options['labels'].update(
+                    (prefix_cfg + key, service_cfg_lbls[key]) for key in service_cfg_lbls)
+            container_options['labels'].update(
+                (prefix_cmd + key, service_cmd_lbls[key]) for key in service_cmd_lbls)
 
         if options['-e']:
             # Merge environment from config with -e command line
@@ -434,22 +478,34 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            --allow-insecure-ssl   Allow insecure connections to the docker
-                                   registry
-            -d                     Detached mode: Run containers in the background,
-                                   print new container names.
-            --no-color             Produce monochrome output.
-            --no-deps              Don't start linked services.
-            --no-recreate          If containers already exist, don't recreate them.
-            --no-build             Don't build an image, even if it's missing
-            -t, --timeout TIMEOUT  When attached, use this timeout in seconds
-                                   for the shutdown. (default: 10)
+            --allow-insecure-ssl        Allow insecure connections to the docker registry.
+            -d                          Detached mode: Run containers in the background,
+                                        print new container names.
+            --labels-file FILE          Uses all labels, in the given yaml FILE for the
+                                        SERVICEs to be up.
+            --no-build                  Don't build an image, even if it's missing.
+            --no-deps                   Don't start linked services.
+            --no-color                  Produce monochrome output.
+            --no-prefix-labels          Don't prefix '.cfg' and '.cmd' when --labels-file
+                                        is used.
+            --no-recreate               If containers already exist, don't recreate them.
+            --remove-labels [REGEX]     Removes all labels. If REGEX is given, removes
+                                        labels that match the given REGular EXpression.
+                                        (Note: This option has less priority than the
+                                        given --labels-file).
+            -t, --timeout TIMEOUT       When attached, use this timeout in seconds for the
+                                        shutdown. (default: 10)
 
         """
         insecure_registry = options['--allow-insecure-ssl']
         detached = options['-d']
 
         monochrome = options['--no-color']
+
+        if options['--labels-file']:
+            labels_file = self.get_config_path(options['--labels-file'])
+        else:
+            labels_file = ''
 
         start_deps = not options['--no-deps']
         recreate = not options['--no-recreate']
@@ -462,6 +518,9 @@ class TopLevelCommand(Command):
             insecure_registry=insecure_registry,
             detach=detached,
             do_build=not options['--no-build'],
+            prefix_labels=not options['--no-prefix-labels'],
+            remove_labels=str(options['--remove-labels']),
+            labels_file=labels_file
         )
 
         to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
