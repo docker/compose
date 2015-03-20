@@ -362,7 +362,7 @@ security_opt:
   - label:role:ROLE
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
+### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only 
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -378,6 +378,8 @@ user: postgresql
 hostname: foo
 domainname: foo.com
 
+mac_address: 02:42:ac:11:65:43
+
 mem_limit: 1000000000
 privileged: true
 
@@ -386,6 +388,7 @@ restart: always
 stdin_open: true
 tty: true
 read_only: true
+
 ```
 
 ## Compose documentation
