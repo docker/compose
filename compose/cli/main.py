@@ -328,20 +328,20 @@ class TopLevelCommand(Command):
         if options['--user']:
             container_options['user'] = options.get('--user')
 
+        if not options['--service-ports']:
+            container_options['ports'] = []
+
         container = service.create_container(
             one_off=True,
             insecure_registry=insecure_registry,
             **container_options
         )
 
-        service_ports = None
-        if options['--service-ports']:
-            service_ports = service.options['ports']
         if options['-d']:
-            service.start_container(container, ports=service_ports, one_off=True)
+            service.start_container(container)
             print(container.name)
         else:
-            service.start_container(container, ports=service_ports, one_off=True)
+            service.start_container(container)
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:

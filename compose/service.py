@@ -8,6 +8,7 @@ from operator import attrgetter
 import sys
 
 from docker.errors import APIError
+from docker.utils import create_host_config
 
 from .config import DOCKER_CONFIG_KEYS
 from .container import Container, get_container_name
@@ -168,6 +169,7 @@ class Service(object):
                          one_off=False,
                          insecure_registry=False,
                          do_build=True,
+                         intermediate_container=None,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
@@ -175,7 +177,9 @@ class Service(object):
         """
         container_options = self._get_container_create_options(
             override_options,
-            one_off=one_off)
+            one_off=one_off,
+            intermediate_container=intermediate_container,
+        )
 
         if (do_build and
                 self.can_be_built() and
@@ -240,56 +244,33 @@ class Service(object):
             entrypoint=['/bin/echo'],
             command=[],
             detach=True,
+            host_config=create_host_config(volumes_from=[container.id]),
         )
-        intermediate_container.start(volumes_from=container.id)
+        intermediate_container.start()
         intermediate_container.wait()
         container.remove()
 
         options = dict(override_options)
-        new_container = self.create_container(do_build=False, **options)
-        self.start_container(new_container, intermediate_container=intermediate_container)
+        new_container = self.create_container(
+            do_build=False,
+            intermediate_container=intermediate_container,
+            **options
+        )
+        self.start_container(new_container)
 
         intermediate_container.remove()
 
         return (intermediate_container, new_container)
 
-    def start_container_if_stopped(self, container, **options):
+    def start_container_if_stopped(self, container):
         if container.is_running:
             return container
         else:
             log.info("Starting %s..." % container.name)
-            return self.start_container(container, **options)
+            return self.start_container(container)
 
-    def start_container(self, container, intermediate_container=None, **override_options):
-        options = dict(self.options, **override_options)
-        port_bindings = build_port_bindings(options.get('ports') or [])
-
-        volume_bindings = dict(
-            build_volume_binding(parse_volume_spec(volume))
-            for volume in options.get('volumes') or []
-            if ':' in volume)
-
-        privileged = options.get('privileged', False)
-        dns = options.get('dns', None)
-        dns_search = options.get('dns_search', None)
-        cap_add = options.get('cap_add', None)
-        cap_drop = options.get('cap_drop', None)
-
-        restart = parse_restart_spec(options.get('restart', None))
-
-        container.start(
-            links=self._get_links(link_to_self=options.get('one_off', False)),
-            port_bindings=port_bindings,
-            binds=volume_bindings,
-            volumes_from=self._get_volumes_from(intermediate_container),
-            privileged=privileged,
-            network_mode=self._get_net(),
-            dns=dns,
-            dns_search=dns_search,
-            restart_policy=restart,
-            cap_add=cap_add,
-            cap_drop=cap_drop,
-        )
+    def start_container(self, container):
+        container.start()
         return container
 
     def start_or_create_containers(
@@ -389,7 +370,7 @@ class Service(object):
 
         return net
 
-    def _get_container_create_options(self, override_options, one_off=False):
+    def _get_container_create_options(self, override_options, one_off=False, intermediate_container=None):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
@@ -436,7 +417,46 @@ class Service(object):
         for key in DOCKER_START_KEYS:
             container_options.pop(key, None)
 
+        container_options['host_config'] = self._get_container_host_config(override_options, one_off=one_off, intermediate_container=intermediate_container)
+
         return container_options
+
+    def _get_container_host_config(self, override_options, one_off=False, intermediate_container=None):
+        options = dict(self.options, **override_options)
+        port_bindings = build_port_bindings(options.get('ports') or [])
+
+        volume_bindings = dict(
+            build_volume_binding(parse_volume_spec(volume))
+            for volume in options.get('volumes') or []
+            if ':' in volume)
+
+        privileged = options.get('privileged', False)
+        cap_add = options.get('cap_add', None)
+        cap_drop = options.get('cap_drop', None)
+
+        dns = options.get('dns', None)
+        if not isinstance(dns, list):
+            dns = [dns]
+
+        dns_search = options.get('dns_search', None)
+        if not isinstance(dns_search, list):
+            dns_search = [dns_search]
+
+        restart = parse_restart_spec(options.get('restart', None))
+
+        return create_host_config(
+            links=self._get_links(link_to_self=one_off),
+            port_bindings=port_bindings,
+            binds=volume_bindings,
+            volumes_from=self._get_volumes_from(intermediate_container),
+            privileged=privileged,
+            network_mode=self._get_net(),
+            dns=dns,
+            dns_search=dns_search,
+            restart_policy=restart,
+            cap_add=cap_add,
+            cap_drop=cap_drop,
+        )
 
     def _get_image_name(self, image):
         repo, tag = parse_repository_tag(image)
