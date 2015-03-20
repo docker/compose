@@ -189,7 +189,7 @@ net: "host"
 
 ### dns
 
-Custom DNS servers. Can be a single value or a list.
+Custom DNS servers. Can be a single value or a list. Names of linked containers are resolved.
 
 ```
 dns: 8.8.8.8

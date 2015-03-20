@@ -434,6 +434,28 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8', '9.9.9.9'])
 
+    def test_dns_named_single_value(self):
+        dns = self.create_service('dns')
+        web = self.create_service('web', links=[(dns, 'link')], dns='link')
+        dns_container = create_and_start_container(dns)
+        web_container = create_and_start_container(web)
+        self.assertEqual(web_container.get('HostConfig.Dns'), [dns_container.get('NetworkSettings.IPAddress')])
+
+    def test_dns_named_list(self):
+        dns = self.create_service('dns')
+        web = self.create_service('web', links=[(dns, 'link')], dns=['link', '8.8.8.8'])
+        dns_container = create_and_start_container(dns)
+        web_container = create_and_start_container(web)
+        self.assertEqual(web_container.get('HostConfig.Dns'), [dns_container.get('NetworkSettings.IPAddress'), '8.8.8.8'])
+
+    def test_dns_scaled(self):
+        dns = self.create_service('dns')
+        dns.scale(2)
+        web = self.create_service('web', links=[(dns, 'link')], dns=['link'])
+        dns_containers = dns.containers()
+        web_container = create_and_start_container(web)
+        self.assertEqual(web_container.get('HostConfig.Dns'), [c.get('NetworkSettings.IPAddress') for c in dns_containers])
+
     def test_restart_always_value(self):
         service = self.create_service('web', restart='always')
         container = create_and_start_container(service)
