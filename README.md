@@ -1,6 +1,6 @@
 Docker Compose
 ==============
-
+[![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
 *(Previously known as Fig)*
 
 Compose is a tool for defining and running complex applications with Docker.
