@@ -52,34 +52,110 @@ DOCKER_CONFIG_HINTS = {
 
 def load(filename):
     working_dir = os.path.dirname(filename)
-    return from_dictionary(load_yaml(filename), working_dir=working_dir)
+    return from_dictionary(load_yaml(filename), working_dir=working_dir, filename=filename)
 
 
-def load_yaml(filename):
-    try:
-        with open(filename, 'r') as fh:
-            return yaml.safe_load(fh)
-    except IOError as e:
-        raise ConfigurationError(six.text_type(e))
-
-
-def from_dictionary(dictionary, working_dir=None):
+def from_dictionary(dictionary, working_dir=None, filename=None):
     service_dicts = []
 
     for service_name, service_dict in list(dictionary.items()):
         if not isinstance(service_dict, dict):
             raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
-        service_dict = make_service_dict(service_name, service_dict, working_dir=working_dir)
+        loader = ServiceLoader(working_dir=working_dir, filename=filename)
+        service_dict = loader.make_service_dict(service_name, service_dict)
         service_dicts.append(service_dict)
 
     return service_dicts
 
 
-def make_service_dict(name, options, working_dir=None):
-    service_dict = options.copy()
-    service_dict['name'] = name
-    service_dict = resolve_environment(service_dict, working_dir=working_dir)
-    return process_container_options(service_dict, working_dir=working_dir)
+def make_service_dict(name, service_dict, working_dir=None):
+    return ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
+
+
+class ServiceLoader(object):
+    def __init__(self, working_dir, filename=None, already_seen=None):
+        self.working_dir = working_dir
+        self.filename = filename
+        self.already_seen = already_seen or []
+
+    def make_service_dict(self, name, service_dict):
+        if self.signature(name) in self.already_seen:
+            raise CircularReference(self.already_seen)
+
+        service_dict = service_dict.copy()
+        service_dict['name'] = name
+        service_dict = resolve_environment(service_dict, working_dir=self.working_dir)
+        service_dict = self.resolve_extends(service_dict)
+        return process_container_options(service_dict, working_dir=self.working_dir)
+
+    def resolve_extends(self, service_dict):
+        if 'extends' not in service_dict:
+            return service_dict
+
+        extends_options = process_extends_options(service_dict['name'], service_dict['extends'])
+
+        if self.working_dir is None:
+            raise Exception("No working_dir passed to ServiceLoader()")
+
+        other_config_path = expand_path(self.working_dir, extends_options['file'])
+        other_working_dir = os.path.dirname(other_config_path)
+        other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
+        other_loader = ServiceLoader(
+            working_dir=other_working_dir,
+            filename=other_config_path,
+            already_seen=other_already_seen,
+        )
+
+        other_config = load_yaml(other_config_path)
+        other_service_dict = other_config[extends_options['service']]
+        other_service_dict = other_loader.make_service_dict(
+            service_dict['name'],
+            other_service_dict,
+        )
+        validate_extended_service_dict(
+            other_service_dict,
+            filename=other_config_path,
+            service=extends_options['service'],
+        )
+
+        return merge_service_dicts(other_service_dict, service_dict)
+
+    def signature(self, name):
+        return (self.filename, name)
+
+
+def process_extends_options(service_name, extends_options):
+    error_prefix = "Invalid 'extends' configuration for %s:" % service_name
+
+    if not isinstance(extends_options, dict):
+        raise ConfigurationError("%s must be a dictionary" % error_prefix)
+
+    if 'service' not in extends_options:
+        raise ConfigurationError(
+            "%s you need to specify a service, e.g. 'service: web'" % error_prefix
+        )
+
+    for k, _ in extends_options.items():
+        if k not in ['file', 'service']:
+            raise ConfigurationError(
+                "%s unsupported configuration option '%s'" % (error_prefix, k)
+            )
+
+    return extends_options
+
+
+def validate_extended_service_dict(service_dict, filename, service):
+    error_prefix = "Cannot extend service '%s' in %s:" % (service, filename)
+
+    if 'links' in service_dict:
+        raise ConfigurationError("%s services with 'links' cannot be extended" % error_prefix)
+
+    if 'volumes_from' in service_dict:
+        raise ConfigurationError("%s services with 'volumes_from' cannot be extended" % error_prefix)
+
+    if 'net' in service_dict:
+        if get_service_name_from_net(service_dict['net']) is not None:
+            raise ConfigurationError("%s services with 'net: container' cannot be extended" % error_prefix)
 
 
 def process_container_options(service_dict, working_dir=None):
@@ -90,7 +166,41 @@ def process_container_options(service_dict, working_dir=None):
                 msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
             raise ConfigurationError(msg)
 
+    service_dict = service_dict.copy()
+
+    if 'volumes' in service_dict:
+        service_dict['volumes'] = resolve_host_paths(service_dict['volumes'], working_dir=working_dir)
+
     return service_dict
+
+
+def merge_service_dicts(base, override):
+    d = base.copy()
+
+    if 'environment' in base or 'environment' in override:
+        d['environment'] = merge_environment(
+            base.get('environment'),
+            override.get('environment'),
+        )
+
+    if 'volumes' in base or 'volumes' in override:
+        d['volumes'] = merge_volumes(
+            base.get('volumes'),
+            override.get('volumes'),
+        )
+
+    for k in ALLOWED_KEYS:
+        if k not in ['environment', 'volumes']:
+            if k in override:
+                d[k] = override[k]
+
+    return d
+
+
+def merge_environment(base, override):
+    env = parse_environment(base)
+    env.update(parse_environment(override))
+    return env
 
 
 def parse_links(links):
@@ -186,8 +296,63 @@ def env_vars_from_file(filename):
     return env
 
 
+def resolve_host_paths(volumes, working_dir=None):
+    if working_dir is None:
+        raise Exception("No working_dir passed to resolve_host_paths()")
+
+    return [resolve_host_path(v, working_dir) for v in volumes]
+
+
+def resolve_host_path(volume, working_dir):
+    container_path, host_path = split_volume(volume)
+    if host_path is not None:
+        return "%s:%s" % (expand_path(working_dir, host_path), container_path)
+    else:
+        return container_path
+
+
+def merge_volumes(base, override):
+    d = dict_from_volumes(base)
+    d.update(dict_from_volumes(override))
+    return volumes_from_dict(d)
+
+
+def dict_from_volumes(volumes):
+    return dict(split_volume(v) for v in volumes)
+
+
+def split_volume(volume):
+    if ':' in volume:
+        return reversed(volume.split(':', 1))
+    else:
+        return (volume, None)
+
+
+def volumes_from_dict(d):
+    return ["%s:%s" % (host_path, container_path) for (container_path, host_path) in d.items()]
+
+
 def expand_path(working_dir, path):
     return os.path.abspath(os.path.join(working_dir, path))
+
+
+def get_service_name_from_net(net_config):
+    if not net_config:
+        return
+
+    if not net_config.startswith('container:'):
+        return
+
+    _, net_name = net_config.split(':', 1)
+    return net_name
+
+
+def load_yaml(filename):
+    try:
+        with open(filename, 'r') as fh:
+            return yaml.safe_load(fh)
+    except IOError as e:
+        raise ConfigurationError(six.text_type(e))
 
 
 class ConfigurationError(Exception):
@@ -196,3 +361,16 @@ class ConfigurationError(Exception):
 
     def __str__(self):
         return self.msg
+
+
+class CircularReference(ConfigurationError):
+    def __init__(self, trail):
+        self.trail = trail
+
+    @property
+    def msg(self):
+        lines = [
+            "{} in {}".format(service_name, filename)
+            for (filename, service_name) in self.trail
+        ]
+        return "Circular reference:\n  {}".format("\n  extends ".join(lines))

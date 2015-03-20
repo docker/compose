@@ -3,23 +3,12 @@ from __future__ import absolute_import
 import logging
 
 from functools import reduce
-from .config import ConfigurationError
+from .config import get_service_name_from_net, ConfigurationError
 from .service import Service
 from .container import Container
 from docker.errors import APIError
 
 log = logging.getLogger(__name__)
-
-
-def get_service_name_from_net(net_config):
-    if not net_config:
-        return
-
-    if not net_config.startswith('container:'):
-        return
-
-    _, net_name = net_config.split(':', 1)
-    return net_name
 
 
 def sort_service_dicts(services):

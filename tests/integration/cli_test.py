@@ -427,3 +427,30 @@ class CLITestCase(DockerClientTestCase):
         containers = self.project.containers(stopped=True)
         self.assertEqual(len(containers), 1)
         self.assertIn("FOO=1", containers[0].get('Config.Env'))
+
+    def test_up_with_extends(self):
+        self.command.base_dir = 'tests/fixtures/extends'
+        self.command.dispatch(['up', '-d'], None)
+
+        self.assertEqual(
+            set([s.name for s in self.project.services]),
+            set(['mydb', 'myweb']),
+        )
+
+        # Sort by name so we get [db, web]
+        containers = sorted(
+            self.project.containers(stopped=True),
+            key=lambda c: c.name,
+        )
+
+        self.assertEqual(len(containers), 2)
+        web = containers[1]
+
+        self.assertEqual(set(web.links()), set(['db', 'mydb_1', 'extends_mydb_1']))
+
+        expected_env = set([
+            "FOO=1",
+            "BAR=2",
+            "BAZ=2",
+        ])
+        self.assertTrue(expected_env <= set(web.get('Config.Env')))

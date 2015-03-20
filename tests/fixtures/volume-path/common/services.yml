@@ -1,0 +1,5 @@
+db:
+  image: busybox
+  volumes:
+    - ./foo:/foo
+    - ./bar:/bar

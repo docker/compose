@@ -7,18 +7,19 @@ from .testcases import DockerClientTestCase
 
 class ProjectTest(DockerClientTestCase):
     def test_volumes_from_service(self):
+        service_dicts = config.from_dictionary({
+            'data': {
+                'image': 'busybox:latest',
+                'volumes': ['/var/data'],
+            },
+            'db': {
+                'image': 'busybox:latest',
+                'volumes_from': ['data'],
+            },
+        }, working_dir='.')
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
-                'data': {
-                    'image': 'busybox:latest',
-                    'volumes': ['/var/data'],
-                },
-                'db': {
-                    'image': 'busybox:latest',
-                    'volumes_from': ['data'],
-                },
-            }),
+            service_dicts=service_dicts,
             client=self.client,
         )
         db = project.get_service('db')
