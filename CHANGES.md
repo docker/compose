@@ -1,6 +1,33 @@
 Change log
 ==========
 
+1.2.0rc1 (2015-03-23)
+---------------------
+
+This is a release candidate for Compose 1.2.0.
+
+- `docker-compose.yml` now supports an `extends` option, which enables a service to inherit configuration from another service in another configuration file. This is really good for sharing common configuration between apps, or for configuring the same app for different environments. Here's the [documentation](https://github.com/docker/compose/blob/master/docs/yml.md#extends).
+
+- When using Compose with a Swarm cluster, containers that depend on one another will be co-scheduled on the same node. This means that most Compose apps will now work out of the box, as long as they don't use `build`.
+
+- Repeated invocations of `docker-compose up` when using Compose with a Swarm cluster now work reliably.
+
+- Filenames in `env_file` and volume host paths in `volumes` are now treated as relative to the *directory of the configuration file*, not the directory that `docker-compose` is being run in. In the majority of cases, those are the same, but if you use the `-f|--file` argument to specify a configuration file in another directory, **this is a breaking change**.
+
+- A service can now share another service's network namespace with `net: container:<service>`.
+
+- `volumes_from` and `net: container:<service>` entries are taken into account when resolving dependencies, so `docker-compose up <service>` will correctly start all dependencies of `<service>`.
+
+- Problems with authentication when using images from third-party registries have been fixed.
+
+- `docker-compose run` now accepts a `--user` argument to specify a user to run the command as, just like `docker run`.
+
+- The `up`, `stop` and `restart` commands now accept a `--timeout` (or `-t`) argument to specify how long to wait when attempting to gracefully stop containers, just like `docker stop`.
+
+- `docker-compose rm` now accepts `-f` as a shorthand for `--force`, just like `docker rm`.
+
+Thanks, @abesto, @albers, @alunduil, @dnephin, @funkyfuture, @gilclark, @IanVS, @KingsleyKelly, @knutwalker, @thaJeztah and @vmalloc!
+
 1.1.0 (2015-02-25)
 ------------------
 
