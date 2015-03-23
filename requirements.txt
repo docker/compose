@@ -1,8 +1,8 @@
 PyYAML==3.10
-docker-py==1.1.0
+docker-py==1.0.0
 dockerpty==0.3.2
 docopt==0.6.1
-requests==2.5.3
+requests==2.2.1
 six==1.7.3
 texttable==0.8.2
 websocket-client==0.11.0
