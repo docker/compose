@@ -40,26 +40,44 @@ class ConfigTest(unittest.TestCase):
 
 
 class MergeTest(unittest.TestCase):
-    def test_merge_volumes(self):
+    def test_merge_volumes_empty(self):
         service_dict = config.merge_service_dicts({}, {})
         self.assertNotIn('volumes', service_dict)
 
-        service_dict = config.merge_service_dicts({
-            'volumes': ['/foo:/data'],
-        }, {})
-        self.assertEqual(service_dict['volumes'], ['/foo:/data'])
+    def test_merge_volumes_no_override(self):
+        service_dict = config.merge_service_dicts(
+            {'volumes': ['/foo:/code', '/data']},
+            {},
+        )
+        self.assertEqual(set(service_dict['volumes']), set(['/foo:/code', '/data']))
 
-        service_dict = config.merge_service_dicts({}, {
-            'volumes': ['/bar:/data'],
-        })
-        self.assertEqual(service_dict['volumes'], ['/bar:/data'])
+    def test_merge_volumes_no_base(self):
+        service_dict = config.merge_service_dicts(
+            {},
+            {'volumes': ['/bar:/code']},
+        )
+        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code']))
 
-        service_dict = config.merge_service_dicts({
-            'volumes': ['/foo:/data'],
-        }, {
-            'volumes': ['/bar:/data'],
-        })
-        self.assertEqual(service_dict['volumes'], ['/bar:/data'])
+    def test_merge_volumes_override_explicit_path(self):
+        service_dict = config.merge_service_dicts(
+            {'volumes': ['/foo:/code', '/data']},
+            {'volumes': ['/bar:/code']},
+        )
+        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
+
+    def test_merge_volumes_add_explicit_path(self):
+        service_dict = config.merge_service_dicts(
+            {'volumes': ['/foo:/code', '/data']},
+            {'volumes': ['/bar:/code', '/quux:/data']},
+        )
+        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/quux:/data']))
+
+    def test_merge_volumes_remove_explicit_path(self):
+        service_dict = config.merge_service_dicts(
+            {'volumes': ['/foo:/code', '/quux:/data']},
+            {'volumes': ['/bar:/code', '/data']},
+        )
+        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
 
 
 class EnvTest(unittest.TestCase):
