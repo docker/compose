@@ -1,8 +1,12 @@
-#!/bin/sh
+#!/bin/bash
+
 set -ex
-mkdir -p `pwd`/dist
-chmod 777 `pwd`/dist
-docker build -t docker-compose .
-docker run -u user -v `pwd`/dist:/code/dist --rm --entrypoint pyinstaller docker-compose -F bin/docker-compose
-mv dist/docker-compose dist/docker-compose-Linux-x86_64
-docker run -u user -v `pwd`/dist:/code/dist --rm --entrypoint dist/docker-compose-Linux-x86_64 docker-compose --version
+
+TAG="docker-compose"
+docker build -t "$TAG" .
+docker run \
+  --rm \
+  --user=user \
+  --volume="$(pwd):/code" \
+  --entrypoint="script/build-linux-inner" \
+  "$TAG"

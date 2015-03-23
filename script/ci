@@ -1,0 +1,18 @@
+#!/bin/bash
+# This should be run inside a container built from the Dockerfile
+# at the root of the repo:
+#
+# $ TAG="docker-compose:$(git rev-parse --short HEAD)"
+# $ docker build -t "$TAG" .
+# $ docker run --rm --volume="/var/run/docker.sock:/var/run/docker.sock" --volume="$(pwd)/.git:/code/.git" -e "TAG=$TAG" --entrypoint="script/ci" "$TAG"
+
+set -e
+
+>&2 echo "Validating DCO"
+script/validate-dco
+
+export DOCKER_VERSIONS=all
+. script/test-versions
+
+>&2 echo "Building Linux binary"
+su -c script/build-linux-inner user
