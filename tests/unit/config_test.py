@@ -39,6 +39,29 @@ class ConfigTest(unittest.TestCase):
         config.make_service_dict('foo', {'ports': ['8000']})
 
 
+class MergeTest(unittest.TestCase):
+    def test_merge_volumes(self):
+        service_dict = config.merge_service_dicts({}, {})
+        self.assertNotIn('volumes', service_dict)
+
+        service_dict = config.merge_service_dicts({
+            'volumes': ['/foo:/data'],
+        }, {})
+        self.assertEqual(service_dict['volumes'], ['/foo:/data'])
+
+        service_dict = config.merge_service_dicts({}, {
+            'volumes': ['/bar:/data'],
+        })
+        self.assertEqual(service_dict['volumes'], ['/bar:/data'])
+
+        service_dict = config.merge_service_dicts({
+            'volumes': ['/foo:/data'],
+        }, {
+            'volumes': ['/bar:/data'],
+        })
+        self.assertEqual(service_dict['volumes'], ['/bar:/data'])
+
+
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
         environment =[

@@ -318,7 +318,10 @@ def merge_volumes(base, override):
 
 
 def dict_from_volumes(volumes):
-    return dict(split_volume(v) for v in volumes)
+    if volumes:
+        return dict(split_volume(v) for v in volumes)
+    else:
+        return {}
 
 
 def split_volume(volume):
