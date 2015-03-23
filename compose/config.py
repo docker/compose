@@ -17,7 +17,6 @@ DOCKER_CONFIG_KEYS = [
     'environment',
     'hostname',
     'image',
-    'labels',
     'links',
     'mem_limit',
     'net',
@@ -171,9 +170,6 @@ def process_container_options(service_dict, working_dir=None):
 
     if 'volumes' in service_dict:
         service_dict['volumes'] = resolve_host_paths(service_dict['volumes'], working_dir=working_dir)
-
-    if 'labels' in service_dict:
-        service_dict['labels'] = parse_labels(service_dict['labels'])
 
     return service_dict
 
@@ -334,29 +330,6 @@ def split_volume(volume):
 
 def volumes_from_dict(d):
     return ["%s:%s" % (host_path, container_path) for (container_path, host_path) in d.items()]
-
-
-def parse_labels(labels):
-    if not labels:
-        return {}
-
-    if isinstance(labels, list):
-        return dict(split_label(e) for e in labels)
-
-    if isinstance(labels, dict):
-        return labels
-
-    raise ConfigurationError(
-        "labels \"%s\" must be a list or mapping" %
-        labels
-    )
-
-
-def split_label(label):
-    if '=' in label:
-        return label.split('=', 1)
-    else:
-        return label, ''
 
 
 def expand_path(working_dir, path):
