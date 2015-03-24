@@ -108,13 +108,18 @@ specify how to build the image using a file called
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
+    CMD python app.py
 
-This tells Docker to include Python, your code, and your Python dependencies in
-a Docker image. For more information on how to write Dockerfiles, see the
-[Docker user
-guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile)
-and the
-[Dockerfile reference](http://docs.docker.com/reference/builder/).
+This tells Docker to:
+
+* Build an image starting with the Python 2.7 image.
+* Add the curret directory `.` into the path `/code` in the image.
+* Set the working directory to `/code`.
+* Install your Python dependencies. 
+
+For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+
+You can test that this builds by running `docker build -t web .`.
 
 ### Define services
 
@@ -134,19 +139,21 @@ Next, define a set of services using `docker-compose.yml`:
 
 This defines two services:
 
- - `web`, which is built from the `Dockerfile` in the current directory. It also
-   says to run the command `python app.py` inside the image, forward the exposed
-   port 5000 on the container to port 5000 on the host machine, connect up the
-   Redis service, and mount the current directory inside the container so we can
-   work on code without having to rebuild the image.
- - `redis`, which uses the public image
-   [redis](https://registry.hub.docker.com/_/redis/), which gets pulled from the
-   Docker Hub registry.
+#### web
+
+* Builds from the `Dockerfile` in the current directory. 
+* Defines to run the command `python app.py` inside the image on start.
+* Forwards the exposed port 5000 on the container to port 5000 on the host. machine.
+* Connects up the Redis service.
+* Mounts the current directory to `/code` inside the container allowing you to modify the code without having to rebuild the image.
+
+#### redis
+
+* Uses the public [redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
 
 ### Build and run your app with Compose
 
-Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
-image for your code, and start everything up:
+Now, when you run `docker-compose up`, Compose will pull a Redis image, build an image for your code, and start everything up:
 
     $ docker-compose up
     Pulling image redis...
