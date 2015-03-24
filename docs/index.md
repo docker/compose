@@ -121,9 +121,9 @@ This defines two services:
 
 * Builds from the `Dockerfile` in the current directory. 
 * Defines to run the command `python app.py` inside the image on start.
-* Forwards the exposed port 5000 on the container to port 5000 on the host. machine.
-* Connects up the Redis service.
-* Mounts the current directory to `/code` inside the container allowing you to modify the code without having to rebuild the image.
+* Forwards the exposed port 5000 on the container to port 5000 on the host machine.
+* Connects the web container to the Redis service via a link. 
+* Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
 
 #### redis
 
@@ -142,7 +142,12 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
     web_1   |  * Running on http://0.0.0.0:5000/
 
 The web app should now be listening on port 5000 on your Docker daemon host (if
-you're using Boot2docker, `boot2docker ip` will tell you its address).
+you're using Boot2docker, `boot2docker ip` will tell you its address). In a browser,
+open `http://ip-from-boot2docker:5000` and you should get a message in your browser saying:
+
+`Hello World! I have been seen 1 times.`
+
+Refreshing the page will see the number increment.
 
 If you want to run your services in the background, you can pass the `-d` flag
 (for daemon mode) to `docker-compose up` and use `docker-compose ps` to see what
