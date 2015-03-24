@@ -626,20 +626,25 @@ def split_port(port):
 
 
 def build_extra_hosts(extra_hosts_config):
-    if extra_hosts_config is None:
-        return None
+    if not extra_hosts_config:
+        return {}
 
-    if isinstance(extra_hosts_config, basestring):
-        extra_hosts_config = [extra_hosts_config]
-
-    extra_hosts_dict = {}
-    for extra_hosts_line in extra_hosts_config:
-        if isinstance(extra_hosts_line, dict):
-            # already interpreted as a dict (depends on pyyaml version)
-            extra_hosts_dict.update(extra_hosts_line)
-        else:
-            # not already interpreted as a dict
+    if isinstance(extra_hosts_config, list):
+        extra_hosts_dict = {}
+        for extra_hosts_line in extra_hosts_config:
+            if not isinstance(extra_hosts_line, six.string_types):
+                raise ConfigError(
+                    "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
+                    extra_hosts_config
+                )
             host, ip = extra_hosts_line.split(':')
             extra_hosts_dict.update({host.strip(): ip.strip()})
+        extra_hosts_config = extra_hosts_dict
 
-    return extra_hosts_dict
+    if isinstance(extra_hosts_config, dict):
+        return extra_hosts_config
+
+    raise ConfigError(
+        "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
+        extra_hosts_config
+    )
