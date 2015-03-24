@@ -49,7 +49,7 @@ Pulls service images.
 
 ### rm
 
-Removes stopped service containers.
+Removes stopped service containers. _This removes the containers completely, you will lose any data that was contained on them_.
 
 
 ### run
