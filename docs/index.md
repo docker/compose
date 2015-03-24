@@ -15,33 +15,11 @@ recommend that you use it in production yet.
 
 Using Compose is basically a three-step process.
 
-First, you define your app's environment with a `Dockerfile` so it can be
-reproduced anywhere:
-
-```Dockerfile
-FROM python:2.7
-WORKDIR /code
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
-ADD . /code
-CMD python app.py
-```
-
-Next, you define the services that make up your app in `docker-compose.yml` so
+1. Define your app's environment with a `Dockerfile` so it can be
+reproduced anywhere.
+2. Define the services that make up your app in `docker-compose.yml` so
 they can be run together in an isolated environment:
-
-```yaml
-web:
-  build: .
-  links:
-   - db
-  ports:
-   - "8000:8000"
-db:
-  image: postgres
-```
-
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
+3. Lastly, run `docker-compose up` and Compose will start and run your entire app.
 
 Compose has commands for managing the whole lifecycle of your application:
 
