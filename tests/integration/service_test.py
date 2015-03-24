@@ -491,30 +491,3 @@ class ServiceTest(DockerClientTestCase):
         env = create_and_start_container(service).environment
         for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
             self.assertEqual(env[k], v)
-
-    def test_labels(self):
-        labels_dict = {
-            'com.example.description': "Accounting webapp",
-            'com.example.department': "Finance",
-            'com.example.label-with-empty-value': "",
-        }
-
-        service = self.create_service('web', labels=labels_dict)
-        labels = create_and_start_container(service).get('Config.Labels').items()
-        for pair in labels_dict.items():
-            self.assertIn(pair, labels)
-
-        labels_list = ["%s=%s" % pair for pair in labels_dict.items()]
-
-        service = self.create_service('web', labels=labels_list)
-        labels = create_and_start_container(service).get('Config.Labels').items()
-        for pair in labels_dict.items():
-            self.assertIn(pair, labels)
-
-    def test_empty_labels(self):
-        labels_list = ['foo', 'bar']
-
-        service = self.create_service('web', labels=labels_list)
-        labels = create_and_start_container(service).get('Config.Labels').items()
-        for name in labels_list:
-            self.assertIn((name, ''), labels)
