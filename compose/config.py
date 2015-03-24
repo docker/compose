@@ -318,18 +318,30 @@ def merge_volumes(base, override):
 
 
 def dict_from_volumes(volumes):
-    return dict(split_volume(v) for v in volumes)
-
-
-def split_volume(volume):
-    if ':' in volume:
-        return reversed(volume.split(':', 1))
+    if volumes:
+        return dict(split_volume(v) for v in volumes)
     else:
-        return (volume, None)
+        return {}
 
 
 def volumes_from_dict(d):
-    return ["%s:%s" % (host_path, container_path) for (container_path, host_path) in d.items()]
+    return [join_volume(v) for v in d.items()]
+
+
+def split_volume(string):
+    if ':' in string:
+        (host, container) = string.split(':', 1)
+        return (container, host)
+    else:
+        return (string, None)
+
+
+def join_volume(pair):
+    (container, host) = pair
+    if host is None:
+        return container
+    else:
+        return ":".join((host, container))
 
 
 def expand_path(working_dir, path):
