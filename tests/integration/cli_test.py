@@ -318,6 +318,48 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn("0.0.0.0", port_random)
         self.assertEqual(port_assigned, "0.0.0.0:49152")
 
+    @patch('dockerpty.start')
+    def test_run_service_with_commit(self, _):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        name = 'simple'
+        # Create an original container
+        service = self.project.get_service(name)
+        original_container = service.create_container()
+        self.command.dispatch(
+            ['run', '-c', 'simple', '/bin/echo', '"change" > file'],
+            None
+        )
+
+        # Get the current service image id
+        current_image_id = self.client.images(name=service.full_name, quiet=True)[0]
+        
+        # Should be different 
+        self.assertNotEqual(
+            original_container.image,
+            current_image_id
+        )
+
+    @patch('dockerpty.start')
+    def test_run_service_without_commit(self, _):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        name = 'simple'
+        # Create an original container
+        service = self.project.get_service(name)
+        original_container = service.create_container()
+        self.command.dispatch(
+            ['run', 'simple', '/bin/echo', '"change" > file'],
+            None
+        )
+        
+        # Get the current service image id
+        current_image_id = self.client.images(name=service.full_name, quiet=True)[0]
+        
+        # Should be the same image id
+        self.assertEqual(
+            original_container.image,
+            current_image_id
+        )
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()

@@ -283,6 +283,8 @@ class TopLevelCommand(Command):
                                   to the host.
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
+            -c                    Commit the container's file changes or settings after the run command
+                                  into the service image.
         """
         service = project.get_service(options['SERVICE'])
 
@@ -344,6 +346,13 @@ class TopLevelCommand(Command):
             service.start_container(container)
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
+            if options['-c'] and exit_code == 0:
+                # if the container successfully exited then commit the changes to the service image
+                log.info("Committing %s..." % service.full_name)
+                project.client.commit(
+                    container=container.id,
+                    repository=service.full_name
+                )
             if options['--rm']:
                 log.info("Removing %s..." % container.name)
                 project.client.remove_container(container.id)
