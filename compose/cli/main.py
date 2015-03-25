@@ -90,6 +90,7 @@ class TopLevelCommand(Command):
       pull      Pulls service images
       rm        Remove stopped containers
       run       Run a one-off command
+      execute   Run a command in a service
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
@@ -348,6 +349,48 @@ class TopLevelCommand(Command):
                 log.info("Removing %s..." % container.name)
                 project.client.remove_container(container.id)
             sys.exit(exit_code)
+
+    def execute(self, project, options):
+        """
+        Run a command in a running service
+
+        For example:
+            $ docker-compose execute web ps aux
+
+        To run against all services use "all" instead of a service:
+            $ docker-compose execute all ps aux
+
+        Usage: execute [options] SERVICE CMD...
+
+        Options:
+          -d, --detach              Detached mode: run command in the background.
+                                     (default: false)
+        """
+        service = options['SERVICE']
+
+        # Should we run against all containers?
+        if service in ['all']:
+            containers = sorted(
+                project.containers() +
+                project.containers(one_off=True),
+                key=attrgetter('name'))
+        else:
+            containers = sorted(
+                project.containers(service_names=[options['SERVICE']]) +
+                project.containers(service_names=[options['SERVICE']], one_off=True),
+                key=attrgetter('name'))
+
+        detach = options.get('--detach')
+        # Run the command against all containers
+        for container in containers:
+            result = container.execute(options['CMD'], detach=detach)
+
+            # only show container name in detach mode
+            if detach:
+                print(container.name)
+            else:
+                print("----- %s -----\n" % container.name)
+                print(result)
 
     def scale(self, project, options):
         """
