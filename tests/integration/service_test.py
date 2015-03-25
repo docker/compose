@@ -424,6 +424,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
+    def test_dns_no_value(self):
+        service = self.create_service('web')
+        container = create_and_start_container(service)
+        self.assertIsNone(container.get('HostConfig.Dns'))
+
     def test_dns_single_value(self):
         service = self.create_service('web', dns='8.8.8.8')
         container = create_and_start_container(service)
@@ -454,6 +459,11 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', cap_drop=['SYS_ADMIN', 'NET_ADMIN'])
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.CapDrop'), ['SYS_ADMIN', 'NET_ADMIN'])
+
+    def test_dns_search_no_value(self):
+        service = self.create_service('web')
+        container = create_and_start_container(service)
+        self.assertIsNone(container.get('HostConfig.DnsSearch'))
 
     def test_dns_search_single_value(self):
         service = self.create_service('web', dns_search='example.com')

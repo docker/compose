@@ -6,6 +6,7 @@ import re
 import os
 from operator import attrgetter
 import sys
+import six
 
 from docker.errors import APIError
 from docker.utils import create_host_config
@@ -435,11 +436,11 @@ class Service(object):
         cap_drop = options.get('cap_drop', None)
 
         dns = options.get('dns', None)
-        if not isinstance(dns, list):
+        if isinstance(dns, six.string_types):
             dns = [dns]
 
         dns_search = options.get('dns_search', None)
-        if not isinstance(dns_search, list):
+        if isinstance(dns_search, six.string_types):
             dns_search = [dns_search]
 
         restart = parse_restart_spec(options.get('restart', None))
