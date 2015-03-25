@@ -1,5 +1,0 @@
-longrunning:
-  build: tests/fixtures/long_running
-
-longrunning2:
-  build: tests/fixtures/long_running

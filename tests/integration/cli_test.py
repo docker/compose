@@ -320,27 +320,27 @@ class CLITestCase(DockerClientTestCase):
 
 
     @patch('sys.stdout', new_callable=StringIO)
-    def test_execute_one(self, mock_stdout):
+    def test_exec_one(self, mock_stdout):
         """
         Execute a command in a single container for a single service
         """
-        self.command.base_dir = 'tests/fixtures/long_running'
+        self.command.base_dir = 'tests/fixtures/long-running'
         self.command.dispatch(['up', '-d', 'longrunning'], None)
 
         # Validate the start
         service = self.project.get_service('longrunning')
         self.assertEqual(len(service.containers()), 1)
 
-        self.command.dispatch(['execute','longrunning','echo','Hello World!'], None)
+        self.command.dispatch(['exec','longrunning','echo','Hello World!'], None)
         output = mock_stdout.getvalue()
         self.assertIn('Hello World!',output)
 
     @patch('sys.stdout', new_callable=StringIO)
-    def test_execute_multiple(self, mock_stdout):
+    def test_exec_multiple(self, mock_stdout):
         """
         Execute a command in a single container for a single service
         """
-        self.command.base_dir = 'tests/fixtures/long_running'
+        self.command.base_dir = 'tests/fixtures/long-running'
         self.command.dispatch(['up', '-d', 'longrunning'], None)
         self.command.dispatch(['scale', 'longrunning=2'], None)
 
@@ -348,16 +348,16 @@ class CLITestCase(DockerClientTestCase):
         service = self.project.get_service('longrunning')
         self.assertEqual(len(service.containers()), 2)
 
-        self.command.dispatch(['execute','longrunning','echo','Hello World!'], None)
+        self.command.dispatch(['exec','longrunning','echo','Hello World!'], None)
         output = mock_stdout.getvalue()
         self.assertEqual(output.count('Hello World!'), 2)
 
     @patch('sys.stdout', new_callable=StringIO)
-    def test_execute_all(self, mock_stdout):
+    def test_exec_all(self, mock_stdout):
         """
         Execute a command in a multiple containers for a multple service
         """
-        self.command.base_dir = 'tests/fixtures/long_running'
+        self.command.base_dir = 'tests/fixtures/long-running'
         self.command.dispatch(['up', '-d'], None)
         self.command.dispatch(['scale', 'longrunning=2', 'longrunning2=3'], None)
 
@@ -367,7 +367,7 @@ class CLITestCase(DockerClientTestCase):
         service2 = self.project.get_service('longrunning2')
         self.assertEqual(len(service2.containers()), 3)
 
-        self.command.dispatch(['execute','all','echo','Hello World!'], None)
+        self.command.dispatch(['exec','--all','echo','Hello World!'], None)
         output = mock_stdout.getvalue()
         self.assertEqual(output.count('Hello World!'), 5)
 

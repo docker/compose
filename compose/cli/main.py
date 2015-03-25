@@ -90,7 +90,7 @@ class TopLevelCommand(Command):
       pull      Pulls service images
       rm        Remove stopped containers
       run       Run a one-off command
-      execute   Run a command in a service
+      exec      Run a command in a service
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
@@ -350,40 +350,48 @@ class TopLevelCommand(Command):
                 project.client.remove_container(container.id)
             sys.exit(exit_code)
 
-    def execute(self, project, options):
+    # exec is Python reserved word, redirected in docopt_command.py
+    def exec_(self, project, options):
         """
         Run a command in a running service
 
         For example:
-            $ docker-compose execute web ps aux
+            $ docker-compose exec web ps aux
 
-        To run against all services use "all" instead of a service:
-            $ docker-compose execute all ps aux
+        To run against all services:
+            $ docker-compose exec --all ps aux
 
-        Usage: execute [options] SERVICE CMD...
+        Usage: exec [options] [ SERVICE CMD... | CMD... ]
 
         Options:
+          -a, --all                 Run against all containers of all services
           -d, --detach              Detached mode: run command in the background.
                                      (default: false)
         """
         service = options['SERVICE']
+        cmd = options['CMD']
 
         # Should we run against all containers?
-        if service in ['all']:
+        if options['--all']:
             containers = sorted(
                 project.containers() +
                 project.containers(one_off=True),
                 key=attrgetter('name'))
+
+            # If we have a service it should be in the command
+            if service is not None:
+                cmd.insert(0, service)
         else:
             containers = sorted(
-                project.containers(service_names=[options['SERVICE']]) +
-                project.containers(service_names=[options['SERVICE']], one_off=True),
+                project.containers(service_names=[service]) +
+                project.containers(service_names=[service], one_off=True),
                 key=attrgetter('name'))
 
         detach = options.get('--detach')
+
         # Run the command against all containers
         for container in containers:
-            result = container.execute(options['CMD'], detach=detach)
+            result = container.execute(cmd, detach=detach)
 
             # only show container name in detach mode
             if detach:
