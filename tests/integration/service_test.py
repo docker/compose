@@ -121,7 +121,7 @@ class ServiceTest(DockerClientTestCase):
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
         actual_host_path = volumes[container_path]
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
-            msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
+                        msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
@@ -182,11 +182,10 @@ class ServiceTest(DockerClientTestCase):
             entrypoint=['sleep'],
             command=['300']
         )
-        old_container = service.create_container()
+        service.create_container()
         self.assertEqual(len(service.containers(stopped=True)), 1)
         service.recreate_containers()
         self.assertEqual(len(service.containers(stopped=True)), 1)
-
 
     def test_recreate_containers_with_image_declared_volume(self):
         service = Service(
@@ -229,8 +228,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
-                'db',
-            ]),
+                'db'])
         )
 
     def test_start_container_creates_links_with_names(self):
@@ -246,8 +244,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
-                'custom_link_name',
-            ]),
+                'custom_link_name'])
         )
 
     def test_start_container_with_external_links(self):
@@ -265,8 +262,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1',
                 'composetest_db_2',
-                'db_3',
-                ]),
+                'db_3']),
         )
 
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
@@ -291,8 +287,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
-                'db',
-            ]),
+                'db'])
         )
 
     def test_start_container_builds_images(self):
@@ -331,7 +326,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container['HostConfig']['Privileged'], False)
 
     def test_start_container_becomes_priviliged(self):
-        service = self.create_service('web', privileged = True)
+        service = self.create_service('web', privileged=True)
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
 
@@ -483,13 +478,13 @@ class ServiceTest(DockerClientTestCase):
     def test_split_env(self):
         service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
         env = create_and_start_container(service).environment
-        for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.items():
+        for k, v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.items():
             self.assertEqual(env[k], v)
 
     def test_env_from_file_combined_with_env(self):
         service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
-        for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
+        for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
     @mock.patch.dict(os.environ)
@@ -499,5 +494,5 @@ class ServiceTest(DockerClientTestCase):
         os.environ['ENV_DEF'] = 'E3'
         service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
         env = create_and_start_container(service).environment
-        for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
+        for k, v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
             self.assertEqual(env[k], v)

@@ -70,7 +70,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web._get_net(), 'container:'+net.containers()[0].id)
+        self.assertEqual(web._get_net(), 'container:' + net.containers()[0].id)
 
         project.kill()
         project.remove_stopped()
@@ -98,7 +98,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web._get_net(), 'container:'+net_container.id)
+        self.assertEqual(web._get_net(), 'container:' + net_container.id)
 
         project.kill()
         project.remove_stopped()
@@ -266,7 +266,7 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
                 },
-                'data' : {
+                'data': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"]
                 },
@@ -304,7 +304,7 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
                 },
-                'data' : {
+                'data': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"]
                 },

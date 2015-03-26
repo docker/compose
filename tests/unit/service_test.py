@@ -146,16 +146,16 @@ class ServiceTest(unittest.TestCase):
 
     def test_build_port_bindings_with_one_port(self):
         port_bindings = build_port_bindings(["127.0.0.1:1000:1000"])
-        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000")])
+        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
 
     def test_build_port_bindings_with_matching_internal_ports(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000","127.0.0.1:2000:1000"])
-        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000"),("127.0.0.1","2000")])
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000", "127.0.0.1:2000:1000"])
+        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000"), ("127.0.0.1", "2000")])
 
     def test_build_port_bindings_with_nonmatching_internal_ports(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000","127.0.0.1:2000:2000"])
-        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000")])
-        self.assertEqual(port_bindings["2000"],[("127.0.0.1","2000")])
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000", "127.0.0.1:2000:2000"])
+        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
+        self.assertEqual(port_bindings["2000"], [("127.0.0.1", "2000")])
 
     def test_split_domainname_none(self):
         service = Service('foo', hostname='name', client=self.mock_client)
@@ -165,29 +165,32 @@ class ServiceTest(unittest.TestCase):
         self.assertFalse('domainname' in opts, 'domainname')
 
     def test_split_domainname_fqdn(self):
-        service = Service('foo',
-                hostname='name.domain.tld',
-                client=self.mock_client)
+        service = Service(
+            'foo',
+            hostname='name.domain.tld',
+            client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_both(self):
-        service = Service('foo',
-                hostname='name',
-                domainname='domain.tld',
-                client=self.mock_client)
+        service = Service(
+            'foo',
+            hostname='name',
+            domainname='domain.tld',
+            client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_weird(self):
-        service = Service('foo',
-                hostname='name.sub',
-                domainname='domain.tld',
-                client=self.mock_client)
+        service = Service(
+            'foo',
+            hostname='name.sub',
+            domainname='domain.tld',
+            client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
@@ -315,4 +318,3 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(
             binding,
             ('/home/user', dict(bind='/home/user', ro=False)))
-

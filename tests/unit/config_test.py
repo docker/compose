@@ -4,6 +4,7 @@ from .. import unittest
 
 from compose import config
 
+
 class ConfigTest(unittest.TestCase):
     def test_from_dictionary(self):
         service_dicts = config.from_dictionary({
@@ -82,7 +83,7 @@ class MergeTest(unittest.TestCase):
 
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
-        environment =[
+        environment = [
             'NORMAL=F1',
             'CONTAINS_EQUALS=F=2',
             'TRAILING_EQUALS=',
@@ -114,9 +115,8 @@ class EnvTest(unittest.TestCase):
         os.environ['ENV_DEF'] = 'E3'
 
         service_dict = config.make_service_dict(
-            'foo',
-            {
-               'environment': {
+            'foo', {
+                'environment': {
                     'FILE_DEF': 'F1',
                     'FILE_DEF_EMPTY': '',
                     'ENV_DEF': None,
@@ -173,6 +173,7 @@ class EnvTest(unittest.TestCase):
             service_dict['environment'],
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
+
 
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
@@ -231,10 +232,11 @@ class ExtendsTest(unittest.TestCase):
                 ],
             )
 
-
     def test_extends_validation(self):
         dictionary = {'extends': None}
-        load_config = lambda: config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'dictionary', load_config)
 

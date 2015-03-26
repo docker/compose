@@ -8,7 +8,7 @@ set -e
 script/validate-dco
 
 >&2 echo "Running lint checks"
-flake8 compose
+flake8 compose tests setup.py
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="1.5.0"

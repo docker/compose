@@ -8,6 +8,7 @@ from compose import config
 import mock
 import docker
 
+
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
         project = Project.from_dicts('composetest', [
@@ -211,7 +212,7 @@ class ProjectTest(unittest.TestCase):
             }
         ], mock_client)
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), 'container:'+container_id)
+        self.assertEqual(service._get_net(), 'container:' + container_id)
 
     def test_use_net_from_service(self):
         container_name = 'test_aaa_1'
@@ -237,4 +238,4 @@ class ProjectTest(unittest.TestCase):
         ], mock_client)
 
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), 'container:'+container_name)
+        self.assertEqual(service._get_net(), 'container:' + container_name)

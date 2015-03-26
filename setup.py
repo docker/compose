@@ -35,6 +35,7 @@ install_requires = [
     'six >= 1.3.0, < 2',
 ]
 
+
 tests_require = [
     'mock >= 1.0.1',
     'nose',
@@ -54,7 +55,7 @@ setup(
     url='https://www.docker.com/',
     author='Docker, Inc.',
     license='Apache License 2.0',
-    packages=find_packages(exclude=[ 'tests.*', 'tests' ]),
+    packages=find_packages(exclude=['tests.*', 'tests']),
     include_package_data=True,
     test_suite='nose.collector',
     install_requires=install_requires,
