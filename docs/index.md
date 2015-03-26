@@ -20,11 +20,9 @@ reproduced anywhere:
 
 ```Dockerfile
 FROM python:2.7
-WORKDIR /code
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
 ADD . /code
-CMD python app.py
+WORKDIR /code
+RUN pip install -r requirements.txt
 ```
 
 Next, you define the services that make up your app in `docker-compose.yml` so
@@ -33,15 +31,18 @@ they can be run together in an isolated environment:
 ```yaml
 web:
   build: .
-  links:
-   - db
+  command: python app.py
   ports:
-   - "8000:8000"
-db:
-  image: postgres
+   - "5000:5000"
+  volumes:
+   - .:/code
+  links:
+   - redis
+redis:
+  image: redis
 ```
 
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
+Lastly, run `docker-compose up` and Compose will start and run your entire app. All the details about how to run this example can be found below in Quick start.
 
 Compose has commands for managing the whole lifecycle of your application:
 
