@@ -17,6 +17,8 @@ def stream_output(output, stream):
     diff = 0
 
     for chunk in output:
+        if six.PY3 and not isinstance(chunk, str):
+            chunk = chunk.decode('utf-8')
         event = json.loads(chunk)
         all_events.append(event)
 
