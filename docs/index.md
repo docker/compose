@@ -125,8 +125,6 @@ Next, define a set of services using `docker-compose.yml`:
       command: python app.py
       ports:
        - "5000:5000"
-      volumes:
-       - .:/code
       links:
        - redis
     redis:
@@ -136,9 +134,8 @@ This defines two services:
 
  - `web`, which is built from the `Dockerfile` in the current directory. It also
    says to run the command `python app.py` inside the image, forward the exposed
-   port 5000 on the container to port 5000 on the host machine, connect up the
-   Redis service, and mount the current directory inside the container so we can
-   work on code without having to rebuild the image.
+   port 5000 on the container to port 5000 on the host machine, and connect up a
+   Redis service.
  - `redis`, which uses the public image
    [redis](https://registry.hub.docker.com/_/redis/), which gets pulled from the
    Docker Hub registry.
@@ -151,9 +148,8 @@ image for your code, and start everything up:
     $ docker-compose up
     Pulling image redis...
     Building web...
-    Starting composetest_redis_1...
-    Starting composetest_web_1...
-    redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
+    Attaching to composetest_redis_1, composetest_web_1
+    redis_1 | [1] 26 Mar 02:58:52.356 # Server started, Redis version 2.8.19
     web_1   |  * Running on http://0.0.0.0:5000/
 
 The web app should now be listening on port 5000 on your Docker daemon host (if
@@ -167,10 +163,10 @@ is currently running:
     Starting composetest_redis_1...
     Starting composetest_web_1...
     $ docker-compose ps
-	    Name                 Command            State       Ports
-    -------------------------------------------------------------------
-    composetest_redis_1   /usr/local/bin/run         Up
-    composetest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
+	         Name                     Command             State           Ports
+    ----------------------------------------------------------------------------------
+    composetest_redis_1   /entrypoint.sh redis-server   Up      6379/tcp
+    composetest_web_1     python app.py                 Up      0.0.0.0:5000->5000/tcp
 
 The `docker-compose run` command allows you to run one-off commands for your
 services. For example, to see what environment variables are available to the
@@ -184,6 +180,52 @@ If you started Compose with `docker-compose up -d`, you'll probably want to stop
 your services once you've finished with them:
 
     $ docker-compose stop
+
+### Add a volume to your container
+
+Suppose you made some changes to your web app by adding an extra route for your landing page.
+
+```python
+from flask import Flask
+from redis import Redis
+import os
+app = Flask(__name__)
+redis = Redis(host='redis', port=6379)
+
+@app.route('/')
+def index():
+    return 'Index Page'
+
+@app.route('/hello')
+def hello():
+    redis.incr('hits')
+    return 'Hello World! I have been seen %s times.' % redis.get('hits')
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=True)
+```
+
+You will notice that the changes are not reflected in the browser.  Instead of running `docker-compose stop`
+and `docker-compose up` to recreate the container every time you make a change, you can add a volume instead.
+In order to mount the current directory inside the container so we can work on code without having to rebuild the image, modify `docker-compose.yml`:
+
+
+    web:
+      build: .
+      command: python app.py
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+      links:
+       - redis
+    redis:
+      image: redis
+
+Recreate the container and make some more changes. If you are not running in -d mode you will see:
+
+    web_1   |  * Detected change in '/code/app.py', reloading
+    web_1   |  * Restarting with stat
 
 At this point, you have seen the basics of how Compose works.
 
