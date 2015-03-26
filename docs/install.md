@@ -1,5 +1,5 @@
 page_title: Installing Compose
-page_description: How to intall Docker Compose
+page_description: How to install Docker Compose
 page_keywords: compose, orchestration, install, installation, docker, documentation
 
 
@@ -31,7 +31,7 @@ Compose can also be installed as a Python package:
 
     $ sudo pip install -U docker-compose
 
-No further steps are required; Compose should now be successfully  installed.
+No further steps are required; Compose should now be successfully installed.
 You can test the installation by running `docker-compose --version`.
 
 ## Compose documentation
