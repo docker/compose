@@ -589,18 +589,43 @@ def build_volume_binding(volume_spec):
     external = os.path.expanduser(volume_spec.external)
     return os.path.abspath(os.path.expandvars(external)), internal
 
+def add_port_mapping(port_bindings, internal_port, external):
+    if internal_port in port_bindings:
+        port_bindings[internal_port].append(external)
+    else:
+        port_bindings[internal_port] = [external]
 
 def build_port_bindings(ports):
     port_bindings = {}
     for port in ports:
-        internal_port, external = split_port(port)
-        if internal_port in port_bindings:
-            port_bindings[internal_port].append(external)
+        internal_port_range, external_range = split_port(port)
+        if external_range is None:
+            for internal_port in internal_port_range:
+                add_port_mapping(port_bindings, internal_port, None)
         else:
-            port_bindings[internal_port] = [external]
+            for internal_port, external_port in zip(internal_port_range, external_range):
+                add_port_mapping(port_bindings, internal_port, external_port)
     return port_bindings
 
+def to_port_range(port):
+    protocol = ""
+    if "/" in port:
+        parts = port.split("/")
+        if len(parts) != 2:
+            raise ConfigError('Invalid port "%s", should be '
+                              '[[remote_ip:]remote_port:]port[/protocol]' % port)
 
+        port, protocol = port.split("/")
+    parts = str(port).split('-')
+
+    if len(parts) == 1:
+        return [port]
+
+    if len(parts) == 2:
+        return ["%s%s" % (p,protocol)  for p in range(int(parts[0]), int(parts[1])+1)]
+
+    raise ConfigError('Invalid port range "%s", should be '
+                      'port or startport-endport' % port)
 def split_port(port):
     parts = str(port).split(':')
     if not 1 <= len(parts) <= 3:
@@ -609,10 +634,22 @@ def split_port(port):
 
     if len(parts) == 1:
         internal_port, = parts
-        return internal_port, None
+        return to_port_range(internal_port), None
     if len(parts) == 2:
         external_port, internal_port = parts
-        return internal_port, external_port
+
+        internal_range = to_port_range(internal_port)
+        external_range = to_port_range(external_port)
+        if len(internal_range) != len(external_range):
+            raise ConfigError('Port ranges don\'t match in length')
+
+        return internal_range, external_range
 
     external_ip, external_port, internal_port = parts
-    return internal_port, (external_ip, external_port or None)
+    internal_range = to_port_range(internal_port)
+    external_range = to_port_range(external_port)
+
+    if len(internal_range) != len(external_range):
+        raise ConfigError('Port ranges don\'t match in length')
+
+    return internal_range, [(external_ip, ex_port or None) for ex_port in external_range]
