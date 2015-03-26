@@ -2,9 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
-from functools import reduce
 
 from docker.errors import APIError
+from six.moves import reduce
 
 from .config import ConfigurationError
 from .config import get_service_name_from_net

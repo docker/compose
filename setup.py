@@ -48,7 +48,7 @@ tests_require = [
 ]
 
 
-if sys.version_info < (2, 6):
+if sys.version_info < (2, 7):
     tests_require.append('unittest2')
 if sys.version_info[:1] < (3,):
     tests_require.append('pyinstaller')

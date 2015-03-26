@@ -358,7 +358,7 @@ class ServiceTest(DockerClientTestCase):
         )
 
         old_container = create_and_start_container(service)
-        self.assertEqual(old_container.get('Volumes').keys(), ['/data'])
+        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
         volume_path = old_container.get('Volumes')['/data']
 
         new_container, = service.execute_convergence_plan(

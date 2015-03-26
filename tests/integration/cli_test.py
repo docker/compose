@@ -275,7 +275,7 @@ class CLITestCase(DockerClientTestCase):
         self.command.base_dir = 'tests/fixtures/user-composefile'
         name = 'service'
         user = 'sshd'
-        args = ['run', '--user={}'.format(user), name]
+        args = ['run', '--user={user}'.format(user=user), name]
         self.command.dispatch(args, None)
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
