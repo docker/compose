@@ -151,4 +151,3 @@ def make_files(dirname, filenames):
     for fname in filenames:
         with open(os.path.join(dirname, fname), 'w') as f:
             f.write('')
-

@@ -39,14 +39,14 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
 ]
 
 DOCKER_CONFIG_HINTS = {
-    'cpu_share' : 'cpu_shares',
-    'link'      : 'links',
-    'port'      : 'ports',
-    'privilege' : 'privileged',
+    'cpu_share': 'cpu_shares',
+    'link': 'links',
+    'port': 'ports',
+    'privilege': 'privileged',
     'priviliged': 'privileged',
-    'privilige' : 'privileged',
-    'volume'    : 'volumes',
-    'workdir'   : 'working_dir',
+    'privilige': 'privileged',
+    'volume': 'volumes',
+    'workdir': 'working_dir',
 }
 
 
