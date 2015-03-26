@@ -206,8 +206,7 @@ if __name__ == "__main__":
 ```
 
 You will notice that the changes are not reflected in the browser.  Instead of running `docker-compose stop`
-and `docker-compose up` to recreate the container every time you make a change, you can add a volume instead.
-In order to mount the current directory inside the container so we can work on code without having to rebuild the image, modify `docker-compose.yml`:
+`docker-compose build` and `docker-compose up` to recreate the container every time you make a change, you can add a volume instead. In order to mount the current directory inside the container so we can work on code without having to rebuild the image, modify `docker-compose.yml`:
 
 
     web:
