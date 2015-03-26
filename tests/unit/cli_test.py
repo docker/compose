@@ -8,7 +8,6 @@ from .. import unittest
 
 import docker
 import mock
-from six import StringIO
 
 from compose.cli import main
 from compose.cli.main import TopLevelCommand

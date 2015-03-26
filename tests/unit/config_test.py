@@ -234,7 +234,9 @@ class ExtendsTest(unittest.TestCase):
 
     def test_extends_validation(self):
         dictionary = {'extends': None}
-        load_config = lambda: config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'dictionary', load_config)
 

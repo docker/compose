@@ -182,7 +182,7 @@ class ServiceTest(DockerClientTestCase):
             entrypoint=['sleep'],
             command=['300']
         )
-        old_container = service.create_container()
+        service.create_container()
         self.assertEqual(len(service.containers(stopped=True)), 1)
         service.recreate_containers()
         self.assertEqual(len(service.containers(stopped=True)), 1)
@@ -262,8 +262,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1',
                 'composetest_db_2',
-                'db_3',
-                ]),
+                'db_3']),
         )
 
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
