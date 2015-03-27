@@ -23,6 +23,9 @@ RUN set -ex; \
         chmod +x /usr/local/bin/docker-$v; \
     done
 
+# Set the default Docker to be run
+RUN ln -s /usr/local/bin/docker-1.3.3 /usr/local/bin/docker
+
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
 
