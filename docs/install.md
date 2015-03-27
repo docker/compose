@@ -18,12 +18,12 @@ First, install Docker version 1.3 or greater:
 
 ### Install Compose
 
-To install Compose, run the following commands\*:
+To install Compose, run the following commands:
 
     curl -L https://github.com/docker/compose/releases/download/1.1.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
 
-\*Linux users may need to run `sudo su` before the `curl` command if a permission denied error is encountered.
+Linux users may need to run `sudo su` before the `curl` command if **Permission denied** error is encountered.
 
 Optionally, you can also install [command completion](completion.md) for the
 bash shell.
