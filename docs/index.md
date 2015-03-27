@@ -26,7 +26,6 @@ A `docker-compose.yml` looks like this:
 ```yaml
 web:
   build: .
-  command: python app.py
   ports:
    - "5000:5000"
   volumes:
@@ -107,9 +106,10 @@ specify how to build the image using a file called
 This tells Docker to:
 
 * Build an image starting with the Python 2.7 image.
-* Add the curret directory `.` into the path `/code` in the image.
+* Add the current directory `.` into the path `/code` in the image.
 * Set the working directory to `/code`.
-* Install your Python dependencies. 
+* Install your Python dependencies.
+* Set the default command for the container to `python app.py`
 
 For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
@@ -121,7 +121,6 @@ Next, define a set of services using `docker-compose.yml`:
 
     web:
       build: .
-      command: python app.py
       ports:
        - "5000:5000"
       volumes:
@@ -135,10 +134,9 @@ This defines two services:
 
 #### web
 
-* Builds from the `Dockerfile` in the current directory. 
-* Defines to run the command `python app.py` inside the image on start.
+* Builds from the `Dockerfile` in the current directory.
 * Forwards the exposed port 5000 on the container to port 5000 on the host machine.
-* Connects the web container to the Redis service via a link. 
+* Connects the web container to the Redis service via a link.
 * Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
 
 #### redis
