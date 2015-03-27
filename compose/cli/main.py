@@ -325,6 +325,9 @@ class TopLevelCommand(Command):
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')
 
+        if options['--rm']:
+            container_options['restart'] = None
+
         if options['--user']:
             container_options['user'] = options.get('--user')
 
