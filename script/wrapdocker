@@ -4,7 +4,7 @@ if [ "$DOCKER_VERSION" == "" ]; then
     DOCKER_VERSION="1.5.0"
 fi
 
-ln -s "/usr/local/bin/docker-$DOCKER_VERSION" "/usr/local/bin/docker"
+ln -fs "/usr/local/bin/docker-$DOCKER_VERSION" "/usr/local/bin/docker"
 
 # If a pidfile is still around (for example after a container restart),
 # delete it so that docker can start.
