@@ -141,7 +141,7 @@ This defines two services:
 
 #### redis
 
-* Uses the public [redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
+* Uses the public [Redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
 
 ### Build and run your app with Compose
 
@@ -161,7 +161,7 @@ open `http://ip-from-boot2docker:5000` and you should get a message in your brow
 
 `Hello World! I have been seen 1 times.`
 
-Refreshing the page will see the number increment.
+Refreshing the page will increment the number.
 
 If you want to run your services in the background, you can pass the `-d` flag
 (for daemon mode) to `docker-compose up` and use `docker-compose ps` to see what
