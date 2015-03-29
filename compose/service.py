@@ -24,6 +24,7 @@ DOCKER_START_KEYS = [
     'dns_search',
     'env_file',
     'extra_hosts',
+    'read_only',
     'net',
     'pid',
     'privileged',
@@ -442,6 +443,7 @@ class Service(object):
         restart = parse_restart_spec(options.get('restart', None))
 
         extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
+        read_only = options.get('read_only', None)
 
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
@@ -456,6 +458,7 @@ class Service(object):
             cap_add=cap_add,
             cap_drop=cap_drop,
             extra_hosts=extra_hosts,
+            read_only=read_only,
             pid_mode=pid
         )
 
