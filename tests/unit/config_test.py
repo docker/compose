@@ -174,6 +174,18 @@ class EnvTest(unittest.TestCase):
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
 
+    @mock.patch.dict(os.environ)
+    def test_resolve_host_path(self):
+        os.environ['HOSTENV'] = '/tmp/'
+        os.environ['CONTAINERENV'] = '/host/tmp/'
+
+        service_dict = config.make_service_dict(
+            'foo',
+            {'volumes': ['$HOSTENV:$CONTAINERENV']},
+            working_dir="tests/fixtures/env"
+        )
+        self.assertEqual(set(service_dict['volumes']), set(['/tmp/:/host/tmp/']))
+
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
         service_dicts = config.load('tests/fixtures/extends/docker-compose.yml')
