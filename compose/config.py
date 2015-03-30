@@ -299,23 +299,24 @@ def env_vars_from_file(filename):
 def resolve_host_paths(volumes, working_dir=None):
     if working_dir is None:
         raise Exception("No working_dir passed to resolve_host_paths()")
-    
+
     return [resolve_host_path(v, working_dir) for v in volumes]
 
 
 def resolve_host_path(volume, working_dir):
     container_path, host_path = split_volume(volume)
-    if "${" in container_path and "${" in host_path:
-        return "%s:%s" % (os.path.expandvars(host_path),
-            os.path.expandvars(container_path))
-    elif "${" in container_path and not "${" in host_path:
-        return os.path.expandvars(container_path)
-    elif host_path is not None:
-        print  "%s:%s" % (expand_path(working_dir, host_path), container_path)
-        return "%s:%s" % (expand_path(working_dir, host_path), container_path)
+
+    if host_path is not None:
+        if container_path.startswith('$') and host_path.startswith('$'):
+            return "%s:%s" % (os.path.expandvars(host_path),
+                              os.path.expandvars(container_path))
+        else:
+            return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
-        print container_path
-        return container_path
+        if container_path.startswith('$'):
+            return os.path.expandvars(container_path)
+        else:
+            return container_path
 
 
 def merge_volumes(base, override):
