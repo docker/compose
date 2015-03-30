@@ -9,43 +9,24 @@ Still, Compose and Swarm can be useful in a “batch processing” scenario (whe
 
 A number of things need to happen before full integration is achieved, which are documented below.
 
-Re-deploying containers with `docker-compose up`
-------------------------------------------------
-
-Repeated invocations of `docker-compose up` will not work reliably when used against a Swarm cluster because of an under-the-hood design problem; [this will be fixed](https://github.com/docker/fig/pull/972) in the next version of Compose. For now, containers must be completely removed and re-created:
-
-    $ docker-compose kill
-    $ docker-compose rm --force
-    $ docker-compose up
-
 Links and networking
 --------------------
 
 The primary thing stopping multi-container apps from working seamlessly on Swarm is getting them to talk to one another: enabling private communication between containers on different hosts hasn’t been solved in a non-hacky way.
 
-Long-term, networking is [getting overhauled](https://github.com/docker/docker/issues/9983) in such a way that it’ll fit the multi-host model much better. For now, containers on different hosts cannot be linked. In the next version of Compose, linked services will be automatically scheduled on the same host; for now, this must be done manually (see “Co-scheduling containers” below).
+Long-term, networking is [getting overhauled](https://github.com/docker/docker/issues/9983) in such a way that it’ll fit the multi-host model much better. For now, **linked containers are automatically scheduled on the same host**.
 
-`volumes_from` and `net: container`
------------------------------------
+Building
+--------
 
-For containers to share volumes or a network namespace, they must be scheduled on the same host - this is, after all, inherent to how both volumes and network namespaces work. In the next version of Compose, this co-scheduling will be automatic whenever `volumes_from` or `net: "container:..."` is specified; for now, containers which share volumes or a network namespace must be co-scheduled manually (see “Co-scheduling containers” below).
+`docker build` against a Swarm cluster is not implemented, so for now the `build` option will not work - you will need to manually build your service's image, push it somewhere and use `image` to instruct Compose to pull it. Here's an example using the Docker Hub:
 
-Co-scheduling containers
-------------------------
-
-For now, containers can be manually scheduled on the same host using Swarm’s [affinity filters](https://github.com/docker/swarm/blob/master/scheduler/filter/README.md#affinity-filter). Here’s a simple example:
-
-```yaml
-web:
-  image: my-web-image
-  links: ["db"]
-  environment:
-    - "affinity:container==myproject_db_*"
-db:
-  image: postgres
-```
-
-Here, we express an affinity filter on all web containers, saying that each one must run alongside a container whose name begins with `myproject_db_`.
-
-- `myproject` is the common prefix Compose gives to all containers in your project, which is either generated from the name of the current directory or specified with `-p` or the `DOCKER_COMPOSE_PROJECT_NAME` environment variable.
-- `*` is a wildcard, which works just like filename wildcards in a Unix shell.
+    $ docker build -t myusername/web .
+    $ docker push myusername/web
+    $ cat docker-compose.yml
+    web:
+      image: myusername/web
+      links: ["db"]
+    db:
+      image: postgres
+    $ docker-compose up -d
