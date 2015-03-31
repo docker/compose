@@ -7,19 +7,18 @@ from .testcases import DockerClientTestCase
 
 class ProjectTest(DockerClientTestCase):
     def test_volumes_from_service(self):
-        service_dicts = config.from_dictionary({
-            'data': {
-                'image': 'busybox:latest',
-                'volumes': ['/var/data'],
-            },
-            'db': {
-                'image': 'busybox:latest',
-                'volumes_from': ['data'],
-            },
-        }, working_dir='.')
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=service_dicts,
+            config_dict=config.from_dictionary({
+                'data': {
+                    'image': 'busybox:latest',
+                    'volumes': ['/var/data'],
+                },
+                'db': {
+                    'image': 'busybox:latest',
+                    'volumes_from': ['data'],
+                },
+            }, working_dir='.'),
             client=self.client,
         )
         db = project.get_service('db')
@@ -35,7 +34,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            config_dict=config.from_dictionary({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
@@ -52,7 +51,7 @@ class ProjectTest(DockerClientTestCase):
     def test_net_from_service(self):
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            config_dict=config.from_dictionary({
                 'net': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"]
@@ -86,7 +85,7 @@ class ProjectTest(DockerClientTestCase):
 
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            config_dict=config.from_dictionary({
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:composetest_net_container'
@@ -261,7 +260,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_starts_depends(self):
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            config_dict=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],
@@ -299,7 +298,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_with_no_deps(self):
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            config_dict=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["/bin/sleep", "300"],

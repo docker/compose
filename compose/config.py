@@ -1,6 +1,8 @@
 import os
 import yaml
 import six
+import compose
+from distutils.version import StrictVersion
 
 
 DOCKER_CONFIG_KEYS = [
@@ -56,20 +58,66 @@ def load(filename):
 
 
 def from_dictionary(dictionary, working_dir=None, filename=None):
-    service_dicts = []
 
-    for service_name, service_dict in list(dictionary.items()):
-        if not isinstance(service_dict, dict):
-            raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
-        loader = ServiceLoader(working_dir=working_dir, filename=filename)
-        service_dict = loader.make_service_dict(service_name, service_dict)
-        service_dicts.append(service_dict)
+    if not isinstance(dictionary, dict) or 'version' not in dictionary or not isinstance(dictionary['version'], (basestring, int, float)):
+        dictionary = {
+            'version': 1.0,
+            'services': dictionary
+        }
 
-    return service_dicts
+    loader = ConfigLoader(working_dir=working_dir, filename=filename)
+    config_dict = loader.make_config_dict(dictionary)
+    return config_dict
 
 
 def make_service_dict(name, service_dict, working_dir=None):
     return ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
+
+
+class ConfigLoader(object):
+    def __init__(self, working_dir, filename=None):
+        self.working_dir = working_dir
+        self.filename = filename
+        self.service_loader = ServiceLoader(working_dir=self.working_dir, filename=self.filename)
+
+    def make_config_dict(self, config_dict):
+        if 'version' not in config_dict:
+            raise ConfigurationError('The configuration option "version" is compulsory. You docker-compose.yml must have a top level key "version"')
+
+        try:
+            schema_version = StrictVersion(str(config_dict['version']))
+        except:
+            raise ConfigurationError('The configuration version "%s" is not a valid version.' % config_dict['version'])
+
+        if schema_version > StrictVersion(compose.__version__):
+            raise ConfigurationError('The configuration version "%s" is not compatible with the current version of docker-compose "%s".' % (config_dict['version'], compose.__version__))
+
+        config = {
+            'version': str(schema_version),
+            'project': None if self.filename is None else os.path.basename(os.path.dirname(os.path.abspath(self.filename)))
+        }
+
+        if schema_version >= StrictVersion('1.0'):
+            if 'services' not in config_dict:
+                raise ConfigurationError('The configuration option "services" is compulsory. You docker-compose.yml must have a top level key "services"')
+
+            if not isinstance(config_dict['services'], dict):
+                raise ConfigurationError('The configuration option "services" is not a valide dictionnary.')
+
+            config['services'] = []
+            for service_name, service_dict in list(config_dict['services'].items()):
+                if not isinstance(service_dict, dict):
+                    raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All keys defined in the section service in your docker-compose.yml must map to a config_dict of configuration options.' % service_name)
+                service_dict = self.service_loader.make_service_dict(service_name, service_dict)
+                config['services'].append(service_dict)
+
+        if schema_version >= StrictVersion('1.1'):
+            if 'project' in config_dict:
+                if not isinstance(config_dict['project'], basestring):
+                    raise ConfigurationError('The configuration option "project" must be a valid string')
+                config['project'] = str(config_dict['project'])
+
+        return config
 
 
 class ServiceLoader(object):

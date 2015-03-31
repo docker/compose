@@ -33,19 +33,21 @@ Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten 
 
 Finally, `docker-compose.yml` is where the magic happens. This file describes the services that comprise your app (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration needed to link them together and expose the web app's port.
 
-    db:
-      image: postgres
-      ports:
-        - "5432"
-    web:
-      build: .
-      command: bundle exec rails s -p 3000 -b '0.0.0.0'
-      volumes:
-        - .:/myapp
-      ports:
-        - "3000:3000"
-      links:
-        - db
+    version: 1.0
+    services:
+      db:
+        image: postgres
+        ports:
+          - "5432"
+      web:
+        build: .
+        command: bundle exec rails s -p 3000 -b '0.0.0.0'
+        volumes:
+          - .:/myapp
+        ports:
+          - "3000:3000"
+        links:
+          - db
 
 ### Build the project
 

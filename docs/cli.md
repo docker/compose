@@ -140,7 +140,8 @@ By default, if there are existing containers for a service, `docker-compose up` 
 
 ### -p, --project-name NAME
 
- Specifies an alternate project name (default: current directory name)
+ Specifies an alternate project name (default: when defined, used the option
+ project in `docker-compose.yml` else use current directory name)
 
 
 ## Environment Variables

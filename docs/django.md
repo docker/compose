@@ -43,17 +43,19 @@ describes the services that comprise your app (here, a web server and database),
 which Docker images they use, how they link together, what volumes will be
 mounted inside the containers, and what ports they expose.
 
-    db:
-      image: postgres
-    web:
-      build: .
-      command: python manage.py runserver 0.0.0.0:8000
-      volumes:
-        - .:/code
-      ports:
-        - "8000:8000"
-      links:
-        - db
+    version: 1.0
+    services:
+      db:
+        image: postgres
+      web:
+        build: .
+        command: python manage.py runserver 0.0.0.0:8000
+        volumes:
+          - .:/code
+        ports:
+          - "8000:8000"
+        links:
+          - db
 
 See the [`docker-compose.yml` reference](yml.html) for more information on how
 this file works.
