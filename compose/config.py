@@ -195,10 +195,23 @@ def merge_service_dicts(base, override):
     if 'build' in override and 'image' in d:
         del d['image']
 
-    for k in ALLOWED_KEYS:
-        if k not in ['environment', 'volumes']:
-            if k in override:
-                d[k] = override[k]
+    list_keys = ['ports', 'expose', 'external_links']
+
+    for key in list_keys:
+        if key in base or key in override:
+            d[key] = base.get(key, []) + override.get(key, [])
+
+    list_or_string_keys = ['dns', 'dns_search']
+
+    for key in list_or_string_keys:
+        if key in base or key in override:
+            d[key] = to_list(base.get(key)) + to_list(override.get(key))
+
+    already_merged_keys = ['environment', 'volumes'] + list_keys + list_or_string_keys
+
+    for k in set(ALLOWED_KEYS) - set(already_merged_keys):
+        if k in override:
+            d[k] = override[k]
 
     return d
 
@@ -352,6 +365,15 @@ def join_volume(pair):
 
 def expand_path(working_dir, path):
     return os.path.abspath(os.path.join(working_dir, path))
+
+
+def to_list(value):
+    if value is None:
+        return []
+    elif isinstance(value, six.string_types):
+        return [value]
+    else:
+        return value
 
 
 def get_service_name_from_net(net_config):
