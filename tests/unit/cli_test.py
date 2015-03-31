@@ -62,29 +62,31 @@ class CLITestCase(unittest.TestCase):
         self.assertEquals(project_name, name)
 
     def test_filename_check(self):
-        self.assertEqual('docker-compose.yml', get_config_filename_for_files([
+        files = [
             'docker-compose.yml',
             'docker-compose.yaml',
             'fig.yml',
             'fig.yaml',
-        ]))
+        ]
 
-        self.assertEqual('docker-compose.yaml', get_config_filename_for_files([
-            'docker-compose.yaml',
-            'fig.yml',
-            'fig.yaml',
-        ]))
+        """Test with files placed in the basedir"""
 
-        self.assertEqual('fig.yml', get_config_filename_for_files([
-            'fig.yml',
-            'fig.yaml',
-        ]))
-
-        self.assertEqual('fig.yaml', get_config_filename_for_files([
-            'fig.yaml',
-        ]))
-
+        self.assertEqual('docker-compose.yml', get_config_filename_for_files(files[0:]))
+        self.assertEqual('docker-compose.yaml', get_config_filename_for_files(files[1:]))
+        self.assertEqual('fig.yml', get_config_filename_for_files(files[2:]))
+        self.assertEqual('fig.yaml', get_config_filename_for_files(files[3:]))
         self.assertRaises(ComposeFileNotFound, lambda: get_config_filename_for_files([]))
+
+        """Test with files placed in the subdir"""
+
+        def get_config_filename_for_files_in_subdir(files):
+            return get_config_filename_for_files(files, subdir=True)
+
+        self.assertEqual('docker-compose.yml', get_config_filename_for_files_in_subdir(files[0:]))
+        self.assertEqual('docker-compose.yaml', get_config_filename_for_files_in_subdir(files[1:]))
+        self.assertEqual('fig.yml', get_config_filename_for_files_in_subdir(files[2:]))
+        self.assertEqual('fig.yaml', get_config_filename_for_files_in_subdir(files[3:]))
+        self.assertRaises(ComposeFileNotFound, lambda: get_config_filename_for_files_in_subdir([]))
 
     def test_get_project(self):
         command = TopLevelCommand()
@@ -135,12 +137,15 @@ class CLITestCase(unittest.TestCase):
             {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE'})
 
 
-def get_config_filename_for_files(filenames):
+def get_config_filename_for_files(filenames, subdir=None):
     project_dir = tempfile.mkdtemp()
     try:
         make_files(project_dir, filenames)
         command = TopLevelCommand()
-        command.base_dir = project_dir
+        if subdir:
+            command.base_dir = tempfile.mkdtemp(dir=project_dir)
+        else:
+            command.base_dir = project_dir
         return os.path.basename(command.get_config_path())
     finally:
         shutil.rmtree(project_dir)
