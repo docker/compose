@@ -80,6 +80,39 @@ class MergeTest(unittest.TestCase):
         )
         self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
 
+    def test_merge_build_or_image_no_override(self):
+        self.assertEqual(
+            config.merge_service_dicts({'build': '.'}, {}),
+            {'build': '.'},
+        )
+
+        self.assertEqual(
+            config.merge_service_dicts({'image': 'redis'}, {}),
+            {'image': 'redis'},
+        )
+
+    def test_merge_build_or_image_override_with_same(self):
+        self.assertEqual(
+            config.merge_service_dicts({'build': '.'}, {'build': './web'}),
+            {'build': './web'},
+        )
+
+        self.assertEqual(
+            config.merge_service_dicts({'image': 'redis'}, {'image': 'postgres'}),
+            {'image': 'postgres'},
+        )
+
+    def test_merge_build_or_image_override_with_other(self):
+        self.assertEqual(
+            config.merge_service_dicts({'build': '.'}, {'image': 'redis'}),
+            {'image': 'redis'}
+        )
+
+        self.assertEqual(
+            config.merge_service_dicts({'image': 'redis'}, {'build': '.'}),
+            {'build': '.'}
+        )
+
 
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
