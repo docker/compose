@@ -11,6 +11,7 @@ DOCKER_CONFIG_KEYS = [
     'detach',
     'dns',
     'dns_search',
+    'dockerfile',
     'domainname',
     'entrypoint',
     'env_file',

@@ -60,6 +60,8 @@ class Service(object):
             raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
+        if 'dockerfile' in options and 'build' not in options:
+            raise ConfigError('Service %s has a dockerfile specified but no build path. A service with a dockerfile must also have a build path.' % name)
 
         self.name = name
         self.client = client
@@ -68,6 +70,7 @@ class Service(object):
         self.external_links = external_links or []
         self.volumes_from = volumes_from or []
         self.net = net or None
+        self.dockerfile = options.pop('dockerfile', None)
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -474,6 +477,7 @@ class Service(object):
             stream=True,
             rm=True,
             nocache=no_cache,
+            dockerfile=self.dockerfile,
         )
 
         try:
