@@ -71,14 +71,15 @@ class Command(DocoptCommand):
 
     def get_project(self, config_path, project_name=None, verbose=False):
         try:
+            config_dict = config.load(config_path)
             return Project.from_dicts(
-                self.get_project_name(config_path, project_name),
-                config.load(config_path),
+                self.get_project_name(config_dict, project_name),
+                config_dict,
                 self.get_client(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
 
-    def get_project_name(self, config_path, project_name=None):
+    def get_project_name(self, config_dict, project_name=None):
         def normalize_name(name):
             return re.sub(r'[^a-z0-9]', '', name.lower())
 
@@ -90,9 +91,10 @@ class Command(DocoptCommand):
         if project_name is not None:
             return normalize_name(project_name)
 
-        project = os.path.basename(os.path.dirname(os.path.abspath(config_path)))
-        if project:
-            return normalize_name(project)
+        if config_dict:
+            project_name = config_dict['project']
+            if project_name:
+                return normalize_name(project_name)
 
         return 'default'
 

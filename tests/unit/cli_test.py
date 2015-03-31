@@ -13,6 +13,7 @@ from compose.cli import main
 from compose.cli.main import TopLevelCommand
 from compose.cli.errors import ComposeFileNotFound
 from compose.service import Service
+from compose import config
 
 
 class CLITestCase(unittest.TestCase):
@@ -22,7 +23,7 @@ class CLITestCase(unittest.TestCase):
         try:
             os.chdir('tests/fixtures/simple-composefile')
             command = TopLevelCommand()
-            project_name = command.get_project_name(command.get_config_path())
+            project_name = command.get_project_name(config.load(command.get_config_path()))
             self.assertEquals('simplecomposefile', project_name)
         finally:
             os.chdir(cwd)
@@ -30,13 +31,13 @@ class CLITestCase(unittest.TestCase):
     def test_project_name_with_explicit_base_dir(self):
         command = TopLevelCommand()
         command.base_dir = 'tests/fixtures/simple-composefile'
-        project_name = command.get_project_name(command.get_config_path())
+        project_name = command.get_project_name(config.load(command.get_config_path()))
         self.assertEquals('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         command = TopLevelCommand()
         command.base_dir = 'tests/fixtures/UpperCaseDir'
-        project_name = command.get_project_name(command.get_config_path())
+        project_name = command.get_project_name(config.load(command.get_config_path()))
         self.assertEquals('uppercasedir', project_name)
 
     def test_project_name_with_explicit_project_name(self):

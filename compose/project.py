@@ -61,12 +61,12 @@ class Project(object):
         self.client = client
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, config_dict, client):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
         project = cls(name, [], client)
-        for service_dict in sort_service_dicts(service_dicts):
+        for service_dict in sort_service_dicts(config_dict['services']):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)

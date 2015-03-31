@@ -7,13 +7,19 @@ from compose import config
 
 class ConfigTest(unittest.TestCase):
     def test_from_dictionary(self):
-        service_dicts = config.from_dictionary({
-            'foo': {'image': 'busybox'},
-            'bar': {'environment': ['FOO=1']},
+        config_dict = config.from_dictionary({
+            'version': '1.1',
+            'project': 'foo',
+            'services': {
+                'foo': {'image': 'busybox'},
+                'bar': {'environment': ['FOO=1']},
+            }
         })
 
+        self.assertEqual(config_dict['version'], '1.1')
+        self.assertEqual(config_dict['project'], 'foo')
         self.assertEqual(
-            sorted(service_dicts, key=lambda d: d['name']),
+            sorted(config_dict['services'], key=lambda d: d['name']),
             sorted([
                 {
                     'name': 'bar',
@@ -26,10 +32,90 @@ class ConfigTest(unittest.TestCase):
             ])
         )
 
-    def test_from_dictionary_throws_error_when_not_dict(self):
+    def test_from_dictionary_fallback_1_0(self):
+        config_dict = config.from_dictionary({
+            'foo': {'image': 'busybox'},
+            'bar': {'environment': ['FOO=1']},
+        })
+
+        self.assertEqual(config_dict['version'], '1.0')
+        self.assertIsNone(config_dict['project'])
+        self.assertEqual(
+            sorted(config_dict['services'], key=lambda d: d['name']),
+            sorted([
+                {
+                    'name': 'bar',
+                    'environment': {'FOO': '1'},
+                },
+                {
+                    'name': 'foo',
+                    'image': 'busybox',
+                }
+            ])
+        )
+
+    def test_from_dictionary_fallback_service_version(self):
+        config_dict = config.from_dictionary({
+            'version': {'image': 'busybox'},
+        })
+
+        self.assertEqual(
+            sorted(config_dict['services'], key=lambda d: d['name']),
+            sorted([
+                {
+                    'name': 'version',
+                    'image': 'busybox',
+                }
+            ])
+        )
+
+    def test_from_dictionary_throws_error_when_wrong_version(self):
         with self.assertRaises(config.ConfigurationError):
             config.from_dictionary({
-                'web': 'busybox:latest',
+                'version': 'foo'
+            })
+
+    def test_from_dictionary_throws_error_when_version_to_hight(self):
+        with self.assertRaises(config.ConfigurationError):
+            config.from_dictionary({
+                'version': '99.0'
+            })
+
+    def test_from_dictionary_throws_error_when_missing_service(self):
+        with self.assertRaises(config.ConfigurationError):
+            config.from_dictionary({
+                'version': '1.0'
+            })
+
+    def test_from_dictionary_throws_error_when_wrong_project(self):
+        with self.assertRaises(config.ConfigurationError):
+            config.from_dictionary({
+                'version': '1.1',
+                'project': ['foo']
+            })
+
+    def test_from_dictionary_with_project_in_wrong_version(self):
+        config_dict = config.from_dictionary({
+            'version': '1.0',
+            'project': 'foo',
+            'services': {}
+        })
+        self.assertIsNone(config_dict['project'])
+
+    def test_from_dictionary_throws_error_when_services_not_dict(self):
+        with self.assertRaises(config.ConfigurationError):
+            config.from_dictionary({
+                'version': '1.0',
+                'services': 'foo'
+            })
+
+    def test_from_dictionary_throws_error_when_service_not_dict(self):
+        with self.assertRaises(config.ConfigurationError):
+            config.from_dictionary({
+                'version': '1.0',
+                'services': {
+                    'web': 'busybox:latest',
+                }
             })
 
     def test_config_validation(self):
@@ -267,10 +353,10 @@ class EnvTest(unittest.TestCase):
 
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
-        service_dicts = config.load('tests/fixtures/extends/docker-compose.yml')
+        config_dict = config.load('tests/fixtures/extends/docker-compose.yml')
 
         service_dicts = sorted(
-            service_dicts,
+            config_dict['services'],
             key=lambda sd: sd['name'],
         )
 
@@ -294,9 +380,9 @@ class ExtendsTest(unittest.TestCase):
         ])
 
     def test_nested(self):
-        service_dicts = config.load('tests/fixtures/extends/nested.yml')
+        config_dict = config.load('tests/fixtures/extends/nested.yml')
 
-        self.assertEqual(service_dicts, [
+        self.assertEqual(config_dict['services'], [
             {
                 'name': 'myweb',
                 'image': 'busybox',
@@ -382,4 +468,4 @@ class ExtendsTest(unittest.TestCase):
             '%s:/bar' % os.path.abspath('tests/fixtures/volume-path/bar'),
         ]
 
-        self.assertEqual(set(dicts[0]['volumes']), set(paths))
+        self.assertEqual(set(dicts['services'][0]['volumes']), set(paths))
