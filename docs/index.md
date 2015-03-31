@@ -31,14 +31,16 @@ Next, you define the services that make up your app in `docker-compose.yml` so
 they can be run together in an isolated environment:
 
 ```yaml
-web:
-  build: .
-  links:
-   - db
-  ports:
-   - "8000:8000"
-db:
-  image: postgres
+version: 1.0
+services:
+  web:
+    build: .
+    links:
+     - db
+    ports:
+     - "8000:8000"
+  db:
+    image: postgres
 ```
 
 Lastly, run `docker-compose up` and Compose will start and run your entire app.
@@ -120,17 +122,19 @@ and the
 
 Next, define a set of services using `docker-compose.yml`:
 
-    web:
-      build: .
-      command: python app.py
-      ports:
-       - "5000:5000"
-      volumes:
-       - .:/code
-      links:
-       - redis
-    redis:
-      image: redis
+    version: 1.0
+    services:
+      web:
+        build: .
+        command: python app.py
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+        links:
+         - redis
+      redis:
+        image: redis
 
 This defines two services:
 

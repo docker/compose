@@ -188,28 +188,32 @@ Here's a simple example. Suppose we have 2 files - **common.yml** and
 **common.yml**
 
 ```
-webapp:
-  build: ./webapp
-  environment:
-    - DEBUG=false
-    - SEND_EMAILS=false
+version: 1.0
+services:
+  webapp:
+    build: ./webapp
+    environment:
+      - DEBUG=false
+      - SEND_EMAILS=false
 ```
 
 **development.yml**
 
 ```
-web:
-  extends:
-    file: common.yml
-    service: webapp
-  ports:
-    - "8000:8000"
-  links:
-    - db
-  environment:
-    - DEBUG=true
-db:
-  image: postgres
+version: 1.0
+services:
+  web:
+    extends:
+      file: common.yml
+      service: webapp
+    ports:
+      - "8000:8000"
+    links:
+      - db
+    environment:
+      - DEBUG=true
+  db:
+    image: postgres
 ```
 
 Here, the `web` service in **development.yml** inherits the configuration of
@@ -220,15 +224,17 @@ environment variables (DEBUG) with a new value, and the other one
 this:
 
 ```yaml
-web:
-  build: ./webapp
-  ports:
-    - "8000:8000"
-  links:
-    - db
-  environment:
-    - DEBUG=true
-    - SEND_EMAILS=false
+version: 1.0
+services:
+  web:
+    build: ./webapp
+    ports:
+      - "8000:8000"
+    links:
+      - db
+    environment:
+      - DEBUG=true
+      - SEND_EMAILS=false
 ```
 
 The `extends` option is great for sharing configuration between different
@@ -237,21 +243,34 @@ You could write a new file for a staging environment, **staging.yml**, which
 binds to a different port and doesn't turn on debugging:
 
 ```
-web:
-  extends:
-    file: common.yml
-    service: webapp
-  ports:
-    - "80:8000"
-  links:
-    - db
-db:
-  image: postgres
+version: 1.0
+services:
+  web:
+    extends:
+      file: common.yml
+      service: webapp
+    ports:
+      - "80:8000"
+    links:
+      - db
+  db:
+    image: postgres
 ```
 
 > **Note:** When you extend a service, `links` and `volumes_from`
 > configuration options are **not** inherited - you will have to define
 > those manually each time you extend it.
+
+### project
+
+> **Note:** Since version 1.2
+
+The `project` option lets you defined an project name for your services.
+
+```
+version: 1.1
+project: secretproject
+```
 
 ### net
 
