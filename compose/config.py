@@ -189,6 +189,12 @@ def merge_service_dicts(base, override):
             override.get('volumes'),
         )
 
+    if 'image' in override and 'build' in d:
+        del d['build']
+
+    if 'build' in override and 'image' in d:
+        del d['image']
+
     for k in ALLOWED_KEYS:
         if k not in ['environment', 'volumes']:
             if k in override:
