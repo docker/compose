@@ -46,6 +46,10 @@ class ServiceTest(unittest.TestCase):
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
         Service(name='foo', project='bar')
 
+    def test_dockerfile_validation(self):
+        self.assertRaises(ConfigError, lambda: Service(name='foo', image='img', dockerfile='dfile'))
+        self.assertRaises(ConfigError, lambda: Service(name='foo', dockerfile='dfile'))
+
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
         self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
@@ -275,6 +279,21 @@ class ServiceTest(unittest.TestCase):
 
         self.assertFalse(self.mock_client.images.called)
         self.assertFalse(self.mock_client.build.called)
+
+    def test_create_container_with_build_dockerfile(self):
+        self.mock_client.images.return_value = []
+        service = Service('foo', client=self.mock_client, build='woo', dockerfile='bar')
+        service.create_container(do_build=True)
+
+        self.mock_client.images.assert_called_once_with(name=service.full_name)
+        self.mock_client.build.assert_called_once_with(
+            'woo',
+            tag=service.full_name,
+            stream=True,
+            rm=True,
+            nocache=False,
+            dockerfile='bar',
+        )
 
 
 class ServiceVolumesTest(unittest.TestCase):
