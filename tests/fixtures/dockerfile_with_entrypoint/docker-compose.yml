@@ -1,2 +1,2 @@
 service:
-  build: tests/fixtures/dockerfile_with_entrypoint
+  build: .
