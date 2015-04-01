@@ -29,8 +29,9 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. This directory is also the
-build context that is sent to the Docker daemon.
+Path to a directory containing a Dockerfile. When the value supplied is a 
+relative path, it is interpreted as relative to the location of the yml file 
+itself. This directory is also the build context that is sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 

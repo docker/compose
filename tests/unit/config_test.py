@@ -381,3 +381,36 @@ class ExtendsTest(unittest.TestCase):
         ]
 
         self.assertEqual(set(dicts[0]['volumes']), set(paths))
+
+
+class BuildPathTest(unittest.TestCase):
+    def setUp(self):
+        self.abs_context_path = os.path.join(os.getcwd(), 'tests/fixtures/build-ctx')
+
+    def test_nonexistent_path(self):
+        options = {'build': 'nonexistent.path'}
+        self.assertRaises(
+            config.ConfigurationError,
+            lambda: config.make_service_dict('foo', options, 'tests/fixtures/build-path'),
+        )
+
+    def test_relative_path(self):
+        relative_build_path = '../build-ctx/'
+        service_dict = config.make_service_dict(
+            'relpath',
+            {'build': relative_build_path},
+            working_dir='tests/fixtures/build-path'
+        )
+        self.assertEquals(service_dict['build'], self.abs_context_path)
+
+    def test_absolute_path(self):
+        service_dict = config.make_service_dict(
+            'abspath',
+            {'build': self.abs_context_path},
+            working_dir='tests/fixtures/build-path'
+        )
+        self.assertEquals(service_dict['build'], self.abs_context_path)
+
+    def test_from_file(self):
+        service_dict = config.load('tests/fixtures/build-path/docker-compose.yml')
+        self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])

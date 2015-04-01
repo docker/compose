@@ -1,0 +1,2 @@
+foo:
+  build: ../build-ctx/
