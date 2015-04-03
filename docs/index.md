@@ -13,50 +13,12 @@ be done to get it running.
 Compose is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
 
-Using Compose is basically a three-step process.
-
-First, you define your app's environment with a `Dockerfile` so it can be
-reproduced anywhere:
-
-```Dockerfile
-FROM python:2.7
-WORKDIR /code
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
-ADD . /code
-CMD python app.py
-```
-
-Next, you define the services that make up your app in `docker-compose.yml` so
-they can be run together in an isolated environment:
-
-```yaml
-web:
-  build: .
-  links:
-   - db
-  ports:
-   - "8000:8000"
-db:
-  image: postgres
-```
-
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
-
 Compose has commands for managing the whole lifecycle of your application:
 
  * Start, stop and rebuild services
  * View the status of running services
  * Stream the log output of running services
  * Run a one-off command on a service
-
-## Compose documentation
-
-- [Installing Compose](install.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
 
 ## Quick start
 
@@ -191,3 +153,12 @@ At this point, you have seen the basics of how Compose works.
   [Rails](rails.md), or [Wordpress](wordpress.md).
 - See the reference guides for complete details on the [commands](cli.md), the
   [configuration file](yml.md) and [environment variables](env.md).
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
+
