@@ -1,6 +1,5 @@
 Docker Compose
 ==============
-[![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
 *(Previously known as Fig)*
 
 Compose is a tool for defining and running complex applications with Docker.
@@ -53,3 +52,11 @@ Installation and documentation
 
 - Full documentation is available on [Docker's website](http://docs.docker.com/compose/).
 - Hop into #docker-compose on Freenode if you have any questions.
+
+Contributing
+------------
+
+[![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
+
+Want to help build Compose? Check out our [contributing documentation](https://github.com/docker/compose/blob/master/CONTRIBUTING.md).
+
