@@ -186,6 +186,7 @@ class EnvTest(unittest.TestCase):
         )
         self.assertEqual(set(service_dict['volumes']), set(['/tmp/:/host/tmp/']))
 
+
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
         service_dicts = config.load('tests/fixtures/extends/docker-compose.yml')
