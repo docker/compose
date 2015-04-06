@@ -1,6 +1,9 @@
+import json
+import jsonschema
 import os
 import yaml
 import six
+import sys
 
 
 DOCKER_CONFIG_KEYS = [
@@ -51,9 +54,25 @@ DOCKER_CONFIG_HINTS = {
 }
 
 
+def validate_schema(config_data):
+    config_source_dir = os.path.dirname(os.path.abspath(__file__))
+    schema_file = os.path.join(config_source_dir, "schema.json")
+
+    with open(schema_file) as schema_fh:
+        schema = json.load(schema_fh)
+
+    try:
+        jsonschema.validate(config_data, schema)
+    except jsonschema.exceptions.ValidationError as e:
+        exctype, value = sys.exc_info()[:2]
+        raise Exception("Validation failed, reason: (%s)" % e.message)
+
+
 def load(filename):
     working_dir = os.path.dirname(filename)
-    return from_dictionary(load_yaml(filename), working_dir=working_dir, filename=filename)
+    config_data = load_yaml(filename)
+    validate_schema(config_data)
+    return from_dictionary(config_data, working_dir=working_dir, filename=filename)
 
 
 def from_dictionary(dictionary, working_dir=None, filename=None):
