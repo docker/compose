@@ -3,7 +3,6 @@ from __future__ import absolute_import
 from collections import namedtuple
 import logging
 import re
-import os
 from operator import attrgetter
 import sys
 import six
@@ -586,8 +585,7 @@ def parse_repository_tag(s):
 
 def build_volume_binding(volume_spec):
     internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
-    external = os.path.expanduser(volume_spec.external)
-    return os.path.abspath(os.path.expandvars(external)), internal
+    return volume_spec.external, internal
 
 
 def build_port_bindings(ports):

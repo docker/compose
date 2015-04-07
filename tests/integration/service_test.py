@@ -123,6 +123,24 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
+    @mock.patch.dict(os.environ)
+    def test_create_container_with_home_and_env_var_in_volume_path(self):
+        os.environ['VOLUME_NAME'] = 'my-volume'
+        os.environ['HOME'] = '/tmp/home-dir'
+        expected_host_path = os.path.join(os.environ['HOME'], os.environ['VOLUME_NAME'])
+
+        host_path = '~/${VOLUME_NAME}'
+        container_path = '/container-path'
+
+        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
+        container = service.create_container()
+        service.start_container(container)
+
+        actual_host_path = container.get('Volumes')[container_path]
+        components = actual_host_path.split('/')
+        self.assertTrue(components[-2:] == ['home-dir', 'my-volume'],
+                        msg="Last two components differ: %s, %s" % (actual_host_path, expected_host_path))
+
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
         volume_container_1 = volume_service.create_container()
