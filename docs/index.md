@@ -191,3 +191,14 @@ At this point, you have seen the basics of how Compose works.
   [Rails](rails.md), or [Wordpress](wordpress.md).
 - See the reference guides for complete details on the [commands](cli.md), the
   [configuration file](yml.md) and [environment variables](env.md).
+
+### Troubleshooting
+
+#### boot2docker - web_1 fails to launch 
+
+**Error message:**
+
+      web_1   | python: can't open file 'app.py': [Errno 2] No such file or directory
+      composetest_web_1 exited with code 2
+
+If you see this error, it may be because you're using boot2docker and have put your app's files in a directory outside `/Users`. Because the boot2docker only mounts `/Users` inside the VM, rather than your whole filesystem, you'll need to place your app somewhere within it (e.g. `~/composetest`) in order for volume mounts to work as expected.
