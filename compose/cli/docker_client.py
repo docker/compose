@@ -1,5 +1,6 @@
 from docker import Client
 from docker import tls
+from ..service import ConfigError
 import ssl
 import os
 
@@ -15,6 +16,9 @@ def docker_client():
 
     base_url = os.environ.get('DOCKER_HOST')
     tls_config = None
+
+    if not base_url:
+        raise ConfigError('Required environment variable DOCKER_HOST is not set.')
 
     if os.environ.get('DOCKER_TLS_VERIFY', '') != '':
         parts = base_url.split('://', 1)
