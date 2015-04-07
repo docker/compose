@@ -419,6 +419,17 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
+    def test_pid_mode_none_defined(self):
+        service = self.create_service('web', pid=None)
+        container = create_and_start_container(service)
+        print 'STEAK %s' % (container.get('HostConfig.PidMode'))
+        self.assertEqual(container.get('HostConfig.PidMode'), '')
+
+    def test_pid_mode_host(self):
+        service = self.create_service('web', pid='host')
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.PidMode'), 'host')
+
     def test_dns_no_value(self):
         service = self.create_service('web')
         container = create_and_start_container(service)
