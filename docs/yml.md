@@ -221,42 +221,10 @@ Here, the `web` service in **development.yml** inherits the configuration of
 the `webapp` service in **common.yml** - the `build` and `environment` keys -
 and adds `ports` and `links` configuration. It overrides one of the defined
 environment variables (DEBUG) with a new value, and the other one
-(SEND_EMAILS) is left untouched. It's exactly as if you defined `web` like
-this:
+(SEND_EMAILS) is left untouched.
 
-```yaml
-web:
-  build: ./webapp
-  ports:
-    - "8000:8000"
-  links:
-    - db
-  environment:
-    - DEBUG=true
-    - SEND_EMAILS=false
-```
-
-The `extends` option is great for sharing configuration between different
-apps, or for configuring the same app differently for different environments.
-You could write a new file for a staging environment, **staging.yml**, which
-binds to a different port and doesn't turn on debugging:
-
-```
-web:
-  extends:
-    file: common.yml
-    service: webapp
-  ports:
-    - "80:8000"
-  links:
-    - db
-db:
-  image: postgres
-```
-
-> **Note:** When you extend a service, `links` and `volumes_from`
-> configuration options are **not** inherited - you will have to define
-> those manually each time you extend it.
+For more on `extends`, see the [tutorial](extends.md#example) and
+[reference](extends.md#reference).
 
 ### net
 
