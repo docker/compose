@@ -328,10 +328,18 @@ def resolve_host_paths(volumes, working_dir=None):
 
 def resolve_host_path(volume, working_dir):
     container_path, host_path = split_volume(volume)
+
     if host_path is not None:
-        return "%s:%s" % (expand_path(working_dir, host_path), container_path)
+        if container_path.startswith('$') and host_path.startswith('$'):
+            return "%s:%s" % (os.path.expandvars(host_path),
+                              os.path.expandvars(container_path))
+        else:
+            return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
-        return container_path
+        if container_path.startswith('$'):
+            return os.path.expandvars(container_path)
+        else:
+            return container_path
 
 
 def resolve_build_path(build_path, working_dir=None):
