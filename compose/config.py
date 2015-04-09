@@ -329,6 +329,8 @@ def resolve_host_paths(volumes, working_dir=None):
 def resolve_host_path(volume, working_dir):
     container_path, host_path = split_volume(volume)
     if host_path is not None:
+        host_path = os.path.expanduser(host_path)
+        host_path = os.path.expandvars(host_path)
         return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
         return container_path

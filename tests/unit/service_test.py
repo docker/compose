@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import os
 
 from .. import unittest
 import mock
@@ -304,17 +303,3 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(
             binding,
             ('/outside', dict(bind='/inside', ro=False)))
-
-    @mock.patch.dict(os.environ)
-    def test_build_volume_binding_with_environ(self):
-        os.environ['VOLUME_PATH'] = '/opt'
-        binding = build_volume_binding(parse_volume_spec('${VOLUME_PATH}:/opt'))
-        self.assertEqual(binding, ('/opt', dict(bind='/opt', ro=False)))
-
-    @mock.patch.dict(os.environ)
-    def test_building_volume_binding_with_home(self):
-        os.environ['HOME'] = '/home/user'
-        binding = build_volume_binding(parse_volume_spec('~:/home/user'))
-        self.assertEqual(
-            binding,
-            ('/home/user', dict(bind='/home/user', ro=False)))
