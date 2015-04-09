@@ -207,3 +207,17 @@ In addition to bug fixes and refinements, this release adds the following:
 * Better integration with Swarm. Swarm will now schedule inter-dependent
 containers on the same host. For details, see
 [PR #972](https://github.com/docker/compose/pull/972).
+
+## Getting help
+
+Docker Compose is still in its infancy and under active development. If you need
+help, would like to contribute, or simply want to talk about the project with
+like-minded individuals, we have a number of open channels for communication.
+
+* To report bugs or file feature requests: please use the [issue tracker on Github](https://github.com/docker/compose/issues).
+
+* To talk about the project with people in real time: please join the `#docker-compose` channel on IRC.
+
+* To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
+
+For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/project/get-help/).
