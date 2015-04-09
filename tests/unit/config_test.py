@@ -39,6 +39,20 @@ class ConfigTest(unittest.TestCase):
         config.make_service_dict('foo', {'ports': ['8000']})
 
 
+class VolumePathTest(unittest.TestCase):
+    @mock.patch.dict(os.environ)
+    def test_volume_binding_with_environ(self):
+        os.environ['VOLUME_PATH'] = '/host/path'
+        d = config.make_service_dict('foo', {'volumes': ['${VOLUME_PATH}:/container/path']}, working_dir='.')
+        self.assertEqual(d['volumes'], ['/host/path:/container/path'])
+
+    @mock.patch.dict(os.environ)
+    def test_volume_binding_with_home(self):
+        os.environ['HOME'] = '/home/user'
+        d = config.make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
+        self.assertEqual(d['volumes'], ['/home/user:/container/path'])
+
+
 class MergeVolumesTest(unittest.TestCase):
     def test_empty(self):
         service_dict = config.merge_service_dicts({}, {})
