@@ -18,7 +18,7 @@ def sort_service_dicts(services):
     sorted_services = []
 
     def get_service_names(links):
-        return [link.split(':')[0] for link in links]
+        return [link.split(':')[0] for link in links or []]
 
     def get_service_dependents(service_dict, services):
         name = service_dict['name']
@@ -119,7 +119,7 @@ class Project(object):
     def get_links(self, service_dict):
         links = []
         if 'links' in service_dict:
-            for link in service_dict.get('links', []):
+            for link in service_dict.get('links', []) or []:
                 if ':' in link:
                     service_name, link_name = link.split(':', 1)
                 else:

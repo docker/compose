@@ -9,3 +9,4 @@ web:
 console:
   image: busybox:latest
   command: /bin/sleep 300
+  links:
