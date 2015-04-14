@@ -232,14 +232,14 @@ _docker-compose_run() {
 			compopt -o nospace
 			return
 			;;
-		--entrypoint)
+		--entrypoint|--user|-u)
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm --service-ports -T" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
