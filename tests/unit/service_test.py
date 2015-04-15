@@ -42,6 +42,7 @@ class ServiceTest(unittest.TestCase):
         Service('foo', image='foo')
 
     def test_project_validation(self):
+        self.assertRaises(ConfigError, lambda: Service('bar'))
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='_', image='foo'))
         Service(name='foo', project='bar', image='foo')
 
