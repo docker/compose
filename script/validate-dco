@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 source "$(dirname "$BASH_SOURCE")/.validate"
 
 adds=$(validate_diff --numstat | awk '{ s += $1 } END { print s }')

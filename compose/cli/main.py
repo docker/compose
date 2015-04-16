@@ -1,25 +1,25 @@
 from __future__ import print_function
 from __future__ import unicode_literals
+from inspect import getdoc
+from operator import attrgetter
 import logging
-import sys
 import re
 import signal
-from operator import attrgetter
+import sys
 
-from inspect import getdoc
+from docker.errors import APIError
 import dockerpty
 
 from .. import __version__
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, CannotBeScaledError
+from ..config import parse_environment
 from .command import Command
+from .docopt_command import NoSuchCommand
+from .errors import UserError
 from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import yesno
-
-from docker.errors import APIError
-from .errors import UserError
-from .docopt_command import NoSuchCommand
 
 log = logging.getLogger(__name__)
 
@@ -238,8 +238,8 @@ class TopLevelCommand(Command):
         Usage: rm [options] [SERVICE...]
 
         Options:
-            --force   Don't ask to confirm removal
-            -v        Remove volumes associated with containers
+            -f, --force   Don't ask to confirm removal
+            -v            Remove volumes associated with containers
         """
         all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
@@ -276,6 +276,7 @@ class TopLevelCommand(Command):
                                   new container name.
             --entrypoint CMD      Override the entrypoint of the image.
             -e KEY=VAL            Set an environment variable (can be used multiple times)
+            -u, --user=""         Run as specified username or uid
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
             --service-ports       Run command with the service's ports enabled and mapped
@@ -293,7 +294,7 @@ class TopLevelCommand(Command):
             if len(deps) > 0:
                 project.up(
                     service_names=deps,
-                    start_links=True,
+                    start_deps=True,
                     recreate=False,
                     insecure_registry=insecure_registry,
                     detach=options['-d']
@@ -316,28 +317,31 @@ class TopLevelCommand(Command):
         }
 
         if options['-e']:
-            for option in options['-e']:
-                if 'environment' not in service.options:
-                    service.options['environment'] = {}
-                k, v = option.split('=', 1)
-                service.options['environment'][k] = v
+            # Merge environment from config with -e command line
+            container_options['environment'] = dict(
+                parse_environment(service.options.get('environment')),
+                **parse_environment(options['-e']))
 
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')
+
+        if options['--user']:
+            container_options['user'] = options.get('--user')
+
+        if not options['--service-ports']:
+            container_options['ports'] = []
+
         container = service.create_container(
             one_off=True,
             insecure_registry=insecure_registry,
             **container_options
         )
 
-        service_ports = None
-        if options['--service-ports']:
-            service_ports = service.options['ports']
         if options['-d']:
-            service.start_container(container, ports=service_ports, one_off=True)
+            service.start_container(container)
             print(container.name)
         else:
-            service.start_container(container, ports=service_ports, one_off=True)
+            service.start_container(container)
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
@@ -389,17 +393,29 @@ class TopLevelCommand(Command):
 
         They can be started again with `docker-compose start`.
 
-        Usage: stop [SERVICE...]
+        Usage: stop [options] [SERVICE...]
+
+        Options:
+          -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
+                                     (default: 10)
         """
-        project.stop(service_names=options['SERVICE'])
+        timeout = options.get('--timeout')
+        params = {} if timeout is None else {'timeout': int(timeout)}
+        project.stop(service_names=options['SERVICE'], **params)
 
     def restart(self, project, options):
         """
         Restart running containers.
 
-        Usage: restart [SERVICE...]
+        Usage: restart [options] [SERVICE...]
+
+        Options:
+          -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
+                                     (default: 10)
         """
-        project.restart(service_names=options['SERVICE'])
+        timeout = options.get('--timeout')
+        params = {} if timeout is None else {'timeout': int(timeout)}
+        project.restart(service_names=options['SERVICE'], **params)
 
     def up(self, project, options):
         """
@@ -418,30 +434,33 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            --allow-insecure-ssl  Allow insecure connections to the docker
-                                  registry
-            -d                    Detached mode: Run containers in the background,
-                                  print new container names.
-            --no-color            Produce monochrome output.
-            --no-deps             Don't start linked services.
-            --no-recreate         If containers already exist, don't recreate them.
-            --no-build            Don't build an image, even if it's missing
+            --allow-insecure-ssl   Allow insecure connections to the docker
+                                   registry
+            -d                     Detached mode: Run containers in the background,
+                                   print new container names.
+            --no-color             Produce monochrome output.
+            --no-deps              Don't start linked services.
+            --no-recreate          If containers already exist, don't recreate them.
+            --no-build             Don't build an image, even if it's missing
+            -t, --timeout TIMEOUT  When attached, use this timeout in seconds
+                                   for the shutdown. (default: 10)
+
         """
         insecure_registry = options['--allow-insecure-ssl']
         detached = options['-d']
 
         monochrome = options['--no-color']
 
-        start_links = not options['--no-deps']
+        start_deps = not options['--no-deps']
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
 
         project.up(
             service_names=service_names,
-            start_links=start_links,
+            start_deps=start_deps,
             recreate=recreate,
             insecure_registry=insecure_registry,
-            detach=options['-d'],
+            detach=detached,
             do_build=not options['--no-build'],
         )
 
@@ -460,7 +479,9 @@ class TopLevelCommand(Command):
                 signal.signal(signal.SIGINT, handler)
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
-                project.stop(service_names=service_names)
+                timeout = options.get('--timeout')
+                params = {} if timeout is None else {'timeout': int(timeout)}
+                project.stop(service_names=service_names, **params)
 
 
 def list_containers(containers):

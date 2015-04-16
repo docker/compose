@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import os
 
 from .. import unittest
 import mock
@@ -11,14 +10,14 @@ from requests import Response
 from compose import Service
 from compose.container import Container
 from compose.service import (
-    ConfigError,
-    split_port,
-    build_port_bindings,
-    parse_volume_spec,
-    build_volume_binding,
     APIError,
+    ConfigError,
+    build_port_bindings,
+    build_volume_binding,
     get_container_name,
     parse_repository_tag,
+    parse_volume_spec,
+    split_port,
 )
 
 
@@ -45,10 +44,6 @@ class ServiceTest(unittest.TestCase):
     def test_project_validation(self):
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
         Service(name='foo', project='bar')
-
-    def test_config_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
-        Service(name='foo', ports=['8000'])
 
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
@@ -305,95 +300,3 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(
             binding,
             ('/outside', dict(bind='/inside', ro=False)))
-
-    @mock.patch.dict(os.environ)
-    def test_build_volume_binding_with_environ(self):
-        os.environ['VOLUME_PATH'] = '/opt'
-        binding = build_volume_binding(parse_volume_spec('${VOLUME_PATH}:/opt'))
-        self.assertEqual(binding, ('/opt', dict(bind='/opt', ro=False)))
-
-    @mock.patch.dict(os.environ)
-    def test_building_volume_binding_with_home(self):
-        os.environ['HOME'] = '/home/user'
-        binding = build_volume_binding(parse_volume_spec('~:/home/user'))
-        self.assertEqual(
-            binding,
-            ('/home/user', dict(bind='/home/user', ro=False)))
-
-class ServiceEnvironmentTest(unittest.TestCase):
-
-    def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
-        self.mock_client.containers.return_value = []
-
-    def test_parse_environment(self):
-        service = Service('foo',
-                environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}
-            )
-
-    @mock.patch.dict(os.environ)
-    def test_resolve_environment(self):
-        os.environ['FILE_DEF'] = 'E1'
-        os.environ['FILE_DEF_EMPTY'] = 'E2'
-        os.environ['ENV_DEF'] = 'E3'
-        service = Service('foo',
-                environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None},
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}
-            )
-
-    def test_env_from_file(self):
-        service = Service('foo',
-                env_file='tests/fixtures/env/one.env',
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'}
-            )
-
-    def test_env_from_multiple_files(self):
-        service = Service('foo',
-                env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}
-            )
-
-    def test_env_nonexistent_file(self):
-        self.assertRaises(ConfigError, lambda: Service('foo', env_file='tests/fixtures/env/nonexistent.env'))
-
-
-    @mock.patch.dict(os.environ)
-    def test_resolve_environment_from_file(self):
-        os.environ['FILE_DEF'] = 'E1'
-        os.environ['FILE_DEF_EMPTY'] = 'E2'
-        os.environ['ENV_DEF'] = 'E3'
-        service = Service('foo',
-                env_file=['tests/fixtures/env/resolve.env'],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}
-            )

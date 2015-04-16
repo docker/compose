@@ -3,54 +3,19 @@ from __future__ import absolute_import
 from collections import namedtuple
 import logging
 import re
-import os
 from operator import attrgetter
 import sys
+import six
 
 from docker.errors import APIError
+from docker.utils import create_host_config
 
+from .config import DOCKER_CONFIG_KEYS
 from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
 log = logging.getLogger(__name__)
 
-
-DOCKER_CONFIG_KEYS = [
-    'cap_add',
-    'cap_drop',
-    'cpu_shares',
-    'command',
-    'detach',
-    'dns',
-    'dns_search',
-    'domainname',
-    'entrypoint',
-    'env_file',
-    'environment',
-    'hostname',
-    'image',
-    'mem_limit',
-    'net',
-    'ports',
-    'privileged',
-    'restart',
-    'stdin_open',
-    'tty',
-    'user',
-    'volumes',
-    'volumes_from',
-    'working_dir',
-]
-DOCKER_CONFIG_HINTS = {
-    'cpu_share' : 'cpu_shares',
-    'link'      : 'links',
-    'port'      : 'ports',
-    'privilege' : 'privileged',
-    'priviliged': 'privileged',
-    'privilige' : 'privileged',
-    'volume'    : 'volumes',
-    'workdir'   : 'working_dir',
-}
 
 DOCKER_START_KEYS = [
     'cap_add',
@@ -87,7 +52,7 @@ ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, **options):
+    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, net=None, **options):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -95,26 +60,13 @@ class Service(object):
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
 
-        for filename in get_env_files(options):
-            if not os.path.exists(filename):
-                raise ConfigError("Couldn't find env file for service %s: %s" % (name, filename))
-
-        supported_options = DOCKER_CONFIG_KEYS + ['build', 'expose',
-                                                  'external_links']
-
-        for k in options:
-            if k not in supported_options:
-                msg = "Unsupported config option for %s service: '%s'" % (name, k)
-                if k in DOCKER_CONFIG_HINTS:
-                    msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
-                raise ConfigError(msg)
-
         self.name = name
         self.client = client
         self.project = project
         self.links = links or []
         self.external_links = external_links or []
         self.volumes_from = volumes_from or []
+        self.net = net or None
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -217,6 +169,7 @@ class Service(object):
                          one_off=False,
                          insecure_registry=False,
                          do_build=True,
+                         intermediate_container=None,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
@@ -224,7 +177,9 @@ class Service(object):
         """
         container_options = self._get_container_create_options(
             override_options,
-            one_off=one_off)
+            one_off=one_off,
+            intermediate_container=intermediate_container,
+        )
 
         if (do_build and
                 self.can_be_built() and
@@ -289,57 +244,33 @@ class Service(object):
             entrypoint=['/bin/echo'],
             command=[],
             detach=True,
+            host_config=create_host_config(volumes_from=[container.id]),
         )
-        intermediate_container.start(volumes_from=container.id)
+        intermediate_container.start()
         intermediate_container.wait()
         container.remove()
 
         options = dict(override_options)
-        new_container = self.create_container(do_build=False, **options)
-        self.start_container(new_container, intermediate_container=intermediate_container)
+        new_container = self.create_container(
+            do_build=False,
+            intermediate_container=intermediate_container,
+            **options
+        )
+        self.start_container(new_container)
 
         intermediate_container.remove()
 
         return (intermediate_container, new_container)
 
-    def start_container_if_stopped(self, container, **options):
+    def start_container_if_stopped(self, container):
         if container.is_running:
             return container
         else:
             log.info("Starting %s..." % container.name)
-            return self.start_container(container, **options)
+            return self.start_container(container)
 
-    def start_container(self, container, intermediate_container=None, **override_options):
-        options = dict(self.options, **override_options)
-        port_bindings = build_port_bindings(options.get('ports') or [])
-
-        volume_bindings = dict(
-            build_volume_binding(parse_volume_spec(volume))
-            for volume in options.get('volumes') or []
-            if ':' in volume)
-
-        privileged = options.get('privileged', False)
-        net = options.get('net', 'bridge')
-        dns = options.get('dns', None)
-        dns_search = options.get('dns_search', None)
-        cap_add = options.get('cap_add', None)
-        cap_drop = options.get('cap_drop', None)
-
-        restart = parse_restart_spec(options.get('restart', None))
-
-        container.start(
-            links=self._get_links(link_to_self=options.get('one_off', False)),
-            port_bindings=port_bindings,
-            binds=volume_bindings,
-            volumes_from=self._get_volumes_from(intermediate_container),
-            privileged=privileged,
-            network_mode=net,
-            dns=dns,
-            dns_search=dns_search,
-            restart_policy=restart,
-            cap_add=cap_add,
-            cap_drop=cap_drop,
-        )
+    def start_container(self, container):
+        container.start()
         return container
 
     def start_or_create_containers(
@@ -362,6 +293,15 @@ class Service(object):
 
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
+
+    def get_volumes_from_names(self):
+        return [s.name for s in self.volumes_from if isinstance(s, Service)]
+
+    def get_net_name(self):
+        if isinstance(self.net, Service):
+            return self.net.name
+        else:
+            return
 
     def _next_container_name(self, all_containers, one_off=False):
         bits = [self.project, self.name]
@@ -398,7 +338,6 @@ class Service(object):
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
                 containers = volume_source.containers(stopped=True)
-
                 if not containers:
                     volumes_from.append(volume_source.create_container().id)
                 else:
@@ -412,7 +351,26 @@ class Service(object):
 
         return volumes_from
 
-    def _get_container_create_options(self, override_options, one_off=False):
+    def _get_net(self):
+        if not self.net:
+            return "bridge"
+
+        if isinstance(self.net, Service):
+            containers = self.net.containers()
+            if len(containers) > 0:
+                net = 'container:' + containers[0].id
+            else:
+                log.warning("Warning: Service %s is trying to use reuse the network stack "
+                            "of another service that is not running." % (self.net.name))
+                net = None
+        elif isinstance(self.net, Container):
+            net = 'container:' + self.net.id
+        else:
+            net = self.net
+
+        return net
+
+    def _get_container_create_options(self, override_options, one_off=False, intermediate_container=None):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
@@ -450,8 +408,6 @@ class Service(object):
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
-        container_options['environment'] = merge_environment(container_options)
-
         if self.can_be_built():
             container_options['image'] = self.full_name
         else:
@@ -461,7 +417,46 @@ class Service(object):
         for key in DOCKER_START_KEYS:
             container_options.pop(key, None)
 
+        container_options['host_config'] = self._get_container_host_config(override_options, one_off=one_off, intermediate_container=intermediate_container)
+
         return container_options
+
+    def _get_container_host_config(self, override_options, one_off=False, intermediate_container=None):
+        options = dict(self.options, **override_options)
+        port_bindings = build_port_bindings(options.get('ports') or [])
+
+        volume_bindings = dict(
+            build_volume_binding(parse_volume_spec(volume))
+            for volume in options.get('volumes') or []
+            if ':' in volume)
+
+        privileged = options.get('privileged', False)
+        cap_add = options.get('cap_add', None)
+        cap_drop = options.get('cap_drop', None)
+
+        dns = options.get('dns', None)
+        if isinstance(dns, six.string_types):
+            dns = [dns]
+
+        dns_search = options.get('dns_search', None)
+        if isinstance(dns_search, six.string_types):
+            dns_search = [dns_search]
+
+        restart = parse_restart_spec(options.get('restart', None))
+
+        return create_host_config(
+            links=self._get_links(link_to_self=one_off),
+            port_bindings=port_bindings,
+            binds=volume_bindings,
+            volumes_from=self._get_volumes_from(intermediate_container),
+            privileged=privileged,
+            network_mode=self._get_net(),
+            dns=dns,
+            dns_search=dns_search,
+            restart_policy=restart,
+            cap_add=cap_add,
+            cap_drop=cap_drop,
+        )
 
     def _get_image_name(self, image):
         repo, tag = parse_repository_tag(image)
@@ -482,7 +477,7 @@ class Service(object):
 
         try:
             all_events = stream_output(build_output, sys.stdout)
-        except StreamOutputError, e:
+        except StreamOutputError as e:
             raise BuildError(self, unicode(e))
 
         image_id = None
@@ -590,8 +585,7 @@ def parse_repository_tag(s):
 
 def build_volume_binding(volume_spec):
     internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
-    external = os.path.expanduser(volume_spec.external)
-    return os.path.abspath(os.path.expandvars(external)), internal
+    return volume_spec.external, internal
 
 
 def build_port_bindings(ports):
@@ -620,54 +614,3 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
-
-
-def get_env_files(options):
-    env_files = options.get('env_file', [])
-    if not isinstance(env_files, list):
-        env_files = [env_files]
-    return env_files
-
-
-def merge_environment(options):
-    env = {}
-
-    for f in get_env_files(options):
-        env.update(env_vars_from_file(f))
-
-    if 'environment' in options:
-        if isinstance(options['environment'], list):
-            env.update(dict(split_env(e) for e in options['environment']))
-        else:
-            env.update(options['environment'])
-
-    return dict(resolve_env(k, v) for k, v in env.iteritems())
-
-
-def split_env(env):
-    if '=' in env:
-        return env.split('=', 1)
-    else:
-        return env, None
-
-
-def resolve_env(key, val):
-    if val is not None:
-        return key, val
-    elif key in os.environ:
-        return key, os.environ[key]
-    else:
-        return key, ''
-
-
-def env_vars_from_file(filename):
-    """
-    Read in a line delimited file of environment variables.
-    """
-    env = {}
-    for line in open(filename, 'r'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            k, v = split_env(line)
-            env[k] = v
-    return env
