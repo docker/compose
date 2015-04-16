@@ -6,7 +6,7 @@ page_keywords: compose, orchestration, install, installation, docker, documentat
 ## Installing Compose
 
 To install Compose, you'll need to install Docker first. You'll then install
-Compose with a `curl` command. 
+Compose with a `curl` command.
 
 ### Install Docker
 
@@ -18,12 +18,9 @@ First, install Docker version 1.3 or greater:
 
 ### Install Compose
 
-To install Compose, run the following commands:
+To install Compose, run the following command:
 
-    curl -L https://github.com/docker/compose/releases/download/1.2.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-
-> Note: If you get a "Permission denied" error, your `/usr/local/bin` directory probably isn't writable and you'll need to install Compose as the superuser. Run `sudo -i`, then the two commands above, then `exit`.
+    sudo bash -c "curl -L https://github.com/docker/compose/releases/download/1.2.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose"
 
 Optionally, you can also install [command completion](completion.md) for the
 bash shell.
