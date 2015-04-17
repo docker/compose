@@ -352,6 +352,16 @@ devices:
   - "/dev/ttyUSB0:/dev/ttyUSB0"
 ```
 
+### security_opt
+
+Override the default labeling scheme for each container.
+
+```
+security_opt:
+  - label:user:USER
+  - label:role:ROLE
+```
+
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
 
 Each of these is a single value, analogous to its

@@ -42,6 +42,7 @@ DOCKER_START_KEYS = [
     'privileged',
     'restart',
     'volumes_from',
+    'security_opt',
 ]
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -595,6 +596,7 @@ class Service(object):
         cap_drop = options.get('cap_drop', None)
         log_config = LogConfig(type=options.get('log_driver', 'json-file'))
         pid = options.get('pid', None)
+        security_opt = options.get('security_opt', None)
 
         dns = options.get('dns', None)
         if isinstance(dns, six.string_types):
@@ -627,7 +629,8 @@ class Service(object):
             log_config=log_config,
             extra_hosts=extra_hosts,
             read_only=read_only,
-            pid_mode=pid
+            pid_mode=pid,
+            security_opt=security_opt
         )
 
     def build(self, no_cache=False):
