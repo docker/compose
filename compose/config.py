@@ -7,6 +7,7 @@ DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
     'cpu_shares',
+    'cpuset',
     'command',
     'detach',
     'dns',
