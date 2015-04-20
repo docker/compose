@@ -19,6 +19,7 @@ DOCKER_CONFIG_KEYS = [
     'image',
     'links',
     'mem_limit',
+    'memswap_limit',
     'net',
     'pid',
     'ports',
