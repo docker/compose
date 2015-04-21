@@ -332,6 +332,17 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
+    def test_stop(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['stop', '-t', '1'], None)
+
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
+
     def test_kill(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -371,7 +382,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
-        self.command.dispatch(['restart'], None)
+        self.command.dispatch(['restart', '-t', '1'], None)
         container.inspect()
         self.assertNotEqual(
             container.dictionary['State']['FinishedAt'],
