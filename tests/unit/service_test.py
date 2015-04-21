@@ -38,12 +38,13 @@ class ServiceTest(unittest.TestCase):
         self.assertRaises(ConfigError, lambda: Service(name='foo_bar'))
         self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__'))
 
-        Service('a')
-        Service('foo')
+        Service('a', image='foo')
+        Service('foo', image='foo')
 
     def test_project_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
-        Service(name='foo', project='bar')
+        self.assertRaises(ConfigError, lambda: Service('bar'))
+        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_', image='foo'))
+        Service(name='foo', project='bar', image='foo')
 
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
@@ -52,7 +53,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')
 
     def test_containers(self):
-        service = Service('db', client=self.mock_client, project='myproject')
+        service = Service('db', client=self.mock_client, image='foo', project='myproject')
 
         self.mock_client.containers.return_value = []
         self.assertEqual(service.containers(), [])
@@ -66,7 +67,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual([c.id for c in service.containers()], ['IN_1'])
 
     def test_containers_prefixed(self):
-        service = Service('db', client=self.mock_client, project='myproject')
+        service = Service('db', client=self.mock_client, image='foo', project='myproject')
 
         self.mock_client.containers.return_value = [
             {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/swarm-host-1/myproject', '/swarm-host-1/foo/bar']},
@@ -80,14 +81,15 @@ class ServiceTest(unittest.TestCase):
         container_id = 'aabbccddee'
         service = Service(
             'test',
+            image='foo',
             volumes_from=[mock.Mock(id=container_id, spec=Container)])
 
         self.assertEqual(service._get_volumes_from(), [container_id])
 
     def test_get_volumes_from_intermediate_container(self):
         container_id = 'aabbccddee'
-        service = Service('test')
-        container = mock.Mock(id=container_id, spec=Container)
+        service = Service('test', image='foo')
+        container = mock.Mock(id=container_id, spec=Container, image='foo')
 
         self.assertEqual(service._get_volumes_from(container), [container_id])
 
@@ -98,7 +100,7 @@ class ServiceTest(unittest.TestCase):
             mock.Mock(id=container_id, spec=Container)
             for container_id in container_ids
         ]
-        service = Service('test', volumes_from=[from_service])
+        service = Service('test', volumes_from=[from_service], image='foo')
 
         self.assertEqual(service._get_volumes_from(), container_ids)
 
@@ -109,7 +111,7 @@ class ServiceTest(unittest.TestCase):
         from_service.create_container.return_value = mock.Mock(
             id=container_id,
             spec=Container)
-        service = Service('test', volumes_from=[from_service])
+        service = Service('test', image='foo', volumes_from=[from_service])
 
         self.assertEqual(service._get_volumes_from(), [container_id])
         from_service.create_container.assert_called_once_with()
@@ -157,7 +159,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(port_bindings["2000"], [("127.0.0.1", "2000")])
 
     def test_split_domainname_none(self):
-        service = Service('foo', hostname='name', client=self.mock_client)
+        service = Service('foo', image='foo', hostname='name', client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
@@ -167,6 +169,7 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'foo',
             hostname='name.domain.tld',
+            image='foo',
             client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
@@ -177,6 +180,7 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'foo',
             hostname='name',
+            image='foo',
             domainname='domain.tld',
             client=self.mock_client)
         self.mock_client.containers.return_value = []
@@ -189,6 +193,7 @@ class ServiceTest(unittest.TestCase):
             'foo',
             hostname='name.sub',
             domainname='domain.tld',
+            image='foo',
             client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
@@ -197,7 +202,7 @@ class ServiceTest(unittest.TestCase):
 
     def test_get_container_not_found(self):
         self.mock_client.containers.return_value = []
-        service = Service('foo', client=self.mock_client)
+        service = Service('foo', client=self.mock_client, image='foo')
 
         self.assertRaises(ValueError, service.get_container)
 
@@ -205,7 +210,7 @@ class ServiceTest(unittest.TestCase):
     def test_get_container(self, mock_container_class):
         container_dict = dict(Name='default_foo_2')
         self.mock_client.containers.return_value = [container_dict]
-        service = Service('foo', client=self.mock_client)
+        service = Service('foo', image='foo', client=self.mock_client)
 
         container = service.get_container(number=2)
         self.assertEqual(container, mock_container_class.from_ps.return_value)

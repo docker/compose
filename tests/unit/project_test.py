@@ -80,10 +80,12 @@ class ProjectTest(unittest.TestCase):
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
         )
         console = Service(
             project='composetest',
             name='console',
+            image='foo',
         )
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(), [web, console])
@@ -92,10 +94,12 @@ class ProjectTest(unittest.TestCase):
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
         )
         console = Service(
             project='composetest',
             name='console',
+            image='foo',
         )
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(['console']), [console])
@@ -104,19 +108,23 @@ class ProjectTest(unittest.TestCase):
         db = Service(
             project='composetest',
             name='db',
+            image='foo',
         )
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
             links=[(db, 'database')]
         )
         cache = Service(
             project='composetest',
-            name='cache'
+            name='cache',
+            image='foo'
         )
         console = Service(
             project='composetest',
             name='console',
+            image='foo',
             links=[(web, 'web')]
         )
         project = Project('test', [web, db, cache, console], None)
@@ -129,10 +137,12 @@ class ProjectTest(unittest.TestCase):
         db = Service(
             project='composetest',
             name='db',
+            image='foo',
         )
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
             links=[(db, 'database')]
         )
         project = Project('test', [web, db], None)
