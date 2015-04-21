@@ -134,6 +134,55 @@ class CLITestCase(unittest.TestCase):
             call_kwargs['environment'],
             {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE'})
 
+    def test_run_service_with_restart_always(self):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock()
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            restart='always',
+            image='someimage')
+        command.run(mock_project, {
+            'SERVICE': 'service',
+            'COMMAND': None,
+            '-e': [],
+            '--user': None,
+            '--no-deps': None,
+            '--allow-insecure-ssl': None,
+            '-d': True,
+            '-T': None,
+            '--entrypoint': None,
+            '--service-ports': None,
+            '--rm': None,
+        })
+        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
+        self.assertEquals(call_kwargs['host_config']['RestartPolicy']['Name'], 'always')
+
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock()
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            restart='always',
+            image='someimage')
+        command.run(mock_project, {
+            'SERVICE': 'service',
+            'COMMAND': None,
+            '-e': [],
+            '--user': None,
+            '--no-deps': None,
+            '--allow-insecure-ssl': None,
+            '-d': True,
+            '-T': None,
+            '--entrypoint': None,
+            '--service-ports': None,
+            '--rm': True,
+        })
+        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
+        self.assertFalse('RestartPolicy' in call_kwargs['host_config'])
+
 
 def get_config_filename_for_files(filenames):
     project_dir = tempfile.mkdtemp()
