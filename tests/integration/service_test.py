@@ -112,7 +112,7 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         self.assertEqual(container.inspect()['Config']['CpuShares'], '0')
-        
+       
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
