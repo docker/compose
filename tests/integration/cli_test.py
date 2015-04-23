@@ -24,6 +24,12 @@ class CLITestCase(DockerClientTestCase):
 
     @property
     def project(self):
+        # Hack: allow project to be overridden. This needs refactoring so that
+        # the project object is built exactly once, by the command object, and
+        # accessed by the test case object.
+        if hasattr(self, '_project'):
+            return self._project
+
         return self.command.get_project(self.command.get_config_path())
 
     def test_help(self):
@@ -245,6 +251,28 @@ class CLITestCase(DockerClientTestCase):
         )
 
     @patch('dockerpty.start')
+    def test_run_service_with_user_overridden(self, _):
+        self.command.base_dir = 'tests/fixtures/user-composefile'
+        name = 'service'
+        user = 'sshd'
+        args = ['run', '--user={}'.format(user), name]
+        self.command.dispatch(args, None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(user, container.get('Config.User'))
+
+    @patch('dockerpty.start')
+    def test_run_service_with_user_overridden_short_form(self, _):
+        self.command.base_dir = 'tests/fixtures/user-composefile'
+        name = 'service'
+        user = 'sshd'
+        args = ['run', '-u', user, name]
+        self.command.dispatch(args, None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(user, container.get('Config.User'))
+
+    @patch('dockerpty.start')
     def test_run_service_with_environement_overridden(self, _):
         name = 'service'
         self.command.base_dir = 'tests/fixtures/environment-composefile'
@@ -284,6 +312,7 @@ class CLITestCase(DockerClientTestCase):
 
     @patch('dockerpty.start')
     def test_run_service_with_map_ports(self, __):
+
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['run', '-d', '--service-ports', 'simple'], None)
@@ -299,7 +328,7 @@ class CLITestCase(DockerClientTestCase):
         # check the ports
         self.assertNotEqual(port_random, None)
         self.assertIn("0.0.0.0", port_random)
-        self.assertEqual(port_assigned, "0.0.0.0:9999")
+        self.assertEqual(port_assigned, "0.0.0.0:49152")
 
     @patch('dockerpty.start')
     def test_run_with_encrypted_var(self, _):
@@ -330,6 +359,23 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.command.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
+        service = self.project.get_service('simple')
+        service.create_container()
+        service.kill()
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.command.dispatch(['rm', '-f'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 0)
+
+    def test_stop(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['stop', '-t', '1'], None)
+
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
 
     def test_kill(self):
         self.command.dispatch(['up', '-d'], None)
@@ -370,7 +416,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
-        self.command.dispatch(['restart'], None)
+        self.command.dispatch(['restart', '-t', '1'], None)
         container.inspect()
         self.assertNotEqual(
             container.dictionary['State']['FinishedAt'],
@@ -404,6 +450,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
     def test_port(self):
+
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['up', '-d'], None)
         container = self.project.get_service('simple').get_container()
@@ -414,5 +461,41 @@ class CLITestCase(DockerClientTestCase):
             return mock_stdout.getvalue().rstrip()
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
-        self.assertEqual(get_port(3001), "0.0.0.0:9999")
+        self.assertEqual(get_port(3001), "0.0.0.0:49152")
         self.assertEqual(get_port(3002), "")
+
+    def test_env_file_relative_to_compose_file(self):
+        config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
+        self.command.dispatch(['-f', config_path, 'up', '-d'], None)
+        self._project = self.command.get_project(config_path)
+
+        containers = self.project.containers(stopped=True)
+        self.assertEqual(len(containers), 1)
+        self.assertIn("FOO=1", containers[0].get('Config.Env'))
+
+    def test_up_with_extends(self):
+        self.command.base_dir = 'tests/fixtures/extends'
+        self.command.dispatch(['up', '-d'], None)
+
+        self.assertEqual(
+            set([s.name for s in self.project.services]),
+            set(['mydb', 'myweb']),
+        )
+
+        # Sort by name so we get [db, web]
+        containers = sorted(
+            self.project.containers(stopped=True),
+            key=lambda c: c.name,
+        )
+
+        self.assertEqual(len(containers), 2)
+        web = containers[1]
+
+        self.assertEqual(set(web.links()), set(['db', 'mydb_1', 'extends_mydb_1']))
+
+        expected_env = set([
+            "FOO=1",
+            "BAR=2",
+            "BAZ=2",
+        ])
+        self.assertTrue(expected_env <= set(web.get('Config.Env')))

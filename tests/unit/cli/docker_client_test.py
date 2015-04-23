@@ -5,7 +5,7 @@ import os
 import mock
 from tests import unittest
 
-from compose.cli import docker_client 
+from compose.cli import docker_client
 
 
 class DockerClientTestCase(unittest.TestCase):
@@ -19,4 +19,4 @@ class DockerClientTestCase(unittest.TestCase):
         with mock.patch.dict(os.environ):
             os.environ['DOCKER_CLIENT_TIMEOUT'] = timeout = "300"
             client = docker_client.docker_client()
-        self.assertEqual(client._timeout, int(timeout))
+        self.assertEqual(client.timeout, int(timeout))

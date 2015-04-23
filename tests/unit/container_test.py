@@ -9,7 +9,6 @@ from compose.container import Container
 
 class ContainerTest(unittest.TestCase):
 
-
     def setUp(self):
         self.container_dict = {
             "Id": "abc",
@@ -30,11 +29,13 @@ class ContainerTest(unittest.TestCase):
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
-        self.assertEqual(container.dictionary, {
-            "Id": "abc",
-            "Image":"busybox:latest",
-            "Name": "/composetest_db_1",
-        })
+        self.assertEqual(
+            container.dictionary,
+            {
+                "Id": "abc",
+                "Image": "busybox:latest",
+                "Name": "/composetest_db_1",
+            })
 
     def test_from_ps_prefixed(self):
         self.container_dict['Names'] = ['/swarm-host-1' + n for n in self.container_dict['Names']]
@@ -44,7 +45,7 @@ class ContainerTest(unittest.TestCase):
                                       has_been_inspected=True)
         self.assertEqual(container.dictionary, {
             "Id": "abc",
-            "Image":"busybox:latest",
+            "Image": "busybox:latest",
             "Name": "/composetest_db_1",
         })
 
@@ -100,7 +101,7 @@ class ContainerTest(unittest.TestCase):
 
     def test_human_readable_ports_public_and_private(self):
         self.container_dict['NetworkSettings']['Ports'].update({
-            "45454/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "49197" } ],
+            "45454/tcp": [{"HostIp": "0.0.0.0", "HostPort": "49197"}],
             "45453/tcp": [],
         })
         container = Container(None, self.container_dict, has_been_inspected=True)
@@ -110,7 +111,7 @@ class ContainerTest(unittest.TestCase):
 
     def test_get_local_port(self):
         self.container_dict['NetworkSettings']['Ports'].update({
-            "45454/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "49197" } ],
+            "45454/tcp": [{"HostIp": "0.0.0.0", "HostPort": "49197"}],
         })
         container = Container(None, self.container_dict, has_been_inspected=True)
 
@@ -120,12 +121,12 @@ class ContainerTest(unittest.TestCase):
 
     def test_get(self):
         container = Container(None, {
-            "Status":"Up 8 seconds",
+            "Status": "Up 8 seconds",
             "HostConfig": {
-                "VolumesFrom": ["volume_id",]
+                "VolumesFrom": ["volume_id"]
             },
         }, has_been_inspected=True)
 
         self.assertEqual(container.get('Status'), "Up 8 seconds")
-        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id",])
+        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id"])
         self.assertEqual(container.get('Foo.Bar.DoesNotExist'), None)

@@ -1,5 +1,7 @@
 
 - ['compose/index.md', 'User Guide', 'Docker Compose' ]
+- ['compose/production.md', 'User Guide', 'Using Compose in production' ]
+- ['compose/extends.md', 'User Guide', 'Extending services in Compose']
 - ['compose/install.md', 'Installation', 'Docker Compose']
 - ['compose/cli.md', 'Reference', 'Compose command line']
 - ['compose/yml.md', 'Reference', 'Compose yml']

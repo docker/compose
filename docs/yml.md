@@ -29,8 +29,9 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. This directory is also the
-build context that is sent to the Docker daemon.
+Path to a directory containing a Dockerfile. When the value supplied is a 
+relative path, it is interpreted as relative to the location of the yml file 
+itself. This directory is also the build context that is sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 
@@ -158,16 +159,72 @@ environment:
 
 Add environment variables from a file. Can be a single value or a list.
 
+If you have specified a Compose file with `docker-compose -f FILE`, paths in
+`env_file` are relative to the directory that file is in.
+
 Environment variables specified in `environment` override these values.
 
 ```
+env_file: .env
+
 env_file:
-  - .env
+  - ./common.env
+  - ./apps/web.env
+  - /opt/secrets.env
 ```
 
+Compose expects each line in an env file to be in `VAR=VAL` format. Lines
+beginning with `#` (i.e. comments) are ignored, as are blank lines.
+
 ```
-RACK_ENV: development
+# Set Rails/Rack environment
+RACK_ENV=development
 ```
+
+### extends
+
+Extend another service, in the current file or another, optionally overriding
+configuration.
+
+Here's a simple example. Suppose we have 2 files - **common.yml** and
+**development.yml**. We can use `extends` to define a service in
+**development.yml** which uses configuration defined in **common.yml**:
+
+**common.yml**
+
+```
+webapp:
+  build: ./webapp
+  environment:
+    - DEBUG=false
+    - SEND_EMAILS=false
+```
+
+**development.yml**
+
+```
+web:
+  extends:
+    file: common.yml
+    service: webapp
+  ports:
+    - "8000:8000"
+  links:
+    - db
+  environment:
+    - DEBUG=true
+db:
+  image: postgres
+```
+
+Here, the `web` service in **development.yml** inherits the configuration of
+the `webapp` service in **common.yml** - the `build` and `environment` keys -
+and adds `ports` and `links` configuration. It overrides one of the defined
+environment variables (DEBUG) with a new value, and the other one
+(SEND_EMAILS) is left untouched.
+
+For more on `extends`, see the [tutorial](extends.md#example) and
+[reference](extends.md#reference).
 
 ### net
 
@@ -179,6 +236,16 @@ net: "none"
 net: "container:[name or id]"
 net: "host"
 ```
+### pid
+
+```
+pid: "host"
+```
+
+Sets the PID mode to the host PID mode.  This turns on sharing between
+container and the host operating system the PID address space.  Containers
+launched with this flag will be able to access and manipulate other
+containers in the bare-metal machine's namespace and vise-versa.
 
 ### dns
 

@@ -1,0 +1,12 @@
+foo:
+  image: busybox
+bar:
+  image: busybox
+web:
+  extends:
+    file: circle-2.yml
+    service: web
+baz:
+  image: busybox
+quux:
+  image: busybox

@@ -4,12 +4,8 @@ from requests.exceptions import ConnectionError, SSLError
 import logging
 import os
 import re
-import yaml
 import six
-import base64
-
-from simplecrypt import decrypt
-from simplecrypt import DecryptionException
+from .. import config
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
@@ -28,7 +24,7 @@ class Command(DocoptCommand):
     def dispatch(self, *args, **kwargs):
         try:
             super(Command, self).dispatch(*args, **kwargs)
-        except SSLError, e:
+        except SSLError as e:
             raise errors.UserError('SSL error: %s' % e)
         except ConnectionError:
             if call_silently(['which', 'docker']) != 0:
@@ -72,32 +68,11 @@ class Command(DocoptCommand):
             return verbose_proxy.VerboseProxy('docker', client)
         return client
 
-    def get_config(self, config_path):
-        try:
-            with open(config_path, 'r') as fh:
-                config = yaml.safe_load(fh)
-                for project in config:
-                    if 'environment' in config[project]:
-                        for key, var in config[project]['environment'].items():
-                            if var.startswith('encrypted:'):
-                                secret = os.environ.get('FIG_CRYPT_KEY')
-                                if secret is None:
-                                    raise SystemExit("Your yml configuration has encrypted environmental variables but you haven't set 'FIG_CRYPT_KEY in your environment.  Please set it and try again.")
-                                try:
-                                    config[project]['environment'][key] = decrypt(secret, base64.urlsafe_b64decode(var.replace('encrypted:', '').encode('utf8')))
-                                except DecryptionException:
-                                    log.fatal("Decryption Error: We couldn't decrypt the environmental variable %s in your yml config with the given FIG_CRYPT_KEY.  The value has been set to BAD_DECRYPT." % key)
-                                    config[project]['environment'][key] = "BAD_DECRYPT"
-                return config
-
-        except IOError as e:
-            raise errors.UserError(six.text_type(e))
-
     def get_project(self, config_path, project_name=None, verbose=False):
         try:
-            return Project.from_config(
+            return Project.from_dicts(
                 self.get_project_name(config_path, project_name),
-                self.get_config(config_path),
+                config.load(config_path),
                 self.get_client(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))

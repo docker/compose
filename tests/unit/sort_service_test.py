@@ -65,6 +65,95 @@ class SortServiceTest(unittest.TestCase):
         self.assertEqual(sorted_services[1]['name'], 'parent')
         self.assertEqual(sorted_services[2]['name'], 'grandparent')
 
+    def test_sort_service_dicts_4(self):
+        services = [
+            {
+                'name': 'child'
+            },
+            {
+                'name': 'parent',
+                'volumes_from': ['child']
+            },
+            {
+                'links': ['parent'],
+                'name': 'grandparent'
+            },
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 3)
+        self.assertEqual(sorted_services[0]['name'], 'child')
+        self.assertEqual(sorted_services[1]['name'], 'parent')
+        self.assertEqual(sorted_services[2]['name'], 'grandparent')
+
+    def test_sort_service_dicts_5(self):
+        services = [
+            {
+                'links': ['parent'],
+                'name': 'grandparent'
+            },
+            {
+                'name': 'parent',
+                'net': 'container:child'
+            },
+            {
+                'name': 'child'
+            }
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 3)
+        self.assertEqual(sorted_services[0]['name'], 'child')
+        self.assertEqual(sorted_services[1]['name'], 'parent')
+        self.assertEqual(sorted_services[2]['name'], 'grandparent')
+
+    def test_sort_service_dicts_6(self):
+        services = [
+            {
+                'links': ['parent'],
+                'name': 'grandparent'
+            },
+            {
+                'name': 'parent',
+                'volumes_from': ['child']
+            },
+            {
+                'name': 'child'
+            }
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 3)
+        self.assertEqual(sorted_services[0]['name'], 'child')
+        self.assertEqual(sorted_services[1]['name'], 'parent')
+        self.assertEqual(sorted_services[2]['name'], 'grandparent')
+
+    def test_sort_service_dicts_7(self):
+        services = [
+            {
+                'net': 'container:three',
+                'name': 'four'
+            },
+            {
+                'links': ['two'],
+                'name': 'three'
+            },
+            {
+                'name': 'two',
+                'volumes_from': ['one']
+            },
+            {
+                'name': 'one'
+            }
+        ]
+
+        sorted_services = sort_service_dicts(services)
+        self.assertEqual(len(sorted_services), 4)
+        self.assertEqual(sorted_services[0]['name'], 'one')
+        self.assertEqual(sorted_services[1]['name'], 'two')
+        self.assertEqual(sorted_services[2]['name'], 'three')
+        self.assertEqual(sorted_services[3]['name'], 'four')
+
     def test_sort_service_dicts_circular_imports(self):
         services = [
             {

@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
 from os import path
+import mock
 
 from compose import Service
 from compose.service import CannotBeScaledError
@@ -12,7 +13,7 @@ from .testcases import DockerClientTestCase
 
 def create_and_start_container(service, **override_options):
     container = service.create_container(**override_options)
-    return service.start_container(container, **override_options)
+    return service.start_container(container)
 
 
 class ServiceTest(DockerClientTestCase):
@@ -120,7 +121,25 @@ class ServiceTest(DockerClientTestCase):
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
         actual_host_path = volumes[container_path]
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
-            msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
+                        msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
+
+    @mock.patch.dict(os.environ)
+    def test_create_container_with_home_and_env_var_in_volume_path(self):
+        os.environ['VOLUME_NAME'] = 'my-volume'
+        os.environ['HOME'] = '/tmp/home-dir'
+        expected_host_path = os.path.join(os.environ['HOME'], os.environ['VOLUME_NAME'])
+
+        host_path = '~/${VOLUME_NAME}'
+        container_path = '/container-path'
+
+        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
+        container = service.create_container()
+        service.start_container(container)
+
+        actual_host_path = container.get('Volumes')[container_path]
+        components = actual_host_path.split('/')
+        self.assertTrue(components[-2:] == ['home-dir', 'my-volume'],
+                        msg="Last two components differ: %s, %s" % (actual_host_path, expected_host_path))
 
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
@@ -181,11 +200,10 @@ class ServiceTest(DockerClientTestCase):
             entrypoint=['sleep'],
             command=['300']
         )
-        old_container = service.create_container()
+        service.create_container()
         self.assertEqual(len(service.containers(stopped=True)), 1)
         service.recreate_containers()
         self.assertEqual(len(service.containers(stopped=True)), 1)
-
 
     def test_recreate_containers_with_image_declared_volume(self):
         service = Service(
@@ -228,8 +246,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
-                'db',
-            ]),
+                'db'])
         )
 
     def test_start_container_creates_links_with_names(self):
@@ -245,8 +262,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
-                'custom_link_name',
-            ]),
+                'custom_link_name'])
         )
 
     def test_start_container_with_external_links(self):
@@ -264,8 +280,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1',
                 'composetest_db_2',
-                'db_3',
-                ]),
+                'db_3']),
         )
 
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
@@ -290,8 +305,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
-                'db',
-            ]),
+                'db'])
         )
 
     def test_start_container_builds_images(self):
@@ -330,7 +344,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container['HostConfig']['Privileged'], False)
 
     def test_start_container_becomes_priviliged(self):
-        service = self.create_service('web', privileged = True)
+        service = self.create_service('web', privileged=True)
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
 
@@ -423,6 +437,21 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
+    def test_pid_mode_none_defined(self):
+        service = self.create_service('web', pid=None)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.PidMode'), '')
+
+    def test_pid_mode_host(self):
+        service = self.create_service('web', pid='host')
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.PidMode'), 'host')
+
+    def test_dns_no_value(self):
+        service = self.create_service('web')
+        container = create_and_start_container(service)
+        self.assertIsNone(container.get('HostConfig.Dns'))
+
     def test_dns_single_value(self):
         service = self.create_service('web', dns='8.8.8.8')
         container = create_and_start_container(service)
@@ -454,6 +483,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.CapDrop'), ['SYS_ADMIN', 'NET_ADMIN'])
 
+    def test_dns_search_no_value(self):
+        service = self.create_service('web')
+        container = create_and_start_container(service)
+        self.assertIsNone(container.get('HostConfig.DnsSearch'))
+
     def test_dns_search_single_value(self):
         service = self.create_service('web', dns_search='example.com')
         container = create_and_start_container(service)
@@ -472,25 +506,21 @@ class ServiceTest(DockerClientTestCase):
     def test_split_env(self):
         service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
         env = create_and_start_container(service).environment
-        for k,v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.iteritems():
+        for k, v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.items():
             self.assertEqual(env[k], v)
 
     def test_env_from_file_combined_with_env(self):
         service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
-        for k,v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.iteritems():
+        for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
+    @mock.patch.dict(os.environ)
     def test_resolve_env(self):
-        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
-        try:
-            env = create_and_start_container(service).environment
-            for k,v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.iteritems():
-                self.assertEqual(env[k], v)
-        finally:
-            del os.environ['FILE_DEF']
-            del os.environ['FILE_DEF_EMPTY']
-            del os.environ['ENV_DEF']
+        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
+        env = create_and_start_container(service).environment
+        for k, v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
+            self.assertEqual(env[k], v)

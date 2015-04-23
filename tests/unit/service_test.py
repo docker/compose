@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import os
 
 from .. import unittest
 import mock
@@ -11,14 +10,14 @@ from requests import Response
 from compose import Service
 from compose.container import Container
 from compose.service import (
-    ConfigError,
-    split_port,
-    build_port_bindings,
-    parse_volume_spec,
-    build_volume_binding,
     APIError,
+    ConfigError,
+    build_port_bindings,
+    build_volume_binding,
     get_container_name,
     parse_repository_tag,
+    parse_volume_spec,
+    split_port,
 )
 
 
@@ -39,16 +38,13 @@ class ServiceTest(unittest.TestCase):
         self.assertRaises(ConfigError, lambda: Service(name='foo_bar'))
         self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__'))
 
-        Service('a')
-        Service('foo')
+        Service('a', image='foo')
+        Service('foo', image='foo')
 
     def test_project_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_'))
-        Service(name='foo', project='bar')
-
-    def test_config_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', port=['8000']))
-        Service(name='foo', ports=['8000'])
+        self.assertRaises(ConfigError, lambda: Service('bar'))
+        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_', image='foo'))
+        Service(name='foo', project='bar', image='foo')
 
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
@@ -57,7 +53,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')
 
     def test_containers(self):
-        service = Service('db', client=self.mock_client, project='myproject')
+        service = Service('db', client=self.mock_client, image='foo', project='myproject')
 
         self.mock_client.containers.return_value = []
         self.assertEqual(service.containers(), [])
@@ -71,7 +67,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual([c.id for c in service.containers()], ['IN_1'])
 
     def test_containers_prefixed(self):
-        service = Service('db', client=self.mock_client, project='myproject')
+        service = Service('db', client=self.mock_client, image='foo', project='myproject')
 
         self.mock_client.containers.return_value = [
             {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/swarm-host-1/myproject', '/swarm-host-1/foo/bar']},
@@ -85,14 +81,15 @@ class ServiceTest(unittest.TestCase):
         container_id = 'aabbccddee'
         service = Service(
             'test',
+            image='foo',
             volumes_from=[mock.Mock(id=container_id, spec=Container)])
 
         self.assertEqual(service._get_volumes_from(), [container_id])
 
     def test_get_volumes_from_intermediate_container(self):
         container_id = 'aabbccddee'
-        service = Service('test')
-        container = mock.Mock(id=container_id, spec=Container)
+        service = Service('test', image='foo')
+        container = mock.Mock(id=container_id, spec=Container, image='foo')
 
         self.assertEqual(service._get_volumes_from(container), [container_id])
 
@@ -103,7 +100,7 @@ class ServiceTest(unittest.TestCase):
             mock.Mock(id=container_id, spec=Container)
             for container_id in container_ids
         ]
-        service = Service('test', volumes_from=[from_service])
+        service = Service('test', volumes_from=[from_service], image='foo')
 
         self.assertEqual(service._get_volumes_from(), container_ids)
 
@@ -114,7 +111,7 @@ class ServiceTest(unittest.TestCase):
         from_service.create_container.return_value = mock.Mock(
             id=container_id,
             spec=Container)
-        service = Service('test', volumes_from=[from_service])
+        service = Service('test', image='foo', volumes_from=[from_service])
 
         self.assertEqual(service._get_volumes_from(), [container_id])
         from_service.create_container.assert_called_once_with()
@@ -150,48 +147,54 @@ class ServiceTest(unittest.TestCase):
 
     def test_build_port_bindings_with_one_port(self):
         port_bindings = build_port_bindings(["127.0.0.1:1000:1000"])
-        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000")])
+        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
 
     def test_build_port_bindings_with_matching_internal_ports(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000","127.0.0.1:2000:1000"])
-        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000"),("127.0.0.1","2000")])
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000", "127.0.0.1:2000:1000"])
+        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000"), ("127.0.0.1", "2000")])
 
     def test_build_port_bindings_with_nonmatching_internal_ports(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000","127.0.0.1:2000:2000"])
-        self.assertEqual(port_bindings["1000"],[("127.0.0.1","1000")])
-        self.assertEqual(port_bindings["2000"],[("127.0.0.1","2000")])
+        port_bindings = build_port_bindings(["127.0.0.1:1000:1000", "127.0.0.1:2000:2000"])
+        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
+        self.assertEqual(port_bindings["2000"], [("127.0.0.1", "2000")])
 
     def test_split_domainname_none(self):
-        service = Service('foo', hostname='name', client=self.mock_client)
+        service = Service('foo', image='foo', hostname='name', client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
     def test_split_domainname_fqdn(self):
-        service = Service('foo',
-                hostname='name.domain.tld',
-                client=self.mock_client)
+        service = Service(
+            'foo',
+            hostname='name.domain.tld',
+            image='foo',
+            client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_both(self):
-        service = Service('foo',
-                hostname='name',
-                domainname='domain.tld',
-                client=self.mock_client)
+        service = Service(
+            'foo',
+            hostname='name',
+            image='foo',
+            domainname='domain.tld',
+            client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_weird(self):
-        service = Service('foo',
-                hostname='name.sub',
-                domainname='domain.tld',
-                client=self.mock_client)
+        service = Service(
+            'foo',
+            hostname='name.sub',
+            domainname='domain.tld',
+            image='foo',
+            client=self.mock_client)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
@@ -199,7 +202,7 @@ class ServiceTest(unittest.TestCase):
 
     def test_get_container_not_found(self):
         self.mock_client.containers.return_value = []
-        service = Service('foo', client=self.mock_client)
+        service = Service('foo', client=self.mock_client, image='foo')
 
         self.assertRaises(ValueError, service.get_container)
 
@@ -207,7 +210,7 @@ class ServiceTest(unittest.TestCase):
     def test_get_container(self, mock_container_class):
         container_dict = dict(Name='default_foo_2')
         self.mock_client.containers.return_value = [container_dict]
-        service = Service('foo', client=self.mock_client)
+        service = Service('foo', image='foo', client=self.mock_client)
 
         container = service.get_container(number=2)
         self.assertEqual(container, mock_container_class.from_ps.return_value)
@@ -305,95 +308,3 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(
             binding,
             ('/outside', dict(bind='/inside', ro=False)))
-
-    @mock.patch.dict(os.environ)
-    def test_build_volume_binding_with_environ(self):
-        os.environ['VOLUME_PATH'] = '/opt'
-        binding = build_volume_binding(parse_volume_spec('${VOLUME_PATH}:/opt'))
-        self.assertEqual(binding, ('/opt', dict(bind='/opt', ro=False)))
-
-    @mock.patch.dict(os.environ)
-    def test_building_volume_binding_with_home(self):
-        os.environ['HOME'] = '/home/user'
-        binding = build_volume_binding(parse_volume_spec('~:/home/user'))
-        self.assertEqual(
-            binding,
-            ('/home/user', dict(bind='/home/user', ro=False)))
-
-class ServiceEnvironmentTest(unittest.TestCase):
-
-    def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
-        self.mock_client.containers.return_value = []
-
-    def test_parse_environment(self):
-        service = Service('foo',
-                environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}
-            )
-
-    @mock.patch.dict(os.environ)
-    def test_resolve_environment(self):
-        os.environ['FILE_DEF'] = 'E1'
-        os.environ['FILE_DEF_EMPTY'] = 'E2'
-        os.environ['ENV_DEF'] = 'E3'
-        service = Service('foo',
-                environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None},
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}
-            )
-
-    def test_env_from_file(self):
-        service = Service('foo',
-                env_file='tests/fixtures/env/one.env',
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'}
-            )
-
-    def test_env_from_multiple_files(self):
-        service = Service('foo',
-                env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}
-            )
-
-    def test_env_nonexistent_file(self):
-        self.assertRaises(ConfigError, lambda: Service('foo', env_file='tests/fixtures/env/nonexistent.env'))
-
-
-    @mock.patch.dict(os.environ)
-    def test_resolve_environment_from_file(self):
-        os.environ['FILE_DEF'] = 'E1'
-        os.environ['FILE_DEF_EMPTY'] = 'E2'
-        os.environ['ENV_DEF'] = 'E3'
-        service = Service('foo',
-                env_file=['tests/fixtures/env/resolve.env'],
-                client=self.mock_client,
-                image='image_name',
-            )
-        options = service._get_container_create_options({})
-        self.assertEqual(
-            options['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}
-            )

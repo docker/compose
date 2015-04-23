@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import six
+from functools import reduce
 
 
 class Container(object):
@@ -125,8 +126,8 @@ class Container(object):
     def kill(self, **options):
         return self.client.kill(self.id, **options)
 
-    def restart(self):
-        return self.client.restart(self.id)
+    def restart(self, **options):
+        return self.client.restart(self.id, **options)
 
     def remove(self, **options):
         return self.client.remove_container(self.id, **options)
