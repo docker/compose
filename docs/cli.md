@@ -136,7 +136,10 @@ By default, if there are existing containers for a service, `docker-compose up` 
 
 ### -f, --file FILE
 
- Specifies an alternate Compose yaml file (default: `docker-compose.yml`)
+ Specify what file to read configuration from. If not provided, Compose will look
+ for `docker-compose.yml` in the current working directory, and then each parent
+ directory successively, until found.
+
 
 ### -p, --project-name NAME
 
@@ -157,7 +160,9 @@ Sets the project name, which is prepended to the name of every container started
 
 ### COMPOSE\_FILE
 
-Sets the path to the `docker-compose.yml` to use. Defaults to `docker-compose.yml` in the current working directory.
+Specify what file to read configuration from. If not provided, Compose will look
+for `docker-compose.yml` in the current working directory, and then each parent
+directory successively, until found.
 
 ### DOCKER\_HOST
 
