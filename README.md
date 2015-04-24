@@ -51,7 +51,7 @@ Installation and documentation
 ------------------------------
 
 - Full documentation is available on [Docker's website](http://docs.docker.com/compose/).
-- Hop into #docker-compose on Freenode if you have any questions.
+- If you have any questions, you can talk in real-time with other developers in the #docker-compose IRC channel on Freenode. [Click here to join using IRCCloud.](https://www.irccloud.com/invite?hostname=irc.freenode.net&channel=%23docker-compose)
 
 Contributing
 ------------
