@@ -391,6 +391,11 @@ class ServiceTest(DockerClientTestCase):
             ],
         })
 
+    def test_start_with_image_id(self):
+        # Image id for the current busybox:latest
+        service = self.create_service('foo', image='8c2e06607696')
+        self.assertTrue(service.start_or_create_containers())
+
     def test_scale(self):
         service = self.create_service('web')
         service.scale(1)
