@@ -47,6 +47,10 @@ Lists containers.
 
 Pulls service images.
 
+### restart
+
+Restarts services.
+
 ### rm
 
 Removes stopped service containers.
@@ -130,7 +134,7 @@ By default, if there are existing containers for a service, `docker-compose up` 
 
  Shows more output
 
-### --version
+### -v, --version
 
  Prints version and exits
 
