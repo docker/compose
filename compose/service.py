@@ -30,6 +30,7 @@ DOCKER_START_KEYS = [
     'pid',
     'privileged',
     'restart',
+    'volumes_from',
 ]
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -175,16 +176,16 @@ class Service(object):
                          one_off=False,
                          insecure_registry=False,
                          do_build=True,
-                         intermediate_container=None,
+                         previous_container=None,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
+        override_options['volumes_from'] = self._get_volumes_from(previous_container)
         container_options = self._get_container_create_options(
             override_options,
             one_off=one_off,
-            intermediate_container=intermediate_container,
         )
 
         if (do_build and
@@ -213,21 +214,24 @@ class Service(object):
                 do_build=do_build,
                 **override_options)
             self.start_container(container)
-            return [(None, container)]
-        else:
-            tuples = []
+            return [container]
 
-            for c in containers:
-                log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
-
-            return tuples
+        return [
+            self.recreate_container(
+                c,
+                insecure_registry=insecure_registry,
+                **override_options)
+            for c in containers
+        ]
 
     def recreate_container(self, container, **override_options):
-        """Recreate a container. An intermediate container is created so that
-        the new container has the same name, while still supporting
-        `volumes-from` the original container.
+        """Recreate a container.
+
+        The original container is renamed to a temporary name so that data
+        volumes can be copied to the new container, before the original
+        container is removed.
         """
+        log.info("Recreating %s..." % container.name)
         try:
             container.stop()
         except APIError as e:
@@ -238,29 +242,17 @@ class Service(object):
             else:
                 raise
 
-        intermediate_container = Container.create(
-            self.client,
-            image=container.image,
-            entrypoint=['/bin/echo'],
-            command=[],
-            detach=True,
-            host_config=create_host_config(volumes_from=[container.id]),
-        )
-        intermediate_container.start()
-        intermediate_container.wait()
-        container.remove()
-
-        options = dict(override_options)
+        # Use a hopefully unique container name by prepending the short id
+        self.client.rename(
+            container.id,
+            '%s_%s' % (container.short_id, container.name))
         new_container = self.create_container(
             do_build=False,
-            intermediate_container=intermediate_container,
-            **options
-        )
+            previous_container=container,
+            **override_options)
         self.start_container(new_container)
-
-        intermediate_container.remove()
-
-        return (intermediate_container, new_container)
+        container.remove()
+        return new_container
 
     def start_container_if_stopped(self, container):
         if container.is_running:
@@ -333,7 +325,7 @@ class Service(object):
             links.append((external_link, link_name))
         return links
 
-    def _get_volumes_from(self, intermediate_container=None):
+    def _get_volumes_from(self, previous_container=None):
         volumes_from = []
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
@@ -346,8 +338,8 @@ class Service(object):
             elif isinstance(volume_source, Container):
                 volumes_from.append(volume_source.id)
 
-        if intermediate_container:
-            volumes_from.append(intermediate_container.id)
+        if previous_container:
+            volumes_from.append(previous_container.id)
 
         return volumes_from
 
@@ -370,7 +362,7 @@ class Service(object):
 
         return net
 
-    def _get_container_create_options(self, override_options, one_off=False, intermediate_container=None):
+    def _get_container_create_options(self, override_options, one_off=False):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
@@ -415,11 +407,13 @@ class Service(object):
         for key in DOCKER_START_KEYS:
             container_options.pop(key, None)
 
-        container_options['host_config'] = self._get_container_host_config(override_options, one_off=one_off, intermediate_container=intermediate_container)
+        container_options['host_config'] = self._get_container_host_config(
+            override_options,
+            one_off=one_off)
 
         return container_options
 
-    def _get_container_host_config(self, override_options, one_off=False, intermediate_container=None):
+    def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
 
@@ -451,7 +445,7 @@ class Service(object):
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
             binds=volume_bindings,
-            volumes_from=self._get_volumes_from(intermediate_container),
+            volumes_from=options.get('volumes_from'),
             privileged=privileged,
             network_mode=self._get_net(),
             dns=dns,
