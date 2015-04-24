@@ -407,9 +407,15 @@ def get_service_name_from_net(net_config):
 def load_yaml(filename):
     try:
         with open(filename, 'r') as fh:
-            return yaml.safe_load(fh)
+            return inject_env_variables(yaml.safe_load(fh))
     except IOError as e:
         raise ConfigurationError(six.text_type(e))
+
+
+def inject_env_variables(content):
+    for k, v in os.environ.iteritems():
+        content = content.replace('$'+k, v)
+    return content
 
 
 class ConfigurationError(Exception):
