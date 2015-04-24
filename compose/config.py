@@ -414,7 +414,7 @@ def load_yaml(filename):
 
 def inject_env_variables(content):
     for k, v in os.environ.iteritems():
-        content = content.replace('$'+k, v, 1)
+        content = content.replace('$'+k, v)
     return content
 
 
