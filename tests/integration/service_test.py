@@ -107,6 +107,12 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
 
+    def test_create_container_with_memswap_limit(self):
+        service = self.create_service('db', memswap_limit='200m', mem_limit='200m')
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.inspect()['Config']['MemorySwap'], 209715200)
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'

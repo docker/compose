@@ -283,7 +283,7 @@ dns_search:
   - dc2.example.com
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, memswap\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -299,6 +299,7 @@ hostname: foo
 domainname: foo.com
 
 mem_limit: 1000000000
+memswap_limit: 2000000000
 privileged: true
 
 restart: always
