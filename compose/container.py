@@ -4,6 +4,8 @@ from __future__ import absolute_import
 import six
 from functools import reduce
 
+from .const import LABEL_CONTAINER_NUMBER, LABEL_SERVICE
+
 
 class Container(object):
     """
@@ -58,14 +60,11 @@ class Container(object):
 
     @property
     def name_without_project(self):
-        return '_'.join(self.dictionary['Name'].split('_')[1:])
+        return '{0}_{1}'.format(self.labels.get(LABEL_SERVICE), self.number)
 
     @property
     def number(self):
-        try:
-            return int(self.name.split('_')[-1])
-        except ValueError:
-            return None
+        return int(self.labels.get(LABEL_CONTAINER_NUMBER) or 0)
 
     @property
     def ports(self):
@@ -159,6 +158,7 @@ class Container(object):
         self.has_been_inspected = True
         return self.dictionary
 
+    # TODO: only used by tests, move to test module
     def links(self):
         links = []
         for container in self.client.containers():
