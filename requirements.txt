@@ -1,4 +1,6 @@
 PyYAML==3.10
+#cerberus==0.9
+git+https://github.com/nicolairocci/cerberus.git@master#egg=cerbereus
 docker-py==1.2.2
 dockerpty==0.3.4
 docopt==0.6.1

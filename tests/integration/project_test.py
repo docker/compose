@@ -54,14 +54,14 @@ class ProjectTest(DockerClientTestCase):
             self.client,
             image='busybox:latest',
             volumes=['/var/data'],
-            name='composetest_data_container',
+            name='composetestdatacontainer',
         )
         project = Project.from_dicts(
             name='composetest',
             service_dicts=config.from_dictionary({
                 'db': {
                     'image': 'busybox:latest',
-                    'volumes_from': ['composetest_data_container'],
+                    'volumes_from': ['composetestdatacontainer'],
                 },
             }),
             client=self.client,

@@ -11,8 +11,9 @@ from docker.errors import APIError
 from docker.utils import create_host_config, LogConfig
 
 from . import __version__
-from .config import DOCKER_CONFIG_KEYS, merge_environment
+from .config import merge_environment
 from .const import (
+    DOCKER_CONFIG_KEYS,
     LABEL_CONTAINER_NUMBER,
     LABEL_ONE_OFF,
     LABEL_PROJECT,
@@ -159,13 +160,8 @@ class Service(object):
         while len(containers) < desired_num:
             containers.append(self.create_container())
 
-        running_containers = []
-        stopped_containers = []
-        for c in containers:
-            if c.is_running:
-                running_containers.append(c)
-            else:
-                stopped_containers.append(c)
+        running_containers = [c for c in containers if c.is_running]
+        stopped_containers = [c for c in containers if not c.is_running]
         running_containers.sort(key=lambda c: c.number)
         stopped_containers.sort(key=lambda c: c.number)
 
@@ -394,6 +390,7 @@ class Service(object):
         container.start()
         return container
 
+    # TODO? decorate next four methods as properties
     def config_hash(self):
         return json_hash(self.config_dict())
 
@@ -471,6 +468,7 @@ class Service(object):
 
         return volumes_from
 
+    # TODO? decorate as property
     def _get_net(self):
         if not self.net:
             return "bridge"
@@ -655,6 +653,7 @@ class Service(object):
 
         return image_id
 
+    # TODO? decorate as property
     def can_be_built(self):
         return 'build' in self.options
 
@@ -672,6 +671,7 @@ class Service(object):
             '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
         ]
 
+    # TODO? decorate as property
     def can_be_scaled(self):
         for port in self.options.get('ports', []):
             if ':' in str(port):
