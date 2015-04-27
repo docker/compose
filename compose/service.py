@@ -482,6 +482,7 @@ class Service(object):
             stream=True,
             rm=True,
             nocache=no_cache,
+            dockerfile=self.options.get('dockerfile', None),
         )
 
         try:
