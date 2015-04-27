@@ -398,6 +398,21 @@ class ExtendsTest(unittest.TestCase):
 
         self.assertEqual(set(dicts[0]['volumes']), set(paths))
 
+    def test_parent_build_path_dne(self):
+        child = config.load('tests/fixtures/extends/nonexistent-path-child.yml')
+
+        self.assertEqual(child, [
+            {
+                'name': 'dnechild',
+                'image': 'busybox',
+                'command': '/bin/true',
+                'environment': {
+                    "FOO": "1",
+                    "BAR": "2",
+                },
+            },
+        ])
+
 
 class BuildPathTest(unittest.TestCase):
     def setUp(self):
@@ -407,7 +422,10 @@ class BuildPathTest(unittest.TestCase):
         options = {'build': 'nonexistent.path'}
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.make_service_dict('foo', options, 'tests/fixtures/build-path'),
+            lambda: config.from_dictionary({
+                'foo': options,
+                'working_dir': 'tests/fixtures/build-path'
+            })
         )
 
     def test_relative_path(self):
