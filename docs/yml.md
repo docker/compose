@@ -87,6 +87,23 @@ external_links:
  - project_db_1:postgresql
 ```
 
+### extra_hosts
+
+Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
+
+```
+extra_hosts:
+ - "somehost:162.242.195.82"
+ - "otherhost:50.31.209.229"
+```
+
+An entry with the ip address and hostname will be created in `/etc/hosts` inside containers for this service, e.g:
+
+```
+162.242.195.82  somehost
+50.31.209.229   otherhost
+```
+
 ### ports
 
 Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container

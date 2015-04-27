@@ -5,7 +5,11 @@ from os import path
 import mock
 
 from compose import Service
-from compose.service import CannotBeScaledError
+from compose.service import (
+    CannotBeScaledError,
+    build_extra_hosts,
+    ConfigError,
+)
 from compose.container import Container
 from docker.errors import APIError
 from .testcases import DockerClientTestCase
@@ -106,6 +110,62 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
+
+    def test_build_extra_hosts(self):
+        # string
+        self.assertRaises(ConfigError, lambda: build_extra_hosts("www.example.com: 192.168.0.17"))
+
+        # list of strings
+        self.assertEqual(build_extra_hosts(
+            ["www.example.com:192.168.0.17"]),
+            {'www.example.com': '192.168.0.17'})
+        self.assertEqual(build_extra_hosts(
+            ["www.example.com: 192.168.0.17"]),
+            {'www.example.com': '192.168.0.17'})
+        self.assertEqual(build_extra_hosts(
+            ["www.example.com: 192.168.0.17",
+             "static.example.com:192.168.0.19",
+             "api.example.com: 192.168.0.18"]),
+            {'www.example.com': '192.168.0.17',
+             'static.example.com': '192.168.0.19',
+             'api.example.com': '192.168.0.18'})
+
+        # list of dictionaries
+        self.assertRaises(ConfigError, lambda: build_extra_hosts(
+            [{'www.example.com': '192.168.0.17'},
+             {'api.example.com': '192.168.0.18'}]))
+
+        # dictionaries
+        self.assertEqual(build_extra_hosts(
+            {'www.example.com': '192.168.0.17',
+             'api.example.com': '192.168.0.18'}),
+            {'www.example.com': '192.168.0.17',
+             'api.example.com': '192.168.0.18'})
+
+    def test_create_container_with_extra_hosts_list(self):
+        extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
+        service = self.create_service('db', extra_hosts=extra_hosts)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(set(container.get('HostConfig.ExtraHosts')), set(extra_hosts))
+
+    def test_create_container_with_extra_hosts_string(self):
+        extra_hosts = 'somehost:162.242.195.82'
+        service = self.create_service('db', extra_hosts=extra_hosts)
+        self.assertRaises(ConfigError, lambda: service.create_container())
+
+    def test_create_container_with_extra_hosts_list_of_dicts(self):
+        extra_hosts = [{'somehost': '162.242.195.82'}, {'otherhost': '50.31.209.229'}]
+        service = self.create_service('db', extra_hosts=extra_hosts)
+        self.assertRaises(ConfigError, lambda: service.create_container())
+
+    def test_create_container_with_extra_hosts_dicts(self):
+        extra_hosts = {'somehost': '162.242.195.82', 'otherhost': '50.31.209.229'}
+        extra_hosts_list = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
+        service = self.create_service('db', extra_hosts=extra_hosts)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(set(container.get('HostConfig.ExtraHosts')), set(extra_hosts_list))
 
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'

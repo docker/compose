@@ -23,6 +23,7 @@ DOCKER_START_KEYS = [
     'dns',
     'dns_search',
     'env_file',
+    'extra_hosts',
     'net',
     'pid',
     'privileged',
@@ -448,6 +449,8 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
+        extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
+
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
@@ -460,6 +463,7 @@ class Service(object):
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            extra_hosts=extra_hosts,
             pid_mode=pid
         )
 
@@ -619,3 +623,28 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
+
+
+def build_extra_hosts(extra_hosts_config):
+    if not extra_hosts_config:
+        return {}
+
+    if isinstance(extra_hosts_config, list):
+        extra_hosts_dict = {}
+        for extra_hosts_line in extra_hosts_config:
+            if not isinstance(extra_hosts_line, six.string_types):
+                raise ConfigError(
+                    "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
+                    extra_hosts_config
+                )
+            host, ip = extra_hosts_line.split(':')
+            extra_hosts_dict.update({host.strip(): ip.strip()})
+        extra_hosts_config = extra_hosts_dict
+
+    if isinstance(extra_hosts_config, dict):
+        return extra_hosts_config
+
+    raise ConfigError(
+        "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
+        extra_hosts_config
+    )
