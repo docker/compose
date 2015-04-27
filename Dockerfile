@@ -15,14 +15,14 @@ RUN set -ex; \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-ENV ALL_DOCKER_VERSIONS 1.6.0-rc4
+ENV ALL_DOCKER_VERSIONS 1.6.0
 
 RUN set -ex; \
-    curl https://test.docker.com/builds/Linux/x86_64/docker-1.6.0-rc4 -o /usr/local/bin/docker-1.6.0-rc4; \
-    chmod +x /usr/local/bin/docker-1.6.0-rc4
+    curl https://get.docker.com/builds/Linux/x86_64/docker-1.6.0 -o /usr/local/bin/docker-1.6.0; \
+    chmod +x /usr/local/bin/docker-1.6.0
 
 # Set the default Docker to be run
-RUN ln -s /usr/local/bin/docker-1.6.0-rc4 /usr/local/bin/docker
+RUN ln -s /usr/local/bin/docker-1.6.0 /usr/local/bin/docker
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
