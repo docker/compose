@@ -206,7 +206,7 @@ For complete information on this release, see the [1.2.0 Milestone project page]
 In addition to bug fixes and refinements, this release adds the following:
 
 * The `extends` keyword, which adds the ability to extend services by sharing  common configurations. For details, see
-[PR #972](https://github.com/docker/compose/pull/1088).
+[PR #1088](https://github.com/docker/compose/pull/1088).
 
 * Better integration with Swarm. Swarm will now schedule inter-dependent
 containers on the same host. For details, see
