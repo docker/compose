@@ -1,0 +1,8 @@
+dnechild:
+  extends:
+    file: nonexistent-path-base.yml
+    service: dnebase
+  image: busybox
+  command: /bin/true
+  environment:
+    - BAR=2

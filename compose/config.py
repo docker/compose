@@ -64,6 +64,7 @@ def from_dictionary(dictionary, working_dir=None, filename=None):
             raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
+        validate_paths(service_dict)
         service_dicts.append(service_dict)
 
     return service_dicts
@@ -339,12 +340,14 @@ def resolve_host_path(volume, working_dir):
 def resolve_build_path(build_path, working_dir=None):
     if working_dir is None:
         raise Exception("No working_dir passed to resolve_build_path")
+    return expand_path(working_dir, build_path)
 
-    _path = expand_path(working_dir, build_path)
-    if not os.path.exists(_path) or not os.access(_path, os.R_OK):
-        raise ConfigurationError("build path %s either does not exist or is not accessible." % _path)
-    else:
-        return _path
+
+def validate_paths(service_dict):
+    if 'build' in service_dict:
+        build_path = service_dict['build']
+        if not os.path.exists(build_path) or not os.access(build_path, os.R_OK):
+            raise ConfigurationError("build path %s either does not exist or is not accessible." % build_path)
 
 
 def merge_volumes(base, override):
