@@ -8,9 +8,6 @@
 
 set -e
 
->&2 echo "Validating DCO"
-script/validate-dco
-
 export DOCKER_VERSIONS=all
 . script/test-versions
 

@@ -31,8 +31,8 @@ that should get you started.
 
 ## Running the test suite
 
-Use the test script to run DCO check, linting checks and then the full test
-suite against different Python interpreters:
+Use the test script to run linting checks and then the full test suite against
+different Python interpreters:
 
     $ script/test
 
@@ -50,8 +50,6 @@ you can specify a test directory, file, module, class or method:
     $ script/test tests/unit/cli_test.py
     $ script/test tests.integration.service_test
     $ script/test tests.integration.service_test:ServiceTest.test_containers
-
-Before pushing a commit you can check the DCO by invoking `script/validate-dco`.
 
 ## Building binaries
 
