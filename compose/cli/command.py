@@ -7,6 +7,7 @@ import re
 import six
 
 from .. import config
+from ..errors import ValidationError
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
@@ -82,7 +83,7 @@ class Command(DocoptCommand):
                 self.get_project_name(config_path, project_name),
                 config.load(config_path),
                 self.get_client(verbose=verbose))
-        except ConfigError as e:
+        except (ConfigError, ValidationError) as e:
             raise errors.UserError(six.text_type(e))
 
     def get_project_name(self, config_path, project_name=None):

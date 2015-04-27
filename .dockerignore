@@ -2,3 +2,4 @@
 build
 dist
 venv
+*.pyc
