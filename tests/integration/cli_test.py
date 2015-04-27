@@ -21,6 +21,8 @@ class CLITestCase(DockerClientTestCase):
         sys.exit = self.old_sys_exit
         self.project.kill()
         self.project.remove_stopped()
+        for container in self.project.containers(stopped=True, one_off=True):
+            container.remove(force=True)
 
     @property
     def project(self):
@@ -62,6 +64,10 @@ class CLITestCase(DockerClientTestCase):
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_composefile(self, mock_stdout):
+        config_path = os.path.abspath(
+            'tests/fixtures/multiple-composefiles/compose2.yml')
+        self._project = self.command.get_project(config_path)
+
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
         self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
@@ -416,7 +422,6 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
     def test_port(self):
-
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['up', '-d'], None)
         container = self.project.get_service('simple').get_container()
