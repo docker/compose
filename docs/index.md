@@ -15,36 +15,6 @@ be done to get it running.
 Compose is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
 
-Using Compose is basically a three-step process.
-
-First, you define your app's environment with a `Dockerfile` so it can be
-reproduced anywhere:
-
-```Dockerfile
-FROM python:2.7
-WORKDIR /code
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
-ADD . /code
-CMD python app.py
-```
-
-Next, you define the services that make up your app in `docker-compose.yml` so
-they can be run together in an isolated environment:
-
-```yaml
-web:
-  build: .
-  links:
-   - db
-  ports:
-   - "8000:8000"
-db:
-  image: postgres
-```
-
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
-
 Compose has commands for managing the whole lifecycle of your application:
 
  * Start, stop and rebuild services
@@ -95,11 +65,6 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)
 ```
 
-Next, define the Python dependencies in a file called `requirements.txt`:
-
-    flask
-    redis
-
 ### Create a Docker image
 
 Now, create a Docker image containing all of your app's dependencies. You
@@ -107,9 +72,8 @@ specify how to build the image using a file called
 [`Dockerfile`](http://docs.docker.com/reference/builder/):
 
     FROM python:2.7
-    ADD . /code
     WORKDIR /code
-    RUN pip install -r requirements.txt
+    RUN pip install flask redis
 
 This tells Docker to include Python, your code, and your Python dependencies in
 a Docker image. For more information on how to write Dockerfiles, see the
