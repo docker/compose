@@ -43,6 +43,8 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
 DOCKER_CONFIG_HINTS = {
     'cpu_share': 'cpu_shares',
     'add_host': 'extra_hosts',
+    'hosts': 'extra_hosts',
+    'extra_host': 'extra_hosts',
     'link': 'links',
     'port': 'ports',
     'privilege': 'privileged',
