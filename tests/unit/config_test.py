@@ -489,3 +489,19 @@ class BuildPathTest(unittest.TestCase):
     def test_from_file(self):
         service_dict = config.load('tests/fixtures/build-path/docker-compose.yml')
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
+
+    def test_valid_url_path(self):
+        valid_urls = [
+            'git://github.com/docker/docker',
+            'git@github.com:docker/docker.git',
+            'git@bitbucket.org:atlassianlabs/atlassian-docker.git',
+            'https://github.com/docker/docker.git',
+            'http://github.com/docker/docker.git',
+        ]
+        for valid_url in valid_urls:
+            service_dict = config.make_service_dict(
+                'validurl',
+                {'build': valid_url},
+                working_dir='tests/fixtures/build-path'
+            )
+            self.assertEquals(service_dict['build'], valid_url)

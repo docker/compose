@@ -57,6 +57,14 @@ DOCKER_CONFIG_HINTS = {
     'workdir': 'working_dir',
 }
 
+DOCKER_VALID_URL_PREFIXES = (
+    'http://',
+    'https://',
+    'git://',
+    'github.com/',
+    'git@',
+)
+
 
 def load(filename):
     working_dir = os.path.dirname(filename)
@@ -356,14 +364,21 @@ def resolve_host_path(volume, working_dir):
 def resolve_build_path(build_path, working_dir=None):
     if working_dir is None:
         raise Exception("No working_dir passed to resolve_build_path")
-    return expand_path(working_dir, build_path)
+    if is_url(build_path):
+        return build_path
+    else:
+        return expand_path(working_dir, build_path)
 
 
 def validate_paths(service_dict):
     if 'build' in service_dict:
         build_path = service_dict['build']
-        if not os.path.exists(build_path) or not os.access(build_path, os.R_OK):
-            raise ConfigurationError("build path %s either does not exist or is not accessible." % build_path)
+        if (not os.path.exists(build_path) or not os.access(build_path, os.R_OK)) and not is_url(build_path):
+            raise ConfigurationError("build path %s either does not exist, is not accessible or is not a valid url." % build_path)
+
+
+def is_url(build_path):
+    return build_path.startswith(DOCKER_VALID_URL_PREFIXES)
 
 
 def merge_volumes(base, override):
