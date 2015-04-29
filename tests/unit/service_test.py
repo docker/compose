@@ -221,8 +221,21 @@ class ServiceTest(unittest.TestCase):
     def test_pull_image(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
         service.pull(insecure_registry=True)
-        self.mock_client.pull.assert_called_once_with('someimage:sometag', insecure_registry=True)
+        self.mock_client.pull.assert_called_once_with(
+            'someimage',
+            tag='sometag',
+            insecure_registry=True,
+            stream=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
+
+    def test_pull_image_no_tag(self):
+        service = Service('foo', client=self.mock_client, image='ababab')
+        service.pull()
+        self.mock_client.pull.assert_called_once_with(
+            'ababab',
+            tag='latest',
+            insecure_registry=False,
+            stream=True)
 
     @mock.patch('compose.service.Container', autospec=True)
     @mock.patch('compose.service.log', autospec=True)
@@ -243,11 +256,12 @@ class ServiceTest(unittest.TestCase):
             service.create_container(insecure_registry=True)
 
         self.mock_client.pull.assert_called_once_with(
-            'someimage:sometag',
+            'someimage',
+            tag='sometag',
             insecure_registry=True,
             stream=True)
         mock_log.info.assert_called_once_with(
-            'Pulling image someimage:sometag...')
+            'Pulling foo (someimage:sometag)...')
 
     def test_parse_repository_tag(self):
         self.assertEqual(parse_repository_tag("root"), ("root", ""))
@@ -257,11 +271,20 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", ""))
         self.assertEqual(parse_repository_tag("url:5000/repo:tag"), ("url:5000/repo", "tag"))
 
-    def test_latest_is_used_when_tag_is_not_specified(self):
+    @mock.patch('compose.service.Container', autospec=True)
+    def test_create_container_latest_is_used_when_no_tag_specified(self, mock_container):
+        mock_container.create.side_effect = APIError(
+            "oops",
+            mock.Mock(status_code=404),
+            "No such image")
         service = Service('foo', client=self.mock_client, image='someimage')
-        Container.create = mock.Mock()
-        service.create_container()
-        self.assertEqual(Container.create.call_args[1]['image'], 'someimage:latest')
+        with self.assertRaises(APIError):
+            service.create_container()
+        self.mock_client.pull.assert_called_once_with(
+            'someimage',
+            tag='latest',
+            insecure_registry=False,
+            stream=True)
 
     def test_create_container_with_build(self):
         self.mock_client.images.return_value = []

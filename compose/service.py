@@ -194,13 +194,7 @@ class Service(object):
             return Container.create(self.client, **container_options)
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                log.info('Pulling image %s...' % container_options['image'])
-                output = self.client.pull(
-                    container_options['image'],
-                    stream=True,
-                    insecure_registry=insecure_registry
-                )
-                stream_output(output, sys.stdout)
+                self.pull(insecure_registry=insecure_registry)
                 return Container.create(self.client, **container_options)
             raise
 
@@ -414,8 +408,6 @@ class Service(object):
 
         if self.can_be_built():
             container_options['image'] = self.full_name
-        else:
-            container_options['image'] = self._get_image_name(container_options['image'])
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
@@ -467,12 +459,6 @@ class Service(object):
             pid_mode=pid
         )
 
-    def _get_image_name(self, image):
-        repo, tag = parse_repository_tag(image)
-        if tag == "":
-            tag = "latest"
-        return '%s:%s' % (repo, tag)
-
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
@@ -520,13 +506,18 @@ class Service(object):
         return True
 
     def pull(self, insecure_registry=False):
-        if 'image' in self.options:
-            image_name = self._get_image_name(self.options['image'])
-            log.info('Pulling %s (%s)...' % (self.name, image_name))
-            self.client.pull(
-                image_name,
-                insecure_registry=insecure_registry
-            )
+        if 'image' not in self.options:
+            return
+
+        repo, tag = parse_repository_tag(self.options['image'])
+        tag = tag or 'latest'
+        log.info('Pulling %s (%s:%s)...' % (self.name, repo, tag))
+        output = self.client.pull(
+            repo,
+            tag=tag,
+            stream=True,
+            insecure_registry=insecure_registry)
+        stream_output(output, sys.stdout)
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
