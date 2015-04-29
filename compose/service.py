@@ -476,6 +476,11 @@ class Service(object):
         except StreamOutputError as e:
             raise BuildError(self, unicode(e))
 
+        # Ensure the HTTP connection is not reused for another
+        # streaming command, as the Docker daemon can sometimes
+        # complain about it
+        self.client.close()
+
         image_id = None
 
         for event in all_events:
