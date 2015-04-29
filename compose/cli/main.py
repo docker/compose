@@ -75,10 +75,10 @@ class TopLevelCommand(Command):
       docker-compose -h|--help
 
     Options:
-      --verbose                 Show more output
-      --version                 Print version and exit
       -f, --file FILE           Specify an alternate compose file (default: docker-compose.yml)
       -p, --project-name NAME   Specify an alternate project name (default: directory name)
+      --verbose                 Show more output
+      -v, --version             Print version and exit
 
     Commands:
       build     Build or rebuild services
@@ -88,12 +88,12 @@ class TopLevelCommand(Command):
       port      Print the public port for a port binding
       ps        List containers
       pull      Pulls service images
+      restart   Restart services
       rm        Remove stopped containers
       run       Run a one-off command
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
-      restart   Restart services
       up        Create and start containers
 
     """
