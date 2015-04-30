@@ -4,6 +4,10 @@ import os
 from os import path
 import mock
 
+import tempfile
+import shutil
+import six
+
 from compose import Service
 from compose.service import (
     CannotBeScaledError,
@@ -403,6 +407,29 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service).inspect()
         self.assertEqual(list(container['NetworkSettings']['Ports'].keys()), ['8000/tcp'])
         self.assertNotEqual(container['NetworkSettings']['Ports']['8000/tcp'][0]['HostPort'], '8000')
+
+    def test_build(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        self.create_service('web', build=base_dir).build()
+        self.assertEqual(len(self.client.images(name='composetest_web')), 1)
+
+    def test_build_non_ascii_filename(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        with open(os.path.join(base_dir, b'foo\xE2bar'), 'w') as f:
+            f.write("hello world\n")
+
+        self.create_service('web', build=six.text_type(base_dir)).build()
+        self.assertEqual(len(self.client.images(name='composetest_web')), 1)
 
     def test_start_container_stays_unpriviliged(self):
         service = self.create_service('web')
