@@ -185,6 +185,47 @@ class MergeStringsOrListsTest(unittest.TestCase):
         self.assertEqual(set(service_dict['dns']), set(['8.8.8.8', '9.9.9.9']))
 
 
+class MergeLabelsTest(unittest.TestCase):
+    def test_empty(self):
+        service_dict = config.merge_service_dicts({}, {})
+        self.assertNotIn('labels', service_dict)
+
+    def test_no_override(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
+            config.make_service_dict('foo', {}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
+
+    def test_no_base(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {}),
+            config.make_service_dict('foo', {'labels': ['foo=2']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '2'})
+
+    def test_override_explicit_value(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
+            config.make_service_dict('foo', {'labels': ['foo=2']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '2', 'bar': ''})
+
+    def test_add_explicit_value(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
+            config.make_service_dict('foo', {'labels': ['bar=2']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': '2'})
+
+    def test_remove_explicit_value(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}),
+            config.make_service_dict('foo', {'labels': ['bar']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
+
+
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
         environment = [

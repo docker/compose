@@ -80,6 +80,10 @@ class Container(object):
                          for item in sorted(six.iteritems(self.ports)))
 
     @property
+    def labels(self):
+        return self.get('Config.Labels') or {}
+
+    @property
     def human_readable_state(self):
         if self.is_running:
             return 'Ghost' if self.get('State.Ghost') else 'Up'

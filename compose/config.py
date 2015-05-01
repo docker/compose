@@ -19,6 +19,7 @@ DOCKER_CONFIG_KEYS = [
     'extra_hosts',
     'hostname',
     'image',
+    'labels',
     'links',
     'mem_limit',
     'net',
@@ -182,6 +183,9 @@ def process_container_options(service_dict, working_dir=None):
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
 
+    if 'labels' in service_dict:
+        service_dict['labels'] = parse_labels(service_dict['labels'])
+
     return service_dict
 
 
@@ -198,6 +202,12 @@ def merge_service_dicts(base, override):
         d['volumes'] = merge_volumes(
             base.get('volumes'),
             override.get('volumes'),
+        )
+
+    if 'labels' in base or 'labels' in override:
+        d['labels'] = merge_labels(
+            base.get('labels'),
+            override.get('labels'),
         )
 
     if 'image' in override and 'build' in d:
@@ -218,7 +228,7 @@ def merge_service_dicts(base, override):
         if key in base or key in override:
             d[key] = to_list(base.get(key)) + to_list(override.get(key))
 
-    already_merged_keys = ['environment', 'volumes'] + list_keys + list_or_string_keys
+    already_merged_keys = ['environment', 'volumes', 'labels'] + list_keys + list_or_string_keys
 
     for k in set(ALLOWED_KEYS) - set(already_merged_keys):
         if k in override:
@@ -387,6 +397,35 @@ def join_volume(pair):
         return container
     else:
         return ":".join((host, container))
+
+
+def merge_labels(base, override):
+    labels = parse_labels(base)
+    labels.update(parse_labels(override))
+    return labels
+
+
+def parse_labels(labels):
+    if not labels:
+        return {}
+
+    if isinstance(labels, list):
+        return dict(split_label(e) for e in labels)
+
+    if isinstance(labels, dict):
+        return labels
+
+    raise ConfigurationError(
+        "labels \"%s\" must be a list or mapping" %
+        labels
+    )
+
+
+def split_label(label):
+    if '=' in label:
+        return label.split('=', 1)
+    else:
+        return label, ''
 
 
 def expand_path(working_dir, path):
