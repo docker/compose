@@ -22,7 +22,8 @@ class DockerClientTestCase(unittest.TestCase):
                 self.client.remove_image(i)
 
     def create_service(self, name, **kwargs):
-        kwargs['image'] = kwargs.pop('image', 'busybox:latest')
+        if 'image' not in kwargs and 'build' not in kwargs:
+            kwargs['image'] = 'busybox:latest'
 
         if 'command' not in kwargs:
             kwargs['command'] = ["/bin/sleep", "300"]

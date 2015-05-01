@@ -462,8 +462,10 @@ class Service(object):
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
+        path = six.binary_type(self.options['build'])
+
         build_output = self.client.build(
-            self.options['build'],
+            path=path,
             tag=self.full_name,
             stream=True,
             rm=True,
