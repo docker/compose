@@ -328,7 +328,7 @@ dns_search:
   - dc2.example.com
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -351,6 +351,7 @@ restart: always
 
 stdin_open: true
 tty: true
+read_only: true
 ```
 
 ## Compose documentation

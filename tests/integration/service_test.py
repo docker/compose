@@ -177,6 +177,13 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(container.inspect()['Config']['Cpuset'], '0')
 
+    def test_create_container_with_read_only_root_fs(self):
+        read_only = True
+        service = self.create_service('db', read_only=read_only)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.ReadonlyRootfs'), read_only, container.get('HostConfig'))
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
