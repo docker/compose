@@ -94,7 +94,7 @@ _docker-compose_build() {
 _docker-compose_docker-compose() {
 	case "$prev" in
 		--file|-f)
-			_filedir y?(a)ml
+			_filedir "y?(a)ml"
 			return
 			;;
 		--project-name|-p)
@@ -303,6 +303,9 @@ _docker-compose_up() {
 
 
 _docker-compose() {
+	local previous_extglob_setting=$(shopt -p extglob)
+	shopt -s extglob
+
 	local commands=(
 		build
 		help
@@ -352,6 +355,7 @@ _docker-compose() {
 	local completions_func=_docker-compose_${command}
 	declare -F $completions_func >/dev/null && $completions_func
 
+	eval "$previous_extglob_setting"
 	return 0
 }
 
