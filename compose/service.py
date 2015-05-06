@@ -9,9 +9,12 @@ from collections import namedtuple
 from operator import attrgetter
 
 import six
+
 from docker.errors import APIError
 from docker.utils import create_host_config
 from docker.utils import LogConfig
+from docker.utils import create_context_from_path
+from docker.utils import ContextError
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 
@@ -707,7 +710,13 @@ class Service(object):
         )
 
     def build(self, no_cache=False):
-        log.info('Building %s...' % self.name)
+        build_ctx = None
+        context_path = six.binary_type(self.options['build'])
+        dockerfile = self.options.get('dockerfile', 'Dockerfile')
+        try:
+            build_ctx = create_context_from_path(context_path, dockerfile=dockerfile)
+        except ContextError as ce:
+            raise BuildError(self, ce.message)
 
         path = self.options['build']
         # python2 os.path() doesn't support unicode, so we need to encode it to
@@ -716,13 +725,13 @@ class Service(object):
             path = path.encode('utf8')
 
         build_output = self.client.build(
-            path=path,
+            build_ctx.path,
             tag=self.image_name,
             stream=True,
             rm=True,
             pull=False,
             nocache=no_cache,
-            dockerfile=self.options.get('dockerfile', None),
+            **build_ctx.job_params
         )
 
         try:

@@ -15,6 +15,8 @@ from .validation import validate_service_names
 from .validation import validate_top_level_object
 from compose.cli.utils import find_candidates_in_parent_dirs
 
+from docker.utils import is_remote
+
 
 DOCKER_CONFIG_KEYS = [
     'cap_add',
@@ -428,16 +430,17 @@ def resolve_volume_path(volume, working_dir, service_name):
         return container_path
 
 
-def resolve_build_path(build_path, working_dir=None):
-    if working_dir is None:
-        raise Exception("No working_dir passed to resolve_build_path")
-    return expand_path(working_dir, build_path)
+def resolve_build_path(build_path, working_dir):
+    if is_remote(build_path):
+        return build_path
+    else:
+        return expand_path(working_dir, build_path)
 
 
 def validate_paths(service_dict):
     if 'build' in service_dict:
         build_path = service_dict['build']
-        if not os.path.exists(build_path) or not os.access(build_path, os.R_OK):
+        if not is_remote(build_path) and (not os.path.exists(build_path) or not os.access(build_path, os.R_OK)):
             raise ConfigurationError("build path %s either does not exist or is not accessible." % build_path)
 
 

@@ -973,6 +973,14 @@ class BuildPathTest(unittest.TestCase):
         service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
 
+    def test_from_tarball_context(self):
+        service_dict = config.make_service_dict(
+            'tarball',
+            {'build': '../build-ctx/ctx.tar.xz'},
+            working_dir='tests/fixtures/build-path'
+        )
+        self.assertEquals(service_dict['build'], os.path.join(self.abs_context_path, 'ctx.tar.xz'))
+
 
 class GetConfigPathTestCase(unittest.TestCase):
 
