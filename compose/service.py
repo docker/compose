@@ -8,7 +8,7 @@ import sys
 import six
 
 from docker.errors import APIError
-from docker.utils import create_host_config
+from docker.utils import create_host_config, LogConfig
 
 from .config import DOCKER_CONFIG_KEYS
 from .container import Container, get_container_name
@@ -25,6 +25,7 @@ DOCKER_START_KEYS = [
     'env_file',
     'extra_hosts',
     'net',
+    'log_driver',
     'pid',
     'privileged',
     'restart',
@@ -429,6 +430,7 @@ class Service(object):
         privileged = options.get('privileged', False)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
+        log_config = LogConfig(type=options.get('log_driver', 'json-file'))
         pid = options.get('pid', None)
 
         dns = options.get('dns', None)
@@ -455,6 +457,7 @@ class Service(object):
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            log_config=log_config,
             extra_hosts=extra_hosts,
             pid_mode=pid
         )

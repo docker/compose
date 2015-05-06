@@ -271,6 +271,20 @@ labels:
   - "com.example.label-with-empty-value"
 ```
 
+### log driver
+
+Specify a logging driver for the service's containers, as with the ``--log-driver`` option for docker run ([documented here](http://docs.docker.com/reference/run/#logging-drivers-log-driver)).
+
+Allowed values are currently ``json-file``, ``syslog`` and ``none``. The list will change over time as more drivers are added to the Docker engine.
+
+The default value is json-file.
+
+```
+log_driver: "json-file"
+log_driver: "syslog"
+log_driver: "none"
+```
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.

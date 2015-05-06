@@ -84,6 +84,10 @@ class Container(object):
         return self.get('Config.Labels') or {}
 
     @property
+    def log_config(self):
+        return self.get('HostConfig.LogConfig') or None
+
+    @property
     def human_readable_state(self):
         if self.is_running:
             return 'Ghost' if self.get('State.Ghost') else 'Up'

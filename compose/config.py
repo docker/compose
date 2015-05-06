@@ -23,6 +23,7 @@ DOCKER_CONFIG_KEYS = [
     'links',
     'mem_limit',
     'net',
+    'log_driver',
     'pid',
     'ports',
     'privileged',
