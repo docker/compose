@@ -94,7 +94,7 @@ class TopLevelCommand(Command):
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
-      down      Down services (same as stop but symmetrical to up)
+      down      Same as stop (exactly the same)
       up        Create and start containers
 
     """
