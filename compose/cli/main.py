@@ -108,7 +108,7 @@ class TopLevelCommand(Command):
 
         Services are built once and then tagged as `project_service`,
         e.g. `composetest_db`. If you change a service's `Dockerfile` or the
-        contents of its build directory, you can run `compose build` to rebuild it.
+        contents of its build directory, you can run `docker-compose build` to rebuild it.
 
         Usage: build [options] [SERVICE...]
 
