@@ -656,3 +656,21 @@ class ServiceTest(DockerClientTestCase):
         labels = create_and_start_container(service).labels.items()
         for name in labels_list:
             self.assertIn((name, ''), labels)
+
+    def test_log_drive_invalid(self):
+        service = self.create_service('web', log_driver='xxx')
+        self.assertRaises(ValueError, lambda: create_and_start_container(service))
+
+    def test_log_drive_empty_default_jsonfile(self):
+        service = self.create_service('web')
+        log_config = create_and_start_container(service).log_config
+
+        self.assertEqual('json-file', log_config['Type'])
+        self.assertFalse(log_config['Config'])
+
+    def test_log_drive_none(self):
+        service = self.create_service('web', log_driver='none')
+        log_config = create_and_start_container(service).log_config
+
+        self.assertEqual('none', log_config['Type'])
+        self.assertFalse(log_config['Config'])
