@@ -3,14 +3,12 @@ layout: default
 title: Command Completion
 ---
 
-Command Completion
-==================
+#Command Completion
 
 Compose comes with [command completion](http://en.wikipedia.org/wiki/Command-line_completion)
 for the bash shell.
 
-Installing Command Completion
------------------------------
+##Installing Command Completion
 
 Make sure bash completion is installed. If you use a current Linux in a non-minimal installation, bash completion should be available.
 On a Mac, install with `brew install bash-completion`
@@ -21,8 +19,8 @@ Place the completion script in `/etc/bash_completion.d/` (`/usr/local/etc/bash_c
  
 Completion will be available upon next login.
 
-Available completions
----------------------
+##Available completions
+
 Depending on what you typed on the command line so far, it will complete
 
  - available docker-compose commands
