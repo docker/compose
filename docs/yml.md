@@ -29,8 +29,8 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. When the value supplied is a 
-relative path, it is interpreted as relative to the location of the yml file 
+Path to a directory containing a Dockerfile. When the value supplied is a
+relative path, it is interpreted as relative to the location of the yml file
 itself. This directory is also the build context that is sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
@@ -340,6 +340,16 @@ dns_search: example.com
 dns_search:
   - dc1.example.com
   - dc2.example.com
+```
+
+### devices
+
+List of device mappings.  Uses the same format as the `--device` docker 
+client create option.
+
+```
+devices:
+  - "/dev/ttyUSB0:/dev/ttyUSB0"
 ```
 
 ### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
