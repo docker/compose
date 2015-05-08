@@ -86,7 +86,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(service._get_volumes_from(), [container_id])
 
-    def test_get_volumes_from_intermediate_container(self):
+    def test_get_volumes_from_previous_container(self):
         container_id = 'aabbccddee'
         service = Service('test', image='foo')
         container = mock.Mock(id=container_id, spec=Container, image='foo')
@@ -262,6 +262,20 @@ class ServiceTest(unittest.TestCase):
             stream=True)
         mock_log.info.assert_called_once_with(
             'Pulling foo (someimage:sometag)...')
+
+    @mock.patch('compose.service.Container', autospec=True)
+    def test_recreate_container(self, _):
+        mock_container = mock.create_autospec(Container)
+        service = Service('foo', client=self.mock_client, image='someimage')
+        new_container = service.recreate_container(mock_container)
+
+        mock_container.stop.assert_called_once_with()
+        self.mock_client.rename.assert_called_once_with(
+            mock_container.id,
+            '%s_%s' % (mock_container.short_id, mock_container.name))
+
+        new_container.start.assert_called_once_with()
+        mock_container.remove.assert_called_once_with()
 
     def test_parse_repository_tag(self):
         self.assertEqual(parse_repository_tag("root"), ("root", ""))

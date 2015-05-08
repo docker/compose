@@ -249,25 +249,20 @@ class ServiceTest(DockerClientTestCase):
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
-        tuples = service.recreate_containers()
-        self.assertEqual(len(tuples), 1)
-
-        intermediate_container = tuples[0][0]
-        new_container = tuples[0][1]
-        self.assertEqual(intermediate_container.dictionary['Config']['Entrypoint'], ['/bin/echo'])
+        new_container, = service.recreate_containers()
 
         self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
         self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
         self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
         self.assertEqual(new_container.name, 'composetest_db_1')
         self.assertEqual(new_container.inspect()['Volumes']['/etc'], volume_path)
-        self.assertIn(intermediate_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
+        self.assertIn(old_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
         self.assertRaises(APIError,
                           self.client.inspect_container,
-                          intermediate_container.id)
+                          old_container.id)
 
     def test_recreate_containers_when_containers_are_stopped(self):
         service = self.create_service(
