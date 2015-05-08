@@ -158,6 +158,42 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
         self.assertEqual(port_bindings["2000"], [("127.0.0.1", "2000")])
 
+    def test_replace_container_num_hostname(self):
+        service = Service('foo', hostname='name-%%id%%', client=self.mock_client)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'image': 'foo'})
+        self.assertEqual(opts['hostname'], 'name-1', 'hostname')
+
+    def test_replace_container_num_command(self):
+        service = Service('foo', hostname='name-%%id%%', command='echo %%id%%', client=self.mock_client)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'image': 'foo'})
+        self.assertEqual(opts['command'], 'echo 1', 'command')
+
+    def test_replace_container_num_command_list(self):
+        service = Service('foo', hostname='name-%%id%%', command=['echo', '%%id%%'], client=self.mock_client)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'image': 'foo'})
+        self.assertEqual(opts['command'], ['echo', '1'], 'command')
+
+    def test_replace_hostname_command(self):
+        service = Service('foo', hostname='name', command='echo %%hostname%%', client=self.mock_client)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'image': 'foo'})
+        self.assertEqual(opts['command'], 'echo name', 'command')
+
+    def test_replace_hostname_command_list(self):
+        service = Service('foo', hostname='name', command=['echo', '%%hostname%%'], client=self.mock_client)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'image': 'foo'})
+        self.assertEqual(opts['command'], ['echo', 'name'], 'command')
+
+    def test_replace_hostname_hostname(self):
+        service = Service('foo', hostname='name-%%hostname%%', client=self.mock_client)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'image': 'foo'})
+        self.assertEqual(opts['hostname'], 'name-%%hostname%%', 'hostname')
+
     def test_split_domainname_none(self):
         service = Service('foo', image='foo', hostname='name', client=self.mock_client)
         self.mock_client.containers.return_value = []
