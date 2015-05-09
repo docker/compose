@@ -3,14 +3,14 @@ from __future__ import absolute_import
 from collections import namedtuple
 import logging
 import re
-from operator import attrgetter
 import sys
-import six
+from operator import attrgetter
 
+import six
 from docker.errors import APIError
 from docker.utils import create_host_config, LogConfig
 
-from .config import DOCKER_CONFIG_KEYS
+from .config import DOCKER_CONFIG_KEYS, merge_environment
 from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
@@ -183,10 +183,10 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        override_options['volumes_from'] = self._get_volumes_from(previous_container)
         container_options = self._get_container_create_options(
             override_options,
             one_off=one_off,
+            previous_container=previous_container,
         )
 
         if (do_build and
@@ -247,6 +247,12 @@ class Service(object):
         self.client.rename(
             container.id,
             '%s_%s' % (container.short_id, container.name))
+
+        override_options = dict(
+            override_options,
+            environment=merge_environment(
+                override_options.get('environment'),
+                {'affinity:container': '=' + container.id}))
         new_container = self.create_container(
             do_build=False,
             previous_container=container,
@@ -326,7 +332,7 @@ class Service(object):
             links.append((external_link, link_name))
         return links
 
-    def _get_volumes_from(self, previous_container=None):
+    def _get_volumes_from(self):
         volumes_from = []
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
@@ -338,9 +344,6 @@ class Service(object):
 
             elif isinstance(volume_source, Container):
                 volumes_from.append(volume_source.id)
-
-        if previous_container:
-            volumes_from.append(previous_container.id)
 
         return volumes_from
 
@@ -363,7 +366,11 @@ class Service(object):
 
         return net
 
-    def _get_container_create_options(self, override_options, one_off=False):
+    def _get_container_create_options(
+            self,
+            override_options,
+            one_off=False,
+            previous_container=None):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
@@ -396,10 +403,18 @@ class Service(object):
                 ports.append(port)
             container_options['ports'] = ports
 
+        override_options['binds'] = merge_volume_bindings(
+            container_options.get('volumes') or [],
+            previous_container)
+
         if 'volumes' in container_options:
             container_options['volumes'] = dict(
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
+
+        container_options['environment'] = merge_environment(
+            self.options.get('environment'),
+            override_options.get('environment'))
 
         if self.can_be_built():
             container_options['image'] = self.full_name
@@ -417,11 +432,6 @@ class Service(object):
     def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
-
-        volume_bindings = dict(
-            build_volume_binding(parse_volume_spec(volume))
-            for volume in options.get('volumes') or []
-            if ':' in volume)
 
         privileged = options.get('privileged', False)
         cap_add = options.get('cap_add', None)
@@ -447,8 +457,8 @@ class Service(object):
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
-            binds=volume_bindings,
-            volumes_from=options.get('volumes_from'),
+            binds=options.get('binds'),
+            volumes_from=self._get_volumes_from(),
             privileged=privileged,
             network_mode=self._get_net(),
             devices=devices,
@@ -529,6 +539,50 @@ class Service(object):
             stream=True,
             insecure_registry=insecure_registry)
         stream_output(output, sys.stdout)
+
+
+def get_container_data_volumes(container, volumes_option):
+    """Find the container data volumes that are in `volumes_option`, and return
+    a mapping of volume bindings for those volumes.
+    """
+    volumes = []
+
+    volumes_option = volumes_option or []
+    container_volumes = container.get('Volumes') or {}
+    image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
+
+    for volume in set(volumes_option + image_volumes.keys()):
+        volume = parse_volume_spec(volume)
+        # No need to preserve host volumes
+        if volume.external:
+            continue
+
+        volume_path = container_volumes.get(volume.internal)
+        # New volume, doesn't exist in the old container
+        if not volume_path:
+            continue
+
+        # Copy existing volume from old container
+        volume = volume._replace(external=volume_path)
+        volumes.append(build_volume_binding(volume))
+
+    return dict(volumes)
+
+
+def merge_volume_bindings(volumes_option, previous_container):
+    """Return a list of volume bindings for a container. Container data volumes
+    are replaced by those from the previous container.
+    """
+    volume_bindings = dict(
+        build_volume_binding(parse_volume_spec(volume))
+        for volume in volumes_option or []
+        if ':' in volume)
+
+    if previous_container:
+        volume_bindings.update(
+            get_container_data_volumes(previous_container, volumes_option))
+
+    return volume_bindings
 
 
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')

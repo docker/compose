@@ -14,7 +14,9 @@ from compose.service import (
     ConfigError,
     build_port_bindings,
     build_volume_binding,
+    get_container_data_volumes,
     get_container_name,
+    merge_volume_bindings,
     parse_repository_tag,
     parse_volume_spec,
     split_port,
@@ -85,13 +87,6 @@ class ServiceTest(unittest.TestCase):
             volumes_from=[mock.Mock(id=container_id, spec=Container)])
 
         self.assertEqual(service._get_volumes_from(), [container_id])
-
-    def test_get_volumes_from_previous_container(self):
-        container_id = 'aabbccddee'
-        service = Service('test', image='foo')
-        container = mock.Mock(id=container_id, spec=Container, image='foo')
-
-        self.assertEqual(service._get_volumes_from(container), [container_id])
 
     def test_get_volumes_from_service_container_exists(self):
         container_ids = ['aabbccddee', '12345']
@@ -320,6 +315,9 @@ class ServiceTest(unittest.TestCase):
 
 class ServiceVolumesTest(unittest.TestCase):
 
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.Client)
+
     def test_parse_volume_spec_only_one_path(self):
         spec = parse_volume_spec('/the/volume')
         self.assertEqual(spec, (None, '/the/volume', 'rw'))
@@ -345,3 +343,61 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(
             binding,
             ('/outside', dict(bind='/inside', ro=False)))
+
+    def test_get_container_data_volumes(self):
+        options = [
+            '/host/volume:/host/volume:ro',
+            '/new/volume',
+            '/existing/volume',
+        ]
+
+        self.mock_client.inspect_image.return_value = {
+            'ContainerConfig': {
+                'Volumes': {
+                    '/mnt/image/data': {},
+                }
+            }
+        }
+        container = Container(self.mock_client, {
+            'Image': 'ababab',
+            'Volumes': {
+                '/host/volume': '/host/volume',
+                '/existing/volume': '/var/lib/docker/aaaaaaaa',
+                '/removed/volume': '/var/lib/docker/bbbbbbbb',
+                '/mnt/image/data': '/var/lib/docker/cccccccc',
+            },
+        }, has_been_inspected=True)
+
+        expected = {
+            '/var/lib/docker/aaaaaaaa': {'bind': '/existing/volume', 'ro': False},
+            '/var/lib/docker/cccccccc': {'bind': '/mnt/image/data', 'ro': False},
+        }
+
+        binds = get_container_data_volumes(container, options)
+        self.assertEqual(binds, expected)
+
+    def test_merge_volume_bindings(self):
+        options = [
+            '/host/volume:/host/volume:ro',
+            '/host/rw/volume:/host/rw/volume',
+            '/new/volume',
+            '/existing/volume',
+        ]
+
+        self.mock_client.inspect_image.return_value = {
+            'ContainerConfig': {'Volumes': {}}
+        }
+
+        intermediate_container = Container(self.mock_client, {
+            'Image': 'ababab',
+            'Volumes': {'/existing/volume': '/var/lib/docker/aaaaaaaa'},
+        }, has_been_inspected=True)
+
+        expected = {
+            '/host/volume': {'bind': '/host/volume', 'ro': True},
+            '/host/rw/volume': {'bind': '/host/rw/volume', 'ro': False},
+            '/var/lib/docker/aaaaaaaa': {'bind': '/existing/volume', 'ro': False},
+        }
+
+        binds = merge_volume_bindings(options, intermediate_container)
+        self.assertEqual(binds, expected)

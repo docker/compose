@@ -317,10 +317,7 @@ class TopLevelCommand(Command):
         }
 
         if options['-e']:
-            # Merge environment from config with -e command line
-            container_options['environment'] = dict(
-                parse_environment(service.options.get('environment')),
-                **parse_environment(options['-e']))
+            container_options['environment'] = parse_environment(options['-e'])
 
         if options['--entrypoint']:
             container_options['entrypoint'] = options.get('--entrypoint')
