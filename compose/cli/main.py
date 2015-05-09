@@ -11,6 +11,7 @@ from docker.errors import APIError
 import dockerpty
 
 from .. import __version__
+from .. import migration
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, CannotBeScaledError
 from ..config import parse_environment
@@ -81,20 +82,21 @@ class TopLevelCommand(Command):
       -v, --version             Print version and exit
 
     Commands:
-      build     Build or rebuild services
-      help      Get help on a command
-      kill      Kill containers
-      logs      View output from containers
-      port      Print the public port for a port binding
-      ps        List containers
-      pull      Pulls service images
-      restart   Restart services
-      rm        Remove stopped containers
-      run       Run a one-off command
-      scale     Set number of containers for a service
-      start     Start services
-      stop      Stop services
-      up        Create and start containers
+      build              Build or rebuild services
+      help               Get help on a command
+      kill               Kill containers
+      logs               View output from containers
+      port               Print the public port for a port binding
+      ps                 List containers
+      pull               Pulls service images
+      restart            Restart services
+      rm                 Remove stopped containers
+      run                Run a one-off command
+      scale              Set number of containers for a service
+      start              Start services
+      stop               Stop services
+      up                 Create and start containers
+      migrate_to_labels  Recreate containers to add labels
 
     """
     def docopt_options(self):
@@ -482,6 +484,9 @@ class TopLevelCommand(Command):
                 timeout = options.get('--timeout')
                 params = {} if timeout is None else {'timeout': int(timeout)}
                 project.stop(service_names=service_names, **params)
+
+    def migrate_to_labels(self, project, _options):
+        migration.migrate_project_to_labels(project)
 
 
 def list_containers(containers):

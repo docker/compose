@@ -19,7 +19,7 @@ from .const import (
     LABEL_SERVICE,
     LABEL_VERSION,
 )
-from .container import Container
+from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
 log = logging.getLogger(__name__)
@@ -86,10 +86,21 @@ class Service(object):
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
-        return [Container.from_ps(self.client, container)
-                for container in self.client.containers(
-                    all=stopped,
-                    filters={'label': self.labels(one_off=one_off)})]
+        containers = [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})]
+
+        if not containers:
+            check_for_legacy_containers(
+                self.client,
+                self.project,
+                [self.name],
+                stopped=stopped,
+                one_off=one_off)
+
+        return containers
 
     def get_container(self, number=1):
         """Return a :class:`compose.container.Container` for this service. The
@@ -612,6 +623,31 @@ def build_container_labels(label_options, service_labels, number, one_off=False)
     labels[LABEL_CONTAINER_NUMBER] = str(number)
     labels[LABEL_VERSION] = __version__
     return labels
+
+
+def check_for_legacy_containers(
+        client,
+        project,
+        services,
+        stopped=False,
+        one_off=False):
+    """Check if there are containers named using the old naming convention
+    and warn the user that those containers may need to be migrated to
+    using labels, so that compose can find them.
+    """
+    for container in client.containers(all=stopped):
+        name = get_container_name(container)
+        for service in services:
+            prefix = '%s_%s_%s' % (project, service, 'run_' if one_off else '')
+            if not name.startswith(prefix):
+                continue
+
+            log.warn(
+                "Compose found a found a container named %s without any "
+                "labels. As of compose 1.3.0 containers are identified with "
+                "labels instead of naming convention. If you'd like compose "
+                "to use this container, please run "
+                "`docker-compose --migrate-to-labels`" % (name,))
 
 
 def parse_restart_spec(restart_config):

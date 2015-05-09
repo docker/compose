@@ -28,7 +28,7 @@ class ContainerTest(unittest.TestCase):
                 "Labels": {
                     "com.docker.compose.project": "composetest",
                     "com.docker.compose.service": "web",
-                    "com.docker.compose.container_number": 7,
+                    "com.docker.compose.container-number": 7,
                 },
             }
         }

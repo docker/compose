@@ -64,7 +64,11 @@ class Container(object):
 
     @property
     def number(self):
-        return int(self.labels.get(LABEL_CONTAINER_NUMBER) or 0)
+        number = self.labels.get(LABEL_CONTAINER_NUMBER)
+        if not number:
+            raise ValueError("Container {0} does not have a {1} label".format(
+                self.short_id, LABEL_CONTAINER_NUMBER))
+        return int(number)
 
     @property
     def ports(self):
