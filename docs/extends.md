@@ -342,8 +342,8 @@ environment:
   - BAZ=local
 ```
 
-Finally, for `volumes`, Compose "merges" entries together with locally-defined
-bindings taking precedence:
+Finally, for `volumes` and `devices`, Compose "merges" entries together with
+locally-defined bindings taking precedence:
 
 ```yaml
 # original service

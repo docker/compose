@@ -669,3 +669,16 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual('none', log_config['Type'])
         self.assertFalse(log_config['Config'])
+
+    def test_devices(self):
+        service = self.create_service('web', devices=["/dev/random:/dev/mapped-random"])
+        device_config = create_and_start_container(service).get('HostConfig.Devices')
+
+        device_dict = {
+            'PathOnHost': '/dev/random',
+            'CgroupPermissions': 'rwm',
+            'PathInContainer': '/dev/mapped-random'
+        }
+
+        self.assertEqual(1, len(device_config))
+        self.assertDictEqual(device_dict, device_config[0])

@@ -54,46 +54,61 @@ class VolumePathTest(unittest.TestCase):
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
 
-class MergeVolumesTest(unittest.TestCase):
+class MergePathMappingTest(object):
+    def config_name(self):
+        return ""
+
     def test_empty(self):
         service_dict = config.merge_service_dicts({}, {})
-        self.assertNotIn('volumes', service_dict)
+        self.assertNotIn(self.config_name(), service_dict)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/data']},
+            {self.config_name(): ['/foo:/code', '/data']},
             {},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/foo:/code', '/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/foo:/code', '/data']))
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {'volumes': ['/bar:/code']},
+            {self.config_name(): ['/bar:/code']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code']))
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/data']},
-            {'volumes': ['/bar:/code']},
+            {self.config_name(): ['/foo:/code', '/data']},
+            {self.config_name(): ['/bar:/code']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/data']))
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/data']},
-            {'volumes': ['/bar:/code', '/quux:/data']},
+            {self.config_name(): ['/foo:/code', '/data']},
+            {self.config_name(): ['/bar:/code', '/quux:/data']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/quux:/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/quux:/data']))
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/quux:/data']},
-            {'volumes': ['/bar:/code', '/data']},
+            {self.config_name(): ['/foo:/code', '/quux:/data']},
+            {self.config_name(): ['/bar:/code', '/data']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/data']))
 
+
+class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
+    def config_name(self):
+        return 'volumes'
+
+
+class MergeDevicesTest(unittest.TestCase, MergePathMappingTest):
+    def config_name(self):
+        return 'devices'
+
+
+class BuildOrImageMergeTest(unittest.TestCase):
     def test_merge_build_or_image_no_override(self):
         self.assertEqual(
             config.merge_service_dicts({'build': '.'}, {}),

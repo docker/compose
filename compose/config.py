@@ -10,6 +10,7 @@ DOCKER_CONFIG_KEYS = [
     'cpuset',
     'command',
     'detach',
+    'devices',
     'dns',
     'dns_search',
     'domainname',
@@ -50,6 +51,7 @@ DOCKER_CONFIG_HINTS = {
     'add_host': 'extra_hosts',
     'hosts': 'extra_hosts',
     'extra_host': 'extra_hosts',
+    'device': 'devices',
     'link': 'links',
     'port': 'ports',
     'privilege': 'privileged',
@@ -200,11 +202,14 @@ def merge_service_dicts(base, override):
             override.get('environment'),
         )
 
-    if 'volumes' in base or 'volumes' in override:
-        d['volumes'] = merge_volumes(
-            base.get('volumes'),
-            override.get('volumes'),
-        )
+    path_mapping_keys = ['volumes', 'devices']
+
+    for key in path_mapping_keys:
+        if key in base or key in override:
+            d[key] = merge_path_mappings(
+                base.get(key),
+                override.get(key),
+            )
 
     if 'labels' in base or 'labels' in override:
         d['labels'] = merge_labels(
@@ -230,7 +235,7 @@ def merge_service_dicts(base, override):
         if key in base or key in override:
             d[key] = to_list(base.get(key)) + to_list(override.get(key))
 
-    already_merged_keys = ['environment', 'volumes', 'labels'] + list_keys + list_or_string_keys
+    already_merged_keys = ['environment', 'labels'] + path_mapping_keys + list_keys + list_or_string_keys
 
     for k in set(ALLOWED_KEYS) - set(already_merged_keys):
         if k in override:
@@ -346,7 +351,7 @@ def resolve_host_paths(volumes, working_dir=None):
 
 
 def resolve_host_path(volume, working_dir):
-    container_path, host_path = split_volume(volume)
+    container_path, host_path = split_path_mapping(volume)
     if host_path is not None:
         host_path = os.path.expanduser(host_path)
         host_path = os.path.expandvars(host_path)
@@ -368,24 +373,24 @@ def validate_paths(service_dict):
             raise ConfigurationError("build path %s either does not exist or is not accessible." % build_path)
 
 
-def merge_volumes(base, override):
-    d = dict_from_volumes(base)
-    d.update(dict_from_volumes(override))
-    return volumes_from_dict(d)
+def merge_path_mappings(base, override):
+    d = dict_from_path_mappings(base)
+    d.update(dict_from_path_mappings(override))
+    return path_mappings_from_dict(d)
 
 
-def dict_from_volumes(volumes):
-    if volumes:
-        return dict(split_volume(v) for v in volumes)
+def dict_from_path_mappings(path_mappings):
+    if path_mappings:
+        return dict(split_path_mapping(v) for v in path_mappings)
     else:
         return {}
 
 
-def volumes_from_dict(d):
-    return [join_volume(v) for v in d.items()]
+def path_mappings_from_dict(d):
+    return [join_path_mapping(v) for v in d.items()]
 
 
-def split_volume(string):
+def split_path_mapping(string):
     if ':' in string:
         (host, container) = string.split(':', 1)
         return (container, host)
@@ -393,7 +398,7 @@ def split_volume(string):
         return (string, None)
 
 
-def join_volume(pair):
+def join_path_mapping(pair):
     (container, host) = pair
     if host is None:
         return container

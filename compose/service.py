@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 DOCKER_START_KEYS = [
     'cap_add',
     'cap_drop',
+    'devices',
     'dns',
     'dns_search',
     'env_file',
@@ -441,6 +442,8 @@ class Service(object):
         extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
         read_only = options.get('read_only', None)
 
+        devices = options.get('devices', None)
+
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
@@ -448,6 +451,7 @@ class Service(object):
             volumes_from=options.get('volumes_from'),
             privileged=privileged,
             network_mode=self._get_net(),
+            devices=devices,
             dns=dns,
             dns_search=dns_search,
             restart_policy=restart,
