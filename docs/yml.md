@@ -134,8 +134,8 @@ ports:
 
 ### expose
 
-Expose ports without publishing them to the host machine - they'll only be
-accessible to linked services. Only the internal port can be specified.
+Expose ports without publishing them to the host machine - this will make the ports 
+accessible to linked services as directly on the container when accessing it by its IP address assigned from the Docker Host. Only the internal port can be specified.
 
 ```
 expose:
