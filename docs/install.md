@@ -39,6 +39,9 @@ You can test the installation by running `docker-compose --version`.
 ## Compose documentation
 
 - [User guide](index.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
