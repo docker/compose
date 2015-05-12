@@ -212,7 +212,7 @@ class Service(object):
                 return Container.create(self.client, **container_options)
             raise
 
-    def recreate_containers(self, insecure_registry=False, do_build=True, **override_options):
+    def recreate_containers(self, insecure_registry=False, do_build=True):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
@@ -221,20 +221,16 @@ class Service(object):
         if not containers:
             container = self.create_container(
                 insecure_registry=insecure_registry,
-                do_build=do_build,
-                **override_options)
+                do_build=do_build)
             self.start_container(container)
             return [container]
 
         return [
-            self.recreate_container(
-                c,
-                insecure_registry=insecure_registry,
-                **override_options)
+            self.recreate_container(c, insecure_registry=insecure_registry)
             for c in containers
         ]
 
-    def recreate_container(self, container, **override_options):
+    def recreate_container(self, container, insecure_registry=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -257,16 +253,12 @@ class Service(object):
             container.id,
             '%s_%s' % (container.short_id, container.name))
 
-        override_options = dict(
-            override_options,
-            environment=merge_environment(
-                override_options.get('environment'),
-                {'affinity:container': '=' + container.id}))
         new_container = self.create_container(
+            insecure_registry=insecure_registry,
             do_build=False,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
-            **override_options)
+        )
         self.start_container(new_container)
         container.remove()
         return new_container
@@ -430,8 +422,10 @@ class Service(object):
             self.options.get('environment'),
             override_options.get('environment'))
 
-        if self.can_be_built():
-            container_options['image'] = self.full_name
+        if previous_container:
+            container_options['environment']['affinity:container'] = ('=' + previous_container.id)
+
+        container_options['image'] = self.image_name
 
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
