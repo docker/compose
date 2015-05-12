@@ -362,3 +362,14 @@ volumes:
   - /local-dir/bar:/bar
   - /local-dir/baz/:baz
 ```
+
+## Compose documentation
+
+- [User guide](index.md)
+- [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose command line completion](completion.md)

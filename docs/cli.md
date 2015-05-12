@@ -183,8 +183,11 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 
 ## Compose documentation
 
-- [Installing Compose](install.md)
 - [User guide](index.md)
+- [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
