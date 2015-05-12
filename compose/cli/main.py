@@ -299,7 +299,6 @@ class TopLevelCommand(Command):
                     start_deps=True,
                     recreate=False,
                     insecure_registry=insecure_registry,
-                    detach=options['-d']
                 )
 
         tty = True
@@ -461,7 +460,6 @@ class TopLevelCommand(Command):
             start_deps=start_deps,
             recreate=recreate,
             insecure_registry=insecure_registry,
-            detach=detached,
             do_build=not options['--no-build'],
         )
 

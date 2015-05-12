@@ -147,7 +147,7 @@ class Service(object):
         # Create enough containers
         containers = self.containers(stopped=True)
         while len(containers) < desired_num:
-            containers.append(self.create_container(detach=True))
+            containers.append(self.create_container())
 
         running_containers = []
         stopped_containers = []
@@ -285,14 +285,12 @@ class Service(object):
     def start_or_create_containers(
             self,
             insecure_registry=False,
-            detach=False,
             do_build=True):
         containers = self.containers(stopped=True)
 
         if not containers:
             new_container = self.create_container(
                 insecure_registry=insecure_registry,
-                detach=detach,
                 do_build=do_build,
             )
             return [self.start_container(new_container)]
@@ -392,6 +390,9 @@ class Service(object):
         container_options.update(override_options)
 
         container_options['name'] = self.get_container_name(number, one_off)
+
+        if 'detach' not in container_options:
+            container_options['detach'] = True
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
