@@ -13,7 +13,7 @@ import dockerpty
 from .. import __version__
 from .. import migration
 from ..project import NoSuchService, ConfigurationError
-from ..service import BuildError, CannotBeScaledError
+from ..service import BuildError, CannotBeScaledError, NeedsBuildError
 from ..config import parse_environment
 from .command import Command
 from .docopt_command import NoSuchCommand
@@ -46,6 +46,9 @@ def main():
         sys.exit(1)
     except BuildError as e:
         log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
+        sys.exit(1)
+    except NeedsBuildError as e:
+        log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
 
 
@@ -297,7 +300,7 @@ class TopLevelCommand(Command):
                 project.up(
                     service_names=deps,
                     start_deps=True,
-                    recreate=False,
+                    allow_recreate=False,
                     insecure_registry=insecure_registry,
                 )
 
@@ -440,6 +443,8 @@ class TopLevelCommand(Command):
                                    print new container names.
             --no-color             Produce monochrome output.
             --no-deps              Don't start linked services.
+            --x-smart-recreate     Only recreate containers whose configuration or
+                                   image needs to be updated. (EXPERIMENTAL)
             --no-recreate          If containers already exist, don't recreate them.
             --no-build             Don't build an image, even if it's missing
             -t, --timeout TIMEOUT  When attached, use this timeout in seconds
@@ -452,13 +457,15 @@ class TopLevelCommand(Command):
         monochrome = options['--no-color']
 
         start_deps = not options['--no-deps']
-        recreate = not options['--no-recreate']
+        allow_recreate = not options['--no-recreate']
+        smart_recreate = options['--x-smart-recreate']
         service_names = options['SERVICE']
 
         project.up(
             service_names=service_names,
             start_deps=start_deps,
-            recreate=recreate,
+            allow_recreate=allow_recreate,
+            smart_recreate=smart_recreate,
             insecure_registry=insecure_registry,
             do_build=not options['--no-build'],
         )

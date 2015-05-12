@@ -185,7 +185,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
 
-        project.up(recreate=False)
+        project.up(allow_recreate=False)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
@@ -204,7 +204,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 0)
 
         project.up(['db'])
-        project.stop()
+        project.kill()
 
         old_containers = project.containers(stopped=True)
 
@@ -212,10 +212,11 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = old_containers[0].id
         db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
 
-        project.up(recreate=False)
+        project.up(allow_recreate=False)
 
         new_containers = project.containers(stopped=True)
         self.assertEqual(len(new_containers), 2)
+        self.assertEqual([c.is_running for c in new_containers], [True, True])
 
         db_container = [c for c in new_containers if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
