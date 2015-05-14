@@ -145,8 +145,7 @@ Defining the web application requires the following:
         FROM python:2.7
         ADD . /code
         WORKDIR /code
-        RUN pip install -r
-        requirements.txt
+        RUN pip install -r requirements.txt
         CMD python app.py
 
 4.  Create a Compose configuration file called `common.yml`:
