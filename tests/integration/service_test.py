@@ -107,7 +107,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', volumes=['/var/db'])
         container = service.create_container()
         service.start_container(container)
-        self.assertIn('/var/db', container.inspect()['Volumes'])
+        self.assertIn('/var/db', container.get('Volumes'))
 
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
@@ -239,24 +239,27 @@ class ServiceTest(DockerClientTestCase):
             command=['300']
         )
         old_container = service.create_container()
-        self.assertEqual(old_container.dictionary['Config']['Entrypoint'], ['sleep'])
-        self.assertEqual(old_container.dictionary['Config']['Cmd'], ['300'])
-        self.assertIn('FOO=1', old_container.dictionary['Config']['Env'])
+        self.assertEqual(old_container.get('Config.Entrypoint'), ['sleep'])
+        self.assertEqual(old_container.get('Config.Cmd'), ['300'])
+        self.assertIn('FOO=1', old_container.get('Config.Env'))
         self.assertEqual(old_container.name, 'composetest_db_1')
         service.start_container(old_container)
-        volume_path = old_container.inspect()['Volumes']['/etc']
+        old_container.inspect()  # reload volume data
+        volume_path = old_container.get('Volumes')['/etc']
 
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
         new_container, = service.recreate_containers()
 
-        self.assertEqual(new_container.dictionary['Config']['Entrypoint'], ['sleep'])
-        self.assertEqual(new_container.dictionary['Config']['Cmd'], ['300'])
-        self.assertIn('FOO=2', new_container.dictionary['Config']['Env'])
+        self.assertEqual(new_container.get('Config.Entrypoint'), ['sleep'])
+        self.assertEqual(new_container.get('Config.Cmd'), ['300'])
+        self.assertIn('FOO=2', new_container.get('Config.Env'))
         self.assertEqual(new_container.name, 'composetest_db_1')
-        self.assertEqual(new_container.inspect()['Volumes']['/etc'], volume_path)
-        self.assertIn(old_container.id, new_container.dictionary['HostConfig']['VolumesFrom'])
+        self.assertEqual(new_container.get('Volumes')['/etc'], volume_path)
+        self.assertIn(
+            'affinity:container==%s' % old_container.id,
+            new_container.get('Config.Env'))
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
@@ -289,9 +292,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.get('Volumes').keys(), ['/data'])
         volume_path = old_container.get('Volumes')['/data']
 
-        service.recreate_containers()
-        new_container = service.containers()[0]
-        service.start_container(new_container)
+        new_container = service.recreate_containers()[0]
         self.assertEqual(new_container.get('Volumes').keys(), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 

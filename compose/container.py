@@ -45,6 +45,10 @@ class Container(object):
         return self.dictionary['Image']
 
     @property
+    def image_config(self):
+        return self.client.inspect_image(self.image)
+
+    @property
     def short_id(self):
         return self.id[:10]
 
