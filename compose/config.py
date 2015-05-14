@@ -61,7 +61,7 @@ def decrypt_config(config):
     for project in config:
         if 'environment' in config[project] and hasattr(config[project]['environment'], 'items'):
             for key, var in config[project]['environment'].items():
-                if var.startswith('encrypted:'):
+                if str(var).startswith('encrypted:'):
                     secret = os.environ.get('FIG_CRYPT_KEY')
                     if secret is None:
                         raise SystemExit("Your yml configuration has encrypted environmental variables but you haven't set 'FIG_CRYPT_KEY in your environment.  Please set it and try again.")
