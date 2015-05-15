@@ -94,6 +94,7 @@ class TopLevelCommand(Command):
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
+      down      Same as stop (exactly the same)
       up        Create and start containers
 
     """
@@ -386,6 +387,22 @@ class TopLevelCommand(Command):
         Usage: start [SERVICE...]
         """
         project.start(service_names=options['SERVICE'])
+
+    def down(self, project, options):
+        """
+        Stop running containers without removing them.
+
+        They can be started again with `docker-compose start`.
+
+        Usage: down [options] [SERVICE...]
+
+        Options:
+          -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
+                                     (default: 10)
+        """
+        timeout = options.get('--timeout')
+        params = {} if timeout is None else {'timeout': int(timeout)}
+        project.stop(service_names=options['SERVICE'], **params)
 
     def stop(self, project, options):
         """

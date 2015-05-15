@@ -1,6 +1,11 @@
 Change log
 ==========
 
+1.3.0 (2015-04-16)
+------------------
+
+- `docker-compose` now supports `down` option, which behaves exactly the same as the `stop` option.
+
 1.2.0 (2015-04-16)
 ------------------
 
