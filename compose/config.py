@@ -1,3 +1,7 @@
+from simplecrypt import decrypt
+from simplecrypt import DecryptionException
+import logging
+import base64
 import os
 import yaml
 import six
@@ -61,10 +65,28 @@ DOCKER_CONFIG_HINTS = {
     'workdir': 'working_dir',
 }
 
+log = logging.getLogger(__name__)
+
+
+def decrypt_config(config):
+    for project in config:
+        if 'environment' in config[project] and hasattr(config[project]['environment'], 'items'):
+            for key, var in config[project]['environment'].items():
+                if str(var).startswith('encrypted:'):
+                    secret = os.environ.get('FIG_CRYPT_KEY')
+                    if secret is None:
+                        raise SystemExit("Your yml configuration has encrypted environmental variables but you haven't set 'FIG_CRYPT_KEY in your environment.  Please set it and try again.")
+                    try:
+                        config[project]['environment'][key] = decrypt(secret, base64.urlsafe_b64decode(var.replace('encrypted:', '').encode('utf8')))
+                    except DecryptionException:
+                        log.fatal("Decryption Error: We couldn't decrypt the environmental variable %s in your yml config with the given FIG_CRYPT_KEY.  The value has been set to BAD_DECRYPT." % key)
+                        config[project]['environment'][key] = "BAD_DECRYPT"
+    return config
+
 
 def load(filename):
     working_dir = os.path.dirname(filename)
-    return from_dictionary(load_yaml(filename), working_dir=working_dir, filename=filename)
+    return from_dictionary(decrypt_config(load_yaml(filename)), working_dir=working_dir, filename=filename)
 
 
 def from_dictionary(dictionary, working_dir=None, filename=None):

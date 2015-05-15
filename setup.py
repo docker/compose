@@ -33,6 +33,7 @@ install_requires = [
     'docker-py >= 1.2.2, < 1.3',
     'dockerpty >= 0.3.3, < 0.4',
     'six >= 1.3.0, < 2',
+    'simple-crypt == 4.0.0'
 ]
 
 

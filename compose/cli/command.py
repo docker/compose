@@ -5,7 +5,6 @@ import logging
 import os
 import re
 import six
-
 from .. import config
 from ..project import Project
 from ..service import ConfigError
@@ -48,7 +47,7 @@ class Command(DocoptCommand):
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
     def perform_command(self, options, handler, command_options):
-        if options['COMMAND'] == 'help':
+        if options['COMMAND'] == 'help' or options['COMMAND'] == 'encrypt':
             # Skip looking up the compose file.
             handler(None, command_options)
             return

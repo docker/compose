@@ -2,12 +2,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from inspect import getdoc
 from operator import attrgetter
+from simplecrypt import encrypt as enc
+from operator import attrgetter
+from docker.errors import APIError
 import logging
 import re
 import signal
+import os
+import base64
 import sys
-
-from docker.errors import APIError
 import dockerpty
 
 from .. import __version__
@@ -82,6 +85,7 @@ class TopLevelCommand(Command):
 
     Commands:
       build     Build or rebuild services
+      encrypt   Helper to encrypt environmental variables
       help      Get help on a command
       kill      Kill containers
       logs      View output from containers
@@ -117,6 +121,18 @@ class TopLevelCommand(Command):
         """
         no_cache = bool(options.get('--no-cache', False))
         project.build(service_names=options['SERVICE'], no_cache=no_cache)
+
+    def encrypt(self, project, options):
+        """
+        Helper to encrypt a string with the current FIG_CRYPT_KEY environment variable.
+
+        Usage: encrypt STRING
+        """
+        string = options['STRING']
+        if os.environ.get('FIG_CRYPT_KEY') is None:
+            raise SystemExit("You must set 'FIG_CRYPT_KEY in your environment")
+        print("Use the following as your key's value in your yml configuration(this may take a moment):")
+        print("encrypted:%s" % base64.urlsafe_b64encode(enc(os.environ.get('FIG_CRYPT_KEY'), string)))
 
     def help(self, project, options):
         """
