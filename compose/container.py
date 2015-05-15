@@ -168,6 +168,9 @@ class Container(object):
                     links.append(bits[2])
         return links
 
+    def execute(self, *args, **kwargs):
+        return self.client.execute(self.id, *args, **kwargs)
+
     def attach(self, *args, **kwargs):
         return self.client.attach(self.id, *args, **kwargs)
 

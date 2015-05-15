@@ -34,7 +34,11 @@ class DocoptCommand(object):
             raise SystemExit(getdoc(self))
 
         if not hasattr(self, command):
-            raise NoSuchCommand(command, self)
+            # A command can be a reserved word, like exec
+            if hasattr(self, "%s_" % command):
+                command = "%s_" % command
+            else:
+                raise NoSuchCommand(command, self)
 
         handler = getattr(self, command)
         docstring = getdoc(handler)

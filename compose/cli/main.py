@@ -91,6 +91,7 @@ class TopLevelCommand(Command):
       restart   Restart services
       rm        Remove stopped containers
       run       Run a one-off command
+      exec      Run a command in a service
       scale     Set number of containers for a service
       start     Start services
       stop      Stop services
@@ -348,6 +349,56 @@ class TopLevelCommand(Command):
                 log.info("Removing %s..." % container.name)
                 project.client.remove_container(container.id)
             sys.exit(exit_code)
+
+    # exec is Python reserved word, redirected in docopt_command.py
+    def exec_(self, project, options):
+        """
+        Run a command in a running service
+
+        For example:
+            $ docker-compose exec web ps aux
+
+        To run against all services:
+            $ docker-compose exec --all ps aux
+
+        Usage: exec [options] [ SERVICE CMD... | CMD... ]
+
+        Options:
+          -a, --all                 Run against all containers of all services
+          -d, --detach              Detached mode: run command in the background.
+                                     (default: false)
+        """
+        service = options['SERVICE']
+        cmd = options['CMD']
+
+        # Should we run against all containers?
+        if options['--all']:
+            containers = sorted(
+                project.containers() +
+                project.containers(one_off=True),
+                key=attrgetter('name'))
+
+            # If we have a service it should be in the command
+            if service is not None:
+                cmd.insert(0, service)
+        else:
+            containers = sorted(
+                project.containers(service_names=[service]) +
+                project.containers(service_names=[service], one_off=True),
+                key=attrgetter('name'))
+
+        detach = options.get('--detach')
+
+        # Run the command against all containers
+        for container in containers:
+            result = container.execute(cmd, detach=detach)
+
+            # only show container name in detach mode
+            if detach:
+                print(container.name)
+            else:
+                print("----- %s -----\n" % container.name)
+                print(result)
 
     def scale(self, project, options):
         """
