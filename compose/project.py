@@ -196,6 +196,7 @@ class Project(object):
            service_names=None,
            start_deps=True,
            recreate=True,
+           publish_all_ports=True,
            insecure_registry=False,
            detach=False,
            do_build=True):
@@ -205,12 +206,14 @@ class Project(object):
                 for (_, container) in service.recreate_containers(
                         insecure_registry=insecure_registry,
                         detach=detach,
+                        publish_all_ports=publish_all_ports,
                         do_build=do_build):
                     running_containers.append(container)
             else:
                 for container in service.start_or_create_containers(
                         insecure_registry=insecure_registry,
                         detach=detach,
+                        publish_all_ports=publish_all_ports,
                         do_build=do_build):
                     running_containers.append(container)
 

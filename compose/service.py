@@ -27,6 +27,7 @@ DOCKER_START_KEYS = [
     'net',
     'privileged',
     'restart',
+    'publish_all_ports',
 ]
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -278,6 +279,7 @@ class Service(object):
             self,
             insecure_registry=False,
             detach=False,
+            publish_all_ports=True,
             do_build=True):
         containers = self.containers(stopped=True)
 
@@ -445,9 +447,12 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
+        publish_all_ports = options.get('publish_all_ports', True)
+
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
+            publish_all_ports=publish_all_ports,
             binds=volume_bindings,
             volumes_from=self._get_volumes_from(intermediate_container),
             privileged=privileged,

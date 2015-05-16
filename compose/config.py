@@ -21,6 +21,7 @@ DOCKER_CONFIG_KEYS = [
     'mem_limit',
     'net',
     'ports',
+    'publish_all_ports'
     'privileged',
     'restart',
     'stdin_open',

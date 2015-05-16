@@ -441,6 +441,7 @@ class TopLevelCommand(Command):
             --no-color             Produce monochrome output.
             --no-deps              Don't start linked services.
             --no-recreate          If containers already exist, don't recreate them.
+            -P                     Docker will bind the exposed ports to a random port on the host between 49153 and 65535.
             --no-build             Don't build an image, even if it's missing
             -t, --timeout TIMEOUT  When attached, use this timeout in seconds
                                    for the shutdown. (default: 10)
@@ -454,11 +455,13 @@ class TopLevelCommand(Command):
         start_deps = not options['--no-deps']
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
+        publish_all_ports = not options['-P']
 
         project.up(
             service_names=service_names,
             start_deps=start_deps,
             recreate=recreate,
+            publish_all_ports=publish_all_ports,
             insecure_registry=insecure_registry,
             detach=detached,
             do_build=not options['--no-build'],
