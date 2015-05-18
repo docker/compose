@@ -13,6 +13,7 @@ import dockerpty
 from .. import __version__
 from .. import migration
 from ..project import NoSuchService, ConfigurationError
+from ..service import update_etc_hosts
 from ..service import BuildError, CannotBeScaledError
 from ..config import parse_environment
 from .command import Command
@@ -359,7 +360,11 @@ class TopLevelCommand(Command):
 
             $ docker-compose scale web=2 worker=3
 
-        Usage: scale [SERVICE=NUM...]
+        Usage: scale [options] [SERVICE=NUM...]
+
+        Options:
+            --share-etc-hosts      Share /etc/hosts between containers
+
         """
         for s in options['SERVICE=NUM']:
             if '=' not in s:
@@ -379,6 +384,9 @@ class TopLevelCommand(Command):
                     'created, the port would clash.\n\nRemove the ":" from the '
                     'port definition in docker-compose.yml so Docker can choose a random '
                     'port for each container.' % service_name)
+        share_etc_hosts = options['--share-etc-hosts']
+        if share_etc_hosts:
+            update_etc_hosts(project.client)
 
     def start(self, project, options):
         """
@@ -443,6 +451,7 @@ class TopLevelCommand(Command):
             --no-deps              Don't start linked services.
             --no-recreate          If containers already exist, don't recreate them.
             --no-build             Don't build an image, even if it's missing
+            --share-etc-hosts      Share /etc/hosts between containers
             -t, --timeout TIMEOUT  When attached, use this timeout in seconds
                                    for the shutdown. (default: 10)
 
@@ -455,6 +464,7 @@ class TopLevelCommand(Command):
         start_deps = not options['--no-deps']
         recreate = not options['--no-recreate']
         service_names = options['SERVICE']
+        share_etc_hosts = options['--share-etc-hosts']
 
         project.up(
             service_names=service_names,
@@ -466,6 +476,9 @@ class TopLevelCommand(Command):
         )
 
         to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
+
+        if share_etc_hosts:
+            update_etc_hosts(project.client)
 
         if not detached:
             print("Attaching to", list_containers(to_attach))

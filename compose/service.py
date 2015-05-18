@@ -751,3 +751,30 @@ def build_extra_hosts(extra_hosts_config):
         "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
         extra_hosts_config
     )
+
+def update_etc_hosts(client, running_containers=None, print_host_table=False):
+    if not running_containers:
+        running_containers = client.containers()
+    hosts = {}
+    for c in running_containers:
+        d = client.inspect_container(c.get("Id"))
+        hosts[d['Id']] = (d['Name'][1:], (d['NetworkSettings']['IPAddress'], d['Config']['Hostname']))
+    for k in hosts:
+        kv = hosts[k]
+        host_table = str('\n'.join([
+            "##START_CONTAINERS_HOSTS##",
+            str('\n'.join(['%s\t%s' % h[1]
+                           for h in hosts.itervalues()
+                           if h != kv])),
+            "##END_CONTAINERS_HOSTS##"]))
+        cmd = '/bin/bash -c "cat /etc/hosts > out ' \
+              '&& sed "/##START/,/##END/d" out > /etc/hosts ' \
+              '&& rm out ' \
+              '&& echo -e %r >> /etc/hosts" ' % host_table
+        print 'Updating host table of %s...' % kv[0]
+        client.execute(k, cmd)
+    if print_host_table:
+        print str('\n'.join(['%s\t%s' % h[1]
+                             for h in hosts.itervalues()]))
+    # Return the host table
+    return hosts
