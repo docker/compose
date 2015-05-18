@@ -1,12 +1,14 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import logging
-
 from functools import reduce
-from .config import get_service_name_from_net, ConfigurationError
-from .service import Service
-from .container import Container
+
 from docker.errors import APIError
+
+from .config import get_service_name_from_net, ConfigurationError
+from .const import LABEL_PROJECT, LABEL_ONE_OFF
+from .service import Service, check_for_legacy_containers
+from .container import Container
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +62,12 @@ class Project(object):
         self.services = services
         self.client = client
 
+    def labels(self, one_off=False):
+        return [
+            '{0}={1}'.format(LABEL_PROJECT, self.name),
+            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
+        ]
+
     @classmethod
     def from_dicts(cls, name, service_dicts, client):
         """
@@ -74,6 +82,10 @@ class Project(object):
             project.services.append(Service(client=client, project=name, links=links, net=net,
                                             volumes_from=volumes_from, **service_dict))
         return project
+
+    @property
+    def service_names(self):
+        return [service.name for service in self.services]
 
     def get_service(self, name):
         """
@@ -102,7 +114,7 @@ class Project(object):
         """
         if service_names is None or len(service_names) == 0:
             return self.get_services(
-                service_names=[s.name for s in self.services],
+                service_names=self.service_names,
                 include_deps=include_deps
             )
         else:
@@ -223,10 +235,21 @@ class Project(object):
             service.remove_stopped(**options)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
-        return [Container.from_ps(self.client, container)
-                for container in self.client.containers(all=stopped)
-                for service in self.get_services(service_names)
-                if service.has_container(container, one_off=one_off)]
+        containers = [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})]
+
+        if not containers:
+            check_for_legacy_containers(
+                self.client,
+                self.name,
+                self.service_names,
+                stopped=stopped,
+                one_off=one_off)
+
+        return containers
 
     def _inject_deps(self, acc, service):
         net_name = service.get_net_name()

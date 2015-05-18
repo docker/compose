@@ -8,11 +8,19 @@ import tempfile
 import shutil
 import six
 
-from compose import Service
+from compose import __version__
+from compose.const import (
+    LABEL_CONTAINER_NUMBER,
+    LABEL_ONE_OFF,
+    LABEL_PROJECT,
+    LABEL_SERVICE,
+    LABEL_VERSION,
+)
 from compose.service import (
     CannotBeScaledError,
-    build_extra_hosts,
     ConfigError,
+    Service,
+    build_extra_hosts,
 )
 from compose.container import Container
 from docker.errors import APIError
@@ -633,17 +641,18 @@ class ServiceTest(DockerClientTestCase):
             'com.example.label-with-empty-value': "",
         }
 
+        compose_labels = {
+            LABEL_CONTAINER_NUMBER: '1',
+            LABEL_ONE_OFF: 'False',
+            LABEL_PROJECT: 'composetest',
+            LABEL_SERVICE: 'web',
+            LABEL_VERSION: __version__,
+        }
+        expected = dict(labels_dict, **compose_labels)
+
         service = self.create_service('web', labels=labels_dict)
-        labels = create_and_start_container(service).labels.items()
-        for pair in labels_dict.items():
-            self.assertIn(pair, labels)
-
-        labels_list = ["%s=%s" % pair for pair in labels_dict.items()]
-
-        service = self.create_service('web', labels=labels_list)
-        labels = create_and_start_container(service).labels.items()
-        for pair in labels_dict.items():
-            self.assertIn(pair, labels)
+        labels = create_and_start_container(service).labels
+        self.assertEqual(labels, expected)
 
     def test_empty_labels(self):
         labels_list = ['foo', 'bar']

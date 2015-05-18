@@ -10,7 +10,15 @@ import six
 from docker.errors import APIError
 from docker.utils import create_host_config, LogConfig
 
+from . import __version__
 from .config import DOCKER_CONFIG_KEYS, merge_environment
+from .const import (
+    LABEL_CONTAINER_NUMBER,
+    LABEL_ONE_OFF,
+    LABEL_PROJECT,
+    LABEL_SERVICE,
+    LABEL_VERSION,
+)
 from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
 
@@ -78,28 +86,29 @@ class Service(object):
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
-        return [Container.from_ps(self.client, container)
-                for container in self.client.containers(all=stopped)
-                if self.has_container(container, one_off=one_off)]
+        containers = [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})]
 
-    def has_container(self, container, one_off=False):
-        """Return True if `container` was created to fulfill this service."""
-        name = get_container_name(container)
-        if not name or not is_valid_name(name, one_off):
-            return False
-        project, name, _number = parse_name(name)
-        return project == self.project and name == self.name
+        if not containers:
+            check_for_legacy_containers(
+                self.client,
+                self.project,
+                [self.name],
+                stopped=stopped,
+                one_off=one_off)
+
+        return containers
 
     def get_container(self, number=1):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-        for container in self.client.containers():
-            if not self.has_container(container):
-                continue
-            _, _, container_number = parse_name(get_container_name(container))
-            if container_number == number:
-                return Container.from_ps(self.client, container)
+        labels = self.labels() + ['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]
+        for container in self.client.containers(filters={'label': labels}):
+            return Container.from_ps(self.client, container)
 
         raise ValueError("No container found for %s_%s" % (self.name, number))
 
@@ -138,7 +147,6 @@ class Service(object):
         # Create enough containers
         containers = self.containers(stopped=True)
         while len(containers) < desired_num:
-            log.info("Creating %s..." % self._next_container_name(containers))
             containers.append(self.create_container(detach=True))
 
         running_containers = []
@@ -178,6 +186,7 @@ class Service(object):
                          insecure_registry=False,
                          do_build=True,
                          previous_container=None,
+                         number=None,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
@@ -185,6 +194,7 @@ class Service(object):
         """
         container_options = self._get_container_create_options(
             override_options,
+            number or self._next_container_number(one_off=one_off),
             one_off=one_off,
             previous_container=previous_container,
         )
@@ -209,7 +219,6 @@ class Service(object):
         """
         containers = self.containers(stopped=True)
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
             container = self.create_container(
                 insecure_registry=insecure_registry,
                 do_build=do_build,
@@ -256,6 +265,7 @@ class Service(object):
         new_container = self.create_container(
             do_build=False,
             previous_container=container,
+            number=container.labels.get(LABEL_CONTAINER_NUMBER),
             **override_options)
         self.start_container(new_container)
         container.remove()
@@ -280,7 +290,6 @@ class Service(object):
         containers = self.containers(stopped=True)
 
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
             new_container = self.create_container(
                 insecure_registry=insecure_registry,
                 detach=detach,
@@ -302,14 +311,19 @@ class Service(object):
         else:
             return
 
-    def _next_container_name(self, all_containers, one_off=False):
-        bits = [self.project, self.name]
-        if one_off:
-            bits.append('run')
-        return '_'.join(bits + [str(self._next_container_number(all_containers))])
+    def get_container_name(self, number, one_off=False):
+        # TODO: Implement issue #652 here
+        return build_container_name(self.project, self.name, number, one_off)
 
-    def _next_container_number(self, all_containers):
-        numbers = [parse_name(c.name).number for c in all_containers]
+    # TODO: this would benefit from github.com/docker/docker/pull/11943
+    # to remove the need to inspect every container
+    def _next_container_number(self, one_off=False):
+        numbers = [
+            Container.from_ps(self.client, container).number
+            for container in self.client.containers(
+                all=True,
+                filters={'label': self.labels(one_off=one_off)})
+        ]
         return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):
@@ -369,6 +383,7 @@ class Service(object):
     def _get_container_create_options(
             self,
             override_options,
+            number,
             one_off=False,
             previous_container=None):
         container_options = dict(
@@ -376,9 +391,7 @@ class Service(object):
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        container_options['name'] = self._next_container_name(
-            self.containers(stopped=True, one_off=one_off),
-            one_off)
+        container_options['name'] = self.get_container_name(number, one_off)
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
@@ -418,6 +431,11 @@ class Service(object):
 
         if self.can_be_built():
             container_options['image'] = self.full_name
+
+        container_options['labels'] = build_container_labels(
+            container_options.get('labels', {}),
+            self.labels(one_off=one_off),
+            number)
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
@@ -520,6 +538,13 @@ class Service(object):
         """
         return '%s_%s' % (self.project, self.name)
 
+    def labels(self, one_off=False):
+        return [
+            '{0}={1}'.format(LABEL_PROJECT, self.project),
+            '{0}={1}'.format(LABEL_SERVICE, self.name),
+            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
+        ]
+
     def can_be_scaled(self):
         for port in self.options.get('ports', []):
             if ':' in str(port):
@@ -585,23 +610,44 @@ def merge_volume_bindings(volumes_option, previous_container):
     return volume_bindings
 
 
-NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
-
-
-def is_valid_name(name, one_off=False):
-    match = NAME_RE.match(name)
-    if match is None:
-        return False
+def build_container_name(project, service, number, one_off=False):
+    bits = [project, service]
     if one_off:
-        return match.group(3) == 'run_'
-    else:
-        return match.group(3) is None
+        bits.append('run')
+    return '_'.join(bits + [str(number)])
 
 
-def parse_name(name):
-    match = NAME_RE.match(name)
-    (project, service_name, _, suffix) = match.groups()
-    return ServiceName(project, service_name, int(suffix))
+def build_container_labels(label_options, service_labels, number, one_off=False):
+    labels = label_options or {}
+    labels.update(label.split('=', 1) for label in service_labels)
+    labels[LABEL_CONTAINER_NUMBER] = str(number)
+    labels[LABEL_VERSION] = __version__
+    return labels
+
+
+def check_for_legacy_containers(
+        client,
+        project,
+        services,
+        stopped=False,
+        one_off=False):
+    """Check if there are containers named using the old naming convention
+    and warn the user that those containers may need to be migrated to
+    using labels, so that compose can find them.
+    """
+    for container in client.containers(all=stopped):
+        name = get_container_name(container)
+        for service in services:
+            prefix = '%s_%s_%s' % (project, service, 'run_' if one_off else '')
+            if not name.startswith(prefix):
+                continue
+
+            log.warn(
+                "Compose found a found a container named %s without any "
+                "labels. As of compose 1.3.0 containers are identified with "
+                "labels instead of naming convention. If you'd like compose "
+                "to use this container, please run "
+                "`docker-compose --migrate-to-labels`" % (name,))
 
 
 def parse_restart_spec(restart_config):

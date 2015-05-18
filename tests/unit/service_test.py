@@ -7,15 +7,15 @@ import mock
 import docker
 from requests import Response
 
-from compose import Service
+from compose.service import Service
 from compose.container import Container
+from compose.const import LABEL_SERVICE, LABEL_PROJECT, LABEL_ONE_OFF
 from compose.service import (
     APIError,
     ConfigError,
     build_port_bindings,
     build_volume_binding,
     get_container_data_volumes,
-    get_container_name,
     merge_volume_bindings,
     parse_repository_tag,
     parse_volume_spec,
@@ -48,36 +48,27 @@ class ServiceTest(unittest.TestCase):
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='_', image='foo'))
         Service(name='foo', project='bar', image='foo')
 
-    def test_get_container_name(self):
-        self.assertIsNone(get_container_name({}))
-        self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
-        self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
-        self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')
-
     def test_containers(self):
-        service = Service('db', client=self.mock_client, image='foo', project='myproject')
-
+        service = Service('db', self.mock_client, 'myproject', image='foo')
         self.mock_client.containers.return_value = []
         self.assertEqual(service.containers(), [])
 
+    def test_containers_with_containers(self):
         self.mock_client.containers.return_value = [
-            {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/myproject', '/foo/bar']},
-            {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/myproject_db']},
-            {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/db_1']},
-            {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/myproject_db_1', '/myproject_web_1/db']},
+            dict(Name=str(i), Image='foo', Id=i) for i in range(3)
         ]
-        self.assertEqual([c.id for c in service.containers()], ['IN_1'])
+        service = Service('db', self.mock_client, 'myproject', image='foo')
+        self.assertEqual([c.id for c in service.containers()], range(3))
 
-    def test_containers_prefixed(self):
-        service = Service('db', client=self.mock_client, image='foo', project='myproject')
-
-        self.mock_client.containers.return_value = [
-            {'Image': 'busybox', 'Id': 'OUT_1', 'Names': ['/swarm-host-1/myproject', '/swarm-host-1/foo/bar']},
-            {'Image': 'busybox', 'Id': 'OUT_2', 'Names': ['/swarm-host-1/myproject_db']},
-            {'Image': 'busybox', 'Id': 'OUT_3', 'Names': ['/swarm-host-1/db_1']},
-            {'Image': 'busybox', 'Id': 'IN_1', 'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']},
+        expected_labels = [
+            '{0}=myproject'.format(LABEL_PROJECT),
+            '{0}=db'.format(LABEL_SERVICE),
+            '{0}=False'.format(LABEL_ONE_OFF),
         ]
-        self.assertEqual([c.id for c in service.containers()], ['IN_1'])
+
+        self.mock_client.containers.assert_called_once_with(
+            all=False,
+            filters={'label': expected_labels})
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -156,7 +147,7 @@ class ServiceTest(unittest.TestCase):
     def test_split_domainname_none(self):
         service = Service('foo', image='foo', hostname='name', client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({'image': 'foo'})
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
@@ -167,7 +158,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({'image': 'foo'})
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -179,7 +170,7 @@ class ServiceTest(unittest.TestCase):
             domainname='domain.tld',
             client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({'image': 'foo'})
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -191,7 +182,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             client=self.mock_client)
         self.mock_client.containers.return_value = []
-        opts = service._get_container_create_options({'image': 'foo'})
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -255,7 +246,7 @@ class ServiceTest(unittest.TestCase):
             tag='sometag',
             insecure_registry=True,
             stream=True)
-        mock_log.info.assert_called_once_with(
+        mock_log.info.assert_called_with(
             'Pulling foo (someimage:sometag)...')
 
     @mock.patch('compose.service.Container', autospec=True)
