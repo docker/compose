@@ -5,14 +5,13 @@ from .. import unittest
 import mock
 
 import docker
-from requests import Response
 
 from compose.service import Service
 from compose.container import Container
 from compose.const import LABEL_SERVICE, LABEL_PROJECT, LABEL_ONE_OFF
 from compose.service import (
-    APIError,
     ConfigError,
+    NeedsBuildError,
     build_port_bindings,
     build_volume_binding,
     get_container_data_volumes,
@@ -223,36 +222,28 @@ class ServiceTest(unittest.TestCase):
             insecure_registry=False,
             stream=True)
 
-    @mock.patch('compose.service.Container', autospec=True)
-    @mock.patch('compose.service.log', autospec=True)
-    def test_create_container_from_insecure_registry(
-            self,
-            mock_log,
-            mock_container):
+    def test_create_container_from_insecure_registry(self):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
-        mock_response = mock.Mock(Response)
-        mock_response.status_code = 404
-        mock_response.reason = "Not Found"
-        mock_container.create.side_effect = APIError(
-            'Mock error', mock_response, "No such image")
+        images = []
 
-        # We expect the APIError because our service requires a
-        # non-existent image.
-        with self.assertRaises(APIError):
-            service.create_container(insecure_registry=True)
+        def pull(repo, tag=None, insecure_registry=False, **kwargs):
+            self.assertEqual('someimage', repo)
+            self.assertEqual('sometag', tag)
+            self.assertTrue(insecure_registry)
+            images.append({'Id': 'abc123'})
+            return []
 
-        self.mock_client.pull.assert_called_once_with(
-            'someimage',
-            tag='sometag',
-            insecure_registry=True,
-            stream=True)
-        mock_log.info.assert_called_with(
-            'Pulling foo (someimage:sometag)...')
+        service.image = lambda: images[0] if images else None
+        self.mock_client.pull = pull
+
+        service.create_container(insecure_registry=True)
+        self.assertEqual(1, len(images))
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
         service = Service('foo', client=self.mock_client, image='someimage')
+        service.image = lambda: {'Id': 'abc123'}
         new_container = service.recreate_container(mock_container)
 
         mock_container.stop.assert_called_once_with()
@@ -273,35 +264,44 @@ class ServiceTest(unittest.TestCase):
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_create_container_latest_is_used_when_no_tag_specified(self, mock_container):
-        mock_container.create.side_effect = APIError(
-            "oops",
-            mock.Mock(status_code=404),
-            "No such image")
         service = Service('foo', client=self.mock_client, image='someimage')
-        with self.assertRaises(APIError):
-            service.create_container()
-        self.mock_client.pull.assert_called_once_with(
-            'someimage',
-            tag='latest',
-            insecure_registry=False,
-            stream=True)
+        images = []
+
+        def pull(repo, tag=None, **kwargs):
+            self.assertEqual('someimage', repo)
+            self.assertEqual('latest', tag)
+            images.append({'Id': 'abc123'})
+            return []
+
+        service.image = lambda: images[0] if images else None
+        self.mock_client.pull = pull
+
+        service.create_container()
+        self.assertEqual(1, len(images))
 
     def test_create_container_with_build(self):
-        self.mock_client.images.return_value = []
         service = Service('foo', client=self.mock_client, build='.')
-        service.build = mock.create_autospec(service.build)
-        service.create_container(do_build=True)
 
-        self.mock_client.images.assert_called_once_with(name=service.full_name)
-        service.build.assert_called_once_with()
+        images = []
+        service.image = lambda *args, **kwargs: images[0] if images else None
+        service.build = lambda: images.append({'Id': 'abc123'})
+
+        service.create_container(do_build=True)
+        self.assertEqual(1, len(images))
 
     def test_create_container_no_build(self):
-        self.mock_client.images.return_value = []
         service = Service('foo', client=self.mock_client, build='.')
-        service.create_container(do_build=False)
+        service.image = lambda: {'Id': 'abc123'}
 
-        self.assertFalse(self.mock_client.images.called)
+        service.create_container(do_build=False)
         self.assertFalse(self.mock_client.build.called)
+
+    def test_create_container_no_build_but_needs_build(self):
+        service = Service('foo', client=self.mock_client, build='.')
+        service.image = lambda: None
+
+        with self.assertRaises(NeedsBuildError):
+            service.create_container(do_build=False)
 
 
 class ServiceVolumesTest(unittest.TestCase):

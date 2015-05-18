@@ -18,9 +18,11 @@ from .const import (
     LABEL_PROJECT,
     LABEL_SERVICE,
     LABEL_VERSION,
+    LABEL_CONFIG_HASH,
 )
 from .container import Container, get_container_name
 from .progress_stream import stream_output, StreamOutputError
+from .utils import json_hash
 
 log = logging.getLogger(__name__)
 
@@ -59,10 +61,18 @@ class ConfigError(ValueError):
     pass
 
 
+class NeedsBuildError(Exception):
+    def __init__(self, service):
+        self.service = service
+
+
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
+
+
+ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 
 class Service(object):
@@ -147,7 +157,7 @@ class Service(object):
         # Create enough containers
         containers = self.containers(stopped=True)
         while len(containers) < desired_num:
-            containers.append(self.create_container(detach=True))
+            containers.append(self.create_container())
 
         running_containers = []
         stopped_containers = []
@@ -192,6 +202,11 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
+        self.ensure_image_exists(
+            do_build=do_build,
+            insecure_registry=insecure_registry,
+        )
+
         container_options = self._get_container_create_options(
             override_options,
             number or self._next_container_number(one_off=one_off),
@@ -199,42 +214,142 @@ class Service(object):
             previous_container=previous_container,
         )
 
-        if (do_build and
-                self.can_be_built() and
-                not self.client.images(name=self.full_name)):
-            self.build()
+        return Container.create(self.client, **container_options)
 
+    def ensure_image_exists(self,
+                            do_build=True,
+                            insecure_registry=False):
+
+        if self.image():
+            return
+
+        if self.can_be_built():
+            if do_build:
+                self.build()
+            else:
+                raise NeedsBuildError(self)
+        else:
+            self.pull(insecure_registry=insecure_registry)
+
+    def image(self):
         try:
-            return Container.create(self.client, **container_options)
+            return self.client.inspect_image(self.image_name)
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                self.pull(insecure_registry=insecure_registry)
-                return Container.create(self.client, **container_options)
-            raise
+                return None
+            else:
+                raise
 
-    def recreate_containers(self, insecure_registry=False, do_build=True, **override_options):
+    @property
+    def image_name(self):
+        if self.can_be_built():
+            return self.full_name
+        else:
+            return self.options['image']
+
+    def converge(self,
+                 allow_recreate=True,
+                 smart_recreate=False,
+                 insecure_registry=False,
+                 do_build=True):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
         """
+        plan = self.convergence_plan(
+            allow_recreate=allow_recreate,
+            smart_recreate=smart_recreate,
+        )
+
+        return self.execute_convergence_plan(
+            plan,
+            insecure_registry=insecure_registry,
+            do_build=do_build,
+        )
+
+    def convergence_plan(self,
+                         allow_recreate=True,
+                         smart_recreate=False):
+
         containers = self.containers(stopped=True)
+
         if not containers:
+            return ConvergencePlan('create', [])
+
+        if smart_recreate and not self._containers_have_diverged(containers):
+            stopped = [c for c in containers if not c.is_running]
+
+            if stopped:
+                return ConvergencePlan('start', stopped)
+
+            return ConvergencePlan('noop', containers)
+
+        if not allow_recreate:
+            return ConvergencePlan('start', containers)
+
+        return ConvergencePlan('recreate', containers)
+
+    def recreate_plan(self):
+        containers = self.containers(stopped=True)
+        return ConvergencePlan('recreate', containers)
+
+    def _containers_have_diverged(self, containers):
+        config_hash = self.config_hash()
+        has_diverged = False
+
+        for c in containers:
+            container_config_hash = c.labels.get(LABEL_CONFIG_HASH, None)
+            if container_config_hash != config_hash:
+                log.debug(
+                    '%s has diverged: %s != %s',
+                    c.name, container_config_hash, config_hash,
+                )
+                has_diverged = True
+
+        return has_diverged
+
+    def execute_convergence_plan(self,
+                                 plan,
+                                 insecure_registry=False,
+                                 do_build=True):
+        (action, containers) = plan
+
+        if action == 'create':
             container = self.create_container(
                 insecure_registry=insecure_registry,
                 do_build=do_build,
-                **override_options)
+            )
             self.start_container(container)
+
             return [container]
 
-        return [
-            self.recreate_container(
-                c,
-                insecure_registry=insecure_registry,
-                **override_options)
-            for c in containers
-        ]
+        elif action == 'recreate':
+            return [
+                self.recreate_container(
+                    c,
+                    insecure_registry=insecure_registry,
+                )
+                for c in containers
+            ]
 
-    def recreate_container(self, container, **override_options):
+        elif action == 'start':
+            for c in containers:
+                self.start_container_if_stopped(c)
+
+            return containers
+
+        elif action == 'noop':
+            for c in containers:
+                log.info("%s is up-to-date" % c.name)
+
+            return containers
+
+        else:
+            raise Exception("Invalid action: {}".format(action))
+
+    def recreate_container(self,
+                           container,
+                           insecure_registry=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -257,16 +372,12 @@ class Service(object):
             container.id,
             '%s_%s' % (container.short_id, container.name))
 
-        override_options = dict(
-            override_options,
-            environment=merge_environment(
-                override_options.get('environment'),
-                {'affinity:container': '=' + container.id}))
         new_container = self.create_container(
+            insecure_registry=insecure_registry,
             do_build=False,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
-            **override_options)
+        )
         self.start_container(new_container)
         container.remove()
         return new_container
@@ -285,19 +396,32 @@ class Service(object):
     def start_or_create_containers(
             self,
             insecure_registry=False,
-            detach=False,
             do_build=True):
         containers = self.containers(stopped=True)
 
         if not containers:
             new_container = self.create_container(
                 insecure_registry=insecure_registry,
-                detach=detach,
                 do_build=do_build,
             )
             return [self.start_container(new_container)]
         else:
             return [self.start_container_if_stopped(c) for c in containers]
+
+    def config_hash(self):
+        return json_hash(self.config_dict())
+
+    def config_dict(self):
+        return {
+            'options': self.options,
+            'image_id': self.image()['Id'],
+        }
+
+    def get_dependency_names(self):
+        net_name = self.get_net_name()
+        return (self.get_linked_names() +
+                self.get_volumes_from_names() +
+                ([net_name] if net_name else []))
 
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
@@ -386,12 +510,25 @@ class Service(object):
             number,
             one_off=False,
             previous_container=None):
+
+        add_config_hash = (not one_off and not override_options)
+
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
         container_options['name'] = self.get_container_name(number, one_off)
+
+        if add_config_hash:
+            config_hash = self.config_hash()
+            if 'labels' not in container_options:
+                container_options['labels'] = {}
+            container_options['labels'][LABEL_CONFIG_HASH] = config_hash
+            log.debug("Added config hash: %s" % config_hash)
+
+        if 'detach' not in container_options:
+            container_options['detach'] = True
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
@@ -429,8 +566,10 @@ class Service(object):
             self.options.get('environment'),
             override_options.get('environment'))
 
-        if self.can_be_built():
-            container_options['image'] = self.full_name
+        if previous_container:
+            container_options['environment']['affinity:container'] = ('=' + previous_container.id)
+
+        container_options['image'] = self.image_name
 
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
@@ -498,7 +637,7 @@ class Service(object):
 
         build_output = self.client.build(
             path=path,
-            tag=self.full_name,
+            tag=self.image_name,
             stream=True,
             rm=True,
             nocache=no_cache,

@@ -179,12 +179,15 @@ class Container(object):
         return self.client.attach_socket(self.id, **kwargs)
 
     def __repr__(self):
-        return '<Container: %s>' % self.name
+        return '<Container: %s (%s)>' % (self.name, self.id[:6])
 
     def __eq__(self, other):
         if type(self) != type(other):
             return False
         return self.id == other.id
+
+    def __hash__(self):
+        return self.id.__hash__()
 
 
 def get_container_name(container):

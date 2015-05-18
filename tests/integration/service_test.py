@@ -238,7 +238,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn(volume_container_2.id,
                       host_container.get('HostConfig.VolumesFrom'))
 
-    def test_recreate_containers(self):
+    def test_converge(self):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
@@ -258,7 +258,7 @@ class ServiceTest(DockerClientTestCase):
         num_containers_before = len(self.client.containers(all=True))
 
         service.options['environment']['FOO'] = '2'
-        new_container, = service.recreate_containers()
+        new_container = service.converge()[0]
 
         self.assertEqual(new_container.get('Config.Entrypoint'), ['sleep'])
         self.assertEqual(new_container.get('Config.Cmd'), ['300'])
@@ -275,7 +275,7 @@ class ServiceTest(DockerClientTestCase):
                           self.client.inspect_container,
                           old_container.id)
 
-    def test_recreate_containers_when_containers_are_stopped(self):
+    def test_converge_when_containers_are_stopped(self):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
@@ -285,10 +285,10 @@ class ServiceTest(DockerClientTestCase):
         )
         service.create_container()
         self.assertEqual(len(service.containers(stopped=True)), 1)
-        service.recreate_containers()
+        service.converge()
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
-    def test_recreate_containers_with_image_declared_volume(self):
+    def test_converge_with_image_declared_volume(self):
         service = Service(
             project='composetest',
             name='db',
@@ -300,7 +300,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.get('Volumes').keys(), ['/data'])
         volume_path = old_container.get('Volumes')['/data']
 
-        new_container = service.recreate_containers()[0]
+        new_container = service.converge()[0]
         self.assertEqual(new_container.get('Volumes').keys(), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
@@ -651,8 +651,19 @@ class ServiceTest(DockerClientTestCase):
         expected = dict(labels_dict, **compose_labels)
 
         service = self.create_service('web', labels=labels_dict)
-        labels = create_and_start_container(service).labels
-        self.assertEqual(labels, expected)
+        labels = create_and_start_container(service).labels.items()
+        for pair in expected.items():
+            self.assertIn(pair, labels)
+
+        service.kill()
+        service.remove_stopped()
+
+        labels_list = ["%s=%s" % pair for pair in labels_dict.items()]
+
+        service = self.create_service('web', labels=labels_list)
+        labels = create_and_start_container(service).labels.items()
+        for pair in expected.items():
+            self.assertIn(pair, labels)
 
     def test_empty_labels(self):
         labels_list = ['foo', 'bar']

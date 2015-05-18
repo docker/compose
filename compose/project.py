@@ -207,24 +207,59 @@ class Project(object):
     def up(self,
            service_names=None,
            start_deps=True,
-           recreate=True,
+           allow_recreate=True,
+           smart_recreate=False,
            insecure_registry=False,
-           detach=False,
            do_build=True):
-        running_containers = []
-        for service in self.get_services(service_names, include_deps=start_deps):
-            if recreate:
-                create_func = service.recreate_containers
+
+        services = self.get_services(service_names, include_deps=start_deps)
+
+        plans = self._get_convergence_plans(
+            services,
+            allow_recreate=allow_recreate,
+            smart_recreate=smart_recreate,
+        )
+
+        return [
+            container
+            for service in services
+            for container in service.execute_convergence_plan(
+                plans[service.name],
+                insecure_registry=insecure_registry,
+                do_build=do_build,
+            )
+        ]
+
+    def _get_convergence_plans(self,
+                               services,
+                               allow_recreate=True,
+                               smart_recreate=False):
+
+        plans = {}
+
+        for service in services:
+            updated_dependencies = [
+                name
+                for name in service.get_dependency_names()
+                if name in plans
+                and plans[name].action == 'recreate'
+            ]
+
+            if updated_dependencies:
+                log.debug(
+                    '%s has not changed but its dependencies (%s) have, so recreating',
+                    service.name, ", ".join(updated_dependencies),
+                )
+                plan = service.recreate_plan()
             else:
-                create_func = service.start_or_create_containers
+                plan = service.convergence_plan(
+                    allow_recreate=allow_recreate,
+                    smart_recreate=smart_recreate,
+                )
 
-            for container in create_func(
-                    insecure_registry=insecure_registry,
-                    detach=detach,
-                    do_build=do_build):
-                running_containers.append(container)
+            plans[service.name] = plan
 
-        return running_containers
+        return plans
 
     def pull(self, service_names=None, insecure_registry=False):
         for service in self.get_services(service_names, include_deps=True):
@@ -252,10 +287,7 @@ class Project(object):
         return containers
 
     def _inject_deps(self, acc, service):
-        net_name = service.get_net_name()
-        dep_names = (service.get_linked_names() +
-                     service.get_volumes_from_names() +
-                     ([net_name] if net_name else []))
+        dep_names = service.get_dependency_names()
 
         if len(dep_names) > 0:
             dep_services = self.get_services(
