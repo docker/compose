@@ -341,7 +341,6 @@ class TopLevelCommand(Command):
             service.start_container(container)
             print(container.name)
         else:
-            service.start_container(container)
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
