@@ -490,6 +490,11 @@ class TopLevelCommand(Command):
                 project.stop(service_names=service_names, **params)
 
     def migrate_to_labels(self, project, _options):
+        """
+        Recreate containers to add labels
+
+        Usage: migrate_to_labels
+        """
         migration.migrate_project_to_labels(project)
 
 
