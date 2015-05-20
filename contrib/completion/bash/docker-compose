@@ -311,6 +311,7 @@ _docker-compose() {
 		help
 		kill
 		logs
+		migrate-to-labels
 		port
 		ps
 		pull
