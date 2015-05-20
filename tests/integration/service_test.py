@@ -192,6 +192,13 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(container.get('HostConfig.ReadonlyRootfs'), read_only, container.get('HostConfig'))
 
+    def test_create_container_with_security_opt(self):
+        security_opt = ['label:disable']
+        service = self.create_service('db', security_opt=security_opt)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(set(container.get('HostConfig.SecurityOpt')), set(security_opt))
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'

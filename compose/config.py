@@ -30,6 +30,7 @@ DOCKER_CONFIG_KEYS = [
     'ports',
     'privileged',
     'restart',
+    'security_opt',
     'stdin_open',
     'tty',
     'user',
