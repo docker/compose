@@ -33,6 +33,8 @@ class DocoptCommand(object):
         if command is None:
             raise SystemExit(getdoc(self))
 
+        command = command.replace('-', '_')
+
         if not hasattr(self, command):
             raise NoSuchCommand(command, self)
 

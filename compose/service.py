@@ -789,7 +789,7 @@ def check_for_legacy_containers(
                 "labels. As of compose 1.3.0 containers are identified with "
                 "labels instead of naming convention. If you'd like compose "
                 "to use this container, please run "
-                "`docker-compose migrate_to_labels`" % (name,))
+                "`docker-compose migrate-to-labels`" % (name,))
 
 
 def parse_restart_spec(restart_config):
