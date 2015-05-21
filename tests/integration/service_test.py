@@ -236,7 +236,7 @@ class ServiceTest(DockerClientTestCase):
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
         volume_container_1 = volume_service.create_container()
-        volume_container_2 = Container.create(self.client, image='busybox:latest', command=["/bin/sleep", "300"])
+        volume_container_2 = Container.create(self.client, image='busybox:latest', command=["top"])
         host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
         host_container = host_service.create_container()
         host_service.start_container(host_container)
@@ -250,12 +250,12 @@ class ServiceTest(DockerClientTestCase):
             'db',
             environment={'FOO': '1'},
             volumes=['/etc'],
-            entrypoint=['sleep'],
-            command=['300']
+            entrypoint=['top'],
+            command=['-d', '1']
         )
         old_container = service.create_container()
-        self.assertEqual(old_container.get('Config.Entrypoint'), ['sleep'])
-        self.assertEqual(old_container.get('Config.Cmd'), ['300'])
+        self.assertEqual(old_container.get('Config.Entrypoint'), ['top'])
+        self.assertEqual(old_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=1', old_container.get('Config.Env'))
         self.assertEqual(old_container.name, 'composetest_db_1')
         service.start_container(old_container)
@@ -267,8 +267,8 @@ class ServiceTest(DockerClientTestCase):
         service.options['environment']['FOO'] = '2'
         new_container = service.converge()[0]
 
-        self.assertEqual(new_container.get('Config.Entrypoint'), ['sleep'])
-        self.assertEqual(new_container.get('Config.Cmd'), ['300'])
+        self.assertEqual(new_container.get('Config.Entrypoint'), ['top'])
+        self.assertEqual(new_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=2', new_container.get('Config.Env'))
         self.assertEqual(new_container.name, 'composetest_db_1')
         self.assertEqual(new_container.get('Volumes')['/etc'], volume_path)
@@ -287,8 +287,8 @@ class ServiceTest(DockerClientTestCase):
             'db',
             environment={'FOO': '1'},
             volumes=['/var/db'],
-            entrypoint=['sleep'],
-            command=['300']
+            entrypoint=['top'],
+            command=['-d', '1']
         )
         service.create_container()
         self.assertEqual(len(service.containers(stopped=True)), 1)

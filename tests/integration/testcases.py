@@ -27,7 +27,7 @@ class DockerClientTestCase(unittest.TestCase):
             kwargs['image'] = 'busybox:latest'
 
         if 'command' not in kwargs:
-            kwargs['command'] = ["/bin/sleep", "300"]
+            kwargs['command'] = ["top"]
 
         return Service(
             project='composetest',

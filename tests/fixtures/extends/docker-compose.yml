@@ -2,7 +2,7 @@ myweb:
   extends:
     file: common.yml
     service: web
-  command: sleep 300
+  command: top
   links:
     - "mydb:db"
   environment:
@@ -13,4 +13,4 @@ myweb:
     BAZ: "2"
 mydb:
   image: busybox
-  command: sleep 300
+  command: top

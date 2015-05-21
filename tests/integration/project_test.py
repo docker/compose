@@ -78,12 +78,12 @@ class ProjectTest(DockerClientTestCase):
             service_dicts=config.from_dictionary({
                 'net': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:net',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
             }),
             client=self.client,
@@ -103,7 +103,7 @@ class ProjectTest(DockerClientTestCase):
             self.client,
             image='busybox:latest',
             name='composetest_net_container',
-            command='/bin/sleep 300'
+            command='top'
         )
         net_container.start()
 
@@ -288,20 +288,20 @@ class ProjectTest(DockerClientTestCase):
             service_dicts=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                 },
                 'data': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
                 'db': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'volumes_from': ['data'],
                 },
                 'web': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'links': ['db'],
                 },
             }),
@@ -326,20 +326,20 @@ class ProjectTest(DockerClientTestCase):
             service_dicts=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                 },
                 'data': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
                 'db': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'volumes_from': ['data'],
                 },
                 'web': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'links': ['db'],
                 },
             }),

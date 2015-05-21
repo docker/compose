@@ -348,12 +348,12 @@ class ExtendsTest(unittest.TestCase):
             {
                 'name': 'mydb',
                 'image': 'busybox',
-                'command': 'sleep 300',
+                'command': 'top',
             },
             {
                 'name': 'myweb',
                 'image': 'busybox',
-                'command': 'sleep 300',
+                'command': 'top',
                 'links': ['mydb:db'],
                 'environment': {
                     "FOO": "1",
