@@ -99,7 +99,7 @@ class TopLevelCommand(Command):
       start              Start services
       stop               Stop services
       up                 Create and start containers
-      migrate_to_labels  Recreate containers to add labels
+      migrate-to-labels  Recreate containers to add labels
 
     """
     def docopt_options(self):
@@ -493,7 +493,7 @@ class TopLevelCommand(Command):
         """
         Recreate containers to add labels
 
-        Usage: migrate_to_labels
+        Usage: migrate-to-labels
         """
         migration.migrate_project_to_labels(project)
 
