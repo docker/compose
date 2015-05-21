@@ -26,19 +26,34 @@ def check_for_legacy_containers(
     and warn the user that those containers may need to be migrated to
     using labels, so that compose can find them.
     """
+    names = get_legacy_container_names(
+        client,
+        project,
+        services,
+        stopped=stopped,
+        one_off=one_off)
+
+    for name in names:
+        log.warn(
+            "Compose found a found a container named %s without any "
+            "labels. As of compose 1.3.0 containers are identified with "
+            "labels instead of naming convention. If you'd like compose "
+            "to use this container, please run "
+            "`docker-compose migrate-to-labels`" % (name,))
+
+
+def get_legacy_container_names(
+        client,
+        project,
+        services,
+        stopped=False,
+        one_off=False):
     for container in client.containers(all=stopped):
         name = get_container_name(container)
         for service in services:
             prefix = '%s_%s_%s' % (project, service, 'run_' if one_off else '')
-            if not name.startswith(prefix):
-                continue
-
-            log.warn(
-                "Compose found a found a container named %s without any "
-                "labels. As of compose 1.3.0 containers are identified with "
-                "labels instead of naming convention. If you'd like compose "
-                "to use this container, please run "
-                "`docker-compose migrate-to-labels`" % (name,))
+            if name.startswith(prefix):
+                yield name
 
 
 def add_labels(project, container, name):

@@ -7,24 +7,41 @@ from .testcases import DockerClientTestCase
 
 class ProjectTest(DockerClientTestCase):
 
-    def test_migration_to_labels(self):
-        services = [
+    def setUp(self):
+        super(ProjectTest, self).setUp()
+
+        self.services = [
             self.create_service('web'),
             self.create_service('db'),
         ]
 
-        project = Project('composetest', services, self.client)
+        self.project = Project('composetest', self.services, self.client)
 
-        for service in services:
+        for service in self.services:
             service.ensure_image_exists()
             self.client.create_container(
-                name='{}_{}_1'.format(project.name, service.name),
+                name='{}_{}_1'.format(self.project.name, service.name),
                 **service.options
             )
 
-        with mock.patch.object(legacy, 'log', autospec=True) as mock_log:
-            self.assertEqual(project.containers(stopped=True), [])
-            self.assertEqual(mock_log.warn.call_count, 2)
+    def get_names(self, **kwargs):
+        if 'stopped' not in kwargs:
+            kwargs['stopped'] = True
 
-        legacy.migrate_project_to_labels(project)
-        self.assertEqual(len(project.containers(stopped=True)), 2)
+        return list(legacy.get_legacy_container_names(
+            self.client,
+            self.project.name,
+            [s.name for s in self.services],
+            **kwargs
+        ))
+
+    def test_get_legacy_container_names(self):
+        self.assertEqual(len(self.get_names()), len(self.services))
+
+    def test_migration_to_labels(self):
+        with mock.patch.object(legacy, 'log', autospec=True) as mock_log:
+            self.assertEqual(self.project.containers(stopped=True), [])
+            self.assertEqual(mock_log.warn.call_count, len(self.services))
+
+        legacy.migrate_project_to_labels(self.project)
+        self.assertEqual(len(self.project.containers(stopped=True)), len(self.services))
