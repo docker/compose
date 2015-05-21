@@ -248,10 +248,13 @@ class Project(object):
 
             if updated_dependencies:
                 log.debug(
-                    '%s has not changed but its dependencies (%s) have, so recreating',
+                    '%s has upstream changes (%s)',
                     service.name, ", ".join(updated_dependencies),
                 )
-                plan = service.recreate_plan()
+                plan = service.convergence_plan(
+                    allow_recreate=allow_recreate,
+                    smart_recreate=False,
+                )
             else:
                 plan = service.convergence_plan(
                     allow_recreate=allow_recreate,
