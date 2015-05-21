@@ -167,7 +167,7 @@ class ServiceStateTest(DockerClientTestCase):
         self.assertEqual(('noop', [container]), web.convergence_plan(smart_recreate=True))
 
     def test_trigger_start(self):
-        options = dict(command=["/bin/sleep", "300"])
+        options = dict(command=["top"])
 
         web = self.create_service('web', **options)
         web.scale(2)
@@ -185,10 +185,10 @@ class ServiceStateTest(DockerClientTestCase):
         )
 
     def test_trigger_recreate_with_config_change(self):
-        web = self.create_service('web', command=["/bin/sleep", "300"])
+        web = self.create_service('web', command=["top"])
         container = web.create_container()
 
-        web = self.create_service('web', command=["/bin/sleep", "400"])
+        web = self.create_service('web', command=["top", "-d", "1"])
         self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
 
     def test_trigger_recreate_with_image_change(self):
@@ -254,10 +254,10 @@ class ConfigHashTest(DockerClientTestCase):
         self.assertIn('foo', container.labels)
 
     def test_config_hash_sticks_around(self):
-        web = self.create_service('web', command=["/bin/sleep", "300"])
+        web = self.create_service('web', command=["top"])
         container = web.converge()[0]
         self.assertIn(LABEL_CONFIG_HASH, container.labels)
 
-        web = self.create_service('web', command=["/bin/sleep", "400"])
+        web = self.create_service('web', command=["top", "-d", "1"])
         container = web.converge()[0]
         self.assertIn(LABEL_CONFIG_HASH, container.labels)

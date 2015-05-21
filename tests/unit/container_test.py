@@ -14,7 +14,7 @@ class ContainerTest(unittest.TestCase):
         self.container_dict = {
             "Id": "abc",
             "Image": "busybox:latest",
-            "Command": "sleep 300",
+            "Command": "top",
             "Created": 1387384730,
             "Status": "Up 8 seconds",
             "Ports": None,
