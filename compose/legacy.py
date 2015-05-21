@@ -10,6 +10,20 @@ log = logging.getLogger(__name__)
 # TODO: remove this section when migrate_project_to_labels is removed
 NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
 
+ERROR_MESSAGE_FORMAT = """
+Compose found the following containers without labels:
+
+{names_list}
+
+As of Compose 1.3.0, containers are identified with labels instead of naming convention. If you want to continue using these containers, run:
+
+    $ docker-compose migrate-to-labels
+
+Alternatively, remove them:
+
+    $ docker rm -f {rm_args}
+"""
+
 
 def check_for_legacy_containers(
         client,
@@ -21,20 +35,30 @@ def check_for_legacy_containers(
     and warn the user that those containers may need to be migrated to
     using labels, so that compose can find them.
     """
-    names = get_legacy_container_names(
+    names = list(get_legacy_container_names(
         client,
         project,
         services,
         stopped=stopped,
-        one_off=one_off)
+        one_off=one_off))
 
-    for name in names:
-        log.warn(
-            "Compose found a found a container named %s without any "
-            "labels. As of compose 1.3.0 containers are identified with "
-            "labels instead of naming convention. If you'd like compose "
-            "to use this container, please run "
-            "`docker-compose migrate-to-labels`" % (name,))
+    if names:
+        raise LegacyContainersError(names)
+
+
+class LegacyContainersError(Exception):
+    def __init__(self, names):
+        self.names = names
+
+        self.msg = ERROR_MESSAGE_FORMAT.format(
+            names_list="\n".join("    {}".format(name) for name in names),
+            rm_args=" ".join(names),
+        )
+
+    def __unicode__(self):
+        return self.msg
+
+    __str__ = __unicode__
 
 
 def add_labels(project, container, name):
