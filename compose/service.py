@@ -215,6 +215,9 @@ class Service(object):
             previous_container=previous_container,
         )
 
+        if 'name' in container_options:
+            log.info("Creating %s..." % container_options['name'])
+
         return Container.create(self.client, **container_options)
 
     def ensure_image_exists(self,
