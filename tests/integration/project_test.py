@@ -6,6 +6,29 @@ from .testcases import DockerClientTestCase
 
 
 class ProjectTest(DockerClientTestCase):
+
+    def test_containers(self):
+        web = self.create_service('web')
+        db = self.create_service('db')
+        project = Project('composetest', [web, db], self.client)
+
+        project.up()
+
+        containers = project.containers()
+        self.assertEqual(len(containers), 2)
+
+    def test_containers_with_service_names(self):
+        web = self.create_service('web')
+        db = self.create_service('db')
+        project = Project('composetest', [web, db], self.client)
+
+        project.up()
+
+        containers = project.containers(['web'])
+        self.assertEqual(
+            [c.name for c in containers],
+            ['composetest_web_1'])
+
     def test_volumes_from_service(self):
         service_dicts = config.from_dictionary({
             'data': {
