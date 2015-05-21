@@ -6,7 +6,7 @@ from functools import reduce
 from docker.errors import APIError
 
 from .config import get_service_name_from_net, ConfigurationError
-from .const import LABEL_PROJECT, LABEL_ONE_OFF
+from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
 from .service import Service, check_for_legacy_containers
 from .container import Container
 
@@ -276,6 +276,11 @@ class Project(object):
                 all=stopped,
                 filters={'label': self.labels(one_off=one_off)})]
 
+        def matches_service_names(container):
+            if not service_names:
+                return True
+            return container.labels.get(LABEL_SERVICE) in service_names
+
         if not containers:
             check_for_legacy_containers(
                 self.client,
@@ -284,7 +289,7 @@ class Project(object):
                 stopped=stopped,
                 one_off=one_off)
 
-        return containers
+        return filter(matches_service_names, containers)
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
