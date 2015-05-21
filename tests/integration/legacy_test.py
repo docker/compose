@@ -17,12 +17,19 @@ class ProjectTest(DockerClientTestCase):
 
         self.project = Project('composetest', self.services, self.client)
 
+        # Create a legacy container for each service
         for service in self.services:
             service.ensure_image_exists()
             self.client.create_container(
                 name='{}_{}_1'.format(self.project.name, service.name),
                 **service.options
             )
+
+        # Create a single one-off legacy container
+        self.client.create_container(
+            name='{}_{}_run_1'.format(self.project.name, self.services[0].name),
+            **self.services[0].options
+        )
 
     def get_names(self, **kwargs):
         if 'stopped' not in kwargs:
@@ -37,6 +44,9 @@ class ProjectTest(DockerClientTestCase):
 
     def test_get_legacy_container_names(self):
         self.assertEqual(len(self.get_names()), len(self.services))
+
+    def test_get_legacy_container_names_one_off(self):
+        self.assertEqual(len(self.get_names(one_off=True)), 1)
 
     def test_migration_to_labels(self):
         with mock.patch.object(legacy, 'log', autospec=True) as mock_log:
