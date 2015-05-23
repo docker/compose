@@ -1,6 +1,7 @@
 import os
 import yaml
 import six
+import json
 
 
 DOCKER_CONFIG_KEYS = [
@@ -322,7 +323,10 @@ def split_env(env):
 
 def resolve_env_var(key, val):
     if val is not None:
-        return key, val
+        if isinstance(val, dict) or isinstance(val, list):
+            return key, json.dumps(val)
+        else:
+            return key, val
     elif key in os.environ:
         return key, os.environ[key]
     else:
