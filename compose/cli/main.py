@@ -11,7 +11,7 @@ from docker.errors import APIError
 import dockerpty
 
 from .. import __version__
-from .. import migration
+from .. import legacy
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, CannotBeScaledError, NeedsBuildError
 from ..config import parse_environment
@@ -495,7 +495,7 @@ class TopLevelCommand(Command):
 
         Usage: migrate-to-labels
         """
-        migration.migrate_project_to_labels(project)
+        legacy.migrate_project_to_labels(project)
 
 
 def list_containers(containers):

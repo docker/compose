@@ -20,7 +20,8 @@ from .const import (
     LABEL_VERSION,
     LABEL_CONFIG_HASH,
 )
-from .container import Container, get_container_name
+from .container import Container
+from .legacy import check_for_legacy_containers
 from .progress_stream import stream_output, StreamOutputError
 from .utils import json_hash
 
@@ -768,31 +769,6 @@ def build_container_labels(label_options, service_labels, number, one_off=False)
     labels[LABEL_CONTAINER_NUMBER] = str(number)
     labels[LABEL_VERSION] = __version__
     return labels
-
-
-def check_for_legacy_containers(
-        client,
-        project,
-        services,
-        stopped=False,
-        one_off=False):
-    """Check if there are containers named using the old naming convention
-    and warn the user that those containers may need to be migrated to
-    using labels, so that compose can find them.
-    """
-    for container in client.containers(all=stopped):
-        name = get_container_name(container)
-        for service in services:
-            prefix = '%s_%s_%s' % (project, service, 'run_' if one_off else '')
-            if not name.startswith(prefix):
-                continue
-
-            log.warn(
-                "Compose found a found a container named %s without any "
-                "labels. As of compose 1.3.0 containers are identified with "
-                "labels instead of naming convention. If you'd like compose "
-                "to use this container, please run "
-                "`docker-compose migrate-to-labels`" % (name,))
 
 
 def parse_restart_spec(restart_config):
