@@ -2,10 +2,10 @@ Docker Compose
 ==============
 *(Previously known as Fig)*
 
-Compose is a tool for defining and running complex applications with Docker.
-With Compose, you define a multi-container application in a single file, then
-spin your application up in a single command which does everything that needs to
-be done to get it running.
+Compose is a tool for defining and running multi-container applications with
+Docker. With Compose, you define a multi-container application in a single
+file, then spin your application up in a single command which does everything
+that needs to be done to get it running.
 
 Compose is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
@@ -50,4 +50,3 @@ Contributing
 [![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
 
 Want to help build Compose? Check out our [contributing documentation](https://github.com/docker/compose/blob/master/CONTRIBUTING.md).
-

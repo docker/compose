@@ -72,7 +72,7 @@ def parse_doc_section(name, source):
 
 
 class TopLevelCommand(Command):
-    """Fast, isolated development environments using Docker.
+    """Define and run multi-container applications with Docker.
 
     Usage:
       docker-compose [options] [COMMAND] [ARGS...]
