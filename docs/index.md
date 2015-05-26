@@ -7,10 +7,10 @@ page_keywords: documentation, docs,  docker, compose, orchestration, containers
 
 ## Overview
 
-Compose is a tool for defining and running complex applications with Docker.
-With Compose, you define a multi-container application in a single file, then
-spin your application up in a single command which does everything that needs to
-be done to get it running.
+Compose is a tool for defining and running multi-container applications with
+Docker. With Compose, you define a multi-container application in a single
+file, then spin your application up in a single command which does everything
+that needs to be done to get it running.
 
 Compose is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
@@ -200,7 +200,7 @@ At this point, you have seen the basics of how Compose works.
   [Rails](rails.md), or [Wordpress](wordpress.md).
 - See the reference guides for complete details on the [commands](cli.md), the
   [configuration file](yml.md) and [environment variables](env.md).
-  
+
 ## Release Notes
 
 ### Version 1.2.0 (April 7, 2015)
