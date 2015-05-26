@@ -174,6 +174,18 @@ class ProjectTest(DockerClientTestCase):
         project.kill()
         project.remove_stopped()
 
+    def test_project_up_starts_uncreated_services(self):
+        db = self.create_service('db')
+        web = self.create_service('web', links=[(db, 'db')])
+        project = Project('composetest', [db, web], self.client)
+        project.up(['db'])
+        self.assertEqual(len(project.containers()), 1)
+
+        project.up()
+        self.assertEqual(len(project.containers()), 2)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(web.containers()), 1)
+
     def test_project_up_recreates_containers(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/etc'])

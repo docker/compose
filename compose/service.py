@@ -294,10 +294,6 @@ class Service(object):
 
         return ConvergencePlan('recreate', containers)
 
-    def recreate_plan(self):
-        containers = self.containers(stopped=True)
-        return ConvergencePlan('recreate', containers)
-
     def _containers_have_diverged(self, containers):
         config_hash = self.config_hash()
         has_diverged = False
