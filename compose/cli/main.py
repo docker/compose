@@ -13,7 +13,7 @@ import dockerpty
 from .. import __version__
 from .. import legacy
 from ..project import NoSuchService, ConfigurationError
-from ..service import BuildError, CannotBeScaledError, NeedsBuildError
+from ..service import BuildError, NeedsBuildError
 from ..config import parse_environment
 from .command import Command
 from .docopt_command import NoSuchCommand
@@ -372,15 +372,7 @@ class TopLevelCommand(Command):
             except ValueError:
                 raise UserError('Number of containers for service "%s" is not a '
                                 'number' % service_name)
-            try:
-                project.get_service(service_name).scale(num)
-            except CannotBeScaledError:
-                raise UserError(
-                    'Service "%s" cannot be scaled because it specifies a port '
-                    'on the host. If multiple containers for this service were '
-                    'created, the port would clash.\n\nRemove the ":" from the '
-                    'port definition in docker-compose.yml so Docker can choose a random '
-                    'port for each container.' % service_name)
+            project.get_service(service_name).scale(num)
 
     def start(self, project, options):
         """

@@ -17,7 +17,6 @@ from compose.const import (
     LABEL_VERSION,
 )
 from compose.service import (
-    CannotBeScaledError,
     ConfigError,
     Service,
     build_extra_hosts,
@@ -525,10 +524,6 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
         service.scale(0)
         self.assertEqual(len(service.containers()), 0)
-
-    def test_scale_on_service_that_cannot_be_scaled(self):
-        service = self.create_service('web', ports=['8000:8000'])
-        self.assertRaises(CannotBeScaledError, lambda: service.scale(1))
 
     def test_scale_sets_ports(self):
         service = self.create_service('web', ports=['8000'])
