@@ -33,7 +33,7 @@ def main():
     except KeyboardInterrupt:
         log.error("\nAborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError) as e:
+    except (UserError, NoSuchService, ConfigurationError, legacy.LegacyContainersError) as e:
         log.error(e.msg)
         sys.exit(1)
     except NoSuchCommand as e:

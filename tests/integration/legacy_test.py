@@ -1,5 +1,3 @@
-import mock
-
 from compose import legacy
 from compose.project import Project
 from .testcases import DockerClientTestCase
@@ -49,9 +47,13 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(self.get_names(one_off=True)), 1)
 
     def test_migration_to_labels(self):
-        with mock.patch.object(legacy, 'log', autospec=True) as mock_log:
+        with self.assertRaises(legacy.LegacyContainersError) as cm:
             self.assertEqual(self.project.containers(stopped=True), [])
-            self.assertEqual(mock_log.warn.call_count, len(self.services))
+
+        self.assertEqual(
+            set(cm.exception.names),
+            set(['composetest_web_1', 'composetest_db_1']),
+        )
 
         legacy.migrate_project_to_labels(self.project)
         self.assertEqual(len(self.project.containers(stopped=True)), len(self.services))
