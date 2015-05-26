@@ -20,7 +20,7 @@ First, install Docker version 1.6 or greater:
 
 To install Compose, run the following commands:
 
-    curl -L https://github.com/docker/compose/releases/download/1.2.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+    curl -L https://github.com/docker/compose/releases/download/1.3.0rc2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
 
 > Note: If you get a "Permission denied" error, your `/usr/local/bin` directory probably isn't writable and you'll need to install Compose as the superuser. Run `sudo -i`, then the two commands above, then `exit`.
@@ -35,6 +35,18 @@ Compose can also be installed as a Python package:
 
 No further steps are required; Compose should now be successfully installed.
 You can test the installation by running `docker-compose --version`.
+
+### Upgrading
+
+If you're coming from Compose 1.2 or earlier, you'll need to remove or migrate your existing containers after upgrading Compose. This is because, as of version 1.3, Compose uses Docker labels to keep track of containers, and so they need to be recreated with labels added.
+
+If Compose detects containers that were created without labels, it will refuse to run so that you don't end up with two sets of them. If you want to keep using your existing containers (for example, because they have data volumes you want to preserve) you can migrate them with the following command:
+
+    docker-compose migrate-to-labels
+
+Alternatively, if you're not worried about keeping them, you can remove them - Compose will just create new ones.
+
+    docker rm -f myapp_web_1 myapp_db_1 ...
 
 ## Compose documentation
 
