@@ -35,15 +35,15 @@ def check_for_legacy_containers(
     and warn the user that those containers may need to be migrated to
     using labels, so that compose can find them.
     """
-    names = list(get_legacy_container_names(
+    containers = list(get_legacy_containers(
         client,
         project,
         services,
         stopped=stopped,
         one_off=one_off))
 
-    if names:
-        raise LegacyContainersError(names)
+    if containers:
+        raise LegacyContainersError([c.name for c in containers])
 
 
 class LegacyContainersError(Exception):
@@ -61,8 +61,8 @@ class LegacyContainersError(Exception):
     __str__ = __unicode__
 
 
-def add_labels(project, container, name):
-    project_name, service_name, one_off, number = NAME_RE.match(name).groups()
+def add_labels(project, container):
+    project_name, service_name, one_off, number = NAME_RE.match(container.name).groups()
     if project_name != project.name or service_name not in project.service_names:
         return
     service = project.get_service(service_name)
@@ -72,26 +72,31 @@ def add_labels(project, container, name):
 def migrate_project_to_labels(project):
     log.info("Running migration to labels for project %s", project.name)
 
-    client = project.client
-    for container in client.containers(all=True):
-        name = get_container_name(container)
-        if not is_valid_name(name):
-            continue
-        add_labels(project, Container.from_ps(client, container), name)
+    containers = get_legacy_containers(
+        project.client,
+        project.name,
+        project.service_names,
+        stopped=True,
+        one_off=False)
+
+    for container in containers:
+        add_labels(project, container)
 
 
-def get_legacy_container_names(
+def get_legacy_containers(
         client,
         project,
         services,
         stopped=False,
         one_off=False):
 
-    for container in client.containers(all=stopped):
-        name = get_container_name(container)
-        for service in services:
+    containers = client.containers(all=stopped)
+
+    for service in services:
+        for container in containers:
+            name = get_container_name(container)
             if has_container(project, service, name, one_off=one_off):
-                yield name
+                yield Container.from_ps(client, container)
 
 
 def has_container(project, service, name, one_off=False):

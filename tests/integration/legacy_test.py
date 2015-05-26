@@ -8,20 +8,21 @@ class ProjectTest(DockerClientTestCase):
     def setUp(self):
         super(ProjectTest, self).setUp()
 
-        self.services = [
-            self.create_service('web'),
-            self.create_service('db'),
-        ]
+        db = self.create_service('db')
+        web = self.create_service('web', links=[(db, 'db')])
+        nginx = self.create_service('nginx', links=[(web, 'web')])
 
+        self.services = [db, web, nginx]
         self.project = Project('composetest', self.services, self.client)
 
         # Create a legacy container for each service
         for service in self.services:
             service.ensure_image_exists()
-            self.client.create_container(
+            container = self.client.create_container(
                 name='{}_{}_1'.format(self.project.name, service.name),
                 **service.options
             )
+            self.client.start(container)
 
         # Create a single one-off legacy container
         self.client.create_container(
@@ -29,11 +30,8 @@ class ProjectTest(DockerClientTestCase):
             **self.services[0].options
         )
 
-    def get_names(self, **kwargs):
-        if 'stopped' not in kwargs:
-            kwargs['stopped'] = True
-
-        return list(legacy.get_legacy_container_names(
+    def get_legacy_containers(self, **kwargs):
+        return list(legacy.get_legacy_containers(
             self.client,
             self.project.name,
             [s.name for s in self.services],
@@ -41,10 +39,10 @@ class ProjectTest(DockerClientTestCase):
         ))
 
     def test_get_legacy_container_names(self):
-        self.assertEqual(len(self.get_names()), len(self.services))
+        self.assertEqual(len(self.get_legacy_containers()), len(self.services))
 
     def test_get_legacy_container_names_one_off(self):
-        self.assertEqual(len(self.get_names(one_off=True)), 1)
+        self.assertEqual(len(self.get_legacy_containers(stopped=True, one_off=True)), 1)
 
     def test_migration_to_labels(self):
         with self.assertRaises(legacy.LegacyContainersError) as cm:
@@ -52,7 +50,7 @@ class ProjectTest(DockerClientTestCase):
 
         self.assertEqual(
             set(cm.exception.names),
-            set(['composetest_web_1', 'composetest_db_1']),
+            set(['composetest_db_1', 'composetest_web_1', 'composetest_nginx_1']),
         )
 
         legacy.migrate_project_to_labels(self.project)
