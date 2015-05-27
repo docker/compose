@@ -36,7 +36,7 @@ class CLITestCase(DockerClientTestCase):
         if hasattr(self, '_project'):
             return self._project
 
-        return self.command.get_project(self.command.get_config_path())
+        return self.command.get_project()
 
     def test_help(self):
         old_base_dir = self.command.base_dir

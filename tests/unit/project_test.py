@@ -3,7 +3,6 @@ from .. import unittest
 from compose.service import Service
 from compose.project import Project
 from compose.container import Container
-from compose import config
 
 import mock
 import docker
@@ -51,14 +50,16 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.services[2].name, 'web')
 
     def test_from_config(self):
-        dicts = config.from_dictionary({
-            'web': {
+        dicts = [
+            {
+                'name': 'web',
                 'image': 'busybox:latest',
             },
-            'db': {
+            {
+                'name': 'db',
                 'image': 'busybox:latest',
             },
-        })
+        ]
         project = Project.from_dicts('composetest', dicts, None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')

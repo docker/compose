@@ -10,20 +10,13 @@ from .. import config
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
-from .utils import call_silently, is_mac, is_ubuntu, find_candidates_in_parent_dirs
+from .utils import call_silently, is_mac, is_ubuntu
 from .docker_client import docker_client
 from . import verbose_proxy
 from . import errors
 from .. import __version__
 
 log = logging.getLogger(__name__)
-
-SUPPORTED_FILENAMES = [
-    'docker-compose.yml',
-    'docker-compose.yaml',
-    'fig.yml',
-    'fig.yaml',
-]
 
 
 class Command(DocoptCommand):
@@ -59,7 +52,7 @@ class Command(DocoptCommand):
 
         explicit_config_path = options.get('--file') or os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')
         project = self.get_project(
-            self.get_config_path(explicit_config_path),
+            explicit_config_path,
             project_name=options.get('--project-name'),
             verbose=options.get('--verbose'))
 
@@ -76,16 +69,18 @@ class Command(DocoptCommand):
             return verbose_proxy.VerboseProxy('docker', client)
         return client
 
-    def get_project(self, config_path, project_name=None, verbose=False):
+    def get_project(self, config_path=None, project_name=None, verbose=False):
+        config_details = config.find(self.base_dir, config_path)
+
         try:
             return Project.from_dicts(
-                self.get_project_name(config_path, project_name),
-                config.load(config_path),
+                self.get_project_name(config_details.working_dir, project_name),
+                config.load(config_details),
                 self.get_client(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
 
-    def get_project_name(self, config_path, project_name=None):
+    def get_project_name(self, working_dir, project_name=None):
         def normalize_name(name):
             return re.sub(r'[^a-z0-9]', '', name.lower())
 
@@ -93,38 +88,15 @@ class Command(DocoptCommand):
             log.warn('The FIG_PROJECT_NAME environment variable is deprecated.')
             log.warn('Please use COMPOSE_PROJECT_NAME instead.')
 
-        project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME') or os.environ.get('FIG_PROJECT_NAME')
+        project_name = (
+            project_name or
+            os.environ.get('COMPOSE_PROJECT_NAME') or
+            os.environ.get('FIG_PROJECT_NAME'))
         if project_name is not None:
             return normalize_name(project_name)
 
-        project = os.path.basename(os.path.dirname(os.path.abspath(config_path)))
+        project = os.path.basename(os.path.abspath(working_dir))
         if project:
             return normalize_name(project)
 
         return 'default'
-
-    def get_config_path(self, file_path=None):
-        if file_path:
-            return os.path.join(self.base_dir, file_path)
-
-        (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, self.base_dir)
-
-        if len(candidates) == 0:
-            raise errors.ComposeFileNotFound(SUPPORTED_FILENAMES)
-
-        winner = candidates[0]
-
-        if len(candidates) > 1:
-            log.warning("Found multiple config files with supported names: %s", ", ".join(candidates))
-            log.warning("Using %s\n", winner)
-
-        if winner == 'docker-compose.yaml':
-            log.warning("Please be aware that .yml is the expected extension "
-                        "in most cases, and using .yaml can cause compatibility "
-                        "issues in future.\n")
-
-        if winner.startswith("fig."):
-            log.warning("%s is deprecated and will not be supported in future. "
-                        "Please rename your config file to docker-compose.yml\n" % winner)
-
-        return os.path.join(path, winner)
