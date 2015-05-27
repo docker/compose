@@ -53,16 +53,20 @@ you can specify a test directory, file, module, class or method:
 
 ## Building binaries
 
-Linux:
+`script/build-linux` will build the Linux binary inside a Docker container:
 
     $ script/build-linux
 
-OS X:
+`script/build-osx` will build the Mac OS X binary inside a virtualenv:
 
     $ script/build-osx
 
-Note that this only works on Mountain Lion, not Mavericks, due to a
-[bug in PyInstaller](http://www.pyinstaller.org/ticket/807).
+For official releases, you should build inside a Mountain Lion VM for proper
+compatibility. Run the this script first to prepare the environment before
+building - it will use Homebrew to make sure Python is installed and
+up-to-date.
+
+    $ script/prepare-osx
 
 ## Release process
 
