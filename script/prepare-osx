@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -ex
+
+if !(which brew); then
+  ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+fi
+
+brew update
+
+if [ ! -f /usr/local/bin/python ]; then
+  brew install python
+fi
+
+if [ -n "$(brew outdated | grep python)" ]; then
+  brew upgrade python
+fi
+
+if !(which virtualenv); then
+  pip install virtualenv
+fi
+
