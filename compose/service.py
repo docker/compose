@@ -312,7 +312,8 @@ class Service(object):
     def execute_convergence_plan(self,
                                  plan,
                                  insecure_registry=False,
-                                 do_build=True):
+                                 do_build=True,
+                                 timeout=None):
         (action, containers) = plan
 
         if action == 'create':
@@ -329,6 +330,7 @@ class Service(object):
                 self.recreate_container(
                     c,
                     insecure_registry=insecure_registry,
+                    timeout=timeout
                 )
                 for c in containers
             ]
@@ -350,7 +352,8 @@ class Service(object):
 
     def recreate_container(self,
                            container,
-                           insecure_registry=False):
+                           insecure_registry=False,
+                           timeout=None):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -359,7 +362,8 @@ class Service(object):
         """
         log.info("Recreating %s..." % container.name)
         try:
-            container.stop()
+            stop_params = {} if timeout is None else {'timeout': timeout}
+            container.stop(**stop_params)
         except APIError as e:
             if (e.response.status_code == 500
                     and e.explanation
