@@ -5,6 +5,9 @@ import datetime
 import os
 import subprocess
 import platform
+import ssl
+
+from .. import __version__
 
 
 def yesno(prompt, default=None):
@@ -120,3 +123,11 @@ def is_mac():
 
 def is_ubuntu():
     return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
+
+
+def get_version_info():
+    return '\n'.join([
+        'docker-compose version: %s' % __version__,
+        "%s version: %s" % (platform.python_implementation(), platform.python_version()),
+        "OpenSSL version: %s" % ssl.OPENSSL_VERSION,
+    ])

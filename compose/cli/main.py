@@ -10,7 +10,6 @@ import sys
 from docker.errors import APIError
 import dockerpty
 
-from .. import __version__
 from .. import legacy
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, CannotBeScaledError, NeedsBuildError
@@ -20,7 +19,7 @@ from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import Formatter
 from .log_printer import LogPrinter
-from .utils import yesno
+from .utils import get_version_info, yesno
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +103,7 @@ class TopLevelCommand(Command):
     """
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = "docker-compose %s" % __version__
+        options['version'] = get_version_info()
         return options
 
     def build(self, project, options):
