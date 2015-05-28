@@ -4,3 +4,4 @@ git+https://github.com/pyinstaller/pyinstaller.git@12e40471c77f588ea5be352f7219c
 unittest2==0.8.0
 flake8==2.3.0
 pep8==1.6.1
+coverage==3.7.1
