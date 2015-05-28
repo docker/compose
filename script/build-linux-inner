@@ -7,4 +7,4 @@ chmod 777 `pwd`/dist
 
 pyinstaller -F bin/docker-compose
 mv dist/docker-compose dist/docker-compose-Linux-x86_64
-dist/docker-compose-Linux-x86_64 --version
+dist/docker-compose-Linux-x86_64 version

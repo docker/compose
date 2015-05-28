@@ -8,6 +8,7 @@ from docker import version as docker_py_version
 import os
 import platform
 import subprocess
+import ssl
 
 
 def yesno(prompt, default=None):
@@ -132,6 +133,7 @@ def get_version_info(scope):
     elif scope == 'full':
         return versioninfo + '\n' \
             + "docker-py version: %s\n" % docker_py_version \
-            + "%s version: %s" % (platform.python_implementation(), platform.python_version())
+            + "%s version: %s\n" % (platform.python_implementation(), platform.python_version()) \
+            + "OpenSSL version: %s" % ssl.OPENSSL_VERSION
     else:
         raise RuntimeError('passed unallowed value to `cli.utils.get_version_info`')
