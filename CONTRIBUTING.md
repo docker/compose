@@ -73,7 +73,6 @@ up-to-date.
 1. Open pull request that:
  - Updates the version in `compose/__init__.py`
  - Updates the binary URL in `docs/install.md`
- - Updates the script URL in `docs/completion.md`
  - Adds release notes to `CHANGES.md`
 2. Create unpublished GitHub release with release notes
 3. Build Linux version on any Docker host with `script/build-linux` and attach
