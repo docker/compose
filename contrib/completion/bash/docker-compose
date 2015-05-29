@@ -104,7 +104,7 @@ _docker-compose_docker-compose() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help -h --verbose --version --file -f --project-name -p" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help -h --verbose --version -v --file -f --project-name -p" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -293,7 +293,7 @@ _docker-compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate -t --timeout" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate -t --timeout --x-smart-recreate" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
