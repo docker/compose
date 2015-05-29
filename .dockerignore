@@ -1,2 +1,4 @@
 .git
 venv
+build
+dist
