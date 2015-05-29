@@ -360,22 +360,22 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
-    def test_kill_signal_sigint(self):
+    def test_kill_signal_sigstop(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
 
         self.assertEqual(len(service.containers()), 1)
-        # The container is still running. It has been only interrupted
+        # The container is still running. It has only been paused
         self.assertTrue(service.containers()[0].is_running)
 
-    def test_kill_interrupted_service(self):
+    def test_kill_stopped_service(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
-        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
         self.assertTrue(service.containers()[0].is_running)
 
         self.command.dispatch(['kill', '-s', 'SIGKILL'], None)
