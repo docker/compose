@@ -240,6 +240,7 @@ __docker-compose_subcommand () {
                 "--no-recreate[If containers already exist, don't recreate them.]" \
                 "--no-build[Don't build an image, even if it's missing]" \
                 '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                "--x-smart-recreate[Only recreate containers whose configuration or image needs to be updated. (EXPERIMENTAL)]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (*)
@@ -263,7 +264,7 @@ _docker-compose () {
     _arguments -C \
         '(- :)'{-h,--help}'[Get help]' \
         '--verbose[Show more output]' \
-        '(- :)--version[Print version and exit]' \
+        '(- :)'{-v,--version}'[Print version and exit]' \
         '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
         '(-): :->command' \
