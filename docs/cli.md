@@ -95,7 +95,9 @@ specify the `--no-deps` flag:
 
 Similarly, if you do want the service's ports to be created and mapped to the
 host, specify the `--service-ports` flag:
-	$ docker-compose run --service-ports web python manage.py shell
+
+    $ docker-compose run --service-ports web python manage.py shell
+
 
 ### scale
 
