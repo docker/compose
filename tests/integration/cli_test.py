@@ -24,6 +24,7 @@ class CLITestCase(DockerClientTestCase):
         self.project.remove_stopped()
         for container in self.project.containers(stopped=True, one_off=True):
             container.remove(force=True)
+        super(CLITestCase, self).tearDown()
 
     @property
     def project(self):
@@ -207,12 +208,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(old_ids, new_ids)
 
     @patch('dockerpty.start')
-    def test_run_without_command(self, __):
+    def test_run_without_command(self, _):
         self.command.base_dir = 'tests/fixtures/commands-composefile'
         self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
-
-        for c in self.project.containers(stopped=True, one_off=True):
-            c.remove()
 
         self.command.dispatch(['run', 'implicit'], None)
         service = self.project.get_service('implicit')

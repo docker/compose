@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
+
 from compose import config
+from compose.const import LABEL_PROJECT
 from compose.project import Project
 from compose.container import Container
 from .testcases import DockerClientTestCase
@@ -55,6 +57,7 @@ class ProjectTest(DockerClientTestCase):
             image='busybox:latest',
             volumes=['/var/data'],
             name='composetest_data_container',
+            labels={LABEL_PROJECT: 'composetest'},
         )
         project = Project.from_dicts(
             name='composetest',
@@ -68,9 +71,6 @@ class ProjectTest(DockerClientTestCase):
         )
         db = project.get_service('db')
         self.assertEqual(db.volumes_from, [data_container])
-
-        project.kill()
-        project.remove_stopped()
 
     def test_net_from_service(self):
         project = Project.from_dicts(
@@ -95,15 +95,13 @@ class ProjectTest(DockerClientTestCase):
         net = project.get_service('net')
         self.assertEqual(web._get_net(), 'container:' + net.containers()[0].id)
 
-        project.kill()
-        project.remove_stopped()
-
     def test_net_from_container(self):
         net_container = Container.create(
             self.client,
             image='busybox:latest',
             name='composetest_net_container',
-            command='top'
+            command='top',
+            labels={LABEL_PROJECT: 'composetest'},
         )
         net_container.start()
 
@@ -122,9 +120,6 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         self.assertEqual(web._get_net(), 'container:' + net_container.id)
-
-        project.kill()
-        project.remove_stopped()
 
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')
@@ -171,9 +166,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(web.containers()), 0)
 
-        project.kill()
-        project.remove_stopped()
-
     def test_project_up_starts_uncreated_services(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'db')])
@@ -205,9 +197,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertNotEqual(db_container.id, old_db_id)
         self.assertEqual(db_container.get('Volumes./etc'), db_volume_path)
 
-        project.kill()
-        project.remove_stopped()
-
     def test_project_up_with_no_recreate_running(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/var/db'])
@@ -227,9 +216,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(db_container.id, old_db_id)
         self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
                          db_volume_path)
-
-        project.kill()
-        project.remove_stopped()
 
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
@@ -258,9 +244,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
                          db_volume_path)
 
-        project.kill()
-        project.remove_stopped()
-
     def test_project_up_without_all_services(self):
         console = self.create_service('console')
         db = self.create_service('db')
@@ -272,9 +255,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 2)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 1)
-
-        project.kill()
-        project.remove_stopped()
 
     def test_project_up_starts_links(self):
         console = self.create_service('console')
@@ -290,9 +270,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
-
-        project.kill()
-        project.remove_stopped()
 
     def test_project_up_starts_depends(self):
         project = Project.from_dicts(
@@ -328,9 +305,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('db').containers()), 1)
         self.assertEqual(len(project.get_service('data').containers()), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
-
-        project.kill()
-        project.remove_stopped()
 
     def test_project_up_with_no_deps(self):
         project = Project.from_dicts(
@@ -368,9 +342,6 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('data').containers(stopped=True)), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
-        project.kill()
-        project.remove_stopped()
-
     def test_unscale_after_restart(self):
         web = self.create_service('web')
         project = Project('composetest', [web], self.client)
@@ -395,5 +366,3 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         service = project.get_service('web')
         self.assertEqual(len(service.containers()), 1)
-        project.kill()
-        project.remove_stopped()

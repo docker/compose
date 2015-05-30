@@ -235,7 +235,12 @@ class ServiceTest(DockerClientTestCase):
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
         volume_container_1 = volume_service.create_container()
-        volume_container_2 = Container.create(self.client, image='busybox:latest', command=["top"])
+        volume_container_2 = Container.create(
+            self.client,
+            image='busybox:latest',
+            command=["top"],
+            labels={LABEL_PROJECT: 'composetest'},
+        )
         host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
         host_container = host_service.create_container()
         host_service.start_container(host_container)
@@ -408,7 +413,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(self.client.images(name='composetest_test')), 1)
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
-        self.client.build('tests/fixtures/simple-dockerfile', tag='composetest_test')
+        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
         service = Service(
             name='test',
             client=self.client,

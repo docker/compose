@@ -216,18 +216,19 @@ class ServiceStateTest(DockerClientTestCase):
 
     def test_trigger_recreate_with_build(self):
         context = tempfile.mkdtemp()
+        base_image = "FROM busybox\nLABEL com.docker.compose.test_image=true\n"
 
         try:
             dockerfile = os.path.join(context, 'Dockerfile')
 
             with open(dockerfile, 'w') as f:
-                f.write('FROM busybox\n')
+                f.write(base_image)
 
             web = self.create_service('web', build=context)
             container = web.create_container()
 
             with open(dockerfile, 'w') as f:
-                f.write('FROM busybox\nCMD echo hello world\n')
+                f.write(base_image + 'CMD echo hello world\n')
             web.build()
 
             web = self.create_service('web', build=context)
