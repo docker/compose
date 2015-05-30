@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from compose.service import Service
 from compose.config import make_service_dict
+from compose.const import LABEL_PROJECT
 from compose.cli.docker_client import docker_client
 from compose.progress_stream import stream_output
 from .. import unittest
@@ -12,12 +13,12 @@ class DockerClientTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.client = docker_client()
 
-    # TODO: update to use labels in #652
     def setUp(self):
-        for c in self.client.containers(all=True):
-            if c['Names'] and 'composetest' in c['Names'][0]:
-                self.client.kill(c['Id'])
-                self.client.remove_container(c['Id'])
+        for c in self.client.containers(
+                all=True,
+                filters={'label': '%s=composetest' % LABEL_PROJECT}):
+            self.client.kill(c['Id'])
+            self.client.remove_container(c['Id'])
         for i in self.client.images():
             if isinstance(i.get('Tag'), basestring) and 'composetest' in i['Tag']:
                 self.client.remove_image(i)
