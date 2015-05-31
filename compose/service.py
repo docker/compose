@@ -594,6 +594,7 @@ class Service(object):
         privileged = options.get('privileged', False)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
+        read_only = options.get('read_only', None)
         log_config = LogConfig(type=options.get('log_driver', 'json-file'))
         pid = options.get('pid', None)
         security_opt = options.get('security_opt', None)

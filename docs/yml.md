@@ -362,7 +362,7 @@ security_opt:
   - label:role:ROLE
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, read\_only, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.

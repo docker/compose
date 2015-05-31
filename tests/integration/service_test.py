@@ -459,6 +459,16 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
 
+    def test_start_container_stays_readwrite(self):
+        service = self.create_service('web')
+        container = create_and_start_container(service).inspect()
+        self.assertEqual(container['HostConfig']['ReadonlyRootfs'], False)
+
+    def test_start_container_becomes_read_only(self):
+        service = self.create_service('web', read_only=True)
+        container = create_and_start_container(service).inspect()
+        self.assertEqual(container['HostConfig']['ReadonlyRootfs'], True)
+
     def test_expose_does_not_publish_ports(self):
         service = self.create_service('web', expose=[8000])
         container = create_and_start_container(service).inspect()
