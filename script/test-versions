@@ -1,0 +1,26 @@
+#!/bin/bash
+# This should be run inside a container built from the Dockerfile
+# at the root of the repo - script/test will do it automatically.
+
+set -e
+
+>&2 echo "Running lint checks"
+flake8 compose tests setup.py
+
+if [ "$DOCKER_VERSIONS" == "" ]; then
+  DOCKER_VERSIONS="default"
+elif [ "$DOCKER_VERSIONS" == "all" ]; then
+  DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
+fi
+
+for version in $DOCKER_VERSIONS; do
+  >&2 echo "Running tests against Docker $version"
+  docker run \
+    --rm \
+    --privileged \
+    --volume="/var/lib/docker" \
+    -e "DOCKER_VERSION=$version" \
+    --entrypoint="script/dind" \
+    "$TAG" \
+    script/wrapdocker nosetests "$@"
+done

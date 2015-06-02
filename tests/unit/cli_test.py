@@ -8,7 +8,6 @@ from .. import unittest
 
 import docker
 import mock
-from six import StringIO
 
 from compose.cli import main
 from compose.cli.main import TopLevelCommand
@@ -63,29 +62,31 @@ class CLITestCase(unittest.TestCase):
         self.assertEquals(project_name, name)
 
     def test_filename_check(self):
-        self.assertEqual('docker-compose.yml', get_config_filename_for_files([
+        files = [
             'docker-compose.yml',
             'docker-compose.yaml',
             'fig.yml',
             'fig.yaml',
-        ]))
+        ]
 
-        self.assertEqual('docker-compose.yaml', get_config_filename_for_files([
-            'docker-compose.yaml',
-            'fig.yml',
-            'fig.yaml',
-        ]))
+        """Test with files placed in the basedir"""
 
-        self.assertEqual('fig.yml', get_config_filename_for_files([
-            'fig.yml',
-            'fig.yaml',
-        ]))
-
-        self.assertEqual('fig.yaml', get_config_filename_for_files([
-            'fig.yaml',
-        ]))
-
+        self.assertEqual('docker-compose.yml', get_config_filename_for_files(files[0:]))
+        self.assertEqual('docker-compose.yaml', get_config_filename_for_files(files[1:]))
+        self.assertEqual('fig.yml', get_config_filename_for_files(files[2:]))
+        self.assertEqual('fig.yaml', get_config_filename_for_files(files[3:]))
         self.assertRaises(ComposeFileNotFound, lambda: get_config_filename_for_files([]))
+
+        """Test with files placed in the subdir"""
+
+        def get_config_filename_for_files_in_subdir(files):
+            return get_config_filename_for_files(files, subdir=True)
+
+        self.assertEqual('docker-compose.yml', get_config_filename_for_files_in_subdir(files[0:]))
+        self.assertEqual('docker-compose.yaml', get_config_filename_for_files_in_subdir(files[1:]))
+        self.assertEqual('fig.yml', get_config_filename_for_files_in_subdir(files[2:]))
+        self.assertEqual('fig.yaml', get_config_filename_for_files_in_subdir(files[3:]))
+        self.assertRaises(ComposeFileNotFound, lambda: get_config_filename_for_files_in_subdir([]))
 
     def test_get_project(self):
         command = TopLevelCommand()
@@ -120,6 +121,7 @@ class CLITestCase(unittest.TestCase):
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': ['BAR=NEW', 'OTHER=THREE'],
+            '--user': None,
             '--no-deps': None,
             '--allow-insecure-ssl': None,
             '-d': True,
@@ -134,13 +136,65 @@ class CLITestCase(unittest.TestCase):
             call_kwargs['environment'],
             {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE'})
 
+    def test_run_service_with_restart_always(self):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock()
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            restart='always',
+            image='someimage')
+        command.run(mock_project, {
+            'SERVICE': 'service',
+            'COMMAND': None,
+            '-e': [],
+            '--user': None,
+            '--no-deps': None,
+            '--allow-insecure-ssl': None,
+            '-d': True,
+            '-T': None,
+            '--entrypoint': None,
+            '--service-ports': None,
+            '--rm': None,
+        })
+        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
+        self.assertEquals(call_kwargs['host_config']['RestartPolicy']['Name'], 'always')
 
-def get_config_filename_for_files(filenames):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock()
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            restart='always',
+            image='someimage')
+        command.run(mock_project, {
+            'SERVICE': 'service',
+            'COMMAND': None,
+            '-e': [],
+            '--user': None,
+            '--no-deps': None,
+            '--allow-insecure-ssl': None,
+            '-d': True,
+            '-T': None,
+            '--entrypoint': None,
+            '--service-ports': None,
+            '--rm': True,
+        })
+        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
+        self.assertFalse('RestartPolicy' in call_kwargs['host_config'])
+
+
+def get_config_filename_for_files(filenames, subdir=None):
     project_dir = tempfile.mkdtemp()
     try:
         make_files(project_dir, filenames)
         command = TopLevelCommand()
-        command.base_dir = project_dir
+        if subdir:
+            command.base_dir = tempfile.mkdtemp(dir=project_dir)
+        else:
+            command.base_dir = project_dir
         return os.path.basename(command.get_config_path())
     finally:
         shutil.rmtree(project_dir)
@@ -150,4 +204,3 @@ def make_files(dirname, filenames):
     for fname in filenames:
         with open(os.path.join(dirname, fname), 'w') as f:
             f.write('')
-

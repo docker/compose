@@ -29,13 +29,24 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. This directory is also the
-build context that is sent to the Docker daemon.
+Path to a directory containing a Dockerfile. When the value supplied is a
+relative path, it is interpreted as relative to the location of the yml file
+itself. This directory is also the build context that is sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 
 ```
 build: /path/to/build/dir
+```
+
+### dockerfile
+
+Alternate Dockerfile.
+
+Compose will use an alternate file to build with.
+
+```
+dockerfile: Dockerfile-alternate
 ```
 
 ### command
@@ -84,6 +95,23 @@ external_links:
  - redis_1
  - project_db_1:mysql
  - project_db_1:postgresql
+```
+
+### extra_hosts
+
+Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
+
+```
+extra_hosts:
+ - "somehost:162.242.195.82"
+ - "otherhost:50.31.209.229"
+```
+
+An entry with the ip address and hostname will be created in `/etc/hosts` inside containers for this service, e.g:
+
+```
+162.242.195.82  somehost
+50.31.209.229   otherhost
 ```
 
 ### ports
@@ -158,15 +186,103 @@ environment:
 
 Add environment variables from a file. Can be a single value or a list.
 
+If you have specified a Compose file with `docker-compose -f FILE`, paths in
+`env_file` are relative to the directory that file is in.
+
 Environment variables specified in `environment` override these values.
 
 ```
+env_file: .env
+
 env_file:
-  - .env
+  - ./common.env
+  - ./apps/web.env
+  - /opt/secrets.env
 ```
 
+Compose expects each line in an env file to be in `VAR=VAL` format. Lines
+beginning with `#` (i.e. comments) are ignored, as are blank lines.
+
 ```
-RACK_ENV: development
+# Set Rails/Rack environment
+RACK_ENV=development
+```
+
+### extends
+
+Extend another service, in the current file or another, optionally overriding
+configuration.
+
+Here's a simple example. Suppose we have 2 files - **common.yml** and
+**development.yml**. We can use `extends` to define a service in
+**development.yml** which uses configuration defined in **common.yml**:
+
+**common.yml**
+
+```
+webapp:
+  build: ./webapp
+  environment:
+    - DEBUG=false
+    - SEND_EMAILS=false
+```
+
+**development.yml**
+
+```
+web:
+  extends:
+    file: common.yml
+    service: webapp
+  ports:
+    - "8000:8000"
+  links:
+    - db
+  environment:
+    - DEBUG=true
+db:
+  image: postgres
+```
+
+Here, the `web` service in **development.yml** inherits the configuration of
+the `webapp` service in **common.yml** - the `build` and `environment` keys -
+and adds `ports` and `links` configuration. It overrides one of the defined
+environment variables (DEBUG) with a new value, and the other one
+(SEND_EMAILS) is left untouched.
+
+For more on `extends`, see the [tutorial](extends.md#example) and
+[reference](extends.md#reference).
+
+### labels
+
+Add metadata to containers using [Docker labels](http://docs.docker.com/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
+
+It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
+
+```
+labels:
+  com.example.description: "Accounting webapp"
+  com.example.department: "Finance"
+  com.example.label-with-empty-value: ""
+
+labels:
+  - "com.example.description=Accounting webapp"
+  - "com.example.department=Finance"
+  - "com.example.label-with-empty-value"
+```
+
+### log driver
+
+Specify a logging driver for the service's containers, as with the ``--log-driver`` option for docker run ([documented here](http://docs.docker.com/reference/run/#logging-drivers-log-driver)).
+
+Allowed values are currently ``json-file``, ``syslog`` and ``none``. The list will change over time as more drivers are added to the Docker engine.
+
+The default value is json-file.
+
+```
+log_driver: "json-file"
+log_driver: "syslog"
+log_driver: "none"
 ```
 
 ### net
@@ -179,6 +295,16 @@ net: "none"
 net: "container:[name or id]"
 net: "host"
 ```
+### pid
+
+```
+pid: "host"
+```
+
+Sets the PID mode to the host PID mode.  This turns on sharing between
+container and the host operating system the PID address space.  Containers
+launched with this flag will be able to access and manipulate other
+containers in the bare-metal machine's namespace and vise-versa.
 
 ### dns
 
@@ -216,13 +342,34 @@ dns_search:
   - dc2.example.com
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
+### devices
+
+List of device mappings.  Uses the same format as the `--device` docker 
+client create option.
+
+```
+devices:
+  - "/dev/ttyUSB0:/dev/ttyUSB0"
+```
+
+### security_opt
+
+Override the default labeling scheme for each container.
+
+```
+security_opt:
+  - label:user:USER
+  - label:role:ROLE
+```
+
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
 
 ```
 cpu_shares: 73
+cpuset: 0,1
 
 working_dir: /code
 entrypoint: /code/entrypoint.sh
@@ -238,12 +385,16 @@ restart: always
 
 stdin_open: true
 tty: true
+read_only: true
 ```
 
 ## Compose documentation
 
-- [Installing Compose](install.md)
 - [User guide](index.md)
+- [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Command line reference](cli.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)

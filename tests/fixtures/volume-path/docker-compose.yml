@@ -1,0 +1,6 @@
+db:
+  extends:
+    file: common/services.yml
+    service: db
+  volumes:
+    - ./bar:/bar

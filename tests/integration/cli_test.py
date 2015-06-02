@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import sys
+import os
 
 from six import StringIO
 from mock import patch
@@ -20,9 +21,17 @@ class CLITestCase(DockerClientTestCase):
         sys.exit = self.old_sys_exit
         self.project.kill()
         self.project.remove_stopped()
+        for container in self.project.containers(stopped=True, one_off=True):
+            container.remove(force=True)
 
     @property
     def project(self):
+        # Hack: allow project to be overridden. This needs refactoring so that
+        # the project object is built exactly once, by the command object, and
+        # accessed by the test case object.
+        if hasattr(self, '_project'):
+            return self._project
+
         return self.command.get_project(self.command.get_config_path())
 
     def test_help(self):
@@ -62,6 +71,10 @@ class CLITestCase(DockerClientTestCase):
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_composefile(self, mock_stdout):
+        config_path = os.path.abspath(
+            'tests/fixtures/multiple-composefiles/compose2.yml')
+        self._project = self.command.get_project(config_path)
+
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
         self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
@@ -239,6 +252,28 @@ class CLITestCase(DockerClientTestCase):
         )
 
     @patch('dockerpty.start')
+    def test_run_service_with_user_overridden(self, _):
+        self.command.base_dir = 'tests/fixtures/user-composefile'
+        name = 'service'
+        user = 'sshd'
+        args = ['run', '--user={}'.format(user), name]
+        self.command.dispatch(args, None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(user, container.get('Config.User'))
+
+    @patch('dockerpty.start')
+    def test_run_service_with_user_overridden_short_form(self, _):
+        self.command.base_dir = 'tests/fixtures/user-composefile'
+        name = 'service'
+        user = 'sshd'
+        args = ['run', '-u', user, name]
+        self.command.dispatch(args, None)
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(user, container.get('Config.User'))
+
+    @patch('dockerpty.start')
     def test_run_service_with_environement_overridden(self, _):
         name = 'service'
         self.command.base_dir = 'tests/fixtures/environment-composefile'
@@ -278,6 +313,7 @@ class CLITestCase(DockerClientTestCase):
 
     @patch('dockerpty.start')
     def test_run_service_with_map_ports(self, __):
+
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['run', '-d', '--service-ports', 'simple'], None)
@@ -293,7 +329,7 @@ class CLITestCase(DockerClientTestCase):
         # check the ports
         self.assertNotEqual(port_random, None)
         self.assertIn("0.0.0.0", port_random)
-        self.assertEqual(port_assigned, "0.0.0.0:9999")
+        self.assertEqual(port_assigned, "0.0.0.0:49152")
 
     def test_rm(self):
         service = self.project.get_service('simple')
@@ -309,6 +345,17 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
+    def test_stop(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['stop', '-t', '1'], None)
+
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
+
     def test_kill(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -320,22 +367,22 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
-    def test_kill_signal_sigint(self):
+    def test_kill_signal_sigstop(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
 
         self.assertEqual(len(service.containers()), 1)
-        # The container is still running. It has been only interrupted
+        # The container is still running. It has only been paused
         self.assertTrue(service.containers()[0].is_running)
 
-    def test_kill_interrupted_service(self):
+    def test_kill_stopped_service(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
-        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
         self.assertTrue(service.containers()[0].is_running)
 
         self.command.dispatch(['kill', '-s', 'SIGKILL'], None)
@@ -348,7 +395,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
-        self.command.dispatch(['restart'], None)
+        self.command.dispatch(['restart', '-t', '1'], None)
         container.inspect()
         self.assertNotEqual(
             container.dictionary['State']['FinishedAt'],
@@ -392,5 +439,41 @@ class CLITestCase(DockerClientTestCase):
             return mock_stdout.getvalue().rstrip()
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
-        self.assertEqual(get_port(3001), "0.0.0.0:9999")
+        self.assertEqual(get_port(3001), "0.0.0.0:49152")
         self.assertEqual(get_port(3002), "")
+
+    def test_env_file_relative_to_compose_file(self):
+        config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
+        self.command.dispatch(['-f', config_path, 'up', '-d'], None)
+        self._project = self.command.get_project(config_path)
+
+        containers = self.project.containers(stopped=True)
+        self.assertEqual(len(containers), 1)
+        self.assertIn("FOO=1", containers[0].get('Config.Env'))
+
+    def test_up_with_extends(self):
+        self.command.base_dir = 'tests/fixtures/extends'
+        self.command.dispatch(['up', '-d'], None)
+
+        self.assertEqual(
+            set([s.name for s in self.project.services]),
+            set(['mydb', 'myweb']),
+        )
+
+        # Sort by name so we get [db, web]
+        containers = sorted(
+            self.project.containers(stopped=True),
+            key=lambda c: c.name,
+        )
+
+        self.assertEqual(len(containers), 2)
+        web = containers[1]
+
+        self.assertEqual(set(web.links()), set(['db', 'mydb_1', 'extends_mydb_1']))
+
+        expected_env = set([
+            "FOO=1",
+            "BAR=2",
+            "BAZ=2",
+        ])
+        self.assertTrue(expected_env <= set(web.get('Config.Env')))

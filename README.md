@@ -1,47 +1,35 @@
 Docker Compose
 ==============
-
-[![wercker status](https://app.wercker.com/status/d5dbac3907301c3d5ce735e2d5e95a5b/s/master "wercker status")](https://app.wercker.com/project/bykey/d5dbac3907301c3d5ce735e2d5e95a5b)
-
 *(Previously known as Fig)*
 
-Compose is a tool for defining and running complex applications with Docker.
-With Compose, you define a multi-container application in a single file, then
-spin your application up in a single command which does everything that needs to
-be done to get it running.
+Compose is a tool for defining and running multi-container applications with
+Docker. With Compose, you define a multi-container application in a single
+file, then spin your application up in a single command which does everything
+that needs to be done to get it running.
 
 Compose is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
 
 Using Compose is basically a three-step process.
 
-First, you define your app's environment with a `Dockerfile` so it can be
-reproduced anywhere:
-
-```Dockerfile
-FROM python:2.7
-WORKDIR /code
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
-ADD . /code
-CMD python app.py
-```
-
-Next, you define the services that make up your app in `docker-compose.yml` so
+1. Define your app's environment with a `Dockerfile` so it can be
+reproduced anywhere.
+2. Define the services that make up your app in `docker-compose.yml` so
 they can be run together in an isolated environment:
+3. Lastly, run `docker-compose up` and Compose will start and run your entire app.
 
-```yaml
-web:
-  build: .
-  links:
-   - db
-  ports:
-   - "8000:8000"
-db:
-  image: postgres
-```
+A `docker-compose.yml` looks like this:
 
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
+    web:
+      build: .
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+      links:
+       - redis
+    redis:
+      image: redis
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -54,4 +42,11 @@ Installation and documentation
 ------------------------------
 
 - Full documentation is available on [Docker's website](http://docs.docker.com/compose/).
-- Hop into #docker-compose on Freenode if you have any questions.
+- If you have any questions, you can talk in real-time with other developers in the #docker-compose IRC channel on Freenode. [Click here to join using IRCCloud.](https://www.irccloud.com/invite?hostname=irc.freenode.net&channel=%23docker-compose)
+
+Contributing
+------------
+
+[![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
+
+Want to help build Compose? Check out our [contributing documentation](https://github.com/docker/compose/blob/master/CONTRIBUTING.md).

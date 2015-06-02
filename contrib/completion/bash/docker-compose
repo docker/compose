@@ -1,7 +1,7 @@
 #!bash
 #
 # bash completion for docker-compose
-# 
+#
 # This work is based on the completion for the docker command.
 #
 # This script provides completion of:
@@ -94,7 +94,7 @@ _docker-compose_build() {
 _docker-compose_docker-compose() {
 	case "$prev" in
 		--file|-f)
-			_filedir y?(a)ml
+			_filedir "y?(a)ml"
 			return
 			;;
 		--project-name|-p)
@@ -196,7 +196,20 @@ _docker-compose_pull() {
 
 
 _docker-compose_restart() {
-	__docker-compose_services_running
+	case "$prev" in
+		-t | --timeout)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "-t --timeout" -- "$cur" ) )
+			;;
+		*)
+			__docker-compose_services_running
+			;;
+	esac
 }
 
 
@@ -219,14 +232,14 @@ _docker-compose_run() {
 			compopt -o nospace
 			return
 			;;
-		--entrypoint)
+		--entrypoint|--user|-u)
 			return
-			;;	
+			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm --service-ports -T" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -254,14 +267,33 @@ _docker-compose_start() {
 
 
 _docker-compose_stop() {
-	__docker-compose_services_running
+	case "$prev" in
+		-t | --timeout)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "-t --timeout" -- "$cur" ) )
+			;;
+		*)
+			__docker-compose_services_running
+			;;
+	esac
 }
 
 
 _docker-compose_up() {
+	case "$prev" in
+		-t | --timeout)
+			return
+			;;
+	esac
+
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate -t --timeout" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -271,11 +303,15 @@ _docker-compose_up() {
 
 
 _docker-compose() {
+	local previous_extglob_setting=$(shopt -p extglob)
+	shopt -s extglob
+
 	local commands=(
 		build
 		help
 		kill
 		logs
+		migrate-to-labels
 		port
 		ps
 		pull
@@ -320,6 +356,7 @@ _docker-compose() {
 	local completions_func=_docker-compose_${command}
 	declare -F $completions_func >/dev/null && $completions_func
 
+	eval "$previous_extglob_setting"
 	return 0
 }
 

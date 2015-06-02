@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ "$DOCKER_VERSION" != "" ] && [ "$DOCKER_VERSION" != "default" ]; then
+    ln -fs "/usr/local/bin/docker-$DOCKER_VERSION" "/usr/local/bin/docker"
+fi
+
+# If a pidfile is still around (for example after a container restart),
+# delete it so that docker can start.
+rm -rf /var/run/docker.pid
+docker -d $DOCKER_DAEMON_ARGS &>/var/log/docker.log &
+
+>&2 echo "Waiting for Docker to start..."
+while ! docker ps &>/dev/null; do
+    sleep 1
+done
+
+>&2 echo ">" "$@"
+exec "$@"

@@ -4,6 +4,8 @@ from __future__ import absolute_import
 import six
 from functools import reduce
 
+from .const import LABEL_CONTAINER_NUMBER, LABEL_SERVICE
+
 
 class Container(object):
     """
@@ -45,6 +47,10 @@ class Container(object):
         return self.dictionary['Image']
 
     @property
+    def image_config(self):
+        return self.client.inspect_image(self.image)
+
+    @property
     def short_id(self):
         return self.id[:10]
 
@@ -54,14 +60,15 @@ class Container(object):
 
     @property
     def name_without_project(self):
-        return '_'.join(self.dictionary['Name'].split('_')[1:])
+        return '{0}_{1}'.format(self.labels.get(LABEL_SERVICE), self.number)
 
     @property
     def number(self):
-        try:
-            return int(self.name.split('_')[-1])
-        except ValueError:
-            return None
+        number = self.labels.get(LABEL_CONTAINER_NUMBER)
+        if not number:
+            raise ValueError("Container {0} does not have a {1} label".format(
+                self.short_id, LABEL_CONTAINER_NUMBER))
+        return int(number)
 
     @property
     def ports(self):
@@ -78,6 +85,14 @@ class Container(object):
 
         return ', '.join(format_port(*item)
                          for item in sorted(six.iteritems(self.ports)))
+
+    @property
+    def labels(self):
+        return self.get('Config.Labels') or {}
+
+    @property
+    def log_config(self):
+        return self.get('HostConfig.LogConfig') or None
 
     @property
     def human_readable_state(self):
@@ -126,8 +141,8 @@ class Container(object):
     def kill(self, **options):
         return self.client.kill(self.id, **options)
 
-    def restart(self):
-        return self.client.restart(self.id)
+    def restart(self, **options):
+        return self.client.restart(self.id, **options)
 
     def remove(self, **options):
         return self.client.remove_container(self.id, **options)
@@ -147,6 +162,7 @@ class Container(object):
         self.has_been_inspected = True
         return self.dictionary
 
+    # TODO: only used by tests, move to test module
     def links(self):
         links = []
         for container in self.client.containers():
@@ -163,12 +179,15 @@ class Container(object):
         return self.client.attach_socket(self.id, **kwargs)
 
     def __repr__(self):
-        return '<Container: %s>' % self.name
+        return '<Container: %s (%s)>' % (self.name, self.id[:6])
 
     def __eq__(self, other):
         if type(self) != type(other):
             return False
         return self.id == other.id
+
+    def __hash__(self):
+        return self.id.__hash__()
 
 
 def get_container_name(container):

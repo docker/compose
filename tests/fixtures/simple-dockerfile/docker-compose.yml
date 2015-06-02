@@ -1,2 +1,2 @@
 simple:
-  build: tests/fixtures/simple-dockerfile
+  build: .

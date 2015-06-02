@@ -4,19 +4,26 @@ from requests.exceptions import ConnectionError, SSLError
 import logging
 import os
 import re
-import yaml
 import six
 
+from .. import config
 from ..project import Project
 from ..service import ConfigError
 from .docopt_command import DocoptCommand
-from .utils import call_silently, is_mac, is_ubuntu
+from .utils import call_silently, is_mac, is_ubuntu, find_candidates_in_parent_dirs
 from .docker_client import docker_client
 from . import verbose_proxy
 from . import errors
 from .. import __version__
 
 log = logging.getLogger(__name__)
+
+SUPPORTED_FILENAMES = [
+    'docker-compose.yml',
+    'docker-compose.yaml',
+    'fig.yml',
+    'fig.yaml',
+]
 
 
 class Command(DocoptCommand):
@@ -69,18 +76,11 @@ class Command(DocoptCommand):
             return verbose_proxy.VerboseProxy('docker', client)
         return client
 
-    def get_config(self, config_path):
-        try:
-            with open(config_path, 'r') as fh:
-                return yaml.safe_load(fh)
-        except IOError as e:
-            raise errors.UserError(six.text_type(e))
-
     def get_project(self, config_path, project_name=None, verbose=False):
         try:
-            return Project.from_config(
+            return Project.from_dicts(
                 self.get_project_name(config_path, project_name),
-                self.get_config(config_path),
+                config.load(config_path),
                 self.get_client(verbose=verbose))
         except ConfigError as e:
             raise errors.UserError(six.text_type(e))
@@ -107,20 +107,10 @@ class Command(DocoptCommand):
         if file_path:
             return os.path.join(self.base_dir, file_path)
 
-        supported_filenames = [
-            'docker-compose.yml',
-            'docker-compose.yaml',
-            'fig.yml',
-            'fig.yaml',
-        ]
-
-        def expand(filename):
-            return os.path.join(self.base_dir, filename)
-
-        candidates = [filename for filename in supported_filenames if os.path.exists(expand(filename))]
+        (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, self.base_dir)
 
         if len(candidates) == 0:
-            raise errors.ComposeFileNotFound(supported_filenames)
+            raise errors.ComposeFileNotFound(SUPPORTED_FILENAMES)
 
         winner = candidates[0]
 
@@ -137,4 +127,4 @@ class Command(DocoptCommand):
             log.warning("%s is deprecated and will not be supported in future. "
                         "Please rename your config file to docker-compose.yml\n" % winner)
 
-        return expand(winner)
+        return os.path.join(path, winner)

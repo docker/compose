@@ -74,8 +74,9 @@ def print_output_event(event, stream, is_terminal):
         stream.write("%s %s%s" % (status, event['progress'], terminator))
     elif 'progressDetail' in event:
         detail = event['progressDetail']
-        if 'current' in detail:
-            percentage = float(detail['current']) / float(detail['total']) * 100
+        total = detail.get('total')
+        if 'current' in detail and total:
+            percentage = float(detail['current']) / float(total) * 100
             stream.write('%s (%.1f%%)%s' % (status, percentage, terminator))
         else:
             stream.write('%s%s' % (status, terminator))

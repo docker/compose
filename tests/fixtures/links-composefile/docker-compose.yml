@@ -1,11 +1,11 @@
 db:
   image: busybox:latest
-  command: /bin/sleep 300
+  command: top
 web:
   image: busybox:latest
-  command: /bin/sleep 300
+  command: top
   links:
     - db:db
 console:
   image: busybox:latest
-  command: /bin/sleep 300
+  command: top

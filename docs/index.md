@@ -5,43 +5,38 @@ page_keywords: documentation, docs,  docker, compose, orchestration, containers
 
 # Docker Compose
 
-Compose is a tool for defining and running complex applications with Docker.
-With Compose, you define a multi-container application in a single file, then
-spin your application up in a single command which does everything that needs to
-be done to get it running.
+## Overview
+
+Compose is a tool for defining and running multi-container applications with
+Docker. With Compose, you define a multi-container application in a single
+file, then spin your application up in a single command which does everything
+that needs to be done to get it running.
 
 Compose is great for development environments, staging servers, and CI. We don't
 recommend that you use it in production yet.
 
 Using Compose is basically a three-step process.
 
-First, you define your app's environment with a `Dockerfile` so it can be
-reproduced anywhere:
-
-```Dockerfile
-FROM python:2.7
-WORKDIR /code
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
-ADD . /code
-CMD python app.py
-```
-
-Next, you define the services that make up your app in `docker-compose.yml` so
+1. Define your app's environment with a `Dockerfile` so it can be
+reproduced anywhere.
+2. Define the services that make up your app in `docker-compose.yml` so
 they can be run together in an isolated environment:
+3. Lastly, run `docker-compose up` and Compose will start and run your entire app.
+
+A `docker-compose.yml` looks like this:
 
 ```yaml
 web:
   build: .
-  links:
-   - db
   ports:
-   - "8000:8000"
-db:
-  image: postgres
+   - "5000:5000"
+  volumes:
+   - .:/code
+  links:
+   - redis
+redis:
+  image: redis
 ```
-
-Lastly, run `docker-compose up` and Compose will start and run your entire app.
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -53,6 +48,9 @@ Compose has commands for managing the whole lifecycle of your application:
 ## Compose documentation
 
 - [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
@@ -108,13 +106,19 @@ specify how to build the image using a file called
     ADD . /code
     WORKDIR /code
     RUN pip install -r requirements.txt
+    CMD python app.py
 
-This tells Docker to include Python, your code, and your Python dependencies in
-a Docker image. For more information on how to write Dockerfiles, see the
-[Docker user
-guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile)
-and the
-[Dockerfile reference](http://docs.docker.com/reference/builder/).
+This tells Docker to:
+
+* Build an image starting with the Python 2.7 image.
+* Add the current directory `.` into the path `/code` in the image.
+* Set the working directory to `/code`.
+* Install your Python dependencies.
+* Set the default command for the container to `python app.py`
+
+For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+
+You can test that this builds by running `docker build -t web .`.
 
 ### Define services
 
@@ -122,7 +126,6 @@ Next, define a set of services using `docker-compose.yml`:
 
     web:
       build: .
-      command: python app.py
       ports:
        - "5000:5000"
       volumes:
@@ -134,19 +137,20 @@ Next, define a set of services using `docker-compose.yml`:
 
 This defines two services:
 
- - `web`, which is built from the `Dockerfile` in the current directory. It also
-   says to run the command `python app.py` inside the image, forward the exposed
-   port 5000 on the container to port 5000 on the host machine, connect up the
-   Redis service, and mount the current directory inside the container so we can
-   work on code without having to rebuild the image.
- - `redis`, which uses the public image
-   [redis](https://registry.hub.docker.com/_/redis/), which gets pulled from the
-   Docker Hub registry.
+#### web
+
+* Builds from the `Dockerfile` in the current directory.
+* Forwards the exposed port 5000 on the container to port 5000 on the host machine.
+* Connects the web container to the Redis service via a link.
+* Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
+
+#### redis
+
+* Uses the public [Redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
 
 ### Build and run your app with Compose
 
-Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
-image for your code, and start everything up:
+Now, when you run `docker-compose up`, Compose will pull a Redis image, build an image for your code, and start everything up:
 
     $ docker-compose up
     Pulling image redis...
@@ -157,7 +161,12 @@ image for your code, and start everything up:
     web_1   |  * Running on http://0.0.0.0:5000/
 
 The web app should now be listening on port 5000 on your Docker daemon host (if
-you're using Boot2docker, `boot2docker ip` will tell you its address).
+you're using Boot2docker, `boot2docker ip` will tell you its address). In a browser,
+open `http://ip-from-boot2docker:5000` and you should get a message in your browser saying:
+
+`Hello World! I have been seen 1 times.`
+
+Refreshing the page will increment the number.
 
 If you want to run your services in the background, you can pass the `-d` flag
 (for daemon mode) to `docker-compose up` and use `docker-compose ps` to see what
@@ -191,3 +200,31 @@ At this point, you have seen the basics of how Compose works.
   [Rails](rails.md), or [Wordpress](wordpress.md).
 - See the reference guides for complete details on the [commands](cli.md), the
   [configuration file](yml.md) and [environment variables](env.md).
+
+## Release Notes
+
+### Version 1.2.0 (April 7, 2015)
+
+For complete information on this release, see the [1.2.0 Milestone project page](https://github.com/docker/compose/wiki/1.2.0-Milestone-Project-Page).
+In addition to bug fixes and refinements, this release adds the following:
+
+* The `extends` keyword, which adds the ability to extend services by sharing  common configurations. For details, see
+[PR #1088](https://github.com/docker/compose/pull/1088).
+
+* Better integration with Swarm. Swarm will now schedule inter-dependent
+containers on the same host. For details, see
+[PR #972](https://github.com/docker/compose/pull/972).
+
+## Getting help
+
+Docker Compose is still in its infancy and under active development. If you need
+help, would like to contribute, or simply want to talk about the project with
+like-minded individuals, we have a number of open channels for communication.
+
+* To report bugs or file feature requests: please use the [issue tracker on Github](https://github.com/docker/compose/issues).
+
+* To talk about the project with people in real time: please join the `#docker-compose` channel on IRC.
+
+* To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
+
+For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/project/get-help/).
