@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import sys
 import os
+import shlex
 
 from six import StringIO
 from mock import patch
@@ -240,8 +241,8 @@ class CLITestCase(DockerClientTestCase):
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(
-            container.human_readable_command,
-            u'/bin/echo helloworld'
+            shlex.split(container.human_readable_command),
+            [u'/bin/echo', u'helloworld'],
         )
 
     @patch('dockerpty.start')
