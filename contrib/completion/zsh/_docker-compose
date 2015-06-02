@@ -243,6 +243,10 @@ __docker-compose_subcommand () {
                 "--x-smart-recreate[Only recreate containers whose configuration or image needs to be updated. (EXPERIMENTAL)]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
+        (version)
+            _arguments \
+                "--short[Shows only Compose's version number.]" && ret=0
+            ;;
         (*)
             _message 'Unknown sub command'
     esac
