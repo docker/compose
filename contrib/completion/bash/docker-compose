@@ -302,6 +302,15 @@ _docker-compose_up() {
 }
 
 
+_docker-compose_version() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--short" -- "$cur" ) )
+			;;
+	esac
+}
+
+
 _docker-compose() {
 	local previous_extglob_setting=$(shopt -p extglob)
 	shopt -s extglob
@@ -322,6 +331,7 @@ _docker-compose() {
 		start
 		stop
 		up
+		version
 	)
 
 	COMPREPLY=()
