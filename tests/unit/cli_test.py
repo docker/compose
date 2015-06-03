@@ -134,7 +134,7 @@ class CLITestCase(unittest.TestCase):
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
         self.assertEqual(
             call_kwargs['environment'],
-            {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE'})
+            {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE', 'COMPOSE_CONTAINER_NAME': 'default_service_run_1'})
 
     def test_run_service_with_restart_always(self):
         command = TopLevelCommand()
