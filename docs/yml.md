@@ -134,6 +134,12 @@ Mount paths as volumes, optionally specifying a path on the host machine
      - cache/:/tmp/cache
      - ~/configs:/etc/configs/:ro
 
+You can mount a relative path on the host, which will expand relative to
+the directory of the Compose configuration file being used.
+
+> Note: No path expansion will be done if you have also specified a
+> `volume_driver`.
+
 ### volumes_from
 
 Mount all of the volumes from another service or container.
@@ -333,7 +339,7 @@ Override the default labeling scheme for each container.
         - label:user:USER
         - label:role:ROLE
 
-### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, memswap\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only 
+### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, memswap\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only, volume\_driver
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -360,6 +366,8 @@ Each of these is a single value, analogous to its
     tty: true
     read_only: true
 
+    volume_driver: mydriver
+```
 
 ## Compose documentation
 
