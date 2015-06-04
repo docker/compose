@@ -47,6 +47,6 @@ Installation and documentation
 Contributing
 ------------
 
-[![Build Status](http://jenkins.dockerproject.com/buildStatus/icon?job=Compose Master)](http://jenkins.dockerproject.com/job/Compose%20Master/)
+[![Build Status](http://jenkins.dockerproject.org/buildStatus/icon?job=Compose%20Master)](http://jenkins.dockerproject.org/job/Compose%20Master/)
 
 Want to help build Compose? Check out our [contributing documentation](https://github.com/docker/compose/blob/master/CONTRIBUTING.md).
