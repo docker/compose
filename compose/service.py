@@ -55,10 +55,6 @@ class BuildError(Exception):
         self.reason = reason
 
 
-class CannotBeScaledError(Exception):
-    pass
-
-
 class ConfigError(ValueError):
     pass
 
@@ -154,7 +150,9 @@ class Service(object):
         - removes all stopped containers
         """
         if not self.can_be_scaled():
-            raise CannotBeScaledError()
+            log.warn('Service %s specifies a port on the host. If multiple containers '
+                     'for this service are created on a single host, the port will clash.'
+                     % self.name)
 
         # Create enough containers
         containers = self.containers(stopped=True)
