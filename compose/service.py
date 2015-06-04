@@ -215,6 +215,7 @@ class Service(object):
         )
 
         if 'name' in container_options:
+            container_options['environment'].setdefault('COMPOSE_CONTAINER_NAME', container_options['name'])
             log.info("Creating %s..." % container_options['name'])
 
         return Container.create(self.client, **container_options)
