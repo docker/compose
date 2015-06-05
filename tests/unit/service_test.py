@@ -372,13 +372,12 @@ class ServiceVolumesTest(unittest.TestCase):
         spec = parse_volume_spec('external:interval:ro')
         self.assertEqual(spec, ('external', 'interval', 'ro'))
 
+        spec = parse_volume_spec('external:interval:z')
+        self.assertEqual(spec, ('external', 'interval', 'z'))
+
     def test_parse_volume_spec_too_many_parts(self):
         with self.assertRaises(ConfigError):
             parse_volume_spec('one:two:three:four')
-
-    def test_parse_volume_bad_mode(self):
-        with self.assertRaises(ConfigError):
-            parse_volume_spec('one:two:notrw')
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(parse_volume_spec('/outside:/inside'))
@@ -508,3 +507,26 @@ class ServiceVolumesTest(unittest.TestCase):
             create_options['host_config']['Binds'],
             ['/mnt/sda1/host/path:/data:rw'],
         )
+
+    def test_create_with_special_volume_mode(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
+
+        create_calls = []
+
+        def create_container(*args, **kwargs):
+            create_calls.append((args, kwargs))
+            return {'Id': 'containerid'}
+
+        self.mock_client.create_container = create_container
+
+        volumes = ['/tmp:/foo:z']
+
+        Service(
+            'web',
+            client=self.mock_client,
+            image='busybox',
+            volumes=volumes,
+        ).create_container()
+
+        self.assertEqual(len(create_calls), 1)
+        self.assertEqual(create_calls[0][1]['host_config']['Binds'], volumes)
