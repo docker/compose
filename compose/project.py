@@ -274,6 +274,9 @@ class Project(object):
             service.remove_stopped(**options)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
+        if service_names:
+            # Will raise NoSuchService if one of the names is invalid
+            self.get_services(service_names)
         containers = [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
