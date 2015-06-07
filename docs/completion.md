@@ -1,7 +1,13 @@
----
-layout: default
-title: Command Completion
----
+<!--[metadata]>
++++
+title = "Command Completion"
+description = "Compose CLI reference"
+keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
+[menu.main]
+parent="smn_workw_compose"
+weight=3
++++
+<![end-metadata]-->
 
 # Command Completion
 
@@ -53,7 +59,7 @@ Enjoy working with Compose faster and with less typos!
 
 ## Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

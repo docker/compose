@@ -1,11 +1,15 @@
-page_title: Compose: Multi-container orchestration for Docker
-page_description: Introduction and Overview of Compose
-page_keywords: documentation, docs,  docker, compose, orchestration, containers
+<!--[metadata]>
++++
+title = "Overview of Docker Compose"
+description = "Introduction and Overview of Compose"
+keywords = ["documentation, docs,  docker, compose, orchestration,  containers"]
+[menu.main]
+parent="smn_workw_compose"
++++
+<![end-metadata]-->
 
 
-# Docker Compose
-
-## Overview
+# Overview of Docker Compose
 
 Compose is a tool for defining and running multi-container applications with
 Docker. With Compose, you define a multi-container application in a single

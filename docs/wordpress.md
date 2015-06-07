@@ -1,14 +1,21 @@
-page_title: Quickstart Guide: Compose and Wordpress
-page_description: Getting started with Docker Compose and Rails
-page_keywords: documentation, docs,  docker, compose, orchestration, containers,
-wordpress
+<!--[metadata]>
++++
+title = "Quickstart Guide: Compose and Wordpress"
+description = "Getting started with Compose and Wordpress"
+keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
+[menu.main]
+parent="smn_workw_compose"
+weight=6
++++
+<![end-metadata]-->
 
-## Getting started with Compose and Wordpress
+
+# Quickstart Guide: Compose and Wordpress
 
 You can use Compose to easily run Wordpress in an isolated environment built
 with Docker containers. 
 
-### Define the project
+## Define the project
 
 First, [Install Compose](install.md) and then download Wordpress into the
 current directory:
@@ -114,7 +121,7 @@ address).
 
 ## More Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

@@ -1,9 +1,16 @@
-page_title: Compose CLI reference
-page_description: Compose CLI reference
-page_keywords: fig, composition, compose, docker, orchestration, cli, reference
+<!--[metadata]>
++++
+title = "Compose CLI reference"
+description = "Compose CLI reference"
+keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
+[menu.main]
+identifier = "smn_install_compose"
+parent = "smn_compose_ref"	
++++
+<![end-metadata]-->
 
 
-# CLI reference
+# Compose CLI reference
 
 Most Docker Compose commands are run against one or more services. If
 the service is not specified, the command will apply to all services.
@@ -185,7 +192,7 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 
 ## Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

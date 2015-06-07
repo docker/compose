@@ -1,10 +1,13 @@
----
-layout: default
-title: docker-compose.yml reference
-page_title: docker-compose.yml reference
-page_description: docker-compose.yml reference
-page_keywords: fig, composition, compose, docker
----
+<!--[metadata]>
++++
+title = "docker-compose.yml reference"
+description = "docker-compose.yml reference"
+keywords = ["fig, composition, compose,  docker"]
+[menu.main]
+parent="smn_compose_ref"
++++
+<![end-metadata]-->
+
 
 # docker-compose.yml reference
 
@@ -390,7 +393,7 @@ read_only: true
 
 ## Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

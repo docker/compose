@@ -1,10 +1,16 @@
-page_title: Quickstart Guide: Compose and Django
-page_description: Getting started with Docker Compose and Django
-page_keywords: documentation, docs,  docker, compose, orchestration, containers,
-django
+<!--[metadata]>
++++
+title = "Quickstart Guide: Compose and Django"
+description = "Getting started with Docker Compose and Django"
+keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
+[menu.main]
+parent="smn_workw_compose"
+weight=4
++++
+<![end-metadata]-->
 
 
-## Getting started with Compose and Django
+## Quickstart Guide: Compose and Django
 
 
 This Quick-start Guide will demonstrate how to use Compose to set up and run a
@@ -119,7 +125,7 @@ example, run `docker-compose up` and in another terminal run:
 
 ## More Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
