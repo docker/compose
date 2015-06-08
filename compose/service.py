@@ -197,6 +197,7 @@ class Service(object):
                          do_build=True,
                          previous_container=None,
                          number=None,
+                         quiet=False,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
@@ -214,7 +215,7 @@ class Service(object):
             previous_container=previous_container,
         )
 
-        if 'name' in container_options:
+        if 'name' in container_options and not quiet:
             log.info("Creating %s..." % container_options['name'])
 
         return Container.create(self.client, **container_options)
@@ -376,6 +377,7 @@ class Service(object):
             do_build=False,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
+            quiet=True,
         )
         self.start_container(new_container)
         container.remove()
