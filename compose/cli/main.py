@@ -336,6 +336,7 @@ class TopLevelCommand(Command):
             container_options['ports'] = []
 
         container = service.create_container(
+            quiet=True,
             one_off=True,
             insecure_registry=insecure_registry,
             **container_options
