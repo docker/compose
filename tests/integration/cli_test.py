@@ -7,6 +7,7 @@ from mock import patch
 
 from .testcases import DockerClientTestCase
 from compose.cli.main import TopLevelCommand
+from compose.project import NoSuchService
 
 
 class CLITestCase(DockerClientTestCase):
@@ -348,6 +349,10 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
+
+    def test_logs_invalid_service_name(self):
+        with self.assertRaises(NoSuchService):
+            self.command.dispatch(['logs', 'madeupname'], None)
 
     def test_kill(self):
         self.command.dispatch(['up', '-d'], None)
