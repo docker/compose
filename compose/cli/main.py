@@ -349,7 +349,6 @@ class TopLevelCommand(Command):
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
             if options['--rm']:
-                log.info("Removing %s..." % container.name)
                 project.client.remove_container(container.id)
             sys.exit(exit_code)
 
