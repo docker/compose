@@ -394,21 +394,6 @@ class Service(object):
         container.start()
         return container
 
-    def start_or_create_containers(
-            self,
-            insecure_registry=False,
-            do_build=True):
-        containers = self.containers(stopped=True)
-
-        if not containers:
-            new_container = self.create_container(
-                insecure_registry=insecure_registry,
-                do_build=do_build,
-            )
-            return [self.start_container(new_container)]
-        else:
-            return [self.start_container_if_stopped(c) for c in containers]
-
     def config_hash(self):
         return json_hash(self.config_dict())
 
