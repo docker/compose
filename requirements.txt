@@ -1,6 +1,6 @@
 PyYAML==3.10
 docker-py==1.2.2
-dockerpty==0.3.3
+dockerpty==0.3.4
 docopt==0.6.1
 requests==2.6.1
 six==1.7.3
