@@ -155,7 +155,7 @@ By default, if there are existing containers for a service, `docker-compose up` 
 Several environment variables are available for you to configure Compose's behaviour.
 
 Variables starting with `DOCKER_` are the same as those used to configure the
-Docker command-line client. If you're using boot2docker, `$(boot2docker shellinit)`
+Docker command-line client. If you're using boot2docker, `eval "$(boot2docker shellinit)"`
 will set them to their correct values.
 
 ### COMPOSE\_PROJECT\_NAME
