@@ -171,7 +171,7 @@ class Project(object):
                     try:
                         net = Container.from_id(self.client, net_name)
                     except APIError:
-                        raise ConfigurationError('Serivce "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
+                        raise ConfigurationError('Service "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
             else:
                 net = service_dict['net']
 
