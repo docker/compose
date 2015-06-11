@@ -708,6 +708,47 @@ class Service(object):
         stream_output(output, sys.stdout)
 
 
+# Names
+
+
+def build_container_name(project, service, number, one_off=False):
+    bits = [project, service]
+    if one_off:
+        bits.append('run')
+    return '_'.join(bits + [str(number)])
+
+
+# Images
+
+
+def parse_repository_tag(s):
+    if ":" not in s:
+        return s, ""
+    repo, tag = s.rsplit(":", 1)
+    if "/" in tag:
+        return s, ""
+    return repo, tag
+
+
+# Volumes
+
+
+def merge_volume_bindings(volumes_option, previous_container):
+    """Return a list of volume bindings for a container. Container data volumes
+    are replaced by those from the previous container.
+    """
+    volume_bindings = dict(
+        build_volume_binding(parse_volume_spec(volume))
+        for volume in volumes_option or []
+        if ':' in volume)
+
+    if previous_container:
+        volume_bindings.update(
+            get_container_data_volumes(previous_container, volumes_option))
+
+    return volume_bindings
+
+
 def get_container_data_volumes(container, volumes_option):
     """Find the container data volumes that are in `volumes_option`, and return
     a mapping of volume bindings for those volumes.
@@ -736,51 +777,9 @@ def get_container_data_volumes(container, volumes_option):
     return dict(volumes)
 
 
-def merge_volume_bindings(volumes_option, previous_container):
-    """Return a list of volume bindings for a container. Container data volumes
-    are replaced by those from the previous container.
-    """
-    volume_bindings = dict(
-        build_volume_binding(parse_volume_spec(volume))
-        for volume in volumes_option or []
-        if ':' in volume)
-
-    if previous_container:
-        volume_bindings.update(
-            get_container_data_volumes(previous_container, volumes_option))
-
-    return volume_bindings
-
-
-def build_container_name(project, service, number, one_off=False):
-    bits = [project, service]
-    if one_off:
-        bits.append('run')
-    return '_'.join(bits + [str(number)])
-
-
-def build_container_labels(label_options, service_labels, number, one_off=False):
-    labels = label_options or {}
-    labels.update(label.split('=', 1) for label in service_labels)
-    labels[LABEL_CONTAINER_NUMBER] = str(number)
-    labels[LABEL_VERSION] = __version__
-    return labels
-
-
-def parse_restart_spec(restart_config):
-    if not restart_config:
-        return None
-    parts = restart_config.split(':')
-    if len(parts) > 2:
-        raise ConfigError("Restart %s has incorrect format, should be "
-                          "mode[:max_retry]" % restart_config)
-    if len(parts) == 2:
-        name, max_retry_count = parts
-    else:
-        name, = parts
-        max_retry_count = 0
-
-    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+def build_volume_binding(volume_spec):
+    internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
+    return volume_spec.external, internal
 
 
 def parse_volume_spec(volume_config):
@@ -803,18 +802,7 @@ def parse_volume_spec(volume_config):
     return VolumeSpec(external, internal, mode)
 
 
-def parse_repository_tag(s):
-    if ":" not in s:
-        return s, ""
-    repo, tag = s.rsplit(":", 1)
-    if "/" in tag:
-        return s, ""
-    return repo, tag
-
-
-def build_volume_binding(volume_spec):
-    internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
-    return volume_spec.external, internal
+# Ports
 
 
 def build_port_bindings(ports):
@@ -843,6 +831,39 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
+
+
+# Labels
+
+
+def build_container_labels(label_options, service_labels, number, one_off=False):
+    labels = label_options or {}
+    labels.update(label.split('=', 1) for label in service_labels)
+    labels[LABEL_CONTAINER_NUMBER] = str(number)
+    labels[LABEL_VERSION] = __version__
+    return labels
+
+
+# Restart policy
+
+
+def parse_restart_spec(restart_config):
+    if not restart_config:
+        return None
+    parts = restart_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Restart %s has incorrect format, should be "
+                          "mode[:max_retry]" % restart_config)
+    if len(parts) == 2:
+        name, max_retry_count = parts
+    else:
+        name, = parts
+        max_retry_count = 0
+
+    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+
+# Extra hosts
 
 
 def build_extra_hosts(extra_hosts_config):
