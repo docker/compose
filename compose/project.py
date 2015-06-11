@@ -211,7 +211,8 @@ class Project(object):
            allow_recreate=True,
            smart_recreate=False,
            insecure_registry=False,
-           do_build=True):
+           do_build=True,
+           timeout=None):
 
         services = self.get_services(service_names, include_deps=start_deps)
 
@@ -228,6 +229,7 @@ class Project(object):
                 plans[service.name],
                 insecure_registry=insecure_registry,
                 do_build=do_build,
+                timeout=timeout
             )
         ]
 
