@@ -731,7 +731,7 @@ def merge_volume_bindings(volumes_option, previous_container):
         volume_bindings.update(
             get_container_data_volumes(previous_container, volumes_option))
 
-    return volume_bindings
+    return volume_bindings.values()
 
 
 def get_container_data_volumes(container, volumes_option):
@@ -763,8 +763,7 @@ def get_container_data_volumes(container, volumes_option):
 
 
 def build_volume_binding(volume_spec):
-    internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
-    return volume_spec.external, internal
+    return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
 
 
 def parse_volume_spec(volume_config):
