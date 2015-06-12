@@ -11,6 +11,7 @@ docker run \
   --volume="/var/run/docker.sock:/var/run/docker.sock" \
   -e DOCKER_VERSIONS \
   -e "TAG=$TAG" \
+  -e "affinity:image==$TAG" \
   --entrypoint="script/test-versions" \
   "$TAG" \
   "$@"
