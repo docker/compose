@@ -12,6 +12,7 @@ docker run \
   --volume="$(pwd):/code" \
   -e DOCKER_VERSIONS \
   -e "TAG=$TAG" \
+  -e "affinity:image==$TAG" \
   --entrypoint="script/test-versions" \
   "$TAG" \
   "$@"
