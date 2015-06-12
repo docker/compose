@@ -469,21 +469,28 @@ def load_yaml(filename):
         raise ConfigurationError(six.text_type(e))
 
 
-class TemplateVariable(object):
-    def __init__(self, env_var_name, default_value=None, required=False):
-        self.env_var_name = env_var_name
-        self.default_value = default_value
-        self.required = required
+class ComposeTemplate(object):
 
-    def value(self):
-        result = os.environ.get(self.env_var_name, None)
-        if result:
-            return result
-        if self.default_value:
-            return self.default_value
-        if self.required:
-            raise TemplateError("Environment variable '{0}' was required but had no value.".format(self.env_var_name))
-        return ''
+    @classmethod
+    def create_from_file(klass, file_handle):
+        return klass(file_handle.read())
+
+    def __init__(self, string):
+        self.string = string
+
+    def render(self):
+        try:
+            return "\n".join(reduce(self.__evaluate_env_vars, self.string.splitlines(), []))
+        except TemplateError as e:
+            raise ConfigurationError(six.text_type(e))
+
+    def __evaluate_env_vars(self, memo, line):
+        line_result = re.sub('\${[^}]*}', self.__match_obj_to_env_var, line)
+        memo.append(line_result)
+        return memo
+
+    def __match_obj_to_env_var(self, match_object):
+        return TemplateVariableFactory.create_from_string(match_object.group(0)).value()
 
 
 class TemplateVariableFactory(object):
@@ -513,28 +520,21 @@ class TemplateVariableFactory(object):
             return string[2:-1]
 
 
-class ComposeTemplate(object):
+class TemplateVariable(object):
+    def __init__(self, env_var_name, default_value=None, required=False):
+        self.env_var_name = env_var_name
+        self.default_value = default_value
+        self.required = required
 
-    @classmethod
-    def create_from_file(klass, file_handle):
-        return klass(file_handle.read())
-
-    def __init__(self, string):
-        self.string = string
-
-    def render(self):
-        try:
-            return "\n".join(reduce(self.__evaluate_env_vars, self.string.splitlines(), []))
-        except TemplateError as e:
-            raise ConfigurationError(six.text_type(e))
-
-    def __evaluate_env_vars(self, memo, line):
-        line_result = re.sub('\${[^}]*}', self.__match_obj_to_env_var, line)
-        memo.append(line_result)
-        return memo
-
-    def __match_obj_to_env_var(self, match_object):
-        return TemplateVariableFactory.create_from_string(match_object.group(0)).value()
+    def value(self):
+        result = os.environ.get(self.env_var_name, None)
+        if result:
+            return result
+        if self.default_value:
+            return self.default_value
+        if self.required:
+            raise TemplateError("Environment variable '{0}' was required but had no value.".format(self.env_var_name))
+        return ''
 
 
 class TemplateError(Exception):
