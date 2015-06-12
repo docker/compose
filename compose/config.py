@@ -480,11 +480,13 @@ class ComposeTemplate(object):
 
     def render(self):
         try:
+            self.lines_parsed = 0
             return "\n".join(reduce(self.__evaluate_env_vars, self.string.splitlines(), []))
         except TemplateError as e:
-            raise ConfigurationError(six.text_type(e))
+          raise ConfigurationError("Line " + str(self.lines_parsed) + ": "+ six.text_type(e))
 
     def __evaluate_env_vars(self, memo, line):
+        self.lines_parsed = self.lines_parsed + 1
         line_result = re.sub('\${[^}]*}', self.__match_obj_to_env_var, line)
         memo.append(line_result)
         return memo
