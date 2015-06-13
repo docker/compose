@@ -5,11 +5,12 @@ from functools import reduce
 
 from docker.errors import APIError
 
-from .config import get_service_name_from_net, ConfigurationError
+from .config import get_service_name_from_net
 from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
-from .service import Service
 from .container import Container
+from .errors import ConfigurationError
 from .legacy import check_for_legacy_containers
+from .service import Service
 
 log = logging.getLogger(__name__)
 

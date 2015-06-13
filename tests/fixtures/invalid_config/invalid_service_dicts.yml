@@ -1,0 +1,343 @@
+"":
+  image: busybox
+
+" ":
+  image: busybox
+
+"/":
+  image: busybox
+
+"!":
+  image: busybox
+
+"\xe2":
+  image: busybox
+
+"_":
+  image: busybox
+
+"____":
+  image: busybox
+
+"foo_bar":
+  image: busybox
+
+"__foo_bar__":
+  image: busybox
+
+build01:
+  build: \n
+
+build02:
+  build: Dockerfile
+
+build03:
+  build: dir/*
+
+build04:
+  build: ['.', 'test']
+
+build05:
+  build: nonexisting.path
+
+build06:
+  build: fit@fun
+
+build07:
+  build: gitfun.com/whoo
+
+build08:
+  build: ftp://github.com/docker/compose
+
+buildimage:
+  build: .
+  image: busybox
+
+nobuildnoimage:
+  expose:
+    - "80"
+
+cap01:
+  image: busybox
+  cap_add: CAP_FOO
+
+cap02:
+  image: busybox
+  cap_drop: [123, 'FOO_BAR']
+
+cpu01:
+  image: busybox
+  cpu_shares: max
+
+cpu02:
+  image: busybox
+  cpu_shares: -1
+
+cpu03:
+  image: busybox
+  cpu_shares: 1025
+
+cpu04:
+  image: busybox
+  cpu_shares: null
+
+dns01:
+  image: busybox
+  dns: dns.inter.net
+
+dns02:
+  image: busybox
+  dns: 1,2.3.4
+
+dns03:
+  image: busybox
+  dns: 1..3.4
+
+dns04:
+  image: busybox
+  dns: ['1.2.3.4', 'gggg:1111:2222:3333:4444:5555:6666:7777:8888']
+
+dns_search01:
+  image: busybox
+  dns_search: "*.domain.org"
+
+dns_search02:
+  image: busybox
+  dns_search:
+    1: one.net
+    2: another.net
+
+domain01:
+  image: busybox
+  domainname: inter,net
+
+domain02:
+  image: busybox
+  domainname: '*.inter.net'
+
+entrypoint01:
+  image: busybox
+  entrypoint: null
+
+entrypoint02:
+  image: busybox
+  entrypoint: 0
+
+entrypoint03:
+  image: busybox
+  entrypoint: ['/script', ['/init', '/default']]
+
+environment01:
+  image: busybox
+  environment: VARIABLE=1
+
+environment02:
+  image: busybox
+  environment:
+    VARIABLE: ['a', 'list']
+
+environment03:
+  image: busybox
+  environment:
+    VARIABLE: 42
+
+expose01:
+  image: busybox
+  expose: 80
+
+expose02:
+  image: busybox
+  expose:
+    - web
+
+expose03:
+  image: busybox
+  expose:
+    - 70000
+
+external01:
+  image: busybox
+  external_links: some_container
+
+external02:
+  image: busybox
+  external_links:
+    db: mysql
+
+external03:
+  image: busybox
+  external_links:
+    - \_Ö_/
+
+extrahosts01:
+  image: busybox
+  extra_hosts:
+    - "127.0.0.1:somehost"
+
+extrahosts02:
+  image: busybox
+  extra_hosts:
+    - "somehost::alias:127.0.0.1"
+
+hostname01:
+  image: busybox
+  hostname:
+    - foo
+    - bar
+
+hostname02:
+  image: busybox
+  hostname: LOUD_ONE
+
+hostname03:
+  image: busybox
+  hostname: bling*bling*
+
+hostname04:
+  image: busybox
+  hostname: a.domain.name
+
+image01:
+  image:
+    - ubuntu
+    - arch
+
+image02:
+  image: /top-level
+
+image03:
+  image: some/name/space
+
+image04:
+  image: another:name:space
+
+image05:
+  image: überbild
+
+image06:
+  image: ~meeow~
+
+labels01:
+  image: busybox
+  labels:
+    - com.docker.compose=
+
+# FIXME
+#labels02:
+#  image: busybox
+#  labels:
+#    - com..docker.compose
+
+#labels03:
+#  image: busybox
+#  labels:
+#    - com.docker--compose
+
+logdriver01:
+  image:
+  log_driver: xxx
+
+memlimit01:
+  image: busybox
+  mem_limit: null
+
+net01:
+  image: busybox
+  net: null
+
+net02:
+  image: busybox
+  net: container
+
+net03:
+  image: busybox
+  net: "container:"
+
+net04:
+  image: busybox
+  net: intergalactic
+
+ports01:
+  image: busybox
+  ports:
+    - "80:"
+
+ports02:
+  image: busybox
+  ports:
+    - ":80"
+
+ports03:
+  image: busybox
+  ports:
+    - "127.00.1:80:80"
+
+ports04:
+  image: busybox
+  ports:
+    - "0123:4567:89ab:cdef:1234:5678:9abc:def1:80:80"
+
+ports05:
+  image: busybox
+  ports:
+    - 65536
+
+ports06:
+  images: busybox
+  ports:
+    - -42
+
+ports07:
+  image: busybox
+  ports:
+    - 127.0.0.1:80
+
+ports08:
+  image: busybox
+  ports:
+    - abc
+
+ports09:
+  image: busybox
+  ports:
+    - "49153-65536"
+
+ports10:
+  image: busybox
+  ports:
+    - "1024-2048:512-1024"
+
+ports09:
+  image: busybox
+  ports:
+    - "0.0.0.0:1024-2048:512-1024"
+
+volumes01:
+  image: busybox
+  volumes:
+    - ':path'
+
+volumes02:
+  image: busybox
+  volumes:
+    - 'path:'
+
+volumes03:
+  image: busybox
+  volumes:
+    - ':'
+
+volumes04:
+  image: busybox
+  volumes:
+    - nonexisting.path:/path
+
+volumes05:
+  image: busybox
+  volumes:
+    - invalid_service_dicts.yml:/path:ro:rw
+
+volumes06:
+  image: busybox
+  volumes:
+    - invalid_service_dicts.yml:/path:rx

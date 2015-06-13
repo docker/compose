@@ -1,0 +1,240 @@
+build01:
+  build: .
+
+# TODO reactivate when urls are resolved
+#build02:
+#  build: github.com/docker/compose
+#
+#build03:
+#  build: git@github.com:docker/compose.git
+#
+#build04:
+#  build: https://github.com/docker/compose
+#
+#build05:
+#  build: http://github.com/docker/compose
+
+cap01:
+  image: busybox
+  cap_add:
+    - SYS_ADMIN
+    - NET_ADMIN
+
+cpuset01:
+  image: busybox
+  cpuset: "1"
+
+cpuset02:
+  image: busybox
+  cpuset: "1,3"
+
+cpuset03:
+  image: busybox
+  cpuset: "1-3"
+
+cpuset04:
+  image: busybox
+  cpuset: "1-3,5,7-9"
+
+devices01:
+  image: busybox
+  devices:
+    - "/dev/snd:/dev/snd"
+
+dns01:
+  image: busybox
+  dns: 8.8.8.8
+
+dns02:
+  image: busybox
+  dns:
+    - 8.8.8.8
+    - 9.9.9.9
+
+dnssearch01:
+  image: busybox
+  dns_search:
+    - dc1.example.com
+    - dc2.example.com
+
+dnssearch02:
+  image: busybox
+  dns_search: example.com
+
+environment01:
+  image: busybox
+  environment:
+    - VARIABLE=FOO
+
+environment02:
+  image: busybox
+  environment:
+    VARIABLE: FOO
+
+envfile:
+  image: busybox
+  env_file: ./env_file.txt
+
+expose01:
+  image: busybox
+  expose:
+    - "80"
+    - "443"
+
+extends01:
+  image: busybox
+  extends:
+    file: extends/web.yml
+    service: web
+
+external01:
+  image: busybox
+  external_links:
+    - composetest_db_1
+    - composetest_db_2
+    - composetest_db_3:db_3
+
+extrahosts01:
+  image: busybox
+  extra_hosts:
+    - "somehost:127.0.0.1"
+
+extrahosts02:
+  image: busybox
+  extra_hosts:
+    - "www.domain.net:127.0.0.1"
+
+extrahosts03:
+  image: busybox
+  extra_hosts: www.domain.net:127.0.0.1
+
+extrahosts04:
+  image: busybox
+  extra_hosts:
+    - "www.domain.net": "127.0.0.1"
+
+extrahosts05:
+  image: busybox
+  extra_hosts:
+    "www.domain.net": "127.0.0.1"
+
+# FIXME https://github.com/docker/compose/issues/1422
+#extrahosts06:
+#  image: busybox
+#  extra_hosts:
+#    - "www.world.web:1111:2222:3333:4444:5555:6666:7777:8888"
+
+labels01:
+  image: busybox
+  labels:
+    - com.docker.compose.test=test
+
+labels02:
+  image: busybox
+  labels:
+    - test=test
+
+labels03:
+  image: busybox
+  labels:
+    - com.docker.compose.test
+
+labels04:
+  image: busybox
+  labels:
+    - test
+
+labels05:
+  image: busybox
+  labels:
+    com.docker.compose.test: test
+
+image01:
+  image: with_underscore
+
+links01:
+  image: busybox
+  links:
+    - db
+
+links02:
+  image: busybox
+  links:
+    - db:db
+
+macadress01:
+  image: busybox
+  mac_address: "01:23:45:67:89:af"
+
+net01:
+  image: busybox
+  net: bridge
+
+net02:
+  image: busybox
+  net: none
+
+net03:
+  image: busybox
+  net: host
+
+net04:
+  image: busybox
+  net: container:foo
+
+ports01:
+  image: busybox
+  ports:
+    - 127.0.0.1:8001:8000
+
+ports02:
+  image: busybox
+  ports:
+    - 0.0.0.0:9001:9000/udp
+
+ports03:
+  image: busybox
+  ports:
+    - '3000'
+    - '49152:3001'
+
+ports04:
+  image: busybox
+  ports:
+    - "[0123:4567:89ab:cdef:1234:5678:9abc:def1]:80:80"
+
+port05:
+  image: busybox
+  ports:
+    - '3000'
+
+port06:
+  image: busybox
+  ports:
+    - '49152:3001'
+
+volumes01:
+  image: busybox
+  volumes:
+    - /containerpath
+
+volumes01:
+  image: busybox
+  volumes:
+    - valid_service_dicts.yml:/path
+
+volumes02:
+  image: busybox
+  volumes:
+    - valid_service_dicts.yml:/path:ro
+
+volumes03:
+  image: busybox
+  volumes:
+    - valid_service_dicts.yml:/path:rw
+
+# TODO reactivate when escaped colons are handled properly
+#volumes04:
+#  image: busybox
+#  volumes:
+#    - escaped\:colon

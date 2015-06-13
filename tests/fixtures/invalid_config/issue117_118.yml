@@ -1,0 +1,16 @@
+mongodb:
+  image: dockerfile/mongodb
+  ports:
+    - 27017:27017
+    - 27018:27018
+  volumes: /data/db:/data/db 
+
+web:
+  image: foo:dev
+  links:
+    - mongodb
+  ports:
+    - 3000:3000
+  volumes:
+    - ../../:/home/foo/
+  command: bin/webapp

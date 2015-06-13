@@ -11,9 +11,10 @@ from docker.errors import APIError
 import dockerpty
 
 from .. import __version__, legacy
-from ..project import NoSuchService, ConfigurationError
-from ..service import BuildError, NeedsBuildError
 from ..config import parse_environment
+from ..errors import ConfigurationError
+from ..project import NoSuchService
+from ..service import BuildError, NeedsBuildError
 from .command import Command
 from .docopt_command import NoSuchCommand
 from .errors import UserError
