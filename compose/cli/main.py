@@ -10,7 +10,9 @@ import sys
 from docker.errors import APIError
 import dockerpty
 
-from .. import __version__, legacy
+from .. import __version__
+from .. import legacy
+from ..const import DEFAULT_TIMEOUT
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, NeedsBuildError
 from ..config import parse_environment
@@ -394,9 +396,8 @@ class TopLevelCommand(Command):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = options.get('--timeout')
-        params = {} if timeout is None else {'timeout': int(timeout)}
-        project.stop(service_names=options['SERVICE'], **params)
+        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        project.stop(service_names=options['SERVICE'], timeout=timeout)
 
     def restart(self, project, options):
         """
@@ -408,9 +409,8 @@ class TopLevelCommand(Command):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = options.get('--timeout')
-        params = {} if timeout is None else {'timeout': int(timeout)}
-        project.restart(service_names=options['SERVICE'], **params)
+        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        project.restart(service_names=options['SERVICE'], timeout=timeout)
 
     def up(self, project, options):
         """
@@ -452,7 +452,7 @@ class TopLevelCommand(Command):
         allow_recreate = not options['--no-recreate']
         smart_recreate = options['--x-smart-recreate']
         service_names = options['SERVICE']
-        timeout = int(options['--timeout']) if options['--timeout'] is not None else None
+        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
 
         project.up(
             service_names=service_names,
@@ -479,8 +479,7 @@ class TopLevelCommand(Command):
                 signal.signal(signal.SIGINT, handler)
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
-                params = {} if timeout is None else {'timeout': timeout}
-                project.stop(service_names=service_names, **params)
+                project.stop(service_names=service_names, timeout=timeout)
 
     def migrate_to_labels(self, project, _options):
         """

@@ -6,7 +6,7 @@ from functools import reduce
 from docker.errors import APIError
 
 from .config import get_service_name_from_net, ConfigurationError
-from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
+from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF, DEFAULT_TIMEOUT
 from .service import Service
 from .container import Container
 from .legacy import check_for_legacy_containers
@@ -212,7 +212,7 @@ class Project(object):
            smart_recreate=False,
            insecure_registry=False,
            do_build=True,
-           timeout=None):
+           timeout=DEFAULT_TIMEOUT):
 
         services = self.get_services(service_names, include_deps=start_deps)
 

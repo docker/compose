@@ -246,7 +246,7 @@ class ServiceTest(unittest.TestCase):
         service.image = lambda: {'Id': 'abc123'}
         new_container = service.recreate_container(mock_container)
 
-        mock_container.stop.assert_called_once_with()
+        mock_container.stop.assert_called_once_with(timeout=10)
         self.mock_client.rename.assert_called_once_with(
             mock_container.id,
             '%s_%s' % (mock_container.short_id, mock_container.name))
