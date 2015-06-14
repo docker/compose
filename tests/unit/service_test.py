@@ -331,9 +331,7 @@ class ServiceVolumesTest(unittest.TestCase):
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(parse_volume_spec('/outside:/inside'))
-        self.assertEqual(
-            binding,
-            ('/outside', dict(bind='/inside', ro=False)))
+        self.assertEqual(binding, ('/inside', '/outside:/inside:rw'))
 
     def test_get_container_data_volumes(self):
         options = [
@@ -360,8 +358,8 @@ class ServiceVolumesTest(unittest.TestCase):
         }, has_been_inspected=True)
 
         expected = {
-            '/var/lib/docker/aaaaaaaa': {'bind': '/existing/volume', 'ro': False},
-            '/var/lib/docker/cccccccc': {'bind': '/mnt/image/data', 'ro': False},
+            '/existing/volume': '/var/lib/docker/aaaaaaaa:/existing/volume:rw',
+            '/mnt/image/data': '/var/lib/docker/cccccccc:/mnt/image/data:rw',
         }
 
         binds = get_container_data_volumes(container, options)
@@ -384,11 +382,78 @@ class ServiceVolumesTest(unittest.TestCase):
             'Volumes': {'/existing/volume': '/var/lib/docker/aaaaaaaa'},
         }, has_been_inspected=True)
 
-        expected = {
-            '/host/volume': {'bind': '/host/volume', 'ro': True},
-            '/host/rw/volume': {'bind': '/host/rw/volume', 'ro': False},
-            '/var/lib/docker/aaaaaaaa': {'bind': '/existing/volume', 'ro': False},
-        }
+        expected = [
+            '/host/volume:/host/volume:ro',
+            '/host/rw/volume:/host/rw/volume:rw',
+            '/var/lib/docker/aaaaaaaa:/existing/volume:rw',
+        ]
 
         binds = merge_volume_bindings(options, intermediate_container)
-        self.assertEqual(binds, expected)
+        self.assertEqual(set(binds), set(expected))
+
+    def test_mount_same_host_path_to_two_volumes(self):
+        service = Service(
+            'web',
+            image='busybox',
+            volumes=[
+                '/host/path:/data1',
+                '/host/path:/data2',
+            ],
+            client=self.mock_client,
+        )
+
+        self.mock_client.inspect_image.return_value = {
+            'Id': 'ababab',
+            'ContainerConfig': {
+                'Volumes': {}
+            }
+        }
+
+        create_options = service._get_container_create_options(
+            override_options={},
+            number=1,
+        )
+
+        self.assertEqual(
+            set(create_options['host_config']['Binds']),
+            set([
+                '/host/path:/data1:rw',
+                '/host/path:/data2:rw',
+            ]),
+        )
+
+    def test_different_host_path_in_container_json(self):
+        service = Service(
+            'web',
+            image='busybox',
+            volumes=['/host/path:/data'],
+            client=self.mock_client,
+        )
+
+        self.mock_client.inspect_image.return_value = {
+            'Id': 'ababab',
+            'ContainerConfig': {
+                'Volumes': {
+                    '/data': {},
+                }
+            }
+        }
+
+        self.mock_client.inspect_container.return_value = {
+            'Id': '123123123',
+            'Image': 'ababab',
+            'Volumes': {
+                '/data': '/mnt/sda1/host/path',
+            },
+        }
+
+        create_options = service._get_container_create_options(
+            override_options={},
+            number=1,
+            previous_container=Container(self.mock_client, {'Id': '123123123'}),
+        )
+
+        self.assertEqual(
+            create_options['host_config']['Binds'],
+            ['/mnt/sda1/host/path:/data:rw'],
+        )
