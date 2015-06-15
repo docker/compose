@@ -1,6 +1,13 @@
-page_title: Using Compose in production
-page_description: Guide to using Docker Compose in production
-page_keywords: documentation, docs,  docker, compose, orchestration, containers, production
+<!--[metadata]>
++++
+title = "Using Compose in production"
+description = "Guide to using Docker Compose in production"
+keywords = ["documentation, docs,  docker, compose, orchestration, containers,  production"]
+[menu.main]
+parent="smn_workw_compose"
+weight=1
++++
+<![end-metadata]-->
 
 
 ## Using Compose in production
