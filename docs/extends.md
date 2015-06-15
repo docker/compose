@@ -1,6 +1,13 @@
-page_title: Extending services in Compose
-page_description: How to use Docker Compose's "extends" keyword to share configuration between files and projects
-page_keywords: fig, composition, compose, docker, orchestration, documentation, docs
+<!--[metadata]>
++++
+title = "Extending services in Compose"
+description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
+keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
+[menu.main]
+parent="smn_workw_compose"
+weight=2
++++
+<![end-metadata]-->
 
 
 ## Extending services in Compose
@@ -79,7 +86,7 @@ For full details on how to use `extends`, refer to the [reference](#reference).
 ### Example use case
 
 In this example, you’ll repurpose the example app from the [quick start
-guide](index.md). (If you're not familiar with Compose, it's recommended that
+guide](compose-overview.md). (If you're not familiar with Compose, it's recommended that
 you go through the quick start first.) This example assumes you want to use
 Compose both to develop an application locally and then deploy it to a
 production environment.
@@ -364,7 +371,7 @@ volumes:
 
 ## Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

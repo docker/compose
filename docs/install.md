@@ -1,14 +1,21 @@
-page_title: Installing Compose
-page_description: How to install Docker Compose
-page_keywords: compose, orchestration, install, installation, docker, documentation
+<!--[metadata]>
++++
+title = "Docker Compose"
+description = "How to install Docker Compose"
+keywords = ["compose, orchestration, install, installation, docker, documentation"]
+[menu.main]
+parent="mn_install"
+weight=4
++++
+<![end-metadata]-->
 
 
-## Installing Compose
+# Install Docker Compose
 
 To install Compose, you'll need to install Docker first. You'll then install
 Compose with a `curl` command. 
 
-### Install Docker
+## Install Docker
 
 First, install Docker version 1.6 or greater:
 
@@ -16,7 +23,7 @@ First, install Docker version 1.6 or greater:
 - [Instructions for Ubuntu](http://docs.docker.com/installation/ubuntulinux/)
 - [Instructions for other systems](http://docs.docker.com/installation/)
 
-### Install Compose
+## Install Compose
 
 To install Compose, run the following commands:
 
@@ -38,7 +45,7 @@ You can test the installation by running `docker-compose --version`.
 
 ## Compose documentation
 
-- [User guide](index.md)
+- [User guide](compose-overview.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
