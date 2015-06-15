@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from operator import attrgetter
 import sys
 import os
 import shlex
@@ -434,6 +435,27 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
         self.assertEqual(get_port(3001), "0.0.0.0:49152")
+        self.assertEqual(get_port(3002), "")
+
+    def test_port_with_scale(self):
+
+        self.command.base_dir = 'tests/fixtures/ports-composefile-scale'
+        self.command.dispatch(['scale', 'simple=2'], None)
+        containers = sorted(
+            self.project.containers(service_names=['simple']),
+            key=attrgetter('name'))
+
+        @patch('sys.stdout', new_callable=StringIO)
+        def get_port(number, mock_stdout, index=None):
+            if index is None:
+                self.command.dispatch(['port', 'simple', str(number)], None)
+            else:
+                self.command.dispatch(['port', '--index=' + str(index), 'simple', str(number)], None)
+            return mock_stdout.getvalue().rstrip()
+
+        self.assertEqual(get_port(3000), containers[0].get_local_port(3000))
+        self.assertEqual(get_port(3000, index=1), containers[0].get_local_port(3000))
+        self.assertEqual(get_port(3000, index=2), containers[1].get_local_port(3000))
         self.assertEqual(get_port(3002), "")
 
     def test_env_file_relative_to_compose_file(self):
