@@ -12,8 +12,8 @@ from .testcases import DockerClientTestCase
 
 class ProjectTestCase(DockerClientTestCase):
     def run_up(self, cfg, **kwargs):
-        if 'smart_recreate' not in kwargs:
-            kwargs['smart_recreate'] = True
+        kwargs.setdefault('smart_recreate', True)
+        kwargs.setdefault('timeout', 0.1)
 
         project = self.make_project(cfg)
         project.up(**kwargs)
@@ -153,7 +153,31 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.assertEqual(new_containers - old_containers, set())
 
 
+def converge(service,
+             allow_recreate=True,
+             smart_recreate=False,
+             insecure_registry=False,
+             do_build=True):
+    """
+    If a container for this service doesn't exist, create and start one. If there are
+    any, stop them, create+start new ones, and remove the old containers.
+    """
+    plan = service.convergence_plan(
+        allow_recreate=allow_recreate,
+        smart_recreate=smart_recreate,
+    )
+
+    return service.execute_convergence_plan(
+        plan,
+        insecure_registry=insecure_registry,
+        do_build=do_build,
+        timeout=0.1,
+    )
+
+
 class ServiceStateTest(DockerClientTestCase):
+    """Test cases for Service.convergence_plan."""
+
     def test_trigger_create(self):
         web = self.create_service('web')
         self.assertEqual(('create', []), web.convergence_plan(smart_recreate=True))
@@ -223,18 +247,19 @@ class ServiceStateTest(DockerClientTestCase):
 
     def test_trigger_recreate_with_build(self):
         context = tempfile.mkdtemp()
+        base_image = "FROM busybox\nLABEL com.docker.compose.test_image=true\n"
 
         try:
             dockerfile = os.path.join(context, 'Dockerfile')
 
             with open(dockerfile, 'w') as f:
-                f.write('FROM busybox\n')
+                f.write(base_image)
 
             web = self.create_service('web', build=context)
             container = web.create_container()
 
             with open(dockerfile, 'w') as f:
-                f.write('FROM busybox\nCMD echo hello world\n')
+                f.write(base_image + 'CMD echo hello world\n')
             web.build()
 
             web = self.create_service('web', build=context)
@@ -256,15 +281,15 @@ class ConfigHashTest(DockerClientTestCase):
 
     def test_config_hash_with_custom_labels(self):
         web = self.create_service('web', labels={'foo': '1'})
-        container = web.converge()[0]
+        container = converge(web)[0]
         self.assertIn(LABEL_CONFIG_HASH, container.labels)
         self.assertIn('foo', container.labels)
 
     def test_config_hash_sticks_around(self):
         web = self.create_service('web', command=["top"])
-        container = web.converge()[0]
+        container = converge(web)[0]
         self.assertIn(LABEL_CONFIG_HASH, container.labels)
 
         web = self.create_service('web', command=["top", "-d", "1"])
-        container = web.converge()[0]
+        container = converge(web)[0]
         self.assertIn(LABEL_CONFIG_HASH, container.labels)

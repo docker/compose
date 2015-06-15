@@ -247,13 +247,22 @@ class ServiceTest(unittest.TestCase):
         service.image = lambda: {'Id': 'abc123'}
         new_container = service.recreate_container(mock_container)
 
-        mock_container.stop.assert_called_once_with()
+        mock_container.stop.assert_called_once_with(timeout=10)
         self.mock_client.rename.assert_called_once_with(
             mock_container.id,
             '%s_%s' % (mock_container.short_id, mock_container.name))
 
         new_container.start.assert_called_once_with()
         mock_container.remove.assert_called_once_with()
+
+    @mock.patch('compose.service.Container', autospec=True)
+    def test_recreate_container_with_timeout(self, _):
+        mock_container = mock.create_autospec(Container)
+        self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
+        service = Service('foo', client=self.mock_client, image='someimage')
+        service.recreate_container(mock_container, timeout=1)
+
+        mock_container.stop.assert_called_once_with(timeout=1)
 
     def test_parse_repository_tag(self):
         self.assertEqual(parse_repository_tag("root"), ("root", ""))

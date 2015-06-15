@@ -13,6 +13,7 @@ from docker.utils import create_host_config, LogConfig
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS, merge_environment
 from .const import (
+    DEFAULT_TIMEOUT,
     LABEL_CONTAINER_NUMBER,
     LABEL_ONE_OFF,
     LABEL_PROJECT,
@@ -258,26 +259,6 @@ class Service(object):
         else:
             return self.options['image']
 
-    def converge(self,
-                 allow_recreate=True,
-                 smart_recreate=False,
-                 insecure_registry=False,
-                 do_build=True):
-        """
-        If a container for this service doesn't exist, create and start one. If there are
-        any, stop them, create+start new ones, and remove the old containers.
-        """
-        plan = self.convergence_plan(
-            allow_recreate=allow_recreate,
-            smart_recreate=smart_recreate,
-        )
-
-        return self.execute_convergence_plan(
-            plan,
-            insecure_registry=insecure_registry,
-            do_build=do_build,
-        )
-
     def convergence_plan(self,
                          allow_recreate=True,
                          smart_recreate=False):
@@ -328,7 +309,8 @@ class Service(object):
     def execute_convergence_plan(self,
                                  plan,
                                  insecure_registry=False,
-                                 do_build=True):
+                                 do_build=True,
+                                 timeout=DEFAULT_TIMEOUT):
         (action, containers) = plan
 
         if action == 'create':
@@ -345,6 +327,7 @@ class Service(object):
                 self.recreate_container(
                     c,
                     insecure_registry=insecure_registry,
+                    timeout=timeout
                 )
                 for c in containers
             ]
@@ -366,7 +349,8 @@ class Service(object):
 
     def recreate_container(self,
                            container,
-                           insecure_registry=False):
+                           insecure_registry=False,
+                           timeout=DEFAULT_TIMEOUT):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -375,7 +359,7 @@ class Service(object):
         """
         log.info("Recreating %s..." % container.name)
         try:
-            container.stop()
+            container.stop(timeout=timeout)
         except APIError as e:
             if (e.response.status_code == 500
                     and e.explanation

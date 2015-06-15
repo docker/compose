@@ -11,6 +11,7 @@ from docker.errors import APIError
 import dockerpty
 
 from .. import legacy
+from ..const import DEFAULT_TIMEOUT
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, NeedsBuildError
 from ..config import parse_environment
@@ -392,9 +393,8 @@ class TopLevelCommand(Command):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = options.get('--timeout')
-        params = {} if timeout is None else {'timeout': int(timeout)}
-        project.stop(service_names=options['SERVICE'], **params)
+        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        project.stop(service_names=options['SERVICE'], timeout=timeout)
 
     def restart(self, project, options):
         """
@@ -406,9 +406,8 @@ class TopLevelCommand(Command):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = options.get('--timeout')
-        params = {} if timeout is None else {'timeout': int(timeout)}
-        project.restart(service_names=options['SERVICE'], **params)
+        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        project.restart(service_names=options['SERVICE'], timeout=timeout)
 
     def up(self, project, options):
         """
@@ -437,9 +436,9 @@ class TopLevelCommand(Command):
                                    image needs to be updated. (EXPERIMENTAL)
             --no-recreate          If containers already exist, don't recreate them.
             --no-build             Don't build an image, even if it's missing
-            -t, --timeout TIMEOUT  When attached, use this timeout in seconds
-                                   for the shutdown. (default: 10)
-
+            -t, --timeout TIMEOUT  Use this timeout in seconds for container shutdown
+                                   when attached or when containers are already
+                                   running. (default: 10)
         """
         insecure_registry = options['--allow-insecure-ssl']
         detached = options['-d']
@@ -450,6 +449,7 @@ class TopLevelCommand(Command):
         allow_recreate = not options['--no-recreate']
         smart_recreate = options['--x-smart-recreate']
         service_names = options['SERVICE']
+        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
 
         project.up(
             service_names=service_names,
@@ -458,6 +458,7 @@ class TopLevelCommand(Command):
             smart_recreate=smart_recreate,
             insecure_registry=insecure_registry,
             do_build=not options['--no-build'],
+            timeout=timeout
         )
 
         to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
@@ -475,9 +476,7 @@ class TopLevelCommand(Command):
                 signal.signal(signal.SIGINT, handler)
 
                 print("Gracefully stopping... (press Ctrl+C again to force)")
-                timeout = options.get('--timeout')
-                params = {} if timeout is None else {'timeout': int(timeout)}
-                project.stop(service_names=service_names, **params)
+                project.stop(service_names=service_names, timeout=timeout)
 
     def migrate_to_labels(self, project, _options):
         """
