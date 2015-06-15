@@ -1,12 +1,15 @@
+from docker.errors import APIError
+
 from compose import legacy
 from compose.project import Project
 from .testcases import DockerClientTestCase
 
 
-class ProjectTest(DockerClientTestCase):
+class LegacyTestCase(DockerClientTestCase):
 
     def setUp(self):
-        super(ProjectTest, self).setUp()
+        super(LegacyTestCase, self).setUp()
+        self.containers = []
 
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'db')])
@@ -23,12 +26,25 @@ class ProjectTest(DockerClientTestCase):
                 **service.options
             )
             self.client.start(container)
+            self.containers.append(container)
 
         # Create a single one-off legacy container
-        self.client.create_container(
+        self.containers.append(self.client.create_container(
             name='{}_{}_run_1'.format(self.project.name, self.services[0].name),
             **self.services[0].options
-        )
+        ))
+
+    def tearDown(self):
+        super(LegacyTestCase, self).tearDown()
+        for container in self.containers:
+            try:
+                self.client.kill(container)
+            except APIError:
+                pass
+            try:
+                self.client.remove_container(container)
+            except APIError:
+                pass
 
     def get_legacy_containers(self, **kwargs):
         return list(legacy.get_legacy_containers(

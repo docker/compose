@@ -24,6 +24,7 @@ class CLITestCase(DockerClientTestCase):
         self.project.remove_stopped()
         for container in self.project.containers(stopped=True, one_off=True):
             container.remove(force=True)
+        super(CLITestCase, self).tearDown()
 
     @property
     def project(self):
@@ -161,6 +162,19 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(old_ids, new_ids)
 
+    def test_up_with_timeout(self):
+        self.command.dispatch(['up', '-d', '-t', '1'], None)
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(len(another.containers()), 1)
+
+        # Ensure containers don't have stdin and stdout connected in -d mode
+        config = service.containers()[0].inspect()['Config']
+        self.assertFalse(config['AttachStderr'])
+        self.assertFalse(config['AttachStdout'])
+        self.assertFalse(config['AttachStdin'])
+
     @patch('dockerpty.start')
     def test_run_service_without_links(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/links-composefile'
@@ -207,12 +221,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(old_ids, new_ids)
 
     @patch('dockerpty.start')
-    def test_run_without_command(self, __):
+    def test_run_without_command(self, _):
         self.command.base_dir = 'tests/fixtures/commands-composefile'
         self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
-
-        for c in self.project.containers(stopped=True, one_off=True):
-            c.remove()
 
         self.command.dispatch(['run', 'implicit'], None)
         service = self.project.get_service('implicit')
