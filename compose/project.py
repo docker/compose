@@ -99,6 +99,16 @@ class Project(object):
 
         raise NoSuchService(name)
 
+    def validate_service_names(self, service_names):
+        """
+        Validate that the given list of service names only contains valid
+        services. Raises NoSuchService if one of the names is invalid.
+        """
+        valid_names = self.service_names
+        for name in service_names:
+            if name not in valid_names:
+                raise NoSuchService(name)
+
     def get_services(self, service_names=None, include_deps=False):
         """
         Returns a list of this project's services filtered
@@ -275,8 +285,7 @@ class Project(object):
 
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:
-            # Will raise NoSuchService if one of the names is invalid
-            self.get_services(service_names)
+            self.validate_service_names(service_names)
         containers = [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
