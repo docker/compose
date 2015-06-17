@@ -23,6 +23,7 @@ DOCKER_CONFIG_KEYS = [
     'image',
     'labels',
     'links',
+    'mac_address',
     'mem_limit',
     'net',
     'log_driver',

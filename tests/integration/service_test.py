@@ -199,6 +199,12 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(set(container.get('HostConfig.SecurityOpt')), set(security_opt))
 
+    def test_create_container_with_mac_address(self):
+        service = self.create_service('db', mac_address='02:42:ac:11:65:43')
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.inspect()['Config']['MacAddress'], '02:42:ac:11:65:43')
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
