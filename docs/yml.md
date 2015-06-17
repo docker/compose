@@ -127,6 +127,8 @@ port (a random host port will be chosen).
 > parse numbers in the format `xx:yy` as sexagesimal (base 60). For this reason,
 > we recommend always explicitly specifying your port mappings as strings.
 
+Ports will only be exposed when running `docker-compose up`; running `docker-compose run` will not map them automatically.
+
 ```
 ports:
  - "3000"
