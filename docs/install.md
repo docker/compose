@@ -57,7 +57,7 @@ Alternatively, if you're not worried about keeping them, you can remove them - C
 
 ## Compose documentation
 
-- [User guide](compose-overview.md)
+- [User guide](/)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
