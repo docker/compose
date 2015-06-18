@@ -393,7 +393,7 @@ read_only: true
 
 ## Compose documentation
 
-- [User guide](compose-overview.md)
+- [User guide](/)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

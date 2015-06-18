@@ -86,7 +86,7 @@ For full details on how to use `extends`, refer to the [reference](#reference).
 ### Example use case
 
 In this example, you’ll repurpose the example app from the [quick start
-guide](compose-overview.md). (If you're not familiar with Compose, it's recommended that
+guide](index.md). (If you're not familiar with Compose, it's recommended that
 you go through the quick start first.) This example assumes you want to use
 Compose both to develop an application locally and then deploy it to a
 production environment.
@@ -371,7 +371,7 @@ volumes:
 
 ## Compose documentation
 
-- [User guide](compose-overview.md)
+- [User guide](/)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

@@ -124,7 +124,7 @@ you're using Boot2docker, `boot2docker ip` will tell you its address).
 
 ## More Compose documentation
 
-- [User guide](compose-overview.md)
+- [User guide](/)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
