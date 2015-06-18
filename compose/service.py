@@ -3,16 +3,27 @@ from __future__ import absolute_import
 from collections import namedtuple
 import logging
 import re
-from operator import attrgetter
 import sys
+from operator import attrgetter
+
 import six
-
 from docker.errors import APIError
-from docker.utils import create_host_config
+from docker.utils import create_host_config, LogConfig
 
-from .config import DOCKER_CONFIG_KEYS
-from .container import Container, get_container_name
+from . import __version__
+from .config import DOCKER_CONFIG_KEYS, merge_environment
+from .const import (
+    LABEL_CONTAINER_NUMBER,
+    LABEL_ONE_OFF,
+    LABEL_PROJECT,
+    LABEL_SERVICE,
+    LABEL_VERSION,
+    LABEL_CONFIG_HASH,
+)
+from .container import Container
+from .legacy import check_for_legacy_containers
 from .progress_stream import stream_output, StreamOutputError
+from .utils import json_hash
 
 log = logging.getLogger(__name__)
 
@@ -20,12 +31,19 @@ log = logging.getLogger(__name__)
 DOCKER_START_KEYS = [
     'cap_add',
     'cap_drop',
+    'devices',
     'dns',
     'dns_search',
     'env_file',
+    'extra_hosts',
+    'read_only',
     'net',
+    'log_driver',
+    'pid',
     'privileged',
     'restart',
+    'volumes_from',
+    'security_opt',
 ]
 
 VALID_NAME_CHARS = '[a-zA-Z0-9]'
@@ -37,18 +55,22 @@ class BuildError(Exception):
         self.reason = reason
 
 
-class CannotBeScaledError(Exception):
-    pass
-
-
 class ConfigError(ValueError):
     pass
+
+
+class NeedsBuildError(Exception):
+    def __init__(self, service):
+        self.service = service
 
 
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
+
+
+ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 
 class Service(object):
@@ -59,6 +81,8 @@ class Service(object):
             raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
         if 'image' in options and 'build' in options:
             raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
+        if 'image' not in options and 'build' not in options:
+            raise ConfigError('Service %s has neither an image nor a build path specified. Exactly one must be provided.' % name)
 
         self.name = name
         self.client = client
@@ -70,28 +94,29 @@ class Service(object):
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
-        return [Container.from_ps(self.client, container)
-                for container in self.client.containers(all=stopped)
-                if self.has_container(container, one_off=one_off)]
+        containers = [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})]
 
-    def has_container(self, container, one_off=False):
-        """Return True if `container` was created to fulfill this service."""
-        name = get_container_name(container)
-        if not name or not is_valid_name(name, one_off):
-            return False
-        project, name, _number = parse_name(name)
-        return project == self.project and name == self.name
+        if not containers:
+            check_for_legacy_containers(
+                self.client,
+                self.project,
+                [self.name],
+                stopped=stopped,
+                one_off=one_off)
+
+        return containers
 
     def get_container(self, number=1):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-        for container in self.client.containers():
-            if not self.has_container(container):
-                continue
-            _, _, container_number = parse_name(get_container_name(container))
-            if container_number == number:
-                return Container.from_ps(self.client, container)
+        labels = self.labels() + ['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]
+        for container in self.client.containers(filters={'label': labels}):
+            return Container.from_ps(self.client, container)
 
         raise ValueError("No container found for %s_%s" % (self.name, number))
 
@@ -125,13 +150,14 @@ class Service(object):
         - removes all stopped containers
         """
         if not self.can_be_scaled():
-            raise CannotBeScaledError()
+            log.warn('Service %s specifies a port on the host. If multiple containers '
+                     'for this service are created on a single host, the port will clash.'
+                     % self.name)
 
         # Create enough containers
         containers = self.containers(stopped=True)
         while len(containers) < desired_num:
-            log.info("Creating %s..." % self._next_container_name(containers))
-            containers.append(self.create_container(detach=True))
+            containers.append(self.create_container())
 
         running_containers = []
         stopped_containers = []
@@ -169,65 +195,168 @@ class Service(object):
                          one_off=False,
                          insecure_registry=False,
                          do_build=True,
-                         intermediate_container=None,
+                         previous_container=None,
+                         number=None,
+                         quiet=False,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        container_options = self._get_container_create_options(
-            override_options,
-            one_off=one_off,
-            intermediate_container=intermediate_container,
+        self.ensure_image_exists(
+            do_build=do_build,
+            insecure_registry=insecure_registry,
         )
 
-        if (do_build and
-                self.can_be_built() and
-                not self.client.images(name=self.full_name)):
-            self.build()
+        container_options = self._get_container_create_options(
+            override_options,
+            number or self._next_container_number(one_off=one_off),
+            one_off=one_off,
+            previous_container=previous_container,
+        )
 
+        if 'name' in container_options and not quiet:
+            log.info("Creating %s..." % container_options['name'])
+
+        return Container.create(self.client, **container_options)
+
+    def ensure_image_exists(self,
+                            do_build=True,
+                            insecure_registry=False):
+
+        if self.image():
+            return
+
+        if self.can_be_built():
+            if do_build:
+                self.build()
+            else:
+                raise NeedsBuildError(self)
+        else:
+            self.pull(insecure_registry=insecure_registry)
+
+    def image(self):
         try:
-            return Container.create(self.client, **container_options)
+            return self.client.inspect_image(self.image_name)
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                log.info('Pulling image %s...' % container_options['image'])
-                output = self.client.pull(
-                    container_options['image'],
-                    stream=True,
-                    insecure_registry=insecure_registry
-                )
-                stream_output(output, sys.stdout)
-                return Container.create(self.client, **container_options)
-            raise
+                return None
+            else:
+                raise
 
-    def recreate_containers(self, insecure_registry=False, do_build=True, **override_options):
+    @property
+    def image_name(self):
+        if self.can_be_built():
+            return self.full_name
+        else:
+            return self.options['image']
+
+    def converge(self,
+                 allow_recreate=True,
+                 smart_recreate=False,
+                 insecure_registry=False,
+                 do_build=True):
         """
         If a container for this service doesn't exist, create and start one. If there are
         any, stop them, create+start new ones, and remove the old containers.
         """
+        plan = self.convergence_plan(
+            allow_recreate=allow_recreate,
+            smart_recreate=smart_recreate,
+        )
+
+        return self.execute_convergence_plan(
+            plan,
+            insecure_registry=insecure_registry,
+            do_build=do_build,
+        )
+
+    def convergence_plan(self,
+                         allow_recreate=True,
+                         smart_recreate=False):
+
         containers = self.containers(stopped=True)
+
         if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
+            return ConvergencePlan('create', [])
+
+        if smart_recreate and not self._containers_have_diverged(containers):
+            stopped = [c for c in containers if not c.is_running]
+
+            if stopped:
+                return ConvergencePlan('start', stopped)
+
+            return ConvergencePlan('noop', containers)
+
+        if not allow_recreate:
+            return ConvergencePlan('start', containers)
+
+        return ConvergencePlan('recreate', containers)
+
+    def _containers_have_diverged(self, containers):
+        config_hash = self.config_hash()
+        has_diverged = False
+
+        for c in containers:
+            container_config_hash = c.labels.get(LABEL_CONFIG_HASH, None)
+            if container_config_hash != config_hash:
+                log.debug(
+                    '%s has diverged: %s != %s',
+                    c.name, container_config_hash, config_hash,
+                )
+                has_diverged = True
+
+        return has_diverged
+
+    def execute_convergence_plan(self,
+                                 plan,
+                                 insecure_registry=False,
+                                 do_build=True):
+        (action, containers) = plan
+
+        if action == 'create':
             container = self.create_container(
                 insecure_registry=insecure_registry,
                 do_build=do_build,
-                **override_options)
+            )
             self.start_container(container)
-            return [(None, container)]
-        else:
-            tuples = []
 
+            return [container]
+
+        elif action == 'recreate':
+            return [
+                self.recreate_container(
+                    c,
+                    insecure_registry=insecure_registry,
+                )
+                for c in containers
+            ]
+
+        elif action == 'start':
             for c in containers:
-                log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, insecure_registry=insecure_registry, **override_options))
+                self.start_container_if_stopped(c)
 
-            return tuples
+            return containers
 
-    def recreate_container(self, container, **override_options):
-        """Recreate a container. An intermediate container is created so that
-        the new container has the same name, while still supporting
-        `volumes-from` the original container.
+        elif action == 'noop':
+            for c in containers:
+                log.info("%s is up-to-date" % c.name)
+
+            return containers
+
+        else:
+            raise Exception("Invalid action: {}".format(action))
+
+    def recreate_container(self,
+                           container,
+                           insecure_registry=False):
+        """Recreate a container.
+
+        The original container is renamed to a temporary name so that data
+        volumes can be copied to the new container, before the original
+        container is removed.
         """
+        log.info("Recreating %s..." % container.name)
         try:
             container.stop()
         except APIError as e:
@@ -238,29 +367,21 @@ class Service(object):
             else:
                 raise
 
-        intermediate_container = Container.create(
-            self.client,
-            image=container.image,
-            entrypoint=['/bin/echo'],
-            command=[],
-            detach=True,
-            host_config=create_host_config(volumes_from=[container.id]),
-        )
-        intermediate_container.start()
-        intermediate_container.wait()
-        container.remove()
+        # Use a hopefully unique container name by prepending the short id
+        self.client.rename(
+            container.id,
+            '%s_%s' % (container.short_id, container.name))
 
-        options = dict(override_options)
         new_container = self.create_container(
+            insecure_registry=insecure_registry,
             do_build=False,
-            intermediate_container=intermediate_container,
-            **options
+            previous_container=container,
+            number=container.labels.get(LABEL_CONTAINER_NUMBER),
+            quiet=True,
         )
         self.start_container(new_container)
-
-        intermediate_container.remove()
-
-        return (intermediate_container, new_container)
+        container.remove()
+        return new_container
 
     def start_container_if_stopped(self, container):
         if container.is_running:
@@ -273,23 +394,20 @@ class Service(object):
         container.start()
         return container
 
-    def start_or_create_containers(
-            self,
-            insecure_registry=False,
-            detach=False,
-            do_build=True):
-        containers = self.containers(stopped=True)
+    def config_hash(self):
+        return json_hash(self.config_dict())
 
-        if not containers:
-            log.info("Creating %s..." % self._next_container_name(containers))
-            new_container = self.create_container(
-                insecure_registry=insecure_registry,
-                detach=detach,
-                do_build=do_build,
-            )
-            return [self.start_container(new_container)]
-        else:
-            return [self.start_container_if_stopped(c) for c in containers]
+    def config_dict(self):
+        return {
+            'options': self.options,
+            'image_id': self.image()['Id'],
+        }
+
+    def get_dependency_names(self):
+        net_name = self.get_net_name()
+        return (self.get_linked_names() +
+                self.get_volumes_from_names() +
+                ([net_name] if net_name else []))
 
     def get_linked_names(self):
         return [s.name for (s, _) in self.links]
@@ -303,14 +421,19 @@ class Service(object):
         else:
             return
 
-    def _next_container_name(self, all_containers, one_off=False):
-        bits = [self.project, self.name]
-        if one_off:
-            bits.append('run')
-        return '_'.join(bits + [str(self._next_container_number(all_containers))])
+    def get_container_name(self, number, one_off=False):
+        # TODO: Implement issue #652 here
+        return build_container_name(self.project, self.name, number, one_off)
 
-    def _next_container_number(self, all_containers):
-        numbers = [parse_name(c.name).number for c in all_containers]
+    # TODO: this would benefit from github.com/docker/docker/pull/11943
+    # to remove the need to inspect every container
+    def _next_container_number(self, one_off=False):
+        numbers = [
+            Container.from_ps(self.client, container).number
+            for container in self.client.containers(
+                all=True,
+                filters={'label': self.labels(one_off=one_off)})
+        ]
         return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):
@@ -333,7 +456,7 @@ class Service(object):
             links.append((external_link, link_name))
         return links
 
-    def _get_volumes_from(self, intermediate_container=None):
+    def _get_volumes_from(self):
         volumes_from = []
         for volume_source in self.volumes_from:
             if isinstance(volume_source, Service):
@@ -345,9 +468,6 @@ class Service(object):
 
             elif isinstance(volume_source, Container):
                 volumes_from.append(volume_source.id)
-
-        if intermediate_container:
-            volumes_from.append(intermediate_container.id)
 
         return volumes_from
 
@@ -370,15 +490,31 @@ class Service(object):
 
         return net
 
-    def _get_container_create_options(self, override_options, one_off=False, intermediate_container=None):
+    def _get_container_create_options(
+            self,
+            override_options,
+            number,
+            one_off=False,
+            previous_container=None):
+
+        add_config_hash = (not one_off and not override_options)
+
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        container_options['name'] = self._next_container_name(
-            self.containers(stopped=True, one_off=one_off),
-            one_off)
+        container_options['name'] = self.get_container_name(number, one_off)
+
+        if add_config_hash:
+            config_hash = self.config_hash()
+            if 'labels' not in container_options:
+                container_options['labels'] = {}
+            container_options['labels'][LABEL_CONFIG_HASH] = config_hash
+            log.debug("Added config hash: %s" % config_hash)
+
+        if 'detach' not in container_options:
+            container_options['detach'] = True
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
@@ -403,36 +539,49 @@ class Service(object):
                 ports.append(port)
             container_options['ports'] = ports
 
+        override_options['binds'] = merge_volume_bindings(
+            container_options.get('volumes') or [],
+            previous_container)
+
         if 'volumes' in container_options:
             container_options['volumes'] = dict(
                 (parse_volume_spec(v).internal, {})
                 for v in container_options['volumes'])
 
-        if self.can_be_built():
-            container_options['image'] = self.full_name
-        else:
-            container_options['image'] = self._get_image_name(container_options['image'])
+        container_options['environment'] = merge_environment(
+            self.options.get('environment'),
+            override_options.get('environment'))
+
+        if previous_container:
+            container_options['environment']['affinity:container'] = ('=' + previous_container.id)
+
+        container_options['image'] = self.image_name
+
+        container_options['labels'] = build_container_labels(
+            container_options.get('labels', {}),
+            self.labels(one_off=one_off),
+            number)
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
             container_options.pop(key, None)
 
-        container_options['host_config'] = self._get_container_host_config(override_options, one_off=one_off, intermediate_container=intermediate_container)
+        container_options['host_config'] = self._get_container_host_config(
+            override_options,
+            one_off=one_off)
 
         return container_options
 
-    def _get_container_host_config(self, override_options, one_off=False, intermediate_container=None):
+    def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
         port_bindings = build_port_bindings(options.get('ports') or [])
-
-        volume_bindings = dict(
-            build_volume_binding(parse_volume_spec(volume))
-            for volume in options.get('volumes') or []
-            if ':' in volume)
 
         privileged = options.get('privileged', False)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
+        log_config = LogConfig(type=options.get('log_driver', 'json-file'))
+        pid = options.get('pid', None)
+        security_opt = options.get('security_opt', None)
 
         dns = options.get('dns', None)
         if isinstance(dns, six.string_types):
@@ -444,41 +593,54 @@ class Service(object):
 
         restart = parse_restart_spec(options.get('restart', None))
 
+        extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
+        read_only = options.get('read_only', None)
+
+        devices = options.get('devices', None)
+
         return create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
-            binds=volume_bindings,
-            volumes_from=self._get_volumes_from(intermediate_container),
+            binds=options.get('binds'),
+            volumes_from=self._get_volumes_from(),
             privileged=privileged,
             network_mode=self._get_net(),
+            devices=devices,
             dns=dns,
             dns_search=dns_search,
             restart_policy=restart,
             cap_add=cap_add,
             cap_drop=cap_drop,
+            log_config=log_config,
+            extra_hosts=extra_hosts,
+            read_only=read_only,
+            pid_mode=pid,
+            security_opt=security_opt
         )
-
-    def _get_image_name(self, image):
-        repo, tag = parse_repository_tag(image)
-        if tag == "":
-            tag = "latest"
-        return '%s:%s' % (repo, tag)
 
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
+        path = six.binary_type(self.options['build'])
+
         build_output = self.client.build(
-            self.options['build'],
-            tag=self.full_name,
+            path=path,
+            tag=self.image_name,
             stream=True,
             rm=True,
             nocache=no_cache,
+            dockerfile=self.options.get('dockerfile', None),
         )
 
         try:
             all_events = stream_output(build_output, sys.stdout)
         except StreamOutputError as e:
             raise BuildError(self, unicode(e))
+
+        # Ensure the HTTP connection is not reused for another
+        # streaming command, as the Docker daemon can sometimes
+        # complain about it
+        self.client.close()
 
         image_id = None
 
@@ -503,6 +665,13 @@ class Service(object):
         """
         return '%s_%s' % (self.project, self.name)
 
+    def labels(self, one_off=False):
+        return [
+            '{0}={1}'.format(LABEL_PROJECT, self.project),
+            '{0}={1}'.format(LABEL_SERVICE, self.name),
+            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
+        ]
+
     def can_be_scaled(self):
         for port in self.options.get('ports', []):
             if ':' in str(port):
@@ -510,48 +679,91 @@ class Service(object):
         return True
 
     def pull(self, insecure_registry=False):
-        if 'image' in self.options:
-            image_name = self._get_image_name(self.options['image'])
-            log.info('Pulling %s (%s)...' % (self.name, image_name))
-            self.client.pull(
-                image_name,
-                insecure_registry=insecure_registry
-            )
+        if 'image' not in self.options:
+            return
+
+        repo, tag = parse_repository_tag(self.options['image'])
+        tag = tag or 'latest'
+        log.info('Pulling %s (%s:%s)...' % (self.name, repo, tag))
+        output = self.client.pull(
+            repo,
+            tag=tag,
+            stream=True,
+            insecure_registry=insecure_registry)
+        stream_output(output, sys.stdout)
 
 
-NAME_RE = re.compile(r'^([^_]+)_([^_]+)_(run_)?(\d+)$')
+# Names
 
 
-def is_valid_name(name, one_off=False):
-    match = NAME_RE.match(name)
-    if match is None:
-        return False
+def build_container_name(project, service, number, one_off=False):
+    bits = [project, service]
     if one_off:
-        return match.group(3) == 'run_'
-    else:
-        return match.group(3) is None
+        bits.append('run')
+    return '_'.join(bits + [str(number)])
 
 
-def parse_name(name):
-    match = NAME_RE.match(name)
-    (project, service_name, _, suffix) = match.groups()
-    return ServiceName(project, service_name, int(suffix))
+# Images
 
 
-def parse_restart_spec(restart_config):
-    if not restart_config:
-        return None
-    parts = restart_config.split(':')
-    if len(parts) > 2:
-        raise ConfigError("Restart %s has incorrect format, should be "
-                          "mode[:max_retry]" % restart_config)
-    if len(parts) == 2:
-        name, max_retry_count = parts
-    else:
-        name, = parts
-        max_retry_count = 0
+def parse_repository_tag(s):
+    if ":" not in s:
+        return s, ""
+    repo, tag = s.rsplit(":", 1)
+    if "/" in tag:
+        return s, ""
+    return repo, tag
 
-    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+# Volumes
+
+
+def merge_volume_bindings(volumes_option, previous_container):
+    """Return a list of volume bindings for a container. Container data volumes
+    are replaced by those from the previous container.
+    """
+    volume_bindings = dict(
+        build_volume_binding(parse_volume_spec(volume))
+        for volume in volumes_option or []
+        if ':' in volume)
+
+    if previous_container:
+        volume_bindings.update(
+            get_container_data_volumes(previous_container, volumes_option))
+
+    return volume_bindings.values()
+
+
+def get_container_data_volumes(container, volumes_option):
+    """Find the container data volumes that are in `volumes_option`, and return
+    a mapping of volume bindings for those volumes.
+    """
+    volumes = []
+
+    volumes_option = volumes_option or []
+    container_volumes = container.get('Volumes') or {}
+    image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
+
+    for volume in set(volumes_option + image_volumes.keys()):
+        volume = parse_volume_spec(volume)
+        # No need to preserve host volumes
+        if volume.external:
+            continue
+
+        volume_path = container_volumes.get(volume.internal)
+        # New volume, doesn't exist in the old container
+        if not volume_path:
+            continue
+
+        # Copy existing volume from old container
+        volume = volume._replace(external=volume_path)
+        volumes.append(build_volume_binding(volume))
+
+    return dict(volumes)
+
+
+def build_volume_binding(volume_spec):
+    return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
 
 
 def parse_volume_spec(volume_config):
@@ -574,18 +786,7 @@ def parse_volume_spec(volume_config):
     return VolumeSpec(external, internal, mode)
 
 
-def parse_repository_tag(s):
-    if ":" not in s:
-        return s, ""
-    repo, tag = s.rsplit(":", 1)
-    if "/" in tag:
-        return s, ""
-    return repo, tag
-
-
-def build_volume_binding(volume_spec):
-    internal = {'bind': volume_spec.internal, 'ro': volume_spec.mode == 'ro'}
-    return volume_spec.external, internal
+# Ports
 
 
 def build_port_bindings(ports):
@@ -614,3 +815,61 @@ def split_port(port):
 
     external_ip, external_port, internal_port = parts
     return internal_port, (external_ip, external_port or None)
+
+
+# Labels
+
+
+def build_container_labels(label_options, service_labels, number, one_off=False):
+    labels = label_options or {}
+    labels.update(label.split('=', 1) for label in service_labels)
+    labels[LABEL_CONTAINER_NUMBER] = str(number)
+    labels[LABEL_VERSION] = __version__
+    return labels
+
+
+# Restart policy
+
+
+def parse_restart_spec(restart_config):
+    if not restart_config:
+        return None
+    parts = restart_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Restart %s has incorrect format, should be "
+                          "mode[:max_retry]" % restart_config)
+    if len(parts) == 2:
+        name, max_retry_count = parts
+    else:
+        name, = parts
+        max_retry_count = 0
+
+    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+
+# Extra hosts
+
+
+def build_extra_hosts(extra_hosts_config):
+    if not extra_hosts_config:
+        return {}
+
+    if isinstance(extra_hosts_config, list):
+        extra_hosts_dict = {}
+        for extra_hosts_line in extra_hosts_config:
+            if not isinstance(extra_hosts_line, six.string_types):
+                raise ConfigError(
+                    "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
+                    extra_hosts_config
+                )
+            host, ip = extra_hosts_line.split(':')
+            extra_hosts_dict.update({host.strip(): ip.strip()})
+        extra_hosts_config = extra_hosts_dict
+
+    if isinstance(extra_hosts_config, dict):
+        return extra_hosts_config
+
+    raise ConfigError(
+        "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
+        extra_hosts_config
+    )

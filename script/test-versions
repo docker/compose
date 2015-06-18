@@ -5,10 +5,10 @@
 set -e
 
 >&2 echo "Running lint checks"
-flake8 compose
+flake8 compose tests setup.py
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="1.5.0"
+  DOCKER_VERSIONS="default"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
 fi

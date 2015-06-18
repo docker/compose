@@ -12,6 +12,7 @@ class DockerClientTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.client = docker_client()
 
+    # TODO: update to use labels in #652
     def setUp(self):
         for c in self.client.containers(all=True):
             if c['Names'] and 'composetest' in c['Names'][0]:
@@ -22,10 +23,11 @@ class DockerClientTestCase(unittest.TestCase):
                 self.client.remove_image(i)
 
     def create_service(self, name, **kwargs):
-        kwargs['image'] = "busybox:latest"
+        if 'image' not in kwargs and 'build' not in kwargs:
+            kwargs['image'] = 'busybox:latest'
 
         if 'command' not in kwargs:
-            kwargs['command'] = ["/bin/sleep", "300"]
+            kwargs['command'] = ["top"]
 
         return Service(
             project='composetest',

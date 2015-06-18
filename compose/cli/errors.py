@@ -58,7 +58,7 @@ class ConnectionErrorGeneric(UserError):
 class ComposeFileNotFound(UserError):
     def __init__(self, supported_filenames):
         super(ComposeFileNotFound, self).__init__("""
-        Can't find a suitable configuration file. Are you in the right directory?
+        Can't find a suitable configuration file in this directory or any parent. Are you in the right directory?
 
         Supported filenames: %s
         """ % ", ".join(supported_filenames))

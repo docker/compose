@@ -5,16 +5,16 @@ import mock
 import docker
 
 from compose.container import Container
+from compose.container import get_container_name
 
 
 class ContainerTest(unittest.TestCase):
-
 
     def setUp(self):
         self.container_dict = {
             "Id": "abc",
             "Image": "busybox:latest",
-            "Command": "sleep 300",
+            "Command": "top",
             "Created": 1387384730,
             "Status": "Up 8 seconds",
             "Ports": None,
@@ -24,17 +24,26 @@ class ContainerTest(unittest.TestCase):
             "NetworkSettings": {
                 "Ports": {},
             },
+            "Config": {
+                "Labels": {
+                    "com.docker.compose.project": "composetest",
+                    "com.docker.compose.service": "web",
+                    "com.docker.compose.container-number": 7,
+                },
+            }
         }
 
     def test_from_ps(self):
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
-        self.assertEqual(container.dictionary, {
-            "Id": "abc",
-            "Image":"busybox:latest",
-            "Name": "/composetest_db_1",
-        })
+        self.assertEqual(
+            container.dictionary,
+            {
+                "Id": "abc",
+                "Image": "busybox:latest",
+                "Name": "/composetest_db_1",
+            })
 
     def test_from_ps_prefixed(self):
         self.container_dict['Names'] = ['/swarm-host-1' + n for n in self.container_dict['Names']]
@@ -44,7 +53,7 @@ class ContainerTest(unittest.TestCase):
                                       has_been_inspected=True)
         self.assertEqual(container.dictionary, {
             "Id": "abc",
-            "Image":"busybox:latest",
+            "Image": "busybox:latest",
             "Name": "/composetest_db_1",
         })
 
@@ -64,10 +73,8 @@ class ContainerTest(unittest.TestCase):
         })
 
     def test_number(self):
-        container = Container.from_ps(None,
-                                      self.container_dict,
-                                      has_been_inspected=True)
-        self.assertEqual(container.number, 1)
+        container = Container(None, self.container_dict, has_been_inspected=True)
+        self.assertEqual(container.number, 7)
 
     def test_name(self):
         container = Container.from_ps(None,
@@ -76,10 +83,8 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.name, "composetest_db_1")
 
     def test_name_without_project(self):
-        container = Container.from_ps(None,
-                                      self.container_dict,
-                                      has_been_inspected=True)
-        self.assertEqual(container.name_without_project, "db_1")
+        container = Container(None, self.container_dict, has_been_inspected=True)
+        self.assertEqual(container.name_without_project, "web_7")
 
     def test_inspect_if_not_inspected(self):
         mock_client = mock.create_autospec(docker.Client)
@@ -100,7 +105,7 @@ class ContainerTest(unittest.TestCase):
 
     def test_human_readable_ports_public_and_private(self):
         self.container_dict['NetworkSettings']['Ports'].update({
-            "45454/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "49197" } ],
+            "45454/tcp": [{"HostIp": "0.0.0.0", "HostPort": "49197"}],
             "45453/tcp": [],
         })
         container = Container(None, self.container_dict, has_been_inspected=True)
@@ -110,7 +115,7 @@ class ContainerTest(unittest.TestCase):
 
     def test_get_local_port(self):
         self.container_dict['NetworkSettings']['Ports'].update({
-            "45454/tcp": [ { "HostIp": "0.0.0.0", "HostPort": "49197" } ],
+            "45454/tcp": [{"HostIp": "0.0.0.0", "HostPort": "49197"}],
         })
         container = Container(None, self.container_dict, has_been_inspected=True)
 
@@ -120,12 +125,21 @@ class ContainerTest(unittest.TestCase):
 
     def test_get(self):
         container = Container(None, {
-            "Status":"Up 8 seconds",
+            "Status": "Up 8 seconds",
             "HostConfig": {
-                "VolumesFrom": ["volume_id",]
+                "VolumesFrom": ["volume_id"]
             },
         }, has_been_inspected=True)
 
         self.assertEqual(container.get('Status'), "Up 8 seconds")
-        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id",])
+        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id"])
         self.assertEqual(container.get('Foo.Bar.DoesNotExist'), None)
+
+
+class GetContainerNameTestCase(unittest.TestCase):
+
+    def test_get_container_name(self):
+        self.assertIsNone(get_container_name({}))
+        self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')

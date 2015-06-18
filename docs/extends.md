@@ -1,6 +1,13 @@
-page_title: Extending services in Compose
-page_description: How to use Docker Compose's "extends" keyword to share configuration between files and projects
-page_keywords: fig, composition, compose, docker, orchestration, documentation, docs
+<!--[metadata]>
++++
+title = "Extending services in Compose"
+description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
+keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
+[menu.main]
+parent="smn_workw_compose"
+weight=2
++++
+<![end-metadata]-->
 
 
 ## Extending services in Compose
@@ -145,8 +152,7 @@ Defining the web application requires the following:
         FROM python:2.7
         ADD . /code
         WORKDIR /code
-        RUN pip install -r
-        requirements.txt
+        RUN pip install -r requirements.txt
         CMD python app.py
 
 4.  Create a Compose configuration file called `common.yml`:
@@ -321,8 +327,8 @@ expose:
   - "5000"
 ```
 
-In the case of `environment`, Compose "merges" entries together with
-locally-defined values taking precedence:
+In the case of `environment` and `labels`, Compose "merges" entries together
+with locally-defined values taking precedence:
 
 ```yaml
 # original service
@@ -342,8 +348,8 @@ environment:
   - BAZ=local
 ```
 
-Finally, for `volumes`, Compose "merges" entries together with locally-defined
-bindings taking precedence:
+Finally, for `volumes` and `devices`, Compose "merges" entries together with
+locally-defined bindings taking precedence:
 
 ```yaml
 # original service
@@ -362,3 +368,14 @@ volumes:
   - /local-dir/bar:/bar
   - /local-dir/baz/:baz
 ```
+
+## Compose documentation
+
+- [User guide](/)
+- [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose command line completion](completion.md)

@@ -4,6 +4,7 @@ from .. import unittest
 
 from compose import config
 
+
 class ConfigTest(unittest.TestCase):
     def test_from_dictionary(self):
         service_dicts = config.from_dictionary({
@@ -53,46 +54,61 @@ class VolumePathTest(unittest.TestCase):
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
 
-class MergeVolumesTest(unittest.TestCase):
+class MergePathMappingTest(object):
+    def config_name(self):
+        return ""
+
     def test_empty(self):
         service_dict = config.merge_service_dicts({}, {})
-        self.assertNotIn('volumes', service_dict)
+        self.assertNotIn(self.config_name(), service_dict)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/data']},
+            {self.config_name(): ['/foo:/code', '/data']},
             {},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/foo:/code', '/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/foo:/code', '/data']))
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {'volumes': ['/bar:/code']},
+            {self.config_name(): ['/bar:/code']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code']))
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/data']},
-            {'volumes': ['/bar:/code']},
+            {self.config_name(): ['/foo:/code', '/data']},
+            {self.config_name(): ['/bar:/code']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/data']))
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/data']},
-            {'volumes': ['/bar:/code', '/quux:/data']},
+            {self.config_name(): ['/foo:/code', '/data']},
+            {self.config_name(): ['/bar:/code', '/quux:/data']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/quux:/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/quux:/data']))
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {'volumes': ['/foo:/code', '/quux:/data']},
-            {'volumes': ['/bar:/code', '/data']},
+            {self.config_name(): ['/foo:/code', '/quux:/data']},
+            {self.config_name(): ['/bar:/code', '/data']},
         )
-        self.assertEqual(set(service_dict['volumes']), set(['/bar:/code', '/data']))
+        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/data']))
 
+
+class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
+    def config_name(self):
+        return 'volumes'
+
+
+class MergeDevicesTest(unittest.TestCase, MergePathMappingTest):
+    def config_name(self):
+        return 'devices'
+
+
+class BuildOrImageMergeTest(unittest.TestCase):
     def test_merge_build_or_image_no_override(self):
         self.assertEqual(
             config.merge_service_dicts({'build': '.'}, {}),
@@ -184,9 +200,50 @@ class MergeStringsOrListsTest(unittest.TestCase):
         self.assertEqual(set(service_dict['dns']), set(['8.8.8.8', '9.9.9.9']))
 
 
+class MergeLabelsTest(unittest.TestCase):
+    def test_empty(self):
+        service_dict = config.merge_service_dicts({}, {})
+        self.assertNotIn('labels', service_dict)
+
+    def test_no_override(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
+            config.make_service_dict('foo', {}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
+
+    def test_no_base(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {}),
+            config.make_service_dict('foo', {'labels': ['foo=2']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '2'})
+
+    def test_override_explicit_value(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
+            config.make_service_dict('foo', {'labels': ['foo=2']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '2', 'bar': ''})
+
+    def test_add_explicit_value(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
+            config.make_service_dict('foo', {'labels': ['bar=2']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': '2'})
+
+    def test_remove_explicit_value(self):
+        service_dict = config.merge_service_dicts(
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}),
+            config.make_service_dict('foo', {'labels': ['bar']}),
+        )
+        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
+
+
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
-        environment =[
+        environment = [
             'NORMAL=F1',
             'CONTAINS_EQUALS=F=2',
             'TRAILING_EQUALS=',
@@ -218,9 +275,8 @@ class EnvTest(unittest.TestCase):
         os.environ['ENV_DEF'] = 'E3'
 
         service_dict = config.make_service_dict(
-            'foo',
-            {
-               'environment': {
+            'foo', {
+                'environment': {
                     'FILE_DEF': 'F1',
                     'FILE_DEF_EMPTY': '',
                     'ENV_DEF': None,
@@ -278,6 +334,7 @@ class EnvTest(unittest.TestCase):
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
 
+
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
         service_dicts = config.load('tests/fixtures/extends/docker-compose.yml')
@@ -291,12 +348,12 @@ class ExtendsTest(unittest.TestCase):
             {
                 'name': 'mydb',
                 'image': 'busybox',
-                'command': 'sleep 300',
+                'command': 'top',
             },
             {
                 'name': 'myweb',
                 'image': 'busybox',
-                'command': 'sleep 300',
+                'command': 'top',
                 'links': ['mydb:db'],
                 'environment': {
                     "FOO": "1",
@@ -335,10 +392,11 @@ class ExtendsTest(unittest.TestCase):
                 ],
             )
 
-
     def test_extends_validation(self):
         dictionary = {'extends': None}
-        load_config = lambda: config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'dictionary', load_config)
 
@@ -396,6 +454,21 @@ class ExtendsTest(unittest.TestCase):
 
         self.assertEqual(set(dicts[0]['volumes']), set(paths))
 
+    def test_parent_build_path_dne(self):
+        child = config.load('tests/fixtures/extends/nonexistent-path-child.yml')
+
+        self.assertEqual(child, [
+            {
+                'name': 'dnechild',
+                'image': 'busybox',
+                'command': '/bin/true',
+                'environment': {
+                    "FOO": "1",
+                    "BAR": "2",
+                },
+            },
+        ])
+
 
 class BuildPathTest(unittest.TestCase):
     def setUp(self):
@@ -405,7 +478,10 @@ class BuildPathTest(unittest.TestCase):
         options = {'build': 'nonexistent.path'}
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.make_service_dict('foo', options, 'tests/fixtures/build-path'),
+            lambda: config.from_dictionary({
+                'foo': options,
+                'working_dir': 'tests/fixtures/build-path'
+            })
         )
 
     def test_relative_path(self):

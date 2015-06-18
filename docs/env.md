@@ -1,9 +1,15 @@
----
-layout: default
-title: Compose environment variables reference
----
+<!--[metadata]>
++++
+title = "Compose environment variables reference"
+description = "Compose CLI reference"
+keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
+[menu.main]
+parent="smn_compose_ref"
+weight=3
++++
+<![end-metadata]-->
 
-Environment variables reference
+# Compose environment variables reference
 ===============================
 
 **Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, the name of the linked service) as the hostname to connect to. See the [docker-compose.yml documentation](yml.md#links) for details.
@@ -34,8 +40,11 @@ Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 
 ## Compose documentation
 
+- [User guide](/)
 - [Installing Compose](install.md)
-- [User guide](index.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose command line completion](completion.md)

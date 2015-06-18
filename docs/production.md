@@ -1,6 +1,13 @@
-page_title: Using Compose in production
-page_description: Guide to using Docker Compose in production
-page_keywords: documentation, docs,  docker, compose, orchestration, containers, production
+<!--[metadata]>
++++
+title = "Using Compose in production"
+description = "Guide to using Docker Compose in production"
+keywords = ["documentation, docs,  docker, compose, orchestration, containers,  production"]
+[menu.main]
+parent="smn_workw_compose"
+weight=1
++++
+<![end-metadata]-->
 
 
 ## Using Compose in production
@@ -75,3 +82,15 @@ Compose against a Swarm instance and run your apps across multiple hosts.
 Compose/Swarm integration is still in the experimental stage, and Swarm is still
 in beta, but if you'd like to explore and experiment, check out the
 [integration guide](https://github.com/docker/compose/blob/master/SWARM.md).
+
+## Compose documentation
+
+- [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
+- [Command line reference](cli.md)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
+

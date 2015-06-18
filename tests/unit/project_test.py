@@ -8,6 +8,7 @@ from compose import config
 import mock
 import docker
 
+
 class ProjectTest(unittest.TestCase):
     def test_from_dict(self):
         project = Project.from_dicts('composetest', [
@@ -79,10 +80,12 @@ class ProjectTest(unittest.TestCase):
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
         )
         console = Service(
             project='composetest',
             name='console',
+            image='foo',
         )
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(), [web, console])
@@ -91,10 +94,12 @@ class ProjectTest(unittest.TestCase):
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
         )
         console = Service(
             project='composetest',
             name='console',
+            image='foo',
         )
         project = Project('test', [web, console], None)
         self.assertEqual(project.get_services(['console']), [console])
@@ -103,19 +108,23 @@ class ProjectTest(unittest.TestCase):
         db = Service(
             project='composetest',
             name='db',
+            image='foo',
         )
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
             links=[(db, 'database')]
         )
         cache = Service(
             project='composetest',
-            name='cache'
+            name='cache',
+            image='foo'
         )
         console = Service(
             project='composetest',
             name='console',
+            image='foo',
             links=[(web, 'web')]
         )
         project = Project('test', [web, db, cache, console], None)
@@ -128,10 +137,12 @@ class ProjectTest(unittest.TestCase):
         db = Service(
             project='composetest',
             name='db',
+            image='foo',
         )
         web = Service(
             project='composetest',
             name='web',
+            image='foo',
             links=[(db, 'database')]
         )
         project = Project('test', [web, db], None)
@@ -211,7 +222,7 @@ class ProjectTest(unittest.TestCase):
             }
         ], mock_client)
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), 'container:'+container_id)
+        self.assertEqual(service._get_net(), 'container:' + container_id)
 
     def test_use_net_from_service(self):
         container_name = 'test_aaa_1'
@@ -237,4 +248,4 @@ class ProjectTest(unittest.TestCase):
         ], mock_client)
 
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), 'container:'+container_name)
+        self.assertEqual(service._get_net(), 'container:' + container_name)

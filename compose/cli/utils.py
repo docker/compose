@@ -5,6 +5,9 @@ import datetime
 import os
 import subprocess
 import platform
+import ssl
+
+from .. import __version__
 
 
 def yesno(prompt, default=None):
@@ -62,6 +65,25 @@ def mkdir(path, permissions=0o700):
     return path
 
 
+def find_candidates_in_parent_dirs(filenames, path):
+    """
+    Given a directory path to start, looks for filenames in the
+    directory, and then each parent directory successively,
+    until found.
+
+    Returns tuple (candidates, path).
+    """
+    candidates = [filename for filename in filenames
+                  if os.path.exists(os.path.join(path, filename))]
+
+    if len(candidates) == 0:
+        parent_dir = os.path.join(path, '..')
+        if os.path.abspath(parent_dir) != os.path.abspath(path):
+            return find_candidates_in_parent_dirs(filenames, parent_dir)
+
+    return (candidates, path)
+
+
 def split_buffer(reader, separator):
     """
     Given a generator which yields strings and a separator string,
@@ -101,3 +123,11 @@ def is_mac():
 
 def is_ubuntu():
     return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
+
+
+def get_version_info():
+    return '\n'.join([
+        'docker-compose version: %s' % __version__,
+        "%s version: %s" % (platform.python_implementation(), platform.python_version()),
+        "OpenSSL version: %s" % ssl.OPENSSL_VERSION,
+    ])

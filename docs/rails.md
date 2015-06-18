@@ -1,10 +1,15 @@
-page_title: Quickstart Guide: Compose and Rails
-page_description: Getting started with Docker Compose and Rails
-page_keywords: documentation, docs,  docker, compose, orchestration, containers,
-rails
+<!--[metadata]>
++++
+title = "Quickstart Guide: Compose and Rails"
+description = "Getting started with Docker Compose and Rails"
+keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
+[menu.main]
+parent="smn_workw_compose"
+weight=5
++++
+<![end-metadata]-->
 
-
-## Getting started with Compose and Rails
+## Quickstart Guide: Compose and Rails
 
 This Quickstart guide will show you how to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
 
@@ -119,8 +124,11 @@ you're using Boot2docker, `boot2docker ip` will tell you its address).
 
 ## More Compose documentation
 
+- [User guide](/)
 - [Installing Compose](install.md)
-- [User guide](index.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)

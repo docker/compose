@@ -7,22 +7,30 @@ DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
     'cpu_shares',
+    'cpuset',
     'command',
     'detach',
+    'devices',
     'dns',
     'dns_search',
     'domainname',
     'entrypoint',
     'env_file',
     'environment',
+    'extra_hosts',
+    'read_only',
     'hostname',
     'image',
+    'labels',
     'links',
     'mem_limit',
     'net',
+    'log_driver',
+    'pid',
     'ports',
     'privileged',
     'restart',
+    'security_opt',
     'stdin_open',
     'tty',
     'user',
@@ -33,20 +41,25 @@ DOCKER_CONFIG_KEYS = [
 
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
+    'dockerfile',
     'expose',
     'external_links',
     'name',
 ]
 
 DOCKER_CONFIG_HINTS = {
-    'cpu_share' : 'cpu_shares',
-    'link'      : 'links',
-    'port'      : 'ports',
-    'privilege' : 'privileged',
+    'cpu_share': 'cpu_shares',
+    'add_host': 'extra_hosts',
+    'hosts': 'extra_hosts',
+    'extra_host': 'extra_hosts',
+    'device': 'devices',
+    'link': 'links',
+    'port': 'ports',
+    'privilege': 'privileged',
     'priviliged': 'privileged',
-    'privilige' : 'privileged',
-    'volume'    : 'volumes',
-    'workdir'   : 'working_dir',
+    'privilige': 'privileged',
+    'volume': 'volumes',
+    'workdir': 'working_dir',
 }
 
 
@@ -63,6 +76,7 @@ def from_dictionary(dictionary, working_dir=None, filename=None):
             raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
+        validate_paths(service_dict)
         service_dicts.append(service_dict)
 
     return service_dicts
@@ -174,6 +188,9 @@ def process_container_options(service_dict, working_dir=None):
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
 
+    if 'labels' in service_dict:
+        service_dict['labels'] = parse_labels(service_dict['labels'])
+
     return service_dict
 
 
@@ -186,10 +203,19 @@ def merge_service_dicts(base, override):
             override.get('environment'),
         )
 
-    if 'volumes' in base or 'volumes' in override:
-        d['volumes'] = merge_volumes(
-            base.get('volumes'),
-            override.get('volumes'),
+    path_mapping_keys = ['volumes', 'devices']
+
+    for key in path_mapping_keys:
+        if key in base or key in override:
+            d[key] = merge_path_mappings(
+                base.get(key),
+                override.get(key),
+            )
+
+    if 'labels' in base or 'labels' in override:
+        d['labels'] = merge_labels(
+            base.get('labels'),
+            override.get('labels'),
         )
 
     if 'image' in override and 'build' in d:
@@ -210,7 +236,7 @@ def merge_service_dicts(base, override):
         if key in base or key in override:
             d[key] = to_list(base.get(key)) + to_list(override.get(key))
 
-    already_merged_keys = ['environment', 'volumes'] + list_keys + list_or_string_keys
+    already_merged_keys = ['environment', 'labels'] + path_mapping_keys + list_keys + list_or_string_keys
 
     for k in set(ALLOWED_KEYS) - set(already_merged_keys):
         if k in override:
@@ -326,7 +352,7 @@ def resolve_host_paths(volumes, working_dir=None):
 
 
 def resolve_host_path(volume, working_dir):
-    container_path, host_path = split_volume(volume)
+    container_path, host_path = split_path_mapping(volume)
     if host_path is not None:
         host_path = os.path.expanduser(host_path)
         host_path = os.path.expandvars(host_path)
@@ -338,32 +364,34 @@ def resolve_host_path(volume, working_dir):
 def resolve_build_path(build_path, working_dir=None):
     if working_dir is None:
         raise Exception("No working_dir passed to resolve_build_path")
-
-    _path = expand_path(working_dir, build_path)
-    if not os.path.exists(_path) or not os.access(_path, os.R_OK):
-        raise ConfigurationError("build path %s either does not exist or is not accessible." % _path)
-    else:
-        return _path
+    return expand_path(working_dir, build_path)
 
 
-def merge_volumes(base, override):
-    d = dict_from_volumes(base)
-    d.update(dict_from_volumes(override))
-    return volumes_from_dict(d)
+def validate_paths(service_dict):
+    if 'build' in service_dict:
+        build_path = service_dict['build']
+        if not os.path.exists(build_path) or not os.access(build_path, os.R_OK):
+            raise ConfigurationError("build path %s either does not exist or is not accessible." % build_path)
 
 
-def dict_from_volumes(volumes):
-    if volumes:
-        return dict(split_volume(v) for v in volumes)
+def merge_path_mappings(base, override):
+    d = dict_from_path_mappings(base)
+    d.update(dict_from_path_mappings(override))
+    return path_mappings_from_dict(d)
+
+
+def dict_from_path_mappings(path_mappings):
+    if path_mappings:
+        return dict(split_path_mapping(v) for v in path_mappings)
     else:
         return {}
 
 
-def volumes_from_dict(d):
-    return [join_volume(v) for v in d.items()]
+def path_mappings_from_dict(d):
+    return [join_path_mapping(v) for v in d.items()]
 
 
-def split_volume(string):
+def split_path_mapping(string):
     if ':' in string:
         (host, container) = string.split(':', 1)
         return (container, host)
@@ -371,12 +399,41 @@ def split_volume(string):
         return (string, None)
 
 
-def join_volume(pair):
+def join_path_mapping(pair):
     (container, host) = pair
     if host is None:
         return container
     else:
         return ":".join((host, container))
+
+
+def merge_labels(base, override):
+    labels = parse_labels(base)
+    labels.update(parse_labels(override))
+    return labels
+
+
+def parse_labels(labels):
+    if not labels:
+        return {}
+
+    if isinstance(labels, list):
+        return dict(split_label(e) for e in labels)
+
+    if isinstance(labels, dict):
+        return labels
+
+    raise ConfigurationError(
+        "labels \"%s\" must be a list or mapping" %
+        labels
+    )
+
+
+def split_label(label):
+    if '=' in label:
+        return label.split('=', 1)
+    else:
+        return label, ''
 
 
 def expand_path(working_dir, path):

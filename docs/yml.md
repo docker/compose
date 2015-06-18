@@ -1,10 +1,13 @@
----
-layout: default
-title: docker-compose.yml reference
-page_title: docker-compose.yml reference
-page_description: docker-compose.yml reference
-page_keywords: fig, composition, compose, docker
----
+<!--[metadata]>
++++
+title = "docker-compose.yml reference"
+description = "docker-compose.yml reference"
+keywords = ["fig, composition, compose,  docker"]
+[menu.main]
+parent="smn_compose_ref"
++++
+<![end-metadata]-->
+
 
 # docker-compose.yml reference
 
@@ -29,14 +32,24 @@ image: a4bc65fd
 
 ### build
 
-Path to a directory containing a Dockerfile. When the value supplied is a 
-relative path, it is interpreted as relative to the location of the yml file 
+Path to a directory containing a Dockerfile. When the value supplied is a
+relative path, it is interpreted as relative to the location of the yml file
 itself. This directory is also the build context that is sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 
 ```
 build: /path/to/build/dir
+```
+
+### dockerfile
+
+Alternate Dockerfile.
+
+Compose will use an alternate file to build with.
+
+```
+dockerfile: Dockerfile-alternate
 ```
 
 ### command
@@ -85,6 +98,23 @@ external_links:
  - redis_1
  - project_db_1:mysql
  - project_db_1:postgresql
+```
+
+### extra_hosts
+
+Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
+
+```
+extra_hosts:
+ - "somehost:162.242.195.82"
+ - "otherhost:50.31.209.229"
+```
+
+An entry with the ip address and hostname will be created in `/etc/hosts` inside containers for this service, e.g:
+
+```
+162.242.195.82  somehost
+50.31.209.229   otherhost
 ```
 
 ### ports
@@ -226,6 +256,38 @@ environment variables (DEBUG) with a new value, and the other one
 For more on `extends`, see the [tutorial](extends.md#example) and
 [reference](extends.md#reference).
 
+### labels
+
+Add metadata to containers using [Docker labels](http://docs.docker.com/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
+
+It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
+
+```
+labels:
+  com.example.description: "Accounting webapp"
+  com.example.department: "Finance"
+  com.example.label-with-empty-value: ""
+
+labels:
+  - "com.example.description=Accounting webapp"
+  - "com.example.department=Finance"
+  - "com.example.label-with-empty-value"
+```
+
+### log driver
+
+Specify a logging driver for the service's containers, as with the ``--log-driver`` option for docker run ([documented here](http://docs.docker.com/reference/run/#logging-drivers-log-driver)).
+
+Allowed values are currently ``json-file``, ``syslog`` and ``none``. The list will change over time as more drivers are added to the Docker engine.
+
+The default value is json-file.
+
+```
+log_driver: "json-file"
+log_driver: "syslog"
+log_driver: "none"
+```
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.
@@ -283,13 +345,34 @@ dns_search:
   - dc2.example.com
 ```
 
-### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares
+### devices
+
+List of device mappings.  Uses the same format as the `--device` docker 
+client create option.
+
+```
+devices:
+  - "/dev/ttyUSB0:/dev/ttyUSB0"
+```
+
+### security_opt
+
+Override the default labeling scheme for each container.
+
+```
+security_opt:
+  - label:user:USER
+  - label:role:ROLE
+```
+
+### working\_dir, entrypoint, user, hostname, domainname, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
 
 ```
 cpu_shares: 73
+cpuset: 0,1
 
 working_dir: /code
 entrypoint: /code/entrypoint.sh
@@ -305,12 +388,16 @@ restart: always
 
 stdin_open: true
 tty: true
+read_only: true
 ```
 
 ## Compose documentation
 
+- [User guide](/)
 - [Installing Compose](install.md)
-- [User guide](index.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
 - [Command line reference](cli.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)

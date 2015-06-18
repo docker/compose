@@ -9,9 +9,9 @@ docker build -t "$TAG" .
 docker run \
   --rm \
   --volume="/var/run/docker.sock:/var/run/docker.sock" \
-  --volume="$(pwd):/code" \
   -e DOCKER_VERSIONS \
   -e "TAG=$TAG" \
+  -e "affinity:image==$TAG" \
   --entrypoint="script/test-versions" \
   "$TAG" \
   "$@"

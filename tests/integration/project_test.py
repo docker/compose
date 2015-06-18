@@ -6,6 +6,29 @@ from .testcases import DockerClientTestCase
 
 
 class ProjectTest(DockerClientTestCase):
+
+    def test_containers(self):
+        web = self.create_service('web')
+        db = self.create_service('db')
+        project = Project('composetest', [web, db], self.client)
+
+        project.up()
+
+        containers = project.containers()
+        self.assertEqual(len(containers), 2)
+
+    def test_containers_with_service_names(self):
+        web = self.create_service('web')
+        db = self.create_service('db')
+        project = Project('composetest', [web, db], self.client)
+
+        project.up()
+
+        containers = project.containers(['web'])
+        self.assertEqual(
+            [c.name for c in containers],
+            ['composetest_web_1'])
+
     def test_volumes_from_service(self):
         service_dicts = config.from_dictionary({
             'data': {
@@ -55,12 +78,12 @@ class ProjectTest(DockerClientTestCase):
             service_dicts=config.from_dictionary({
                 'net': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:net',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
             }),
             client=self.client,
@@ -70,7 +93,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web._get_net(), 'container:'+net.containers()[0].id)
+        self.assertEqual(web._get_net(), 'container:' + net.containers()[0].id)
 
         project.kill()
         project.remove_stopped()
@@ -80,7 +103,7 @@ class ProjectTest(DockerClientTestCase):
             self.client,
             image='busybox:latest',
             name='composetest_net_container',
-            command='/bin/sleep 300'
+            command='top'
         )
         net_container.start()
 
@@ -98,7 +121,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web._get_net(), 'container:'+net_container.id)
+        self.assertEqual(web._get_net(), 'container:' + net_container.id)
 
         project.kill()
         project.remove_stopped()
@@ -151,6 +174,18 @@ class ProjectTest(DockerClientTestCase):
         project.kill()
         project.remove_stopped()
 
+    def test_project_up_starts_uncreated_services(self):
+        db = self.create_service('db')
+        web = self.create_service('web', links=[(db, 'db')])
+        project = Project('composetest', [db, web], self.client)
+        project.up(['db'])
+        self.assertEqual(len(project.containers()), 1)
+
+        project.up()
+        self.assertEqual(len(project.containers()), 2)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(web.containers()), 1)
+
     def test_project_up_recreates_containers(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=['/etc'])
@@ -185,7 +220,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
 
-        project.up(recreate=False)
+        project.up(allow_recreate=False)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
@@ -204,7 +239,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 0)
 
         project.up(['db'])
-        project.stop()
+        project.kill()
 
         old_containers = project.containers(stopped=True)
 
@@ -212,10 +247,11 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = old_containers[0].id
         db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
 
-        project.up(recreate=False)
+        project.up(allow_recreate=False)
 
         new_containers = project.containers(stopped=True)
         self.assertEqual(len(new_containers), 2)
+        self.assertEqual([c.is_running for c in new_containers], [True, True])
 
         db_container = [c for c in new_containers if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
@@ -264,20 +300,20 @@ class ProjectTest(DockerClientTestCase):
             service_dicts=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                 },
-                'data' : {
+                'data': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
                 'db': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'volumes_from': ['data'],
                 },
                 'web': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'links': ['db'],
                 },
             }),
@@ -302,20 +338,20 @@ class ProjectTest(DockerClientTestCase):
             service_dicts=config.from_dictionary({
                 'console': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                 },
-                'data' : {
+                'data': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"]
+                    'command': ["top"]
                 },
                 'db': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'volumes_from': ['data'],
                 },
                 'web': {
                     'image': 'busybox:latest',
-                    'command': ["/bin/sleep", "300"],
+                    'command': ["top"],
                     'links': ['db'],
                 },
             }),

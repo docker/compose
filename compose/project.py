@@ -1,12 +1,15 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import logging
-
 from functools import reduce
+
+from docker.errors import APIError
+
 from .config import get_service_name_from_net, ConfigurationError
+from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
 from .service import Service
 from .container import Container
-from docker.errors import APIError
+from .legacy import check_for_legacy_containers
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +63,12 @@ class Project(object):
         self.services = services
         self.client = client
 
+    def labels(self, one_off=False):
+        return [
+            '{0}={1}'.format(LABEL_PROJECT, self.name),
+            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
+        ]
+
     @classmethod
     def from_dicts(cls, name, service_dicts, client):
         """
@@ -74,6 +83,10 @@ class Project(object):
             project.services.append(Service(client=client, project=name, links=links, net=net,
                                             volumes_from=volumes_from, **service_dict))
         return project
+
+    @property
+    def service_names(self):
+        return [service.name for service in self.services]
 
     def get_service(self, name):
         """
@@ -102,7 +115,7 @@ class Project(object):
         """
         if service_names is None or len(service_names) == 0:
             return self.get_services(
-                service_names=[s.name for s in self.services],
+                service_names=self.service_names,
                 include_deps=include_deps
             )
         else:
@@ -158,7 +171,7 @@ class Project(object):
                     try:
                         net = Container.from_id(self.client, net_name)
                     except APIError:
-                        raise ConfigurationError('Serivce "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
+                        raise ConfigurationError('Service "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
             else:
                 net = service_dict['net']
 
@@ -195,26 +208,62 @@ class Project(object):
     def up(self,
            service_names=None,
            start_deps=True,
-           recreate=True,
+           allow_recreate=True,
+           smart_recreate=False,
            insecure_registry=False,
-           detach=False,
            do_build=True):
-        running_containers = []
-        for service in self.get_services(service_names, include_deps=start_deps):
-            if recreate:
-                for (_, container) in service.recreate_containers(
-                        insecure_registry=insecure_registry,
-                        detach=detach,
-                        do_build=do_build):
-                    running_containers.append(container)
-            else:
-                for container in service.start_or_create_containers(
-                        insecure_registry=insecure_registry,
-                        detach=detach,
-                        do_build=do_build):
-                    running_containers.append(container)
 
-        return running_containers
+        services = self.get_services(service_names, include_deps=start_deps)
+
+        plans = self._get_convergence_plans(
+            services,
+            allow_recreate=allow_recreate,
+            smart_recreate=smart_recreate,
+        )
+
+        return [
+            container
+            for service in services
+            for container in service.execute_convergence_plan(
+                plans[service.name],
+                insecure_registry=insecure_registry,
+                do_build=do_build,
+            )
+        ]
+
+    def _get_convergence_plans(self,
+                               services,
+                               allow_recreate=True,
+                               smart_recreate=False):
+
+        plans = {}
+
+        for service in services:
+            updated_dependencies = [
+                name
+                for name in service.get_dependency_names()
+                if name in plans
+                and plans[name].action == 'recreate'
+            ]
+
+            if updated_dependencies:
+                log.debug(
+                    '%s has upstream changes (%s)',
+                    service.name, ", ".join(updated_dependencies),
+                )
+                plan = service.convergence_plan(
+                    allow_recreate=allow_recreate,
+                    smart_recreate=False,
+                )
+            else:
+                plan = service.convergence_plan(
+                    allow_recreate=allow_recreate,
+                    smart_recreate=smart_recreate,
+                )
+
+            plans[service.name] = plan
+
+        return plans
 
     def pull(self, service_names=None, insecure_registry=False):
         for service in self.get_services(service_names, include_deps=True):
@@ -225,16 +274,29 @@ class Project(object):
             service.remove_stopped(**options)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
-        return [Container.from_ps(self.client, container)
-                for container in self.client.containers(all=stopped)
-                for service in self.get_services(service_names)
-                if service.has_container(container, one_off=one_off)]
+        containers = [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})]
+
+        def matches_service_names(container):
+            if not service_names:
+                return True
+            return container.labels.get(LABEL_SERVICE) in service_names
+
+        if not containers:
+            check_for_legacy_containers(
+                self.client,
+                self.name,
+                self.service_names,
+                stopped=stopped,
+                one_off=one_off)
+
+        return filter(matches_service_names, containers)
 
     def _inject_deps(self, acc, service):
-        net_name = service.get_net_name()
-        dep_names = (service.get_linked_names() +
-                     service.get_volumes_from_names() +
-                     ([net_name] if net_name else []))
+        dep_names = service.get_dependency_names()
 
         if len(dep_names) > 0:
             dep_services = self.get_services(

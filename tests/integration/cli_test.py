@@ -1,6 +1,8 @@
 from __future__ import absolute_import
+from operator import attrgetter
 import sys
 import os
+import shlex
 
 from six import StringIO
 from mock import patch
@@ -21,6 +23,8 @@ class CLITestCase(DockerClientTestCase):
         sys.exit = self.old_sys_exit
         self.project.kill()
         self.project.remove_stopped()
+        for container in self.project.containers(stopped=True, one_off=True):
+            container.remove(force=True)
 
     @property
     def project(self):
@@ -62,6 +66,10 @@ class CLITestCase(DockerClientTestCase):
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_composefile(self, mock_stdout):
+        config_path = os.path.abspath(
+            'tests/fixtures/multiple-composefiles/compose2.yml')
+        self._project = self.command.get_project(config_path)
+
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
         self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
@@ -234,8 +242,8 @@ class CLITestCase(DockerClientTestCase):
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(
-            container.human_readable_command,
-            u'/bin/echo helloworld'
+            shlex.split(container.human_readable_command),
+            [u'/bin/echo', u'helloworld'],
         )
 
     @patch('dockerpty.start')
@@ -332,6 +340,17 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
+    def test_stop(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.command.dispatch(['stop', '-t', '1'], None)
+
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
+
     def test_kill(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -343,22 +362,22 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
-    def test_kill_signal_sigint(self):
+    def test_kill_signal_sigstop(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
 
         self.assertEqual(len(service.containers()), 1)
-        # The container is still running. It has been only interrupted
+        # The container is still running. It has only been paused
         self.assertTrue(service.containers()[0].is_running)
 
-    def test_kill_interrupted_service(self):
+    def test_kill_stopped_service(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
-        self.command.dispatch(['kill', '-s', 'SIGINT'], None)
+        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
         self.assertTrue(service.containers()[0].is_running)
 
         self.command.dispatch(['kill', '-s', 'SIGKILL'], None)
@@ -371,7 +390,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
-        self.command.dispatch(['restart'], None)
+        self.command.dispatch(['restart', '-t', '1'], None)
         container.inspect()
         self.assertNotEqual(
             container.dictionary['State']['FinishedAt'],
@@ -405,7 +424,6 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
     def test_port(self):
-
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['up', '-d'], None)
         container = self.project.get_service('simple').get_container()
@@ -417,6 +435,27 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
         self.assertEqual(get_port(3001), "0.0.0.0:49152")
+        self.assertEqual(get_port(3002), "")
+
+    def test_port_with_scale(self):
+
+        self.command.base_dir = 'tests/fixtures/ports-composefile-scale'
+        self.command.dispatch(['scale', 'simple=2'], None)
+        containers = sorted(
+            self.project.containers(service_names=['simple']),
+            key=attrgetter('name'))
+
+        @patch('sys.stdout', new_callable=StringIO)
+        def get_port(number, mock_stdout, index=None):
+            if index is None:
+                self.command.dispatch(['port', 'simple', str(number)], None)
+            else:
+                self.command.dispatch(['port', '--index=' + str(index), 'simple', str(number)], None)
+            return mock_stdout.getvalue().rstrip()
+
+        self.assertEqual(get_port(3000), containers[0].get_local_port(3000))
+        self.assertEqual(get_port(3000, index=1), containers[0].get_local_port(3000))
+        self.assertEqual(get_port(3000, index=2), containers[1].get_local_port(3000))
         self.assertEqual(get_port(3002), "")
 
     def test_env_file_relative_to_compose_file(self):

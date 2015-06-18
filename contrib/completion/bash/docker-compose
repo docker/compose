@@ -94,7 +94,7 @@ _docker-compose_build() {
 _docker-compose_docker-compose() {
 	case "$prev" in
 		--file|-f)
-			_filedir y?(a)ml
+			_filedir "y?(a)ml"
 			return
 			;;
 		--project-name|-p)
@@ -104,7 +104,7 @@ _docker-compose_docker-compose() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help -h --verbose --version --file -f --project-name -p" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help -h --verbose --version -v --file -f --project-name -p" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -293,7 +293,7 @@ _docker-compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate -t --timeout" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate -t --timeout --x-smart-recreate" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -303,11 +303,15 @@ _docker-compose_up() {
 
 
 _docker-compose() {
+	local previous_extglob_setting=$(shopt -p extglob)
+	shopt -s extglob
+
 	local commands=(
 		build
 		help
 		kill
 		logs
+		migrate-to-labels
 		port
 		ps
 		pull
@@ -352,6 +356,7 @@ _docker-compose() {
 	local completions_func=_docker-compose_${command}
 	declare -F $completions_func >/dev/null && $completions_func
 
+	eval "$previous_extglob_setting"
 	return 0
 }
 
