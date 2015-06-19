@@ -209,6 +209,18 @@ class ProjectTest(unittest.TestCase):
         ], None)
         self.assertEqual(project.get_service('test')._get_volumes_from(), container_ids)
 
+    def test_net_unset(self):
+        mock_client = mock.create_autospec(docker.Client)
+        project = Project.from_dicts('test', [
+            {
+                'name': 'test',
+                'image': 'busybox:latest',
+            }
+        ], mock_client)
+        service = project.get_service('test')
+        self.assertEqual(service._get_net(), None)
+        self.assertNotIn('NetworkMode', service._get_container_host_config({}))
+
     def test_use_net_from_container(self):
         container_id = 'aabbccddee'
         container_dict = dict(Name='aaa', Id=container_id)
