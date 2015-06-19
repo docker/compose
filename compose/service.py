@@ -612,6 +612,7 @@ class Service(object):
             tag=self.image_name,
             stream=True,
             rm=True,
+            pull=False,
             nocache=no_cache,
             dockerfile=self.options.get('dockerfile', None),
         )
