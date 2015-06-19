@@ -473,7 +473,7 @@ class Service(object):
 
     def _get_net(self):
         if not self.net:
-            return "bridge"
+            return None
 
         if isinstance(self.net, Service):
             containers = self.net.containers()
