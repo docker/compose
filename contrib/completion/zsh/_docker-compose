@@ -192,6 +192,7 @@ __docker-compose_subcommand () {
         (ps)
             _arguments \
                 '-q[Only display IDs]' \
+                '-s[Only display service names]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (pull)
