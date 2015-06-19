@@ -6,7 +6,7 @@ import warnings
 from . import errors
 
 
-def docker_client(tls=False, tls_ca_cert=None, tls_cert=None, tls_key=None, tls_verify=False):
+def docker_client(tls=None, tls_ca_cert=None, tls_cert=None, tls_key=None, tls_verify=None):
     """
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
@@ -18,33 +18,23 @@ def docker_client(tls=False, tls_ca_cert=None, tls_cert=None, tls_key=None, tls_
     base_url = os.environ.get('DOCKER_HOST')
     tls_config = None
 
-    tls_verify = tls_verify or os.environ.get('DOCKER_TLS_VERIFY', '') != ''
+    tls = tls in ("true", "t", "1")
+    tls_verify = os.environ.get('DOCKER_TLS_VERIFY', '') != '' if tls_verify is None else tls_verify in ("true", "t", "1")
     if tls or tls_verify:
+        parts = base_url.split('://', 1)
+        base_url = '%s://%s' % ('https', parts[1])
+
+        # Prefer cli argument over environment variable
+        tls_ca_cert = os.path.expanduser(os.path.join(cert_path, 'ca.pem') if tls_ca_cert is None else tls_ca_cert)
+        tls_cert = os.path.expanduser(os.path.join(cert_path, 'cert.pem') if tls_cert is None else tls_cert)
+        tls_key = os.path.expanduser(os.path.join(cert_path, 'key.pem') if tls_key is None else tls_key)
+
         if not tls_verify:
             warnings.warn((
                 'Unverified HTTPS request is being made. '
                 'Adding certificate verification is strongly advised. See: '
                 'https://urllib3.readthedocs.org/en/latest/security.html'),
                 errors.InsecureRequestWarning)
-
-        parts = base_url.split('://', 1)
-        base_url = '%s://%s' % ('https', parts[1])
-
-        # Prefer cli argument over environment variable
-        if tls_ca_cert is None:
-            tls_ca_cert = os.path.join(cert_path, 'ca.pem')
-
-        if tls_key is None:
-            tls_key = os.path.join(cert_path, 'key.pem')
-
-        if tls_cert is None:
-            tls_cert = os.path.join(cert_path, 'cert.pem')
-
-        tls_ca_cert = os.path.expanduser(tls_ca_cert)
-        tls_cert = os.path.expanduser(tls_cert)
-        tls_key = os.path.expanduser(tls_key)
-
-        if not tls_verify:
             tls_ca_cert = None
 
         tls_config = docker_tls.TLSConfig(

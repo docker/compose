@@ -61,16 +61,16 @@ class Command(DocoptCommand):
         project = self.get_project(
             self.get_config_path(explicit_config_path),
             project_name=options.get('--project-name'),
-            tls=options.get('--tls') in ("true", "t", "1"),
+            tls=options.get('--tls'),
             tls_ca_cert=options.get('--tlscacert'),
             tls_cert=options.get('--tlscert'),
             tls_key=options.get('--tlskey'),
-            tls_verify=options.get('--tlsverify') in ("true", "t", "1"),
+            tls_verify=options.get('--tlsverify'),
             verbose=options.get('--verbose'))
 
         handler(project, command_options)
 
-    def get_client(self, tls=False, tls_ca_cert=None, tls_cert=None, tls_key=None, tls_verify=False, verbose=False):
+    def get_client(self, tls=None, tls_ca_cert=None, tls_cert=None, tls_key=None, tls_verify=None, verbose=False):
         client = docker_client(tls, tls_ca_cert, tls_cert, tls_key, tls_verify)
         if verbose:
             version_info = six.iteritems(client.version())
@@ -81,8 +81,8 @@ class Command(DocoptCommand):
             return verbose_proxy.VerboseProxy('docker', client)
         return client
 
-    def get_project(self, config_path, project_name=None, tls=False, tls_ca_cert=None, tls_cert=None, tls_key=None,
-                    tls_verify=False, verbose=False):
+    def get_project(self, config_path, project_name=None, tls=None, tls_ca_cert=None, tls_cert=None, tls_key=None,
+                    tls_verify=None, verbose=False):
         try:
             return Project.from_dicts(
                 self.get_project_name(config_path, project_name),
