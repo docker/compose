@@ -169,8 +169,8 @@ open `http://ip-from-boot2docker:5000` and you should get a message in your brow
 Refreshing the page will increment the number.
 
 If you want to run your services in the background, you can pass the `-d` flag
-(for daemon mode) to `docker-compose up` and use `docker-compose ps` to see what
-is currently running:
+(for "detached" mode) to `docker-compose up` and use `docker-compose ps` to
+see what is currently running:
 
     $ docker-compose up -d
     Starting composetest_redis_1...
