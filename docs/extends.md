@@ -28,25 +28,21 @@ the configuration around.
 When defining any service in `docker-compose.yml`, you can declare that you are
 extending another service like this:
 
-```yaml
-web:
-  extends:
-    file: common-services.yml
-    service: webapp
-```
+    web:
+      extends:
+        file: common-services.yml
+        service: webapp
 
 This instructs Compose to re-use the configuration for the `webapp` service
 defined in the `common-services.yml` file. Suppose that `common-services.yml`
 looks like this:
 
-```yaml
-webapp:
-  build: .
-  ports:
-    - "8000:8000"
-  volumes:
-    - "/data"
-```
+    webapp:
+      build: .
+      ports:
+        - "8000:8000"
+      volumes:
+        - "/data"
 
 In this case, you'll get exactly the same result as if you wrote
 `docker-compose.yml` with that `build`, `ports` and `volumes` configuration
@@ -55,31 +51,27 @@ defined directly under `web`.
 You can go further and define (or re-define) configuration locally in
 `docker-compose.yml`:
 
-```yaml
-web:
-  extends:
-    file: common-services.yml
-    service: webapp
-  environment:
-    - DEBUG=1
-  cpu_shares: 5
-```
+    web:
+      extends:
+        file: common-services.yml
+        service: webapp
+      environment:
+        - DEBUG=1
+      cpu_shares: 5
 
 You can also write other services and link your `web` service to them:
 
-```yaml
-web:
-  extends:
-    file: common-services.yml
-    service: webapp
-  environment:
-    - DEBUG=1
-  cpu_shares: 5
-  links:
-    - db
-db:
-  image: postgres
-```
+    web:
+      extends:
+        file: common-services.yml
+        service: webapp
+      environment:
+        - DEBUG=1
+      cpu_shares: 5
+      links:
+        - db
+    db:
+      image: postgres
 
 For full details on how to use `extends`, refer to the [reference](#reference).
 
@@ -271,103 +263,91 @@ For single-value options like `image`, `command` or `mem_limit`, the new value
 replaces the old value. **This is the default behaviour - all exceptions are
 listed below.**
 
-```yaml
-# original service
-command: python app.py
+    # original service
+    command: python app.py
 
-# local service
-command: python otherapp.py
+    # local service
+    command: python otherapp.py
 
-# result
-command: python otherapp.py
-```
+    # result
+    command: python otherapp.py
 
 In the case of `build` and `image`, using one in the local service causes
 Compose to discard the other, if it was defined in the original service.
 
-```yaml
-# original service
-build: .
+    # original service
+    build: .
 
-# local service
-image: redis
+    # local service
+    image: redis
 
-# result
-image: redis
-```
+    # result
+    image: redis
 
-```yaml
-# original service
-image: redis
+    # original service
+    image: redis
 
-# local service
-build: .
+    # local service
+    build: .
 
-# result
-build: .
-```
+    # result
+    build: .
 
 For the **multi-value options** `ports`, `expose`, `external_links`, `dns` and
 `dns_search`, Compose concatenates both sets of values:
 
-```yaml
-# original service
-expose:
-  - "3000"
+    # original service
+    expose:
+      - "3000"
 
-# local service
-expose:
-  - "4000"
-  - "5000"
+    # local service
+    expose:
+      - "4000"
+      - "5000"
 
-# result
-expose:
-  - "3000"
-  - "4000"
-  - "5000"
-```
+    # result
+    expose:
+      - "3000"
+      - "4000"
+      - "5000"
 
 In the case of `environment` and `labels`, Compose "merges" entries together
 with locally-defined values taking precedence:
 
-```yaml
-# original service
-environment:
-  - FOO=original
-  - BAR=original
+    # original service
+    environment:
+      - FOO=original
+      - BAR=original
 
-# local service
-environment:
-  - BAR=local
-  - BAZ=local
+    # local service
+    environment:
+      - BAR=local
+      - BAZ=local
 
-# result
-environment:
-  - FOO=original
-  - BAR=local
-  - BAZ=local
-```
+    # result
+    environment:
+      - FOO=original
+      - BAR=local
+      - BAZ=local
 
 Finally, for `volumes` and `devices`, Compose "merges" entries together with
 locally-defined bindings taking precedence:
 
-```yaml
-# original service
-volumes:
-  - /original-dir/foo:/foo
-  - /original-dir/bar:/bar
+    # original service
+    volumes:
+      - /original-dir/foo:/foo
+      - /original-dir/bar:/bar
 
-# local service
-volumes:
-  - /local-dir/bar:/bar
-  - /local-dir/baz/:baz
+    # local service
+    volumes:
+      - /local-dir/bar:/bar
+      - /local-dir/baz/:baz
 
-# result
-volumes:
-  - /original-dir/foo:/foo
-  - /local-dir/bar:/bar
-  - /local-dir/baz/:baz
-```
+    # result
+    volumes:
+      - /original-dir/foo:/foo
+      - /local-dir/bar:/bar
+      - /local-dir/baz/:baz
 
 ## Compose documentation
 

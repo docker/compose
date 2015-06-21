@@ -32,10 +32,8 @@ Dockerfiles, see the
 [Dockerfile reference](http://docs.docker.com/reference/builder/). In this case,
 your Dockerfile should be:
 
-```
-FROM orchardup/php5
-ADD . /code
-```
+    FROM orchardup/php5
+    ADD . /code
 
 This tells Docker how to build an image defining a container that contains PHP
 and Wordpress. 
@@ -43,74 +41,69 @@ and Wordpress.
 Next you'll create a `docker-compose.yml` file that will start your web service
 and a separate MySQL instance:
 
-```
-web:
-  build: .
-  command: php -S 0.0.0.0:8000 -t /code
-  ports:
-    - "8000:8000"
-  links:
-    - db
-  volumes:
-    - .:/code
-db:
-  image: orchardup/mysql
-  environment:
-    MYSQL_DATABASE: wordpress
-```
+    web:
+      build: .
+      command: php -S 0.0.0.0:8000 -t /code
+      ports:
+        - "8000:8000"
+      links:
+        - db
+      volumes:
+        - .:/code
+    db:
+      image: orchardup/mysql
+      environment:
+        MYSQL_DATABASE: wordpress
 
 Two supporting files are needed to get this working - first, `wp-config.php` is
 the standard Wordpress config file with a single change to point the database
 configuration at the `db` container:
 
-```
-<?php
-define('DB_NAME', 'wordpress');
-define('DB_USER', 'root');
-define('DB_PASSWORD', '');
-define('DB_HOST', "db:3306");
-define('DB_CHARSET', 'utf8');
-define('DB_COLLATE', '');
+    <?php
+    define('DB_NAME', 'wordpress');
+    define('DB_USER', 'root');
+    define('DB_PASSWORD', '');
+    define('DB_HOST', "db:3306");
+    define('DB_CHARSET', 'utf8');
+    define('DB_COLLATE', '');
 
-define('AUTH_KEY',         'put your unique phrase here');
-define('SECURE_AUTH_KEY',  'put your unique phrase here');
-define('LOGGED_IN_KEY',    'put your unique phrase here');
-define('NONCE_KEY',        'put your unique phrase here');
-define('AUTH_SALT',        'put your unique phrase here');
-define('SECURE_AUTH_SALT', 'put your unique phrase here');
-define('LOGGED_IN_SALT',   'put your unique phrase here');
-define('NONCE_SALT',       'put your unique phrase here');
+    define('AUTH_KEY',         'put your unique phrase here');
+    define('SECURE_AUTH_KEY',  'put your unique phrase here');
+    define('LOGGED_IN_KEY',    'put your unique phrase here');
+    define('NONCE_KEY',        'put your unique phrase here');
+    define('AUTH_SALT',        'put your unique phrase here');
+    define('SECURE_AUTH_SALT', 'put your unique phrase here');
+    define('LOGGED_IN_SALT',   'put your unique phrase here');
+    define('NONCE_SALT',       'put your unique phrase here');
 
-$table_prefix  = 'wp_';
-define('WPLANG', '');
-define('WP_DEBUG', false);
+    $table_prefix  = 'wp_';
+    define('WPLANG', '');
+    define('WP_DEBUG', false);
 
-if ( !defined('ABSPATH') )
-    define('ABSPATH', dirname(__FILE__) . '/');
+    if ( !defined('ABSPATH') )
+        define('ABSPATH', dirname(__FILE__) . '/');
 
-require_once(ABSPATH . 'wp-settings.php');
-```
+    require_once(ABSPATH . 'wp-settings.php');
 
 Second, `router.php` tells PHP's built-in web server how to run Wordpress:
 
-```
-<?php
+    <?php
 
-$root = $_SERVER['DOCUMENT_ROOT'];
-chdir($root);
-$path = '/'.ltrim(parse_url($_SERVER['REQUEST_URI'])['path'],'/');
-set_include_path(get_include_path().':'.__DIR__);
-if(file_exists($root.$path))
-{
-    if(is_dir($root.$path) && substr($path,strlen($path) - 1, 1) !== '/')
-        $path = rtrim($path,'/').'/index.php';
-    if(strpos($path,'.php') === false) return false;
-    else {
-        chdir(dirname($root.$path));
-        require_once $root.$path;
-    }
-}else include_once 'index.php';
-```
+    $root = $_SERVER['DOCUMENT_ROOT'];
+    chdir($root);
+    $path = '/'.ltrim(parse_url($_SERVER['REQUEST_URI'])['path'],'/');
+    set_include_path(get_include_path().':'.__DIR__);
+    if(file_exists($root.$path))
+    {
+        if(is_dir($root.$path) && substr($path,strlen($path) - 1, 1) !== '/')
+            $path = rtrim($path,'/').'/index.php';
+        if(strpos($path,'.php') === false) return false;
+        else {
+            chdir(dirname($root.$path));
+            require_once $root.$path;
+        }
+    }else include_once 'index.php';
+
 ### Build the project
 
 With those four files in place, run `docker-compose up` inside your Wordpress
