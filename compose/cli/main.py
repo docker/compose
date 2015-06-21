@@ -380,7 +380,7 @@ class TopLevelCommand(Command):
             except ValueError:
                 raise UserError('Number of containers for service "%s" is not a '
                                 'number' % service_name)
-            project.get_service(service_name).scale(num, timeout)
+            project.get_service(service_name).scale(desired_num=num, timeout=timeout)
 
     def start(self, project, options):
         """
