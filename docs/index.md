@@ -29,18 +29,16 @@ they can be run together in an isolated environment:
 
 A `docker-compose.yml` looks like this:
 
-```yaml
-web:
-  build: .
-  ports:
-   - "5000:5000"
-  volumes:
-   - .:/code
-  links:
-   - redis
-redis:
-  image: redis
-```
+    web:
+      build: .
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+      links:
+       - redis
+    redis:
+      image: redis
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -79,21 +77,19 @@ Next, you'll want to make a directory for the project:
 Inside this directory, create `app.py`, a simple web app that uses the Flask
 framework and increments a value in Redis:
 
-```python
-from flask import Flask
-from redis import Redis
-import os
-app = Flask(__name__)
-redis = Redis(host='redis', port=6379)
+    from flask import Flask
+    from redis import Redis
+    import os
+    app = Flask(__name__)
+    redis = Redis(host='redis', port=6379)
 
-@app.route('/')
-def hello():
-    redis.incr('hits')
-    return 'Hello World! I have been seen %s times.' % redis.get('hits')
+    @app.route('/')
+    def hello():
+        redis.incr('hits')
+        return 'Hello World! I have been seen %s times.' % redis.get('hits')
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True)
-```
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", debug=True)
 
 Next, define the Python dependencies in a file called `requirements.txt`:
 
