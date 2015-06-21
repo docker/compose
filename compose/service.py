@@ -140,10 +140,11 @@ class Service(object):
             log.info("Restarting %s..." % c.name)
             c.restart(**options)
 
-    def scale(self, desired_num):
+    def scale(self, desired_num, timeout):
         """
         Adjusts the number of containers to the specified number and ensures
-        they are running.
+        they are running. Optionally takes a timeout to handle container's long
+        graceful shutdown.
 
         - creates containers until there are at least `desired_num`
         - stops containers until there are at most `desired_num` running
@@ -174,7 +175,7 @@ class Service(object):
         while len(running_containers) > desired_num:
             c = running_containers.pop()
             log.info("Stopping %s..." % c.name)
-            c.stop(timeout=1)
+            c.stop(timeout=timeout)
             stopped_containers.append(c)
 
         # Start containers
