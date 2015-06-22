@@ -11,6 +11,7 @@ import mock
 
 from compose.cli import main
 from compose.cli.main import TopLevelCommand
+from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import ComposeFileNotFound
 from compose.service import Service
 
@@ -100,6 +101,22 @@ class CLITestCase(unittest.TestCase):
         command = TopLevelCommand()
         with self.assertRaises(SystemExit):
             command.dispatch(['-h'], None)
+
+    def test_command_help(self):
+        with self.assertRaises(SystemExit) as ctx:
+            TopLevelCommand().dispatch(['help', 'up'], None)
+
+        self.assertIn('Usage: up', str(ctx.exception))
+
+    def test_command_help_dashes(self):
+        with self.assertRaises(SystemExit) as ctx:
+            TopLevelCommand().dispatch(['help', 'migrate-to-labels'], None)
+
+        self.assertIn('Usage: migrate-to-labels', str(ctx.exception))
+
+    def test_command_help_nonexistent(self):
+        with self.assertRaises(NoSuchCommand):
+            TopLevelCommand().dispatch(['help', 'nonexistent'], None)
 
     def test_setup_logging(self):
         main.setup_logging()
