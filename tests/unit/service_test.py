@@ -303,6 +303,17 @@ class ServiceTest(unittest.TestCase):
         with self.assertRaises(NeedsBuildError):
             service.create_container(do_build=False)
 
+    def test_build_does_not_pull(self):
+        self.mock_client.build.return_value = [
+            '{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build='.')
+        service.build()
+
+        self.assertEqual(self.mock_client.build.call_count, 1)
+        self.assertFalse(self.mock_client.build.call_args[1]['pull'])
+
 
 class ServiceVolumesTest(unittest.TestCase):
 
