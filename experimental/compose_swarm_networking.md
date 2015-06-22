@@ -25,32 +25,32 @@ You’ll also need a [Docker Hub](https://hub.docker.com/account/signup/) accoun
 
 Set the `DIGITALOCEAN_ACCESS_TOKEN` environment variable to a valid Digital Ocean API token, which you can generate in the [API panel](https://cloud.digitalocean.com/settings/applications).
 
-    $ DIGITALOCEAN_ACCESS_TOKEN=abc12345
+    DIGITALOCEAN_ACCESS_TOKEN=abc12345
 
 Start a consul server:
 
-    $ docker-machine create -d digitalocean --engine-install-url https://experimental.docker.com consul
-    $ docker $(docker-machine config consul) run -d -p 8500:8500 -h consul progrium/consul -server -bootstrap
+    docker-machine create -d digitalocean --engine-install-url https://experimental.docker.com consul
+    docker $(docker-machine config consul) run -d -p 8500:8500 -h consul progrium/consul -server -bootstrap
 
 (In a real world setting you’d set up a distributed consul, but that’s beyond the scope of this guide!)
 
 Create a Swarm token:
 
-    $ SWARM_TOKEN=$(docker run swarm create)
+    SWARM_TOKEN=$(docker run swarm create)
 
 Create a Swarm master:
 
-    $ docker-machine create -d digitalocean --swarm --swarm-discovery=token://$SWARM_TOKEN --engine-install-url="https://experimental.docker.com" --digitalocean-image "ubuntu-14-10-x64" --swarm-master --swarm --engine-opt=default-network=overlay:multihost  --engine-label=com.docker.network.driver.overlay.bind_interface=eth0 --kv-store=consul:$(docker-machine ip consul):8500 swarm-0
+    docker-machine create -d digitalocean --swarm --swarm-master --swarm-discovery=token://$SWARM_TOKEN --engine-install-url="https://experimental.docker.com" --digitalocean-image "ubuntu-14-10-x64" --engine-opt=default-network=overlay:multihost --engine-label=com.docker.network.driver.overlay.bind_interface=eth0 --engine-opt=kv-store=consul:$(docker-machine ip consul):8500 swarm-0
 
 Create a Swarm node:
 
-    $ docker-machine create -d digitalocean --swarm --swarm-discovery=token://$SWARM_TOKEN --engine-install-url="https://experimental.docker.com" --digitalocean-image "ubuntu-14-10-x64" --swarm --engine-opt=default-network=overlay:multihost  --engine-label=com.docker.network.driver.overlay.bind_interface=eth0 --kv-store=consul:$(docker-machine ip consul):8500 --engine-label com.docker.network.driver.overlay.neighbor_ip=$(docker-machine ip swarm-0) swarm-1
+    docker-machine create -d digitalocean --swarm --swarm-discovery=token://$SWARM_TOKEN --engine-install-url="https://experimental.docker.com" --digitalocean-image "ubuntu-14-10-x64" --engine-opt=default-network=overlay:multihost --engine-label=com.docker.network.driver.overlay.bind_interface=eth0 --engine-opt=kv-store=consul:$(docker-machine ip consul):8500 --engine-label com.docker.network.driver.overlay.neighbor_ip=$(docker-machine ip swarm-0) swarm-1
 
 You can create more Swarm nodes if you want - it’s best to give them sensible names (swarm-2, swarm-3, etc).
 
 Finally, point Docker at your swarm:
 
-    $ eval "$(docker-machine env --swarm swarm-0)"
+    eval "$(docker-machine env --swarm swarm-0)"
 
 ## Run containers and get them communicating
 
