@@ -473,7 +473,7 @@ class Service(object):
 
     def _get_net(self):
         if not self.net:
-            return "bridge"
+            return None
 
         if isinstance(self.net, Service):
             containers = self.net.containers()
@@ -628,6 +628,7 @@ class Service(object):
             tag=self.image_name,
             stream=True,
             rm=True,
+            pull=False,
             nocache=no_cache,
             dockerfile=self.options.get('dockerfile', None),
         )

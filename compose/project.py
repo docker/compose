@@ -178,7 +178,7 @@ class Project(object):
             del service_dict['net']
 
         else:
-            net = 'bridge'
+            net = None
 
         return net
 

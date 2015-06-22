@@ -1,6 +1,15 @@
 Change log
 ==========
 
+1.3.1 (2015-06-21)
+------------------
+
+The following bugs have been fixed:
+
+- `docker-compose build` would always attempt to pull the base image before building.
+- `docker-compose help migrate-to-labels` failed with an error.
+- If no network mode was specified, Compose would set it to "bridge", rather than allowing the Docker daemon to use its configured default network mode.
+
 1.3.0 (2015-06-18)
 ------------------
 

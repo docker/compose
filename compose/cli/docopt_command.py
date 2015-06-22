@@ -33,12 +33,7 @@ class DocoptCommand(object):
         if command is None:
             raise SystemExit(getdoc(self))
 
-        command = command.replace('-', '_')
-
-        if not hasattr(self, command):
-            raise NoSuchCommand(command, self)
-
-        handler = getattr(self, command)
+        handler = self.get_handler(command)
         docstring = getdoc(handler)
 
         if docstring is None:
@@ -46,6 +41,14 @@ class DocoptCommand(object):
 
         command_options = docopt_full_help(docstring, options['ARGS'], options_first=True)
         return options, handler, command_options
+
+    def get_handler(self, command):
+        command = command.replace('-', '_')
+
+        if not hasattr(self, command):
+            raise NoSuchCommand(command, self)
+
+        return getattr(self, command)
 
 
 class NoSuchCommand(Exception):
