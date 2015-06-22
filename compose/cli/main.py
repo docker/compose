@@ -131,10 +131,8 @@ class TopLevelCommand(Command):
 
         Usage: help COMMAND
         """
-        command = options['COMMAND']
-        if not hasattr(self, command):
-            raise NoSuchCommand(command, self)
-        raise SystemExit(getdoc(getattr(self, command)))
+        handler = self.get_handler(options['COMMAND'])
+        raise SystemExit(getdoc(handler))
 
     def kill(self, project, options):
         """
@@ -485,6 +483,24 @@ class TopLevelCommand(Command):
     def migrate_to_labels(self, project, _options):
         """
         Recreate containers to add labels
+
+        If you're coming from Compose 1.2 or earlier, you'll need to remove or
+        migrate your existing containers after upgrading Compose. This is
+        because, as of version 1.3, Compose uses Docker labels to keep track
+        of containers, and so they need to be recreated with labels added.
+
+        If Compose detects containers that were created without labels, it
+        will refuse to run so that you don't end up with two sets of them. If
+        you want to keep using your existing containers (for example, because
+        they have data volumes you want to preserve) you can migrate them with
+        the following command:
+
+            docker-compose migrate-to-labels
+
+        Alternatively, if you're not worried about keeping them, you can
+        remove them - Compose will just create new ones.
+
+            docker rm -f myapp_web_1 myapp_db_1 ...
 
         Usage: migrate-to-labels
         """
