@@ -82,7 +82,7 @@ __docker-compose_services_stopped() {
 _docker-compose_build() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--no-cache" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --no-cache" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_from_build
@@ -128,7 +128,7 @@ _docker-compose_kill() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-s" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help -s" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_running
@@ -140,10 +140,19 @@ _docker-compose_kill() {
 _docker-compose_logs() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--no-color" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --no-color" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
+			;;
+	esac
+}
+
+
+_docker-compose_migrate-to-labels() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 	esac
 }
@@ -162,7 +171,7 @@ _docker-compose_port() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--protocol --index" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --index --protocol" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -174,7 +183,7 @@ _docker-compose_port() {
 _docker-compose_ps() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help -q" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -186,7 +195,7 @@ _docker-compose_ps() {
 _docker-compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl --help" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_from_image
@@ -204,7 +213,7 @@ _docker-compose_restart() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-t --timeout" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_running
@@ -216,7 +225,7 @@ _docker-compose_restart() {
 _docker-compose_rm() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--force -f -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--force -f --help -v" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_stopped
@@ -239,7 +248,7 @@ _docker-compose_run() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --help --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -258,11 +267,24 @@ _docker-compose_scale() {
 			compopt -o nospace
 			;;
 	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+	esac
 }
 
 
 _docker-compose_start() {
-	__docker-compose_services_stopped
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+		*)
+			__docker-compose_services_stopped
+			;;
+	esac
 }
 
 
@@ -275,7 +297,7 @@ _docker-compose_stop() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-t --timeout" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_running
@@ -293,7 +315,7 @@ _docker-compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --no-build --no-color --no-deps --no-recreate -t --timeout --x-smart-recreate" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --help --no-build --no-color --no-deps --no-recreate --timeout -t --x-smart-recreate" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
