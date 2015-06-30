@@ -55,6 +55,21 @@ Alternatively, if you're not worried about keeping them, you can remove them - C
 
     docker rm -f myapp_web_1 myapp_db_1 ...
 
+
+## Uninstallation
+
+To uninstall Docker Compose if you installed using `curl`:
+
+    $ rm /usr/local/bin/docker-compose
+
+
+To uninstall Docker Compose if you installed using `pip`:
+
+    $ pip uninstall docker-compose
+    
+> Note: If you get a "Permission denied" error using either of the above methods, you probably do not have the proper permissions to remove `docker-compose`.  To force the removal, prepend `sudo` to either of the above commands and run again.
+
+
 ## Compose documentation
 
 - [User guide](/)
