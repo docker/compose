@@ -1,0 +1,11 @@
+image: stackbrew/ubuntu
+ports:
+  - 3306:3306
+  - 6379:6379
+links:
+   - mysql
+   - redis
+mysql:
+  image: orchardup/mysql
+redis:
+  image: orchardup/redis

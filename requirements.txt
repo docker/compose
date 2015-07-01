@@ -6,3 +6,4 @@ requests==2.6.1
 six==1.7.3
 texttable==0.8.2
 websocket-client==0.11.0
+jsonschema==2.4.0

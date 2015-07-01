@@ -1,0 +1,137 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    
+    "type": "object",
+    
+    "patternProperties": {
+        "^[a-zA-Z0-9]+$": {
+            "$ref": "#/definitions/service"
+        }
+    },    
+    
+    "additionalProperties": false,
+
+    "definitions": {
+        "service": {
+            "type": "object",
+            "properties": {
+                "build": { "type": "string" },
+
+                "image": { "type": "string" },
+
+                "command": { "$ref": "#/definitions/string_or_stringlist" },
+
+                "links": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "external_links": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "expose": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "volumes": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "volumes_from": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "net": {
+                    "type": "string"
+                },
+
+                "cap_add": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "drop": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "working_dir": { "type": "string" },
+
+                "entrypoint": { "type": "string" },
+
+                "user": { "type": "string" },
+
+                "hostname": { "type": "string" },
+
+                "domainname": { "type": "string" },
+
+                "mem_limit": { "type": "string" },
+
+                "privileged": { "type": "string" },
+
+                "restart": { "type": "string" },
+
+                "stdin_open": { "type": "string" },
+
+                "tty": { "type": "string" },
+
+                "cpu_shares": { "type": "string" },
+
+                "build": { "type": "string" },
+
+                "image": { "type": "string" },
+
+                "ports": {
+                    "$ref": "#/definitions/stringlist"
+                },
+
+                "environment": {
+                    "$ref": "#/definitions/dict_or_list"
+                },
+
+                "env_file": { "$ref": "#/definitions/string_or_stringlist" },
+
+                "dns": { "$ref": "#/definitions/string_or_stringlist" },
+
+                "dns_search": { "$ref": "#/definitions/string_or_stringlist" },
+
+                "extends": {
+                    "type": "object",
+                    "properties": {
+                        "file": { "type": "string" },
+                        "service": { "type": "string" }
+                    },
+                    "required": [ "file", "service" ]
+                }
+            },
+
+            "additionalProperties": false
+        },
+        
+        "string_or_stringlist": {
+            "oneOf": [
+                { "type": "string" },
+                {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "uniqueItems": true
+                }
+            ]
+        },
+        
+        "stringlist": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": true
+        },
+        
+        "dict_or_list": {
+            "oneOf": [
+                { "type": "object" },
+                {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "uniqueItems": true
+                }
+            ]
+        }
+    }
+}
