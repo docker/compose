@@ -2,11 +2,11 @@
 
 ## Building binaries
 
-`script/build-linux` will build the Linux binary inside a Docker container:
+`script/build-linux` builds the Linux binary inside a Docker container:
 
     $ script/build-linux
 
-`script/build-osx` will build the Mac OS X binary inside a virtualenv:
+`script/build-osx` builds the Mac OS X binary inside a virtualenv:
 
     $ script/build-osx
 
