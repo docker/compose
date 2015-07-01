@@ -129,6 +129,7 @@ you're using Boot2docker, `boot2docker ip` will tell you its address).
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
+- [Migration: Dockerize osclass](osclass.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
