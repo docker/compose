@@ -159,6 +159,7 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
     Starting composetest_web_1...
     redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     web_1   |  * Running on http://0.0.0.0:5000/
+    web_1   |  * Restarting with stat
 
 The web app should now be listening on port 5000 on your Docker daemon host (if
 you're using Boot2docker, `boot2docker ip` will tell you its address). In a browser,
