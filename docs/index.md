@@ -75,7 +75,7 @@ Next, you'll want to make a directory for the project:
     $ cd composetest
 
 Inside this directory, create `app.py`, a simple web app that uses the Flask
-framework and increments a value in Redis:
+framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
 
     from flask import Flask
     from redis import Redis
