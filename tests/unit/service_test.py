@@ -28,16 +28,16 @@ class ServiceTest(unittest.TestCase):
         self.mock_client = mock.create_autospec(docker.Client)
 
     def test_name_validations(self):
-        self.assertRaises(ConfigError, lambda: Service(name=''))
+        self.assertRaises(ConfigError, lambda: Service(name='', image='foo'))
 
-        self.assertRaises(ConfigError, lambda: Service(name=' '))
-        self.assertRaises(ConfigError, lambda: Service(name='/'))
-        self.assertRaises(ConfigError, lambda: Service(name='!'))
-        self.assertRaises(ConfigError, lambda: Service(name='\xe2'))
-        self.assertRaises(ConfigError, lambda: Service(name='_'))
-        self.assertRaises(ConfigError, lambda: Service(name='____'))
-        self.assertRaises(ConfigError, lambda: Service(name='foo_bar'))
-        self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__'))
+        self.assertRaises(ConfigError, lambda: Service(name=' ', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='/', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='!', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='\xe2', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='_', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='____', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='foo_bar', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__', image='foo'))
 
         Service('a', image='foo')
         Service('foo', image='foo')
