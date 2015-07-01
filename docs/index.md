@@ -190,7 +190,7 @@ services. For example, to see what environment variables are available to the
 
     $ docker-compose run web env
 
-See `docker-compose --help` to see other available commands. You can also install [command completion](completion.md) for the bash shell, which will also show you available commands.
+See `docker-compose --help` to see other available commands. You can also install [command completion](completion.md) for the bash and zsh shell, which will also show you available commands.
 
 If you started Compose with `docker-compose up -d`, you'll probably want to stop
 your services once you've finished with them:
