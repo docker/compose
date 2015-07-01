@@ -32,7 +32,7 @@ that should get you started.
 
 ## Submitting a pull request
 
-See docker's [basic contribution workflow](https://docs.docker.com/project/make-a-contribution/#the-basic-contribution-workflow) for a guide on how to submit a pull request for code or documentation.
+See Docker's [basic contribution workflow](https://docs.docker.com/project/make-a-contribution/#the-basic-contribution-workflow) for a guide on how to submit a pull request for code or documentation.
 
 ## Running the test suite
 
