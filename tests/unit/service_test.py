@@ -34,18 +34,23 @@ class ServiceTest(unittest.TestCase):
         self.assertRaises(ConfigError, lambda: Service(name='/', image='foo'))
         self.assertRaises(ConfigError, lambda: Service(name='!', image='foo'))
         self.assertRaises(ConfigError, lambda: Service(name='\xe2', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='_', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='____', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='foo_bar', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__', image='foo'))
 
         Service('a', image='foo')
         Service('foo', image='foo')
+        Service('foo-bar', image='foo')
+        Service('foo.bar', image='foo')
+        Service('foo_bar', image='foo')
+        Service('_', image='foo')
+        Service('___', image='foo')
+        Service('-', image='foo')
+        Service('--', image='foo')
+        Service('.__.', image='foo')
 
     def test_project_validation(self):
         self.assertRaises(ConfigError, lambda: Service('bar'))
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_', image='foo'))
-        Service(name='foo', project='bar', image='foo')
+        self.assertRaises(ConfigError, lambda: Service(name='foo', project='>', image='foo'))
+
+        Service(name='foo', project='bar.bar__', image='foo')
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')

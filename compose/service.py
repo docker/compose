@@ -47,7 +47,7 @@ DOCKER_START_KEYS = [
     'security_opt',
 ]
 
-VALID_NAME_CHARS = '[a-zA-Z0-9]'
+VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 
 
 class BuildError(Exception):
