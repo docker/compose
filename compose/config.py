@@ -163,7 +163,12 @@ class ServiceLoader(object):
         if self.working_dir is None:
             raise Exception("No working_dir passed to ServiceLoader()")
 
-        other_config_path = expand_path(self.working_dir, extends_options['file'])
+        try:
+            extends_from_filename = extends_options['file']
+        except KeyError:
+            extends_from_filename = os.path.split(self.filename)[1]
+
+        other_config_path = expand_path(self.working_dir, extends_from_filename)
         other_working_dir = os.path.dirname(other_config_path)
         other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
         other_loader = ServiceLoader(

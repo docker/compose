@@ -447,6 +447,30 @@ class ExtendsTest(unittest.TestCase):
         dictionary['extends']['what'] = 'is this'
         self.assertRaisesRegexp(config.ConfigurationError, 'what', load_config)
 
+    def test_extends_file_defaults_to_self(self):
+        """
+        Test not specifying a file in our extends options that the
+        config is valid and correctly extends from itself.
+        """
+        service_dicts = config.load('tests/fixtures/extends/no-file-specified.yml')
+        self.assertEqual(service_dicts, [
+            {
+                'name': 'myweb',
+                'image': 'busybox',
+                'environment': {
+                    "BAR": "1",
+                    "BAZ": "3",
+                }
+            },
+            {
+                'name': 'web',
+                'image': 'busybox',
+                'environment': {
+                    "BAZ": "3",
+                }
+            }
+        ])
+
     def test_blacklisted_options(self):
         def load_config():
             return config.make_service_dict('myweb', {
