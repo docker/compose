@@ -82,6 +82,11 @@ class TopLevelCommand(Command):
     Options:
       -f, --file FILE           Specify an alternate compose file (default: docker-compose.yml)
       -p, --project-name NAME   Specify an alternate project name (default: directory name)
+      --tls=BOOL                Use TLS; implied by --tlsverify
+      --tlscacert=FILE          Trust certs signed only by this ca (default: ~/.docker/ca.pem)
+      --tlscert=FILE            Path to tls certificate file (default: ~/.docker/cert.pem)
+      --tlskey=FILE             Path to tls key file (default: ~/.docker/key.pem)
+      --tlsverify=BOOL          Use TLS and verify the remote
       --verbose                 Show more output
       -v, --version             Print version and exit
 

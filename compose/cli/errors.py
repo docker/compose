@@ -62,3 +62,8 @@ class ComposeFileNotFound(UserError):
 
         Supported filenames: %s
         """ % ", ".join(supported_filenames))
+
+
+class InsecureRequestWarning(Warning):
+    """Unverified HTTPS request is being made. Adding certificate verification is strongly advised."""
+    pass

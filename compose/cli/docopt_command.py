@@ -5,6 +5,9 @@ import sys
 from inspect import getdoc
 from docopt import docopt, DocoptExit
 
+import warnings
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
 
 def docopt_full_help(docstring, *args, **kwargs):
     try:
@@ -21,7 +24,9 @@ class DocoptCommand(object):
         self.dispatch(sys.argv[1:], None)
 
     def dispatch(self, argv, global_options):
-        self.perform_command(*self.parse(argv, global_options))
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', category=InsecureRequestWarning)
+            self.perform_command(*self.parse(argv, global_options))
 
     def perform_command(self, options, handler, command_options):
         handler(command_options)
