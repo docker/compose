@@ -504,3 +504,9 @@ class BuildPathTest(unittest.TestCase):
     def test_from_file(self):
         service_dict = config.load('tests/fixtures/build-path/docker-compose.yml')
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
+
+
+class InjectEnvTest(unittest.TestCase):
+    def test_injection(self):
+        os.environ["BAR"] = 'rab'
+        self.assertEquals(config.inject_env_variables('foo $BAR oof'), 'foo rab oof')
