@@ -107,7 +107,6 @@ You can also use the `INSTALL.sh` file if you want to launch without `docker-com
 
         $ docker exec -it <NAME_OSCLASS_CONTAINER> bash /osclass_backup.sh
 
-
 ## More Compose documentation
 
 - [User guide](/)
