@@ -22,7 +22,7 @@ that should get you started.
 1. Fork [https://github.com/docker/compose](https://github.com/docker/compose)
    to your username.
 2. Clone your forked repository locally `git clone git@github.com:yourusername/compose.git`.
-3. You must [configure](https://help.github.com/articles/configuring-a-remote-for-a-fork/) a remote for your fork so that you can [sync changes you make](https://help.github.com/articles/syncing-a-fork/) with the original repository.
+3. You must [configure a remote](https://help.github.com/articles/configuring-a-remote-for-a-fork/) for your fork so that you can [sync changes you make](https://help.github.com/articles/syncing-a-fork/) with the original repository.
 4. Enter the local directory `cd compose`.
 5. Set up a development environment by running `python setup.py develop`. This
    will install the dependencies and set up a symlink from your `docker-compose`
