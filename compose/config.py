@@ -1,6 +1,7 @@
 import os
 import yaml
 import six
+import re
 
 
 DOCKER_CONFIG_KEYS = [
@@ -464,9 +465,87 @@ def get_service_name_from_net(net_config):
 def load_yaml(filename):
     try:
         with open(filename, 'r') as fh:
-            return yaml.safe_load(fh)
+            return yaml.safe_load(ComposeTemplate.create_from_file(fh).render())
     except IOError as e:
         raise ConfigurationError(six.text_type(e))
+
+
+class ComposeTemplate(object):
+
+    @classmethod
+    def create_from_file(klass, file_handle):
+        return klass(file_handle.read())
+
+    def __init__(self, string):
+        self.string = string
+
+    def render(self):
+        try:
+            self.lines_parsed = 0
+            return "\n".join(reduce(self.__evaluate_env_vars, self.string.splitlines(), []))
+        except TemplateError as e:
+            raise ConfigurationError("Line " + str(self.lines_parsed) + ": " + six.text_type(e))
+
+    def __evaluate_env_vars(self, memo, line):
+        self.lines_parsed = self.lines_parsed + 1
+        line_result = re.sub('\${[^}]*}', self.__match_obj_to_env_var, line)
+        memo.append(line_result)
+        return memo
+
+    def __match_obj_to_env_var(self, match_object):
+        return TemplateVariableFactory.create_from_string(match_object.group(0)).value()
+
+
+class TemplateVariableFactory(object):
+
+    @classmethod
+    def create_from_string(klass, string):
+        default, required = klass.__extract_var_meta(string)
+        name = klass.__extract_var_name(string, default, required)
+        return TemplateVariable(name, default, required)
+
+    @classmethod
+    def __extract_var_meta(klass, string):
+        required = string[-2] == "?"
+        if len(string.split("-")) > 1:
+            default = string.split("-")[1][0:-1]
+        else:
+            default = None
+        return (default, required)
+
+    @classmethod
+    def __extract_var_name(klass, string, default, required):
+        if required:
+            return string[2:-2]
+        elif default:
+            return string.split("-")[0][2:]
+        else:
+            return string[2:-1]
+
+
+class TemplateVariable(object):
+    def __init__(self, env_var_name, default_value=None, required=False):
+        self.env_var_name = env_var_name
+        self.default_value = default_value
+        self.required = required
+
+    def value(self):
+        result = os.environ.get(self.env_var_name, None)
+        if result:
+            return result
+        if self.default_value:
+            return self.default_value
+        if self.required:
+            raise TemplateError("Environment variable '{0}' was required but had no value.".format(self.env_var_name))
+        return ''
+
+
+class TemplateError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
 
 
 class ConfigurationError(Exception):
