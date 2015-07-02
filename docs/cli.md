@@ -197,7 +197,7 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
-- [Migration: Dockerize osclass](osclass.md)
+- [Migrate Osclass installation to Docker Compose](osclass.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)

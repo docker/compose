@@ -45,7 +45,7 @@ Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
-- [Migration: Dockerize osclass](osclass.md)
+- [Migrate Osclass installation to Docker Compose](osclass.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose command line completion](completion.md)
