@@ -158,7 +158,7 @@ class ServiceLoader(object):
         if 'extends' not in service_dict:
             return service_dict
 
-        extends_options = process_extends_options(service_dict['name'], service_dict['extends'])
+        extends_options = validate_extends_options(service_dict['name'], service_dict['extends'])
 
         if self.working_dir is None:
             raise Exception("No working_dir passed to ServiceLoader()")
@@ -190,7 +190,7 @@ class ServiceLoader(object):
         return (self.filename, name)
 
 
-def process_extends_options(service_name, extends_options):
+def validate_extends_options(service_name, extends_options):
     error_prefix = "Invalid 'extends' configuration for %s:" % service_name
 
     if not isinstance(extends_options, dict):
