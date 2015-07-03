@@ -47,9 +47,9 @@ class ConfigTest(unittest.TestCase):
     def test_config_validation(self):
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.make_service_dict('foo', {'port': ['8000']})
+            lambda: config.make_service_dict('foo', {'port': ['8000']}, 'tests/')
         )
-        config.make_service_dict('foo', {'ports': ['8000']})
+        config.make_service_dict('foo', {'ports': ['8000']}, 'tests/')
 
 
 class VolumePathTest(unittest.TestCase):
@@ -219,36 +219,36 @@ class MergeLabelsTest(unittest.TestCase):
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
-            config.make_service_dict('foo', {}),
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
+            config.make_service_dict('foo', {}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {}),
-            config.make_service_dict('foo', {'labels': ['foo=2']}),
+            config.make_service_dict('foo', {}, 'tests/'),
+            config.make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '2'})
 
     def test_override_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
-            config.make_service_dict('foo', {'labels': ['foo=2']}),
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
+            config.make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '2', 'bar': ''})
 
     def test_add_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}),
-            config.make_service_dict('foo', {'labels': ['bar=2']}),
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
+            config.make_service_dict('foo', {'labels': ['bar=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': '2'})
 
     def test_remove_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}),
-            config.make_service_dict('foo', {'labels': ['bar']}),
+            config.make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}, 'tests/'),
+            config.make_service_dict('foo', {'labels': ['bar']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
@@ -295,6 +295,7 @@ class EnvTest(unittest.TestCase):
                     'NO_DEF': None
                 },
             },
+            'tests/'
         )
 
         self.assertEqual(

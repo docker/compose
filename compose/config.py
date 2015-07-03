@@ -134,7 +134,7 @@ def load(config_details):
     return service_dicts
 
 
-def make_service_dict(name, service_dict, working_dir=None):
+def make_service_dict(name, service_dict, working_dir):
     return ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
 
 
