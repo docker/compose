@@ -378,6 +378,26 @@ class Service(object):
         container.start()
         return container
 
+    def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
+        for c in self.duplicate_containers():
+            log.info('Removing %s...' % c.name)
+            c.stop(timeout=timeout)
+            c.remove()
+
+    def duplicate_containers(self):
+        containers = sorted(
+            self.containers(stopped=True),
+            key=lambda c: c.get('Created'),
+        )
+
+        numbers = set()
+
+        for c in containers:
+            if c.number in numbers:
+                yield c
+            else:
+                numbers.add(c.number)
+
     def config_hash(self):
         return json_hash(self.config_dict())
 
