@@ -705,3 +705,18 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(1, len(device_config))
         self.assertDictEqual(device_dict, device_config[0])
+
+    def test_duplicate_containers(self):
+        service = self.create_service('web')
+
+        options = service._get_container_create_options({}, 1)
+        original = Container.create(service.client, **options)
+
+        self.assertEqual(set(service.containers(stopped=True)), set([original]))
+        self.assertEqual(set(service.duplicate_containers()), set())
+
+        options['name'] = 'temporary_container_name'
+        duplicate = Container.create(service.client, **options)
+
+        self.assertEqual(set(service.containers(stopped=True)), set([original, duplicate]))
+        self.assertEqual(set(service.duplicate_containers()), set([duplicate]))
