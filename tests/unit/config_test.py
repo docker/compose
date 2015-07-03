@@ -478,10 +478,10 @@ class BuildPathTest(unittest.TestCase):
         options = {'build': 'nonexistent.path'}
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.from_dictionary({
-                'foo': options,
-                'working_dir': 'tests/fixtures/build-path'
-            })
+            lambda: config.from_dictionary(
+                {'foo': options},
+                working_dir='tests/fixtures/build-path'
+            )
         )
 
     def test_relative_path(self):
