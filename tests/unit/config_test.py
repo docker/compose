@@ -427,7 +427,7 @@ class ExtendsTest(unittest.TestCase):
                 ],
             )
 
-    def test_extends_validation(self):
+    def test_extends_validation_empty_dictionary(self):
         dictionary = {'extends': None}
 
         def load_config():
@@ -438,14 +438,34 @@ class ExtendsTest(unittest.TestCase):
         dictionary['extends'] = {}
         self.assertRaises(config.ConfigurationError, load_config)
 
-        dictionary['extends']['file'] = 'common.yml'
+    def test_extends_validation_missing_service_key(self):
+        dictionary = {'extends': {'file': 'common.yml'}}
+
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
         self.assertRaisesRegexp(config.ConfigurationError, 'service', load_config)
 
-        dictionary['extends']['service'] = 'web'
-        self.assertIsInstance(load_config(), dict)
+    def test_extends_validation_invalid_key(self):
+        dictionary = {
+            'extends':
+            {
+                'service': 'web', 'file': 'common.yml', 'what': 'is this'
+            }
+        }
 
-        dictionary['extends']['what'] = 'is this'
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
         self.assertRaisesRegexp(config.ConfigurationError, 'what', load_config)
+
+    def test_extends_validation_valid_config(self):
+        dictionary = {'extends': {'service': 'web', 'file': 'common.yml'}}
+
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
+        self.assertIsInstance(load_config(), dict)
 
     def test_extends_file_defaults_to_self(self):
         """
