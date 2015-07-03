@@ -149,7 +149,7 @@ class ServiceLoader(object):
 
     def make_service_dict(self, name, service_dict):
         if self.signature(name) in self.already_seen:
-            raise CircularReference(self.already_seen)
+            raise CircularReference(self.already_seen + [self.signature(name)])
 
         service_dict = service_dict.copy()
         service_dict['name'] = name
