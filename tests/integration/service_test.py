@@ -363,7 +363,7 @@ class ServiceTest(DockerClientTestCase):
 
         new_container, = service.execute_convergence_plan(
             ConvergencePlan('recreate', [old_container]))
-        self.assertEqual(new_container.get('Volumes').keys(), ['/data'])
+        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
     def test_start_container_passes_through_options(self):
@@ -498,7 +498,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        with open(os.path.join(base_dir, b'foo\xE2bar'), 'w') as f:
+        with open(os.path.join(base_dir.encode('utf8'), b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
         self.create_service('web', build=text_type(base_dir)).build()

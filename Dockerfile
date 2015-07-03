@@ -30,6 +30,18 @@ RUN set -ex; \
     rm -rf /Python-2.7.9; \
     rm Python-2.7.9.tgz
 
+# Build python 3.4 from source
+RUN set -ex; \
+    curl -LO https://www.python.org/ftp/python/3.4.3/Python-3.4.3.tgz; \
+    tar -xzf Python-3.4.3.tgz; \
+    cd Python-3.4.3; \
+    ./configure --enable-shared; \
+    make; \
+    make install; \
+    cd ..; \
+    rm -rf /Python-3.4.3; \
+    rm Python-3.4.3.tgz
+
 # Make libpython findable
 ENV LD_LIBRARY_PATH /usr/local/lib
 
@@ -62,6 +74,8 @@ RUN ln -s /usr/local/bin/docker-1.7.1 /usr/local/bin/docker
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
+
+RUN pip install tox
 
 ADD requirements.txt /code/
 RUN pip install -r requirements.txt

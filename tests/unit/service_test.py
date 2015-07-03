@@ -41,7 +41,7 @@ class ServiceTest(unittest.TestCase):
             dict(Name=str(i), Image='foo', Id=i) for i in range(3)
         ]
         service = Service('db', self.mock_client, 'myproject', image='foo')
-        self.assertEqual([c.id for c in service.containers()], range(3))
+        self.assertEqual([c.id for c in service.containers()], list(range(3)))
 
         expected_labels = [
             '{0}=myproject'.format(LABEL_PROJECT),
