@@ -453,7 +453,7 @@ class TopLevelCommand(Command):
         service_names = options['SERVICE']
         timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
 
-        project.up(
+        to_attach = project.up(
             service_names=service_names,
             start_deps=start_deps,
             allow_recreate=allow_recreate,
@@ -462,8 +462,6 @@ class TopLevelCommand(Command):
             do_build=not options['--no-build'],
             timeout=timeout
         )
-
-        to_attach = [c for s in project.get_services(service_names) for c in s.containers()]
 
         if not detached:
             print("Attaching to", list_containers(to_attach))
