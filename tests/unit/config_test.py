@@ -7,6 +7,13 @@ from .. import unittest
 from compose import config
 
 
+def make_service_dict(name, service_dict, working_dir):
+    """
+    Test helper function to contruct a ServiceLoader
+    """
+    return config.ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
+
+
 class ConfigTest(unittest.TestCase):
     def test_load(self):
         service_dicts = config.load(
@@ -47,22 +54,22 @@ class ConfigTest(unittest.TestCase):
     def test_config_validation(self):
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.make_service_dict('foo', {'port': ['8000']}, 'tests/')
+            lambda: make_service_dict('foo', {'port': ['8000']}, 'tests/')
         )
-        config.make_service_dict('foo', {'ports': ['8000']}, 'tests/')
+        make_service_dict('foo', {'ports': ['8000']}, 'tests/')
 
 
 class VolumePathTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environ(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = config.make_service_dict('foo', {'volumes': ['${VOLUME_PATH}:/container/path']}, working_dir='.')
+        d = make_service_dict('foo', {'volumes': ['${VOLUME_PATH}:/container/path']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
-        d = config.make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
+        d = make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
 
@@ -219,36 +226,36 @@ class MergeLabelsTest(unittest.TestCase):
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
-            config.make_service_dict('foo', {}, 'tests/'),
+            make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
+            make_service_dict('foo', {}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {}, 'tests/'),
-            config.make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
+            make_service_dict('foo', {}, 'tests/'),
+            make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '2'})
 
     def test_override_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
-            config.make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
+            make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
+            make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '2', 'bar': ''})
 
     def test_add_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
-            config.make_service_dict('foo', {'labels': ['bar=2']}, 'tests/'),
+            make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
+            make_service_dict('foo', {'labels': ['bar=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': '2'})
 
     def test_remove_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            config.make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}, 'tests/'),
-            config.make_service_dict('foo', {'labels': ['bar']}, 'tests/'),
+            make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}, 'tests/'),
+            make_service_dict('foo', {'labels': ['bar']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
@@ -286,7 +293,7 @@ class EnvTest(unittest.TestCase):
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
 
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'foo', {
                 'environment': {
                     'FILE_DEF': 'F1',
@@ -304,7 +311,7 @@ class EnvTest(unittest.TestCase):
         )
 
     def test_env_from_file(self):
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'foo',
             {'env_file': 'one.env'},
             'tests/fixtures/env',
@@ -315,7 +322,7 @@ class EnvTest(unittest.TestCase):
         )
 
     def test_env_from_multiple_files(self):
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'foo',
             {'env_file': ['one.env', 'two.env']},
             'tests/fixtures/env',
@@ -329,7 +336,7 @@ class EnvTest(unittest.TestCase):
         options = {'env_file': 'nonexistent.env'}
         self.assertRaises(
             config.ConfigurationError,
-            lambda: config.make_service_dict('foo', options, 'tests/fixtures/env'),
+            lambda: make_service_dict('foo', options, 'tests/fixtures/env'),
         )
 
     @mock.patch.dict(os.environ)
@@ -337,7 +344,7 @@ class EnvTest(unittest.TestCase):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'foo',
             {'env_file': 'resolve.env'},
             'tests/fixtures/env',
@@ -352,14 +359,14 @@ class EnvTest(unittest.TestCase):
         os.environ['HOSTENV'] = '/tmp'
         os.environ['CONTAINERENV'] = '/host/tmp'
 
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'foo',
             {'volumes': ['$HOSTENV:$CONTAINERENV']},
             working_dir="tests/fixtures/env"
         )
         self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
 
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'foo',
             {'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']},
             working_dir="tests/fixtures/env"
@@ -459,7 +466,7 @@ class ExtendsTest(unittest.TestCase):
         dictionary = {'extends': None}
 
         def load_config():
-            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'dictionary', load_config)
 
@@ -470,7 +477,7 @@ class ExtendsTest(unittest.TestCase):
         dictionary = {'extends': {'file': 'common.yml'}}
 
         def load_config():
-            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'service', load_config)
 
@@ -483,7 +490,7 @@ class ExtendsTest(unittest.TestCase):
         }
 
         def load_config():
-            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'what', load_config)
 
@@ -491,7 +498,7 @@ class ExtendsTest(unittest.TestCase):
         dictionary = {'extends': {'service': 'web'}}
 
         def load_config():
-            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertRaisesRegexp(config.ConfigurationError, 'file', load_config)
 
@@ -499,7 +506,7 @@ class ExtendsTest(unittest.TestCase):
         dictionary = {'extends': {'service': 'web', 'file': 'common.yml'}}
 
         def load_config():
-            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
         self.assertIsInstance(load_config(), dict)
 
@@ -529,7 +536,7 @@ class ExtendsTest(unittest.TestCase):
 
     def test_blacklisted_options(self):
         def load_config():
-            return config.make_service_dict('myweb', {
+            return make_service_dict('myweb', {
                 'extends': {
                     'file': 'whatever',
                     'service': 'web',
@@ -603,7 +610,7 @@ class BuildPathTest(unittest.TestCase):
 
     def test_relative_path(self):
         relative_build_path = '../build-ctx/'
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'relpath',
             {'build': relative_build_path},
             working_dir='tests/fixtures/build-path'
@@ -611,7 +618,7 @@ class BuildPathTest(unittest.TestCase):
         self.assertEquals(service_dict['build'], self.abs_context_path)
 
     def test_absolute_path(self):
-        service_dict = config.make_service_dict(
+        service_dict = make_service_dict(
             'abspath',
             {'build': self.abs_context_path},
             working_dir='tests/fixtures/build-path'

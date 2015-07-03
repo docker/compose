@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from compose.service import Service
-from compose.config import make_service_dict
+from compose.config import ServiceLoader
 from compose.const import LABEL_PROJECT
 from compose.cli.docker_client import docker_client
 from compose.progress_stream import stream_output
@@ -30,10 +30,12 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
+        options = ServiceLoader(working_dir='.').make_service_dict(name, kwargs)
+
         return Service(
             project='composetest',
             client=self.client,
-            **make_service_dict(name, kwargs, working_dir='.')
+            **options
         )
 
     def check_build(self, *args, **kwargs):

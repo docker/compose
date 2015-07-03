@@ -134,10 +134,6 @@ def load(config_details):
     return service_dicts
 
 
-def make_service_dict(name, service_dict, working_dir):
-    return ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
-
-
 class ServiceLoader(object):
     def __init__(self, working_dir, filename=None, already_seen=None):
         self.working_dir = os.path.abspath(working_dir)
