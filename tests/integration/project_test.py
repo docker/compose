@@ -29,6 +29,21 @@ class ProjectTest(DockerClientTestCase):
             [c.name for c in containers],
             ['composetest_web_1'])
 
+    def test_containers_with_extra_service(self):
+        web = self.create_service('web')
+        web_1 = web.create_container()
+
+        db = self.create_service('db')
+        db_1 = db.create_container()
+
+        self.create_service('extra').create_container()
+
+        project = Project('composetest', [web, db], self.client)
+        self.assertEqual(
+            set(project.containers(stopped=True)),
+            set([web_1, db_1]),
+        )
+
     def test_volumes_from_service(self):
         service_dicts = config.from_dictionary({
             'data': {
