@@ -459,6 +459,14 @@ class ExtendsTest(unittest.TestCase):
 
         self.assertRaisesRegexp(config.ConfigurationError, 'what', load_config)
 
+    def test_extends_validation_no_file_key_no_filename_set(self):
+        dictionary = {'extends': {'service': 'web'}}
+
+        def load_config():
+            return config.make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
+
+        self.assertRaisesRegexp(config.ConfigurationError, 'file', load_config)
+
     def test_extends_validation_valid_config(self):
         dictionary = {'extends': {'service': 'web', 'file': 'common.yml'}}
 
