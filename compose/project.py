@@ -226,6 +226,9 @@ class Project(object):
 
         services = self.get_services(service_names, include_deps=start_deps)
 
+        for service in services:
+            service.remove_duplicate_containers()
+
         plans = self._get_convergence_plans(
             services,
             allow_recreate=allow_recreate,
