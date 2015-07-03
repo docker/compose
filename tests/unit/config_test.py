@@ -413,6 +413,33 @@ class ExtendsTest(unittest.TestCase):
             },
         ])
 
+    def test_self_referencing_file(self):
+        """
+        We specify a 'file' key that is the filename we're already in.
+        """
+        service_dicts = load_from_filename('tests/fixtures/extends/specify-file-as-self.yml')
+        self.assertEqual(service_dicts, [
+            {
+                'environment':
+                {
+                    'YEP': '1', 'BAR': '1', 'BAZ': '3'
+                },
+                'image': 'busybox',
+                'name': 'myweb'
+            },
+            {
+                'environment':
+                {'YEP': '1'},
+                'name': 'otherweb'
+            },
+            {
+                'environment':
+                {'YEP': '1', 'BAZ': '3'},
+                'image': 'busybox',
+                'name': 'web'
+            }
+        ])
+
     def test_circular(self):
         try:
             load_from_filename('tests/fixtures/extends/circle-1.yml')
