@@ -480,7 +480,7 @@ class ExtendsTest(unittest.TestCase):
         Test not specifying a file in our extends options that the
         config is valid and correctly extends from itself.
         """
-        service_dicts = config.load('tests/fixtures/extends/no-file-specified.yml')
+        service_dicts = load_from_filename('tests/fixtures/extends/no-file-specified.yml')
         self.assertEqual(service_dicts, [
             {
                 'name': 'myweb',
