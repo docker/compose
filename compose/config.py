@@ -184,7 +184,7 @@ def process_container_options(service_dict, working_dir=None):
     service_dict = service_dict.copy()
 
     if 'volumes' in service_dict:
-        service_dict['volumes'] = resolve_host_paths(service_dict['volumes'], working_dir=working_dir)
+        service_dict['volumes'] = resolve_volume_paths(service_dict['volumes'], working_dir=working_dir)
 
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
@@ -345,18 +345,18 @@ def env_vars_from_file(filename):
     return env
 
 
-def resolve_host_paths(volumes, working_dir=None):
+def resolve_volume_paths(volumes, working_dir=None):
     if working_dir is None:
-        raise Exception("No working_dir passed to resolve_host_paths()")
+        raise Exception("No working_dir passed to resolve_volume_paths()")
 
-    return [resolve_host_path(v, working_dir) for v in volumes]
+    return [resolve_volume_path(v, working_dir) for v in volumes]
 
 
-def resolve_host_path(volume, working_dir):
+def resolve_volume_path(volume, working_dir):
     container_path, host_path = split_path_mapping(volume)
+    container_path = os.path.expanduser(os.path.expandvars(container_path))
     if host_path is not None:
-        host_path = os.path.expanduser(host_path)
-        host_path = os.path.expandvars(host_path)
+        host_path = os.path.expanduser(os.path.expandvars(host_path))
         return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
         return container_path
