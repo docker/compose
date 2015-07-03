@@ -288,6 +288,9 @@ class Project(object):
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:
             self.validate_service_names(service_names)
+        else:
+            service_names = self.service_names
+
         containers = [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
@@ -295,8 +298,6 @@ class Project(object):
                 filters={'label': self.labels(one_off=one_off)})]
 
         def matches_service_names(container):
-            if not service_names:
-                return True
             return container.labels.get(LABEL_SERVICE) in service_names
 
         if not containers:
