@@ -2,9 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+from functools import reduce
 
 from docker.errors import APIError
-from six.moves import reduce
 
 from .config import ConfigurationError
 from .config import get_service_name_from_net
@@ -340,7 +340,7 @@ class Project(object):
                 self.service_names,
             )
 
-        return filter(matches_service_names, containers)
+        return [c for c in containers if matches_service_names(c)]
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()

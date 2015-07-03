@@ -712,7 +712,9 @@ class Service(object):
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
-        path = six.binary_type(self.options['build'])
+        path = self.options['build']
+        if not six.PY3:
+            path = path.encode('utf8')
 
         build_output = self.client.build(
             path=path,
@@ -843,7 +845,7 @@ def merge_volume_bindings(volumes_option, previous_container):
         volume_bindings.update(
             get_container_data_volumes(previous_container, volumes_option))
 
-    return volume_bindings.values()
+    return list(volume_bindings.values())
 
 
 def get_container_data_volumes(container, volumes_option):
@@ -856,7 +858,7 @@ def get_container_data_volumes(container, volumes_option):
     container_volumes = container.get('Volumes') or {}
     image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
 
-    for volume in set(volumes_option + image_volumes.keys()):
+    for volume in set(volumes_option + list(image_volumes)):
         volume = parse_volume_spec(volume)
         # No need to preserve host volumes
         if volume.external:

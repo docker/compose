@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from six import iteritems
-from six.moves import reduce
+from functools import reduce
+
+import six
 
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_SERVICE
@@ -89,7 +90,7 @@ class Container(object):
                 private=private, **public[0])
 
         return ', '.join(format_port(*item)
-                         for item in sorted(iteritems(self.ports)))
+                         for item in sorted(six.iteritems(self.ports)))
 
     @property
     def labels(self):
