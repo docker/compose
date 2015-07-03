@@ -147,10 +147,11 @@ class ServiceLoader(object):
             self.filename = filename
         self.already_seen = already_seen or []
 
-    def make_service_dict(self, name, service_dict):
+    def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
+    def make_service_dict(self, name, service_dict):
         service_dict = service_dict.copy()
         service_dict['name'] = name
         service_dict = resolve_environment(service_dict, working_dir=self.working_dir)
@@ -182,6 +183,7 @@ class ServiceLoader(object):
 
         other_config = load_yaml(other_config_path)
         other_service_dict = other_config[extends_options['service']]
+        other_loader.detect_cycle(extends_options['service'])
         other_service_dict = other_loader.make_service_dict(
             service_dict['name'],
             other_service_dict,
