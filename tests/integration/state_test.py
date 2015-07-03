@@ -23,7 +23,7 @@ class ProjectTestCase(DockerClientTestCase):
         return Project.from_dicts(
             name='composetest',
             client=self.client,
-            service_dicts=config.from_dictionary(cfg),
+            service_dicts=config.load(config.ConfigDetails(cfg, 'working_dir', None))
         )
 
 

@@ -1,6 +1,12 @@
+import logging
 import os
+import sys
 import yaml
+from collections import namedtuple
+
 import six
+
+from compose.cli.utils import find_candidates_in_parent_dirs
 
 
 DOCKER_CONFIG_KEYS = [
@@ -64,12 +70,57 @@ DOCKER_CONFIG_HINTS = {
 }
 
 
-def load(filename):
-    working_dir = os.path.dirname(filename)
-    return from_dictionary(load_yaml(filename), working_dir=working_dir, filename=filename)
+SUPPORTED_FILENAMES = [
+    'docker-compose.yml',
+    'docker-compose.yaml',
+    'fig.yml',
+    'fig.yaml',
+]
 
 
-def from_dictionary(dictionary, working_dir=None, filename=None):
+log = logging.getLogger(__name__)
+
+
+ConfigDetails = namedtuple('ConfigDetails', 'config working_dir filename')
+
+
+def find(base_dir, filename):
+    if filename == '-':
+        return ConfigDetails(yaml.safe_load(sys.stdin), os.getcwd(), None)
+
+    if filename:
+        filename = os.path.join(base_dir, filename)
+    else:
+        filename = get_config_path(base_dir)
+    return ConfigDetails(load_yaml(filename), os.path.dirname(filename), filename)
+
+
+def get_config_path(base_dir):
+    (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
+
+    if len(candidates) == 0:
+        raise ComposeFileNotFound(SUPPORTED_FILENAMES)
+
+    winner = candidates[0]
+
+    if len(candidates) > 1:
+        log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
+        log.warn("Using %s\n", winner)
+
+    if winner == 'docker-compose.yaml':
+        log.warn("Please be aware that .yml is the expected extension "
+                 "in most cases, and using .yaml can cause compatibility "
+                 "issues in future.\n")
+
+    if winner.startswith("fig."):
+        log.warn("%s is deprecated and will not be supported in future. "
+                 "Please rename your config file to docker-compose.yml\n" % winner)
+
+    return os.path.join(path, winner)
+
+
+def load(config_details):
+    dictionary, working_dir, filename = config_details
     service_dicts = []
 
     for service_name, service_dict in list(dictionary.items()):
@@ -488,3 +539,12 @@ class CircularReference(ConfigurationError):
             for (filename, service_name) in self.trail
         ]
         return "Circular reference:\n  {}".format("\n  extends ".join(lines))
+
+
+class ComposeFileNotFound(ConfigurationError):
+    def __init__(self, supported_filenames):
+        super(ComposeFileNotFound, self).__init__("""
+        Can't find a suitable configuration file in this directory or any parent. Are you in the right directory?
+
+        Supported filenames: %s
+        """ % ", ".join(supported_filenames))

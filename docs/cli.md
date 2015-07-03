@@ -153,6 +153,9 @@ By default, if there are existing containers for a service, `docker-compose up` 
  for `docker-compose.yml` in the current working directory, and then each parent
  directory successively, until found.
 
+ Use a `-` as the filename to read configuration from stdin. When stdin is used
+ all paths in the configuration will be relative to the current working
+ directory.
 
 ### -p, --project-name NAME
 

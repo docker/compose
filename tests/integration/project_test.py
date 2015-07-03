@@ -7,6 +7,10 @@ from compose.container import Container
 from .testcases import DockerClientTestCase
 
 
+def build_service_dicts(service_config):
+    return config.load(config.ConfigDetails(service_config, 'working_dir', None))
+
+
 class ProjectTest(DockerClientTestCase):
 
     def test_containers(self):
@@ -32,7 +36,7 @@ class ProjectTest(DockerClientTestCase):
             ['composetest_web_1'])
 
     def test_volumes_from_service(self):
-        service_dicts = config.from_dictionary({
+        service_dicts = build_service_dicts({
             'data': {
                 'image': 'busybox:latest',
                 'volumes': ['/var/data'],
@@ -41,7 +45,7 @@ class ProjectTest(DockerClientTestCase):
                 'image': 'busybox:latest',
                 'volumes_from': ['data'],
             },
-        }, working_dir='.')
+        })
         project = Project.from_dicts(
             name='composetest',
             service_dicts=service_dicts,
@@ -61,7 +65,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            service_dicts=build_service_dicts({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
@@ -75,7 +79,7 @@ class ProjectTest(DockerClientTestCase):
     def test_net_from_service(self):
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            service_dicts=build_service_dicts({
                 'net': {
                     'image': 'busybox:latest',
                     'command': ["top"]
@@ -107,7 +111,7 @@ class ProjectTest(DockerClientTestCase):
 
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            service_dicts=build_service_dicts({
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:composetest_net_container'
@@ -274,7 +278,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_starts_depends(self):
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            service_dicts=build_service_dicts({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],
@@ -309,7 +313,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_with_no_deps(self):
         project = Project.from_dicts(
             name='composetest',
-            service_dicts=config.from_dictionary({
+            service_dicts=build_service_dicts({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],
