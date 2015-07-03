@@ -308,8 +308,7 @@ class Project(object):
                 self.client,
                 self.name,
                 self.service_names,
-                stopped=stopped,
-                one_off=one_off)
+            )
 
         return filter(matches_service_names, containers)
 
