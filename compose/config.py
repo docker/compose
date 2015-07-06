@@ -134,20 +134,20 @@ def load(config_details):
     return service_dicts
 
 
-def make_service_dict(name, service_dict, working_dir=None):
-    return ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
-
-
 class ServiceLoader(object):
     def __init__(self, working_dir, filename=None, already_seen=None):
-        self.working_dir = working_dir
-        self.filename = filename
+        self.working_dir = os.path.abspath(working_dir)
+        if filename:
+            self.filename = os.path.abspath(filename)
+        else:
+            self.filename = filename
         self.already_seen = already_seen or []
 
-    def make_service_dict(self, name, service_dict):
+    def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
-            raise CircularReference(self.already_seen)
+            raise CircularReference(self.already_seen + [self.signature(name)])
 
+    def make_service_dict(self, name, service_dict):
         service_dict = service_dict.copy()
         service_dict['name'] = name
         service_dict = resolve_environment(service_dict, working_dir=self.working_dir)
@@ -158,12 +158,17 @@ class ServiceLoader(object):
         if 'extends' not in service_dict:
             return service_dict
 
-        extends_options = process_extends_options(service_dict['name'], service_dict['extends'])
+        extends_options = self.validate_extends_options(service_dict['name'], service_dict['extends'])
 
         if self.working_dir is None:
             raise Exception("No working_dir passed to ServiceLoader()")
 
-        other_config_path = expand_path(self.working_dir, extends_options['file'])
+        if 'file' in extends_options:
+            extends_from_filename = extends_options['file']
+            other_config_path = expand_path(self.working_dir, extends_from_filename)
+        else:
+            other_config_path = self.filename
+
         other_working_dir = os.path.dirname(other_config_path)
         other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
         other_loader = ServiceLoader(
@@ -174,6 +179,7 @@ class ServiceLoader(object):
 
         other_config = load_yaml(other_config_path)
         other_service_dict = other_config[extends_options['service']]
+        other_loader.detect_cycle(extends_options['service'])
         other_service_dict = other_loader.make_service_dict(
             service_dict['name'],
             other_service_dict,
@@ -189,25 +195,29 @@ class ServiceLoader(object):
     def signature(self, name):
         return (self.filename, name)
 
+    def validate_extends_options(self, service_name, extends_options):
+        error_prefix = "Invalid 'extends' configuration for %s:" % service_name
 
-def process_extends_options(service_name, extends_options):
-    error_prefix = "Invalid 'extends' configuration for %s:" % service_name
+        if not isinstance(extends_options, dict):
+            raise ConfigurationError("%s must be a dictionary" % error_prefix)
 
-    if not isinstance(extends_options, dict):
-        raise ConfigurationError("%s must be a dictionary" % error_prefix)
-
-    if 'service' not in extends_options:
-        raise ConfigurationError(
-            "%s you need to specify a service, e.g. 'service: web'" % error_prefix
-        )
-
-    for k, _ in extends_options.items():
-        if k not in ['file', 'service']:
+        if 'service' not in extends_options:
             raise ConfigurationError(
-                "%s unsupported configuration option '%s'" % (error_prefix, k)
+                "%s you need to specify a service, e.g. 'service: web'" % error_prefix
             )
 
-    return extends_options
+        if 'file' not in extends_options and self.filename is None:
+            raise ConfigurationError(
+                "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
+            )
+
+        for k, _ in extends_options.items():
+            if k not in ['file', 'service']:
+                raise ConfigurationError(
+                    "%s unsupported configuration option '%s'" % (error_prefix, k)
+                )
+
+        return extends_options
 
 
 def validate_extended_service_dict(service_dict, filename, service):
