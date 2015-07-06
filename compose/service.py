@@ -402,10 +402,14 @@ class Service(object):
         return json_hash(self.config_dict())
 
     def config_dict(self):
-        return {
+        dict = {
             'options': self.options,
-            'image_id': self.image()['Id'],
         }
+
+        if self.image() is not None:
+            dict['image_id'] = self.image()['Id']
+
+        return dict
 
     def get_dependency_names(self):
         net_name = self.get_net_name()
