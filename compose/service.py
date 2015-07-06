@@ -65,6 +65,10 @@ class NeedsBuildError(Exception):
         self.service = service
 
 
+class NoSuchImageError(Exception):
+    pass
+
+
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
@@ -225,8 +229,11 @@ class Service(object):
                             do_build=True,
                             insecure_registry=False):
 
-        if self.image():
+        try:
+            self.image()
             return
+        except NoSuchImageError:
+            pass
 
         if self.can_be_built():
             if do_build:
@@ -241,7 +248,7 @@ class Service(object):
             return self.client.inspect_image(self.image_name)
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                return None
+                raise NoSuchImageError("Image '{}' not found".format(self.image_name))
             else:
                 raise
 
@@ -275,7 +282,17 @@ class Service(object):
         return ConvergencePlan('recreate', containers)
 
     def _containers_have_diverged(self, containers):
-        config_hash = self.config_hash()
+        config_hash = None
+
+        try:
+            config_hash = self.config_hash()
+        except NoSuchImageError as e:
+            log.debug(
+                'Service %s has diverged: %s',
+                self.name, six.text_type(e),
+            )
+            return True
+
         has_diverged = False
 
         for c in containers:
