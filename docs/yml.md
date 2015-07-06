@@ -312,7 +312,7 @@ Override the default labeling scheme for each container.
         - label:user:USER
         - label:role:ROLE
 
-### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only 
+### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, memswap\_limit, privileged, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only 
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -330,6 +330,7 @@ Each of these is a single value, analogous to its
     mac_address: 02:42:ac:11:65:43
 
     mem_limit: 1000000000
+    memswap_limit: 2000000000
     privileged: true
 
     restart: always

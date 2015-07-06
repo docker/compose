@@ -260,6 +260,31 @@ class MergeLabelsTest(unittest.TestCase):
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
 
+class MemoryOptionsTest(unittest.TestCase):
+    def test_validation_fails_with_just_memswap_limit(self):
+        """
+        When you set a 'memswap_limit' it is invalid config unless you also set
+        a mem_limit
+        """
+        with self.assertRaises(config.ConfigurationError):
+            make_service_dict(
+                'foo', {
+                    'memswap_limit': 2000000,
+                },
+                'tests/'
+            )
+
+    def test_validation_with_correct_memswap_values(self):
+        service_dict = make_service_dict(
+            'foo', {
+                'mem_limit': 1000000,
+                'memswap_limit': 2000000,
+            },
+            'tests/'
+        )
+        self.assertEqual(service_dict['memswap_limit'], 2000000)
+
+
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
         environment = [
