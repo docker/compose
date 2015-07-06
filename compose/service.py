@@ -9,6 +9,7 @@ from operator import attrgetter
 import six
 from docker.errors import APIError
 from docker.utils import create_host_config, LogConfig
+from docker.utils.ports import build_port_bindings, split_port
 
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS, merge_environment
@@ -598,13 +599,13 @@ class Service(object):
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
             all_ports = container_options.get('ports', []) + self.options.get('expose', [])
-            for port in all_ports:
-                port = str(port)
-                if ':' in port:
-                    port = port.split(':')[-1]
-                if '/' in port:
-                    port = tuple(port.split('/'))
-                ports.append(port)
+            for port_range in all_ports:
+                internal_range, _ = split_port(port_range)
+                for port in internal_range:
+                    port = str(port)
+                    if '/' in port:
+                        port = tuple(port.split('/'))
+                    ports.append(port)
             container_options['ports'] = ports
 
         override_options['binds'] = merge_volume_bindings(
@@ -854,38 +855,6 @@ def parse_volume_spec(volume_config):
         parts.append('rw')
 
     return VolumeSpec(*parts)
-
-
-# Ports
-
-
-def build_port_bindings(ports):
-    port_bindings = {}
-    for port in ports:
-        internal_port, external = split_port(port)
-        if internal_port in port_bindings:
-            port_bindings[internal_port].append(external)
-        else:
-            port_bindings[internal_port] = [external]
-    return port_bindings
-
-
-def split_port(port):
-    parts = str(port).split(':')
-    if not 1 <= len(parts) <= 3:
-        raise ConfigError('Invalid port "%s", should be '
-                          '[[remote_ip:]remote_port:]port[/protocol]' % port)
-
-    if len(parts) == 1:
-        internal_port, = parts
-        return internal_port, None
-    if len(parts) == 2:
-        external_port, internal_port = parts
-        return internal_port, external_port
-
-    external_ip, external_port, internal_port = parts
-    return internal_port, (external_ip, external_port or None)
-
 
 # Labels
 

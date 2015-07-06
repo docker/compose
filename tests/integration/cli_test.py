@@ -334,6 +334,7 @@ class CLITestCase(DockerClientTestCase):
         # get port information
         port_random = container.get_local_port(3000)
         port_assigned = container.get_local_port(3001)
+        port_range = container.get_local_port(3002), container.get_local_port(3003)
 
         # close all one off containers we just created
         container.stop()
@@ -342,6 +343,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotEqual(port_random, None)
         self.assertIn("0.0.0.0", port_random)
         self.assertEqual(port_assigned, "0.0.0.0:49152")
+        self.assertEqual(port_range[0], "0.0.0.0:49153")
+        self.assertEqual(port_range[1], "0.0.0.0:49154")
 
     def test_rm(self):
         service = self.project.get_service('simple')
@@ -456,7 +459,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
         self.assertEqual(get_port(3001), "0.0.0.0:49152")
-        self.assertEqual(get_port(3002), "")
+        self.assertEqual(get_port(3002), "0.0.0.0:49153")
 
     def test_port_with_scale(self):
 
