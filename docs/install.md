@@ -33,7 +33,7 @@ To install Compose, run the following commands:
 > Note: If you get a "Permission denied" error, your `/usr/local/bin` directory probably isn't writable and you'll need to install Compose as the superuser. Run `sudo -i`, then the two commands above, then `exit`.
 
 Optionally, you can also install [command completion](completion.md) for the
-bash shell.
+bash and zsh shell.
 
 Compose is available for OS X and 64-bit Linux. If you're on another platform,
 Compose can also be installed as a Python package:
