@@ -75,11 +75,11 @@ Next, you'll want to make a directory for the project:
     $ cd composetest
 
 Inside this directory, create `app.py`, a simple web app that uses the Flask
-framework and increments a value in Redis:
+framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
 
     from flask import Flask
     from redis import Redis
-    import os
+
     app = Flask(__name__)
     redis = Redis(host='redis', port=6379)
 
@@ -159,10 +159,13 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
     Starting composetest_web_1...
     redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     web_1   |  * Running on http://0.0.0.0:5000/
+    web_1   |  * Restarting with stat
 
-The web app should now be listening on port 5000 on your Docker daemon host (if
-you're using Boot2docker, `boot2docker ip` will tell you its address). In a browser,
-open `http://ip-from-boot2docker:5000` and you should get a message in your browser saying:
+If you're using [Boot2docker](https://github.com/boot2docker/boot2docker), then `boot2docker ip` will tell you its address and you can open `http://ip-from-boot2docker:5000` in a browser. 
+
+If you're not using Boot2docker and are on linux, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try localhost:5000.
+
+You should get a message in your browser saying:
 
 `Hello World! I have been seen 1 times.`
 
@@ -187,7 +190,7 @@ services. For example, to see what environment variables are available to the
 
     $ docker-compose run web env
 
-See `docker-compose --help` to see other available commands.
+See `docker-compose --help` to see other available commands. You can also install [command completion](completion.md) for the bash and zsh shell, which will also show you available commands.
 
 If you started Compose with `docker-compose up -d`, you'll probably want to stop
 your services once you've finished with them:

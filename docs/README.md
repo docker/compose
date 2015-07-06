@@ -12,7 +12,7 @@ If you want to add a new file or change the location of the document in the menu
 
 2. Save your changes.
 
-3. Make sure you in your `docs` subdirectory.
+3. Make sure you are in the `docs` subdirectory.
 
 4. Build the documentation.
 
@@ -41,7 +41,7 @@ If you want to add a new file or change the location of the document in the menu
 
 ## Tips on Hugo metadata and menu positioning
 
-The top of each Docker Compose documentation file contains TOML metadata. The metadata is commented out to prevent it from appears in GitHub.
+The top of each Docker Compose documentation file contains TOML metadata. The metadata is commented out to prevent it from appearing in GitHub.
 
     <!--[metadata]>
     +++
