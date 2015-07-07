@@ -191,6 +191,13 @@ class ServiceStateTest(DockerClientTestCase):
         web = self.create_service('web', command=["top", "-d", "1"])
         self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
 
+    def test_trigger_recreate_with_nonexistent_image_tag(self):
+        web = self.create_service('web', image="busybox:latest")
+        container = web.create_container()
+
+        web = self.create_service('web', image="nonexistent-image")
+        self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
+
     def test_trigger_recreate_with_image_change(self):
         repo = 'composetest_myimage'
         tag = 'latest'

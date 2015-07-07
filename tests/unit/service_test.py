@@ -12,6 +12,7 @@ from compose.const import LABEL_SERVICE, LABEL_PROJECT, LABEL_ONE_OFF
 from compose.service import (
     ConfigError,
     NeedsBuildError,
+    NoSuchImageError,
     build_port_bindings,
     build_volume_binding,
     get_container_data_volumes,
@@ -233,7 +234,7 @@ class ServiceTest(unittest.TestCase):
             images.append({'Id': 'abc123'})
             return []
 
-        service.image = lambda: images[0] if images else None
+        service.image = lambda *args, **kwargs: mock_get_image(images)
         self.mock_client.pull = pull
 
         service.create_container(insecure_registry=True)
@@ -273,7 +274,7 @@ class ServiceTest(unittest.TestCase):
             images.append({'Id': 'abc123'})
             return []
 
-        service.image = lambda: images[0] if images else None
+        service.image = lambda *args, **kwargs: mock_get_image(images)
         self.mock_client.pull = pull
 
         service.create_container()
@@ -283,7 +284,7 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', client=self.mock_client, build='.')
 
         images = []
-        service.image = lambda *args, **kwargs: images[0] if images else None
+        service.image = lambda *args, **kwargs: mock_get_image(images)
         service.build = lambda: images.append({'Id': 'abc123'})
 
         service.create_container(do_build=True)
@@ -298,7 +299,7 @@ class ServiceTest(unittest.TestCase):
 
     def test_create_container_no_build_but_needs_build(self):
         service = Service('foo', client=self.mock_client, build='.')
-        service.image = lambda: None
+        service.image = lambda *args, **kwargs: mock_get_image([])
 
         with self.assertRaises(NeedsBuildError):
             service.create_container(do_build=False)
@@ -313,6 +314,13 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(self.mock_client.build.call_count, 1)
         self.assertFalse(self.mock_client.build.call_args[1]['pull'])
+
+
+def mock_get_image(images):
+    if images:
+        return images[0]
+    else:
+        raise NoSuchImageError()
 
 
 class ServiceVolumesTest(unittest.TestCase):
