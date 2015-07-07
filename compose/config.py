@@ -31,6 +31,7 @@ DOCKER_CONFIG_KEYS = [
     'links',
     'mac_address',
     'mem_limit',
+    'memswap_limit',
     'net',
     'log_driver',
     'pid',
@@ -61,6 +62,7 @@ DOCKER_CONFIG_HINTS = {
     'extra_host': 'extra_hosts',
     'device': 'devices',
     'link': 'links',
+    'memory_swap': 'memswap_limit',
     'port': 'ports',
     'privilege': 'privileged',
     'priviliged': 'privileged',
@@ -243,6 +245,9 @@ def process_container_options(service_dict, working_dir=None):
             raise ConfigurationError(msg)
 
     service_dict = service_dict.copy()
+
+    if 'memswap_limit' in service_dict and 'mem_limit' not in service_dict:
+        raise ConfigurationError("Invalid 'memswap_limit' configuration for %s service: when defining 'memswap_limit' you must set 'mem_limit' as well" % service_dict['name'])
 
     if 'volumes' in service_dict:
         service_dict['volumes'] = resolve_volume_paths(service_dict['volumes'], working_dir=working_dir)
