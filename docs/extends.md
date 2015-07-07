@@ -233,11 +233,13 @@ manually keep both environments in sync.
 ### Reference
 
 You can use `extends` on any service together with other configuration keys. It
-always expects a dictionary that should always contain two keys: `file` and
-`service`.
+always expects a dictionary that should always contain the key: `service` and optionally the `file` key.
 
-The `file` key specifies which file to look in. It can be an absolute path or a
-relative one&mdash;if relative, it's treated as relative to the current file.
+The `file` key specifies the location of a Compose configuration file defining
+the extension. The `file` value can be an absolute or relative path. If you
+specify a relative path, Docker Compose treats it as relative to the location
+of the current file. If you don't specify a `file`, Compose looks in the
+current configuration file.
 
 The `service` key specifies the name of the service to extend, for example `web`
 or `database`.
