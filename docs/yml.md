@@ -217,6 +217,9 @@ and adds `ports` and `links` configuration. It overrides one of the defined
 environment variables (DEBUG) with a new value, and the other one
 (SEND_EMAILS) is left untouched.
 
+The `file` key is optional, if it is not set then Compose will look for the
+service within the current file.
+
 For more on `extends`, see the [tutorial](extends.md#example) and
 [reference](extends.md#reference).
 
