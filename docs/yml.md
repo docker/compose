@@ -248,6 +248,14 @@ The default value is json-file.
     log_driver: "syslog"
     log_driver: "none"
 
+Specify logging options with `log_opt` for the logging driver, as with the ``--log-opt`` option for `docker run`.
+
+Logging options are key value pairs. An example of `syslog` options:
+
+    log_driver: "syslog"
+    log_opt:
+      address: "tcp://192.168.0.42:123"
+
 ### net
 
 Networking mode. Use the same values as the docker client `--net` parameter.

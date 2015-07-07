@@ -5,6 +5,7 @@ from .. import unittest
 import mock
 
 import docker
+from docker.utils import LogConfig
 
 from compose.service import Service
 from compose.container import Container
@@ -161,6 +162,16 @@ class ServiceTest(unittest.TestCase):
         opts = service._get_container_create_options({'some': 'overrides'}, 1)
         self.assertEqual(opts['memswap_limit'], 2000000000)
         self.assertEqual(opts['mem_limit'], 1000000000)
+
+    def test_log_opt(self):
+        log_opt = {'address': 'tcp://192.168.0.42:123'}
+        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'some': 'overrides'}, 1)
+
+        self.assertIsInstance(opts['host_config']['LogConfig'], LogConfig)
+        self.assertEqual(opts['host_config']['LogConfig'].type, 'syslog')
+        self.assertEqual(opts['host_config']['LogConfig'].config, log_opt)
 
     def test_split_domainname_fqdn(self):
         service = Service(

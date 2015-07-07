@@ -33,6 +33,7 @@ DOCKER_CONFIG_KEYS = [
     'memswap_limit',
     'net',
     'log_driver',
+    'log_opt',
     'pid',
     'ports',
     'privileged',

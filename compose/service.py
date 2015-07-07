@@ -40,6 +40,7 @@ DOCKER_START_KEYS = [
     'read_only',
     'net',
     'log_driver',
+    'log_opt',
     'pid',
     'privileged',
     'restart',
@@ -583,7 +584,10 @@ class Service(object):
         privileged = options.get('privileged', False)
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
-        log_config = LogConfig(type=options.get('log_driver', 'json-file'))
+        log_config = LogConfig(
+            type=options.get('log_driver', 'json-file'),
+            config=options.get('log_opt', None)
+        )
         pid = options.get('pid', None)
         security_opt = options.get('security_opt', None)
 
