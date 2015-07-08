@@ -127,7 +127,7 @@ class CLITestCase(unittest.TestCase):
     def test_run_with_environment_merged_with_options_list(self, mock_dockerpty):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock()
+        mock_project = mock.Mock(client=mock_client)
         mock_project.get_service.return_value = Service(
             'service',
             client=mock_client,
@@ -156,7 +156,7 @@ class CLITestCase(unittest.TestCase):
     def test_run_service_with_restart_always(self):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock()
+        mock_project = mock.Mock(client=mock_client)
         mock_project.get_service.return_value = Service(
             'service',
             client=mock_client,
@@ -180,7 +180,7 @@ class CLITestCase(unittest.TestCase):
 
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock()
+        mock_project = mock.Mock(client=mock_client)
         mock_project.get_service.return_value = Service(
             'service',
             client=mock_client,

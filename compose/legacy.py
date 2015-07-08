@@ -1,6 +1,7 @@
 import logging
 import re
 
+from .const import LABEL_VERSION
 from .container import get_container_name, Container
 
 
@@ -24,41 +25,82 @@ Alternatively, remove them:
     $ docker rm -f {rm_args}
 """
 
+ONE_OFF_ADDENDUM_FORMAT = """
+You should also remove your one-off containers:
+
+    $ docker rm -f {rm_args}
+"""
+
+ONE_OFF_ERROR_MESSAGE_FORMAT = """
+Compose found the following containers without labels:
+
+{names_list}
+
+As of Compose 1.3.0, containers are identified with labels instead of naming convention.
+
+Remove them before continuing:
+
+    $ docker rm -f {rm_args}
+"""
+
 
 def check_for_legacy_containers(
         client,
         project,
         services,
-        stopped=False,
-        one_off=False):
+        allow_one_off=True):
     """Check if there are containers named using the old naming convention
     and warn the user that those containers may need to be migrated to
     using labels, so that compose can find them.
     """
-    containers = list(get_legacy_containers(
-        client,
-        project,
-        services,
-        stopped=stopped,
-        one_off=one_off))
+    containers = get_legacy_containers(client, project, services, one_off=False)
 
     if containers:
-        raise LegacyContainersError([c.name for c in containers])
+        one_off_containers = get_legacy_containers(client, project, services, one_off=True)
+
+        raise LegacyContainersError(
+            [c.name for c in containers],
+            [c.name for c in one_off_containers],
+        )
+
+    if not allow_one_off:
+        one_off_containers = get_legacy_containers(client, project, services, one_off=True)
+
+        if one_off_containers:
+            raise LegacyOneOffContainersError(
+                [c.name for c in one_off_containers],
+            )
 
 
-class LegacyContainersError(Exception):
-    def __init__(self, names):
+class LegacyError(Exception):
+    def __unicode__(self):
+        return self.msg
+
+    __str__ = __unicode__
+
+
+class LegacyContainersError(LegacyError):
+    def __init__(self, names, one_off_names):
         self.names = names
+        self.one_off_names = one_off_names
 
         self.msg = ERROR_MESSAGE_FORMAT.format(
             names_list="\n".join("    {}".format(name) for name in names),
             rm_args=" ".join(names),
         )
 
-    def __unicode__(self):
-        return self.msg
+        if one_off_names:
+            self.msg += ONE_OFF_ADDENDUM_FORMAT.format(rm_args=" ".join(one_off_names))
 
-    __str__ = __unicode__
+
+class LegacyOneOffContainersError(LegacyError):
+    def __init__(self, one_off_names):
+        self.one_off_names = one_off_names
+
+        self.msg = ONE_OFF_ERROR_MESSAGE_FORMAT.format(
+            names_list="\n".join("    {}".format(name) for name in one_off_names),
+            rm_args=" ".join(one_off_names),
+        )
 
 
 def add_labels(project, container):
@@ -76,8 +118,8 @@ def migrate_project_to_labels(project):
         project.client,
         project.name,
         project.service_names,
-        stopped=True,
-        one_off=False)
+        one_off=False,
+    )
 
     for container in containers:
         add_labels(project, container)
@@ -87,13 +129,29 @@ def get_legacy_containers(
         client,
         project,
         services,
-        stopped=False,
         one_off=False):
 
-    containers = client.containers(all=stopped)
+    return list(_get_legacy_containers_iter(
+        client,
+        project,
+        services,
+        one_off=one_off,
+    ))
+
+
+def _get_legacy_containers_iter(
+        client,
+        project,
+        services,
+        one_off=False):
+
+    containers = client.containers(all=True)
 
     for service in services:
         for container in containers:
+            if LABEL_VERSION in container['Labels']:
+                continue
+
             name = get_container_name(container)
             if has_container(project, service, name, one_off=one_off):
                 yield Container.from_ps(client, container)

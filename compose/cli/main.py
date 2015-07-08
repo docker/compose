@@ -33,7 +33,7 @@ def main():
     except KeyboardInterrupt:
         log.error("\nAborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError, legacy.LegacyContainersError) as e:
+    except (UserError, NoSuchService, ConfigurationError, legacy.LegacyError) as e:
         log.error(e.msg)
         sys.exit(1)
     except NoSuchCommand as e:
@@ -334,12 +334,22 @@ class TopLevelCommand(Command):
         if not options['--service-ports']:
             container_options['ports'] = []
 
-        container = service.create_container(
-            quiet=True,
-            one_off=True,
-            insecure_registry=insecure_registry,
-            **container_options
-        )
+        try:
+            container = service.create_container(
+                quiet=True,
+                one_off=True,
+                insecure_registry=insecure_registry,
+                **container_options
+            )
+        except APIError as e:
+            legacy.check_for_legacy_containers(
+                project.client,
+                project.name,
+                [service.name],
+                allow_one_off=False,
+            )
+
+            raise e
 
         if options['-d']:
             service.start_container(container)
