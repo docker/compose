@@ -111,8 +111,7 @@ class Service(object):
                 self.client,
                 self.project,
                 [self.name],
-                stopped=stopped,
-                one_off=one_off)
+            )
 
         return containers
 
