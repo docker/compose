@@ -28,6 +28,14 @@ pull if it doesn't exist locally.
     image: orchardup/postgresql
     image: a4bc65fd
 
+### load_image
+
+Path to tar archive of an image to load. Use with `image` to load from a
+tar archive instead of pulling from a registry when the image doesn't
+exist locally.
+
+    load_image: /path/to/image/tar
+
 ### build
 
 Path to a directory containing a Dockerfile. When the value supplied is a

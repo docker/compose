@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from collections import namedtuple
 import logging
+import os
 import re
 import sys
 from operator import attrgetter
@@ -240,6 +241,10 @@ class Service(object):
                 self.build()
             else:
                 raise NeedsBuildError(self)
+
+        elif self.can_be_loaded():
+            with open(self.options['load_image'], 'r') as data:
+                self.client.load_image(data=data)
         else:
             self.pull(insecure_registry=insecure_registry)
 
@@ -682,6 +687,9 @@ class Service(object):
 
     def can_be_built(self):
         return 'build' in self.options
+
+    def can_be_loaded(self):
+        return 'load_image' in self.options and os.path.exists(self.options['load_image'])
 
     @property
     def full_name(self):
