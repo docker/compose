@@ -98,7 +98,7 @@ def split_buffer(reader, separator):
     separator = str(separator)
 
     for data in reader:
-        buffered += data
+        buffered += str(data)
         while True:
             index = buffered.find(separator)
             if index == -1:
