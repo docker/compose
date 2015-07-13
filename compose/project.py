@@ -143,12 +143,9 @@ class Project(object):
         links = []
         if 'links' in service_dict:
             for link in service_dict.get('links', []):
-                if ':' in link:
-                    service_name, link_name = link.split(':', 1)
-                else:
-                    service_name, link_name = link, None
+                service_name, _, link_name = link.partition(':')
                 try:
-                    links.append((self.get_service(service_name), link_name))
+                    links.append((self.get_service(service_name), link_name or None))
                 except NoSuchService:
                     raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
             del service_dict['links']
