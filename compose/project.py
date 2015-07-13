@@ -1,15 +1,16 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import logging
 from functools import reduce
+import logging
 
 from docker.errors import APIError
 
 from .config import get_service_name_from_net, ConfigurationError
-from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF, DEFAULT_TIMEOUT
-from .service import Service
+from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
 from .container import Container
 from .legacy import check_for_legacy_containers
+from .service import Service
+from .utils import parallel_execute
 
 log = logging.getLogger(__name__)
 
@@ -197,12 +198,15 @@ class Project(object):
             service.start(**options)
 
     def stop(self, service_names=None, **options):
-        for service in reversed(self.get_services(service_names)):
-            service.stop(**options)
+        parallel_execute("stop", self.containers(service_names), "Stopping", "Stopped", **options)
 
     def kill(self, service_names=None, **options):
-        for service in reversed(self.get_services(service_names)):
-            service.kill(**options)
+        parallel_execute("kill", self.containers(service_names), "Killing", "Killed", **options)
+
+    def remove_stopped(self, service_names=None, **options):
+        all_containers = self.containers(service_names, stopped=True)
+        stopped_containers = [c for c in all_containers if not c.is_running]
+        parallel_execute("remove", stopped_containers, "Removing", "Removed", **options)
 
     def restart(self, service_names=None, **options):
         for service in self.get_services(service_names):
@@ -283,10 +287,6 @@ class Project(object):
     def pull(self, service_names=None, insecure_registry=False):
         for service in self.get_services(service_names, include_deps=True):
             service.pull(insecure_registry=insecure_registry)
-
-    def remove_stopped(self, service_names=None, **options):
-        for service in self.get_services(service_names):
-            service.remove_stopped(**options)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:

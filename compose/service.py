@@ -129,6 +129,7 @@ class Service(object):
         for c in self.containers(stopped=True):
             self.start_container_if_stopped(c, **options)
 
+    # TODO: remove these functions, project takes care of starting/stopping,
     def stop(self, **options):
         for c in self.containers():
             log.info("Stopping %s..." % c.name)
@@ -143,6 +144,8 @@ class Service(object):
         for c in self.containers():
             log.info("Restarting %s..." % c.name)
             c.restart(**options)
+
+    # end TODO
 
     def scale(self, desired_num):
         """
