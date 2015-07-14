@@ -6,7 +6,7 @@ from functools import reduce
 from docker.errors import APIError
 
 from .config import get_service_name_from_net, ConfigurationError
-from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
+from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF, DEFAULT_TIMEOUT
 from .service import Service
 from .container import Container
 from .legacy import check_for_legacy_containers
@@ -98,6 +98,16 @@ class Project(object):
                 return service
 
         raise NoSuchService(name)
+
+    def validate_service_names(self, service_names):
+        """
+        Validate that the given list of service names only contains valid
+        services. Raises NoSuchService if one of the names is invalid.
+        """
+        valid_names = self.service_names
+        for name in service_names:
+            if name not in valid_names:
+                raise NoSuchService(name)
 
     def get_services(self, service_names=None, include_deps=False):
         """
@@ -211,9 +221,13 @@ class Project(object):
            allow_recreate=True,
            smart_recreate=False,
            insecure_registry=False,
-           do_build=True):
+           do_build=True,
+           timeout=DEFAULT_TIMEOUT):
 
         services = self.get_services(service_names, include_deps=start_deps)
+
+        for service in services:
+            service.remove_duplicate_containers()
 
         plans = self._get_convergence_plans(
             services,
@@ -228,6 +242,7 @@ class Project(object):
                 plans[service.name],
                 insecure_registry=insecure_registry,
                 do_build=do_build,
+                timeout=timeout
             )
         ]
 
@@ -274,6 +289,11 @@ class Project(object):
             service.remove_stopped(**options)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
+        if service_names:
+            self.validate_service_names(service_names)
+        else:
+            service_names = self.service_names
+
         containers = [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
@@ -281,8 +301,6 @@ class Project(object):
                 filters={'label': self.labels(one_off=one_off)})]
 
         def matches_service_names(container):
-            if not service_names:
-                return True
             return container.labels.get(LABEL_SERVICE) in service_names
 
         if not containers:
@@ -290,8 +308,7 @@ class Project(object):
                 self.client,
                 self.name,
                 self.service_names,
-                stopped=stopped,
-                one_off=one_off)
+            )
 
         return filter(matches_service_names, containers)
 

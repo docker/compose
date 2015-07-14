@@ -13,6 +13,7 @@ from docker.utils import create_host_config, LogConfig
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS, merge_environment
 from .const import (
+    DEFAULT_TIMEOUT,
     LABEL_CONTAINER_NUMBER,
     LABEL_ONE_OFF,
     LABEL_PROJECT,
@@ -64,6 +65,10 @@ class NeedsBuildError(Exception):
         self.service = service
 
 
+class NoSuchImageError(Exception):
+    pass
+
+
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
@@ -105,8 +110,7 @@ class Service(object):
                 self.client,
                 self.project,
                 [self.name],
-                stopped=stopped,
-                one_off=one_off)
+            )
 
         return containers
 
@@ -224,8 +228,11 @@ class Service(object):
                             do_build=True,
                             insecure_registry=False):
 
-        if self.image():
+        try:
+            self.image()
             return
+        except NoSuchImageError:
+            pass
 
         if self.can_be_built():
             if do_build:
@@ -240,7 +247,7 @@ class Service(object):
             return self.client.inspect_image(self.image_name)
         except APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                return None
+                raise NoSuchImageError("Image '{}' not found".format(self.image_name))
             else:
                 raise
 
@@ -250,26 +257,6 @@ class Service(object):
             return self.full_name
         else:
             return self.options['image']
-
-    def converge(self,
-                 allow_recreate=True,
-                 smart_recreate=False,
-                 insecure_registry=False,
-                 do_build=True):
-        """
-        If a container for this service doesn't exist, create and start one. If there are
-        any, stop them, create+start new ones, and remove the old containers.
-        """
-        plan = self.convergence_plan(
-            allow_recreate=allow_recreate,
-            smart_recreate=smart_recreate,
-        )
-
-        return self.execute_convergence_plan(
-            plan,
-            insecure_registry=insecure_registry,
-            do_build=do_build,
-        )
 
     def convergence_plan(self,
                          allow_recreate=True,
@@ -294,7 +281,17 @@ class Service(object):
         return ConvergencePlan('recreate', containers)
 
     def _containers_have_diverged(self, containers):
-        config_hash = self.config_hash()
+        config_hash = None
+
+        try:
+            config_hash = self.config_hash()
+        except NoSuchImageError as e:
+            log.debug(
+                'Service %s has diverged: %s',
+                self.name, six.text_type(e),
+            )
+            return True
+
         has_diverged = False
 
         for c in containers:
@@ -311,7 +308,8 @@ class Service(object):
     def execute_convergence_plan(self,
                                  plan,
                                  insecure_registry=False,
-                                 do_build=True):
+                                 do_build=True,
+                                 timeout=DEFAULT_TIMEOUT):
         (action, containers) = plan
 
         if action == 'create':
@@ -328,6 +326,7 @@ class Service(object):
                 self.recreate_container(
                     c,
                     insecure_registry=insecure_registry,
+                    timeout=timeout
                 )
                 for c in containers
             ]
@@ -349,7 +348,8 @@ class Service(object):
 
     def recreate_container(self,
                            container,
-                           insecure_registry=False):
+                           insecure_registry=False,
+                           timeout=DEFAULT_TIMEOUT):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -358,7 +358,7 @@ class Service(object):
         """
         log.info("Recreating %s..." % container.name)
         try:
-            container.stop()
+            container.stop(timeout=timeout)
         except APIError as e:
             if (e.response.status_code == 500
                     and e.explanation
@@ -393,6 +393,26 @@ class Service(object):
     def start_container(self, container):
         container.start()
         return container
+
+    def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
+        for c in self.duplicate_containers():
+            log.info('Removing %s...' % c.name)
+            c.stop(timeout=timeout)
+            c.remove()
+
+    def duplicate_containers(self):
+        containers = sorted(
+            self.containers(stopped=True),
+            key=lambda c: c.get('Created'),
+        )
+
+        numbers = set()
+
+        for c in containers:
+            if c.number in numbers:
+                yield c
+            else:
+                numbers.add(c.number)
 
     def config_hash(self):
         return json_hash(self.config_dict())

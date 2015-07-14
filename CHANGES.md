@@ -1,6 +1,21 @@
 Change log
 ==========
 
+1.3.2 (2015-07-14)
+------------------
+
+The following bugs have been fixed:
+
+- When there were one-off containers created by running `docker-compose run` on an older version of Compose, `docker-compose run` would fail with a name collision. Compose now shows an error if you have leftover containers of this type lying around, and tells you how to remove them.
+- Compose was not reading Docker authentication config files created in the new location, `~/docker/config.json`, and authentication against private registries would therefore fail.
+- When a container had a pseudo-TTY attached, its output in `docker-compose up` would be truncated.
+- `docker-compose up --x-smart-recreate` would sometimes fail when an image tag was updated.
+- `docker-compose up` would sometimes create two containers with the same numeric suffix.
+- `docker-compose rm` and `docker-compose ps` would sometimes list services that aren't part of the current project (though no containers were erroneously removed).
+- Some `docker-compose` commands would not show an error if invalid service names were passed in.
+
+Thanks @dano, @josephpage, @kevinsimper, @lieryan, @phemmer, @soulrebel and @sschepens!
+
 1.3.1 (2015-06-21)
 ------------------
 

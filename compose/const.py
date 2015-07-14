@@ -1,4 +1,5 @@
 
+DEFAULT_TIMEOUT = 10
 LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
 LABEL_ONE_OFF = 'com.docker.compose.oneoff'
 LABEL_PROJECT = 'com.docker.compose.project'
