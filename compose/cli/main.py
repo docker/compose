@@ -111,11 +111,11 @@ class TopLevelCommand(Command):
 
     def build(self, project, options):
         """
-        Build or rebuild services.
+        Builds or rebuilds services.
 
-        Services are built once and then tagged as `project_service`,
-        e.g. `composetest_db`. If you change a service's `Dockerfile` or the
-        contents of its build directory, you can run `docker-compose build` to rebuild it.
+        Services are built once and then tagged as `project_service`, e.g.,
+        `composetest_db`. If you change a service's Dockerfile or the contents of its
+        build directory, run `docker-compose build` to rebuild it.
 
         Usage: build [options] [SERVICE...]
 
@@ -127,7 +127,7 @@ class TopLevelCommand(Command):
 
     def help(self, project, options):
         """
-        Get help on a command.
+        Displays help and usage instructions for a command.
 
         Usage: help COMMAND
         """
@@ -136,7 +136,7 @@ class TopLevelCommand(Command):
 
     def kill(self, project, options):
         """
-        Force stop service containers.
+        Forces running containers to stop by sending a `SIGKILL` signal.
 
         Usage: kill [options] [SERVICE...]
 
@@ -150,7 +150,7 @@ class TopLevelCommand(Command):
 
     def logs(self, project, options):
         """
-        View output from containers.
+        Displays log output from services.
 
         Usage: logs [options] [SERVICE...]
 
@@ -165,7 +165,7 @@ class TopLevelCommand(Command):
 
     def port(self, project, options):
         """
-        Print the public port for a port binding.
+        Prints the public port for a port binding.
 
         Usage: port [options] SERVICE PRIVATE_PORT
 
@@ -186,7 +186,7 @@ class TopLevelCommand(Command):
 
     def ps(self, project, options):
         """
-        List containers.
+        Lists containers.
 
         Usage: ps [options] [SERVICE...]
 
@@ -223,7 +223,7 @@ class TopLevelCommand(Command):
 
     def pull(self, project, options):
         """
-        Pulls images for services.
+        Pulls service images.
 
         Usage: pull [options] [SERVICE...]
 
@@ -239,7 +239,7 @@ class TopLevelCommand(Command):
 
     def rm(self, project, options):
         """
-        Remove stopped service containers.
+        Removes stopped service containers.
 
         Usage: rm [options] [SERVICE...]
 
@@ -263,15 +263,44 @@ class TopLevelCommand(Command):
 
     def run(self, project, options):
         """
-        Run a one-off command on a service.
+        Runs a one-off command on a service.
 
-        For example:
+        For example,
 
             $ docker-compose run web python manage.py shell
 
-        By default, linked services will be started, unless they are already
-        running. If you do not want to start linked services, use
-        `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
+        starts the `web` service and then runs `manage.py shell` in python. Note that
+        by default, linked services are also started, unless they are already running.
+
+        One-off commands are started in new containers with the same configuration as a
+        normal container for that service, so volumes, links, etc are all created as
+        expected. When using `run`, there are two differences from bringing up a
+        container normally:
+
+        1. The command is overridden with the one specified. So, if you run
+           `docker-compose run web bash`, the container's command (which might default
+           to, e.g., `python app.py`) is overridden to `bash`.
+
+        2. By default, no ports are exposed, in case they collide with already opened
+           ports.
+
+        Links are also created between one-off commands and the other containers which
+        are part of that service. So, for example, you could run:
+
+            $ docker-compose run db psql -h db -U docker
+
+        This would open up an interactive PostgreSQL shell for the linked `db` container
+        (which would get created or started as needed).
+
+        If you do not want linked containers to start when running the one-off command,
+        specify the `--no-deps` flag:
+
+            $ docker-compose run --no-deps web python manage.py shell
+
+        Similarly, if you do want the service's ports to be created and mapped to the
+        host, specify the `--service-ports` flag:
+
+            $ docker-compose run --service-ports web python manage.py shell
 
         Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
@@ -365,10 +394,9 @@ class TopLevelCommand(Command):
 
     def scale(self, project, options):
         """
-        Set number of containers to run for a service.
+        Sets the number of containers to run for a service.
 
-        Numbers are specified in the form `service=num` as arguments.
-        For example:
+        Numbers are specified as arguments in the form `service=num`. For example:
 
             $ docker-compose scale web=2 worker=3
 
@@ -387,7 +415,7 @@ class TopLevelCommand(Command):
 
     def start(self, project, options):
         """
-        Start existing containers.
+        Starts existing containers for a service.
 
         Usage: start [SERVICE...]
         """
@@ -395,9 +423,8 @@ class TopLevelCommand(Command):
 
     def stop(self, project, options):
         """
-        Stop running containers without removing them.
-
-        They can be started again with `docker-compose start`.
+        Stops running containers without removing them. They can be started again with
+        `docker-compose start`.
 
         Usage: stop [options] [SERVICE...]
 
@@ -410,7 +437,7 @@ class TopLevelCommand(Command):
 
     def restart(self, project, options):
         """
-        Restart running containers.
+        Restarts services.
 
         Usage: restart [options] [SERVICE...]
 
@@ -423,17 +450,20 @@ class TopLevelCommand(Command):
 
     def up(self, project, options):
         """
-        Build, (re)create, start and attach to containers for a service.
+        Builds, (re)creates, starts, and attaches to containers for a service.
 
-        By default, `docker-compose up` will aggregate the output of each container, and
-        when it exits, all containers will be stopped. If you run `docker-compose up -d`,
-        it'll start the containers in the background and leave them running.
+        Linked services will be started, unless they are already running.
 
-        If there are existing containers for a service, `docker-compose up` will stop
-        and recreate them (preserving mounted volumes with volumes-from),
-        so that changes in `docker-compose.yml` are picked up. If you do not want existing
-        containers to be recreated, `docker-compose up --no-recreate` will re-use existing
-        containers.
+        By default, `docker-compose up` will aggregate the output of each container
+        and, when it exits, all containers will be stopped. Running
+        `docker-compose up -d`, will start the containers in the background and leave
+        them running.
+
+        By default, if there are existing containers for a service, `docker-compose
+        up` will stop and recreate them (preserving mounted volumes), so that changes in
+        `docker-compose.yml` are picked up. If you do not want containers stopped and
+        recreated, use `docker-compose up --no-recreate`. This will still start any
+        stopped containers, if needed.
 
         Usage: up [options] [SERVICE...]
 
@@ -516,7 +546,7 @@ class TopLevelCommand(Command):
 
     def version(self, project, options):
         """
-        Show version informations
+        Shows version information.
 
         Usage: version [--short]
 

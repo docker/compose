@@ -13,7 +13,7 @@ parent = "smn_compose_ref"
 # Compose CLI reference
 
 Most Docker Compose commands are run against one or more services. If
-the service is not specified, the command will apply to all services.
+the service is not specified, the command applies to all services.
 
 For full usage information, run `docker-compose [COMMAND] --help`.
 
@@ -44,7 +44,7 @@ Displays log output from services.
 
 ### port
 
-Prints the public port for a port binding
+Prints the public port for a port binding.
 
 ### ps
 
@@ -71,21 +71,20 @@ For example,
 
     $ docker-compose run web python manage.py shell
 
-will start the `web` service and then run `manage.py shell` in python.
-Note that by default, linked services will also be started, unless they are
-already running.
+starts the `web` service and then runs `manage.py shell` in python. Note that
+by default, linked services are also started, unless they are already running.
 
 One-off commands are started in new containers with the same configuration as a
-normal container for that service, so volumes, links, etc will all be created as
+normal container for that service, so volumes, links, etc are all created as
 expected. When using `run`, there are two differences from bringing up a
 container normally:
 
-1. the command will be overridden with the one specified. So, if you run
-`docker-compose run web bash`, the container's web command (which could default
-to, e.g., `python app.py`) will be overridden to `bash`
+1. The command is overridden with the one specified. So, if you run
+   `docker-compose run web bash`, the container's command (which might default
+   to, e.g., `python app.py`) is overridden to `bash`.
 
-2. by default no ports will be created in case they collide with already opened
-ports.
+2. By default, no ports are exposed, in case they collide with already opened
+   ports.
 
 Links are also created between one-off commands and the other containers which
 are part of that service. So, for example, you could run:
@@ -129,37 +128,44 @@ Builds, (re)creates, starts, and attaches to containers for a service.
 
 Linked services will be started, unless they are already running.
 
-By default, `docker-compose up` will aggregate the output of each container and,
-when it exits, all containers will be stopped. Running `docker-compose up -d`,
-will start the containers in the background and leave them running.
+By default, `docker-compose up` will aggregate the output of each container
+and, when it exits, all containers will be stopped. Running
+`docker-compose up -d`, will start the containers in the background and leave
+them running.
 
-By default, if there are existing containers for a service, `docker-compose up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `docker-compose.yml` are picked up. If you do not want containers stopped and recreated, use `docker-compose up --no-recreate`. This will still start any stopped containers, if needed.
+By default, if there are existing containers for a service, `docker-compose
+up` will stop and recreate them (preserving mounted volumes), so that changes in
+`docker-compose.yml` are picked up. If you do not want containers stopped and
+recreated, use `docker-compose up --no-recreate`. This will still start any
+stopped containers, if needed.
 
-[volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/
+### version
+
+Shows version information.
+
 
 ## Options
 
 ### --verbose
 
- Shows more output
+Shows more output
 
 ### -v, --version
 
- Prints version and exits
+Prints version and exits
 
 ### -f, --file FILE
 
- Specify what file to read configuration from. If not provided, Compose will look
- for `docker-compose.yml` in the current working directory, and then each parent
- directory successively, until found.
+Specify what file to read configuration from. If not provided, Compose looks
+for `docker-compose.yml` in the current working directory, and then each parent
+directory successively, until found.
 
- Use a `-` as the filename to read configuration from stdin. When stdin is used
- all paths in the configuration will be relative to the current working
- directory.
+Use a `-` as the filename to read configuration from stdin. When stdin is used,
+all paths in the configuration are relative to the current working directory.
 
 ### -p, --project-name NAME
 
- Specifies an alternate project name (default: current directory name)
+Specifies an alternate project name (default: current directory name)
 
 
 ## Environment Variables
@@ -167,8 +173,8 @@ By default, if there are existing containers for a service, `docker-compose up` 
 Several environment variables are available for you to configure Compose's behaviour.
 
 Variables starting with `DOCKER_` are the same as those used to configure the
-Docker command-line client. If you're using boot2docker, `eval "$(boot2docker shellinit)"`
-will set them to their correct values.
+Docker command-line client. If you're using boot2docker,
+`eval "$(boot2docker shellinit)"` sets them to their correct values.
 
 ### COMPOSE\_PROJECT\_NAME
 
@@ -176,7 +182,7 @@ Sets the project name, which is prepended to the name of every container started
 
 ### COMPOSE\_FILE
 
-Specify what file to read configuration from. If not provided, Compose will look
+Specify what file to read configuration from. If not provided, Compose looks
 for `docker-compose.yml` in the current working directory, and then each parent
 directory successively, until found.
 
