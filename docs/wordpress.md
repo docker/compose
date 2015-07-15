@@ -119,6 +119,7 @@ address).
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
+- [Migrate Osclass installation to Docker Compose](osclass.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)

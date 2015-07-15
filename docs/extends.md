@@ -358,6 +358,7 @@ locally-defined bindings taking precedence:
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
+- [Migrate Osclass installation to Docker Compose](osclass.md)
 - [Command line reference](cli.md)
 - [Yaml file reference](yml.md)
 - [Compose command line completion](completion.md)

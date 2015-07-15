@@ -206,6 +206,7 @@ commands in parallel. Only a subset of commands execute in parallel, `stop`,
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
+- [Migrate Osclass installation to Docker Compose](osclass.md)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
