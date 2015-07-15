@@ -1,4 +1,5 @@
 import unittest
+from mock import Mock
 
 from docker.errors import APIError
 
@@ -63,6 +64,22 @@ class UtilitiesTestCase(unittest.TestCase):
         self.assertFalse(
             legacy.is_valid_name("composetest_web_lol_1", one_off=True),
         )
+
+    def test_get_legacy_containers_no_labels(self):
+        client = Mock()
+        client.containers.return_value = [
+            {
+                "Id": "abc123",
+                "Image": "def456",
+                "Name": "composetest_web_1",
+                "Labels": None,
+            },
+        ]
+
+        containers = list(legacy.get_legacy_containers(
+            client, "composetest", ["web"]))
+
+        self.assertEqual(len(containers), 1)
 
 
 class LegacyTestCase(DockerClientTestCase):
