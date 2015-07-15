@@ -405,7 +405,7 @@ class TopLevelCommand(Command):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
         project.stop(service_names=options['SERVICE'], timeout=timeout)
 
     def restart(self, project, options):
@@ -418,7 +418,7 @@ class TopLevelCommand(Command):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
         project.restart(service_names=options['SERVICE'], timeout=timeout)
 
     def up(self, project, options):
@@ -461,7 +461,7 @@ class TopLevelCommand(Command):
         allow_recreate = not options['--no-recreate']
         smart_recreate = options['--x-smart-recreate']
         service_names = options['SERVICE']
-        timeout = float(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
 
         to_attach = project.up(
             service_names=service_names,
