@@ -55,3 +55,9 @@ you can specify a test directory, file, module, class or method:
     $ script/test tests/unit/cli_test.py
     $ script/test tests.integration.service_test
     $ script/test tests.integration.service_test:ServiceTest.test_containers
+
+## Finding things to work on
+
+We use a [Waffle.io board](https://waffle.io/docker/compose) to keep track of specific things we are working on and planning to work on. If you're looking for things to work on, stuff in the backlog is a great place to start.
+
+For more information about our project planning, take a look at our [GitHub wiki](https://github.com/docker/compose/wiki).
