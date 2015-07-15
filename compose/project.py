@@ -223,10 +223,13 @@ class Project(object):
            service_names=None,
            start_deps=True,
            allow_recreate=True,
-           smart_recreate=False,
+           force_recreate=False,
            insecure_registry=False,
            do_build=True,
            timeout=DEFAULT_TIMEOUT):
+
+        if force_recreate and not allow_recreate:
+            raise ValueError("force_recreate and allow_recreate are in conflict")
 
         services = self.get_services(service_names, include_deps=start_deps)
 
@@ -236,7 +239,7 @@ class Project(object):
         plans = self._get_convergence_plans(
             services,
             allow_recreate=allow_recreate,
-            smart_recreate=smart_recreate,
+            force_recreate=force_recreate,
         )
 
         return [
@@ -253,7 +256,7 @@ class Project(object):
     def _get_convergence_plans(self,
                                services,
                                allow_recreate=True,
-                               smart_recreate=False):
+                               force_recreate=False):
 
         plans = {}
 
@@ -265,19 +268,19 @@ class Project(object):
                 and plans[name].action == 'recreate'
             ]
 
-            if updated_dependencies:
+            if updated_dependencies and allow_recreate:
                 log.debug(
                     '%s has upstream changes (%s)',
                     service.name, ", ".join(updated_dependencies),
                 )
                 plan = service.convergence_plan(
                     allow_recreate=allow_recreate,
-                    smart_recreate=False,
+                    force_recreate=True,
                 )
             else:
                 plan = service.convergence_plan(
                     allow_recreate=allow_recreate,
-                    smart_recreate=smart_recreate,
+                    force_recreate=force_recreate,
                 )
 
             plans[service.name] = plan

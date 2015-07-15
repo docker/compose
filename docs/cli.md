@@ -127,15 +127,20 @@ Stops running containers without removing them. They can be started again with
 
 Builds, (re)creates, starts, and attaches to containers for a service.
 
-Linked services will be started, unless they are already running.
+Unless they are already running, this command also starts any linked services.
 
-By default, `docker-compose up` will aggregate the output of each container and,
-when it exits, all containers will be stopped. Running `docker-compose up -d`,
-will start the containers in the background and leave them running.
+The `docker-compose up` command aggregates the output of each container. When
+the command exits, all containers are stopped. Running `docker-compose up -d`
+starts the containers in the background and leaves them running.
 
-By default, if there are existing containers for a service, `docker-compose up` will stop and recreate them (preserving mounted volumes with [volumes-from]), so that changes in `docker-compose.yml` are picked up. If you do not want containers stopped and recreated, use `docker-compose up --no-recreate`. This will still start any stopped containers, if needed.
+If there are existing containers for a service, and the service's configuration
+or image was changed after the container's creation, `docker-compose up` picks
+up the changes by stopping and recreating the containers (preserving mounted
+volumes). To prevent Compose from picking up changes, use the `--no-recreate`
+flag.
 
-[volumes-from]: http://docs.docker.io/en/latest/use/working_with_volumes/
+If you want to force Compose to stop and recreate all containers, use the
+`--force-recreate` flag.
 
 ## Options
 

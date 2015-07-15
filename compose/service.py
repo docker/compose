@@ -264,25 +264,28 @@ class Service(object):
 
     def convergence_plan(self,
                          allow_recreate=True,
-                         smart_recreate=False):
+                         force_recreate=False):
+
+        if force_recreate and not allow_recreate:
+            raise ValueError("force_recreate and allow_recreate are in conflict")
 
         containers = self.containers(stopped=True)
 
         if not containers:
             return ConvergencePlan('create', [])
 
-        if smart_recreate and not self._containers_have_diverged(containers):
-            stopped = [c for c in containers if not c.is_running]
-
-            if stopped:
-                return ConvergencePlan('start', stopped)
-
-            return ConvergencePlan('noop', containers)
-
         if not allow_recreate:
             return ConvergencePlan('start', containers)
 
-        return ConvergencePlan('recreate', containers)
+        if force_recreate or self._containers_have_diverged(containers):
+            return ConvergencePlan('recreate', containers)
+
+        stopped = [c for c in containers if not c.is_running]
+
+        if stopped:
+            return ConvergencePlan('start', stopped)
+
+        return ConvergencePlan('noop', containers)
 
     def _containers_have_diverged(self, containers):
         config_hash = None
