@@ -52,7 +52,7 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(self._generate_prefix(container)).encode('utf-8')
+        prefix = color_fn(self._generate_prefix(container))
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
 
