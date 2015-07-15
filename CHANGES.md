@@ -1,6 +1,14 @@
 Change log
 ==========
 
+1.3.3 (2015-07-15)
+------------------
+
+Two regressions have been fixed:
+
+- When stopping containers gracefully, Compose was setting the timeout to 0, effectively forcing a SIGKILL every time.
+- Compose would sometimes crash depending on the formatting of container data returned from the Docker API.
+
 1.3.2 (2015-07-14)
 ------------------
 
