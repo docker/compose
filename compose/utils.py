@@ -15,7 +15,7 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
     """
     Execute a given command upon a list of containers in parallel.
     """
-    max_workers = os.environ.get('MAX_WORKERS', DEFAULT_MAX_WORKERS)
+    max_workers = os.environ.get('COMPOSE_MAX_WORKERS', DEFAULT_MAX_WORKERS)
 
     def container_command_execute(container, command, **options):
         log.info("{} {}...".format(doing_msg, container.name))
