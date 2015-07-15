@@ -149,7 +149,7 @@ def _get_legacy_containers_iter(
 
     for service in services:
         for container in containers:
-            if LABEL_VERSION in container['Labels']:
+            if LABEL_VERSION in (container.get('Labels') or {}):
                 continue
 
             name = get_container_name(container)
