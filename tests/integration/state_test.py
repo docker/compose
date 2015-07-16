@@ -13,7 +13,7 @@ from .testcases import DockerClientTestCase
 class ProjectTestCase(DockerClientTestCase):
     def run_up(self, cfg, **kwargs):
         kwargs.setdefault('smart_recreate', True)
-        kwargs.setdefault('timeout', 0.1)
+        kwargs.setdefault('timeout', 1)
 
         project = self.make_project(cfg)
         project.up(**kwargs)
@@ -171,7 +171,7 @@ def converge(service,
         plan,
         insecure_registry=insecure_registry,
         do_build=do_build,
-        timeout=0.1,
+        timeout=1,
     )
 
 
