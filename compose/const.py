@@ -1,5 +1,5 @@
 
-DEFAULT_MAX_WORKERS = 5
+DEFAULT_MAX_WORKERS = 20
 DEFAULT_TIMEOUT = 10
 LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
 LABEL_ONE_OFF = 'com.docker.compose.oneoff'
