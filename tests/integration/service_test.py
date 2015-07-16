@@ -699,6 +699,13 @@ class ServiceTest(DockerClientTestCase):
         for name in labels_list:
             self.assertIn((name, ''), labels)
 
+    def test_custom_container_name(self):
+        service = self.create_service('web', container_name='my-web-container')
+        self.assertEqual(service.custom_container_name(), 'my-web-container')
+
+        container = create_and_start_container(service)
+        self.assertEqual(container.name, 'my-web-container')
+
     def test_log_drive_invalid(self):
         service = self.create_service('web', log_driver='xxx')
         self.assertRaises(ValueError, lambda: create_and_start_container(service))
