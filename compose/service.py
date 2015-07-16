@@ -147,7 +147,7 @@ class Service(object):
 
     # end TODO
 
-    def scale(self, desired_num):
+    def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
         """
         Adjusts the number of containers to the specified number and ensures
         they are running.
@@ -181,7 +181,7 @@ class Service(object):
         while len(running_containers) > desired_num:
             c = running_containers.pop()
             log.info("Stopping %s..." % c.name)
-            c.stop(timeout=1)
+            c.stop(timeout=timeout)
             stopped_containers.append(c)
 
         # Start containers
