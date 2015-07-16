@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 
+from docker.errors import APIError
 import concurrent.futures
 
 from .const import DEFAULT_MAX_WORKERS
@@ -20,12 +21,16 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
     max_workers = os.environ.get('COMPOSE_MAX_WORKERS', DEFAULT_MAX_WORKERS)
     stream = codecs.getwriter('utf-8')(sys.stdout)
     lines = []
+    errors = {}
 
     for container in containers:
         write_out_msg(stream, lines, container.name, doing_msg)
 
     def container_command_execute(container, command, **options):
-        return getattr(container, command)(**options)
+        try:
+            getattr(container, command)(**options)
+        except APIError as e:
+            errors[container.name] = e.explanation
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_container = {
@@ -40,6 +45,10 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
         for future in concurrent.futures.as_completed(future_container):
             container = future_container[future]
             write_out_msg(stream, lines, container.name, done_msg)
+
+    if errors:
+        for container in errors:
+            stream.write("ERROR: for {}  {} \n".format(container, errors[container]))
 
 
 def write_out_msg(stream, lines, container_name, msg):
