@@ -21,8 +21,10 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
     stream = codecs.getwriter('utf-8')(sys.stdout)
     lines = []
 
-    def container_command_execute(container, command, **options):
+    for container in containers:
         write_out_msg(stream, lines, container.name, doing_msg)
+
+    def container_command_execute(container, command, **options):
         return getattr(container, command)(**options)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -41,6 +43,10 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
 
 
 def write_out_msg(stream, lines, container_name, msg):
+    """
+    Using special ANSI code characters we can write out the msg over the top of
+    a previous status message, if it exists.
+    """
     if container_name in lines:
         position = lines.index(container_name)
         diff = len(lines) - position
@@ -55,6 +61,8 @@ def write_out_msg(stream, lines, container_name, msg):
         diff = 0
         lines.append(container_name)
         stream.write("{}: {}... \r\n".format(container_name, msg))
+
+    stream.flush()
 
 
 def json_hash(obj):
