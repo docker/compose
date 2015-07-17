@@ -115,8 +115,7 @@ Then, run `docker-compose up`:
     myapp_web_1 | Starting development server at http://0.0.0.0:8000/
     myapp_web_1 | Quit the server with CONTROL-C.
 
-Your Django app should nw be running at port 8000 on your Docker daemon (if
-you're using Boot2docker, `boot2docker ip` will tell you its address).
+Your Django app should nw be running at port 8000 on your Docker daemon. If you are using a Docker Machine VM, you can use the `docker-machine ip MACHINE_NAME` to get the IP address.
 
 You can also run management commands with Docker. To set up your database, for
 example, run `docker-compose up` and in another terminal run:
