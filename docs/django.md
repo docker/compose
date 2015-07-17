@@ -61,7 +61,7 @@ mounted inside the containers, and what ports they expose.
       links:
         - db
 
-See the [`docker-compose.yml` reference](yml.html) for more information on how
+See the [`docker-compose.yml` reference](yml.md) for more information on how
 this file works.
 
 ### Build the project
