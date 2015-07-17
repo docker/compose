@@ -809,12 +809,7 @@ def parse_volume_spec(volume_config):
     if len(parts) == 2:
         parts.append('rw')
 
-    external, internal, mode = parts
-    if mode not in ('rw', 'ro'):
-        raise ConfigError("Volume %s has invalid mode (%s), should be "
-                          "one of: rw, ro." % (volume_config, mode))
-
-    return VolumeSpec(external, internal, mode)
+    return VolumeSpec(*parts)
 
 
 # Ports
