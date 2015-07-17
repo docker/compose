@@ -151,7 +151,7 @@ By default, if there are existing containers for a service, `docker-compose up` 
 
  Specify what file to read configuration from. If not provided, Compose will look
  for `docker-compose.yml` in the current working directory, and then each parent
- directory successively, until found.
+ directory successively, until found. See also the `COMPOSE_FILE` environment variable.
 
  Use a `-` as the filename to read configuration from stdin. When stdin is used
  all paths in the configuration will be relative to the current working
@@ -160,6 +160,7 @@ By default, if there are existing containers for a service, `docker-compose up` 
 ### -p, --project-name NAME
 
  Specifies an alternate project name (default: current directory name)
+ See also the `COMPOSE_PROJECT_NAME` environment variable.
 
 
 ## Environment Variables
@@ -172,13 +173,13 @@ will set them to their correct values.
 
 ### COMPOSE\_PROJECT\_NAME
 
-Sets the project name, which is prepended to the name of every container started by Compose. Defaults to the `basename` of the current working directory.
+Sets the project name, which is prepended to the name of every container started by Compose. Defaults to the `basename` of the current working directory. See also the `-p` command-line option.
 
 ### COMPOSE\_FILE
 
 Specify what file to read configuration from. If not provided, Compose will look
 for `docker-compose.yml` in the current working directory, and then each parent
-directory successively, until found.
+directory successively, until found. See also the `-f` environment variable.
 
 ### DOCKER\_HOST
 
