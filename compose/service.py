@@ -158,7 +158,7 @@ class Service(object):
         - removes all stopped containers
         """
         if self.specifies_host_port():
-            log.warn('Service %s specifies a port on the host. If multiple containers '
+            log.warn('The "%s" service specifies a port on the host. If multiple containers '
                      'for this service are created on a single host, the port will clash.'
                      % self.name)
 
