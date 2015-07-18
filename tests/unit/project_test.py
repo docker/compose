@@ -166,7 +166,7 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['aaa']
             }
         ], self.mock_client)
-        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_id])
+        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_id + ":rw"])
 
     def test_use_volumes_from_service_no_container(self):
         container_name = 'test_vol_1'
@@ -189,7 +189,7 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['vol']
             }
         ], self.mock_client)
-        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_name])
+        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_name + ":rw"])
 
     @mock.patch.object(Service, 'containers')
     def test_use_volumes_from_service_container(self, mock_return):
@@ -209,7 +209,7 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['vol']
             }
         ], None)
-        self.assertEqual(project.get_service('test')._get_volumes_from(), container_ids)
+        self.assertEqual(project.get_service('test')._get_volumes_from(), [cid + ':rw' for cid in container_ids])
 
     def test_net_unset(self):
         project = Project.from_dicts('test', [

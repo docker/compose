@@ -4,7 +4,6 @@ from collections import namedtuple
 import logging
 import re
 import sys
-from operator import attrgetter
 
 import six
 from docker.errors import APIError
@@ -71,6 +70,9 @@ class NoSuchImageError(Exception):
 
 
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
+
+
+VolumeFromSpec = namedtuple('VolumeFromSpec', 'source mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
@@ -440,7 +442,7 @@ class Service(object):
         return [s.name for (s, _) in self.links]
 
     def get_volumes_from_names(self):
-        return [s.name for s in self.volumes_from if isinstance(s, Service)]
+        return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
     def get_net_name(self):
         if isinstance(self.net, Service):
@@ -485,16 +487,9 @@ class Service(object):
 
     def _get_volumes_from(self):
         volumes_from = []
-        for volume_source in self.volumes_from:
-            if isinstance(volume_source, Service):
-                containers = volume_source.containers(stopped=True)
-                if not containers:
-                    volumes_from.append(volume_source.create_container().id)
-                else:
-                    volumes_from.extend(map(attrgetter('id'), containers))
-
-            elif isinstance(volume_source, Container):
-                volumes_from.append(volume_source.id)
+        for volume_from_spec in self.volumes_from:
+            volumes = build_volume_from(volume_from_spec)
+            volumes_from.extend(volumes)
 
         return volumes_from
 
@@ -810,6 +805,38 @@ def parse_volume_spec(volume_config):
         parts.append('rw')
 
     return VolumeSpec(*parts)
+
+
+def build_volume_from(volume_from_spec):
+    volumes_from = []
+    if isinstance(volume_from_spec.source, Service):
+        containers = volume_from_spec.source.containers(stopped=True)
+        if not containers:
+            volumes_from = ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
+        else:
+            volumes_from = ["{}:{}".format(container.id, volume_from_spec.mode) for container in containers]
+    elif isinstance(volume_from_spec.source, Container):
+        volumes_from = ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
+    return volumes_from
+
+
+def parse_volume_from_spec(volume_from_config):
+    parts = volume_from_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Volume %s has incorrect format, should be "
+                          "external:internal[:mode]" % volume_from_config)
+
+    if len(parts) == 1:
+        source = parts[0]
+        mode = 'rw'
+    else:
+        source, mode = parts
+
+    if mode not in ('rw', 'ro'):
+        raise ConfigError("VolumeFrom %s has invalid mode (%s), should be "
+                          "one of: rw, ro." % (volume_from_config, mode))
+
+    return VolumeFromSpec(source, mode)
 
 
 # Ports

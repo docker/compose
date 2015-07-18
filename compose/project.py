@@ -7,9 +7,9 @@ from docker.errors import APIError
 
 from .config import get_service_name_from_net, ConfigurationError
 from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
+from .service import Service, parse_volume_from_spec, VolumeFromSpec
 from .container import Container
 from .legacy import check_for_legacy_containers
-from .service import Service
 from .utils import parallel_execute
 
 log = logging.getLogger(__name__)
@@ -24,12 +24,15 @@ def sort_service_dicts(services):
     def get_service_names(links):
         return [link.split(':')[0] for link in links]
 
+    def get_service_names_from_volumes_from(volumes_from):
+        return [volume_from.split(':')[0] for volume_from in volumes_from]
+
     def get_service_dependents(service_dict, services):
         name = service_dict['name']
         return [
             service for service in services
             if (name in get_service_names(service.get('links', [])) or
-                name in service.get('volumes_from', []) or
+                name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
                 name == get_service_name_from_net(service.get('net')))
         ]
 
@@ -158,16 +161,19 @@ class Project(object):
     def get_volumes_from(self, service_dict):
         volumes_from = []
         if 'volumes_from' in service_dict:
-            for volume_name in service_dict.get('volumes_from', []):
+            for volume_from_config in service_dict.get('volumes_from', []):
+                volume_from_spec = parse_volume_from_spec(volume_from_config)
+                # Get service
                 try:
-                    service = self.get_service(volume_name)
-                    volumes_from.append(service)
+                    service_name = self.get_service(volume_from_spec.source)
+                    volume_from_spec = VolumeFromSpec(service_name, volume_from_spec.mode)
                 except NoSuchService:
                     try:
-                        container = Container.from_id(self.client, volume_name)
-                        volumes_from.append(container)
+                        container_name = Container.from_id(self.client, volume_from_spec.source)
+                        volume_from_spec = VolumeFromSpec(container_name, volume_from_spec.mode)
                     except APIError:
-                        raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
+                        raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (volume_from_config, volume_from_spec.source))
+                volumes_from.append(volume_from_spec)
             del service_dict['volumes_from']
         return volumes_from
 
