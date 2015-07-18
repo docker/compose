@@ -24,6 +24,7 @@ from compose.service import parse_repository_tag
 from compose.service import parse_volume_spec
 from compose.service import Service
 from compose.service import ServiceNet
+from compose.service import VolumeFromSpec
 
 
 class ServiceTest(unittest.TestCase):
@@ -75,9 +76,18 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'test',
             image='foo',
-            volumes_from=[mock.Mock(id=container_id, spec=Container)])
+            volumes_from=[VolumeFromSpec(mock.Mock(id=container_id, spec=Container), 'rw')])
 
-        self.assertEqual(service._get_volumes_from(), [container_id])
+        self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
+
+    def test_get_volumes_from_container_read_only(self):
+        container_id = 'aabbccddee'
+        service = Service(
+            'test',
+            image='foo',
+            volumes_from=[VolumeFromSpec(mock.Mock(id=container_id, spec=Container), 'ro')])
+
+        self.assertEqual(service._get_volumes_from(), [container_id + ':ro'])
 
     def test_get_volumes_from_service_container_exists(self):
         container_ids = ['aabbccddee', '12345']
@@ -86,9 +96,21 @@ class ServiceTest(unittest.TestCase):
             mock.Mock(id=container_id, spec=Container)
             for container_id in container_ids
         ]
-        service = Service('test', volumes_from=[from_service], image='foo')
+        service = Service('test', volumes_from=[VolumeFromSpec(from_service, 'rw')], image='foo')
 
-        self.assertEqual(service._get_volumes_from(), container_ids)
+        self.assertEqual(service._get_volumes_from(), [cid + ":rw" for cid in container_ids])
+
+    def test_get_volumes_from_service_container_exists_with_flags(self):
+        for mode in ['ro', 'rw', 'z', 'rw,z', 'z,rw']:
+            container_ids = ['aabbccddee:' + mode, '12345:' + mode]
+            from_service = mock.create_autospec(Service)
+            from_service.containers.return_value = [
+                mock.Mock(id=container_id.split(':')[0], spec=Container)
+                for container_id in container_ids
+            ]
+            service = Service('test', volumes_from=[VolumeFromSpec(from_service, mode)], image='foo')
+
+            self.assertEqual(service._get_volumes_from(), container_ids)
 
     def test_get_volumes_from_service_no_container(self):
         container_id = 'abababab'
@@ -97,9 +119,9 @@ class ServiceTest(unittest.TestCase):
         from_service.create_container.return_value = mock.Mock(
             id=container_id,
             spec=Container)
-        service = Service('test', image='foo', volumes_from=[from_service])
+        service = Service('test', image='foo', volumes_from=[VolumeFromSpec(from_service, 'rw')])
 
-        self.assertEqual(service._get_volumes_from(), [container_id])
+        self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
         from_service.create_container.assert_called_once_with()
 
     def test_split_domainname_none(self):
