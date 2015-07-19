@@ -66,7 +66,6 @@ class LogPrinter(object):
         except ConnectionError as e:
             yield color_fn("%s: Unable to connect to Docker Api. Aborting.\n" % (container.name))
             yield STOP
-            sys.exit(1)
 
     def _generate_prefix(self, container):
         """
