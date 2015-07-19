@@ -9,6 +9,7 @@ from . import colors
 from .utils import split_buffer
 from requests.exceptions import ConnectionError
 
+
 class LogPrinter(object):
     def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False):
         self.containers = containers
@@ -63,7 +64,7 @@ class LogPrinter(object):
             exit_code = container.wait()
             yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
             yield STOP
-        except ConnectionError as e:
+        except ConnectionError:
             yield color_fn("%s: Unable to connect to Docker Api. Aborting.\n" % (container.name))
             yield STOP
 
