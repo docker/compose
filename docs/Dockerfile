@@ -6,6 +6,14 @@ COPY . /src
 
 COPY . /docs/content/compose/
 
+RUN svn checkout https://github.com/docker/docker/trunk/docs /docs/content/docker
+RUN svn checkout https://github.com/docker/swarm/trunk/docs /docs/content/swarm
+RUN svn checkout https://github.com/docker/machine/trunk/docs /docs/content/machine
+RUN svn checkout https://github.com/docker/distribution/trunk/docs /docs/content/registry
+RUN svn checkout https://github.com/docker/tutorials/trunk/docs /docs/content/tutorials
+RUN svn checkout https://github.com/docker/opensource/trunk/docs /docs/content
+
+
 # Sed to process GitHub Markdown
 # 1-2 Remove comment code from metadata block
 # 3 Change ](/word to ](/project/ in links
@@ -15,10 +23,4 @@ COPY . /docs/content/compose/
 # 7 Change ](../../ to ](/project/ --> not implemented
 # 
 # 
-RUN find /docs/content/compose -type f -name "*.md" -exec sed -i.old \
-    -e '/^<!.*metadata]>/g' \
-    -e '/^<!.*end-metadata.*>/g' \
-    -e 's/\(\]\)\([(]\)\(\/\)/\1\2\/compose\//g' \
-    -e 's/\(\][(]\)\([A-z].*\)\(\.md\)/\1\/compose\/\2/g' \
-    -e 's/\([(]\)\(.*\)\(\.md\)/\1\2/g'  \
-    -e 's/\(\][(]\)\(\.\.\/\)/\1\/compose\//g' {} \;
+RUN /src/pre-process.sh /docs

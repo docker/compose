@@ -4,6 +4,7 @@ title = "rm"
 description = "Removes stopped service containers."
 keywords = ["fig, composition, compose, docker, orchestration, cli,  rm"]
 [menu.main]
+identifier="rm.compose"
 parent = "smn_compose_cli"
 +++
 <![end-metadata]-->

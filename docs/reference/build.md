@@ -4,6 +4,7 @@ title = "build"
 description = "build"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  build"]
 [menu.main]
+identifier="build.compose"
 parent = "smn_compose_cli"
 +++
 <![end-metadata]-->
