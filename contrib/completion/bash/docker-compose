@@ -315,7 +315,7 @@ _docker-compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --help --no-build --no-color --no-deps --no-recreate --timeout -t --x-smart-recreate" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --help --no-build --no-color --no-deps --no-recreate --force-recreate --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
