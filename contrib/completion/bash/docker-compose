@@ -195,7 +195,7 @@ _docker-compose_ps() {
 _docker-compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl --help" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_from_image
@@ -248,7 +248,7 @@ _docker-compose_run() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --entrypoint -e --help --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all
@@ -315,7 +315,7 @@ _docker-compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--allow-insecure-ssl -d --help --no-build --no-color --no-deps --no-recreate --force-recreate --timeout -t" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --help --no-build --no-color --no-deps --no-recreate --force-recreate --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all

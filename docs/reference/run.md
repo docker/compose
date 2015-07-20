@@ -14,8 +14,6 @@ parent = "smn_compose_cli"
 Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
 Options:
---allow-insecure-ssl  Allow insecure connections to the docker
-                          registry
 -d                    Detached mode: Run container in the background, print
                           new container name.
 --entrypoint CMD      Override the entrypoint of the image.
