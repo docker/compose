@@ -2,13 +2,11 @@ import codecs
 import hashlib
 import json
 import logging
-import os
 import sys
 
 from docker.errors import APIError
-import concurrent.futures
-
-from .const import DEFAULT_MAX_WORKERS
+from Queue import Queue, Empty
+from threading import Thread
 
 
 log = logging.getLogger(__name__)
@@ -18,7 +16,6 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
     """
     Execute a given command upon a list of containers in parallel.
     """
-    max_workers = os.environ.get('COMPOSE_MAX_WORKERS', DEFAULT_MAX_WORKERS)
     stream = codecs.getwriter('utf-8')(sys.stdout)
     lines = []
     errors = {}
@@ -26,25 +23,33 @@ def parallel_execute(command, containers, doing_msg, done_msg, **options):
     for container in containers:
         write_out_msg(stream, lines, container.name, doing_msg)
 
+    q = Queue()
+
     def container_command_execute(container, command, **options):
         try:
             getattr(container, command)(**options)
         except APIError as e:
             errors[container.name] = e.explanation
+        q.put(container)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_container = {
-            executor.submit(
-                container_command_execute,
-                container,
-                command,
-                **options
-            ): container for container in containers
-        }
+    for container in containers:
+        t = Thread(
+            target=container_command_execute,
+            args=(container, command),
+            kwargs=options,
+        )
+        t.daemon = True
+        t.start()
 
-        for future in concurrent.futures.as_completed(future_container):
-            container = future_container[future]
+    done = 0
+
+    while done < len(containers):
+        try:
+            container = q.get(timeout=1)
             write_out_msg(stream, lines, container.name, done_msg)
+            done += 1
+        except Empty:
+            pass
 
     if errors:
         for container in errors:
