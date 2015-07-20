@@ -108,9 +108,7 @@ Second, `router.php` tells PHP's built-in web server how to run Wordpress:
 
 With those four files in place, run `docker-compose up` inside your Wordpress
 directory and it'll pull and build the needed images, and then start the web and
-database containers. You'll then be able to visit Wordpress at port 8000 on your
-Docker daemon (if you're using Boot2docker, `boot2docker ip` will tell you its
-address).
+database containers. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` gives you the machine address and you can open `http://MACHINE_VM_IP:8000` in a browser. 
 
 ## More Compose documentation
 

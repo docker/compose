@@ -161,7 +161,7 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
     web_1   |  * Running on http://0.0.0.0:5000/
     web_1   |  * Restarting with stat
 
-If you're using [Boot2docker](https://github.com/boot2docker/boot2docker), then `boot2docker ip` will tell you its address and you can open `http://ip-from-boot2docker:5000` in a browser. 
+If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser. 
 
 If you're not using Boot2docker and are on linux, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try localhost:5000.
 
