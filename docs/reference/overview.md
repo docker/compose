@@ -44,12 +44,6 @@ the `docker` daemon.
 
 Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
 
-### COMPOSE\_MAX\_WORKERS
-
-Configures the maximum number of worker threads to be used when executing
-commands in parallel. Only a subset of commands execute in parallel, `stop`,
-`kill` and `rm`.
-
 
 
 
