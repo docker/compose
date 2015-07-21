@@ -1,13 +1,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import logging
 import os
 from .. import unittest
 
 import docker
 import mock
 
-from compose.cli import main
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.main import TopLevelCommand
 from compose.service import Service
@@ -87,11 +85,6 @@ class CLITestCase(unittest.TestCase):
     def test_command_help_nonexistent(self):
         with self.assertRaises(NoSuchCommand):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)
-
-    def test_setup_logging(self):
-        main.setup_logging()
-        self.assertEqual(logging.getLogger().level, logging.DEBUG)
-        self.assertEqual(logging.getLogger('requests').propagate, False)
 
     @mock.patch('compose.cli.main.dockerpty', autospec=True)
     def test_run_with_environment_merged_with_options_list(self, mock_dockerpty):
