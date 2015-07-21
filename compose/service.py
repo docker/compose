@@ -176,6 +176,30 @@ class Service(object):
             return
 
         if desired_num > num_running:
+            # we need to start/create until we have desired_num
+            all_containers = self.containers(stopped=True)
+
+            if num_running != len(all_containers):
+                # we have some stopped containers, let's start them up again
+                stopped_containers = sorted([c for c in all_containers if not c.is_running], key=attrgetter('number'))
+
+                num_stopped = len(stopped_containers)
+
+                if num_stopped + num_running > desired_num:
+                    num_to_start = desired_num - num_running
+                    containers_to_start = stopped_containers[:num_to_start]
+                else:
+                    containers_to_start = stopped_containers
+
+                parallel_execute(
+                    objects=containers_to_start,
+                    obj_callable=lambda c: c.start(),
+                    msg_index=lambda c: c.name,
+                    msg="Starting"
+                )
+
+                num_running += len(containers_to_start)
+
             num_to_create = desired_num - num_running
             next_number = self._next_container_number()
             container_numbers = [
@@ -202,18 +226,18 @@ class Service(object):
                 msg_index=lambda c: c.name,
                 msg="Stopping"
             )
-            parallel_execute(
-                objects=containers_to_stop,
-                obj_callable=lambda c: c.remove(),
-                msg_index=lambda c: c.name,
-                msg="Removing"
-            )
+
+        self.remove_stopped()
 
     def remove_stopped(self, **options):
-        for c in self.containers(stopped=True):
-            if not c.is_running:
-                log.info("Removing %s..." % c.name)
-                c.remove(**options)
+        containers = [c for c in self.containers(stopped=True) if not c.is_running]
+
+        parallel_execute(
+            objects=containers,
+            obj_callable=lambda c: c.remove(**options),
+            msg_index=lambda c: c.name,
+            msg="Removing"
+        )
 
     def create_container(self,
                          one_off=False,
