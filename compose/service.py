@@ -24,7 +24,7 @@ from .const import (
 from .container import Container
 from .legacy import check_for_legacy_containers
 from .progress_stream import stream_output, StreamOutputError
-from .utils import json_hash
+from .utils import json_hash, parallel_execute
 
 log = logging.getLogger(__name__)
 
@@ -168,42 +168,82 @@ class Service(object):
                      'for this service are created on a single host, the port will clash.'
                      % self.name)
 
-        # Create enough containers
-        containers = self.containers(stopped=True)
-        while len(containers) < desired_num:
-            containers.append(self.create_container())
+        def create_and_start(service, number):
+            container = service.create_container(number=number, quiet=True)
+            container.start()
+            return container
 
-        running_containers = []
-        stopped_containers = []
-        for c in containers:
-            if c.is_running:
-                running_containers.append(c)
-            else:
-                stopped_containers.append(c)
-        running_containers.sort(key=lambda c: c.number)
-        stopped_containers.sort(key=lambda c: c.number)
+        running_containers = self.containers(stopped=False)
+        num_running = len(running_containers)
 
-        # Stop containers
-        while len(running_containers) > desired_num:
-            c = running_containers.pop()
-            log.info("Stopping %s..." % c.name)
-            c.stop(timeout=timeout)
-            stopped_containers.append(c)
+        if desired_num == num_running:
+            # do nothing as we already have the desired number
+            log.info('Desired container number already achieved')
+            return
 
-        # Start containers
-        while len(running_containers) < desired_num:
-            c = stopped_containers.pop(0)
-            log.info("Starting %s..." % c.name)
-            self.start_container(c)
-            running_containers.append(c)
+        if desired_num > num_running:
+            # we need to start/create until we have desired_num
+            all_containers = self.containers(stopped=True)
+
+            if num_running != len(all_containers):
+                # we have some stopped containers, let's start them up again
+                stopped_containers = sorted([c for c in all_containers if not c.is_running], key=attrgetter('number'))
+
+                num_stopped = len(stopped_containers)
+
+                if num_stopped + num_running > desired_num:
+                    num_to_start = desired_num - num_running
+                    containers_to_start = stopped_containers[:num_to_start]
+                else:
+                    containers_to_start = stopped_containers
+
+                parallel_execute(
+                    objects=containers_to_start,
+                    obj_callable=lambda c: c.start(),
+                    msg_index=lambda c: c.name,
+                    msg="Starting"
+                )
+
+                num_running += len(containers_to_start)
+
+            num_to_create = desired_num - num_running
+            next_number = self._next_container_number()
+            container_numbers = [
+                number for number in range(
+                    next_number, next_number + num_to_create
+                )
+            ]
+
+            parallel_execute(
+                objects=container_numbers,
+                obj_callable=lambda n: create_and_start(service=self, number=n),
+                msg_index=lambda n: n,
+                msg="Creating and starting"
+            )
+
+        if desired_num < num_running:
+            num_to_stop = num_running - desired_num
+            sorted_running_containers = sorted(running_containers, key=attrgetter('number'))
+            containers_to_stop = sorted_running_containers[-num_to_stop:]
+
+            parallel_execute(
+                objects=containers_to_stop,
+                obj_callable=lambda c: c.stop(timeout=timeout),
+                msg_index=lambda c: c.name,
+                msg="Stopping"
+            )
 
         self.remove_stopped()
 
     def remove_stopped(self, **options):
-        for c in self.containers(stopped=True):
-            if not c.is_running:
-                log.info("Removing %s..." % c.name)
-                c.remove(**options)
+        containers = [c for c in self.containers(stopped=True) if not c.is_running]
+
+        parallel_execute(
+            objects=containers,
+            obj_callable=lambda c: c.remove(**options),
+            msg_index=lambda c: c.name,
+            msg="Removing"
+        )
 
     def create_container(self,
                          one_off=False,

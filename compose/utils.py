@@ -12,69 +12,75 @@ from threading import Thread
 log = logging.getLogger(__name__)
 
 
-def parallel_execute(command, containers, doing_msg, done_msg, **options):
+def parallel_execute(objects, obj_callable, msg_index, msg):
     """
-    Execute a given command upon a list of containers in parallel.
+    For a given list of objects, call the callable passing in the first
+    object we give it.
     """
     stream = codecs.getwriter('utf-8')(sys.stdout)
     lines = []
     errors = {}
 
-    for container in containers:
-        write_out_msg(stream, lines, container.name, doing_msg)
+    for obj in objects:
+        write_out_msg(stream, lines, msg_index(obj), msg)
 
     q = Queue()
 
-    def container_command_execute(container, command, **options):
+    def inner_execute_function(an_callable, parameter, msg_index):
         try:
-            getattr(container, command)(**options)
+            result = an_callable(parameter)
         except APIError as e:
-            errors[container.name] = e.explanation
-        q.put(container)
+            errors[msg_index] = e.explanation
+            result = "error"
+        q.put((msg_index, result))
 
-    for container in containers:
+    for an_object in objects:
         t = Thread(
-            target=container_command_execute,
-            args=(container, command),
-            kwargs=options,
+            target=inner_execute_function,
+            args=(obj_callable, an_object, msg_index(an_object)),
         )
         t.daemon = True
         t.start()
 
     done = 0
+    total_to_execute = len(objects)
 
-    while done < len(containers):
+    while done < total_to_execute:
         try:
-            container = q.get(timeout=1)
-            write_out_msg(stream, lines, container.name, done_msg)
+            msg_index, result = q.get(timeout=1)
+            if result == 'error':
+                write_out_msg(stream, lines, msg_index, msg, status='error')
+            else:
+                write_out_msg(stream, lines, msg_index, msg)
             done += 1
         except Empty:
             pass
 
     if errors:
-        for container in errors:
-            stream.write("ERROR: for {}  {} \n".format(container, errors[container]))
+        for error in errors:
+            stream.write("ERROR: for {}  {} \n".format(error, errors[error]))
 
 
-def write_out_msg(stream, lines, container_name, msg):
+def write_out_msg(stream, lines, msg_index, msg, status="done"):
     """
     Using special ANSI code characters we can write out the msg over the top of
     a previous status message, if it exists.
     """
-    if container_name in lines:
-        position = lines.index(container_name)
+    obj_index = msg_index
+    if msg_index in lines:
+        position = lines.index(obj_index)
         diff = len(lines) - position
         # move up
         stream.write("%c[%dA" % (27, diff))
         # erase
         stream.write("%c[2K\r" % 27)
-        stream.write("{}: {} \n".format(container_name, msg))
+        stream.write("{} {}... {}\n".format(msg, obj_index, status))
         # move back down
         stream.write("%c[%dB" % (27, diff))
     else:
         diff = 0
-        lines.append(container_name)
-        stream.write("{}: {}... \r\n".format(container_name, msg))
+        lines.append(obj_index)
+        stream.write("{} {}... \r\n".format(msg, obj_index))
 
     stream.flush()
 
