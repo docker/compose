@@ -157,8 +157,14 @@ class Service(object):
         - starts containers until there are at least `desired_num` running
         - removes all stopped containers
         """
-        if not self.can_be_scaled():
-            log.warn('Service %s specifies a port on the host. If multiple containers '
+        if self.custom_container_name() and desired_num > 1:
+            log.warn('The "%s" service is using the custom container name "%s". '
+                     'Docker requires each container to have a unique name. '
+                     'Remove the custom name to scale the service.'
+                     % (self.name, self.custom_container_name()))
+
+        if self.specifies_host_port():
+            log.warn('The "%s" service specifies a port on the host. If multiple containers '
                      'for this service are created on a single host, the port will clash.'
                      % self.name)
 
@@ -531,7 +537,8 @@ class Service(object):
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        container_options['name'] = self.get_container_name(number, one_off)
+        container_options['name'] = self.custom_container_name() \
+            or self.get_container_name(number, one_off)
 
         if add_config_hash:
             config_hash = self.config_hash()
@@ -703,11 +710,14 @@ class Service(object):
             '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
         ]
 
-    def can_be_scaled(self):
+    def custom_container_name(self):
+        return self.options.get('container_name')
+
+    def specifies_host_port(self):
         for port in self.options.get('ports', []):
             if ':' in str(port):
-                return False
-        return True
+                return True
+        return False
 
     def pull(self, insecure_registry=False):
         if 'image' not in self.options:

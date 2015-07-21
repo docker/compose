@@ -239,6 +239,16 @@ It's recommended that you use reverse-DNS notation to prevent your labels from c
       - "com.example.department=Finance"
       - "com.example.label-with-empty-value"
 
+### container_name
+
+Specify a custom container name, rather than a generated default name.
+
+    container_name: my-web-container
+
+Because Docker container names must be unique, you cannot scale a service
+beyond 1 container if you have specified a custom name. Attempting to do so
+results in an error.
+
 ### log driver
 
 Specify a logging driver for the service's containers, as with the ``--log-driver`` option for docker run ([documented here](http://docs.docker.com/reference/run/#logging-drivers-log-driver)).
