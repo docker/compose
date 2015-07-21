@@ -16,6 +16,7 @@ from ..const import DEFAULT_TIMEOUT
 from ..project import NoSuchService, ConfigurationError
 from ..service import BuildError, NeedsBuildError
 from ..config import parse_environment
+from ..progress_stream import StreamOutputError
 from .command import Command
 from .docopt_command import NoSuchCommand
 from .errors import UserError
@@ -47,6 +48,9 @@ def main():
         sys.exit(1)
     except BuildError as e:
         log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
+        sys.exit(1)
+    except StreamOutputError as e:
+        log.error(e)
         sys.exit(1)
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
