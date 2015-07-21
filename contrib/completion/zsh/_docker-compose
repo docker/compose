@@ -253,9 +253,9 @@ __docker-compose_subcommand () {
                 '--no-color[Produce monochrome output.]' \
                 "--no-deps[Don't start linked services.]" \
                 "--no-recreate[If containers already exist, don't recreate them.]" \
+                "--force-recreate[Recreate containers even if their configuration and image haven't changed]" \
                 "--no-build[Don't build an image, even if it's missing]" \
                 '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
-                "--x-smart-recreate[Only recreate containers whose configuration or image needs to be updated. (EXPERIMENTAL)]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (version)
