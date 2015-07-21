@@ -24,7 +24,7 @@ from .const import (
 from .container import Container
 from .legacy import check_for_legacy_containers
 from .progress_stream import stream_output, StreamOutputError
-from .utils import json_hash, parallel_create_execute, parallel_execute
+from .utils import json_hash, parallel_execute
 
 log = logging.getLogger(__name__)
 
@@ -162,12 +162,10 @@ class Service(object):
                      'for this service are created on a single host, the port will clash.'
                      % self.name)
 
-        def create_and_start(number):
-            container = self.create_container(number=number, quiet=True)
+        def create_and_start(service, number):
+            container = service.create_container(number=number, quiet=True)
             container.start()
             return container
-
-        msgs = {'doing': 'Creating', 'done': 'Started'}
 
         running_containers = self.containers(stopped=False)
         num_running = len(running_containers)
@@ -185,20 +183,31 @@ class Service(object):
                     next_number, next_number + num_to_create
                 )
             ]
-            parallel_create_execute(create_and_start, container_numbers, msgs)
+
+            parallel_execute(
+                objects=container_numbers,
+                obj_callable=lambda n: create_and_start(service=self, number=n),
+                msg_index=lambda n: n,
+                msg="Creating and starting"
+            )
 
         if desired_num < num_running:
+            num_to_stop = num_running - desired_num
             sorted_running_containers = sorted(running_containers, key=attrgetter('number'))
+            containers_to_stop = sorted_running_containers[-num_to_stop:]
 
-            if desired_num < num_running:
-                # count number of running containers.
-                num_to_stop = num_running - desired_num
-
-                containers_to_stop = sorted_running_containers[-num_to_stop:]
-                # TODO: refactor these out?
-                parallel_execute("stop", containers_to_stop, "Stopping", "Stopped")
-                parallel_execute("remove", containers_to_stop, "Removing", "Removed")
-        # self.remove_stopped()
+            parallel_execute(
+                objects=containers_to_stop,
+                obj_callable=lambda c: c.stop(timeout=timeout),
+                msg_index=lambda c: c.name,
+                msg="Stopping"
+            )
+            parallel_execute(
+                objects=containers_to_stop,
+                obj_callable=lambda c: c.remove(),
+                msg_index=lambda c: c.name,
+                msg="Removing"
+            )
 
     def remove_stopped(self, **options):
         for c in self.containers(stopped=True):

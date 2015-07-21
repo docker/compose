@@ -198,15 +198,30 @@ class Project(object):
             service.start(**options)
 
     def stop(self, service_names=None, **options):
-        parallel_execute("stop", self.containers(service_names), "Stopping", "Stopped", **options)
+        parallel_execute(
+            objects=self.containers(service_names),
+            obj_callable=lambda c: c.stop(**options),
+            msg_index=lambda c: c.name,
+            msg="Stopping"
+        )
 
     def kill(self, service_names=None, **options):
-        parallel_execute("kill", self.containers(service_names), "Killing", "Killed", **options)
+        parallel_execute(
+            objects=self.containers(service_names),
+            obj_callable=lambda c: c.kill(**options),
+            msg_index=lambda c: c.name,
+            msg="Killing"
+        )
 
     def remove_stopped(self, service_names=None, **options):
         all_containers = self.containers(service_names, stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
-        parallel_execute("remove", stopped_containers, "Removing", "Removed", **options)
+        parallel_execute(
+            objects=stopped_containers,
+            obj_callable=lambda c: c.remove(**options),
+            msg_index=lambda c: c.name,
+            msg="Removing"
+        )
 
     def restart(self, service_names=None, **options):
         for service in self.get_services(service_names):
