@@ -13,8 +13,13 @@ STOP = object()
 
 
 class Multiplexer(object):
-    def __init__(self, generators):
-        self.generators = generators
+    """
+    Create a single iterator from several iterators by running all of them in
+    parallel and yielding results as they come in.
+    """
+
+    def __init__(self, iterators):
+        self.iterators = iterators
         self.queue = Queue()
 
     def loop(self):
@@ -31,12 +36,12 @@ class Multiplexer(object):
                 pass
 
     def _init_readers(self):
-        for generator in self.generators:
-            t = Thread(target=_enqueue_output, args=(generator, self.queue))
+        for iterator in self.iterators:
+            t = Thread(target=_enqueue_output, args=(iterator, self.queue))
             t.daemon = True
             t.start()
 
 
-def _enqueue_output(generator, queue):
-    for item in generator:
+def _enqueue_output(iterator, queue):
+    for item in iterator:
         queue.put(item)
