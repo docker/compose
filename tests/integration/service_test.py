@@ -4,10 +4,10 @@ import os
 from os import path
 
 from docker.errors import APIError
-import mock
+from mock import patch
 import tempfile
 import shutil
-import six
+from six import StringIO, text_type
 
 from compose import __version__
 from compose.const import (
@@ -221,7 +221,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
-    @mock.patch.dict(os.environ)
+    @patch.dict(os.environ)
     def test_create_container_with_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
         os.environ['HOME'] = '/tmp/home-dir'
@@ -469,7 +469,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
-        self.create_service('web', build=six.text_type(base_dir)).build()
+        self.create_service('web', build=text_type(base_dir)).build()
         self.assertEqual(len(self.client.images(name='composetest_web')), 1)
 
     def test_start_container_stays_unpriviliged(self):
@@ -548,6 +548,120 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
         service.scale(0)
         self.assertEqual(len(service.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_stopped_containers(self, mock_stdout):
+        """
+        Given there are some stopped containers and scale is called with a
+        desired number that is the same as the number of stopped containers,
+        test that those containers are restarted and not removed/recreated.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        valid_numbers = [next_number, next_number + 1]
+        service.create_container(number=next_number, quiet=True)
+        service.create_container(number=next_number + 1, quiet=True)
+
+        for container in service.containers():
+            self.assertFalse(container.is_running)
+
+        service.scale(2)
+
+        self.assertEqual(len(service.containers()), 2)
+        for container in service.containers():
+            self.assertTrue(container.is_running)
+            self.assertTrue(container.number in valid_numbers)
+
+        captured_output = mock_stdout.getvalue()
+        self.assertNotIn('Creating', captured_output)
+        self.assertIn('Starting', captured_output)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_stopped_containers_and_needing_creation(self, mock_stdout):
+        """
+        Given there are some stopped containers and scale is called with a
+        desired number that is greater than the number of stopped containers,
+        test that those containers are restarted and required number are created.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        service.create_container(number=next_number, quiet=True)
+
+        for container in service.containers():
+            self.assertFalse(container.is_running)
+
+        service.scale(2)
+
+        self.assertEqual(len(service.containers()), 2)
+        for container in service.containers():
+            self.assertTrue(container.is_running)
+
+        captured_output = mock_stdout.getvalue()
+        self.assertIn('Creating', captured_output)
+        self.assertIn('Starting', captured_output)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_api_returns_errors(self, mock_stdout):
+        """
+        Test that when scaling if the API returns an error, that error is handled
+        and the remaining threads continue.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        service.create_container(number=next_number, quiet=True)
+
+        with patch(
+            'compose.container.Container.create',
+                side_effect=APIError(message="testing", response={}, explanation="Boom")):
+
+            service.scale(3)
+
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+        self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
+
+    @patch('compose.service.log')
+    def test_scale_with_desired_number_already_achieved(self, mock_log):
+        """
+        Test that calling scale with a desired number that is equal to the
+        number of containers already running results in no change.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        container = service.create_container(number=next_number, quiet=True)
+        container.start()
+
+        self.assertTrue(container.is_running)
+        self.assertEqual(len(service.containers()), 1)
+
+        service.scale(1)
+
+        self.assertEqual(len(service.containers()), 1)
+        container.inspect()
+        self.assertTrue(container.is_running)
+
+        captured_output = mock_log.info.call_args[0]
+        self.assertIn('Desired container number already achieved', captured_output)
+
+    @patch('compose.service.log')
+    def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
+        """
+        Test that calling scale on a service that has a custom container name
+        results in warning output.
+        """
+        service = self.create_service('web', container_name='custom-container')
+
+        self.assertEqual(service.custom_container_name(), 'custom-container')
+
+        service.scale(3)
+
+        captured_output = mock_log.warn.call_args[0][0]
+
+        self.assertEqual(len(service.containers()), 1)
+        self.assertIn(
+            "Remove the custom name to scale the service.",
+            captured_output
+        )
 
     def test_scale_sets_ports(self):
         service = self.create_service('web', ports=['8000'])
@@ -650,7 +764,7 @@ class ServiceTest(DockerClientTestCase):
         for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
-    @mock.patch.dict(os.environ)
+    @patch.dict(os.environ)
     def test_resolve_env(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
