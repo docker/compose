@@ -45,3 +45,5 @@ class Multiplexer(object):
 def _enqueue_output(iterator, queue):
     for item in iterator:
         queue.put(item)
+
+    queue.put(STOP)
