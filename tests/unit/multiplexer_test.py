@@ -26,3 +26,20 @@ class MultiplexerTest(unittest.TestCase):
             [0, 1, 2, 3, 4, 5],
             sorted(list(mux.loop())),
         )
+
+    def test_exception(self):
+        class Problem(Exception):
+            pass
+
+        def problematic_iterator():
+            yield 0
+            yield 2
+            raise Problem(":(")
+
+        mux = Multiplexer([
+            problematic_iterator(),
+            (x for x in [1, 3, 5]),
+        ])
+
+        with self.assertRaises(Problem):
+            list(mux.loop())

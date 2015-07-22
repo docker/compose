@@ -26,7 +26,11 @@ class Multiplexer(object):
 
         while self._num_running > 0:
             try:
-                item = self.queue.get(timeout=0.1)
+                item, exception = self.queue.get(timeout=0.1)
+
+                if exception:
+                    raise exception
+
                 if item is STOP:
                     self._num_running -= 1
                 else:
@@ -42,7 +46,9 @@ class Multiplexer(object):
 
 
 def _enqueue_output(iterator, queue):
-    for item in iterator:
-        queue.put(item)
-
-    queue.put(STOP)
+    try:
+        for item in iterator:
+            queue.put((item, None))
+        queue.put((STOP, None))
+    except Exception as e:
+        queue.put((None, e))
