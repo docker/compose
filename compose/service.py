@@ -577,8 +577,10 @@ class Service(object):
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        container_options['name'] = self.custom_container_name() \
-            or self.get_container_name(number, one_off)
+        if self.custom_container_name() and not one_off:
+            container_options['name'] = self.custom_container_name()
+        else:
+            container_options['name'] = self.get_container_name(number, one_off)
 
         if add_config_hash:
             config_hash = self.config_hash()
