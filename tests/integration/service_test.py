@@ -706,6 +706,9 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.name, 'my-web-container')
 
+        one_off_container = service.create_container(one_off=True)
+        self.assertNotEqual(one_off_container.name, 'my-web-container')
+
     def test_log_drive_invalid(self):
         service = self.create_service('web', log_driver='xxx')
         self.assertRaises(ValueError, lambda: create_and_start_container(service))
