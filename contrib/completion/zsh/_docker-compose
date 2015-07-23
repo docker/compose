@@ -202,7 +202,6 @@ __docker-compose_subcommand () {
             ;;
         (pull)
             _arguments \
-                '--allow-insecure-ssl[Allow insecure connections to the docker registry]' \
                 '--help[Print usage]' \
                 '*:services:__docker-compose_services_from_image' && ret=0
             ;;
@@ -215,7 +214,6 @@ __docker-compose_subcommand () {
             ;;
         (run)
             _arguments \
-                '--allow-insecure-ssl[Allow insecure connections to the docker registry]' \
                 '-d[Detached mode: Run container in the background, print new container name.]' \
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
@@ -247,7 +245,6 @@ __docker-compose_subcommand () {
             ;;
         (up)
             _arguments \
-                '--allow-insecure-ssl[Allow insecure connections to the docker registry]' \
                 '-d[Detached mode: Run containers in the background, print new container names.]' \
                 '--help[Print usage]' \
                 '--no-color[Produce monochrome output.]' \

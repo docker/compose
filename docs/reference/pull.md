@@ -12,9 +12,6 @@ parent = "smn_compose_cli"
 
 ```
 Usage: pull [options] [SERVICE...]
-
-Options:
---allow-insecure-ssl    Allow insecure connections to the docker registry
 ```
 
 Pulls service images.

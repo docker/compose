@@ -155,7 +155,6 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 def converge(service,
              allow_recreate=True,
              force_recreate=False,
-             insecure_registry=False,
              do_build=True):
     """
     If a container for this service doesn't exist, create and start one. If there are
@@ -168,7 +167,6 @@ def converge(service,
 
     return service.execute_convergence_plan(
         plan,
-        insecure_registry=insecure_registry,
         do_build=do_build,
         timeout=1,
     )

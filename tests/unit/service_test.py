@@ -229,11 +229,10 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.log', autospec=True)
     def test_pull_image(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
-        service.pull(insecure_registry=True)
+        service.pull()
         self.mock_client.pull.assert_called_once_with(
             'someimage',
             tag='sometag',
-            insecure_registry=True,
             stream=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
@@ -243,25 +242,7 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'ababab',
             tag='latest',
-            insecure_registry=False,
             stream=True)
-
-    def test_create_container_from_insecure_registry(self):
-        service = Service('foo', client=self.mock_client, image='someimage:sometag')
-        images = []
-
-        def pull(repo, tag=None, insecure_registry=False, **kwargs):
-            self.assertEqual('someimage', repo)
-            self.assertEqual('sometag', tag)
-            self.assertTrue(insecure_registry)
-            images.append({'Id': 'abc123'})
-            return []
-
-        service.image = lambda *args, **kwargs: mock_get_image(images)
-        self.mock_client.pull = pull
-
-        service.create_container(insecure_registry=True)
-        self.assertEqual(1, len(images))
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
