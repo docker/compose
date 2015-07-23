@@ -14,8 +14,6 @@ parent = "smn_compose_cli"
 Usage: up [options] [SERVICE...]
 
 Options:
---allow-insecure-ssl   Allow insecure connections to the docker
-                       registry
 -d                     Detached mode: Run containers in the background,
                        print new container names.
 --no-color             Produce monochrome output.

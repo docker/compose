@@ -26,6 +26,11 @@ from .utils import yesno, get_version_info
 
 log = logging.getLogger(__name__)
 
+INSECURE_SSL_WARNING = """
+Warning: --allow-insecure-ssl is deprecated and has no effect.
+It will be removed in a future version of Compose.
+"""
+
 
 def main():
     setup_logging()
@@ -232,13 +237,13 @@ class TopLevelCommand(Command):
         Usage: pull [options] [SERVICE...]
 
         Options:
-            --allow-insecure-ssl    Allow insecure connections to the docker
-                                    registry
+            --allow-insecure-ssl    Deprecated - no effect.
         """
-        insecure_registry = options['--allow-insecure-ssl']
+        if options['--allow-insecure-ssl']:
+            log.warn(INSECURE_SSL_WARNING)
+
         project.pull(
             service_names=options['SERVICE'],
-            insecure_registry=insecure_registry
         )
 
     def rm(self, project, options):
@@ -280,8 +285,7 @@ class TopLevelCommand(Command):
         Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
-            --allow-insecure-ssl  Allow insecure connections to the docker
-                                  registry
+            --allow-insecure-ssl  Deprecated - no effect.
             -d                    Detached mode: Run container in the background, print
                                   new container name.
             --entrypoint CMD      Override the entrypoint of the image.
@@ -296,7 +300,8 @@ class TopLevelCommand(Command):
         """
         service = project.get_service(options['SERVICE'])
 
-        insecure_registry = options['--allow-insecure-ssl']
+        if options['--allow-insecure-ssl']:
+            log.warn(INSECURE_SSL_WARNING)
 
         if not options['--no-deps']:
             deps = service.get_linked_names()
@@ -306,7 +311,6 @@ class TopLevelCommand(Command):
                     service_names=deps,
                     start_deps=True,
                     allow_recreate=False,
-                    insecure_registry=insecure_registry,
                 )
 
         tty = True
@@ -344,7 +348,6 @@ class TopLevelCommand(Command):
             container = service.create_container(
                 quiet=True,
                 one_off=True,
-                insecure_registry=insecure_registry,
                 **container_options
             )
         except APIError as e:
@@ -453,8 +456,7 @@ class TopLevelCommand(Command):
         Usage: up [options] [SERVICE...]
 
         Options:
-            --allow-insecure-ssl   Allow insecure connections to the docker
-                                   registry
+            --allow-insecure-ssl   Deprecated - no effect.
             -d                     Detached mode: Run containers in the background,
                                    print new container names.
             --no-color             Produce monochrome output.
@@ -468,7 +470,9 @@ class TopLevelCommand(Command):
                                    when attached or when containers are already
                                    running. (default: 10)
         """
-        insecure_registry = options['--allow-insecure-ssl']
+        if options['--allow-insecure-ssl']:
+            log.warn(INSECURE_SSL_WARNING)
+
         detached = options['-d']
 
         monochrome = options['--no-color']
@@ -487,7 +491,6 @@ class TopLevelCommand(Command):
             start_deps=start_deps,
             allow_recreate=allow_recreate,
             force_recreate=force_recreate,
-            insecure_registry=insecure_registry,
             do_build=not options['--no-build'],
             timeout=timeout
         )
