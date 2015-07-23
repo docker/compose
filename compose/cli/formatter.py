@@ -5,6 +5,8 @@ import texttable
 
 
 def get_tty_width():
+    if os.isatty(1) == False:
+        return 0
     tty_size = os.popen('stty size', 'r').read().split()
     if len(tty_size) != 2:
         return 0
