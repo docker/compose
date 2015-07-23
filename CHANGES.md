@@ -1,6 +1,74 @@
 Change log
 ==========
 
+1.4.0 RC2 (2015-07-23)
+----------------------
+
+-   A bug has been fixed where Compose would fail to pull images from private registries serving plain (unsecured) HTTP. The `--allow-insecure-ssl` flag, which was previously used to work around this issue, has been deprecated and now has no effect.
+
+-   A regression has been fixed where specifying a custom container name for a service with `container_name` would cause `docker-compose run` to fail for that service.
+
+1.4.0 RC1 (2015-07-22)
+----------------------
+
+-   By default, `docker-compose up` now only recreates containers for services whose configuration has changed since they were created. This should result in a dramatic speed-up for many applications.
+
+    The experimental `--x-smart-recreate` flag which introduced this feature in Compose 1.3.0 has been removed, and a `--force-recreate` flag has been added for when you want to recreate everything.
+
+-   Several of Compose's commands - `scale`, `stop`, `kill` and `rm` - now perform actions on multiple containers in parallel, rather than in sequence, which will run much faster on larger applications.
+
+-   You can now specify a custom name for a service's container with `container_name`. Because Docker container names must be unique, this means you can't scale the service beyond one container.
+
+-   You no longer have to specify a `file` option when using `extends` - it will default to the current file.
+
+-   Service names can now contain dots, dashes and underscores.
+
+-   Compose can now read YAML configuration from standard input, rather than from a file, by specifying `-` as the filename. This makes it easier to generate configuration dynamically:
+
+        $ echo 'redis: {"image": "redis"}' | docker-compose --file - up
+
+-   There's a new `docker-compose version` command which prints extended information about Compose's bundled dependencies.
+
+-   `docker-compose.yml` now supports `log_opt` as well as `log_driver`, allowing you to pass extra configuration to a service's logging driver.
+
+-   `docker-compose.yml` now supports `memswap_limit`, similar to `docker run --memory-swap`.
+
+-   When mounting volumes with the `volumes` option, you can now pass in any mode supported by the daemon, not just `:ro` or `:rw`. For example, SELinux users can pass `:z` or `:Z`.
+
+Thanks @dnephin, @ekristen, @funkyfuture, @jeffk and @mnowster!
+
+1.3.3 (2015-07-15)
+------------------
+
+Two regressions have been fixed:
+
+- When stopping containers gracefully, Compose was setting the timeout to 0, effectively forcing a SIGKILL every time.
+- Compose would sometimes crash depending on the formatting of container data returned from the Docker API.
+
+1.3.2 (2015-07-14)
+------------------
+
+The following bugs have been fixed:
+
+- When there were one-off containers created by running `docker-compose run` on an older version of Compose, `docker-compose run` would fail with a name collision. Compose now shows an error if you have leftover containers of this type lying around, and tells you how to remove them.
+- Compose was not reading Docker authentication config files created in the new location, `~/docker/config.json`, and authentication against private registries would therefore fail.
+- When a container had a pseudo-TTY attached, its output in `docker-compose up` would be truncated.
+- `docker-compose up --x-smart-recreate` would sometimes fail when an image tag was updated.
+- `docker-compose up` would sometimes create two containers with the same numeric suffix.
+- `docker-compose rm` and `docker-compose ps` would sometimes list services that aren't part of the current project (though no containers were erroneously removed).
+- Some `docker-compose` commands would not show an error if invalid service names were passed in.
+
+Thanks @dano, @josephpage, @kevinsimper, @lieryan, @phemmer, @soulrebel and @sschepens!
+
+1.3.1 (2015-06-21)
+------------------
+
+The following bugs have been fixed:
+
+- `docker-compose build` would always attempt to pull the base image before building.
+- `docker-compose help migrate-to-labels` failed with an error.
+- If no network mode was specified, Compose would set it to "bridge", rather than allowing the Docker daemon to use its configured default network mode.
+
 1.3.0 (2015-06-18)
 ------------------
 
