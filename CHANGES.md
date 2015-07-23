@@ -1,6 +1,38 @@
 Change log
 ==========
 
+1.3.3 (2015-07-15)
+------------------
+
+Two regressions have been fixed:
+
+- When stopping containers gracefully, Compose was setting the timeout to 0, effectively forcing a SIGKILL every time.
+- Compose would sometimes crash depending on the formatting of container data returned from the Docker API.
+
+1.3.2 (2015-07-14)
+------------------
+
+The following bugs have been fixed:
+
+- When there were one-off containers created by running `docker-compose run` on an older version of Compose, `docker-compose run` would fail with a name collision. Compose now shows an error if you have leftover containers of this type lying around, and tells you how to remove them.
+- Compose was not reading Docker authentication config files created in the new location, `~/docker/config.json`, and authentication against private registries would therefore fail.
+- When a container had a pseudo-TTY attached, its output in `docker-compose up` would be truncated.
+- `docker-compose up --x-smart-recreate` would sometimes fail when an image tag was updated.
+- `docker-compose up` would sometimes create two containers with the same numeric suffix.
+- `docker-compose rm` and `docker-compose ps` would sometimes list services that aren't part of the current project (though no containers were erroneously removed).
+- Some `docker-compose` commands would not show an error if invalid service names were passed in.
+
+Thanks @dano, @josephpage, @kevinsimper, @lieryan, @phemmer, @soulrebel and @sschepens!
+
+1.3.1 (2015-06-21)
+------------------
+
+The following bugs have been fixed:
+
+- `docker-compose build` would always attempt to pull the base image before building.
+- `docker-compose help migrate-to-labels` failed with an error.
+- If no network mode was specified, Compose would set it to "bridge", rather than allowing the Docker daemon to use its configured default network mode.
+
 1.3.0 (2015-06-18)
 ------------------
 
