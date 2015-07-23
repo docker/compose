@@ -239,7 +239,6 @@ class Project(object):
            start_deps=True,
            allow_recreate=True,
            force_recreate=False,
-           insecure_registry=False,
            do_build=True,
            timeout=DEFAULT_TIMEOUT):
 
@@ -262,7 +261,6 @@ class Project(object):
             for service in services
             for container in service.execute_convergence_plan(
                 plans[service.name],
-                insecure_registry=insecure_registry,
                 do_build=do_build,
                 timeout=timeout
             )
@@ -302,9 +300,9 @@ class Project(object):
 
         return plans
 
-    def pull(self, service_names=None, insecure_registry=False):
+    def pull(self, service_names=None):
         for service in self.get_services(service_names, include_deps=True):
-            service.pull(insecure_registry=insecure_registry)
+            service.pull()
 
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:

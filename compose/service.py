@@ -247,7 +247,6 @@ class Service(object):
 
     def create_container(self,
                          one_off=False,
-                         insecure_registry=False,
                          do_build=True,
                          previous_container=None,
                          number=None,
@@ -259,7 +258,6 @@ class Service(object):
         """
         self.ensure_image_exists(
             do_build=do_build,
-            insecure_registry=insecure_registry,
         )
 
         container_options = self._get_container_create_options(
@@ -275,8 +273,7 @@ class Service(object):
         return Container.create(self.client, **container_options)
 
     def ensure_image_exists(self,
-                            do_build=True,
-                            insecure_registry=False):
+                            do_build=True):
 
         try:
             self.image()
@@ -290,7 +287,7 @@ class Service(object):
             else:
                 raise NeedsBuildError(self)
         else:
-            self.pull(insecure_registry=insecure_registry)
+            self.pull()
 
     def image(self):
         try:
@@ -360,14 +357,12 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 insecure_registry=False,
                                  do_build=True,
                                  timeout=DEFAULT_TIMEOUT):
         (action, containers) = plan
 
         if action == 'create':
             container = self.create_container(
-                insecure_registry=insecure_registry,
                 do_build=do_build,
             )
             self.start_container(container)
@@ -378,7 +373,6 @@ class Service(object):
             return [
                 self.recreate_container(
                     c,
-                    insecure_registry=insecure_registry,
                     timeout=timeout
                 )
                 for c in containers
@@ -401,7 +395,6 @@ class Service(object):
 
     def recreate_container(self,
                            container,
-                           insecure_registry=False,
                            timeout=DEFAULT_TIMEOUT):
         """Recreate a container.
 
@@ -426,7 +419,6 @@ class Service(object):
             '%s_%s' % (container.short_id, container.name))
 
         new_container = self.create_container(
-            insecure_registry=insecure_registry,
             do_build=False,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
@@ -761,7 +753,7 @@ class Service(object):
                 return True
         return False
 
-    def pull(self, insecure_registry=False):
+    def pull(self):
         if 'image' not in self.options:
             return
 
@@ -772,7 +764,7 @@ class Service(object):
             repo,
             tag=tag,
             stream=True,
-            insecure_registry=insecure_registry)
+        )
         stream_output(output, sys.stdout)
 
 
