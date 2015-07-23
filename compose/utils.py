@@ -57,6 +57,7 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
             pass
 
     if errors:
+        stream.write("\n")
         for error in errors:
             stream.write("ERROR: for {}  {} \n".format(error, errors[error]))
 
