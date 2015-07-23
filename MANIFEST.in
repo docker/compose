@@ -4,7 +4,7 @@ include requirements.txt
 include requirements-dev.txt
 include tox.ini
 include *.md
-include contrib/completion/bash/docker-compose
+recursive-include contrib/completion *
 recursive-include tests *
 global-exclude *.pyc
 global-exclude *.pyo
