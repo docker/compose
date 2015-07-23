@@ -7,6 +7,7 @@ from itertools import cycle
 from .multiplexer import Multiplexer, STOP
 from . import colors
 from .utils import split_buffer
+from requests.exceptions import ConnectionError
 
 
 class LogPrinter(object):
@@ -52,16 +53,20 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(self._generate_prefix(container)).encode('utf-8')
-        # Attach to container before log printer starts running
-        line_generator = split_buffer(self._attach(container), '\n')
+        try:
+            prefix = color_fn(self._generate_prefix(container)).encode('utf-8')
+            # Attach to container before log printer starts running
+            line_generator = split_buffer(self._attach(container), '\n')
 
-        for line in line_generator:
-            yield prefix + line
+            for line in line_generator:
+                yield prefix + line
 
-        exit_code = container.wait()
-        yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
-        yield STOP
+            exit_code = container.wait()
+            yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
+            yield STOP
+        except ConnectionError:
+            yield color_fn("%s: Unable to connect to Docker Api. Aborting.\n" % (container.name))
+            yield STOP
 
     def _generate_prefix(self, container):
         """
