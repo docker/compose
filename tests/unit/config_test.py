@@ -59,11 +59,56 @@ class ConfigTest(unittest.TestCase):
         make_service_dict('foo', {'ports': ['8000']}, 'tests/')
 
 
-class VolumePathTest(unittest.TestCase):
+class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
-    def test_volume_binding_with_environ(self):
+    def test_config_file_with_environment_variable(self):
+        os.environ.update(
+            IMAGE="busybox",
+            HOST_PORT="80",
+            LABEL_VALUE="myvalue",
+        )
+
+        service_dicts = config.load(
+            config.find('tests/fixtures/environment-interpolation', None),
+        )
+
+        self.assertEqual(service_dicts, [
+            {
+                'name': 'web',
+                'image': 'busybox',
+                'ports': ['80:8000'],
+                'labels': {'mylabel': 'myvalue'},
+                'hostname': 'host-',
+                'command': '${ESCAPED}',
+            }
+        ])
+
+    @mock.patch.dict(os.environ)
+    def test_invalid_interpolation(self):
+        with self.assertRaises(config.ConfigurationError) as cm:
+            config.load(
+                config.ConfigDetails(
+                    {'web': {'image': '${'}},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+        self.assertIn('Invalid', cm.exception.msg)
+        self.assertIn('for "image" option', cm.exception.msg)
+        self.assertIn('in service "web"', cm.exception.msg)
+        self.assertIn('"${"', cm.exception.msg)
+
+    @mock.patch.dict(os.environ)
+    def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = make_service_dict('foo', {'volumes': ['${VOLUME_PATH}:/container/path']}, working_dir='.')
+        d = config.load(
+            config.ConfigDetails(
+                config={'foo': {'volumes': ['${VOLUME_PATH}:/container/path']}},
+                working_dir='.',
+                filename=None,
+            )
+        )[0]
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
     @mock.patch.dict(os.environ)
@@ -400,18 +445,22 @@ class EnvTest(unittest.TestCase):
         os.environ['HOSTENV'] = '/tmp'
         os.environ['CONTAINERENV'] = '/host/tmp'
 
-        service_dict = make_service_dict(
-            'foo',
-            {'volumes': ['$HOSTENV:$CONTAINERENV']},
-            working_dir="tests/fixtures/env"
-        )
+        service_dict = config.load(
+            config.ConfigDetails(
+                config={'foo': {'volumes': ['$HOSTENV:$CONTAINERENV']}},
+                working_dir="tests/fixtures/env",
+                filename=None,
+            )
+        )[0]
         self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
 
-        service_dict = make_service_dict(
-            'foo',
-            {'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']},
-            working_dir="tests/fixtures/env"
-        )
+        service_dict = config.load(
+            config.ConfigDetails(
+                config={'foo': {'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
+                working_dir="tests/fixtures/env",
+                filename=None,
+            )
+        )[0]
         self.assertEqual(set(service_dict['volumes']), set(['/opt/tmp:/opt/host/tmp']))
 
 

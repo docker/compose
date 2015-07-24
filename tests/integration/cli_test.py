@@ -488,6 +488,21 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 1)
         self.assertIn("FOO=1", containers[0].get('Config.Env'))
 
+    @patch.dict(os.environ)
+    def test_home_and_env_var_in_volume_path(self):
+        os.environ['VOLUME_NAME'] = 'my-volume'
+        os.environ['HOME'] = '/tmp/home-dir'
+        expected_host_path = os.path.join(os.environ['HOME'], os.environ['VOLUME_NAME'])
+
+        self.command.base_dir = 'tests/fixtures/volume-path-interpolation'
+        self.command.dispatch(['up', '-d'], None)
+
+        container = self.project.containers(stopped=True)[0]
+        actual_host_path = container.get('Volumes')['/container-path']
+        components = actual_host_path.split('/')
+        self.assertTrue(components[-2:] == ['home-dir', 'my-volume'],
+                        msg="Last two components differ: %s, %s" % (actual_host_path, expected_host_path))
+
     def test_up_with_extends(self):
         self.command.base_dir = 'tests/fixtures/extends'
         self.command.dispatch(['up', '-d'], None)
