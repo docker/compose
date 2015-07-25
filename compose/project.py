@@ -205,6 +205,14 @@ class Project(object):
             msg="Stopping"
         )
 
+    def pause(self, service_names=None, **options):
+        for service in reversed(self.get_services(service_names)):
+            service.pause(**options)
+
+    def unpause(self, service_names=None, **options):
+        for service in self.get_services(service_names):
+            service.unpause(**options)
+
     def kill(self, service_names=None, **options):
         parallel_execute(
             objects=self.containers(service_names),

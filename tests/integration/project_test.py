@@ -140,7 +140,7 @@ class ProjectTest(DockerClientTestCase):
         web = project.get_service('web')
         self.assertEqual(web._get_net(), 'container:' + net_container.id)
 
-    def test_start_stop_kill_remove(self):
+    def test_start_pause_unpause_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
         project = Project('composetest', [web, db], self.client)
@@ -158,7 +158,22 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name]))
 
         project.start()
-        self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name, db_container.name]))
+        self.assertEqual(set(c.name for c in project.containers()),
+                         set([web_container_1.name, web_container_2.name, db_container.name]))
+
+        project.pause(service_names=['web'])
+        self.assertEqual(set([c.name for c in project.containers() if c.is_paused]),
+                         set([web_container_1.name, web_container_2.name]))
+
+        project.pause()
+        self.assertEqual(set([c.name for c in project.containers() if c.is_paused]),
+                         set([web_container_1.name, web_container_2.name, db_container.name]))
+
+        project.unpause(service_names=['db'])
+        self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 2)
+
+        project.unpause()
+        self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 0)
 
         project.stop(service_names=['web'], timeout=1)
         self.assertEqual(set(c.name for c in project.containers()), set([db_container.name]))
