@@ -100,6 +100,8 @@ class Container(object):
 
     @property
     def human_readable_state(self):
+        if self.is_paused:
+            return 'Paused'
         if self.is_running:
             return 'Ghost' if self.get('State.Ghost') else 'Up'
         else:
@@ -118,6 +120,10 @@ class Container(object):
     @property
     def is_running(self):
         return self.get('State.Running')
+
+    @property
+    def is_paused(self):
+        return self.get('State.Paused')
 
     def get(self, key):
         """Return a value from the container or None if the value is not set.
@@ -141,6 +147,12 @@ class Container(object):
 
     def stop(self, **options):
         return self.client.stop(self.id, **options)
+
+    def pause(self, **options):
+        return self.client.pause(self.id, **options)
+
+    def unpause(self, **options):
+        return self.client.unpause(self.id, **options)
 
     def kill(self, **options):
         return self.client.kill(self.id, **options)

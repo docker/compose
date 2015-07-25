@@ -97,12 +97,14 @@ class Service(object):
         self.net = net or None
         self.options = options
 
-    def containers(self, stopped=False, one_off=False):
+    def containers(self, stopped=False, one_off=False, filters={}):
+        filters.update({'label': self.labels(one_off=one_off)})
+
         containers = filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})])
+                filters=filters)])
 
         if not containers:
             check_for_legacy_containers(
@@ -132,6 +134,16 @@ class Service(object):
         for c in self.containers():
             log.info("Stopping %s..." % c.name)
             c.stop(**options)
+
+    def pause(self, **options):
+        for c in self.containers(filters={'status': 'running'}):
+            log.info("Pausing %s..." % c.name)
+            c.pause(**options)
+
+    def unpause(self, **options):
+        for c in self.containers(filters={'status': 'paused'}):
+            log.info("Unpausing %s..." % c.name)
+            c.unpause()
 
     def kill(self, **options):
         for c in self.containers():

@@ -68,6 +68,11 @@ __docker_compose_services_with() {
 	COMPREPLY=( $(compgen -W "${names[*]}" -- "$cur") )
 }
 
+# The services for which at least one paused container exists
+__docker_compose_services_paused() {
+	__docker_compose_services_with '.State.Paused'
+}
+
 # The services for which at least one running container exists
 __docker_compose_services_running() {
 	__docker_compose_services_with '.State.Running'
@@ -153,6 +158,18 @@ _docker_compose_migrate_to_labels() {
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+	esac
+}
+
+
+_docker_compose_pause() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_running
 			;;
 	esac
 }
@@ -306,6 +323,18 @@ _docker_compose_stop() {
 }
 
 
+_docker_compose_unpause() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_paused
+			;;
+	esac
+}
+
+
 _docker_compose_up() {
 	case "$prev" in
 		-t | --timeout)
@@ -343,6 +372,7 @@ _docker_compose() {
 		kill
 		logs
 		migrate-to-labels
+		pause
 		port
 		ps
 		pull
@@ -352,6 +382,7 @@ _docker_compose() {
 		scale
 		start
 		stop
+		unpause
 		up
 		version
 	)
