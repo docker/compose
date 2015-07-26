@@ -42,8 +42,10 @@ Compose will build and tag it with a generated name, and use that image thereaft
 
 Alternate Dockerfile.
 
-Compose will use an alternate file to build with.
+Compose will use an alternate file to build with. You still must provide a build-
+path with the `build`-key.
 
+    build: /path/to/build/dir
     dockerfile: Dockerfile-alternate
 
 ### command
