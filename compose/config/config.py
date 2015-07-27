@@ -3,6 +3,8 @@ import os
 import sys
 import yaml
 from collections import namedtuple
+import json
+import jsonschema
 
 import six
 
@@ -131,13 +133,31 @@ def get_config_path(base_dir):
     return os.path.join(path, winner)
 
 
+def validate_against_schema(config):
+    config_source_dir = os.path.dirname(os.path.abspath(__file__))
+    schema_file = os.path.join(config_source_dir, "schema.json")
+
+    with open(schema_file, "r") as schema_fh:
+        schema = json.load(schema_fh)
+
+    validation_output = jsonschema.Draft4Validator(schema)
+
+    errors = [error.message for error in sorted(validation_output.iter_errors(config), key=str)]
+    if errors:
+        raise ConfigurationError("Validation failed, reason(s): {}".format("\n".join(errors)))
+
+
 def load(config_details):
-    dictionary, working_dir, filename = config_details
-    dictionary = interpolate_environment_variables(dictionary)
+    config, working_dir, filename = config_details
+    config = interpolate_environment_variables(config)
 
     service_dicts = []
 
-    for service_name, service_dict in list(dictionary.items()):
+    validate_against_schema(config)
+
+    for service_name, service_dict in list(config.items()):
+        if not isinstance(service_dict, dict):
+            raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
         validate_paths(service_dict)
@@ -210,24 +230,10 @@ class ServiceLoader(object):
     def validate_extends_options(self, service_name, extends_options):
         error_prefix = "Invalid 'extends' configuration for %s:" % service_name
 
-        if not isinstance(extends_options, dict):
-            raise ConfigurationError("%s must be a dictionary" % error_prefix)
-
-        if 'service' not in extends_options:
-            raise ConfigurationError(
-                "%s you need to specify a service, e.g. 'service: web'" % error_prefix
-            )
-
         if 'file' not in extends_options and self.filename is None:
             raise ConfigurationError(
                 "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
             )
-
-        for k, _ in extends_options.items():
-            if k not in ['file', 'service']:
-                raise ConfigurationError(
-                    "%s unsupported configuration option '%s'" % (error_prefix, k)
-                )
 
         return extends_options
 
@@ -255,9 +261,6 @@ def process_container_options(service_dict, working_dir=None):
             raise ConfigurationError(msg)
 
     service_dict = service_dict.copy()
-
-    if 'memswap_limit' in service_dict and 'mem_limit' not in service_dict:
-        raise ConfigurationError("Invalid 'memswap_limit' configuration for %s service: when defining 'memswap_limit' you must set 'mem_limit' as well" % service_dict['name'])
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(service_dict['volumes'], working_dir=working_dir)

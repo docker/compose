@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "type": "object",
+
+  "patternProperties": {
+    "^[a-zA-Z0-9._-]+$": {
+      "$ref": "#/definitions/service"
+    }
+  },
+
+  "definitions": {
+    "service": {
+      "type": "object",
+
+      "properties": {
+        "build": {"type": "string"},
+        "env_file": {"$ref": "#/definitions/string_or_list"},
+        "environment": {
+          "oneOf": [
+            {"type": "object"},
+            {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+          ]
+        },
+        "image": {"type": "string"},
+        "mem_limit": {"type": "number"},
+        "memswap_limit": {"type": "number"},
+
+        "extends": {
+          "type": "object",
+
+          "properties": {
+            "service": {"type": "string"},
+            "file": {"type": "string"}
+          },
+          "required": ["service"],
+          "additionalProperties": false
+        }
+
+      },
+
+      "anyOf": [
+        {
+          "required": ["build"],
+          "not": {"required": ["image"]}
+        },
+        {
+          "required": ["image"],
+          "not": {"required": ["build"]}
+        },
+        {
+          "required": ["extends"],
+          "not": {"required": ["build", "image"]}
+        }
+      ],
+
+      "dependencies": {
+        "memswap_limit": ["mem_limit"]
+      }
+
+    },
+
+    "string_or_list": {
+      "oneOf": [
+        {"type": "string"},
+        {"$ref": "#/definitions/list_of_strings"}
+      ]
+    },
+
+    "list_of_strings": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    }
+
+  },
+
+  "additionalProperties": false
+}

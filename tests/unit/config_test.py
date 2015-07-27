@@ -20,10 +20,10 @@ class ConfigTest(unittest.TestCase):
             config.ConfigDetails(
                 {
                     'foo': {'image': 'busybox'},
-                    'bar': {'environment': ['FOO=1']},
+                    'bar': {'image': 'busybox', 'environment': ['FOO=1']},
                 },
-                'working_dir',
-                'filename.yml'
+                'tests/fixtures/extends',
+                'common.yml'
             )
         )
 
@@ -32,13 +32,14 @@ class ConfigTest(unittest.TestCase):
             sorted([
                 {
                     'name': 'bar',
+                    'image': 'busybox',
                     'environment': {'FOO': '1'},
                 },
                 {
                     'name': 'foo',
                     'image': 'busybox',
                 }
-            ])
+            ], key=lambda d: d['name'])
         )
 
     def test_load_throws_error_when_not_dict(self):
@@ -327,23 +328,26 @@ class MemoryOptionsTest(unittest.TestCase):
         When you set a 'memswap_limit' it is invalid config unless you also set
         a mem_limit
         """
-        with self.assertRaises(config.ConfigurationError):
-            make_service_dict(
-                'foo', {
-                    'memswap_limit': 2000000,
-                },
-                'tests/'
+        with self.assertRaisesRegexp(config.ConfigurationError, "u'mem_limit' is a dependency of u'memswap_limit'"):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'foo': {'image': 'busybox', 'memswap_limit': 2000000},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
             )
 
     def test_validation_with_correct_memswap_values(self):
-        service_dict = make_service_dict(
-            'foo', {
-                'mem_limit': 1000000,
-                'memswap_limit': 2000000,
-            },
-            'tests/'
+        service_dict = config.load(
+            config.ConfigDetails(
+                {'foo': {'image': 'busybox', 'mem_limit': 1000000, 'memswap_limit': 2000000}},
+                'tests/fixtures/extends',
+                'common.yml'
+            )
         )
-        self.assertEqual(service_dict['memswap_limit'], 2000000)
+        self.assertEqual(service_dict[0]['memswap_limit'], 2000000)
 
 
 class EnvTest(unittest.TestCase):
@@ -528,6 +532,7 @@ class ExtendsTest(unittest.TestCase):
             {
                 'environment':
                 {'YEP': '1'},
+                'image': 'busybox',
                 'name': 'otherweb'
             },
             {
@@ -553,36 +558,47 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_empty_dictionary(self):
-        dictionary = {'extends': None}
-
-        def load_config():
-            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
-
-        self.assertRaisesRegexp(config.ConfigurationError, 'dictionary', load_config)
-
-        dictionary['extends'] = {}
-        self.assertRaises(config.ConfigurationError, load_config)
+        with self.assertRaisesRegexp(config.ConfigurationError, 'service'):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'web': {'image': 'busybox', 'extends': {}},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
 
     def test_extends_validation_missing_service_key(self):
-        dictionary = {'extends': {'file': 'common.yml'}}
-
-        def load_config():
-            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
-
-        self.assertRaisesRegexp(config.ConfigurationError, 'service', load_config)
+        with self.assertRaisesRegexp(config.ConfigurationError, "u'service' is a required property"):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'web': {'image': 'busybox', 'extends': {'file': 'common.yml'}},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
 
     def test_extends_validation_invalid_key(self):
-        dictionary = {
-            'extends':
-            {
-                'service': 'web', 'file': 'common.yml', 'what': 'is this'
-            }
-        }
-
-        def load_config():
-            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
-
-        self.assertRaisesRegexp(config.ConfigurationError, 'what', load_config)
+        with self.assertRaisesRegexp(config.ConfigurationError, "'rogue_key' was unexpected"):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'web': {
+                            'image': 'busybox',
+                            'extends': {
+                                'file': 'common.yml',
+                                'service': 'web',
+                                'rogue_key': 'is not allowed'
+                            }
+                        },
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
 
     def test_extends_validation_no_file_key_no_filename_set(self):
         dictionary = {'extends': {'service': 'web'}}
@@ -593,12 +609,18 @@ class ExtendsTest(unittest.TestCase):
         self.assertRaisesRegexp(config.ConfigurationError, 'file', load_config)
 
     def test_extends_validation_valid_config(self):
-        dictionary = {'extends': {'service': 'web', 'file': 'common.yml'}}
+        service = config.load(
+            config.ConfigDetails(
+                {
+                    'web': {'image': 'busybox', 'extends': {'service': 'web', 'file': 'common.yml'}},
+                },
+                'tests/fixtures/extends',
+                'common.yml'
+            )
+        )
 
-        def load_config():
-            return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
-
-        self.assertIsInstance(load_config(), dict)
+        self.assertEquals(len(service), 1)
+        self.assertIsInstance(service[0], dict)
 
     def test_extends_file_defaults_to_self(self):
         """
