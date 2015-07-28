@@ -102,7 +102,7 @@ An entry with the ip address and hostname will be created in `/etc/hosts` inside
 ### ports
 
 Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container
-port (a random host port will be chosen).
+port (a random host port will be chosen). You can specify a port range instead of a single port (`START-END`). If you use a range for the container ports, you may specify a range for the host ports as well. both ranges must be of equal size.
 
 > **Note:** When mapping ports in the `HOST:CONTAINER` format, you may experience
 > erroneous results when using a container port lower than 60, because YAML will
@@ -111,9 +111,12 @@ port (a random host port will be chosen).
 
     ports:
      - "3000"
+     - "3000-3005"
      - "8000:8000"
+     - "9090-9091:8080-8081"
      - "49100:22"
      - "127.0.0.1:8001:8001"
+     - "127.0.0.1:5000-5010:5000-5010"
 
 ### expose
 
@@ -371,3 +374,4 @@ Each of these is a single value, analogous to its
 - [Command line reference](cli.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
+
