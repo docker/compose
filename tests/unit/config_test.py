@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from .. import unittest
 
-from compose import config
+from compose.config import config
 
 
 def make_service_dict(name, service_dict, working_dir):
