@@ -4,6 +4,7 @@ title = "stop"
 description = "Stops running containers without removing them. "
 keywords = ["fig, composition, compose, docker, orchestration, cli, stop"]
 [menu.main]
+identifier="stop.compose"
 parent = "smn_compose_cli"
 +++
 <![end-metadata]-->
