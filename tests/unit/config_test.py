@@ -59,6 +59,27 @@ class ConfigTest(unittest.TestCase):
         )
         make_service_dict('foo', {'ports': ['8000']}, 'tests/')
 
+    def test_config_invalid_service_names(self):
+        with self.assertRaises(config.ConfigurationError):
+            for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
+                config.load(
+                    config.ConfigDetails(
+                        {invalid_name: {'image': 'busybox'}},
+                        'working_dir',
+                        'filename.yml'
+                    )
+                )
+
+    def test_config_valid_service_names(self):
+        for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
+            config.load(
+                config.ConfigDetails(
+                    {valid_name: {'image': 'busybox'}},
+                    'tests/fixtures/extends',
+                    'common.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)

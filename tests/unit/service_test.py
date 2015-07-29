@@ -29,25 +29,6 @@ class ServiceTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.Client)
 
-    def test_name_validations(self):
-        self.assertRaises(ConfigError, lambda: Service(name='', image='foo'))
-
-        self.assertRaises(ConfigError, lambda: Service(name=' ', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='/', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='!', image='foo'))
-        self.assertRaises(ConfigError, lambda: Service(name='\xe2', image='foo'))
-
-        Service('a', image='foo')
-        Service('foo', image='foo')
-        Service('foo-bar', image='foo')
-        Service('foo.bar', image='foo')
-        Service('foo_bar', image='foo')
-        Service('_', image='foo')
-        Service('___', image='foo')
-        Service('-', image='foo')
-        Service('--', image='foo')
-        Service('.__.', image='foo')
-
     def test_project_validation(self):
         self.assertRaises(ConfigError, lambda: Service(name='foo', project='>', image='foo'))
 
