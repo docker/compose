@@ -17,7 +17,7 @@ Compose with a `curl` command.
 
 ## Install Docker
 
-First, install Docker version 1.6 or greater:
+First, install Docker version 1.7.1 or greater:
 
 - [Instructions for Mac OS X](http://docs.docker.com/installation/mac/)
 - [Instructions for Ubuntu](http://docs.docker.com/installation/ubuntulinux/)

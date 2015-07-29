@@ -14,7 +14,7 @@ def docker_client():
         cert_path = os.path.join(os.environ.get('HOME', ''), '.docker')
 
     base_url = os.environ.get('DOCKER_HOST')
-    api_version = os.environ.get('COMPOSE_API_VERSION', '1.18')
+    api_version = os.environ.get('COMPOSE_API_VERSION', '1.19')
 
     tls_config = None
 
