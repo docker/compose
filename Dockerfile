@@ -48,16 +48,14 @@ RUN set -ex; \
     rm -rf pip-7.0.1; \
     rm pip-7.0.1.tar.gz
 
-ENV ALL_DOCKER_VERSIONS 1.6.2 1.7.1
+ENV ALL_DOCKER_VERSIONS 1.7.1
 
 RUN set -ex; \
-    curl https://get.docker.com/builds/Linux/x86_64/docker-1.6.2 -o /usr/local/bin/docker-1.6.2; \
-    chmod +x /usr/local/bin/docker-1.6.2; \
     curl https://get.docker.com/builds/Linux/x86_64/docker-1.7.1 -o /usr/local/bin/docker-1.7.1; \
     chmod +x /usr/local/bin/docker-1.7.1
 
 # Set the default Docker to be run
-RUN ln -s /usr/local/bin/docker-1.6.2 /usr/local/bin/docker
+RUN ln -s /usr/local/bin/docker-1.7.1 /usr/local/bin/docker
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/

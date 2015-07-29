@@ -121,7 +121,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', cpu_shares=73)
         container = service.create_container()
         service.start_container(container)
-        self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
+        self.assertEqual(container.get('HostConfig.CpuShares'), 73)
 
     def test_build_extra_hosts(self):
         # string
@@ -183,7 +183,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', cpuset='0')
         container = service.create_container()
         service.start_container(container)
-        self.assertEqual(container.inspect()['Config']['Cpuset'], '0')
+        self.assertEqual(container.get('HostConfig.CpusetCpus'), '0')
 
     def test_create_container_with_read_only_root_fs(self):
         read_only = True
