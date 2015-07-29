@@ -72,6 +72,22 @@ class VolumePathTest(unittest.TestCase):
         d = make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
+    def test_named_volume_with_driver(self):
+        d = make_service_dict('foo', {
+            'volumes': ['namedvolume:/data'],
+            'volume_driver': 'foodriver',
+        }, working_dir='.')
+        self.assertEqual(d['volumes'], ['namedvolume:/data'])
+
+    @mock.patch.dict(os.environ)
+    def test_named_volume_with_special_chars(self):
+        os.environ['NAME'] = 'surprise!'
+        d = make_service_dict('foo', {
+            'volumes': ['~/${NAME}:/data'],
+            'volume_driver': 'foodriver',
+        }, working_dir='.')
+        self.assertEqual(d['volumes'], ['~/${NAME}:/data'])
+
 
 class MergePathMappingTest(object):
     def config_name(self):
