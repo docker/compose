@@ -35,6 +35,8 @@ To install Compose, run the following commands:
 Optionally, you can also install [command completion](completion.md) for the
 bash and zsh shell.
 
+> **Note:** Some older Mac OS X CPU architectures are incompatible with the binary. If you receive an "Illegal instruction: 4" error after installing, you should install using the `pip` command instead.
+
 Compose is available for OS X and 64-bit Linux. If you're on another platform,
 Compose can also be installed as a Python package:
 
