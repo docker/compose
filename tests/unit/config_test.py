@@ -80,6 +80,28 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_invalid_ports_format_validation(self):
+        with self.assertRaises(config.ConfigurationError):
+            for invalid_ports in [{"1": "8000"}, "whatport"]:
+                config.load(
+                    config.ConfigDetails(
+                        {'web': {'image': 'busybox', 'ports': invalid_ports}},
+                        'working_dir',
+                        'filename.yml'
+                    )
+                )
+
+    def test_config_valid_ports_format_validation(self):
+        valid_ports = [["8000", "9000"], "625", "8000:8050", ["8000/8050"]]
+        for ports in valid_ports:
+            config.load(
+                config.ConfigDetails(
+                    {'web': {'image': 'busybox', 'ports': ports}},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)

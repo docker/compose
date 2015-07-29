@@ -4,7 +4,7 @@ import sys
 import yaml
 from collections import namedtuple
 import json
-import jsonschema
+from jsonschema import Draft4Validator, FormatChecker, ValidationError
 
 import six
 
@@ -133,6 +133,28 @@ def get_config_path(base_dir):
     return os.path.join(path, winner)
 
 
+@FormatChecker.cls_checks(format="ports", raises=ValidationError("Ports is incorrectly formatted."))
+def format_ports(instance):
+    def _is_valid(port):
+        if ':' in port or '/' in port:
+            return True
+        try:
+            int(port)
+            return True
+        except ValueError:
+            return False
+        return False
+
+    if isinstance(instance, list):
+        for port in instance:
+            if not _is_valid(port):
+                return False
+        return True
+    elif isinstance(instance, str):
+        return _is_valid(instance)
+    return False
+
+
 def validate_against_schema(config):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
     schema_file = os.path.join(config_source_dir, "schema.json")
@@ -140,7 +162,7 @@ def validate_against_schema(config):
     with open(schema_file, "r") as schema_fh:
         schema = json.load(schema_fh)
 
-    validation_output = jsonschema.Draft4Validator(schema)
+    validation_output = Draft4Validator(schema, format_checker=FormatChecker(["ports"]))
 
     errors = [error.message for error in sorted(validation_output.iter_errors(config), key=str)]
     if errors:

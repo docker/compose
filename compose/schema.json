@@ -14,6 +14,17 @@
       "type": "object",
 
       "properties": {
+        "ports": {
+          "oneOf": [
+            {"type": "string", "format": "ports"},
+            {
+              "type": "array",
+              "items": {"type": "string"},
+              "uniqueItems": true,
+              "format": "ports"
+            }
+          ]
+        },
         "build": {"type": "string"},
         "env_file": {"$ref": "#/definitions/string_or_list"},
         "environment": {
