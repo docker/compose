@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from collections import namedtuple
 import logging
 import re
+import os
 import sys
 from operator import attrgetter
 
@@ -848,12 +849,15 @@ def parse_volume_spec(volume_config):
                           "external:internal[:mode]" % volume_config)
 
     if len(parts) == 1:
-        return VolumeSpec(None, parts[0], 'rw')
+        external = None
+        internal = os.path.normpath(parts[0])
+    else:
+        external = os.path.normpath(parts[0])
+        internal = os.path.normpath(parts[1])
 
-    if len(parts) == 2:
-        parts.append('rw')
+    mode = parts[2] if len(parts) == 3 else 'rw'
 
-    return VolumeSpec(*parts)
+    return VolumeSpec(external, internal, mode)
 
 
 # Ports

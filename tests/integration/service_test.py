@@ -221,6 +221,40 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
+    def test_duplicate_volume_trailing_slash(self):
+        """
+        When an image specifies a volume, and the Compose file specifies a host path
+        but adds a trailing slash, make sure that we don't create duplicate binds.
+        """
+        host_path = '/tmp/data'
+        container_path = '/data'
+        volumes = ['{}:{}/'.format(host_path, container_path)]
+
+        tmp_container = self.client.create_container(
+            'busybox', 'true',
+            volumes={container_path: {}},
+            labels={'com.docker.compose.test_image': 'true'},
+        )
+        image = self.client.commit(tmp_container)['Id']
+
+        service = self.create_service('db', image=image, volumes=volumes)
+        old_container = create_and_start_container(service)
+
+        self.assertEqual(
+            old_container.get('Config.Volumes'),
+            {container_path: {}},
+        )
+
+        service = self.create_service('db', image=image, volumes=volumes)
+        new_container = service.recreate_container(old_container)
+
+        self.assertEqual(
+            new_container.get('Config.Volumes'),
+            {container_path: {}},
+        )
+
+        self.assertEqual(service.containers(stopped=False), [new_container])
+
     @patch.dict(os.environ)
     def test_create_container_with_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
