@@ -11,21 +11,35 @@ docker run --rm \
   "$TAG" -e pre-commit
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="default"
+  DOCKER_VERSIONS="$DEFAULT_DOCKER_VERSION"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
 fi
 
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
-  docker run \
-    --rm \
-    --privileged \
-    --volume="/var/lib/docker" \
-    --volume="${COVERAGE_DIR:-$(pwd)/coverage-html}:/code/coverage-html" \
-    -e "DOCKER_VERSION=$version" \
-    -e "DOCKER_DAEMON_ARGS" \
-    --entrypoint="script/dind" \
-    "$TAG" \
-    script/wrapdocker tox -e py27,py34 -- "$@"
+
+  (
+    set -x
+
+    daemon_container_id=$(\
+      docker run \
+      -d \
+      --privileged \
+      --volume="/var/lib/docker" \
+      --expose="2375" \
+      dockerswarm/dind:$version \
+      docker -d -H tcp://0.0.0.0:2375 \
+    )
+
+    docker run \
+      --rm \
+      --link="$daemon_container_id:docker" \
+      --env="DOCKER_HOST=tcp://docker:2375" \
+      --entrypoint="tox" \
+      "$TAG" \
+      -e py27,py34 -- "$@"
+
+    docker rm -vf "$daemon_container_id"
+  )
 done
