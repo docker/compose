@@ -221,6 +221,18 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
+    def test_recreate_preserves_volume_with_trailing_slash(self):
+        """
+        When the Compose file specifies a trailing slash in the container path, make
+        sure we copy the volume over when recreating.
+        """
+        service = self.create_service('data', volumes=['/data/'])
+        old_container = create_and_start_container(service)
+        volume_path = old_container.get('Volumes')['/data']
+
+        new_container = service.recreate_container(old_container)
+        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+
     def test_duplicate_volume_trailing_slash(self):
         """
         When an image specifies a volume, and the Compose file specifies a host path
