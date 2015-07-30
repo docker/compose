@@ -4,7 +4,7 @@ import sys
 
 from itertools import cycle
 
-from .multiplexer import Multiplexer, STOP
+from .multiplexer import Multiplexer
 from . import colors
 from .utils import split_buffer
 
@@ -61,7 +61,6 @@ class LogPrinter(object):
 
         exit_code = container.wait()
         yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
-        yield STOP
 
     def _generate_prefix(self, container):
         """
