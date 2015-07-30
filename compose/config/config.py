@@ -525,11 +525,6 @@ def parse_labels(labels):
     if isinstance(labels, dict):
         return labels
 
-    raise ConfigurationError(
-        "labels \"%s\" must be a list or mapping" %
-        labels
-    )
-
 
 def split_label(label):
     if '=' in label:
