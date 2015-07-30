@@ -14,28 +14,15 @@
       "type": "object",
 
       "properties": {
-        "ports": {
-          "oneOf": [
-            {"type": "string", "format": "ports"},
-            {
-              "type": "array",
-              "items": {"type": "string"},
-              "uniqueItems": true,
-              "format": "ports"
-            }
-          ]
-        },
         "build": {"type": "string"},
         "env_file": {"$ref": "#/definitions/string_or_list"},
+
         "environment": {
           "oneOf": [
             {"type": "object"},
             {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
           ]
         },
-        "image": {"type": "string"},
-        "mem_limit": {"type": "number"},
-        "memswap_limit": {"type": "number"},
 
         "extends": {
           "type": "object",
@@ -46,6 +33,22 @@
           },
           "required": ["service"],
           "additionalProperties": false
+        },
+
+        "image": {"type": "string"},
+        "mem_limit": {"type": "number"},
+        "memswap_limit": {"type": "number"},
+
+        "ports": {
+          "oneOf": [
+            {"type": "string", "format": "ports"},
+            {
+              "type": "array",
+              "items": {"type": "string"},
+              "uniqueItems": true,
+              "format": "ports"
+            }
+          ]
         }
 
       },
