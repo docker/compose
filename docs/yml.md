@@ -19,22 +19,6 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
-Values for configuration options can contain environment variables, e.g.
-`image: postgres:${POSTGRES_VERSION}`. For more details, see the section on
-[variable substitution](#variable-substitution).
-
-### image
-
-Tag, partial image ID or digest. Can be local or remote - Compose will attempt to
-pull if it doesn't exist locally.
-
-    image: ubuntu
-    image: orchardup/postgresql
-    image: a4bc65fd
-    image: busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d
-
-Using `image` together with either `build`  or `dockerfile` is not allowed. Attempting to do so results in an error.
-
 ### build
 
 Path to a directory containing a Dockerfile. When the value supplied is a
@@ -47,13 +31,17 @@ Compose will build and tag it with a generated name, and use that image thereaft
 
 Using `build` together with `image` is not allowed. Attempting to do so results in an error.
 
-### dockerfile
+### cap_add, cap_drop
 
-Alternate Dockerfile.
+Add or drop container capabilities.
+See `man 7 capabilities` for a full list.
 
-Compose will use an alternate file to build with.
+    cap_add:
+      - ALL
 
-    dockerfile: Dockerfile-alternate
+    cap_drop:
+      - NET_ADMIN
+      - SYS_ADMIN
 
 Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
@@ -63,143 +51,49 @@ Override the default command.
 
     command: bundle exec thin -p 3000
 
-<a name="links"></a>
-### links
+### container_name
 
-Link to containers in another service. Either specify both the service name and
-the link alias (`SERVICE:ALIAS`), or just the service name (which will also be
-used for the alias).
+Specify a custom container name, rather than a generated default name.
 
-    links:
-     - db
-     - db:database
-     - redis
+    container_name: my-web-container
 
-An entry with the alias' name will be created in `/etc/hosts` inside containers
-for this service, e.g:
+Because Docker container names must be unique, you cannot scale a service
+beyond 1 container if you have specified a custom name. Attempting to do so
+results in an error.
 
-    172.17.2.186  db
-    172.17.2.186  database
-    172.17.2.187  redis
+### devices
 
-Environment variables will also be created - see the [environment variable
-reference](env.md) for details.
+List of device mappings.  Uses the same format as the `--device` docker
+client create option.
 
-### external_links
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
 
-Link to containers started outside this `docker-compose.yml` or even outside
-of Compose, especially for containers that provide shared or common services.
-`external_links` follow semantics similar to `links` when specifying both the
-container name and the link alias (`CONTAINER:ALIAS`).
+### dns
 
-    external_links:
-     - redis_1
-     - project_db_1:mysql
-     - project_db_1:postgresql
+Custom DNS servers. Can be a single value or a list.
 
-### extra_hosts
+    dns: 8.8.8.8
+    dns:
+      - 8.8.8.8
+      - 9.9.9.9
 
-Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
+### dns_search
 
-    extra_hosts:
-     - "somehost:162.242.195.82"
-     - "otherhost:50.31.209.229"
+Custom DNS search domains. Can be a single value or a list.
 
-An entry with the ip address and hostname will be created in `/etc/hosts` inside containers for this service, e.g:
+    dns_search: example.com
+    dns_search:
+      - dc1.example.com
+      - dc2.example.com
 
-    162.242.195.82  somehost
-    50.31.209.229   otherhost
+### dockerfile
 
-### ports
+Alternate Dockerfile.
 
-Makes an exposed port accessible on a host and the port is available to
-any client that can reach that host. Docker binds the exposed port to a random
-port on the host within an *ephemeral port range* defined by
-`/proc/sys/net/ipv4/ip_local_port_range`. You can also map to a specific port or range of ports.
+Compose will use an alternate file to build with.
 
-Acceptable formats for the `ports` value are:
-
-* `containerPort`
-* `ip:hostPort:containerPort`
-* `ip::containerPort`
-* `hostPort:containerPort`
-
-You can specify a range for both the `hostPort` and the `containerPort` values.
-When specifying ranges, the container port values in the range must match the
-number of host port values in the range, for example,
-`1234-1236:1234-1236/tcp`. Once a host is running, use the 'docker-compose port' command
-to see the actual mapping.
-
-The following configuration shows examples of the port formats in use:
-
-    ports:
-     - "3000"
-     - "3000-3005"
-     - "8000:8000"
-     - "9090-9091:8080-8081"
-     - "49100:22"
-     - "127.0.0.1:8001:8001"
-     - "127.0.0.1:5000-5010:5000-5010"
-
-
-When mapping ports, in the `hostPort:containerPort` format, you may
-experience erroneous results when using a container port lower than 60. This
-happens because YAML parses numbers in the format `xx:yy` as sexagesimal (base
-60). To avoid this problem, always explicitly specify your port
-mappings as strings.
-
-### expose
-
-Expose ports without publishing them to the host machine - they'll only be
-accessible to linked services. Only the internal port can be specified.
-
-    expose:
-     - "3000"
-     - "8000"
-
-### volumes
-
-Mount paths as volumes, optionally specifying a path on the host machine
-(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
-
-    volumes:
-     - /var/lib/mysql
-     - ./cache:/tmp/cache
-     - ~/configs:/etc/configs/:ro
-
-You can mount a relative path on the host, which will expand relative to
-the directory of the Compose configuration file being used. Relative paths
-should always begin with `.` or `..`.
-
-> Note: No path expansion will be done if you have also specified a
-> `volume_driver`.
-
-### volumes_from
-
-Mount all of the volumes from another service or container.
-
-    volumes_from:
-     - service_name
-     - container_name
-
-### environment
-
-Add environment variables. You can use either an array or a dictionary. Any
-boolean values; true, false, yes no, need to be enclosed in quotes to ensure
-they are not converted to True or False by the YML parser.
-
-Environment variables with only a key are resolved to their values on the
-machine Compose is running on, which can be helpful for secret or host-specific values.
-
-    environment:
-      RACK_ENV: development
-      SHOW: 'true'
-      SESSION_SECRET:
-
-    environment:
-      - RACK_ENV=development
-      - SHOW=true
-      - SESSION_SECRET
+    dockerfile: Dockerfile-alternate
 
 ### env_file
 
@@ -222,6 +116,34 @@ beginning with `#` (i.e. comments) are ignored, as are blank lines.
 
     # Set Rails/Rack environment
     RACK_ENV=development
+
+### environment
+
+Add environment variables. You can use either an array or a dictionary. Any
+boolean values; true, false, yes no, need to be enclosed in quotes to ensure
+they are not converted to True or False by the YML parser.
+
+Environment variables with only a key are resolved to their values on the
+machine Compose is running on, which can be helpful for secret or host-specific values.
+
+    environment:
+      RACK_ENV: development
+      SHOW: 'true'
+      SESSION_SECRET:
+
+    environment:
+      - RACK_ENV=development
+      - SHOW=true
+      - SESSION_SECRET
+
+### expose
+
+Expose ports without publishing them to the host machine - they'll only be
+accessible to linked services. Only the internal port can be specified.
+
+    expose:
+     - "3000"
+     - "8000"
 
 ### extends
 
@@ -267,6 +189,40 @@ service within the current file.
 For more on `extends`, see the [tutorial](extends.md#example) and
 [reference](extends.md#reference).
 
+### external_links
+
+Link to containers started outside this `docker-compose.yml` or even outside
+of Compose, especially for containers that provide shared or common services.
+`external_links` follow semantics similar to `links` when specifying both the
+container name and the link alias (`CONTAINER:ALIAS`).
+
+    external_links:
+     - redis_1
+     - project_db_1:mysql
+     - project_db_1:postgresql
+
+### extra_hosts
+
+Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
+
+    extra_hosts:
+     - "somehost:162.242.195.82"
+     - "otherhost:50.31.209.229"
+
+An entry with the ip address and hostname will be created in `/etc/hosts` inside containers for this service, e.g:
+
+    162.242.195.82  somehost
+    50.31.209.229   otherhost
+
+### image
+
+Tag or partial image ID. Can be local or remote - Compose will attempt to
+pull if it doesn't exist locally.
+
+    image: ubuntu
+    image: orchardup/postgresql
+    image: a4bc65fd
+
 ### labels
 
 Add metadata to containers using [Docker labels](http://docs.docker.com/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
@@ -283,15 +239,26 @@ It's recommended that you use reverse-DNS notation to prevent your labels from c
       - "com.example.department=Finance"
       - "com.example.label-with-empty-value"
 
-### container_name
+### links
 
-Specify a custom container name, rather than a generated default name.
+Link to containers in another service. Either specify both the service name and
+the link alias (`SERVICE:ALIAS`), or just the service name (which will also be
+used for the alias).
 
-    container_name: my-web-container
+    links:
+     - db
+     - db:database
+     - redis
 
-Because Docker container names must be unique, you cannot scale a service
-beyond 1 container if you have specified a custom name. Attempting to do so
-results in an error.
+An entry with the alias' name will be created in `/etc/hosts` inside containers
+for this service, e.g:
+
+    172.17.2.186  db
+    172.17.2.186  database
+    172.17.2.187  redis
+
+Environment variables will also be created - see the [environment variable
+reference](env.md) for details.
 
 ### log_driver
 
@@ -336,43 +303,21 @@ container and the host operating system the PID address space.  Containers
 launched with this flag will be able to access and manipulate other
 containers in the bare-metal machine's namespace and vise-versa.
 
-### dns
+### ports
 
-Custom DNS servers. Can be a single value or a list.
+Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container
+port (a random host port will be chosen).
 
-    dns: 8.8.8.8
-    dns:
-      - 8.8.8.8
-      - 9.9.9.9
+> **Note:** When mapping ports in the `HOST:CONTAINER` format, you may experience
+> erroneous results when using a container port lower than 60, because YAML will
+> parse numbers in the format `xx:yy` as sexagesimal (base 60). For this reason,
+> we recommend always explicitly specifying your port mappings as strings.
 
-### cap_add, cap_drop
-
-Add or drop container capabilities.
-See `man 7 capabilities` for a full list.
-
-    cap_add:
-      - ALL
-
-    cap_drop:
-      - NET_ADMIN
-      - SYS_ADMIN
-
-### dns_search
-
-Custom DNS search domains. Can be a single value or a list.
-
-    dns_search: example.com
-    dns_search:
-      - dc1.example.com
-      - dc2.example.com
-
-### devices
-
-List of device mappings.  Uses the same format as the `--device` docker
-client create option.
-
-    devices:
-      - "/dev/ttyUSB0:/dev/ttyUSB0"
+    ports:
+     - "3000"
+     - "8000:8000"
+     - "49100:22"
+     - "127.0.0.1:8001:8001"
 
 ### security_opt
 
@@ -381,6 +326,31 @@ Override the default labeling scheme for each container.
       security_opt:
         - label:user:USER
         - label:role:ROLE
+
+### volumes
+
+Mount paths as volumes, optionally specifying a path on the host machine
+(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
+
+    volumes:
+     - /var/lib/mysql
+     - ./cache:/tmp/cache
+     - ~/configs:/etc/configs/:ro
+
+You can mount a relative path on the host, which will expand relative to
+the directory of the Compose configuration file being used. Relative paths
+should always begin with `.` or `..`.
+
+> Note: No path expansion will be done if you have also specified a
+> `volume_driver`.
+
+### volumes_from
+
+Mount all of the volumes from another service or container.
+
+    volumes_from:
+     - service_name
+     - container_name
 
 ### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, memswap\_limit, privileged, ipc, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only, volume\_driver
 
