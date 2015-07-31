@@ -117,6 +117,12 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertIn('/var/db', container.get('Volumes'))
 
+    def test_create_container_with_volume_driver(self):
+        service = self.create_service('db', volume_driver='foodriver')
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual('foodriver', container.get('Config.VolumeDriver'))
+
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
         container = service.create_container()
