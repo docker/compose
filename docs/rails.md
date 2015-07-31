@@ -40,8 +40,6 @@ Finally, `docker-compose.yml` is where the magic happens. This file describes th
 
     db:
       image: postgres
-      ports:
-        - "5432"
     web:
       build: .
       command: bundle exec rails s -p 3000 -b '0.0.0.0'
