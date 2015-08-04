@@ -371,7 +371,8 @@ class MemoryOptionsTest(unittest.TestCase):
         When you set a 'memswap_limit' it is invalid config unless you also set
         a mem_limit
         """
-        with self.assertRaisesRegexp(config.ConfigurationError, "u'mem_limit' is a dependency of u'memswap_limit'"):
+        expected_error_msg = "Invalid 'memswap_limit' configuration for 'foo' service: when defining 'memswap_limit' you must set 'mem_limit' as well"
+        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {
@@ -625,7 +626,8 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_invalid_key(self):
-        with self.assertRaisesRegexp(config.ConfigurationError, "'rogue_key' was unexpected"):
+        expected_error_msg = "Unsupported config option for 'web' service: 'rogue_key'"
+        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {

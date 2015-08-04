@@ -12,7 +12,7 @@ from docker.errors import APIError
 from docker.utils import create_host_config, LogConfig
 
 from . import __version__
-from .config import DOCKER_CONFIG_KEYS, merge_environment
+from .config import DOCKER_CONFIG_KEYS, merge_environment, VALID_NAME_CHARS
 from .const import (
     DEFAULT_TIMEOUT,
     LABEL_CONTAINER_NUMBER,
@@ -48,8 +48,6 @@ DOCKER_START_KEYS = [
     'volumes_from',
     'security_opt',
 ]
-
-VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 
 
 class BuildError(Exception):
