@@ -102,6 +102,56 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_hint(self):
+        expected_error_msg = "(did you mean 'privileged'?)"
+        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'foo': {'image': 'busybox', 'privilige': 'something'},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
+    def test_invalid_config_build_and_image_specified(self):
+        expected_error_msg = "Service 'foo' has both an image and build path specified."
+        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'foo': {'image': 'busybox', 'build': '.'},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
+    def test_invalid_config_type_should_be_an_array(self):
+        expected_error_msg = "Service 'foo' has an invalid value for 'links', it should be an array"
+        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'foo': {'image': 'busybox', 'links': 'an_link'},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
+    def test_invalid_config_not_a_dictionary(self):
+        expected_error_msg = "Top level object needs to be a dictionary."
+        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    ['foo', 'lol'],
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
