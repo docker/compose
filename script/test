@@ -5,6 +5,8 @@ set -ex
 
 TAG="docker-compose:$(git rev-parse --short HEAD)"
 
+rm -rf coverage-html
+
 docker build -t "$TAG" .
 docker run \
   --rm \
@@ -12,6 +14,7 @@ docker run \
   -e DOCKER_VERSIONS \
   -e "TAG=$TAG" \
   -e "affinity:image==$TAG" \
+  -e "COVERAGE_DIR=$(pwd)/coverage-html" \
   --entrypoint="script/test-versions" \
   "$TAG" \
   "$@"
