@@ -5,6 +5,7 @@ import yaml
 from collections import namedtuple
 
 import six
+import json
 
 from compose.cli.utils import find_candidates_in_parent_dirs
 
@@ -392,7 +393,10 @@ def split_env(env):
 
 def resolve_env_var(key, val):
     if val is not None:
-        return key, val
+        if isinstance(val, dict) or isinstance(val, list):
+            return key, json.dumps(val)
+        else:
+            return key, val
     elif key in os.environ:
         return key, os.environ[key]
     else:
