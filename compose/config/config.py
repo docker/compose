@@ -252,8 +252,6 @@ def load(config_details):
     validate_against_schema(config)
 
     for service_name, service_dict in list(config.items()):
-        if not isinstance(service_dict, dict):
-            raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
         validate_paths(service_dict)
@@ -425,18 +423,6 @@ def merge_environment(base, override):
     env = parse_environment(base)
     env.update(parse_environment(override))
     return env
-
-
-def parse_links(links):
-    return dict(parse_link(l) for l in links)
-
-
-def parse_link(link):
-    if ':' in link:
-        source, alias = link.split(':', 1)
-        return (alias, source)
-    else:
-        return (link, link)
 
 
 def get_env_files(options, working_dir=None):
