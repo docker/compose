@@ -55,7 +55,8 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'dockerfile',
     'expose',
     'external_links',
-    'name',
+    'load_image',
+    'name'
 ]
 
 DOCKER_CONFIG_HINTS = {
