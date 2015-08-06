@@ -1,10 +1,12 @@
 import os
 from string import Template
-from collections import defaultdict
 
 import six
 
 from .errors import ConfigurationError
+
+import logging
+log = logging.getLogger(__name__)
 
 
 def interpolate_environment_variables(config):
@@ -59,9 +61,24 @@ def recursive_interpolate(obj):
 
 def interpolate(string, mapping):
     try:
-        return Template(string).substitute(defaultdict(lambda: "", mapping))
+        return Template(string).substitute(BlankDefaultDict(mapping))
     except ValueError:
         raise InvalidInterpolation(string)
+
+
+class BlankDefaultDict(dict):
+    def __init__(self, mapping):
+        super(BlankDefaultDict, self).__init__(mapping)
+
+    def __getitem__(self, key):
+        try:
+            return super(BlankDefaultDict, self).__getitem__(key)
+        except KeyError:
+            log.warn(
+                "The {} variable is not set. Substituting a blank string."
+                .format(key)
+            )
+            return ""
 
 
 class InvalidInterpolation(Exception):
