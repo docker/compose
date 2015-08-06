@@ -12,7 +12,7 @@ from docker.errors import APIError
 from docker.utils import create_host_config, LogConfig
 
 from . import __version__
-from .config import DOCKER_CONFIG_KEYS, merge_environment, VALID_NAME_CHARS
+from .config import DOCKER_CONFIG_KEYS, merge_environment
 from .const import (
     DEFAULT_TIMEOUT,
     LABEL_CONTAINER_NUMBER,
@@ -26,6 +26,7 @@ from .container import Container
 from .legacy import check_for_legacy_containers
 from .progress_stream import stream_output, StreamOutputError
 from .utils import json_hash, parallel_execute
+from .config.validation import VALID_NAME_CHARS
 
 log = logging.getLogger(__name__)
 

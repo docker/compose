@@ -5,6 +5,7 @@ import tempfile
 from .. import unittest
 
 from compose.config import config
+from compose.config.errors import ConfigurationError
 
 
 def make_service_dict(name, service_dict, working_dir):
@@ -43,7 +44,7 @@ class ConfigTest(unittest.TestCase):
         )
 
     def test_load_throws_error_when_not_dict(self):
-        with self.assertRaises(config.ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             config.load(
                 config.ConfigDetails(
                     {'web': 'busybox:latest'},
@@ -52,15 +53,8 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    def test_config_validation(self):
-        self.assertRaises(
-            config.ConfigurationError,
-            lambda: make_service_dict('foo', {'port': ['8000']}, 'tests/')
-        )
-        make_service_dict('foo', {'ports': ['8000']}, 'tests/')
-
     def test_config_invalid_service_names(self):
-        with self.assertRaises(config.ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
                 config.load(
                     config.ConfigDetails(
@@ -81,7 +75,7 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_config_invalid_ports_format_validation(self):
-        with self.assertRaises(config.ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             for invalid_ports in [{"1": "8000"}, "whatport"]:
                 config.load(
                     config.ConfigDetails(
@@ -104,7 +98,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_config_hint(self):
         expected_error_msg = "(did you mean 'privileged'?)"
-        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {
@@ -117,7 +111,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_invalid_config_build_and_image_specified(self):
         expected_error_msg = "Service 'foo' has both an image and build path specified."
-        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {
@@ -130,7 +124,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_invalid_config_type_should_be_an_array(self):
         expected_error_msg = "Service 'foo' has an invalid value for 'links', it should be an array"
-        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {
@@ -143,7 +137,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_invalid_config_not_a_dictionary(self):
         expected_error_msg = "Top level object needs to be a dictionary."
-        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     ['foo', 'lol'],
@@ -198,7 +192,7 @@ class InterpolationTest(unittest.TestCase):
         os.environ['VOLUME_PATH'] = '/host/path'
         d = config.load(
             config.ConfigDetails(
-                config={'foo': {'volumes': ['${VOLUME_PATH}:/container/path']}},
+                config={'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
                 working_dir='.',
                 filename=None,
             )
@@ -422,7 +416,7 @@ class MemoryOptionsTest(unittest.TestCase):
         a mem_limit
         """
         expected_error_msg = "Invalid 'memswap_limit' configuration for 'foo' service: when defining 'memswap_limit' you must set 'mem_limit' as well"
-        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {
@@ -465,7 +459,7 @@ class EnvTest(unittest.TestCase):
         self.assertEqual(config.parse_environment(environment), environment)
 
     def test_parse_environment_invalid(self):
-        with self.assertRaises(config.ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             config.parse_environment('a=b')
 
     def test_parse_environment_empty(self):
@@ -519,7 +513,7 @@ class EnvTest(unittest.TestCase):
     def test_env_nonexistent_file(self):
         options = {'env_file': 'nonexistent.env'}
         self.assertRaises(
-            config.ConfigurationError,
+            ConfigurationError,
             lambda: make_service_dict('foo', options, 'tests/fixtures/env'),
         )
 
@@ -545,7 +539,7 @@ class EnvTest(unittest.TestCase):
 
         service_dict = config.load(
             config.ConfigDetails(
-                config={'foo': {'volumes': ['$HOSTENV:$CONTAINERENV']}},
+                config={'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
                 working_dir="tests/fixtures/env",
                 filename=None,
             )
@@ -554,7 +548,7 @@ class EnvTest(unittest.TestCase):
 
         service_dict = config.load(
             config.ConfigDetails(
-                config={'foo': {'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
+                config={'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
                 working_dir="tests/fixtures/env",
                 filename=None,
             )
@@ -652,7 +646,7 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_empty_dictionary(self):
-        with self.assertRaisesRegexp(config.ConfigurationError, 'service'):
+        with self.assertRaisesRegexp(ConfigurationError, 'service'):
             config.load(
                 config.ConfigDetails(
                     {
@@ -664,7 +658,7 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_missing_service_key(self):
-        with self.assertRaisesRegexp(config.ConfigurationError, "u'service' is a required property"):
+        with self.assertRaisesRegexp(ConfigurationError, "u'service' is a required property"):
             config.load(
                 config.ConfigDetails(
                     {
@@ -677,7 +671,7 @@ class ExtendsTest(unittest.TestCase):
 
     def test_extends_validation_invalid_key(self):
         expected_error_msg = "Unsupported config option for 'web' service: 'rogue_key'"
-        with self.assertRaisesRegexp(config.ConfigurationError, expected_error_msg):
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
                     {
@@ -701,7 +695,7 @@ class ExtendsTest(unittest.TestCase):
         def load_config():
             return make_service_dict('myweb', dictionary, working_dir='tests/fixtures/extends')
 
-        self.assertRaisesRegexp(config.ConfigurationError, 'file', load_config)
+        self.assertRaisesRegexp(ConfigurationError, 'file', load_config)
 
     def test_extends_validation_valid_config(self):
         service = config.load(
@@ -750,19 +744,19 @@ class ExtendsTest(unittest.TestCase):
                 }
             }, '.')
 
-        with self.assertRaisesRegexp(config.ConfigurationError, 'links'):
+        with self.assertRaisesRegexp(ConfigurationError, 'links'):
             other_config = {'web': {'links': ['db']}}
 
             with mock.patch.object(config, 'load_yaml', return_value=other_config):
                 print load_config()
 
-        with self.assertRaisesRegexp(config.ConfigurationError, 'volumes_from'):
+        with self.assertRaisesRegexp(ConfigurationError, 'volumes_from'):
             other_config = {'web': {'volumes_from': ['db']}}
 
             with mock.patch.object(config, 'load_yaml', return_value=other_config):
                 print load_config()
 
-        with self.assertRaisesRegexp(config.ConfigurationError, 'net'):
+        with self.assertRaisesRegexp(ConfigurationError, 'net'):
             other_config = {'web': {'net': 'container:db'}}
 
             with mock.patch.object(config, 'load_yaml', return_value=other_config):
@@ -804,7 +798,7 @@ class BuildPathTest(unittest.TestCase):
         self.abs_context_path = os.path.join(os.getcwd(), 'tests/fixtures/build-ctx')
 
     def test_nonexistent_path(self):
-        with self.assertRaises(config.ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             config.load(
                 config.ConfigDetails(
                     {
