@@ -8,6 +8,13 @@ import six
 
 from compose.cli.utils import find_candidates_in_parent_dirs
 
+from .interpolation import interpolate_environment_variables
+from .errors import (
+    ConfigurationError,
+    CircularReference,
+    ComposeFileNotFound,
+)
+
 
 DOCKER_CONFIG_KEYS = [
     'cap_add',
@@ -126,11 +133,11 @@ def get_config_path(base_dir):
 
 def load(config_details):
     dictionary, working_dir, filename = config_details
+    dictionary = interpolate_environment_variables(dictionary)
+
     service_dicts = []
 
     for service_name, service_dict in list(dictionary.items()):
-        if not isinstance(service_dict, dict):
-            raise ConfigurationError('Service "%s" doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.' % service_name)
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
         validate_paths(service_dict)
@@ -423,9 +430,9 @@ def resolve_volume_paths(volumes, working_dir=None):
 
 def resolve_volume_path(volume, working_dir):
     container_path, host_path = split_path_mapping(volume)
-    container_path = os.path.expanduser(os.path.expandvars(container_path))
+    container_path = os.path.expanduser(container_path)
     if host_path is not None:
-        host_path = os.path.expanduser(os.path.expandvars(host_path))
+        host_path = os.path.expanduser(host_path)
         return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
         return container_path
@@ -536,33 +543,3 @@ def load_yaml(filename):
             return yaml.safe_load(fh)
     except IOError as e:
         raise ConfigurationError(six.text_type(e))
-
-
-class ConfigurationError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
-
-
-class CircularReference(ConfigurationError):
-    def __init__(self, trail):
-        self.trail = trail
-
-    @property
-    def msg(self):
-        lines = [
-            "{} in {}".format(service_name, filename)
-            for (filename, service_name) in self.trail
-        ]
-        return "Circular reference:\n  {}".format("\n  extends ".join(lines))
-
-
-class ComposeFileNotFound(ConfigurationError):
-    def __init__(self, supported_filenames):
-        super(ComposeFileNotFound, self).__init__("""
-        Can't find a suitable configuration file in this directory or any parent. Are you in the right directory?
-
-        Supported filenames: %s
-        """ % ", ".join(supported_filenames))

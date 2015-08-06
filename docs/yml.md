@@ -19,6 +19,10 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
+Values for configuration options can contain environment variables, e.g. 
+`image: postgres:${POSTGRES_VERSION}`. For more details, see the section on
+[variable substitution](#variable-substitution).
+
 ### image
 
 Tag or partial image ID. Can be local or remote - Compose will attempt to
@@ -368,6 +372,33 @@ Each of these is a single value, analogous to its
 
     volume_driver: mydriver
 ```
+
+## Variable substitution
+
+Your configuration options can contain environment variables. Compose uses the
+variable values from the shell environment in which `docker-compose` is run. For
+example, suppose the shell contains `POSTGRES_VERSION=9.3` and you supply this
+configuration:
+
+    db:
+      image: "postgres:${POSTGRES_VERSION}"
+
+When you run `docker-compose up` with this configuration, Compose looks for the
+`POSTGRES_VERSION` environment variable in the shell and substitutes its value
+in. For this example, Compose resolves the `image` to `postgres:9.3` before
+running the configuration.
+
+If an environment variable is not set, Compose substitutes with an empty
+string. In the example above, if `POSTGRES_VERSION` is not set, the value for
+the `image` option is `postgres:`.
+
+Both `$VARIABLE` and `${VARIABLE}` syntax are supported. Extended shell-style
+features, such as `${VARIABLE-default}` and `${VARIABLE/foo/bar}`, are not
+supported.
+
+If you need to put a literal dollar sign in a configuration value, use a double
+dollar sign (`$$`).
+
 
 ## Compose documentation
 
