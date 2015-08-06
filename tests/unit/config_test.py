@@ -117,7 +117,7 @@ class InterpolationTest(unittest.TestCase):
         d = make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
-    def test_named_volume_with_driver(self):
+    def test_named_volume_with_driver_does_not_expand(self):
         d = make_service_dict('foo', {
             'volumes': ['namedvolume:/data'],
             'volume_driver': 'foodriver',
@@ -125,13 +125,13 @@ class InterpolationTest(unittest.TestCase):
         self.assertEqual(d['volumes'], ['namedvolume:/data'])
 
     @mock.patch.dict(os.environ)
-    def test_named_volume_with_special_chars(self):
+    def test_home_directory_with_driver_does_not_expand(self):
         os.environ['NAME'] = 'surprise!'
         d = make_service_dict('foo', {
-            'volumes': ['~/${NAME}:/data'],
+            'volumes': ['~:/data'],
             'volume_driver': 'foodriver',
         }, working_dir='.')
-        self.assertEqual(d['volumes'], ['~/${NAME}:/data'])
+        self.assertEqual(d['volumes'], ['~:/data'])
 
 
 class MergePathMappingTest(object):
