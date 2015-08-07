@@ -105,13 +105,25 @@ An entry with the ip address and hostname will be created in `/etc/hosts` inside
 
 ### ports
 
-Expose ports. Either specify both ports (`HOST:CONTAINER`), or just the container
-port (a random host port will be chosen). You can specify a port range instead of a single port (`START-END`). If you use a range for the container ports, you may specify a range for the host ports as well. both ranges must be of equal size.
+Makes an exposed port accessible on a host and the port is available to
+any client that can reach that host. Docker binds the exposed port to a random
+port on the host within an *ephemeral port range* defined by
+`/proc/sys/net/ipv4/ip_local_port_range`. You can also map to a specific port or range of ports.
 
-> **Note:** When mapping ports in the `HOST:CONTAINER` format, you may experience
-> erroneous results when using a container port lower than 60, because YAML will
-> parse numbers in the format `xx:yy` as sexagesimal (base 60). For this reason,
-> we recommend always explicitly specifying your port mappings as strings.
+Acceptable formats for the `ports` value are:
+
+* `containerPort`
+* `ip:hostPort:containerPort`
+* `ip::containerPort`
+* `hostPort:containerPort`
+
+You can specify a range for both the `hostPort` and the `containerPort` values.
+When specifying ranges, the container port values in the range must match the
+number of host port values in the range, for example,
+`1234-1236:1234-1236/tcp`. Once a host is running, use the 'docker-compose port' command
+to see the actual mapping.
+
+The following configuration shows examples of the port formats in use:
 
     ports:
      - "3000"
@@ -121,6 +133,13 @@ port (a random host port will be chosen). You can specify a port range instead o
      - "49100:22"
      - "127.0.0.1:8001:8001"
      - "127.0.0.1:5000-5010:5000-5010"
+
+
+When mapping ports, in the `hostPort:containerPort` format, you may
+experience erroneous results when using a container port lower than 60. This
+happens because YAML parses numbers in the format `xx:yy` as sexagesimal (base
+60). To avoid this problem, always explicitly specify your port
+mappings as strings.
 
 ### expose
 
