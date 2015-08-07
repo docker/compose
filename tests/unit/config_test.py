@@ -76,7 +76,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_config_invalid_ports_format_validation(self):
         with self.assertRaises(ConfigurationError):
-            for invalid_ports in [{"1": "8000"}, "whatport"]:
+            for invalid_ports in [{"1": "8000"}, "whatport", "625", "8000:8050"]:
                 config.load(
                     config.ConfigDetails(
                         {'web': {'image': 'busybox', 'ports': invalid_ports}},
@@ -86,7 +86,7 @@ class ConfigTest(unittest.TestCase):
                 )
 
     def test_config_valid_ports_format_validation(self):
-        valid_ports = [["8000", "9000"], "625", "8000:8050", ["8000/8050"]]
+        valid_ports = [["8000", "9000"], ["8000/8050"], ["8000"]]
         for ports in valid_ports:
             config.load(
                 config.ConfigDetails(
