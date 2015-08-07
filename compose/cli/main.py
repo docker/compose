@@ -282,7 +282,7 @@ class TopLevelCommand(Command):
         running. If you do not want to start linked services, use
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
-        Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
+        Usage: run [options] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
             --allow-insecure-ssl  Deprecated - no effect.
@@ -293,6 +293,7 @@ class TopLevelCommand(Command):
             -u, --user=""         Run as specified username or uid
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
+            -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
@@ -343,6 +344,15 @@ class TopLevelCommand(Command):
 
         if not options['--service-ports']:
             container_options['ports'] = []
+
+        if options['--publish']:
+            container_options['ports'] = options.get('--publish')
+
+        if options['--publish'] and options['--service-ports']:
+            raise UserError(
+                'Service port mapping and manual port mapping '
+                'can not be used togather'
+            )
 
         try:
             container = service.create_container(

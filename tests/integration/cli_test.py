@@ -343,6 +343,44 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn("0.0.0.0", port_random)
         self.assertEqual(port_assigned, "0.0.0.0:49152")
 
+    @patch('dockerpty.start')
+    def test_run_service_with_explicitly_maped_ports(self, __):
+
+        # create one off container
+        self.command.base_dir = 'tests/fixtures/ports-composefile'
+        self.command.dispatch(['run', '-d', '-p', '30000:3000', '--publish', '30001:3001', 'simple'], None)
+        container = self.project.get_service('simple').containers(one_off=True)[0]
+
+        # get port information
+        port_short = container.get_local_port(3000)
+        port_full = container.get_local_port(3001)
+
+        # close all one off containers we just created
+        container.stop()
+
+        # check the ports
+        self.assertEqual(port_short, "0.0.0.0:30000")
+        self.assertEqual(port_full, "0.0.0.0:30001")
+
+    @patch('dockerpty.start')
+    def test_run_service_with_explicitly_maped_ip_ports(self, __):
+
+        # create one off container
+        self.command.base_dir = 'tests/fixtures/ports-composefile'
+        self.command.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish', '127.0.0.1:30001:3001', 'simple'], None)
+        container = self.project.get_service('simple').containers(one_off=True)[0]
+
+        # get port information
+        port_short = container.get_local_port(3000)
+        port_full = container.get_local_port(3001)
+
+        # close all one off containers we just created
+        container.stop()
+
+        # check the ports
+        self.assertEqual(port_short, "127.0.0.1:30000")
+        self.assertEqual(port_full, "127.0.0.1:30001")
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()

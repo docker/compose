@@ -248,7 +248,7 @@ _docker-compose_run() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --no-deps --rm --service-ports -T --user -u" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --no-deps --rm --service-ports --publish -p -T --user -u" -- "$cur" ) )
 			;;
 		*)
 			__docker-compose_services_all

@@ -7,6 +7,7 @@ import docker
 import mock
 
 from compose.cli.docopt_command import NoSuchCommand
+from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.service import Service
 
@@ -108,6 +109,7 @@ class CLITestCase(unittest.TestCase):
             '-T': None,
             '--entrypoint': None,
             '--service-ports': None,
+            '--publish': [],
             '--rm': None,
         })
 
@@ -136,6 +138,7 @@ class CLITestCase(unittest.TestCase):
             '-T': None,
             '--entrypoint': None,
             '--service-ports': None,
+            '--publish': [],
             '--rm': None,
         })
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
@@ -160,7 +163,35 @@ class CLITestCase(unittest.TestCase):
             '-T': None,
             '--entrypoint': None,
             '--service-ports': None,
+            '--publish': [],
             '--rm': True,
         })
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
         self.assertFalse('RestartPolicy' in call_kwargs['host_config'])
+
+    def test_command_manula_and_service_ports_together(self):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock(client=mock_client)
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            restart='always',
+            image='someimage',
+        )
+
+        with self.assertRaises(UserError):
+            command.run(mock_project, {
+                'SERVICE': 'service',
+                'COMMAND': None,
+                '-e': [],
+                '--user': None,
+                '--no-deps': None,
+                '--allow-insecure-ssl': None,
+                '-d': True,
+                '-T': None,
+                '--entrypoint': None,
+                '--service-ports': True,
+                '--publish': ['80:80'],
+                '--rm': None,
+            })
