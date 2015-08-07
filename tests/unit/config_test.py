@@ -9,7 +9,7 @@ from compose.config import config
 
 def make_service_dict(name, service_dict, working_dir):
     """
-    Test helper function to contruct a ServiceLoader
+    Test helper function to construct a ServiceLoader
     """
     return config.ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
 
