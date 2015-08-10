@@ -147,6 +147,19 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_invalid_config_not_unique_items(self):
+        expected_error_msg = "has non-unique elements"
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'web': {'build': '.', 'devices': ['/dev/foo:/dev/foo', '/dev/foo:/dev/foo']}
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)

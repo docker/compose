@@ -59,6 +59,7 @@ def process_errors(errors):
     invalid_keys = []
     required = []
     type_errors = []
+    other_errors = []
 
     for error in errors:
         # handle root level errors
@@ -115,8 +116,15 @@ def process_errors(errors):
                 required_keys = ",".join(error.validator_value[dependency_key])
                 required.append("Invalid '{}' configuration for '{}' service: when defining '{}' you must set '{}' as well".format(
                     dependency_key, service_name, dependency_key, required_keys))
+            else:
+                # pop the service name off our path
+                error.path.popleft()
 
-    return "\n".join(root_msgs + invalid_keys + required + type_errors)
+                config_key = " ".join(["'%s'" % k for k in error.path])
+                err_msg = "Service '{}' configuration key {} value {}".format(service_name, config_key, error.message)
+                other_errors.append(err_msg)
+
+    return "\n".join(root_msgs + invalid_keys + required + type_errors + other_errors)
 
 
 def validate_against_schema(config):
