@@ -22,10 +22,14 @@ class Container(object):
         """
         Construct a container object from the output of GET /containers/json.
         """
+        name = get_container_name(dictionary)
+        if name is None:
+            return None
+
         new_dictionary = {
             'Id': dictionary['Id'],
             'Image': dictionary['Image'],
-            'Name': '/' + get_container_name(dictionary),
+            'Name': '/' + name,
         }
         return cls(client, new_dictionary, **kwargs)
 
