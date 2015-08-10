@@ -101,11 +101,11 @@ class Service(object):
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
-        containers = [
+        containers = filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})]
+                filters={'label': self.labels(one_off=one_off)})])
 
         if not containers:
             check_for_legacy_containers(
@@ -494,12 +494,13 @@ class Service(object):
     # TODO: this would benefit from github.com/docker/docker/pull/11943
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
-        numbers = [
-            Container.from_ps(self.client, container).number
+        containers = filter(None, [
+            Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=True,
                 filters={'label': self.labels(one_off=one_off)})
-        ]
+        ])
+        numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):

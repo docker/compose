@@ -76,6 +76,18 @@ class ServiceTest(unittest.TestCase):
             all=False,
             filters={'label': expected_labels})
 
+    def test_container_without_name(self):
+        self.mock_client.containers.return_value = [
+            {'Image': 'foo', 'Id': '1', 'Name': '1'},
+            {'Image': 'foo', 'Id': '2', 'Name': None},
+            {'Image': 'foo', 'Id': '3'},
+        ]
+        service = Service('db', self.mock_client, 'myproject', image='foo')
+
+        self.assertEqual([c.id for c in service.containers()], ['1'])
+        self.assertEqual(service._next_container_number(), 2)
+        self.assertEqual(service.get_container(1).id, '1')
+
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
         service = Service(

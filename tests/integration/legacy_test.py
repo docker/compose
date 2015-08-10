@@ -65,7 +65,7 @@ class UtilitiesTestCase(unittest.TestCase):
             legacy.is_valid_name("composetest_web_lol_1", one_off=True),
         )
 
-    def test_get_legacy_containers_no_labels(self):
+    def test_get_legacy_containers(self):
         client = Mock()
         client.containers.return_value = [
             {
@@ -74,12 +74,23 @@ class UtilitiesTestCase(unittest.TestCase):
                 "Name": "composetest_web_1",
                 "Labels": None,
             },
+            {
+                "Id": "ghi789",
+                "Image": "def456",
+                "Name": None,
+                "Labels": None,
+            },
+            {
+                "Id": "jkl012",
+                "Image": "def456",
+                "Labels": None,
+            },
         ]
 
-        containers = list(legacy.get_legacy_containers(
-            client, "composetest", ["web"]))
+        containers = legacy.get_legacy_containers(client, "composetest", ["web"])
 
         self.assertEqual(len(containers), 1)
+        self.assertEqual(containers[0].id, 'abc123')
 
 
 class LegacyTestCase(DockerClientTestCase):

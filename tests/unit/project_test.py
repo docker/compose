@@ -3,6 +3,7 @@ from .. import unittest
 from compose.service import Service
 from compose.project import Project
 from compose.container import Container
+from compose.const import LABEL_SERVICE
 
 import mock
 import docker
@@ -260,3 +261,27 @@ class ProjectTest(unittest.TestCase):
 
         service = project.get_service('test')
         self.assertEqual(service._get_net(), 'container:' + container_name)
+
+    def test_container_without_name(self):
+        self.mock_client.containers.return_value = [
+            {'Image': 'busybox:latest', 'Id': '1', 'Name': '1'},
+            {'Image': 'busybox:latest', 'Id': '2', 'Name': None},
+            {'Image': 'busybox:latest', 'Id': '3'},
+        ]
+        self.mock_client.inspect_container.return_value = {
+            'Id': '1',
+            'Config': {
+                'Labels': {
+                    LABEL_SERVICE: 'web',
+                },
+            },
+        }
+        project = Project.from_dicts(
+            'test',
+            [{
+                'name': 'web',
+                'image': 'busybox:latest',
+            }],
+            self.mock_client,
+        )
+        self.assertEqual([c.id for c in project.containers()], ['1'])
