@@ -917,6 +917,11 @@ class ExtendsTest(unittest.TestCase):
             },
         ])
 
+    def test_load_throws_error_when_base_service_does_not_exist(self):
+        err_msg = r'''Cannot extend service 'foo' in .*: Service not found'''
+        with self.assertRaisesRegexp(ConfigurationError, err_msg):
+            load_from_filename('tests/fixtures/extends/nonexistent-service.yml')
+
 
 class BuildPathTest(unittest.TestCase):
     def setUp(self):

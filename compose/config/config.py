@@ -187,8 +187,16 @@ class ServiceLoader(object):
             already_seen=other_already_seen,
         )
 
+        base_service = extends_options['service']
         other_config = load_yaml(other_config_path)
-        other_service_dict = other_config[extends_options['service']]
+
+        if base_service not in other_config:
+            msg = (
+                "Cannot extend service '%s' in %s: Service not found"
+            ) % (base_service, other_config_path)
+            raise ConfigurationError(msg)
+
+        other_service_dict = other_config[base_service]
         other_loader.detect_cycle(extends_options['service'])
         other_service_dict = other_loader.make_service_dict(
             service_dict['name'],
