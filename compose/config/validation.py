@@ -52,6 +52,9 @@ def process_errors(errors):
     def _parse_key_from_error_msg(error):
         return error.message.split("'")[1]
 
+    def _clean_error_message(message):
+        return message.replace("u'", "'")
+
     root_msgs = []
     invalid_keys = []
     required = []
@@ -68,7 +71,7 @@ def process_errors(errors):
                 msg = "Invalid service name '{}' - only {} characters are allowed".format(invalid_service_name, VALID_NAME_CHARS)
                 root_msgs.append(msg)
             else:
-                root_msgs.append(error.message)
+                root_msgs.append(_clean_error_message(error.message))
 
         else:
             # handle service level errors
@@ -83,7 +86,7 @@ def process_errors(errors):
                 elif 'image' not in error.instance and 'build' not in error.instance:
                     required.append("Service '{}' has neither an image nor a build path specified. Exactly one must be provided.".format(service_name))
                 else:
-                    required.append(error.message)
+                    required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
                 config_key = error.path[1]
                 valid_types = [context.validator_value for context in error.context]
@@ -104,7 +107,7 @@ def process_errors(errors):
                     root_msgs.append("Service '{}' doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.'".format(config_key))
             elif error.validator == 'required':
                 config_key = error.path[1]
-                required.append("Service '{}' option '{}' is invalid, {}".format(service_name, config_key, error.message))
+                required.append("Service '{}' option '{}' is invalid, {}".format(service_name, config_key, _clean_error_message(error.message)))
             elif error.validator == 'dependencies':
                 dependency_key = error.validator_value.keys()[0]
                 required_keys = ",".join(error.validator_value[dependency_key])

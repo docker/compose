@@ -659,7 +659,7 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_missing_service_key(self):
-        with self.assertRaisesRegexp(ConfigurationError, "u'service' is a required property"):
+        with self.assertRaisesRegexp(ConfigurationError, "'service' is a required property"):
             config.load(
                 config.ConfigDetails(
                     {
