@@ -78,6 +78,9 @@ def process_errors(errors):
             # handle service level errors
             service_name = error.path[0]
 
+            # pop the service name off our path
+            error.path.popleft()
+
             if error.validator == 'additionalProperties':
                 invalid_config_key = _parse_key_from_error_msg(error)
                 invalid_keys.append(get_unsupported_config_msg(service_name, invalid_config_key))
@@ -89,7 +92,7 @@ def process_errors(errors):
                 else:
                     required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
-                config_key = error.path[1]
+                config_key = error.path[0]
                 valid_types = [context.validator_value for context in error.context]
                 valid_type_msg = " or ".join(valid_types)
                 type_errors.append("Service '{}' configuration key '{}' contains an invalid type, it should be either {}".format(
@@ -100,16 +103,13 @@ def process_errors(errors):
                 if error.validator_value == "array":
                     msg = "an"
 
-                # pop the service name off our path
-                error.path.popleft()
-
                 if len(error.path) > 0:
                     config_key = " ".join(["'%s'" % k for k in error.path])
                     type_errors.append("Service '{}' configuration key {} contains an invalid type, it should be {} {}".format(service_name, config_key, msg, error.validator_value))
                 else:
                     root_msgs.append("Service '{}' doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.'".format(service_name))
             elif error.validator == 'required':
-                config_key = error.path[1]
+                config_key = error.path[0]
                 required.append("Service '{}' option '{}' is invalid, {}".format(service_name, config_key, _clean_error_message(error.message)))
             elif error.validator == 'dependencies':
                 dependency_key = error.validator_value.keys()[0]
@@ -117,9 +117,6 @@ def process_errors(errors):
                 required.append("Invalid '{}' configuration for '{}' service: when defining '{}' you must set '{}' as well".format(
                     dependency_key, service_name, dependency_key, required_keys))
             else:
-                # pop the service name off our path
-                error.path.popleft()
-
                 config_key = " ".join(["'%s'" % k for k in error.path])
                 err_msg = "Service '{}' configuration key {} value {}".format(service_name, config_key, error.message)
                 other_errors.append(err_msg)
