@@ -117,6 +117,51 @@ class InterpolationTest(unittest.TestCase):
         d = make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
+    @mock.patch.dict(os.environ)
+    def test_volume_binding_with_local_dir_name_raises_warning(self):
+        def make_dict(**config):
+            make_service_dict('foo', config, working_dir='.')
+
+        with mock.patch('compose.config.config.log.warn') as warn:
+            make_dict(volumes=['/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['/data:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['.:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['..:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['./data:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['../data:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['.profile:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['~:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['~/data:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['~tmp:/container/path'])
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['data:/container/path'], volume_driver='mydriver')
+            self.assertEqual(0, warn.call_count)
+
+            make_dict(volumes=['data:/container/path'])
+            self.assertEqual(1, warn.call_count)
+            warning = warn.call_args[0][0]
+            self.assertIn('"data:/container/path"', warning)
+            self.assertIn('"./data:/container/path"', warning)
+
     def test_named_volume_with_driver_does_not_expand(self):
         d = make_service_dict('foo', {
             'volumes': ['namedvolume:/data'],
