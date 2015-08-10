@@ -99,12 +99,14 @@ def process_errors(errors):
                 if error.validator_value == "array":
                     msg = "an"
 
-                try:
-                    config_key = error.path[1]
-                    type_errors.append("Service '{}' has an invalid value for '{}', it should be {} {}".format(service_name, config_key, msg, error.validator_value))
-                except IndexError:
-                    config_key = error.path[0]
-                    root_msgs.append("Service '{}' doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.'".format(config_key))
+                # pop the service name off our path
+                error.path.popleft()
+
+                if len(error.path) > 0:
+                    config_key = " ".join(["'%s'" % k for k in error.path])
+                    type_errors.append("Service '{}' configuration key {} contains an invalid type, it should be {} {}".format(service_name, config_key, msg, error.validator_value))
+                else:
+                    root_msgs.append("Service '{}' doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.'".format(service_name))
             elif error.validator == 'required':
                 config_key = error.path[1]
                 required.append("Service '{}' option '{}' is invalid, {}".format(service_name, config_key, _clean_error_message(error.message)))

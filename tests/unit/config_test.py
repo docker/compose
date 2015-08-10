@@ -124,7 +124,7 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_invalid_config_type_should_be_an_array(self):
-        expected_error_msg = "Service 'foo' has an invalid value for 'links', it should be an array"
+        expected_error_msg = "Service 'foo' configuration key 'links' contains an invalid type, it should be an array"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
@@ -682,6 +682,25 @@ class ExtendsTest(unittest.TestCase):
                                 'file': 'common.yml',
                                 'service': 'web',
                                 'rogue_key': 'is not allowed'
+                            }
+                        },
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
+    def test_extends_validation_sub_property_key(self):
+        expected_error_msg = "Service 'web' configuration key 'extends' 'file' contains an invalid type"
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'web': {
+                            'image': 'busybox',
+                            'extends': {
+                                'file': 1,
+                                'service': 'web',
                             }
                         },
                     },
