@@ -84,6 +84,13 @@ def process_errors(errors):
                     required.append("Service '{}' has neither an image nor a build path specified. Exactly one must be provided.".format(service_name))
                 else:
                     required.append(error.message)
+            elif error.validator == 'oneOf':
+                config_key = error.path[1]
+                valid_types = [context.validator_value for context in error.context]
+                valid_type_msg = " or ".join(valid_types)
+                type_errors.append("Service '{}' configuration key '{}' contains an invalid type, it should be either {}".format(
+                    service_name, config_key, valid_type_msg)
+                )
             elif error.validator == 'type':
                 msg = "a"
                 if error.validator_value == "array":
