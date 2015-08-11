@@ -173,8 +173,8 @@ class ServiceTest(unittest.TestCase):
         service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, mem_limit=1000000000, memswap_limit=2000000000)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'some': 'overrides'}, 1)
-        self.assertEqual(opts['memswap_limit'], 2000000000)
-        self.assertEqual(opts['mem_limit'], 1000000000)
+        self.assertEqual(opts['host_config']['MemorySwap'], 2000000000)
+        self.assertEqual(opts['host_config']['Memory'], 1000000000)
 
     def test_log_opt(self):
         log_opt = {'address': 'tcp://192.168.0.42:123'}
