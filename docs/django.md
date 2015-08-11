@@ -53,6 +53,8 @@ mounted inside the containers, and what ports they expose.
       image: postgres
     web:
       build: .
+      user: "1000:1000"
+      privileged: true
       command: python manage.py runserver 0.0.0.0:8000
       volumes:
         - .:/code
