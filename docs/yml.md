@@ -135,11 +135,12 @@ Mount paths as volumes, optionally specifying a path on the host machine
 
     volumes:
      - /var/lib/mysql
-     - cache/:/tmp/cache
+     - ./cache:/tmp/cache
      - ~/configs:/etc/configs/:ro
 
 You can mount a relative path on the host, which will expand relative to
-the directory of the Compose configuration file being used.
+the directory of the Compose configuration file being used. Relative paths
+should always begin with `.` or `..`.
 
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
