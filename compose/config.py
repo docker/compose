@@ -83,6 +83,13 @@ SUPPORTED_FILENAMES = [
 ]
 
 
+PATH_START_CHARS = [
+    '/',
+    '.',
+    '~',
+]
+
+
 log = logging.getLogger(__name__)
 
 
@@ -253,7 +260,7 @@ def process_container_options(service_dict, working_dir=None):
         raise ConfigurationError("Invalid 'memswap_limit' configuration for %s service: when defining 'memswap_limit' you must set 'mem_limit' as well" % service_dict['name'])
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
-        service_dict['volumes'] = resolve_volume_paths(service_dict['volumes'], working_dir=working_dir)
+        service_dict['volumes'] = resolve_volume_paths(service_dict, working_dir=working_dir)
 
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
@@ -414,18 +421,33 @@ def env_vars_from_file(filename):
     return env
 
 
-def resolve_volume_paths(volumes, working_dir=None):
+def resolve_volume_paths(service_dict, working_dir=None):
     if working_dir is None:
         raise Exception("No working_dir passed to resolve_volume_paths()")
 
-    return [resolve_volume_path(v, working_dir) for v in volumes]
+    return [
+        resolve_volume_path(v, working_dir, service_dict['name'])
+        for v in service_dict['volumes']
+    ]
 
 
-def resolve_volume_path(volume, working_dir):
+def resolve_volume_path(volume, working_dir, service_name):
     container_path, host_path = split_path_mapping(volume)
     container_path = os.path.expanduser(os.path.expandvars(container_path))
+
     if host_path is not None:
         host_path = os.path.expanduser(os.path.expandvars(host_path))
+
+        if not any(host_path.startswith(c) for c in PATH_START_CHARS):
+            log.warn(
+                'Warning: the mapping "{0}" in the volumes config for '
+                'service "{1}" is ambiguous. In a future version of Docker, '
+                'it will designate a "named" volume '
+                '(see https://github.com/docker/docker/pull/14242). '
+                'To prevent unexpected behaviour, change it to "./{0}"'
+                .format(volume, service_name)
+            )
+
         return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
         return container_path
