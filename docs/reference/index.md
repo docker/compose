@@ -13,7 +13,7 @@ parent = "smn_compose_ref"
 
 The following pages describe the usage information for the [docker-compose](/reference/docker-compose.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
 
-* [build](/reference/reference/build.md)
+* [build](/reference/build.md)
 * [help](/reference/help.md)
 * [kill](/reference/kill.md)          
 * [ps](/reference/ps.md)
