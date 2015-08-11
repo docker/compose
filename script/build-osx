@@ -10,4 +10,4 @@ venv/bin/pip install -r requirements-dev.txt
 venv/bin/pip install .
 venv/bin/pyinstaller -F bin/docker-compose
 mv dist/docker-compose dist/docker-compose-Darwin-x86_64
-dist/docker-compose-Darwin-x86_64 --version
+dist/docker-compose-Darwin-x86_64 version

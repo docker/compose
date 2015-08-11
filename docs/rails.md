@@ -40,8 +40,6 @@ Finally, `docker-compose.yml` is where the magic happens. This file describes th
 
     db:
       image: postgres
-      ports:
-        - "5432"
     web:
       build: .
       command: bundle exec rails s -p 3000 -b '0.0.0.0'
@@ -119,8 +117,8 @@ Finally, you need to create the database. In another terminal, run:
 
     $ docker-compose run web rake db:create
 
-That's it. Your app should now be running on port 3000 on your Docker daemon (if
-you're using Boot2docker, `boot2docker ip` will tell you its address).
+That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` returns the Docker host IP address. 
+
 
 ## More Compose documentation
 

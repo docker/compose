@@ -17,14 +17,14 @@ class ResilienceTest(DockerClientTestCase):
         self.host_path = container.get('Volumes')['/var/db']
 
     def test_successful_recreate(self):
-        self.project.up()
+        self.project.up(force_recreate=True)
         container = self.db.containers()[0]
         self.assertEqual(container.get('Volumes')['/var/db'], self.host_path)
 
     def test_create_failure(self):
         with mock.patch('compose.service.Service.create_container', crash):
             with self.assertRaises(Crash):
-                self.project.up()
+                self.project.up(force_recreate=True)
 
         self.project.up()
         container = self.db.containers()[0]
@@ -33,7 +33,7 @@ class ResilienceTest(DockerClientTestCase):
     def test_start_failure(self):
         with mock.patch('compose.service.Service.start_container', crash):
             with self.assertRaises(Crash):
-                self.project.up()
+                self.project.up(force_recreate=True)
 
         self.project.up()
         container = self.db.containers()[0]

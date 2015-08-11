@@ -1,6 +1,12 @@
+import logging
 import os
+import sys
 import yaml
+from collections import namedtuple
+
 import six
+
+from compose.cli.utils import find_candidates_in_parent_dirs
 
 
 DOCKER_CONFIG_KEYS = [
@@ -18,22 +24,26 @@ DOCKER_CONFIG_KEYS = [
     'env_file',
     'environment',
     'extra_hosts',
-    'read_only',
     'hostname',
     'image',
     'labels',
     'links',
+    'mac_address',
     'mem_limit',
+    'memswap_limit',
     'net',
     'log_driver',
+    'log_opt',
     'pid',
     'ports',
     'privileged',
+    'read_only',
     'restart',
     'security_opt',
     'stdin_open',
     'tty',
     'user',
+    'volume_driver',
     'volumes',
     'volumes_from',
     'working_dir',
@@ -41,6 +51,7 @@ DOCKER_CONFIG_KEYS = [
 
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
+    'container_name',
     'dockerfile',
     'expose',
     'external_links',
@@ -54,6 +65,7 @@ DOCKER_CONFIG_HINTS = {
     'extra_host': 'extra_hosts',
     'device': 'devices',
     'link': 'links',
+    'memory_swap': 'memswap_limit',
     'port': 'ports',
     'privilege': 'privileged',
     'priviliged': 'privileged',
@@ -63,12 +75,64 @@ DOCKER_CONFIG_HINTS = {
 }
 
 
-def load(filename):
-    working_dir = os.path.dirname(filename)
-    return from_dictionary(load_yaml(filename), working_dir=working_dir, filename=filename)
+SUPPORTED_FILENAMES = [
+    'docker-compose.yml',
+    'docker-compose.yaml',
+    'fig.yml',
+    'fig.yaml',
+]
 
 
-def from_dictionary(dictionary, working_dir=None, filename=None):
+PATH_START_CHARS = [
+    '/',
+    '.',
+    '~',
+]
+
+
+log = logging.getLogger(__name__)
+
+
+ConfigDetails = namedtuple('ConfigDetails', 'config working_dir filename')
+
+
+def find(base_dir, filename):
+    if filename == '-':
+        return ConfigDetails(yaml.safe_load(sys.stdin), os.getcwd(), None)
+
+    if filename:
+        filename = os.path.join(base_dir, filename)
+    else:
+        filename = get_config_path(base_dir)
+    return ConfigDetails(load_yaml(filename), os.path.dirname(filename), filename)
+
+
+def get_config_path(base_dir):
+    (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
+
+    if len(candidates) == 0:
+        raise ComposeFileNotFound(SUPPORTED_FILENAMES)
+
+    winner = candidates[0]
+
+    if len(candidates) > 1:
+        log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
+        log.warn("Using %s\n", winner)
+
+    if winner == 'docker-compose.yaml':
+        log.warn("Please be aware that .yml is the expected extension "
+                 "in most cases, and using .yaml can cause compatibility "
+                 "issues in future.\n")
+
+    if winner.startswith("fig."):
+        log.warn("%s is deprecated and will not be supported in future. "
+                 "Please rename your config file to docker-compose.yml\n" % winner)
+
+    return os.path.join(path, winner)
+
+
+def load(config_details):
+    dictionary, working_dir, filename = config_details
     service_dicts = []
 
     for service_name, service_dict in list(dictionary.items()):
@@ -82,20 +146,20 @@ def from_dictionary(dictionary, working_dir=None, filename=None):
     return service_dicts
 
 
-def make_service_dict(name, service_dict, working_dir=None):
-    return ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
-
-
 class ServiceLoader(object):
     def __init__(self, working_dir, filename=None, already_seen=None):
-        self.working_dir = working_dir
-        self.filename = filename
+        self.working_dir = os.path.abspath(working_dir)
+        if filename:
+            self.filename = os.path.abspath(filename)
+        else:
+            self.filename = filename
         self.already_seen = already_seen or []
 
-    def make_service_dict(self, name, service_dict):
+    def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
-            raise CircularReference(self.already_seen)
+            raise CircularReference(self.already_seen + [self.signature(name)])
 
+    def make_service_dict(self, name, service_dict):
         service_dict = service_dict.copy()
         service_dict['name'] = name
         service_dict = resolve_environment(service_dict, working_dir=self.working_dir)
@@ -106,12 +170,17 @@ class ServiceLoader(object):
         if 'extends' not in service_dict:
             return service_dict
 
-        extends_options = process_extends_options(service_dict['name'], service_dict['extends'])
+        extends_options = self.validate_extends_options(service_dict['name'], service_dict['extends'])
 
         if self.working_dir is None:
             raise Exception("No working_dir passed to ServiceLoader()")
 
-        other_config_path = expand_path(self.working_dir, extends_options['file'])
+        if 'file' in extends_options:
+            extends_from_filename = extends_options['file']
+            other_config_path = expand_path(self.working_dir, extends_from_filename)
+        else:
+            other_config_path = self.filename
+
         other_working_dir = os.path.dirname(other_config_path)
         other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
         other_loader = ServiceLoader(
@@ -122,6 +191,7 @@ class ServiceLoader(object):
 
         other_config = load_yaml(other_config_path)
         other_service_dict = other_config[extends_options['service']]
+        other_loader.detect_cycle(extends_options['service'])
         other_service_dict = other_loader.make_service_dict(
             service_dict['name'],
             other_service_dict,
@@ -137,25 +207,29 @@ class ServiceLoader(object):
     def signature(self, name):
         return (self.filename, name)
 
+    def validate_extends_options(self, service_name, extends_options):
+        error_prefix = "Invalid 'extends' configuration for %s:" % service_name
 
-def process_extends_options(service_name, extends_options):
-    error_prefix = "Invalid 'extends' configuration for %s:" % service_name
+        if not isinstance(extends_options, dict):
+            raise ConfigurationError("%s must be a dictionary" % error_prefix)
 
-    if not isinstance(extends_options, dict):
-        raise ConfigurationError("%s must be a dictionary" % error_prefix)
-
-    if 'service' not in extends_options:
-        raise ConfigurationError(
-            "%s you need to specify a service, e.g. 'service: web'" % error_prefix
-        )
-
-    for k, _ in extends_options.items():
-        if k not in ['file', 'service']:
+        if 'service' not in extends_options:
             raise ConfigurationError(
-                "%s unsupported configuration option '%s'" % (error_prefix, k)
+                "%s you need to specify a service, e.g. 'service: web'" % error_prefix
             )
 
-    return extends_options
+        if 'file' not in extends_options and self.filename is None:
+            raise ConfigurationError(
+                "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
+            )
+
+        for k, _ in extends_options.items():
+            if k not in ['file', 'service']:
+                raise ConfigurationError(
+                    "%s unsupported configuration option '%s'" % (error_prefix, k)
+                )
+
+        return extends_options
 
 
 def validate_extended_service_dict(service_dict, filename, service):
@@ -182,8 +256,11 @@ def process_container_options(service_dict, working_dir=None):
 
     service_dict = service_dict.copy()
 
-    if 'volumes' in service_dict:
-        service_dict['volumes'] = resolve_host_paths(service_dict['volumes'], working_dir=working_dir)
+    if 'memswap_limit' in service_dict and 'mem_limit' not in service_dict:
+        raise ConfigurationError("Invalid 'memswap_limit' configuration for %s service: when defining 'memswap_limit' you must set 'mem_limit' as well" % service_dict['name'])
+
+    if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
+        service_dict['volumes'] = resolve_volume_paths(service_dict, working_dir=working_dir)
 
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
@@ -344,18 +421,33 @@ def env_vars_from_file(filename):
     return env
 
 
-def resolve_host_paths(volumes, working_dir=None):
+def resolve_volume_paths(service_dict, working_dir=None):
     if working_dir is None:
-        raise Exception("No working_dir passed to resolve_host_paths()")
+        raise Exception("No working_dir passed to resolve_volume_paths()")
 
-    return [resolve_host_path(v, working_dir) for v in volumes]
+    return [
+        resolve_volume_path(v, working_dir, service_dict['name'])
+        for v in service_dict['volumes']
+    ]
 
 
-def resolve_host_path(volume, working_dir):
+def resolve_volume_path(volume, working_dir, service_name):
     container_path, host_path = split_path_mapping(volume)
+    container_path = os.path.expanduser(os.path.expandvars(container_path))
+
     if host_path is not None:
-        host_path = os.path.expanduser(host_path)
-        host_path = os.path.expandvars(host_path)
+        host_path = os.path.expanduser(os.path.expandvars(host_path))
+
+        if not any(host_path.startswith(c) for c in PATH_START_CHARS):
+            log.warn(
+                'Warning: the mapping "{0}" in the volumes config for '
+                'service "{1}" is ambiguous. In a future version of Docker, '
+                'it will designate a "named" volume '
+                '(see https://github.com/docker/docker/pull/14242). '
+                'To prevent unexpected behaviour, change it to "./{0}"'
+                .format(volume, service_name)
+            )
+
         return "%s:%s" % (expand_path(working_dir, host_path), container_path)
     else:
         return container_path
@@ -487,3 +579,12 @@ class CircularReference(ConfigurationError):
             for (filename, service_name) in self.trail
         ]
         return "Circular reference:\n  {}".format("\n  extends ".join(lines))
+
+
+class ComposeFileNotFound(ConfigurationError):
+    def __init__(self, supported_filenames):
+        super(ComposeFileNotFound, self).__init__("""
+        Can't find a suitable configuration file in this directory or any parent. Are you in the right directory?
+
+        Supported filenames: %s
+        """ % ", ".join(supported_filenames))

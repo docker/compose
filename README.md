@@ -50,3 +50,8 @@ Contributing
 [![Build Status](http://jenkins.dockerproject.org/buildStatus/icon?job=Compose%20Master)](http://jenkins.dockerproject.org/job/Compose%20Master/)
 
 Want to help build Compose? Check out our [contributing documentation](https://github.com/docker/compose/blob/master/CONTRIBUTING.md).
+
+Releasing
+---------
+
+Releases are built by maintainers, following an outline of the [release process](https://github.com/docker/compose/blob/master/RELEASE_PROCESS.md).

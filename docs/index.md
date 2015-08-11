@@ -29,18 +29,16 @@ they can be run together in an isolated environment:
 
 A `docker-compose.yml` looks like this:
 
-```yaml
-web:
-  build: .
-  ports:
-   - "5000:5000"
-  volumes:
-   - .:/code
-  links:
-   - redis
-redis:
-  image: redis
-```
+    web:
+      build: .
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+      links:
+       - redis
+    redis:
+      image: redis
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -77,23 +75,21 @@ Next, you'll want to make a directory for the project:
     $ cd composetest
 
 Inside this directory, create `app.py`, a simple web app that uses the Flask
-framework and increments a value in Redis:
+framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
 
-```python
-from flask import Flask
-from redis import Redis
-import os
-app = Flask(__name__)
-redis = Redis(host='redis', port=6379)
+    from flask import Flask
+    from redis import Redis
 
-@app.route('/')
-def hello():
-    redis.incr('hits')
-    return 'Hello World! I have been seen %s times.' % redis.get('hits')
+    app = Flask(__name__)
+    redis = Redis(host='redis', port=6379)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True)
-```
+    @app.route('/')
+    def hello():
+        redis.incr('hits')
+        return 'Hello World! I have been seen %s times.' % redis.get('hits')
+
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", debug=True)
 
 Next, define the Python dependencies in a file called `requirements.txt`:
 
@@ -163,18 +159,21 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
     Starting composetest_web_1...
     redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
     web_1   |  * Running on http://0.0.0.0:5000/
+    web_1   |  * Restarting with stat
 
-The web app should now be listening on port 5000 on your Docker daemon host (if
-you're using Boot2docker, `boot2docker ip` will tell you its address). In a browser,
-open `http://ip-from-boot2docker:5000` and you should get a message in your browser saying:
+If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser. 
+
+If you're not using Boot2docker and are on linux, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try localhost:5000.
+
+You should get a message in your browser saying:
 
 `Hello World! I have been seen 1 times.`
 
 Refreshing the page will increment the number.
 
 If you want to run your services in the background, you can pass the `-d` flag
-(for daemon mode) to `docker-compose up` and use `docker-compose ps` to see what
-is currently running:
+(for "detached" mode) to `docker-compose up` and use `docker-compose ps` to
+see what is currently running:
 
     $ docker-compose up -d
     Starting composetest_redis_1...
@@ -191,7 +190,7 @@ services. For example, to see what environment variables are available to the
 
     $ docker-compose run web env
 
-See `docker-compose --help` to see other available commands.
+See `docker-compose --help` to see other available commands. You can also install [command completion](completion.md) for the bash and zsh shell, which will also show you available commands.
 
 If you started Compose with `docker-compose up -d`, you'll probably want to stop
 your services once you've finished with them:

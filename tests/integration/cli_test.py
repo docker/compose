@@ -9,6 +9,7 @@ from mock import patch
 
 from .testcases import DockerClientTestCase
 from compose.cli.main import TopLevelCommand
+from compose.cli.errors import UserError
 from compose.project import NoSuchService
 
 
@@ -36,7 +37,7 @@ class CLITestCase(DockerClientTestCase):
         if hasattr(self, '_project'):
             return self._project
 
-        return self.command.get_project(self.command.get_config_path())
+        return self.command.get_project()
 
     def test_help(self):
         old_base_dir = self.command.base_dir
@@ -136,21 +137,21 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 0)
         self.assertEqual(len(console.containers()), 0)
 
-    def test_up_with_recreate(self):
+    def test_up_with_force_recreate(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
 
         old_ids = [c.id for c in service.containers()]
 
-        self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['up', '-d', '--force-recreate'], None)
         self.assertEqual(len(service.containers()), 1)
 
         new_ids = [c.id for c in service.containers()]
 
         self.assertNotEqual(old_ids, new_ids)
 
-    def test_up_with_keep_old(self):
+    def test_up_with_no_recreate(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
@@ -163,6 +164,10 @@ class CLITestCase(DockerClientTestCase):
         new_ids = [c.id for c in service.containers()]
 
         self.assertEqual(old_ids, new_ids)
+
+    def test_up_with_force_recreate_and_no_recreate(self):
+        with self.assertRaises(UserError):
+            self.command.dispatch(['up', '-d', '--force-recreate', '--no-recreate'], None)
 
     def test_up_with_timeout(self):
         self.command.dispatch(['up', '-d', '-t', '1'], None)

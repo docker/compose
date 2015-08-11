@@ -10,7 +10,6 @@ weight=3
 <![end-metadata]-->
 
 # Compose environment variables reference
-===============================
 
 **Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, the name of the linked service) as the hostname to connect to. See the [docker-compose.yml documentation](yml.md#links) for details.
 

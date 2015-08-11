@@ -14,6 +14,8 @@ def docker_client():
         cert_path = os.path.join(os.environ.get('HOME', ''), '.docker')
 
     base_url = os.environ.get('DOCKER_HOST')
+    api_version = os.environ.get('COMPOSE_API_VERSION', '1.19')
+
     tls_config = None
 
     if os.environ.get('DOCKER_TLS_VERIFY', '') != '':
@@ -32,4 +34,4 @@ def docker_client():
         )
 
     timeout = int(os.environ.get('DOCKER_CLIENT_TIMEOUT', 60))
-    return Client(base_url=base_url, tls=tls_config, version='1.18', timeout=timeout)
+    return Client(base_url=base_url, tls=tls_config, version=api_version, timeout=timeout)

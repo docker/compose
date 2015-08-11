@@ -1,15 +1,16 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import logging
 from functools import reduce
+import logging
 
 from docker.errors import APIError
 
 from .config import get_service_name_from_net, ConfigurationError
-from .const import LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF, DEFAULT_TIMEOUT
-from .service import Service
+from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
 from .container import Container
 from .legacy import check_for_legacy_containers
+from .service import Service
+from .utils import parallel_execute
 
 log = logging.getLogger(__name__)
 
@@ -197,12 +198,30 @@ class Project(object):
             service.start(**options)
 
     def stop(self, service_names=None, **options):
-        for service in reversed(self.get_services(service_names)):
-            service.stop(**options)
+        parallel_execute(
+            objects=self.containers(service_names),
+            obj_callable=lambda c: c.stop(**options),
+            msg_index=lambda c: c.name,
+            msg="Stopping"
+        )
 
     def kill(self, service_names=None, **options):
-        for service in reversed(self.get_services(service_names)):
-            service.kill(**options)
+        parallel_execute(
+            objects=self.containers(service_names),
+            obj_callable=lambda c: c.kill(**options),
+            msg_index=lambda c: c.name,
+            msg="Killing"
+        )
+
+    def remove_stopped(self, service_names=None, **options):
+        all_containers = self.containers(service_names, stopped=True)
+        stopped_containers = [c for c in all_containers if not c.is_running]
+        parallel_execute(
+            objects=stopped_containers,
+            obj_callable=lambda c: c.remove(**options),
+            msg_index=lambda c: c.name,
+            msg="Removing"
+        )
 
     def restart(self, service_names=None, **options):
         for service in self.get_services(service_names):
@@ -219,10 +238,12 @@ class Project(object):
            service_names=None,
            start_deps=True,
            allow_recreate=True,
-           smart_recreate=False,
-           insecure_registry=False,
+           force_recreate=False,
            do_build=True,
            timeout=DEFAULT_TIMEOUT):
+
+        if force_recreate and not allow_recreate:
+            raise ValueError("force_recreate and allow_recreate are in conflict")
 
         services = self.get_services(service_names, include_deps=start_deps)
 
@@ -232,7 +253,7 @@ class Project(object):
         plans = self._get_convergence_plans(
             services,
             allow_recreate=allow_recreate,
-            smart_recreate=smart_recreate,
+            force_recreate=force_recreate,
         )
 
         return [
@@ -240,7 +261,6 @@ class Project(object):
             for service in services
             for container in service.execute_convergence_plan(
                 plans[service.name],
-                insecure_registry=insecure_registry,
                 do_build=do_build,
                 timeout=timeout
             )
@@ -249,7 +269,7 @@ class Project(object):
     def _get_convergence_plans(self,
                                services,
                                allow_recreate=True,
-                               smart_recreate=False):
+                               force_recreate=False):
 
         plans = {}
 
@@ -261,32 +281,28 @@ class Project(object):
                 and plans[name].action == 'recreate'
             ]
 
-            if updated_dependencies:
+            if updated_dependencies and allow_recreate:
                 log.debug(
                     '%s has upstream changes (%s)',
                     service.name, ", ".join(updated_dependencies),
                 )
                 plan = service.convergence_plan(
                     allow_recreate=allow_recreate,
-                    smart_recreate=False,
+                    force_recreate=True,
                 )
             else:
                 plan = service.convergence_plan(
                     allow_recreate=allow_recreate,
-                    smart_recreate=smart_recreate,
+                    force_recreate=force_recreate,
                 )
 
             plans[service.name] = plan
 
         return plans
 
-    def pull(self, service_names=None, insecure_registry=False):
+    def pull(self, service_names=None):
         for service in self.get_services(service_names, include_deps=True):
-            service.pull(insecure_registry=insecure_registry)
-
-    def remove_stopped(self, service_names=None, **options):
-        for service in self.get_services(service_names):
-            service.remove_stopped(**options)
+            service.pull()
 
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:
@@ -294,11 +310,11 @@ class Project(object):
         else:
             service_names = self.service_names
 
-        containers = [
+        containers = filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})]
+                filters={'label': self.labels(one_off=one_off)})])
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names

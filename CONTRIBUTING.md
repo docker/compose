@@ -22,12 +22,17 @@ that should get you started.
 1. Fork [https://github.com/docker/compose](https://github.com/docker/compose)
    to your username.
 2. Clone your forked repository locally `git clone git@github.com:yourusername/compose.git`.
-3. Enter the local directory `cd compose`.
-4. Set up a development environment by running `python setup.py develop`. This
+3. You must [configure a remote](https://help.github.com/articles/configuring-a-remote-for-a-fork/) for your fork so that you can [sync changes you make](https://help.github.com/articles/syncing-a-fork/) with the original repository.
+4. Enter the local directory `cd compose`.
+5. Set up a development environment by running `python setup.py develop`. This
    will install the dependencies and set up a symlink from your `docker-compose`
    executable to the checkout of the repository. When you now run
    `docker-compose` from anywhere on your machine, it will run your development
    version of Compose.
+
+## Submitting a pull request
+
+See Docker's [basic contribution workflow](https://docs.docker.com/project/make-a-contribution/#the-basic-contribution-workflow) for a guide on how to submit a pull request for code or documentation.
 
 ## Running the test suite
 
@@ -51,37 +56,8 @@ you can specify a test directory, file, module, class or method:
     $ script/test tests.integration.service_test
     $ script/test tests.integration.service_test:ServiceTest.test_containers
 
-## Building binaries
+## Finding things to work on
 
-`script/build-linux` will build the Linux binary inside a Docker container:
+We use a [Waffle.io board](https://waffle.io/docker/compose) to keep track of specific things we are working on and planning to work on. If you're looking for things to work on, stuff in the backlog is a great place to start.
 
-    $ script/build-linux
-
-`script/build-osx` will build the Mac OS X binary inside a virtualenv:
-
-    $ script/build-osx
-
-For official releases, you should build inside a Mountain Lion VM for proper
-compatibility. Run the this script first to prepare the environment before
-building - it will use Homebrew to make sure Python is installed and
-up-to-date.
-
-    $ script/prepare-osx
-
-## Release process
-
-1. Open pull request that:
- - Updates the version in `compose/__init__.py`
- - Updates the binary URL in `docs/install.md`
- - Adds release notes to `CHANGES.md`
-2. Create unpublished GitHub release with release notes
-3. Build Linux version on any Docker host with `script/build-linux` and attach
-   to release
-4. Build OS X version on Mountain Lion with `script/build-osx` and attach to
-   release as `docker-compose-Darwin-x86_64` and `docker-compose-Linux-x86_64`.
-5. Publish GitHub release, creating tag
-6. Update website with `script/deploy-docs`
-7. Upload PyPi package
-
-        $ git checkout $VERSION
-        $ python setup.py sdist upload
+For more information about our project planning, take a look at our [GitHub wiki](https://github.com/docker/compose/wiki).

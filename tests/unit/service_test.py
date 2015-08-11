@@ -5,6 +5,7 @@ from .. import unittest
 import mock
 
 import docker
+from docker.utils import LogConfig
 
 from compose.service import Service
 from compose.container import Container
@@ -29,24 +30,29 @@ class ServiceTest(unittest.TestCase):
         self.mock_client = mock.create_autospec(docker.Client)
 
     def test_name_validations(self):
-        self.assertRaises(ConfigError, lambda: Service(name=''))
+        self.assertRaises(ConfigError, lambda: Service(name='', image='foo'))
 
-        self.assertRaises(ConfigError, lambda: Service(name=' '))
-        self.assertRaises(ConfigError, lambda: Service(name='/'))
-        self.assertRaises(ConfigError, lambda: Service(name='!'))
-        self.assertRaises(ConfigError, lambda: Service(name='\xe2'))
-        self.assertRaises(ConfigError, lambda: Service(name='_'))
-        self.assertRaises(ConfigError, lambda: Service(name='____'))
-        self.assertRaises(ConfigError, lambda: Service(name='foo_bar'))
-        self.assertRaises(ConfigError, lambda: Service(name='__foo_bar__'))
+        self.assertRaises(ConfigError, lambda: Service(name=' ', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='/', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='!', image='foo'))
+        self.assertRaises(ConfigError, lambda: Service(name='\xe2', image='foo'))
 
         Service('a', image='foo')
         Service('foo', image='foo')
+        Service('foo-bar', image='foo')
+        Service('foo.bar', image='foo')
+        Service('foo_bar', image='foo')
+        Service('_', image='foo')
+        Service('___', image='foo')
+        Service('-', image='foo')
+        Service('--', image='foo')
+        Service('.__.', image='foo')
 
     def test_project_validation(self):
         self.assertRaises(ConfigError, lambda: Service('bar'))
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='_', image='foo'))
-        Service(name='foo', project='bar', image='foo')
+        self.assertRaises(ConfigError, lambda: Service(name='foo', project='>', image='foo'))
+
+        Service(name='foo', project='bar.bar__', image='foo')
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
@@ -69,6 +75,18 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.containers.assert_called_once_with(
             all=False,
             filters={'label': expected_labels})
+
+    def test_container_without_name(self):
+        self.mock_client.containers.return_value = [
+            {'Image': 'foo', 'Id': '1', 'Name': '1'},
+            {'Image': 'foo', 'Id': '2', 'Name': None},
+            {'Image': 'foo', 'Id': '3'},
+        ]
+        service = Service('db', self.mock_client, 'myproject', image='foo')
+
+        self.assertEqual([c.id for c in service.containers()], ['1'])
+        self.assertEqual(service._next_container_number(), 2)
+        self.assertEqual(service.get_container(1).id, '1')
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -151,6 +169,23 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
+    def test_memory_swap_limit(self):
+        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, mem_limit=1000000000, memswap_limit=2000000000)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'some': 'overrides'}, 1)
+        self.assertEqual(opts['host_config']['MemorySwap'], 2000000000)
+        self.assertEqual(opts['host_config']['Memory'], 1000000000)
+
+    def test_log_opt(self):
+        log_opt = {'address': 'tcp://192.168.0.42:123'}
+        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
+        self.mock_client.containers.return_value = []
+        opts = service._get_container_create_options({'some': 'overrides'}, 1)
+
+        self.assertIsInstance(opts['host_config']['LogConfig'], LogConfig)
+        self.assertEqual(opts['host_config']['LogConfig'].type, 'syslog')
+        self.assertEqual(opts['host_config']['LogConfig'].config, log_opt)
+
     def test_split_domainname_fqdn(self):
         service = Service(
             'foo',
@@ -206,11 +241,10 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.log', autospec=True)
     def test_pull_image(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
-        service.pull(insecure_registry=True)
+        service.pull()
         self.mock_client.pull.assert_called_once_with(
             'someimage',
             tag='sometag',
-            insecure_registry=True,
             stream=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
@@ -220,25 +254,7 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'ababab',
             tag='latest',
-            insecure_registry=False,
             stream=True)
-
-    def test_create_container_from_insecure_registry(self):
-        service = Service('foo', client=self.mock_client, image='someimage:sometag')
-        images = []
-
-        def pull(repo, tag=None, insecure_registry=False, **kwargs):
-            self.assertEqual('someimage', repo)
-            self.assertEqual('sometag', tag)
-            self.assertTrue(insecure_registry)
-            images.append({'Id': 'abc123'})
-            return []
-
-        service.image = lambda *args, **kwargs: mock_get_image(images)
-        self.mock_client.pull = pull
-
-        service.create_container(insecure_registry=True)
-        self.assertEqual(1, len(images))
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
@@ -349,13 +365,12 @@ class ServiceVolumesTest(unittest.TestCase):
         spec = parse_volume_spec('external:interval:ro')
         self.assertEqual(spec, ('external', 'interval', 'ro'))
 
+        spec = parse_volume_spec('external:interval:z')
+        self.assertEqual(spec, ('external', 'interval', 'z'))
+
     def test_parse_volume_spec_too_many_parts(self):
         with self.assertRaises(ConfigError):
             parse_volume_spec('one:two:three:four')
-
-    def test_parse_volume_bad_mode(self):
-        with self.assertRaises(ConfigError):
-            parse_volume_spec('one:two:notrw')
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(parse_volume_spec('/outside:/inside'))
@@ -485,3 +500,26 @@ class ServiceVolumesTest(unittest.TestCase):
             create_options['host_config']['Binds'],
             ['/mnt/sda1/host/path:/data:rw'],
         )
+
+    def test_create_with_special_volume_mode(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
+
+        create_calls = []
+
+        def create_container(*args, **kwargs):
+            create_calls.append((args, kwargs))
+            return {'Id': 'containerid'}
+
+        self.mock_client.create_container = create_container
+
+        volumes = ['/tmp:/foo:z']
+
+        Service(
+            'web',
+            client=self.mock_client,
+            image='busybox',
+            volumes=volumes,
+        ).create_container()
+
+        self.assertEqual(len(create_calls), 1)
+        self.assertEqual(create_calls[0][1]['host_config']['Binds'], volumes)

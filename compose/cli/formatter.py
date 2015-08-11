@@ -7,7 +7,7 @@ import texttable
 def get_tty_width():
     tty_size = os.popen('stty size', 'r').read().split()
     if len(tty_size) != 2:
-        return 80
+        return 0
     _, width = tty_size
     return int(width)
 

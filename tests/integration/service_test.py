@@ -4,10 +4,10 @@ import os
 from os import path
 
 from docker.errors import APIError
-import mock
+from mock import patch
 import tempfile
 import shutil
-import six
+from six import StringIO, text_type
 
 from compose import __version__
 from compose.const import (
@@ -117,11 +117,17 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertIn('/var/db', container.get('Volumes'))
 
+    def test_create_container_with_volume_driver(self):
+        service = self.create_service('db', volume_driver='foodriver')
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual('foodriver', container.get('Config.VolumeDriver'))
+
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
         container = service.create_container()
         service.start_container(container)
-        self.assertEqual(container.inspect()['Config']['CpuShares'], 73)
+        self.assertEqual(container.get('HostConfig.CpuShares'), 73)
 
     def test_build_extra_hosts(self):
         # string
@@ -183,7 +189,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', cpuset='0')
         container = service.create_container()
         service.start_container(container)
-        self.assertEqual(container.inspect()['Config']['Cpuset'], '0')
+        self.assertEqual(container.get('HostConfig.CpusetCpus'), '0')
 
     def test_create_container_with_read_only_root_fs(self):
         read_only = True
@@ -198,6 +204,12 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         self.assertEqual(set(container.get('HostConfig.SecurityOpt')), set(security_opt))
+
+    def test_create_container_with_mac_address(self):
+        service = self.create_service('db', mac_address='02:42:ac:11:65:43')
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.inspect()['Config']['MacAddress'], '02:42:ac:11:65:43')
 
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
@@ -215,7 +227,53 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
-    @mock.patch.dict(os.environ)
+    def test_recreate_preserves_volume_with_trailing_slash(self):
+        """
+        When the Compose file specifies a trailing slash in the container path, make
+        sure we copy the volume over when recreating.
+        """
+        service = self.create_service('data', volumes=['/data/'])
+        old_container = create_and_start_container(service)
+        volume_path = old_container.get('Volumes')['/data']
+
+        new_container = service.recreate_container(old_container)
+        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+
+    def test_duplicate_volume_trailing_slash(self):
+        """
+        When an image specifies a volume, and the Compose file specifies a host path
+        but adds a trailing slash, make sure that we don't create duplicate binds.
+        """
+        host_path = '/tmp/data'
+        container_path = '/data'
+        volumes = ['{}:{}/'.format(host_path, container_path)]
+
+        tmp_container = self.client.create_container(
+            'busybox', 'true',
+            volumes={container_path: {}},
+            labels={'com.docker.compose.test_image': 'true'},
+        )
+        image = self.client.commit(tmp_container)['Id']
+
+        service = self.create_service('db', image=image, volumes=volumes)
+        old_container = create_and_start_container(service)
+
+        self.assertEqual(
+            old_container.get('Config.Volumes'),
+            {container_path: {}},
+        )
+
+        service = self.create_service('db', image=image, volumes=volumes)
+        new_container = service.recreate_container(old_container)
+
+        self.assertEqual(
+            new_container.get('Config.Volumes'),
+            {container_path: {}},
+        )
+
+        self.assertEqual(service.containers(stopped=False), [new_container])
+
+    @patch.dict(os.environ)
     def test_create_container_with_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
         os.environ['HOME'] = '/tmp/home-dir'
@@ -463,7 +521,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
-        self.create_service('web', build=six.text_type(base_dir)).build()
+        self.create_service('web', build=text_type(base_dir)).build()
         self.assertEqual(len(self.client.images(name='composetest_web')), 1)
 
     def test_start_container_stays_unpriviliged(self):
@@ -542,6 +600,120 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
         service.scale(0)
         self.assertEqual(len(service.containers()), 0)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_stopped_containers(self, mock_stdout):
+        """
+        Given there are some stopped containers and scale is called with a
+        desired number that is the same as the number of stopped containers,
+        test that those containers are restarted and not removed/recreated.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        valid_numbers = [next_number, next_number + 1]
+        service.create_container(number=next_number, quiet=True)
+        service.create_container(number=next_number + 1, quiet=True)
+
+        for container in service.containers():
+            self.assertFalse(container.is_running)
+
+        service.scale(2)
+
+        self.assertEqual(len(service.containers()), 2)
+        for container in service.containers():
+            self.assertTrue(container.is_running)
+            self.assertTrue(container.number in valid_numbers)
+
+        captured_output = mock_stdout.getvalue()
+        self.assertNotIn('Creating', captured_output)
+        self.assertIn('Starting', captured_output)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_stopped_containers_and_needing_creation(self, mock_stdout):
+        """
+        Given there are some stopped containers and scale is called with a
+        desired number that is greater than the number of stopped containers,
+        test that those containers are restarted and required number are created.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        service.create_container(number=next_number, quiet=True)
+
+        for container in service.containers():
+            self.assertFalse(container.is_running)
+
+        service.scale(2)
+
+        self.assertEqual(len(service.containers()), 2)
+        for container in service.containers():
+            self.assertTrue(container.is_running)
+
+        captured_output = mock_stdout.getvalue()
+        self.assertIn('Creating', captured_output)
+        self.assertIn('Starting', captured_output)
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_api_returns_errors(self, mock_stdout):
+        """
+        Test that when scaling if the API returns an error, that error is handled
+        and the remaining threads continue.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        service.create_container(number=next_number, quiet=True)
+
+        with patch(
+            'compose.container.Container.create',
+                side_effect=APIError(message="testing", response={}, explanation="Boom")):
+
+            service.scale(3)
+
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+        self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
+
+    @patch('compose.service.log')
+    def test_scale_with_desired_number_already_achieved(self, mock_log):
+        """
+        Test that calling scale with a desired number that is equal to the
+        number of containers already running results in no change.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        container = service.create_container(number=next_number, quiet=True)
+        container.start()
+
+        self.assertTrue(container.is_running)
+        self.assertEqual(len(service.containers()), 1)
+
+        service.scale(1)
+
+        self.assertEqual(len(service.containers()), 1)
+        container.inspect()
+        self.assertTrue(container.is_running)
+
+        captured_output = mock_log.info.call_args[0]
+        self.assertIn('Desired container number already achieved', captured_output)
+
+    @patch('compose.service.log')
+    def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
+        """
+        Test that calling scale on a service that has a custom container name
+        results in warning output.
+        """
+        service = self.create_service('web', container_name='custom-container')
+
+        self.assertEqual(service.custom_container_name(), 'custom-container')
+
+        service.scale(3)
+
+        captured_output = mock_log.warn.call_args[0][0]
+
+        self.assertEqual(len(service.containers()), 1)
+        self.assertIn(
+            "Remove the custom name to scale the service.",
+            captured_output
+        )
 
     def test_scale_sets_ports(self):
         service = self.create_service('web', ports=['8000'])
@@ -644,7 +816,7 @@ class ServiceTest(DockerClientTestCase):
         for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
-    @mock.patch.dict(os.environ)
+    @patch.dict(os.environ)
     def test_resolve_env(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
@@ -692,6 +864,16 @@ class ServiceTest(DockerClientTestCase):
         labels = create_and_start_container(service).labels.items()
         for name in labels_list:
             self.assertIn((name, ''), labels)
+
+    def test_custom_container_name(self):
+        service = self.create_service('web', container_name='my-web-container')
+        self.assertEqual(service.custom_container_name(), 'my-web-container')
+
+        container = create_and_start_container(service)
+        self.assertEqual(container.name, 'my-web-container')
+
+        one_off_container = service.create_container(one_off=True)
+        self.assertNotEqual(one_off_container.name, 'my-web-container')
 
     def test_log_drive_invalid(self):
         service = self.create_service('web', log_driver='xxx')

@@ -12,7 +12,6 @@ from .testcases import DockerClientTestCase
 
 class ProjectTestCase(DockerClientTestCase):
     def run_up(self, cfg, **kwargs):
-        kwargs.setdefault('smart_recreate', True)
         kwargs.setdefault('timeout', 1)
 
         project = self.make_project(cfg)
@@ -23,7 +22,7 @@ class ProjectTestCase(DockerClientTestCase):
         return Project.from_dicts(
             name='composetest',
             client=self.client,
-            service_dicts=config.from_dictionary(cfg),
+            service_dicts=config.load(config.ConfigDetails(cfg, 'working_dir', None))
         )
 
 
@@ -155,8 +154,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
 def converge(service,
              allow_recreate=True,
-             smart_recreate=False,
-             insecure_registry=False,
+             force_recreate=False,
              do_build=True):
     """
     If a container for this service doesn't exist, create and start one. If there are
@@ -164,12 +162,11 @@ def converge(service,
     """
     plan = service.convergence_plan(
         allow_recreate=allow_recreate,
-        smart_recreate=smart_recreate,
+        force_recreate=force_recreate,
     )
 
     return service.execute_convergence_plan(
         plan,
-        insecure_registry=insecure_registry,
         do_build=do_build,
         timeout=1,
     )
@@ -180,7 +177,7 @@ class ServiceStateTest(DockerClientTestCase):
 
     def test_trigger_create(self):
         web = self.create_service('web')
-        self.assertEqual(('create', []), web.convergence_plan(smart_recreate=True))
+        self.assertEqual(('create', []), web.convergence_plan())
 
     def test_trigger_noop(self):
         web = self.create_service('web')
@@ -188,7 +185,7 @@ class ServiceStateTest(DockerClientTestCase):
         web.start()
 
         web = self.create_service('web')
-        self.assertEqual(('noop', [container]), web.convergence_plan(smart_recreate=True))
+        self.assertEqual(('noop', [container]), web.convergence_plan())
 
     def test_trigger_start(self):
         options = dict(command=["top"])
@@ -205,7 +202,7 @@ class ServiceStateTest(DockerClientTestCase):
         web = self.create_service('web', **options)
         self.assertEqual(
             ('start', containers[0:1]),
-            web.convergence_plan(smart_recreate=True),
+            web.convergence_plan(),
         )
 
     def test_trigger_recreate_with_config_change(self):
@@ -213,14 +210,14 @@ class ServiceStateTest(DockerClientTestCase):
         container = web.create_container()
 
         web = self.create_service('web', command=["top", "-d", "1"])
-        self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
+        self.assertEqual(('recreate', [container]), web.convergence_plan())
 
     def test_trigger_recreate_with_nonexistent_image_tag(self):
         web = self.create_service('web', image="busybox:latest")
         container = web.create_container()
 
         web = self.create_service('web', image="nonexistent-image")
-        self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
+        self.assertEqual(('recreate', [container]), web.convergence_plan())
 
     def test_trigger_recreate_with_image_change(self):
         repo = 'composetest_myimage'
@@ -240,7 +237,7 @@ class ServiceStateTest(DockerClientTestCase):
             self.client.remove_container(c)
 
             web = self.create_service('web', image=image)
-            self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
+            self.assertEqual(('recreate', [container]), web.convergence_plan())
 
         finally:
             self.client.remove_image(image)
@@ -263,7 +260,7 @@ class ServiceStateTest(DockerClientTestCase):
             web.build()
 
             web = self.create_service('web', build=context)
-            self.assertEqual(('recreate', [container]), web.convergence_plan(smart_recreate=True))
+            self.assertEqual(('recreate', [container]), web.convergence_plan())
         finally:
             shutil.rmtree(context)
 
