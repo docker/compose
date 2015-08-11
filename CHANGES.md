@@ -1,6 +1,45 @@
 Change log
 ==========
 
+1.4.0 (2015-08-04)
+------------------
+
+-   By default, `docker-compose up` now only recreates containers for services whose configuration has changed since they were created. This should result in a dramatic speed-up for many applications.
+
+    The experimental `--x-smart-recreate` flag which introduced this feature in Compose 1.3.0 has been removed, and a `--force-recreate` flag has been added for when you want to recreate everything.
+
+-   Several of Compose's commands - `scale`, `stop`, `kill` and `rm` - now perform actions on multiple containers in parallel, rather than in sequence, which will run much faster on larger applications.
+
+-   You can now specify a custom name for a service's container with `container_name`. Because Docker container names must be unique, this means you can't scale the service beyond one container.
+
+-   You no longer have to specify a `file` option when using `extends` - it will default to the current file.
+
+-   Service names can now contain dots, dashes and underscores.
+
+-   Compose can now read YAML configuration from standard input, rather than from a file, by specifying `-` as the filename. This makes it easier to generate configuration dynamically:
+
+        $ echo 'redis: {"image": "redis"}' | docker-compose --file - up
+
+-   There's a new `docker-compose version` command which prints extended information about Compose's bundled dependencies.
+
+-   `docker-compose.yml` now supports `log_opt` as well as `log_driver`, allowing you to pass extra configuration to a service's logging driver.
+
+-   `docker-compose.yml` now supports `memswap_limit`, similar to `docker run --memory-swap`.
+
+-   When mounting volumes with the `volumes` option, you can now pass in any mode supported by the daemon, not just `:ro` or `:rw`. For example, SELinux users can pass `:z` or `:Z`.
+
+-   You can now specify a custom volume driver with the `volume_driver` option in `docker-compose.yml`, much like `docker run --volume-driver`.
+
+-   A bug has been fixed where Compose would fail to pull images from private registries serving plain (unsecured) HTTP. The `--allow-insecure-ssl` flag, which was previously used to work around this issue, has been deprecated and now has no effect.
+
+-   A bug has been fixed where `docker-compose build` would fail if the build depended on a private Hub image or an image from a private registry.
+
+-   A bug has been fixed where Compose would crash if there were containers which the Docker daemon had not finished removing.
+
+-   Two bugs have been fixed where Compose would sometimes fail with a "Duplicate bind mount" error, or fail to attach volumes to a container, if there was a volume path specified in `docker-compose.yml` with a trailing slash.
+
+Thanks @mnowster, @dnephin, @ekristen, @funkyfuture, @jeffk and @lukemarsden!
+
 1.3.3 (2015-07-15)
 ------------------
 
