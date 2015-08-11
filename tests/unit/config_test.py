@@ -160,6 +160,19 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_invalid_list_of_strings_format(self):
+        expected_error_msg = "'command' contains an invalid type, valid types are string or list of strings"
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {
+                        'web': {'build': '.', 'command': [1]}
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)

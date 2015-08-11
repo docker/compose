@@ -55,6 +55,16 @@ def process_errors(errors):
     def _clean_error_message(message):
         return message.replace("u'", "'")
 
+    def _parse_valid_types_from_schema(schema):
+        """
+        Our defined types using $ref in the schema require some extra parsing
+        retrieve a helpful type for error message display.
+        """
+        if '$ref' in schema:
+            return schema['$ref'].replace("#/definitions/", "").replace("_", " ")
+        else:
+            return str(schema['type'])
+
     root_msgs = []
     invalid_keys = []
     required = []
@@ -93,9 +103,11 @@ def process_errors(errors):
                     required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
                 config_key = error.path[0]
-                valid_types = [context.validator_value for context in error.context]
+
+                valid_types = [_parse_valid_types_from_schema(schema) for schema in error.schema['oneOf']]
                 valid_type_msg = " or ".join(valid_types)
-                type_errors.append("Service '{}' configuration key '{}' contains an invalid type, it should be either {}".format(
+
+                type_errors.append("Service '{}' configuration key '{}' contains an invalid type, valid types are {}".format(
                     service_name, config_key, valid_type_msg)
                 )
             elif error.validator == 'type':
