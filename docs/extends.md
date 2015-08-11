@@ -78,7 +78,7 @@ For full details on how to use `extends`, refer to the [reference](#reference).
 ### Example use case
 
 In this example, you’ll repurpose the example app from the [quick start
-guide](index.md). (If you're not familiar with Compose, it's recommended that
+guide](/). (If you're not familiar with Compose, it's recommended that
 you go through the quick start first.) This example assumes you want to use
 Compose both to develop an application locally and then deploy it to a
 production environment.
@@ -358,6 +358,6 @@ locally-defined bindings taking precedence:
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
+- [Command line reference](/reference)
 - [Yaml file reference](yml.md)
 - [Compose command line completion](completion.md)

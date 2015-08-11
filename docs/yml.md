@@ -377,6 +377,6 @@ Each of these is a single value, analogous to its
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
+- [Command line reference](/reference)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)

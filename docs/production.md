@@ -15,8 +15,7 @@ weight=1
 While **Compose is not yet considered production-ready**, if you'd like to experiment and learn more about using it in production deployments, this guide
 can help.
 The project is actively working towards becoming
-production-ready; to learn more about the progress being made, check out the
-[roadmap](https://github.com/docker/compose/blob/master/ROADMAP.md) for details
+production-ready; to learn more about the progress being made, check out the <a href="https://github.com/docker/compose/blob/master/ROADMAP.md">roadmap</a> for details
 on how it's coming along and what still needs to be done.
 
 When deploying to production, you'll almost certainly want to make changes to
@@ -80,8 +79,9 @@ system, exposes the same API as a single Docker host, which means you can use
 Compose against a Swarm instance and run your apps across multiple hosts.
 
 Compose/Swarm integration is still in the experimental stage, and Swarm is still
-in beta, but if you'd like to explore and experiment, check out the
-[integration guide](https://github.com/docker/compose/blob/master/SWARM.md).
+in beta, but if you'd like to explore and experiment, check out the <a
+href="https://github.com/docker/compose/blob/master/SWARM.md">integration
+guide</a>.
 
 ## Compose documentation
 
@@ -89,7 +89,7 @@ in beta, but if you'd like to explore and experiment, check out the
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
+- [Command line reference](/reference)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
