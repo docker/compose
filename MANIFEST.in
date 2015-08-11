@@ -4,6 +4,7 @@ include requirements.txt
 include requirements-dev.txt
 include tox.ini
 include *.md
+include compose/config/schema.json
 recursive-include contrib/completion *
 recursive-include tests *
 global-exclude *.pyc
