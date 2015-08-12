@@ -6,6 +6,7 @@ from functools import reduce
 import six
 
 from .const import LABEL_CONTAINER_NUMBER
+from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 
 
@@ -70,7 +71,12 @@ class Container(object):
 
     @property
     def name_without_project(self):
-        return '{0}_{1}'.format(self.service, self.number)
+        project = self.labels.get(LABEL_PROJECT)
+
+        if self.name.startswith('{0}_{1}'.format(project, self.service)):
+            return '{0}_{1}'.format(self.service, self.number)
+        else:
+            return self.name
 
     @property
     def number(self):
