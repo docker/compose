@@ -7,7 +7,9 @@ fi
 # If a pidfile is still around (for example after a container restart),
 # delete it so that docker can start.
 rm -rf /var/run/docker.pid
-docker -d --storage-driver="overlay" &>/var/log/docker.log &
+docker_command="docker -d $DOCKER_DAEMON_ARGS"
+>&2 echo "Starting Docker with: $docker_command"
+$docker_command &>/var/log/docker.log &
 docker_pid=$!
 
 >&2 echo "Waiting for Docker to start..."

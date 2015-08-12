@@ -21,6 +21,7 @@ for version in $DOCKER_VERSIONS; do
     --volume="/var/lib/docker" \
     --volume="${COVERAGE_DIR:-$(pwd)/coverage-html}:/code/coverage-html" \
     -e "DOCKER_VERSION=$version" \
+    -e "DOCKER_DAEMON_ARGS" \
     --entrypoint="script/dind" \
     "$TAG" \
     script/wrapdocker nosetests --with-coverage --cover-branches --cover-package=compose --cover-erase --cover-html-dir=coverage-html --cover-html "$@"
