@@ -14,13 +14,11 @@ from compose.service import (
     ConfigError,
     NeedsBuildError,
     NoSuchImageError,
-    build_port_bindings,
     build_volume_binding,
     get_container_data_volumes,
     merge_volume_bindings,
     parse_repository_tag,
     parse_volume_spec,
-    split_port,
 )
 
 
@@ -99,48 +97,6 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(service._get_volumes_from(), [container_id])
         from_service.create_container.assert_called_once_with()
-
-    def test_split_port_with_host_ip(self):
-        internal_port, external_port = split_port("127.0.0.1:1000:2000")
-        self.assertEqual(internal_port, "2000")
-        self.assertEqual(external_port, ("127.0.0.1", "1000"))
-
-    def test_split_port_with_protocol(self):
-        internal_port, external_port = split_port("127.0.0.1:1000:2000/udp")
-        self.assertEqual(internal_port, "2000/udp")
-        self.assertEqual(external_port, ("127.0.0.1", "1000"))
-
-    def test_split_port_with_host_ip_no_port(self):
-        internal_port, external_port = split_port("127.0.0.1::2000")
-        self.assertEqual(internal_port, "2000")
-        self.assertEqual(external_port, ("127.0.0.1", None))
-
-    def test_split_port_with_host_port(self):
-        internal_port, external_port = split_port("1000:2000")
-        self.assertEqual(internal_port, "2000")
-        self.assertEqual(external_port, "1000")
-
-    def test_split_port_no_host_port(self):
-        internal_port, external_port = split_port("2000")
-        self.assertEqual(internal_port, "2000")
-        self.assertEqual(external_port, None)
-
-    def test_split_port_invalid(self):
-        with self.assertRaises(ConfigError):
-            split_port("0.0.0.0:1000:2000:tcp")
-
-    def test_build_port_bindings_with_one_port(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000"])
-        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
-
-    def test_build_port_bindings_with_matching_internal_ports(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000", "127.0.0.1:2000:1000"])
-        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000"), ("127.0.0.1", "2000")])
-
-    def test_build_port_bindings_with_nonmatching_internal_ports(self):
-        port_bindings = build_port_bindings(["127.0.0.1:1000:1000", "127.0.0.1:2000:2000"])
-        self.assertEqual(port_bindings["1000"], [("127.0.0.1", "1000")])
-        self.assertEqual(port_bindings["2000"], [("127.0.0.1", "2000")])
 
     def test_split_domainname_none(self):
         service = Service('foo', image='foo', hostname='name', client=self.mock_client)
