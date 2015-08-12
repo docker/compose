@@ -147,11 +147,15 @@ should always begin with `.` or `..`.
 
 ### volumes_from
 
-Mount all of the volumes from another service or container.
+Mount all of the volumes from another service or container, with the
+supported flags by docker : ``ro``, ``rw``.
 
-    volumes_from:
-     - service_name
-     - container_name
+```
+volumes_from:
+ - service_name
+ - container_name:ro
+ - service_name:rw
+```
 
 ### environment
 

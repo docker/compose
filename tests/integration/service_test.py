@@ -22,6 +22,7 @@ from compose.service import (
     ConvergencePlan,
     Service,
     build_extra_hosts,
+    VolumeFromSpec,
 )
 from compose.container import Container
 from .testcases import DockerClientTestCase
@@ -282,12 +283,12 @@ class ServiceTest(DockerClientTestCase):
             command=["top"],
             labels={LABEL_PROJECT: 'composetest'},
         )
-        host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
+        host_service = self.create_service('host', volumes_from=[VolumeFromSpec(volume_service, 'rw'), VolumeFromSpec(volume_container_2, 'rw')])
         host_container = host_service.create_container()
         host_service.start_container(host_container)
-        self.assertIn(volume_container_1.id,
+        self.assertIn(volume_container_1.id + ':rw',
                       host_container.get('HostConfig.VolumesFrom'))
-        self.assertIn(volume_container_2.id,
+        self.assertIn(volume_container_2.id + ':rw',
                       host_container.get('HostConfig.VolumesFrom'))
 
     def test_execute_convergence_plan_recreate(self):
