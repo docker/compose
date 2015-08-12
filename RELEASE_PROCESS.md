@@ -1,36 +1,131 @@
-# Building a Compose release
+Building a Compose release
+==========================
 
-## Building binaries
+## To get started with a new release
 
-`script/build-linux` builds the Linux binary inside a Docker container:
+1.  Create a `bump-$VERSION` branch off master:
 
-    $ script/build-linux
+        git checkout -b bump-$VERSION master
 
-`script/build-osx` builds the Mac OS X binary inside a virtualenv:
+2.  Merge in the `release` branch on the upstream repo, discarding its tree entirely:
 
-    $ script/build-osx
+        git fetch origin
+        git merge --strategy=ours origin/release
 
-For official releases, you should build inside a Mountain Lion VM for proper
-compatibility. Run the this script first to prepare the environment before
-building - it will use Homebrew to make sure Python is installed and
-up-to-date.
+3.  Update the version in `docs/install.md` and `compose/__init__.py`.
 
-    $ script/prepare-osx
+    If the next release will be an RC, append `rcN`, e.g. `1.4.0rc1`.
 
-## Release process
+4.  Write release notes in `CHANGES.md`.
 
-1. Open pull request that:
- - Updates the version in `compose/__init__.py`
- - Updates the binary URL in `docs/install.md`
- - Adds release notes to `CHANGES.md`
-2. Create unpublished GitHub release with release notes
-3. Build Linux version on any Docker host with `script/build-linux` and attach
-   to release
-4. Build OS X version on Mountain Lion with `script/build-osx` and attach to
-   release as `docker-compose-Darwin-x86_64` and `docker-compose-Linux-x86_64`.
-5. Publish GitHub release, creating tag
-6. Update website with `script/deploy-docs`
-7. Upload PyPi package
+5.   Add a bump commit:
 
-        $ git checkout $VERSION
-        $ python setup.py sdist upload
+        git commit -am "Bump $VERSION"
+
+6.   Push the bump branch to your fork:
+
+        git push --set-upstream $USERNAME bump-$VERSION
+
+7.  Open a PR from the bump branch against the `release` branch on the upstream repo, **not** against master.
+
+## When a PR is merged into master that we want in the release
+
+1.  Check out the bump branch:
+
+        git checkout bump-$VERSION
+
+2.   Cherry-pick the merge commit, fixing any conflicts if necessary:
+
+        git cherry-pick -xm1 $MERGE_COMMIT_HASH
+
+3.  Add a signoff (it’s missing from merge commits):
+
+        git commit --amend --signoff
+
+4.  Move the bump commit back to the tip of the branch:
+
+        git rebase --interactive $PARENT_OF_BUMP_COMMIT
+
+5.  Force-push the bump branch to your fork:
+
+        git push --force $USERNAME bump-$VERSION
+
+## To release a version (whether RC or stable)
+
+1.  Check that CI is passing on the bump PR.
+
+2.  Check out the bump branch:
+
+        git checkout bump-$VERSION
+
+3.  Build the Linux binary:
+
+        script/build-linux
+
+4.  Build the Mac binary in a Mountain Lion VM:
+
+        script/prepare-osx
+        script/build-osx
+
+5.  Test the binaries and/or get some other people to test them.
+
+6.  Create a tag:
+
+        TAG=$VERSION # or $VERSION-rcN, if it's an RC
+        git tag $TAG
+
+7.  Push the tag to the upstream repo:
+
+        git push git@github.com:docker/compose.git $TAG
+
+8.  Create a release from the tag on GitHub.
+
+9.  Paste in installation instructions and release notes.
+
+10.  Attach the binaries.
+
+11. Don’t publish it just yet!
+
+12. Upload the latest version to PyPi:
+
+        python setup.py sdist upload
+
+13. Check that the pip package installs and runs (best done in a virtualenv):
+
+        pip install -U docker-compose==$TAG
+        docker-compose version
+
+14. Publish the release on GitHub.
+
+15. Check that both binaries download (following the install instructions) and run.
+
+16. Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+
+## If it’s a stable release (not an RC)
+
+1. Merge the bump PR.
+
+2. Make sure `origin/release` is updated locally:
+
+        git fetch origin
+
+3. Update the `docs` branch on the upstream repo:
+
+        git push git@github.com:docker/compose.git origin/release:docs
+
+4. Let the docs team know that it’s been updated so they can publish it.
+
+5. Close the release’s milestone.
+
+## If it’s a minor release (1.x.0), rather than a patch release (1.x.y)
+
+1. Open a PR against `master` to:
+
+    - update `CHANGELOG.md` to bring it in line with `release`
+    - bump the version in `compose/__init__.py` to the *next* minor version number with `dev` appended. For example, if you just released `1.4.0`, update it to `1.5.0dev`.
+
+2. Get the PR merged.
+
+## Finally
+
+1. Celebrate, however you’d like.
