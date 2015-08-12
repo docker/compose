@@ -199,6 +199,30 @@ class InterpolationTest(unittest.TestCase):
         ])
 
     @mock.patch.dict(os.environ)
+    def test_unset_variable_produces_warning(self):
+        os.environ.pop('FOO', None)
+        os.environ.pop('BAR', None)
+        config_details = config.ConfigDetails(
+            config={
+                'web': {
+                    'image': '${FOO}',
+                    'command': '${BAR}',
+                    'entrypoint': '${BAR}',
+                },
+            },
+            working_dir='.',
+            filename=None,
+        )
+
+        with mock.patch('compose.config.interpolation.log') as log:
+            config.load(config_details)
+
+            self.assertEqual(2, log.warn.call_count)
+            warnings = sorted(args[0][0] for args in log.warn.call_args_list)
+            self.assertIn('BAR', warnings[0])
+            self.assertIn('FOO', warnings[1])
+
+    @mock.patch.dict(os.environ)
     def test_invalid_interpolation(self):
         with self.assertRaises(config.ConfigurationError) as cm:
             config.load(
