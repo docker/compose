@@ -68,8 +68,18 @@
         },
 
         "mac_address": {"type": "string"},
-        "mem_limit": {"type": "number"},
-        "memswap_limit": {"type": "number"},
+        "mem_limit": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "string"}
+          ]
+        },
+        "memswap_limit": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "string"}
+          ]
+        },
         "name": {"type": "string"},
         "net": {"type": "string"},
         "pid": {"type": "string"},
