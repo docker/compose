@@ -9,6 +9,7 @@
 set -e
 
 export DOCKER_VERSIONS=all
+export DOCKER_DAEMON_ARGS="--storage-driver=overlay"
 . script/test-versions
 
 >&2 echo "Building Linux binary"
