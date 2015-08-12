@@ -64,6 +64,17 @@ class ConfigTest(unittest.TestCase):
                     )
                 )
 
+    def test_config_integer_service_name_raise_validation_error(self):
+        expected_error_msg = "Service name: 1 needs to be a string, eg '1'"
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {1: {'image': 'busybox'}},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             config.load(
