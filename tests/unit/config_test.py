@@ -533,6 +533,16 @@ class MemoryOptionsTest(unittest.TestCase):
         )
         self.assertEqual(service_dict[0]['memswap_limit'], 2000000)
 
+    def test_memswap_can_be_a_string(self):
+        service_dict = config.load(
+            config.ConfigDetails(
+                {'foo': {'image': 'busybox', 'mem_limit': "1G", 'memswap_limit': "512M"}},
+                'tests/fixtures/extends',
+                'common.yml'
+            )
+        )
+        self.assertEqual(service_dict[0]['memswap_limit'], "512M")
+
 
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
