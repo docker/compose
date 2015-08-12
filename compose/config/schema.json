@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "type": "object",
+
+  "patternProperties": {
+    "^[a-zA-Z0-9._-]+$": {
+      "$ref": "#/definitions/service"
+    }
+  },
+
+  "definitions": {
+    "service": {
+      "type": "object",
+
+      "properties": {
+        "build": {"type": "string"},
+        "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "command": {"$ref": "#/definitions/string_or_list"},
+        "container_name": {"type": "string"},
+        "cpu_shares": {"type": "string"},
+        "cpuset": {"type": "string"},
+        "detach": {"type": "boolean"},
+        "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "dns": {"$ref": "#/definitions/string_or_list"},
+        "dns_search": {"$ref": "#/definitions/string_or_list"},
+        "dockerfile": {"type": "string"},
+        "domainname": {"type": "string"},
+        "entrypoint": {"type": "string"},
+        "env_file": {"$ref": "#/definitions/string_or_list"},
+
+        "environment": {
+          "oneOf": [
+            {"type": "object"},
+            {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+          ]
+        },
+
+        "expose": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+
+        "extends": {
+          "type": "object",
+
+          "properties": {
+            "service": {"type": "string"},
+            "file": {"type": "string"}
+          },
+          "required": ["service"],
+          "additionalProperties": false
+        },
+
+        "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "hostname": {"type": "string"},
+        "image": {"type": "string"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "log_driver": {"type": "string"},
+
+        "log_opt": {
+          "type": "object",
+
+          "properties": {
+            "address": {"type": "string"}
+          },
+          "required": ["address"]
+        },
+
+        "mac_address": {"type": "string"},
+        "mem_limit": {"type": "number"},
+        "memswap_limit": {"type": "number"},
+        "name": {"type": "string"},
+        "net": {"type": "string"},
+        "pid": {"type": "string"},
+
+        "ports": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {"type": "string"},
+              "uniqueItems": true,
+              "format": "ports"
+            },
+            {
+              "type": "string",
+              "format": "ports"
+            },
+            {
+              "type": "number",
+              "format": "ports"
+            }
+          ]
+        },
+
+        "privileged": {"type": "string"},
+        "read_only": {"type": "boolean"},
+        "restart": {"type": "string"},
+        "security_opt": {"type": "string"},
+        "stdin_open": {"type": "string"},
+        "tty": {"type": "string"},
+        "user": {"type": "string"},
+        "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "working_dir": {"type": "string"}
+      },
+
+      "anyOf": [
+        {
+          "required": ["build"],
+          "not": {"required": ["image"]}
+        },
+        {
+          "required": ["image"],
+          "not": {"required": ["build"]}
+        },
+        {
+          "required": ["extends"],
+          "not": {"required": ["build", "image"]}
+        }
+      ],
+
+      "dependencies": {
+        "memswap_limit": ["mem_limit"]
+      },
+      "additionalProperties": false
+    },
+
+    "string_or_list": {
+      "oneOf": [
+        {"type": "string"},
+        {"$ref": "#/definitions/list_of_strings"}
+      ]
+    },
+
+    "list_of_strings": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+
+    "list_or_dict": {
+      "oneOf": [
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        {"type": "object"}
+      ]
+    }
+
+  },
+  "additionalProperties": false
+}

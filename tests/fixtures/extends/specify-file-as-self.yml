@@ -12,5 +12,6 @@ web:
   environment:
     - "BAZ=3"
 otherweb:
+  image: busybox
   environment:
     - "YEP=1"

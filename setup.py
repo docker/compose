@@ -33,6 +33,7 @@ install_requires = [
     'docker-py >= 1.3.1, < 1.4',
     'dockerpty >= 0.3.4, < 0.4',
     'six >= 1.3.0, < 2',
+    'jsonschema >= 2.5.1, < 3',
 ]
 
 

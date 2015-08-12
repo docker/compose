@@ -3,7 +3,6 @@ import os
 import sys
 import yaml
 from collections import namedtuple
-
 import six
 
 from compose.cli.utils import find_candidates_in_parent_dirs
@@ -14,6 +13,7 @@ from .errors import (
     CircularReference,
     ComposeFileNotFound,
 )
+from .validation import validate_against_schema
 
 
 DOCKER_CONFIG_KEYS = [
@@ -64,22 +64,6 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'external_links',
     'name',
 ]
-
-DOCKER_CONFIG_HINTS = {
-    'cpu_share': 'cpu_shares',
-    'add_host': 'extra_hosts',
-    'hosts': 'extra_hosts',
-    'extra_host': 'extra_hosts',
-    'device': 'devices',
-    'link': 'links',
-    'memory_swap': 'memswap_limit',
-    'port': 'ports',
-    'privilege': 'privileged',
-    'priviliged': 'privileged',
-    'privilige': 'privileged',
-    'volume': 'volumes',
-    'workdir': 'working_dir',
-}
 
 
 SUPPORTED_FILENAMES = [
@@ -139,12 +123,18 @@ def get_config_path(base_dir):
 
 
 def load(config_details):
-    dictionary, working_dir, filename = config_details
-    dictionary = interpolate_environment_variables(dictionary)
+    config, working_dir, filename = config_details
+    if not isinstance(config, dict):
+        raise ConfigurationError(
+            "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
+        )
+
+    config = interpolate_environment_variables(config)
+    validate_against_schema(config)
 
     service_dicts = []
 
-    for service_name, service_dict in list(dictionary.items()):
+    for service_name, service_dict in list(config.items()):
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
         validate_paths(service_dict)
@@ -217,24 +207,10 @@ class ServiceLoader(object):
     def validate_extends_options(self, service_name, extends_options):
         error_prefix = "Invalid 'extends' configuration for %s:" % service_name
 
-        if not isinstance(extends_options, dict):
-            raise ConfigurationError("%s must be a dictionary" % error_prefix)
-
-        if 'service' not in extends_options:
-            raise ConfigurationError(
-                "%s you need to specify a service, e.g. 'service: web'" % error_prefix
-            )
-
         if 'file' not in extends_options and self.filename is None:
             raise ConfigurationError(
                 "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
             )
-
-        for k, _ in extends_options.items():
-            if k not in ['file', 'service']:
-                raise ConfigurationError(
-                    "%s unsupported configuration option '%s'" % (error_prefix, k)
-                )
 
         return extends_options
 
@@ -254,17 +230,7 @@ def validate_extended_service_dict(service_dict, filename, service):
 
 
 def process_container_options(service_dict, working_dir=None):
-    for k in service_dict:
-        if k not in ALLOWED_KEYS:
-            msg = "Unsupported config option for %s service: '%s'" % (service_dict['name'], k)
-            if k in DOCKER_CONFIG_HINTS:
-                msg += " (did you mean '%s'?)" % DOCKER_CONFIG_HINTS[k]
-            raise ConfigurationError(msg)
-
     service_dict = service_dict.copy()
-
-    if 'memswap_limit' in service_dict and 'mem_limit' not in service_dict:
-        raise ConfigurationError("Invalid 'memswap_limit' configuration for %s service: when defining 'memswap_limit' you must set 'mem_limit' as well" % service_dict['name'])
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(service_dict, working_dir=working_dir)
@@ -333,18 +299,6 @@ def merge_environment(base, override):
     env = parse_environment(base)
     env.update(parse_environment(override))
     return env
-
-
-def parse_links(links):
-    return dict(parse_link(l) for l in links)
-
-
-def parse_link(link):
-    if ':' in link:
-        source, alias = link.split(':', 1)
-        return (alias, source)
-    else:
-        return (link, link)
 
 
 def get_env_files(options, working_dir=None):
@@ -520,11 +474,6 @@ def parse_labels(labels):
 
     if isinstance(labels, dict):
         return labels
-
-    raise ConfigurationError(
-        "labels \"%s\" must be a list or mapping" %
-        labels
-    )
 
 
 def split_label(label):

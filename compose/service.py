@@ -26,6 +26,7 @@ from .container import Container
 from .legacy import check_for_legacy_containers
 from .progress_stream import stream_output, StreamOutputError
 from .utils import json_hash, parallel_execute
+from .config.validation import VALID_NAME_CHARS
 
 log = logging.getLogger(__name__)
 
@@ -50,8 +51,6 @@ DOCKER_START_KEYS = [
     'volumes_from',
     'security_opt',
 ]
-
-VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 
 
 class BuildError(Exception):
@@ -84,14 +83,8 @@ ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 class Service(object):
     def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, net=None, **options):
-        if not re.match('^%s+$' % VALID_NAME_CHARS, name):
-            raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
             raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
-        if 'image' in options and 'build' in options:
-            raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
-        if 'image' not in options and 'build' not in options:
-            raise ConfigError('Service %s has neither an image nor a build path specified. Exactly one must be provided.' % name)
 
         self.name = name
         self.client = client
