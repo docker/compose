@@ -75,22 +75,20 @@
         "pid": {"type": "string"},
 
         "ports": {
-          "oneOf": [
-            {
-              "type": "array",
-              "items": {"type": "string"},
-              "uniqueItems": true,
-              "format": "ports"
-            },
-            {
-              "type": "string",
-              "format": "ports"
-            },
-            {
-              "type": "number",
-              "format": "ports"
-            }
-          ]
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "ports"
+              },
+              {
+                "type": "number",
+                "format": "ports"
+              }
+            ]
+          },
+          "uniqueItems": true
         },
 
         "privileged": {"type": "string"},

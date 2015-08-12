@@ -77,7 +77,7 @@ class ConfigTest(unittest.TestCase):
     def test_config_invalid_ports_format_validation(self):
         expected_error_msg = "Service 'web' configuration key 'ports' contains an invalid type"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            for invalid_ports in [{"1": "8000"}, False, 0]:
+            for invalid_ports in [{"1": "8000"}, False, 0, "8000", 8000, ["8000", "8000"]]:
                 config.load(
                     config.ConfigDetails(
                         {'web': {'image': 'busybox', 'ports': invalid_ports}},
@@ -87,7 +87,7 @@ class ConfigTest(unittest.TestCase):
                 )
 
     def test_config_valid_ports_format_validation(self):
-        valid_ports = [["8000", "9000"], ["8000/8050"], ["8000"], "8000", 8000]
+        valid_ports = [["8000", "9000"], ["8000/8050"], ["8000"], [8000], ["49153-49154:3002-3003"]]
         for ports in valid_ports:
             config.load(
                 config.ConfigDetails(
