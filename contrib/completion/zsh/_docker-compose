@@ -221,6 +221,7 @@ __docker-compose_subcommand () {
                 '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
                 "--no-deps[Don't start linked services.]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
+                "--publish[Run command with manually mapped container's port(s) to the host.]" \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
                 '(-):services:__docker-compose_services' \
