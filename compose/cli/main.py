@@ -164,7 +164,7 @@ class TopLevelCommand(Command):
 
             if len(stopped_containers) > 0:
                 print("Going to remove", list_containers(stopped_containers))
-                project.remove_stopped(service_names=options['SERVICE'],v=True)
+                project.remove_stopped(service_names=options['SERVICE'], v=True)
             else:
                 print("No stopped containers")
 
