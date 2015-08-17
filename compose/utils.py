@@ -32,6 +32,10 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
         except APIError as e:
             errors[msg_index] = e.explanation
             result = "error"
+        except Exception as e:
+            errors[msg_index] = e
+            result = 'unexpected_exception'
+
         q.put((msg_index, result))
 
     for an_object in objects:
@@ -48,6 +52,9 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
     while done < total_to_execute:
         try:
             msg_index, result = q.get(timeout=1)
+
+            if result == 'unexpected_exception':
+                raise errors[msg_index]
             if result == 'error':
                 write_out_msg(stream, lines, msg_index, msg, status='error')
             else:
