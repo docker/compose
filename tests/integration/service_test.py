@@ -654,6 +654,25 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(service.containers()[0].is_running)
         self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
 
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_scale_with_api_returns_unexpected_exception(self, mock_stdout):
+        """
+        Test that when scaling if the API returns an error, that is not of type
+        APIError, that error is re-raised.
+        """
+        service = self.create_service('web')
+        next_number = service._next_container_number()
+        service.create_container(number=next_number, quiet=True)
+
+        with patch(
+            'compose.container.Container.create',
+                side_effect=ValueError("BOOM")):
+            with self.assertRaises(ValueError):
+                service.scale(3)
+
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
     @patch('compose.service.log')
     def test_scale_with_desired_number_already_achieved(self, mock_log):
         """
