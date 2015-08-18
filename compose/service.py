@@ -757,9 +757,9 @@ class Service(object):
         if 'image' not in self.options:
             return
 
-        repo, tag = parse_repository_tag(self.options['image'])
+        repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
-        log.info('Pulling %s (%s:%s)...' % (self.name, repo, tag))
+        log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
         output = self.client.pull(
             repo,
             tag=tag,
@@ -780,14 +780,31 @@ def build_container_name(project, service, number, one_off=False):
 
 # Images
 
+def parse_repository_tag(repo_path):
+    """Splits image identification into base image path, tag/digest
+    and it's separator.
 
-def parse_repository_tag(s):
-    if ":" not in s:
-        return s, ""
-    repo, tag = s.rsplit(":", 1)
-    if "/" in tag:
-        return s, ""
-    return repo, tag
+    Example:
+
+    >>> parse_repository_tag('user/repo@sha256:digest')
+    ('user/repo', 'sha256:digest', '@')
+    >>> parse_repository_tag('user/repo:v1')
+    ('user/repo', 'v1', ':')
+    """
+    tag_separator = ":"
+    digest_separator = "@"
+
+    if digest_separator in repo_path:
+        repo, tag = repo_path.rsplit(digest_separator, 1)
+        return repo, tag, digest_separator
+
+    repo, tag = repo_path, ""
+    if tag_separator in repo_path:
+        repo, tag = repo_path.rsplit(tag_separator, 1)
+        if "/" in tag:
+            repo, tag = repo_path, ""
+
+    return repo, tag, tag_separator
 
 
 # Volumes
