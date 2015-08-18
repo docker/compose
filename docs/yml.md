@@ -394,7 +394,6 @@ Each of these is a single value, analogous to its
     read_only: true
 
     volume_driver: mydriver
-```
 
 ## Variable substitution
 
