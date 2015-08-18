@@ -192,6 +192,16 @@ class ServiceTest(unittest.TestCase):
             tag='latest',
             stream=True)
 
+    @mock.patch('compose.service.log', autospec=True)
+    def test_pull_image_digest(self, mock_log):
+        service = Service('foo', client=self.mock_client, image='someimage@sha256:1234')
+        service.pull()
+        self.mock_client.pull.assert_called_once_with(
+            'someimage',
+            tag='sha256:1234',
+            stream=True)
+        mock_log.info.assert_called_once_with('Pulling foo (someimage@sha256:1234)...')
+
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
@@ -217,12 +227,16 @@ class ServiceTest(unittest.TestCase):
         mock_container.stop.assert_called_once_with(timeout=1)
 
     def test_parse_repository_tag(self):
-        self.assertEqual(parse_repository_tag("root"), ("root", ""))
-        self.assertEqual(parse_repository_tag("root:tag"), ("root", "tag"))
-        self.assertEqual(parse_repository_tag("user/repo"), ("user/repo", ""))
-        self.assertEqual(parse_repository_tag("user/repo:tag"), ("user/repo", "tag"))
-        self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", ""))
-        self.assertEqual(parse_repository_tag("url:5000/repo:tag"), ("url:5000/repo", "tag"))
+        self.assertEqual(parse_repository_tag("root"), ("root", "", ":"))
+        self.assertEqual(parse_repository_tag("root:tag"), ("root", "tag", ":"))
+        self.assertEqual(parse_repository_tag("user/repo"), ("user/repo", "", ":"))
+        self.assertEqual(parse_repository_tag("user/repo:tag"), ("user/repo", "tag", ":"))
+        self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", "", ":"))
+        self.assertEqual(parse_repository_tag("url:5000/repo:tag"), ("url:5000/repo", "tag", ":"))
+
+        self.assertEqual(parse_repository_tag("root@sha256:digest"), ("root", "sha256:digest", "@"))
+        self.assertEqual(parse_repository_tag("user/repo@sha256:digest"), ("user/repo", "sha256:digest", "@"))
+        self.assertEqual(parse_repository_tag("url:5000/repo@sha256:digest"), ("url:5000/repo", "sha256:digest", "@"))
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_create_container_latest_is_used_when_no_tag_specified(self, mock_container):

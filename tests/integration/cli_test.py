@@ -88,6 +88,12 @@ class CLITestCase(DockerClientTestCase):
         mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
         mock_logging.info.assert_any_call('Pulling another (busybox:latest)...')
 
+    @patch('compose.service.log')
+    def test_pull_with_digest(self, mock_logging):
+        self.command.dispatch(['-f', 'digest.yml', 'pull'], None)
+        mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
+        mock_logging.info.assert_any_call('Pulling digest (busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
+
     @patch('sys.stdout', new_callable=StringIO)
     def test_build_no_cache(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
