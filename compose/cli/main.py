@@ -152,21 +152,10 @@ class TopLevelCommand(Command):
         Options:
             -s SIGNAL         SIGNAL to send to the container.
                               Default signal is SIGKILL.
-            --rm              Remove containers nd associated volumes forcefully
-                              after stopping them
         """
         signal = options.get('-s', 'SIGKILL')
 
         project.kill(service_names=options['SERVICE'], signal=signal)
-        if options['--rm']:
-            all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
-            stopped_containers = [c for c in all_containers if not c.is_running]
-
-            if len(stopped_containers) > 0:
-                print("Going to remove", list_containers(stopped_containers))
-                project.remove_stopped(service_names=options['SERVICE'], v=True)
-            else:
-                print("No stopped containers")
 
     def logs(self, project, options):
         """
@@ -264,9 +253,14 @@ class TopLevelCommand(Command):
         Usage: rm [options] [SERVICE...]
 
         Options:
+            --kill        Kill all the running Services
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
         """
+        if options['--kill']:
+            print("Going to kill all the Services")
+            project.kill(service_names=options['SERVICE'], signal='SIGKILL')
+
         all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
