@@ -11,7 +11,6 @@ from operator import attrgetter
 import enum
 import six
 from docker.errors import APIError
-from docker.utils import create_host_config
 from docker.utils import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
@@ -678,7 +677,7 @@ class Service(object):
 
         devices = options.get('devices', None)
 
-        return create_host_config(
+        return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
             binds=options.get('binds'),
