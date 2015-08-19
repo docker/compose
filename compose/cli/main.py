@@ -482,7 +482,7 @@ class TopLevelCommand(Command):
         """
         if options['--allow-insecure-ssl']:
             log.warn(INSECURE_SSL_WARNING)
-
+            
         detached = options['-d']
 
         monochrome = options['--no-color']
