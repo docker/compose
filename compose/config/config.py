@@ -19,6 +19,7 @@ from .validation import validate_against_schema
 DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
+    'cgroup_parent',
     'cpu_shares',
     'cpuset',
     'command',
