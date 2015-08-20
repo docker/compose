@@ -152,7 +152,11 @@ def load(config_details):
 
 class ServiceLoader(object):
     def __init__(self, working_dir, filename=None, already_seen=None):
+        if working_dir is None:
+            raise Exception("No working_dir passed to ServiceLoader()")
+
         self.working_dir = os.path.abspath(working_dir)
+
         if filename:
             self.filename = os.path.abspath(filename)
         else:
@@ -175,9 +179,6 @@ class ServiceLoader(object):
             return service_dict
 
         extends_options = self.validate_extends_options(service_dict['name'], service_dict['extends'])
-
-        if self.working_dir is None:
-            raise Exception("No working_dir passed to ServiceLoader()")
 
         if 'file' in extends_options:
             extends_from_filename = extends_options['file']
@@ -319,9 +320,6 @@ def merge_environment(base, override):
 def get_env_files(options, working_dir=None):
     if 'env_file' not in options:
         return {}
-
-    if working_dir is None:
-        raise Exception("No working_dir passed to get_env_files()")
 
     env_files = options.get('env_file', [])
     if not isinstance(env_files, list):
