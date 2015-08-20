@@ -25,12 +25,13 @@ Values for configuration options can contain environment variables, e.g.
 
 ### image
 
-Tag or partial image ID. Can be local or remote - Compose will attempt to
+Tag, partial image ID or digest. Can be local or remote - Compose will attempt to
 pull if it doesn't exist locally.
 
     image: ubuntu
     image: orchardup/postgresql
     image: a4bc65fd
+    image: busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d
 
 ### build
 
