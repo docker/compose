@@ -13,7 +13,11 @@ from .errors import (
     CircularReference,
     ComposeFileNotFound,
 )
-from .validation import validate_against_schema
+from .validation import (
+    validate_against_schema,
+    validate_service_names,
+    validate_top_level_object
+)
 
 
 DOCKER_CONFIG_KEYS = [
@@ -122,19 +126,26 @@ def get_config_path(base_dir):
     return os.path.join(path, winner)
 
 
+@validate_top_level_object
+@validate_service_names
+def pre_process_config(config):
+    """
+    Pre validation checks and processing of the config file to interpolate env
+    vars returning a config dict ready to be tested against the schema.
+    """
+    config = interpolate_environment_variables(config)
+    return config
+
+
 def load(config_details):
     config, working_dir, filename = config_details
-    if not isinstance(config, dict):
-        raise ConfigurationError(
-            "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
-        )
 
-    config = interpolate_environment_variables(config)
-    validate_against_schema(config)
+    processed_config = pre_process_config(config)
+    validate_against_schema(processed_config)
 
     service_dicts = []
 
-    for service_name, service_dict in list(config.items()):
+    for service_name, service_dict in list(processed_config.items()):
         loader = ServiceLoader(working_dir=working_dir, filename=filename)
         service_dict = loader.make_service_dict(service_name, service_dict)
         validate_paths(service_dict)
