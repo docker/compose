@@ -63,9 +63,9 @@
           "type": "object",
 
           "properties": {
-            "address": {"type": "string"}
+            "syslog-address": {"type": "string"}
           },
-          "required": ["address"]
+          "required": ["syslog-address"]
         },
 
         "mac_address": {"type": "string"},

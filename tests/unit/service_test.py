@@ -113,7 +113,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['host_config']['Memory'], 1000000000)
 
     def test_log_opt(self):
-        log_opt = {'address': 'tcp://192.168.0.42:123'}
+        log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
         service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
         self.mock_client.containers.return_value = []
         opts = service._get_container_create_options({'some': 'overrides'}, 1)
