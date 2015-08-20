@@ -52,7 +52,7 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 
 ## Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
