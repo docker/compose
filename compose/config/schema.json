@@ -56,16 +56,9 @@
         "image": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+
         "log_driver": {"type": "string"},
-
-        "log_opt": {
-          "type": "object",
-
-          "properties": {
-            "syslog-address": {"type": "string"}
-          },
-          "required": ["syslog-address"]
-        },
+        "log_opt": {"type": "object"},
 
         "mac_address": {"type": "string"},
         "mem_limit": {
