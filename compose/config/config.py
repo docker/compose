@@ -152,7 +152,7 @@ def load(config_details):
 
 
 class ServiceLoader(object):
-    def __init__(self, working_dir, filename=None, already_seen=None):
+    def __init__(self, working_dir, filename, already_seen=None):
         if working_dir is None:
             raise Exception("No working_dir passed to ServiceLoader()")
 
