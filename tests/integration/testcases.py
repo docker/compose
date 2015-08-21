@@ -31,7 +31,7 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        options = ServiceLoader(working_dir='.', filename=None).make_service_dict(name, kwargs)
+        options = ServiceLoader(working_dir='.', filename=None, service_name=name, service_dict=kwargs).make_service_dict()
 
         labels = options.setdefault('labels', {})
         labels['com.docker.compose.test-name'] = self.id()

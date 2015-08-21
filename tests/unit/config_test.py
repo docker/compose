@@ -15,7 +15,11 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
     """
     Test helper function to construct a ServiceLoader
     """
-    return config.ServiceLoader(working_dir=working_dir, filename=filename).make_service_dict(name, service_dict)
+    return config.ServiceLoader(
+        working_dir=working_dir,
+        filename=filename,
+        service_name=name,
+        service_dict=service_dict).make_service_dict()
 
 
 def service_sort(services):

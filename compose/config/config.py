@@ -142,8 +142,12 @@ def load(config_details):
     service_dicts = []
 
     for service_name, service_dict in list(processed_config.items()):
-        loader = ServiceLoader(working_dir=working_dir, filename=filename)
-        service_dict = loader.make_service_dict(service_name, service_dict)
+        loader = ServiceLoader(
+            working_dir=working_dir,
+            filename=filename,
+            service_name=service_name,
+            service_dict=service_dict)
+        service_dict = loader.make_service_dict()
         validate_paths(service_dict)
         service_dicts.append(service_dict)
 
@@ -151,7 +155,7 @@ def load(config_details):
 
 
 class ServiceLoader(object):
-    def __init__(self, working_dir, filename, already_seen=None):
+    def __init__(self, working_dir, filename, service_name, service_dict, already_seen=None):
         if working_dir is None:
             raise Exception("No working_dir passed to ServiceLoader()")
 
@@ -162,17 +166,19 @@ class ServiceLoader(object):
         else:
             self.filename = filename
         self.already_seen = already_seen or []
+        self.service_dict = service_dict.copy()
+        self.service_dict['name'] = service_name
 
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
-    def make_service_dict(self, name, service_dict):
-        service_dict = service_dict.copy()
-        service_dict['name'] = name
-        service_dict = resolve_environment(service_dict, working_dir=self.working_dir)
-        service_dict = self.resolve_extends(service_dict)
-        return process_container_options(service_dict, working_dir=self.working_dir)
+    def make_service_dict(self):
+        # service_dict = service_dict.copy()
+        # service_dict['name'] = name
+        self.service_dict = resolve_environment(self.service_dict, working_dir=self.working_dir)
+        self.service_dict = self.resolve_extends(self.service_dict)
+        return process_container_options(self.service_dict, working_dir=self.working_dir)
 
     def resolve_extends(self, service_dict):
         if 'extends' not in service_dict:
@@ -188,11 +194,6 @@ class ServiceLoader(object):
 
         other_working_dir = os.path.dirname(other_config_path)
         other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
-        other_loader = ServiceLoader(
-            working_dir=other_working_dir,
-            filename=other_config_path,
-            already_seen=other_already_seen,
-        )
 
         base_service = extends_options['service']
         other_config = load_yaml(other_config_path)
@@ -204,11 +205,16 @@ class ServiceLoader(object):
             raise ConfigurationError(msg)
 
         other_service_dict = other_config[base_service]
-        other_loader.detect_cycle(extends_options['service'])
-        other_service_dict = other_loader.make_service_dict(
-            service_dict['name'],
-            other_service_dict,
+        other_loader = ServiceLoader(
+            working_dir=other_working_dir,
+            filename=other_config_path,
+            service_name=service_dict['name'],
+            service_dict=other_service_dict,
+            already_seen=other_already_seen,
         )
+
+        other_loader.detect_cycle(extends_options['service'])
+        other_service_dict = other_loader.make_service_dict()
         validate_extended_service_dict(
             other_service_dict,
             filename=other_config_path,
