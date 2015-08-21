@@ -301,7 +301,7 @@ Logging options are key value pairs. An example of `syslog` options:
 
     log_driver: "syslog"
     log_opt:
-      address: "tcp://192.168.0.42:123"
+      syslog-address: "tcp://192.168.0.42:123"
 
 ### net
 
