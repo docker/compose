@@ -11,11 +11,11 @@ from compose.config import config
 from compose.config.errors import ConfigurationError
 
 
-def make_service_dict(name, service_dict, working_dir):
+def make_service_dict(name, service_dict, working_dir, filename=None):
     """
     Test helper function to construct a ServiceLoader
     """
-    return config.ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
+    return config.ServiceLoader(working_dir=working_dir, filename=filename).make_service_dict(name, service_dict)
 
 
 def service_sort(services):
