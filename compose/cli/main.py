@@ -257,13 +257,13 @@ class TopLevelCommand(Command):
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
         """
-        killed=False
+        killed = False
         if options['--kill']:
             print("Going to kill all containers")
             if options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
                         project.kill(service_names=options['SERVICE'], signal='SIGKILL')
-                        killed=True
+                        killed = True
             else:
                 print("No containers killed")
 
