@@ -1,7 +1,8 @@
-import codecs
 import json
 
 import six
+
+from compose import utils
 
 
 class StreamOutputError(Exception):
@@ -10,14 +11,13 @@ class StreamOutputError(Exception):
 
 def stream_output(output, stream):
     is_terminal = hasattr(stream, 'isatty') and stream.isatty()
-    if not six.PY3:
-        stream = codecs.getwriter('utf-8')(stream)
+    stream = utils.get_output_stream(stream)
     all_events = []
     lines = {}
     diff = 0
 
     for chunk in output:
-        if six.PY3 and not isinstance(chunk, str):
+        if six.PY3:
             chunk = chunk.decode('utf-8')
         event = json.loads(chunk)
         all_events.append(event)

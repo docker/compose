@@ -5,6 +5,7 @@ import logging
 import sys
 from threading import Thread
 
+import six
 from docker.errors import APIError
 from six.moves.queue import Empty
 from six.moves.queue import Queue
@@ -18,7 +19,7 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
     For a given list of objects, call the callable passing in the first
     object we give it.
     """
-    stream = codecs.getwriter('utf-8')(sys.stdout)
+    stream = get_output_stream()
     lines = []
     errors = {}
 
@@ -68,6 +69,12 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
         stream.write("\n")
         for error in errors:
             stream.write("ERROR: for {}  {} \n".format(error, errors[error]))
+
+
+def get_output_stream(stream=sys.stdout):
+    if six.PY3:
+        return stream
+    return codecs.getwriter('utf-8')(stream)
 
 
 def write_out_msg(stream, lines, msg_index, msg, status="done"):

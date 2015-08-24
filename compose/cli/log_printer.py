@@ -4,13 +4,12 @@ from __future__ import unicode_literals
 import sys
 from itertools import cycle
 
-import six
 from six import next
 
-from compose import utils
 from . import colors
 from .multiplexer import Multiplexer
 from .utils import split_buffer
+from compose import utils
 
 
 class LogPrinter(object):
