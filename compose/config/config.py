@@ -169,16 +169,35 @@ class ServiceLoader(object):
         self.service_dict = service_dict.copy()
         self.service_dict['name'] = service_name
 
+        self.resolve_environment()
+
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
     def make_service_dict(self):
-        # service_dict = service_dict.copy()
-        # service_dict['name'] = name
-        self.service_dict = resolve_environment(self.service_dict, working_dir=self.working_dir)
         self.service_dict = self.resolve_extends(self.service_dict)
         return process_container_options(self.service_dict, working_dir=self.working_dir)
+
+    def resolve_environment(self):
+        """
+        Unpack any environment variables from an env_file, if set.
+        Interpolate environment values if set.
+        """
+        if 'environment' not in self.service_dict and 'env_file' not in self.service_dict:
+            return
+
+        env = {}
+
+        if 'env_file' in self.service_dict:
+            for f in get_env_files(self.service_dict, working_dir=self.working_dir):
+                env.update(env_vars_from_file(f))
+            del self.service_dict['env_file']
+
+        env.update(parse_environment(self.service_dict.get('environment')))
+        env = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
+
+        self.service_dict['environment'] = env
 
     def resolve_extends(self, service_dict):
         if 'extends' not in service_dict:
@@ -332,26 +351,6 @@ def get_env_files(options, working_dir=None):
         env_files = [env_files]
 
     return [expand_path(working_dir, path) for path in env_files]
-
-
-def resolve_environment(service_dict, working_dir=None):
-    service_dict = service_dict.copy()
-
-    if 'environment' not in service_dict and 'env_file' not in service_dict:
-        return service_dict
-
-    env = {}
-
-    if 'env_file' in service_dict:
-        for f in get_env_files(service_dict, working_dir=working_dir):
-            env.update(env_vars_from_file(f))
-        del service_dict['env_file']
-
-    env.update(parse_environment(service_dict.get('environment')))
-    env = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
-
-    service_dict['environment'] = env
-    return service_dict
 
 
 def parse_environment(environment):
