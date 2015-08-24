@@ -21,7 +21,7 @@ class Multiplexer(object):
         self._num_running = len(iterators)
         self.queue = Queue()
 
-    def loop(self):
+    def loop(self, tail=True):
         self._init_readers()
 
         while self._num_running > 0:
@@ -36,7 +36,8 @@ class Multiplexer(object):
                 else:
                     yield item
             except Empty:
-                pass
+                if not tail:
+                    return
 
     def _init_readers(self):
         for iterator in self.iterators:

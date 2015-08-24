@@ -173,12 +173,14 @@ class TopLevelCommand(Command):
 
         Options:
             --no-color  Produce monochrome output.
+            --tail      Prints logs to stdout and returns.
         """
         containers = project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
+        tail = options['--tail']
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, attach_params={'logs': True}, monochrome=monochrome).run()
+        LogPrinter(containers, attach_params={'logs': True}, monochrome=monochrome, tail=tail).run()
 
     def pause(self, project, options):
         """
