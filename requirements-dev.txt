@@ -3,3 +3,4 @@ git+https://github.com/pyinstaller/pyinstaller.git@12e40471c77f588ea5be352f7219c
 mock >= 1.0.1
 nose==1.3.4
 pep8==1.6.1
+coverage==3.7.1
