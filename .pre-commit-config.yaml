@@ -1,0 +1,18 @@
+- repo: git://github.com/pre-commit/pre-commit-hooks
+  sha: 'v0.4.2'
+  hooks:
+    - id: check-added-large-files
+    - id: check-docstring-first
+    - id: check-merge-conflict
+    - id: check-yaml
+    - id: debug-statements
+    - id: end-of-file-fixer
+    - id: flake8
+    - id: name-tests-test
+      exclude: 'tests/integration/testcases.py'
+    - id: requirements-txt-fixer
+    - id: trailing-whitespace
+- repo: git://github.com/asottile/reorder_python_imports
+  sha: 3d86483455ab5bd06cc1069fdd5ac57be5463f10
+  hooks:
+    - id: reorder-python-imports

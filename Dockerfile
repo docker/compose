@@ -14,6 +14,7 @@ RUN set -ex; \
         curl \
         lxc \
         iptables \
+        libsqlite3-dev \
     ; \
     rm -rf /var/lib/apt/lists/*
 
@@ -67,6 +68,8 @@ RUN pip install -r requirements.txt
 
 ADD requirements-dev.txt /code/
 RUN pip install -r requirements-dev.txt
+
+RUN pip install tox==2.1.1
 
 ADD . /code/
 RUN python setup.py install
