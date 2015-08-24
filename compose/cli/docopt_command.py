@@ -1,9 +1,11 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-import sys
+from __future__ import unicode_literals
 
+import sys
 from inspect import getdoc
-from docopt import docopt, DocoptExit
+
+from docopt import docopt
+from docopt import DocoptExit
 
 
 def docopt_full_help(docstring, *args, **kwargs):

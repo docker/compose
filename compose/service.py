@@ -1,33 +1,37 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from collections import namedtuple
+from __future__ import unicode_literals
+
 import logging
-import re
 import os
+import re
 import sys
+from collections import namedtuple
 from operator import attrgetter
 
 import six
 from docker.errors import APIError
-from docker.utils import create_host_config, LogConfig
-from docker.utils.ports import build_port_bindings, split_port
+from docker.utils import create_host_config
+from docker.utils import LogConfig
+from docker.utils.ports import build_port_bindings
+from docker.utils.ports import split_port
 
 from . import __version__
-from .config import DOCKER_CONFIG_KEYS, merge_environment
-from .const import (
-    DEFAULT_TIMEOUT,
-    LABEL_CONTAINER_NUMBER,
-    LABEL_ONE_OFF,
-    LABEL_PROJECT,
-    LABEL_SERVICE,
-    LABEL_VERSION,
-    LABEL_CONFIG_HASH,
-)
+from .config import DOCKER_CONFIG_KEYS
+from .config import merge_environment
+from .config.validation import VALID_NAME_CHARS
+from .const import DEFAULT_TIMEOUT
+from .const import LABEL_CONFIG_HASH
+from .const import LABEL_CONTAINER_NUMBER
+from .const import LABEL_ONE_OFF
+from .const import LABEL_PROJECT
+from .const import LABEL_SERVICE
+from .const import LABEL_VERSION
 from .container import Container
 from .legacy import check_for_legacy_containers
-from .progress_stream import stream_output, StreamOutputError
-from .utils import json_hash, parallel_execute
-from .config.validation import VALID_NAME_CHARS
+from .progress_stream import stream_output
+from .progress_stream import StreamOutputError
+from .utils import json_hash
+from .utils import parallel_execute
 
 log = logging.getLogger(__name__)
 

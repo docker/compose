@@ -1,7 +1,8 @@
+import os
+import ssl
+
 from docker import Client
 from docker import tls
-import ssl
-import os
 
 
 def docker_client():

@@ -1,9 +1,10 @@
-import mock
 import os
 import shutil
 import tempfile
-from .. import unittest
 
+import mock
+
+from .. import unittest
 from compose.config import config
 from compose.config.errors import ConfigurationError
 

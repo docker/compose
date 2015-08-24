@@ -2,7 +2,8 @@ import logging
 import re
 
 from .const import LABEL_VERSION
-from .container import get_container_name, Container
+from .container import Container
+from .container import get_container_name
 
 
 log = logging.getLogger(__name__)

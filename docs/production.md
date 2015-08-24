@@ -93,4 +93,3 @@ guide</a>.
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
-

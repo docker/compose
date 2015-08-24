@@ -1,10 +1,10 @@
 from __future__ import unicode_literals
 
+from .testcases import DockerClientTestCase
 from compose import config
 from compose.const import LABEL_PROJECT
-from compose.project import Project
 from compose.container import Container
-from .testcases import DockerClientTestCase
+from compose.project import Project
 
 
 def build_service_dicts(service_config):

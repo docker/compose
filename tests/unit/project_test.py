@@ -1,12 +1,13 @@
 from __future__ import unicode_literals
-from .. import unittest
-from compose.service import Service
-from compose.project import Project
-from compose.container import Container
-from compose.const import LABEL_SERVICE
 
-import mock
 import docker
+import mock
+
+from .. import unittest
+from compose.const import LABEL_SERVICE
+from compose.container import Container
+from compose.project import Project
+from compose.service import Service
 
 
 class ProjectTest(unittest.TestCase):

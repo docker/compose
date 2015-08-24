@@ -1,7 +1,8 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from compose.cli.utils import split_buffer
+from __future__ import unicode_literals
+
 from .. import unittest
+from compose.cli.utils import split_buffer
 
 
 class SplitBufferTest(unittest.TestCase):

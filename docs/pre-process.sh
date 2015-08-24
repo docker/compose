@@ -13,7 +13,7 @@ content_dir=(`ls -d /docs/content/*`)
 # 5 Change ](word) to ](/project/word)
 # 6 Change ](../../ to ](/project/
 # 7 Change ](../ to ](/project/word)
-# 
+#
 for i in "${content_dir[@]}"
 do
    :
@@ -51,11 +51,10 @@ done
 for i in "${docker_dir[@]}"
 do
    :
-    if [ -d $i ]    
+    if [ -d $i ]
       then
-        mv $i /docs/content/ 
+        mv $i /docs/content/
       fi
 done
 
 rm -rf /docs/content/docker
-

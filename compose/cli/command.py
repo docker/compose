@@ -1,20 +1,25 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from requests.exceptions import ConnectionError, SSLError
+from __future__ import unicode_literals
+
 import logging
 import os
 import re
-import six
 
+import six
+from requests.exceptions import ConnectionError
+from requests.exceptions import SSLError
+
+from . import errors
+from . import verbose_proxy
+from .. import __version__
 from .. import config
 from ..project import Project
 from ..service import ConfigError
-from .docopt_command import DocoptCommand
-from .utils import call_silently, is_mac, is_ubuntu
 from .docker_client import docker_client
-from . import verbose_proxy
-from . import errors
-from .. import __version__
+from .docopt_command import DocoptCommand
+from .utils import call_silently
+from .utils import is_mac
+from .utils import is_ubuntu
 
 log = logging.getLogger(__name__)
 

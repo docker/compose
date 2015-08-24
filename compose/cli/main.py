@@ -1,28 +1,32 @@
 from __future__ import print_function
 from __future__ import unicode_literals
-from inspect import getdoc
-from operator import attrgetter
+
 import logging
 import re
 import signal
 import sys
+from inspect import getdoc
+from operator import attrgetter
 
-from docker.errors import APIError
 import dockerpty
+from docker.errors import APIError
 
 from .. import __version__
 from .. import legacy
-from ..const import DEFAULT_TIMEOUT
-from ..project import NoSuchService, ConfigurationError
-from ..service import BuildError, NeedsBuildError
 from ..config import parse_environment
+from ..const import DEFAULT_TIMEOUT
 from ..progress_stream import StreamOutputError
+from ..project import ConfigurationError
+from ..project import NoSuchService
+from ..service import BuildError
+from ..service import NeedsBuildError
 from .command import Command
 from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import Formatter
 from .log_printer import LogPrinter
-from .utils import yesno, get_version_info
+from .utils import get_version_info
+from .utils import yesno
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)

@@ -1,11 +1,10 @@
+import logging
 import os
 from string import Template
 
 import six
 
 from .errors import ConfigurationError
-
-import logging
 log = logging.getLogger(__name__)
 
 

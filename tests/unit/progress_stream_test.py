@@ -1,10 +1,10 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from tests import unittest
+from __future__ import unicode_literals
 
 from six import StringIO
 
 from compose import progress_stream
+from tests import unittest
 
 
 class ProgressStreamTestCase(unittest.TestCase):
