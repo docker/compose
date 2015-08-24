@@ -1,14 +1,16 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import unicode_literals
 
-from .. import __version__
 import datetime
-from docker import version as docker_py_version
 import os
 import platform
-import subprocess
 import ssl
+import subprocess
+
+from docker import version as docker_py_version
+
+from .. import __version__
 
 
 def yesno(prompt, default=None):

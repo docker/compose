@@ -1,9 +1,11 @@
-from functools import wraps
+import json
 import os
+from functools import wraps
 
 from docker.utils.ports import split_port
-import json
-from jsonschema import Draft4Validator, FormatChecker, ValidationError
+from jsonschema import Draft4Validator
+from jsonschema import FormatChecker
+from jsonschema import ValidationError
 
 from .errors import ConfigurationError
 

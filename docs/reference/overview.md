@@ -5,7 +5,7 @@ description = "Introduction to the CLI"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
 parent = "smn_compose_cli"
-weight=-2	
+weight=-2
 +++
 <![end-metadata]-->
 

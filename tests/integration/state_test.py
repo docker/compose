@@ -1,13 +1,13 @@
 from __future__ import unicode_literals
-import tempfile
-import shutil
-import os
 
-from compose import config
-from compose.project import Project
-from compose.const import LABEL_CONFIG_HASH
+import os
+import shutil
+import tempfile
 
 from .testcases import DockerClientTestCase
+from compose import config
+from compose.const import LABEL_CONFIG_HASH
+from compose.project import Project
 
 
 class ProjectTestCase(DockerClientTestCase):

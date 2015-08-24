@@ -1,9 +1,10 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import os
 
-from compose.cli.log_printer import LogPrinter
 from .. import unittest
+from compose.cli.log_printer import LogPrinter
 
 
 class LogPrinterTest(unittest.TestCase):

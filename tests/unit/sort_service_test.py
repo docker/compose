@@ -1,5 +1,6 @@
-from compose.project import sort_service_dicts, DependencyError
 from .. import unittest
+from compose.project import DependencyError
+from compose.project import sort_service_dicts
 
 
 class SortServiceTest(unittest.TestCase):

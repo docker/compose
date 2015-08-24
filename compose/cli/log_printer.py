@@ -1,11 +1,11 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-import sys
+from __future__ import unicode_literals
 
+import sys
 from itertools import cycle
 
-from .multiplexer import Multiplexer
 from . import colors
+from .multiplexer import Multiplexer
 from .utils import split_buffer
 
 

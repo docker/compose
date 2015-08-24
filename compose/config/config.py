@@ -1,23 +1,19 @@
 import logging
 import os
 import sys
-import yaml
 from collections import namedtuple
+
 import six
+import yaml
 
-from compose.cli.utils import find_candidates_in_parent_dirs
-
+from .errors import CircularReference
+from .errors import ComposeFileNotFound
+from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
-from .errors import (
-    ConfigurationError,
-    CircularReference,
-    ComposeFileNotFound,
-)
-from .validation import (
-    validate_against_schema,
-    validate_service_names,
-    validate_top_level_object
-)
+from .validation import validate_against_schema
+from .validation import validate_service_names
+from .validation import validate_top_level_object
+from compose.cli.utils import find_candidates_in_parent_dirs
 
 
 DOCKER_CONFIG_KEYS = [

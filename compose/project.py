@@ -1,12 +1,17 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from functools import reduce
+from __future__ import unicode_literals
+
 import logging
+from functools import reduce
 
 from docker.errors import APIError
 
-from .config import get_service_name_from_net, ConfigurationError
-from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
+from .config import ConfigurationError
+from .config import get_service_name_from_net
+from .const import DEFAULT_TIMEOUT
+from .const import LABEL_ONE_OFF
+from .const import LABEL_PROJECT
+from .const import LABEL_SERVICE
 from .container import Container
 from .legacy import check_for_legacy_containers
 from .service import Service

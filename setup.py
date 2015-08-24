@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from setuptools import setup, find_packages
+from __future__ import unicode_literals
+
 import codecs
 import os
 import re
 import sys
+
+from setuptools import find_packages
+from setuptools import setup
 
 
 def read(*parts):

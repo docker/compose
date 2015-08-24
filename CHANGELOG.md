@@ -202,7 +202,7 @@ The highlights:
  - There is a new `fig restart` command which restarts a service's containers.
 
  - Fig creates multiple containers in service by appending a number to the service name (e.g. `db_1`, `db_2`, etc). As a convenience, Fig will now give the first container an alias of the service name (e.g. `db`).
-   
+
    This link alias is also a valid hostname and added to `/etc/hosts` so you can connect to linked services using their hostname. For example, instead of resolving the environment variables `DB_PORT_5432_TCP_ADDR` and `DB_PORT_5432_TCP_PORT`, you could just use the hostname `db` and port `5432` directly.
 
  - Volume definitions now support `ro` mode, expanding `~` and expanding environment variables.
@@ -250,7 +250,7 @@ Thanks @ryanbrainard and @d11wtq!
 ------------------
 
  - Fig now starts links when you run `fig run` or `fig up`.
-   
+
    For example, if you have a `web` service which depends on a `db` service, `fig run web ...` will start the `db` service.
 
  - Environment variables can now be resolved from the environment that Fig is running in. Just specify it as a blank variable in your `fig.yml` and, if set, it'll be resolved:
@@ -410,5 +410,3 @@ Big thanks to @tomstuart, @EnTeQuAk, @schickling, @aronasorman and @GeoffreyPlit
 ------------------
 
 Initial release.
-
-

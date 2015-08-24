@@ -1,11 +1,12 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from compose.service import Service
+from __future__ import unicode_literals
+
+from .. import unittest
+from compose.cli.docker_client import docker_client
 from compose.config.config import ServiceLoader
 from compose.const import LABEL_PROJECT
-from compose.cli.docker_client import docker_client
 from compose.progress_stream import stream_output
-from .. import unittest
+from compose.service import Service
 
 
 class DockerClientTestCase(unittest.TestCase):

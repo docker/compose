@@ -1,6 +1,6 @@
+import codecs
 import json
 import os
-import codecs
 
 
 class StreamOutputError(Exception):
