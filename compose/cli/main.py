@@ -25,6 +25,7 @@ from .log_printer import LogPrinter
 from .utils import yesno, get_version_info
 
 log = logging.getLogger(__name__)
+console_handler = logging.StreamHandler(sys.stderr)
 
 INSECURE_SSL_WARNING = """
 Warning: --allow-insecure-ssl is deprecated and has no effect.
@@ -63,9 +64,6 @@ def main():
 
 
 def setup_logging():
-    console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setFormatter(logging.Formatter())
-    console_handler.setLevel(logging.INFO)
     root_logger = logging.getLogger()
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.DEBUG)
@@ -117,6 +115,16 @@ class TopLevelCommand(Command):
         options = super(TopLevelCommand, self).docopt_options()
         options['version'] = get_version_info('compose')
         return options
+
+    def perform_command(self, options, *args, **kwargs):
+        if options.get('--verbose'):
+            console_handler.setFormatter(logging.Formatter('%(name)s.%(funcName)s: %(message)s'))
+            console_handler.setLevel(logging.DEBUG)
+        else:
+            console_handler.setFormatter(logging.Formatter())
+            console_handler.setLevel(logging.INFO)
+
+        return super(TopLevelCommand, self).perform_command(options, *args, **kwargs)
 
     def build(self, project, options):
         """
