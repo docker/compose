@@ -179,6 +179,9 @@ class ServiceLoader(object):
                 self.filename
             )
 
+            self.extended_config_path = self.get_extended_config_path(
+                self.service_dict['extends']
+            )
 
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
@@ -215,11 +218,7 @@ class ServiceLoader(object):
         extends_options = self.service_dict['extends']
         service_name = self.service_dict['name']
 
-        if 'file' in extends_options:
-            extends_from_filename = extends_options['file']
-            other_config_path = expand_path(self.working_dir, extends_from_filename)
-        else:
-            other_config_path = self.filename
+        other_config_path = self.get_extended_config_path(extends_options)
 
         other_working_dir = os.path.dirname(other_config_path)
         other_already_seen = self.already_seen + [self.signature(service_name)]
@@ -251,6 +250,18 @@ class ServiceLoader(object):
         )
 
         return merge_service_dicts(other_service_dict, self.service_dict)
+
+    def get_extended_config_path(self, extends_options):
+        """
+        Service we are extending either has a value for 'file' set, which we
+        need to obtain a full path too or we are extending from a service
+        defined in our own file.
+        """
+        if 'file' in extends_options:
+            extends_from_filename = extends_options['file']
+            return expand_path(self.working_dir, extends_from_filename)
+
+        return self.filename
 
     def signature(self, name):
         return (self.filename, name)
