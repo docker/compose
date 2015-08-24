@@ -180,6 +180,14 @@ class TopLevelCommand(Command):
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, attach_params={'logs': True}, monochrome=monochrome).run()
 
+    def pause(self, project, options):
+        """
+        Pause services.
+
+        Usage: pause [SERVICE...]
+        """
+        project.pause(service_names=options['SERVICE'])
+
     def port(self, project, options):
         """
         Print the public port for a port binding.
@@ -451,6 +459,14 @@ class TopLevelCommand(Command):
         """
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
         project.restart(service_names=options['SERVICE'], timeout=timeout)
+
+    def unpause(self, project, options):
+        """
+        Unpause services.
+
+        Usage: unpause [SERVICE...]
+        """
+        project.unpause(service_names=options['SERVICE'])
 
     def up(self, project, options):
         """

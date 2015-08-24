@@ -96,12 +96,14 @@ class Service(object):
         self.net = net or None
         self.options = options
 
-    def containers(self, stopped=False, one_off=False):
+    def containers(self, stopped=False, one_off=False, filters={}):
+        filters.update({'label': self.labels(one_off=one_off)})
+
         containers = filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})])
+                filters=filters)])
 
         if not containers:
             check_for_legacy_containers(
@@ -131,6 +133,16 @@ class Service(object):
         for c in self.containers():
             log.info("Stopping %s..." % c.name)
             c.stop(**options)
+
+    def pause(self, **options):
+        for c in self.containers(filters={'status': 'running'}):
+            log.info("Pausing %s..." % c.name)
+            c.pause(**options)
+
+    def unpause(self, **options):
+        for c in self.containers(filters={'status': 'paused'}):
+            log.info("Unpausing %s..." % c.name)
+            c.unpause()
 
     def kill(self, **options):
         for c in self.containers():
@@ -331,7 +343,7 @@ class Service(object):
         config_hash = None
 
         try:
-            config_hash = self.config_hash()
+            config_hash = self.config_hash
         except NoSuchImageError as e:
             log.debug(
                 'Service %s has diverged: %s',
@@ -456,6 +468,7 @@ class Service(object):
             else:
                 numbers.add(c.number)
 
+    @property
     def config_hash(self):
         return json_hash(self.config_dict())
 
@@ -573,7 +586,7 @@ class Service(object):
             container_options['name'] = self.get_container_name(number, one_off)
 
         if add_config_hash:
-            config_hash = self.config_hash()
+            config_hash = self.config_hash
             if 'labels' not in container_options:
                 container_options['labels'] = {}
             container_options['labels'][LABEL_CONFIG_HASH] = config_hash

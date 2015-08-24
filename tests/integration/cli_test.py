@@ -415,6 +415,17 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
+    def test_pause_unpause(self):
+        self.command.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertFalse(service.containers()[0].is_paused)
+
+        self.command.dispatch(['pause'], None)
+        self.assertTrue(service.containers()[0].is_paused)
+
+        self.command.dispatch(['unpause'], None)
+        self.assertFalse(service.containers()[0].is_paused)
+
     def test_logs_invalid_service_name(self):
         with self.assertRaises(NoSuchService):
             self.command.dispatch(['logs', 'madeupname'], None)
