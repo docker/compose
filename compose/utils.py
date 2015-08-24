@@ -3,11 +3,11 @@ import hashlib
 import json
 import logging
 import sys
-from Queue import Empty
-from Queue import Queue
 from threading import Thread
 
 from docker.errors import APIError
+from six.moves.queue import Empty
+from six.moves.queue import Queue
 
 
 log = logging.getLogger(__name__)
