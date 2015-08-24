@@ -3,6 +3,7 @@ FROM debian:wheezy
 RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
+        locales \
         gcc \
         make \
         zlib1g \
@@ -60,6 +61,10 @@ RUN set -ex; \
     cd ..; \
     rm -rf pip-7.0.1; \
     rm pip-7.0.1.tar.gz
+
+# Python3 requires a valid locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
+ENV LANG en_US.UTF-8
 
 ENV ALL_DOCKER_VERSIONS 1.7.1 1.8.1
 
