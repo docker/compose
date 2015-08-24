@@ -19,7 +19,7 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
     For a given list of objects, call the callable passing in the first
     object we give it.
     """
-    stream = get_output_stream()
+    stream = get_output_stream(sys.stdout)
     lines = []
     errors = {}
 
@@ -71,7 +71,7 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
             stream.write("ERROR: for {}  {} \n".format(error, errors[error]))
 
 
-def get_output_stream(stream=sys.stdout):
+def get_output_stream(stream):
     if six.PY3:
         return stream
     return codecs.getwriter('utf-8')(stream)

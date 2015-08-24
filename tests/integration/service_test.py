@@ -581,8 +581,7 @@ class ServiceTest(DockerClientTestCase):
         service.scale(0)
         self.assertEqual(len(service.containers()), 0)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_stopped_containers(self, mock_stdout):
+    def test_scale_with_stopped_containers(self):
         """
         Given there are some stopped containers and scale is called with a
         desired number that is the same as the number of stopped containers,
@@ -591,15 +590,11 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web')
         next_number = service._next_container_number()
         valid_numbers = [next_number, next_number + 1]
-        service.create_container(number=next_number, quiet=True)
-        service.create_container(number=next_number + 1, quiet=True)
+        service.create_container(number=next_number)
+        service.create_container(number=next_number + 1)
 
-        for container in service.containers():
-            self.assertFalse(container.is_running)
-
-        service.scale(2)
-
-        self.assertEqual(len(service.containers()), 2)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            service.scale(2)
         for container in service.containers():
             self.assertTrue(container.is_running)
             self.assertTrue(container.number in valid_numbers)
@@ -701,7 +696,6 @@ class ServiceTest(DockerClientTestCase):
         results in warning output.
         """
         service = self.create_service('web', container_name='custom-container')
-
         self.assertEqual(service.custom_container_name(), 'custom-container')
 
         service.scale(3)
