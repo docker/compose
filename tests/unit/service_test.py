@@ -280,7 +280,7 @@ class ServiceTest(unittest.TestCase):
 
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
-            '{"stream": "Successfully built 12345"}',
+            b'{"stream": "Successfully built 12345"}',
         ]
 
         service = Service('foo', client=self.mock_client, build='.')

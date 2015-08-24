@@ -10,27 +10,27 @@ from tests import unittest
 class ProgressStreamTestCase(unittest.TestCase):
     def test_stream_output(self):
         output = [
-            '{"status": "Downloading", "progressDetail": {"current": '
-            '31019763, "start": 1413653874, "total": 62763875}, '
-            '"progress": "..."}',
+            b'{"status": "Downloading", "progressDetail": {"current": '
+            b'31019763, "start": 1413653874, "total": 62763875}, '
+            b'"progress": "..."}',
         ]
         events = progress_stream.stream_output(output, StringIO())
         self.assertEqual(len(events), 1)
 
     def test_stream_output_div_zero(self):
         output = [
-            '{"status": "Downloading", "progressDetail": {"current": '
-            '0, "start": 1413653874, "total": 0}, '
-            '"progress": "..."}',
+            b'{"status": "Downloading", "progressDetail": {"current": '
+            b'0, "start": 1413653874, "total": 0}, '
+            b'"progress": "..."}',
         ]
         events = progress_stream.stream_output(output, StringIO())
         self.assertEqual(len(events), 1)
 
     def test_stream_output_null_total(self):
         output = [
-            '{"status": "Downloading", "progressDetail": {"current": '
-            '0, "start": 1413653874, "total": null}, '
-            '"progress": "..."}',
+            b'{"status": "Downloading", "progressDetail": {"current": '
+            b'0, "start": 1413653874, "total": null}, '
+            b'"progress": "..."}',
         ]
         events = progress_stream.stream_output(output, StringIO())
         self.assertEqual(len(events), 1)

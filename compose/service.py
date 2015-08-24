@@ -710,6 +710,8 @@ class Service(object):
         log.info('Building %s...' % self.name)
 
         path = self.options['build']
+        # python2 os.path() doesn't support unicode, so we need to encode it to
+        # a byte string
         if not six.PY3:
             path = path.encode('utf8')
 
