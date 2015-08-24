@@ -32,7 +32,6 @@ class LogPrinterTest(unittest.TestCase):
         output = self.get_default_output()
         self.assertIn('\033[', output)
 
-    @unittest.skipIf(six.PY3, "Only test unicode in python2")
     def test_unicode(self):
         glyph = u'\u2022'
 
@@ -42,7 +41,10 @@ class LogPrinterTest(unittest.TestCase):
         container = MockContainer(reader)
         output = run_log_printer([container])
 
-        self.assertIn(glyph, output.decode('utf-8'))
+        if six.PY2:
+            output = output.decode('utf-8')
+
+        self.assertIn(glyph, output)
 
 
 def run_log_printer(containers, monochrome=False):

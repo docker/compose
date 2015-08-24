@@ -5,7 +5,9 @@ import sys
 from itertools import cycle
 
 import six
+from six import next
 
+from compose import utils
 from . import colors
 from .multiplexer import Multiplexer
 from .utils import split_buffer
@@ -17,13 +19,11 @@ class LogPrinter(object):
         self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
         self.generators = self._make_log_generators(monochrome)
-        self.output = output
+        self.output = utils.get_output_stream(output)
 
     def run(self):
         mux = Multiplexer(self.generators)
         for line in mux.loop():
-            if isinstance(line, six.text_type) and not six.PY3:
-                line = line.encode('utf-8')
             self.output.write(line)
 
     def _calculate_prefix_width(self, containers):
