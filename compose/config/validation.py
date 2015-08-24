@@ -150,7 +150,7 @@ def process_errors(errors):
                 config_key = error.path[0]
                 required.append("Service '{}' option '{}' is invalid, {}".format(service_name, config_key, _clean_error_message(error.message)))
             elif error.validator == 'dependencies':
-                dependency_key = error.validator_value.keys()[0]
+                dependency_key = list(error.validator_value.keys())[0]
                 required_keys = ",".join(error.validator_value[dependency_key])
                 required.append("Invalid '{}' configuration for '{}' service: when defining '{}' you must set '{}' as well".format(
                     dependency_key, service_name, dependency_key, required_keys))

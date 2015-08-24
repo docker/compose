@@ -18,6 +18,10 @@ def make_service_dict(name, service_dict, working_dir):
     return config.ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
 
 
+def service_sort(services):
+    return sorted(services, key=itemgetter('name'))
+
+
 class ConfigTest(unittest.TestCase):
     def test_load(self):
         service_dicts = config.load(
@@ -32,8 +36,8 @@ class ConfigTest(unittest.TestCase):
         )
 
         self.assertEqual(
-            sorted(service_dicts, key=itemgetter('name')),
-            sorted([
+            service_sort(service_dicts),
+            service_sort([
                 {
                     'name': 'bar',
                     'image': 'busybox',
@@ -43,7 +47,7 @@ class ConfigTest(unittest.TestCase):
                     'name': 'foo',
                     'image': 'busybox',
                 }
-            ], key=itemgetter('name'))
+            ])
         )
 
     def test_load_throws_error_when_not_dict(self):
@@ -684,12 +688,7 @@ class ExtendsTest(unittest.TestCase):
     def test_extends(self):
         service_dicts = load_from_filename('tests/fixtures/extends/docker-compose.yml')
 
-        service_dicts = sorted(
-            service_dicts,
-            key=lambda sd: sd['name'],
-        )
-
-        self.assertEqual(service_dicts, [
+        self.assertEqual(service_sort(service_dicts), service_sort([
             {
                 'name': 'mydb',
                 'image': 'busybox',
@@ -706,7 +705,7 @@ class ExtendsTest(unittest.TestCase):
                     "BAZ": "2",
                 },
             }
-        ])
+        ]))
 
     def test_nested(self):
         service_dicts = load_from_filename('tests/fixtures/extends/nested.yml')
@@ -728,7 +727,7 @@ class ExtendsTest(unittest.TestCase):
         We specify a 'file' key that is the filename we're already in.
         """
         service_dicts = load_from_filename('tests/fixtures/extends/specify-file-as-self.yml')
-        self.assertEqual(service_dicts, [
+        self.assertEqual(service_sort(service_dicts), service_sort([
             {
                 'environment':
                 {
@@ -749,7 +748,7 @@ class ExtendsTest(unittest.TestCase):
                 'image': 'busybox',
                 'name': 'web'
             }
-        ])
+        ]))
 
     def test_circular(self):
         try:
@@ -856,7 +855,7 @@ class ExtendsTest(unittest.TestCase):
         config is valid and correctly extends from itself.
         """
         service_dicts = load_from_filename('tests/fixtures/extends/no-file-specified.yml')
-        self.assertEqual(service_dicts, [
+        self.assertEqual(service_sort(service_dicts), service_sort([
             {
                 'name': 'myweb',
                 'image': 'busybox',
@@ -872,7 +871,7 @@ class ExtendsTest(unittest.TestCase):
                     "BAZ": "3",
                 }
             }
-        ])
+        ]))
 
     def test_blacklisted_options(self):
         def load_config():

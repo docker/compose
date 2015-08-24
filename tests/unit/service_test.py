@@ -34,7 +34,7 @@ class ServiceTest(unittest.TestCase):
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
         self.mock_client.containers.return_value = []
-        self.assertEqual(service.containers(), [])
+        self.assertEqual(list(service.containers()), [])
 
     def test_containers_with_containers(self):
         self.mock_client.containers.return_value = [

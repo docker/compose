@@ -103,11 +103,11 @@ class Service(object):
     def containers(self, stopped=False, one_off=False, filters={}):
         filters.update({'label': self.labels(one_off=one_off)})
 
-        containers = filter(None, [
+        containers = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters=filters)])
+                filters=filters)]))
 
         if not containers:
             check_for_legacy_containers(
