@@ -66,6 +66,19 @@ def validate_top_level_object(func):
     return func_wrapper
 
 
+def validate_extends_file_path(service_name, extends_options, filename):
+    """
+    The service to be extended must either be defined in the config key 'file',
+    or within 'filename'.
+    """
+    error_prefix = "Invalid 'extends' configuration for %s:" % service_name
+
+    if 'file' not in extends_options and filename is None:
+        raise ConfigurationError(
+            "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
+        )
+
+
 def get_unsupported_config_msg(service_name, error_key):
     msg = "Unsupported config option for '{}' service: '{}'".format(service_name, error_key)
     if error_key in DOCKER_CONFIG_HINTS:

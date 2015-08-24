@@ -11,6 +11,7 @@ from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
 from .validation import validate_against_schema
+from .validation import validate_extends_file_path
 from .validation import validate_service_names
 from .validation import validate_top_level_object
 from compose.cli.utils import find_candidates_in_parent_dirs
@@ -171,12 +172,20 @@ class ServiceLoader(object):
 
         self.resolve_environment()
 
+        if 'extends' in self.service_dict:
+            validate_extends_file_path(
+                service_name,
+                self.service_dict['extends'],
+                self.filename
+            )
+
+
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
     def make_service_dict(self):
-        self.service_dict = self.resolve_extends(self.service_dict)
+        self.service_dict = self.resolve_extends()
         return process_container_options(self.service_dict, working_dir=self.working_dir)
 
     def resolve_environment(self):
@@ -199,11 +208,12 @@ class ServiceLoader(object):
 
         self.service_dict['environment'] = env
 
-    def resolve_extends(self, service_dict):
-        if 'extends' not in service_dict:
-            return service_dict
+    def resolve_extends(self):
+        if 'extends' not in self.service_dict:
+            return self.service_dict
 
-        extends_options = self.validate_extends_options(service_dict['name'], service_dict['extends'])
+        extends_options = self.service_dict['extends']
+        service_name = self.service_dict['name']
 
         if 'file' in extends_options:
             extends_from_filename = extends_options['file']
@@ -212,7 +222,7 @@ class ServiceLoader(object):
             other_config_path = self.filename
 
         other_working_dir = os.path.dirname(other_config_path)
-        other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
+        other_already_seen = self.already_seen + [self.signature(service_name)]
 
         base_service = extends_options['service']
         other_config = load_yaml(other_config_path)
@@ -227,7 +237,7 @@ class ServiceLoader(object):
         other_loader = ServiceLoader(
             working_dir=other_working_dir,
             filename=other_config_path,
-            service_name=service_dict['name'],
+            service_name=service_name,
             service_dict=other_service_dict,
             already_seen=other_already_seen,
         )
@@ -240,20 +250,10 @@ class ServiceLoader(object):
             service=extends_options['service'],
         )
 
-        return merge_service_dicts(other_service_dict, service_dict)
+        return merge_service_dicts(other_service_dict, self.service_dict)
 
     def signature(self, name):
         return (self.filename, name)
-
-    def validate_extends_options(self, service_name, extends_options):
-        error_prefix = "Invalid 'extends' configuration for %s:" % service_name
-
-        if 'file' not in extends_options and self.filename is None:
-            raise ConfigurationError(
-                "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
-            )
-
-        return extends_options
 
 
 def validate_extended_service_dict(service_dict, filename, service):
