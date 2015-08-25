@@ -30,6 +30,17 @@ that should get you started.
    `docker-compose` from anywhere on your machine, it will run your development
    version of Compose.
 
+## Install pre-commit hooks
+
+This step is optional, but recommended. Pre-commit hooks will run style checks
+and in some cases fix style issues for you, when you commit code.
+
+Install the git pre-commit hooks using [tox](https://tox.readthedocs.org) by
+running `tox -e pre-commit` or by following the
+[pre-commit install guide](http://pre-commit.com/#install).
+
+To run the style checks at any time run `tox -e pre-commit`.
+
 ## Submitting a pull request
 
 See Docker's [basic contribution workflow](https://docs.docker.com/project/make-a-contribution/#the-basic-contribution-workflow) for a guide on how to submit a pull request for code or documentation.
