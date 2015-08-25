@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-import datetime
 import os
 import platform
 import ssl
@@ -34,39 +33,6 @@ def yesno(prompt, default=None):
         return default
     else:
         return None
-
-
-# http://stackoverflow.com/a/5164027
-def prettydate(d):
-    diff = datetime.datetime.utcnow() - d
-    s = diff.seconds
-    if diff.days > 7 or diff.days < 0:
-        return d.strftime('%d %b %y')
-    elif diff.days == 1:
-        return '1 day ago'
-    elif diff.days > 1:
-        return '{0} days ago'.format(diff.days)
-    elif s <= 1:
-        return 'just now'
-    elif s < 60:
-        return '{0} seconds ago'.format(s)
-    elif s < 120:
-        return '1 minute ago'
-    elif s < 3600:
-        return '{0} minutes ago'.format(s / 60)
-    elif s < 7200:
-        return '1 hour ago'
-    else:
-        return '{0} hours ago'.format(s / 3600)
-
-
-def mkdir(path, permissions=0o700):
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    os.chmod(path, permissions)
-
-    return path
 
 
 def find_candidates_in_parent_dirs(filenames, path):
