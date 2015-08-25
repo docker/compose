@@ -867,6 +867,12 @@ class ExtendsTest(unittest.TestCase):
         self.assertEquals(len(service), 1)
         self.assertIsInstance(service[0], dict)
 
+    def test_extended_service_with_invalid_config(self):
+        expected_error_msg = "Service 'myweb' has neither an image nor a build path specified"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
+
     def test_extends_file_defaults_to_self(self):
         """
         Test not specifying a file in our extends options that the
@@ -891,37 +897,22 @@ class ExtendsTest(unittest.TestCase):
             }
         ]))
 
-    def test_blacklisted_options(self):
-        def load_config():
-            return make_service_dict('myweb', {
-                'extends': {
-                    'file': 'whatever',
-                    'service': 'web',
-                }
-            }, '.')
+    def test_invalid_links_in_extended_service(self):
+        expected_error_msg = "services with 'links' cannot be extended"
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/invalid-links.yml')
 
-        with self.assertRaisesRegexp(ConfigurationError, 'links'):
-            other_config = {'web': {'links': ['db']}}
+    def test_invalid_volumes_from_in_extended_service(self):
+        expected_error_msg = "services with 'volumes_from' cannot be extended"
 
-            with mock.patch.object(config, 'load_yaml', return_value=other_config):
-                print(load_config())
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/invalid-volumes.yml')
 
-        with self.assertRaisesRegexp(ConfigurationError, 'volumes_from'):
-            other_config = {'web': {'volumes_from': ['db']}}
+    def test_invalid_net_in_extended_service(self):
+        expected_error_msg = "services with 'net: container' cannot be extended"
 
-            with mock.patch.object(config, 'load_yaml', return_value=other_config):
-                print(load_config())
-
-        with self.assertRaisesRegexp(ConfigurationError, 'net'):
-            other_config = {'web': {'net': 'container:db'}}
-
-            with mock.patch.object(config, 'load_yaml', return_value=other_config):
-                print(load_config())
-
-        other_config = {'web': {'net': 'host'}}
-
-        with mock.patch.object(config, 'load_yaml', return_value=other_config):
-            print(load_config())
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/invalid-net.yml')
 
     def test_volume_path(self):
         dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')

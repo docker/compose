@@ -182,6 +182,8 @@ class ServiceLoader(object):
             self.extended_config_path = self.get_extended_config_path(
                 self.service_dict['extends']
             )
+            extended_config = load_yaml(self.extended_config_path)
+            validate_against_schema(extended_config)
 
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
@@ -217,10 +219,9 @@ class ServiceLoader(object):
 
         extends_options = self.service_dict['extends']
         service_name = self.service_dict['name']
+        other_config_path = self.extended_config_path
 
-        other_config_path = self.get_extended_config_path(extends_options)
-
-        other_working_dir = os.path.dirname(other_config_path)
+        other_working_dir = os.path.dirname(self.extended_config_path)
         other_already_seen = self.already_seen + [self.signature(service_name)]
 
         base_service = extends_options['service']

@@ -1,0 +1,5 @@
+myweb:
+  extends:
+    service: web
+web:
+  command: top
