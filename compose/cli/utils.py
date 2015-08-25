@@ -7,6 +7,7 @@ import platform
 import ssl
 import subprocess
 
+import six
 from docker import version as docker_py_version
 from six.moves import input
 
@@ -63,11 +64,11 @@ def split_buffer(reader, separator):
     separator, except for the last one if none was found on the end
     of the input.
     """
-    buffered = str('')
-    separator = str(separator)
+    buffered = six.text_type('')
+    separator = six.text_type(separator)
 
     for data in reader:
-        buffered += data
+        buffered += data.decode('utf-8')
         while True:
             index = buffered.find(separator)
             if index == -1:
