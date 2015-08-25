@@ -5,7 +5,10 @@
 set -e
 
 >&2 echo "Running lint checks"
-tox -e pre-commit
+docker run --rm \
+  ${GIT_VOLUME} \
+  --entrypoint="tox" \
+  "$TAG" -e pre-commit
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="default"
