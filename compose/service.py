@@ -9,12 +9,11 @@ from collections import namedtuple
 from operator import attrgetter
 
 import six
-
 from docker.errors import APIError
+from docker.utils import ContextError
+from docker.utils import create_context_from_path
 from docker.utils import create_host_config
 from docker.utils import LogConfig
-from docker.utils import create_context_from_path
-from docker.utils import ContextError
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 

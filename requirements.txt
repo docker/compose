@@ -1,8 +1,7 @@
 PyYAML==3.10
-docker-py==1.3.1
-git+https://github.com/moysesb/docker-py.git@distinct_build_calls#egg=docker-py
 dockerpty==0.3.4
 docopt==0.6.1
+git+https://github.com/moysesb/docker-py.git@distinct_build_calls#egg=docker-py-1.4.0-dev
 jsonschema==2.5.1
 requests==2.6.1
 six==1.7.3
