@@ -1,8 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import mock
-
+from .. import mock
 from .testcases import DockerClientTestCase
 from compose.project import Project
 

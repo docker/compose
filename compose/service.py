@@ -103,11 +103,11 @@ class Service(object):
     def containers(self, stopped=False, one_off=False, filters={}):
         filters.update({'label': self.labels(one_off=one_off)})
 
-        containers = filter(None, [
+        containers = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters=filters)])
+                filters=filters)]))
 
         if not containers:
             check_for_legacy_containers(
@@ -709,7 +709,11 @@ class Service(object):
     def build(self, no_cache=False):
         log.info('Building %s...' % self.name)
 
-        path = six.binary_type(self.options['build'])
+        path = self.options['build']
+        # python2 os.path() doesn't support unicode, so we need to encode it to
+        # a byte string
+        if not six.PY3:
+            path = path.encode('utf8')
 
         build_output = self.client.build(
             path=path,
@@ -724,7 +728,7 @@ class Service(object):
         try:
             all_events = stream_output(build_output, sys.stdout)
         except StreamOutputError as e:
-            raise BuildError(self, unicode(e))
+            raise BuildError(self, six.text_type(e))
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes
@@ -840,7 +844,7 @@ def merge_volume_bindings(volumes_option, previous_container):
         volume_bindings.update(
             get_container_data_volumes(previous_container, volumes_option))
 
-    return volume_bindings.values()
+    return list(volume_bindings.values())
 
 
 def get_container_data_volumes(container, volumes_option):
@@ -853,7 +857,7 @@ def get_container_data_volumes(container, volumes_option):
     container_volumes = container.get('Volumes') or {}
     image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
 
-    for volume in set(volumes_option + image_volumes.keys()):
+    for volume in set(volumes_option + list(image_volumes)):
         volume = parse_volume_spec(volume)
         # No need to preserve host volumes
         if volume.external:

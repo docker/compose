@@ -17,6 +17,7 @@ from .legacy import check_for_legacy_containers
 from .service import Service
 from .utils import parallel_execute
 
+
 log = logging.getLogger(__name__)
 
 
@@ -323,11 +324,11 @@ class Project(object):
         else:
             service_names = self.service_names
 
-        containers = filter(None, [
+        containers = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})])
+                filters={'label': self.labels(one_off=one_off)})]))
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names
@@ -339,7 +340,7 @@ class Project(object):
                 self.service_names,
             )
 
-        return filter(matches_service_names, containers)
+        return [c for c in containers if matches_service_names(c)]
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()

@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import os
 
+import six
+
 from .. import unittest
 from compose.cli.log_printer import LogPrinter
 
@@ -31,13 +33,16 @@ class LogPrinterTest(unittest.TestCase):
         self.assertIn('\033[', output)
 
     def test_unicode(self):
-        glyph = u'\u2022'.encode('utf-8')
+        glyph = u'\u2022'
 
         def reader(*args, **kwargs):
-            yield glyph + b'\n'
+            yield glyph + '\n'
 
         container = MockContainer(reader)
         output = run_log_printer([container])
+
+        if six.PY2:
+            output = output.decode('utf-8')
 
         self.assertIn(glyph, output)
 

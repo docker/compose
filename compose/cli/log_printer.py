@@ -4,9 +4,12 @@ from __future__ import unicode_literals
 import sys
 from itertools import cycle
 
+from six import next
+
 from . import colors
 from .multiplexer import Multiplexer
 from .utils import split_buffer
+from compose import utils
 
 
 class LogPrinter(object):
@@ -15,7 +18,7 @@ class LogPrinter(object):
         self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
         self.generators = self._make_log_generators(monochrome)
-        self.output = output
+        self.output = utils.get_output_stream(output)
 
     def run(self):
         mux = Multiplexer(self.generators)
@@ -52,7 +55,7 @@ class LogPrinter(object):
         return generators
 
     def _make_log_generator(self, container, color_fn):
-        prefix = color_fn(self._generate_prefix(container)).encode('utf-8')
+        prefix = color_fn(self._generate_prefix(container))
         # Attach to container before log printer starts running
         line_generator = split_buffer(self._attach(container), '\n')
 

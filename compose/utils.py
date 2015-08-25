@@ -3,11 +3,12 @@ import hashlib
 import json
 import logging
 import sys
-from Queue import Empty
-from Queue import Queue
 from threading import Thread
 
+import six
 from docker.errors import APIError
+from six.moves.queue import Empty
+from six.moves.queue import Queue
 
 
 log = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
     For a given list of objects, call the callable passing in the first
     object we give it.
     """
-    stream = codecs.getwriter('utf-8')(sys.stdout)
+    stream = get_output_stream(sys.stdout)
     lines = []
     errors = {}
 
@@ -70,6 +71,12 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
             stream.write("ERROR: for {}  {} \n".format(error, errors[error]))
 
 
+def get_output_stream(stream):
+    if six.PY3:
+        return stream
+    return codecs.getwriter('utf-8')(stream)
+
+
 def write_out_msg(stream, lines, msg_index, msg, status="done"):
     """
     Using special ANSI code characters we can write out the msg over the top of
@@ -97,5 +104,5 @@ def write_out_msg(stream, lines, msg_index, msg, status="done"):
 def json_hash(obj):
     dump = json.dumps(obj, sort_keys=True, separators=(',', ':'))
     h = hashlib.sha256()
-    h.update(dump)
+    h.update(dump.encode('utf8'))
     return h.hexdigest()

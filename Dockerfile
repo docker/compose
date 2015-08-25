@@ -3,6 +3,7 @@ FROM debian:wheezy
 RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
+        locales \
         gcc \
         make \
         zlib1g \
@@ -30,6 +31,18 @@ RUN set -ex; \
     rm -rf /Python-2.7.9; \
     rm Python-2.7.9.tgz
 
+# Build python 3.4 from source
+RUN set -ex; \
+    curl -LO https://www.python.org/ftp/python/3.4.3/Python-3.4.3.tgz; \
+    tar -xzf Python-3.4.3.tgz; \
+    cd Python-3.4.3; \
+    ./configure --enable-shared; \
+    make; \
+    make install; \
+    cd ..; \
+    rm -rf /Python-3.4.3; \
+    rm Python-3.4.3.tgz
+
 # Make libpython findable
 ENV LD_LIBRARY_PATH /usr/local/lib
 
@@ -49,6 +62,10 @@ RUN set -ex; \
     rm -rf pip-7.0.1; \
     rm pip-7.0.1.tar.gz
 
+# Python3 requires a valid locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
+ENV LANG en_US.UTF-8
+
 ENV ALL_DOCKER_VERSIONS 1.7.1 1.8.1
 
 RUN set -ex; \
@@ -62,6 +79,8 @@ RUN ln -s /usr/local/bin/docker-1.7.1 /usr/local/bin/docker
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
+
+RUN pip install tox
 
 ADD requirements.txt /code/
 RUN pip install -r requirements.txt

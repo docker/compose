@@ -41,15 +41,15 @@ install_requires = [
 
 
 tests_require = [
-    'mock >= 1.0.1',
     'nose',
-    'pyinstaller',
     'flake8',
 ]
 
 
 if sys.version_info < (2, 7):
     tests_require.append('unittest2')
+if sys.version_info[:1] < (3,):
+    tests_require.append('mock >= 1.0.1')
 
 
 setup(

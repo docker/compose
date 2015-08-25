@@ -2,9 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
-import mock
 from docker.utils import LogConfig
 
+from .. import mock
 from .. import unittest
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -34,14 +34,14 @@ class ServiceTest(unittest.TestCase):
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
         self.mock_client.containers.return_value = []
-        self.assertEqual(service.containers(), [])
+        self.assertEqual(list(service.containers()), [])
 
     def test_containers_with_containers(self):
         self.mock_client.containers.return_value = [
             dict(Name=str(i), Image='foo', Id=i) for i in range(3)
         ]
         service = Service('db', self.mock_client, 'myproject', image='foo')
-        self.assertEqual([c.id for c in service.containers()], range(3))
+        self.assertEqual([c.id for c in service.containers()], list(range(3)))
 
         expected_labels = [
             '{0}=myproject'.format(LABEL_PROJECT),
@@ -280,7 +280,7 @@ class ServiceTest(unittest.TestCase):
 
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
-            '{"stream": "Successfully built 12345"}',
+            b'{"stream": "Successfully built 12345"}',
         ]
 
         service = Service('foo', client=self.mock_client, build='.')
