@@ -259,7 +259,7 @@ class TopLevelCommand(Command):
         """
         killed = False
         if options['--kill']:
-            print("Going to kill all containers")
+            print("Going to kill and remove all containers")
             if options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
                         project.kill(service_names=options['SERVICE'], signal='SIGKILL')
