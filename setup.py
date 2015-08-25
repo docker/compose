@@ -34,10 +34,12 @@ install_requires = [
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.32.0, < 1.0',
     'docker-py >= 1.3.1, < 1.4',
-    'dockerpty >= 0.3.4, < 0.4',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
 ]
+
+if (sys.platform != 'win32'):
+    install_requires.append('dockerpty >= 0.3.4, < 0.4')
 
 
 tests_require = [

@@ -8,7 +8,6 @@ import sys
 from inspect import getdoc
 from operator import attrgetter
 
-import dockerpty
 from docker.errors import APIError
 
 from .. import __version__
@@ -27,6 +26,9 @@ from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
+
+if sys.platform != 'win32':
+    import dockerpty
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
@@ -393,6 +395,13 @@ class TopLevelCommand(Command):
         if options['-d']:
             service.start_container(container)
             print(container.name)
+        elif sys.platform == 'win32':
+            raise UserError(
+                'Only detached mode is supported on Windows. You must run '
+                'compose with the -d option. If you wish to help getting '
+                'terminal mode support working, PRs are welcome! We need to '
+                'replace dockerpty or remove its depedency on fcntl.'
+            )
         else:
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
             exit_code = container.wait()
