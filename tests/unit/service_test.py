@@ -1,25 +1,24 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-
-from .. import unittest
-import mock
+from __future__ import unicode_literals
 
 import docker
+import mock
 from docker.utils import LogConfig
 
-from compose.service import Service
+from .. import unittest
+from compose.const import LABEL_ONE_OFF
+from compose.const import LABEL_PROJECT
+from compose.const import LABEL_SERVICE
 from compose.container import Container
-from compose.const import LABEL_SERVICE, LABEL_PROJECT, LABEL_ONE_OFF
-from compose.service import (
-    ConfigError,
-    NeedsBuildError,
-    NoSuchImageError,
-    build_volume_binding,
-    get_container_data_volumes,
-    merge_volume_bindings,
-    parse_repository_tag,
-    parse_volume_spec,
-)
+from compose.service import build_volume_binding
+from compose.service import ConfigError
+from compose.service import get_container_data_volumes
+from compose.service import merge_volume_bindings
+from compose.service import NeedsBuildError
+from compose.service import NoSuchImageError
+from compose.service import parse_repository_tag
+from compose.service import parse_volume_spec
+from compose.service import Service
 
 
 class ServiceTest(unittest.TestCase):

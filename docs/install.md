@@ -14,7 +14,7 @@ weight=4
 
 You can run Compose on OS X and 64-bit Linux.  It is currently not supported on
 the Windows operating system. To install Compose, you'll need to install Docker
-first. 
+first.
 
 Depending on how your system is configured, you may require `sudo` access to
 install Compose. If your system requires `sudo`, you will receive "Permission
@@ -26,13 +26,13 @@ To install Compose, do the following:
 1. Install Docker Engine version 1.7.1 or greater:
 
      * <a href="https://docs.docker.com/installation/mac/" target="_blank">Mac OS X installation</a> (installs both Engine and Compose)
-     
+
      * <a href="https://docs.docker.com/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
-     
+
      * <a href="https://docs.docker.com/installation/" target="_blank">other system installations</a>
- 
+
 2. Mac OS X users are done installing. Others should continue to the next step.
-   
+
 3. Go to the <a href="https://github.com/docker/compose/releases" target="_blank">repository release page</a>.
 
 4. Enter the `curl` command in your termial.
@@ -40,9 +40,9 @@ To install Compose, do the following:
      The command has the following format:
 
         curl -L https://github.com/docker/compose/releases/download/VERSION_NUM/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
-   
+
      If you have problems installing with `curl`, you can use `pip` instead: `pip install -U docker-compose`
-      
+
 4. Apply executable permissions to the binary:
 
         $ chmod +x /usr/local/bin/docker-compose
@@ -85,7 +85,7 @@ To uninstall Docker Compose if you installed using `curl`:
 To uninstall Docker Compose if you installed using `pip`:
 
     $ pip uninstall docker-compose
-    
+
 >**Note**: If you get a "Permission denied" error using either of the above
 >methods, you probably do not have the proper permissions to remove
 >`docker-compose`.  To force the removal, prepend `sudo` to either of the above

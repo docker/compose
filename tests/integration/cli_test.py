@@ -1,15 +1,16 @@
 from __future__ import absolute_import
-from operator import attrgetter
-import sys
+
 import os
 import shlex
+import sys
+from operator import attrgetter
 
-from six import StringIO
 from mock import patch
+from six import StringIO
 
 from .testcases import DockerClientTestCase
-from compose.cli.main import TopLevelCommand
 from compose.cli.errors import UserError
+from compose.cli.main import TopLevelCommand
 from compose.project import NoSuchService
 
 

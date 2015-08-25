@@ -19,7 +19,7 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
-Values for configuration options can contain environment variables, e.g. 
+Values for configuration options can contain environment variables, e.g.
 `image: postgres:${POSTGRES_VERSION}`. For more details, see the section on
 [variable substitution](#variable-substitution).
 
@@ -353,7 +353,7 @@ Custom DNS search domains. Can be a single value or a list.
 
 ### devices
 
-List of device mappings.  Uses the same format as the `--device` docker 
+List of device mappings.  Uses the same format as the `--device` docker
 client create option.
 
     devices:
@@ -433,4 +433,3 @@ dollar sign (`$$`).
 - [Command line reference](/reference)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
-

@@ -3,10 +3,11 @@ import hashlib
 import json
 import logging
 import sys
+from Queue import Empty
+from Queue import Queue
+from threading import Thread
 
 from docker.errors import APIError
-from Queue import Queue, Empty
-from threading import Thread
 
 
 log = logging.getLogger(__name__)

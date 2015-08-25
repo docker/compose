@@ -1,30 +1,28 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import os
+import shutil
+import tempfile
 from os import path
 
 from docker.errors import APIError
 from mock import patch
-import tempfile
-import shutil
-from six import StringIO, text_type
+from six import StringIO
+from six import text_type
 
-from compose import __version__
-from compose.const import (
-    LABEL_CONTAINER_NUMBER,
-    LABEL_ONE_OFF,
-    LABEL_PROJECT,
-    LABEL_SERVICE,
-    LABEL_VERSION,
-)
-from compose.service import (
-    ConfigError,
-    ConvergencePlan,
-    Service,
-    build_extra_hosts,
-)
-from compose.container import Container
 from .testcases import DockerClientTestCase
+from compose import __version__
+from compose.const import LABEL_CONTAINER_NUMBER
+from compose.const import LABEL_ONE_OFF
+from compose.const import LABEL_PROJECT
+from compose.const import LABEL_SERVICE
+from compose.const import LABEL_VERSION
+from compose.container import Container
+from compose.service import build_extra_hosts
+from compose.service import ConfigError
+from compose.service import ConvergencePlan
+from compose.service import Service
 
 
 def create_and_start_container(service, **override_options):

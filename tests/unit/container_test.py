@@ -1,9 +1,9 @@
 from __future__ import unicode_literals
-from .. import unittest
 
-import mock
 import docker
+import mock
 
+from .. import unittest
 from compose.container import Container
 from compose.container import get_container_name
 

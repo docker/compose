@@ -1,8 +1,8 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from tests import unittest
+from __future__ import unicode_literals
 
 from compose.cli import verbose_proxy
+from tests import unittest
 
 
 class VerboseProxyTestCase(unittest.TestCase):
