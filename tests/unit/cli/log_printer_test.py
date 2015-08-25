@@ -5,8 +5,8 @@ import os
 
 import six
 
-from .. import unittest
 from compose.cli.log_printer import LogPrinter
+from tests import unittest
 
 
 class LogPrinterTest(unittest.TestCase):
