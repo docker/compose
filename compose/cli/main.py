@@ -67,6 +67,14 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
+    except AttributeError as e:
+        if sys.platform == 'win32':
+            if str(e) == "'module' object has no attribute 'AF_UNIX'":
+                log.error('No docker host environment variables specified. '
+                          'Run docker-machine env --help for more info.')
+                sys.exit(1)
+        else:
+            raise
 
 
 def setup_logging():
