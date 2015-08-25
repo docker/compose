@@ -18,6 +18,12 @@ Building a Compose release
 
 4.  Write release notes in `CHANGES.md`.
 
+    Almost every feature enhancement should be mentioned, with the most visible/exciting ones first. Use descriptive sentences and give context where appropriate.
+
+    Bug fixes are worth mentioning if it's likely that they've affected lots of people, or if they were regressions in the previous version.
+
+    Improvements to the code are not worth mentioning.
+
 5.   Add a bump commit:
 
         git commit -am "Bump $VERSION"
@@ -78,9 +84,29 @@ Building a Compose release
 
         git push git@github.com:docker/compose.git $TAG
 
-8.  Create a release from the tag on GitHub.
+8.  Draft a release from the tag on GitHub.
 
-9.  Paste in installation instructions and release notes.
+    - Go to https://github.com/docker/compose/releases and click "Draft a new release".
+    - In the "Tag version" dropdown, select the tag you just pushed.
+
+9.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
+
+        Firstly, note that Compose 1.5.0 requires Docker 1.8.0 or later.
+
+        Secondly, if you're a Mac user, the **[Docker Toolbox](https://www.docker.com/toolbox)** will install Compose ${VERSION} for you, alongside the latest versions of the Docker Engine, Machine and Kitematic.
+
+        Otherwise, you can use the usual commands to install/upgrade. Either download the binary:
+
+            curl -L https://github.com/docker/compose/releases/download/1.5.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+
+        Or install the PyPi package:
+
+            pip install -U docker-compose==1.5.0
+
+        Here's what's new:
+
+        ...release notes go here...
 
 10.  Attach the binaries.
 
