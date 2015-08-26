@@ -315,7 +315,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual('moto=bobo', container.environment['allo'])
 
     @mock.patch('dockerpty.start')
-    def test_run_service_without_map_ports(self, __):
+    def test_run_service_without_map_ports(self, _):
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
         self.command.dispatch(['run', '-d', 'simple'], None)
@@ -333,7 +333,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_assigned, None)
 
     @mock.patch('dockerpty.start')
-    def test_run_service_with_map_ports(self, __):
+    def test_run_service_with_map_ports(self, _):
 
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
@@ -356,7 +356,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_range[1], "0.0.0.0:49154")
 
     @mock.patch('dockerpty.start')
-    def test_run_service_with_explicitly_maped_ports(self, __):
+    def test_run_service_with_explicitly_maped_ports(self, _):
 
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
@@ -375,7 +375,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_full, "0.0.0.0:30001")
 
     @mock.patch('dockerpty.start')
-    def test_run_service_with_explicitly_maped_ip_ports(self, __):
+    def test_run_service_with_explicitly_maped_ip_ports(self, _):
 
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
