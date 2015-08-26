@@ -134,6 +134,11 @@ def process_errors(errors):
                     required.append(
                         "Service '{}' has neither an image nor a build path "
                         "specified. Exactly one must be provided.".format(service_name))
+                elif 'image' in error.instance and 'dockerfile' in error.instance:
+                    required.append(
+                        "Service '{}' has both an image and alternate Dockerfile. "
+                        "A service can either be built to image or use an existing "
+                        "image, not both.".format(service_name))
                 else:
                     required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
