@@ -93,7 +93,9 @@ class CLITestCase(DockerClientTestCase):
     def test_pull_with_digest(self, mock_logging):
         self.command.dispatch(['-f', 'digest.yml', 'pull'], None)
         mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
-        mock_logging.info.assert_any_call('Pulling digest (busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
+        mock_logging.info.assert_any_call(
+            'Pulling digest (busybox@'
+            'sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
 
     @mock.patch('sys.stdout', new_callable=StringIO)
     def test_build_no_cache(self, mock_stdout):
