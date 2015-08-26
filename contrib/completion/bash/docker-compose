@@ -223,7 +223,7 @@ _docker_compose_pull() {
 
 _docker_compose_restart() {
 	case "$prev" in
-		-t | --timeout)
+		--timeout|-t)
 			return
 			;;
 	esac
@@ -311,7 +311,7 @@ _docker_compose_start() {
 
 _docker_compose_stop() {
 	case "$prev" in
-		-t | --timeout)
+		--timeout|-t)
 			return
 			;;
 	esac
@@ -341,7 +341,7 @@ _docker_compose_unpause() {
 
 _docker_compose_up() {
 	case "$prev" in
-		-t | --timeout)
+		--timeout|-t)
 			return
 			;;
 	esac
@@ -402,11 +402,11 @@ _docker_compose() {
 	local compose_file compose_project
 	while [ $counter -lt $cword ]; do
 		case "${words[$counter]}" in
-			-f|--file)
+			--file|-f)
 				(( counter++ ))
 				compose_file="${words[$counter]}"
 				;;
-			-p|--project-name)
+			--project-name|p)
 				(( counter++ ))
 				compose_project="${words[$counter]}"
 				;;
