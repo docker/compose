@@ -112,6 +112,7 @@ class CLITestCase(unittest.TestCase):
             '--service-ports': None,
             '--publish': [],
             '--rm': None,
+            '--name': None,
         })
 
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
@@ -141,6 +142,7 @@ class CLITestCase(unittest.TestCase):
             '--service-ports': None,
             '--publish': [],
             '--rm': None,
+            '--name': None,
         })
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
         self.assertEquals(call_kwargs['host_config']['RestartPolicy']['Name'], 'always')
@@ -166,6 +168,7 @@ class CLITestCase(unittest.TestCase):
             '--service-ports': None,
             '--publish': [],
             '--rm': True,
+            '--name': None,
         })
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
         self.assertFalse('RestartPolicy' in call_kwargs['host_config'])
@@ -195,4 +198,5 @@ class CLITestCase(unittest.TestCase):
                 '--service-ports': True,
                 '--publish': ['80:80'],
                 '--rm': None,
+                '--name': None,
             })

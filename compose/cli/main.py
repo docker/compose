@@ -308,6 +308,7 @@ class TopLevelCommand(Command):
             --allow-insecure-ssl  Deprecated - no effect.
             -d                    Detached mode: Run container in the background, print
                                   new container name.
+            --name NAME           Assign a name to the container
             --entrypoint CMD      Override the entrypoint of the image.
             -e KEY=VAL            Set an environment variable (can be used multiple times)
             -u, --user=""         Run as specified username or uid
@@ -373,6 +374,9 @@ class TopLevelCommand(Command):
                 'Service port mapping and manual port mapping '
                 'can not be used togather'
             )
+
+        if options['--name']:
+            container_options['name'] = options['--name']
 
         try:
             container = service.create_container(
