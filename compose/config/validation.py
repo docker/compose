@@ -30,7 +30,11 @@ DOCKER_CONFIG_HINTS = {
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 
 
-@FormatChecker.cls_checks(format="ports", raises=ValidationError("Invalid port formatting, it should be '[[remote_ip:]remote_port:]port[/protocol]'"))
+@FormatChecker.cls_checks(
+    format="ports",
+    raises=ValidationError(
+        "Invalid port formatting, it should be "
+        "'[[remote_ip:]remote_port:]port[/protocol]'"))
 def format_ports(instance):
     try:
         split_port(instance)
@@ -122,9 +126,14 @@ def process_errors(errors):
                 invalid_keys.append(get_unsupported_config_msg(service_name, invalid_config_key))
             elif error.validator == 'anyOf':
                 if 'image' in error.instance and 'build' in error.instance:
-                    required.append("Service '{}' has both an image and build path specified. A service can either be built to image or use an existing image, not both.".format(service_name))
+                    required.append(
+                        "Service '{}' has both an image and build path specified. "
+                        "A service can either be built to image or use an existing "
+                        "image, not both.".format(service_name))
                 elif 'image' not in error.instance and 'build' not in error.instance:
-                    required.append("Service '{}' has neither an image nor a build path specified. Exactly one must be provided.".format(service_name))
+                    required.append(
+                        "Service '{}' has neither an image nor a build path "
+                        "specified. Exactly one must be provided.".format(service_name))
                 else:
                     required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
@@ -143,12 +152,25 @@ def process_errors(errors):
 
                 if len(error.path) > 0:
                     config_key = " ".join(["'%s'" % k for k in error.path])
-                    type_errors.append("Service '{}' configuration key {} contains an invalid type, it should be {} {}".format(service_name, config_key, msg, error.validator_value))
+                    type_errors.append(
+                        "Service '{}' configuration key {} contains an invalid "
+                        "type, it should be {} {}".format(
+                            service_name,
+                            config_key,
+                            msg,
+                            error.validator_value))
                 else:
-                    root_msgs.append("Service '{}' doesn\'t have any configuration options. All top level keys in your docker-compose.yml must map to a dictionary of configuration options.'".format(service_name))
+                    root_msgs.append(
+                        "Service '{}' doesn\'t have any configuration options. "
+                        "All top level keys in your docker-compose.yml must map "
+                        "to a dictionary of configuration options.'".format(service_name))
             elif error.validator == 'required':
                 config_key = error.path[0]
-                required.append("Service '{}' option '{}' is invalid, {}".format(service_name, config_key, _clean_error_message(error.message)))
+                required.append(
+                    "Service '{}' option '{}' is invalid, {}".format(
+                        service_name,
+                        config_key,
+                        _clean_error_message(error.message)))
             elif error.validator == 'dependencies':
                 dependency_key = list(error.validator_value.keys())[0]
                 required_keys = ",".join(error.validator_value[dependency_key])

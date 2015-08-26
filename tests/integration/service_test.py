@@ -804,7 +804,10 @@ class ServiceTest(DockerClientTestCase):
             self.assertEqual(env[k], v)
 
     def test_env_from_file_combined_with_env(self):
-        service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
+        service = self.create_service(
+            'web',
+            environment=['ONE=1', 'TWO=2', 'THREE=3'],
+            env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
         for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
