@@ -79,6 +79,14 @@ def validate_extends_file_path(service_name, extends_options, filename):
         )
 
 
+def validate_extended_service_exists(extended_service_name, full_extended_config, extended_config_path):
+    if extended_service_name not in full_extended_config:
+        msg = (
+            "Cannot extend service '%s' in %s: Service not found"
+        ) % (extended_service_name, extended_config_path)
+        raise ConfigurationError(msg)
+
+
 def get_unsupported_config_msg(service_name, error_key):
     msg = "Unsupported config option for '{}' service: '{}'".format(service_name, error_key)
     if error_key in DOCKER_CONFIG_HINTS:
