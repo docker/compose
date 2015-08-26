@@ -538,19 +538,8 @@ class TopLevelCommand(Command):
         )
 
         if not detached:
-            print("Attaching to", list_containers(to_attach))
-            log_printer = LogPrinter(to_attach, attach_params={"logs": True}, monochrome=monochrome)
-
-            try:
-                log_printer.run()
-            finally:
-                def handler(signal, frame):
-                    project.kill(service_names=service_names)
-                    sys.exit(0)
-                signal.signal(signal.SIGINT, handler)
-
-                print("Gracefully stopping... (press Ctrl+C again to force)")
-                project.stop(service_names=service_names, timeout=timeout)
+            log_printer = build_log_printer(to_attach, service_names, monochrome)
+            attach_to_logs(project, log_printer, service_names, timeout)
 
     def migrate_to_labels(self, project, _options):
         """
@@ -591,6 +580,27 @@ class TopLevelCommand(Command):
             print(__version__)
         else:
             print(get_version_info('full'))
+
+
+def build_log_printer(containers, service_names, monochrome):
+    return LogPrinter(
+        [c for c in containers if c.service in service_names],
+        attach_params={"logs": True},
+        monochrome=monochrome)
+
+
+def attach_to_logs(project, log_printer, service_names, timeout):
+    print("Attaching to", list_containers(log_printer.containers))
+    try:
+        log_printer.run()
+    finally:
+        def handler(signal, frame):
+            project.kill(service_names=service_names)
+            sys.exit(0)
+        signal.signal(signal.SIGINT, handler)
+
+        print("Gracefully stopping... (press Ctrl+C again to force)")
+        project.stop(service_names=service_names, timeout=timeout)
 
 
 def list_containers(containers):
