@@ -33,6 +33,9 @@ class DockerClientTestCase(unittest.TestCase):
 
         options = ServiceLoader(working_dir='.').make_service_dict(name, kwargs)
 
+        labels = options.setdefault('labels', {})
+        labels['com.docker.compose.test-name'] = self.id()
+
         return Service(
             project='composetest',
             client=self.client,
