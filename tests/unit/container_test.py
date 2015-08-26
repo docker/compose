@@ -142,4 +142,12 @@ class GetContainerNameTestCase(unittest.TestCase):
         self.assertIsNone(get_container_name({}))
         self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
         self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
-        self.assertEqual(get_container_name({'Names': ['/swarm-host-1/myproject_db_1', '/swarm-host-1/myproject_web_1/db']}), 'myproject_db_1')
+        self.assertEqual(
+            get_container_name({
+                'Names': [
+                    '/swarm-host-1/myproject_db_1',
+                    '/swarm-host-1/myproject_web_1/db'
+                ]
+            }),
+            'myproject_db_1'
+        )

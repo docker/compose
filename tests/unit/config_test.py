@@ -529,7 +529,10 @@ class MemoryOptionsTest(unittest.TestCase):
         When you set a 'memswap_limit' it is invalid config unless you also set
         a mem_limit
         """
-        expected_error_msg = "Invalid 'memswap_limit' configuration for 'foo' service: when defining 'memswap_limit' you must set 'mem_limit' as well"
+        expected_error_msg = (
+            "Invalid 'memswap_limit' configuration for 'foo' service: when "
+            "defining 'memswap_limit' you must set 'mem_limit' as well"
+        )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
