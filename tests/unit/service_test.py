@@ -150,6 +150,19 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
+    def test_get_container_create_options_with_name_option(self):
+        service = Service(
+            'foo',
+            image='foo',
+            client=self.mock_client,
+            container_name='foo1')
+        name = 'the_new_name'
+        opts = service._get_container_create_options(
+            {'name': name},
+            1,
+            one_off=True)
+        self.assertEqual(opts['name'], name)
+
     def test_get_container_not_found(self):
         self.mock_client.containers.return_value = []
         service = Service('foo', client=self.mock_client, image='foo')

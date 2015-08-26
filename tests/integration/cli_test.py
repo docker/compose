@@ -393,6 +393,16 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "127.0.0.1:30000")
         self.assertEqual(port_full, "127.0.0.1:30001")
 
+    @mock.patch('dockerpty.start')
+    def test_run_with_custom_name(self, _):
+        self.command.base_dir = 'tests/fixtures/environment-composefile'
+        name = 'the-container-name'
+        self.command.dispatch(['run', '--name', name, 'service'], None)
+
+        service = self.project.get_service('service')
+        container, = service.containers(stopped=True, one_off=True)
+        self.assertEqual(container.name, name)
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()

@@ -587,7 +587,7 @@ class Service(object):
 
         if self.custom_container_name() and not one_off:
             container_options['name'] = self.custom_container_name()
-        else:
+        elif not container_options.get('name'):
             container_options['name'] = self.get_container_name(number, one_off)
 
         if add_config_hash:
