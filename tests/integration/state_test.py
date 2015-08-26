@@ -199,7 +199,6 @@ class ServiceStateTest(DockerClientTestCase):
 
         self.assertEqual([c.is_running for c in containers], [False, True])
 
-        web = self.create_service('web', **options)
         self.assertEqual(
             ('start', containers[0:1]),
             web.convergence_plan(),

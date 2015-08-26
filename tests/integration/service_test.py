@@ -695,7 +695,7 @@ class ServiceTest(DockerClientTestCase):
         Test that calling scale on a service that has a custom container name
         results in warning output.
         """
-        service = self.create_service('web', container_name='custom-container')
+        service = self.create_service('app', container_name='custom-container')
         self.assertEqual(service.custom_container_name(), 'custom-container')
 
         service.scale(3)
