@@ -914,6 +914,17 @@ class ExtendsTest(unittest.TestCase):
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             load_from_filename('tests/fixtures/extends/invalid-net.yml')
 
+    @mock.patch.dict(os.environ)
+    def test_valid_interpolation_in_extended_service(self):
+        os.environ.update(
+            HOSTNAME_VALUE="penguin",
+        )
+        expected_interpolated_value = "host-penguin"
+
+        service_dicts = load_from_filename('tests/fixtures/extends/valid-interpolation.yml')
+        for service in service_dicts:
+            self.assertTrue(service['hostname'], expected_interpolated_value)
+
     def test_volume_path(self):
         dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')
 

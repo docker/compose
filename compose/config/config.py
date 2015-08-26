@@ -11,6 +11,7 @@ from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
 from .validation import validate_against_schema
+from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
 from .validation import validate_service_names
 from .validation import validate_top_level_object
@@ -178,12 +179,25 @@ class ServiceLoader(object):
                 self.service_dict['extends'],
                 self.filename
             )
-
             self.extended_config_path = self.get_extended_config_path(
                 self.service_dict['extends']
             )
-            extended_config = load_yaml(self.extended_config_path)
-            validate_against_schema(extended_config)
+            self.extended_service_name = self.service_dict['extends']['service']
+
+            full_extended_config = pre_process_config(
+                load_yaml(self.extended_config_path)
+            )
+
+            validate_extended_service_exists(
+                self.extended_service_name,
+                full_extended_config,
+                self.extended_config_path
+            )
+            validate_against_schema(full_extended_config)
+
+            self.extended_config = full_extended_config[self.extended_service_name]
+        else:
+            self.extended_config = None
 
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
@@ -214,40 +228,28 @@ class ServiceLoader(object):
         self.service_dict['environment'] = env
 
     def resolve_extends(self):
-        if 'extends' not in self.service_dict:
+        if self.extended_config is None:
             return self.service_dict
 
-        extends_options = self.service_dict['extends']
         service_name = self.service_dict['name']
-        other_config_path = self.extended_config_path
 
         other_working_dir = os.path.dirname(self.extended_config_path)
         other_already_seen = self.already_seen + [self.signature(service_name)]
 
-        base_service = extends_options['service']
-        other_config = load_yaml(other_config_path)
-
-        if base_service not in other_config:
-            msg = (
-                "Cannot extend service '%s' in %s: Service not found"
-            ) % (base_service, other_config_path)
-            raise ConfigurationError(msg)
-
-        other_service_dict = other_config[base_service]
         other_loader = ServiceLoader(
             working_dir=other_working_dir,
-            filename=other_config_path,
+            filename=self.extended_config_path,
             service_name=service_name,
-            service_dict=other_service_dict,
+            service_dict=self.extended_config,
             already_seen=other_already_seen,
         )
 
-        other_loader.detect_cycle(extends_options['service'])
+        other_loader.detect_cycle(self.extended_service_name)
         other_service_dict = other_loader.make_service_dict()
         validate_extended_service_dict(
             other_service_dict,
-            filename=other_config_path,
-            service=extends_options['service'],
+            filename=self.extended_config_path,
+            service=self.extended_service_name,
         )
 
         return merge_service_dicts(other_service_dict, self.service_dict)
