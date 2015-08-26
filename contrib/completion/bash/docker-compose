@@ -278,16 +278,17 @@ _docker_compose_scale() {
 	case "$prev" in
 		=)
 			COMPREPLY=("$cur")
-			;;
-		*)
-			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
-			compopt -o nospace
+			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
 			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+		*)
+			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
+			compopt -o nospace
 			;;
 	esac
 }
