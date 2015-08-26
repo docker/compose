@@ -33,6 +33,8 @@ pull if it doesn't exist locally.
     image: a4bc65fd
     image: busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d
 
+Using `image` together with either `build`  or `dockerfile` is not allowed. Attempting to do so results in an error.
+
 ### build
 
 Path to a directory containing a Dockerfile. When the value supplied is a
@@ -43,6 +45,8 @@ Compose will build and tag it with a generated name, and use that image thereaft
 
     build: /path/to/build/dir
 
+Using `build` together with `image` is not allowed. Attempting to do so results in an error.
+
 ### dockerfile
 
 Alternate Dockerfile.
@@ -50,6 +54,8 @@ Alternate Dockerfile.
 Compose will use an alternate file to build with.
 
     dockerfile: Dockerfile-alternate
+
+Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
 ### command
 

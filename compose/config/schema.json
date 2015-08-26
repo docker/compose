@@ -114,7 +114,10 @@
         },
         {
           "required": ["image"],
-          "not": {"required": ["build"]}
+          "not": {"anyOf": [
+            {"required": ["build"]},
+            {"required": ["dockerfile"]}
+          ]}
         },
         {
           "required": ["extends"],
