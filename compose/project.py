@@ -269,26 +269,30 @@ class Project(object):
         if force_recreate and not allow_recreate:
             raise ValueError("force_recreate and allow_recreate are in conflict")
 
-        services = self.get_services(service_names, include_deps=start_deps)
+        services = self.get_services(service_names, include_deps=False)
+        all_services = self.get_services(service_names, include_deps=start_deps)
 
-        for service in services:
+        for service in all_services:
             service.remove_duplicate_containers()
 
         plans = self._get_convergence_plans(
-            services,
+            all_services,
             allow_recreate=allow_recreate,
             force_recreate=force_recreate,
         )
 
-        return [
-            container
-            for service in services
-            for container in service.execute_convergence_plan(
+        containers_to_return = []
+
+        for service in all_services:
+            containers = service.execute_convergence_plan(
                 plans[service.name],
                 do_build=do_build,
                 timeout=timeout
             )
-        ]
+            if service in services:
+                containers_to_return += containers
+
+        return containers_to_return
 
     def _get_convergence_plans(self,
                                services,

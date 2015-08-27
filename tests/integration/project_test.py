@@ -189,16 +189,29 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers(stopped=True)), 0)
 
     def test_project_up(self):
-        web = self.create_service('web')
         db = self.create_service('db', volumes=['/var/db'])
-        project = Project('composetest', [web, db], self.client)
+        web = self.create_service('web', links=[(db, 'db')])
+        project = Project('composetest', [db, web], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
 
-        project.up(['db'])
+        containers = project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(web.containers()), 0)
+        self.assertEqual(set(containers), set(db.containers()))
+
+        containers = project.up(['web'])
+        self.assertEqual(len(project.containers()), 2)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(set(containers), set(web.containers()))
+
+        containers = project.up([])
+        self.assertEqual(len(project.containers()), 2)
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(web.containers()), 1)
+        self.assertEqual(set(containers), set(project.containers()))
 
     def test_project_up_starts_uncreated_services(self):
         db = self.create_service('db')
