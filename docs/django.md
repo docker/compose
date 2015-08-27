@@ -10,7 +10,7 @@ Let's use Fig to set up and run a Django/PostgreSQL app. Before starting, you'll
 
 Let's set up the three files that'll get us started. First, our app is going to be running inside a Docker container which contains all of its dependencies. We can define what goes inside that Docker container using a file called `Dockerfile`. It'll contain this to start with:
 
-    FROM python:2.7
+    FROM python:3.4
     ENV PYTHONUNBUFFERED 1
     RUN mkdir /code
     WORKDIR /code
@@ -22,8 +22,8 @@ That'll install our application inside an image with Python installed alongside 
 
 Second, we define our Python dependencies in a file called `requirements.txt`:
 
-    Django
-    psycopg2
+    Django==1.8.4
+    psycopg2==2.6.1
 
 Simple enough. Finally, this is all tied together with a file called `fig.yml`. It describes the services that our app comprises of (a web server and database), what Docker images they use, how they link together, what volumes will be mounted inside the containers and what ports they expose.
 
@@ -87,5 +87,5 @@ And your Django app should be running at port 8000 on your docker daemon (if you
 
 You can also run management commands with Docker. To set up your database, for example, run `fig up` and in another terminal run:
 
-    $ fig run web python manage.py syncdb
+    $ fig run web python manage.py migrate
 
