@@ -5,14 +5,14 @@ import os
 
 import six
 
-from .. import unittest
 from compose.cli.log_printer import LogPrinter
+from tests import unittest
 
 
 class LogPrinterTest(unittest.TestCase):
     def get_default_output(self, monochrome=False):
         def reader(*args, **kwargs):
-            yield "hello\nworld"
+            yield b"hello\nworld"
 
         container = MockContainer(reader)
         output = run_log_printer([container], monochrome=monochrome)
@@ -36,11 +36,10 @@ class LogPrinterTest(unittest.TestCase):
         glyph = u'\u2022'
 
         def reader(*args, **kwargs):
-            yield glyph + '\n'
+            yield glyph.encode('utf-8') + b'\n'
 
         container = MockContainer(reader)
         output = run_log_printer([container])
-
         if six.PY2:
             output = output.decode('utf-8')
 

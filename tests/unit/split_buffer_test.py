@@ -8,33 +8,33 @@ from compose.cli.utils import split_buffer
 class SplitBufferTest(unittest.TestCase):
     def test_single_line_chunks(self):
         def reader():
-            yield 'abc\n'
-            yield 'def\n'
-            yield 'ghi\n'
+            yield b'abc\n'
+            yield b'def\n'
+            yield b'ghi\n'
 
         self.assert_produces(reader, ['abc\n', 'def\n', 'ghi\n'])
 
     def test_no_end_separator(self):
         def reader():
-            yield 'abc\n'
-            yield 'def\n'
-            yield 'ghi'
+            yield b'abc\n'
+            yield b'def\n'
+            yield b'ghi'
 
         self.assert_produces(reader, ['abc\n', 'def\n', 'ghi'])
 
     def test_multiple_line_chunk(self):
         def reader():
-            yield 'abc\ndef\nghi'
+            yield b'abc\ndef\nghi'
 
         self.assert_produces(reader, ['abc\n', 'def\n', 'ghi'])
 
     def test_chunked_line(self):
         def reader():
-            yield 'a'
-            yield 'b'
-            yield 'c'
-            yield '\n'
-            yield 'd'
+            yield b'a'
+            yield b'b'
+            yield b'c'
+            yield b'\n'
+            yield b'd'
 
         self.assert_produces(reader, ['abc\n', 'd'])
 
@@ -42,12 +42,12 @@ class SplitBufferTest(unittest.TestCase):
         string = u"a\u2022c\n"
 
         def reader():
-            yield string
+            yield string.encode('utf-8')
 
         self.assert_produces(reader, [string])
 
     def assert_produces(self, reader, expectations):
-        split = split_buffer(reader(), '\n')
+        split = split_buffer(reader(), u'\n')
 
         for (actual, expected) in zip(split, expectations):
             self.assertEqual(type(actual), type(expected))

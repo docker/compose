@@ -2,12 +2,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-import datetime
 import os
 import platform
 import ssl
 import subprocess
 
+import six
 from docker import version as docker_py_version
 from six.moves import input
 
@@ -34,39 +34,6 @@ def yesno(prompt, default=None):
         return default
     else:
         return None
-
-
-# http://stackoverflow.com/a/5164027
-def prettydate(d):
-    diff = datetime.datetime.utcnow() - d
-    s = diff.seconds
-    if diff.days > 7 or diff.days < 0:
-        return d.strftime('%d %b %y')
-    elif diff.days == 1:
-        return '1 day ago'
-    elif diff.days > 1:
-        return '{0} days ago'.format(diff.days)
-    elif s <= 1:
-        return 'just now'
-    elif s < 60:
-        return '{0} seconds ago'.format(s)
-    elif s < 120:
-        return '1 minute ago'
-    elif s < 3600:
-        return '{0} minutes ago'.format(s / 60)
-    elif s < 7200:
-        return '1 hour ago'
-    else:
-        return '{0} hours ago'.format(s / 3600)
-
-
-def mkdir(path, permissions=0o700):
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    os.chmod(path, permissions)
-
-    return path
 
 
 def find_candidates_in_parent_dirs(filenames, path):
@@ -97,11 +64,11 @@ def split_buffer(reader, separator):
     separator, except for the last one if none was found on the end
     of the input.
     """
-    buffered = str('')
-    separator = str(separator)
+    buffered = six.text_type('')
+    separator = six.text_type(separator)
 
     for data in reader:
-        buffered += data
+        buffered += data.decode('utf-8')
         while True:
             index = buffered.find(separator)
             if index == -1:
