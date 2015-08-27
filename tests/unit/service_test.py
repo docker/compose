@@ -6,6 +6,7 @@ from docker.utils import LogConfig
 
 from .. import mock
 from .. import unittest
+from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
@@ -162,6 +163,40 @@ class ServiceTest(unittest.TestCase):
             1,
             one_off=True)
         self.assertEqual(opts['name'], name)
+
+    def test_get_container_create_options_does_not_mutate_options(self):
+        labels = {'thing': 'real'}
+        environment = {'also': 'real'}
+        service = Service(
+            'foo',
+            image='foo',
+            labels=dict(labels),
+            client=self.mock_client,
+            environment=dict(environment),
+        )
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        prev_container = mock.Mock(
+            id='ababab',
+            image_config={'ContainerConfig': {}})
+
+        opts = service._get_container_create_options(
+            {},
+            1,
+            previous_container=prev_container)
+
+        self.assertEqual(service.options['labels'], labels)
+        self.assertEqual(service.options['environment'], environment)
+
+        self.assertEqual(
+            opts['labels'][LABEL_CONFIG_HASH],
+            'b30306d0a73b67f67a45b99b88d36c359e470e6fa0c04dda1cf62d2087205b81')
+        self.assertEqual(
+            opts['environment'],
+            {
+                'affinity:container': '=ababab',
+                'also': 'real',
+            }
+        )
 
     def test_get_container_not_found(self):
         self.mock_client.containers.return_value = []
