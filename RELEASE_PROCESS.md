@@ -93,7 +93,7 @@ Building a Compose release
 
         Firstly, note that Compose 1.5.0 requires Docker 1.8.0 or later.
 
-        Secondly, if you're a Mac user, the **[Docker Toolbox](https://www.docker.com/toolbox)** will install Compose ${VERSION} for you, alongside the latest versions of the Docker Engine, Machine and Kitematic.
+        Secondly, if you're a Mac user, the **[Docker Toolbox](https://www.docker.com/toolbox)** will install Compose 1.5.0 for you, alongside the latest versions of the Docker Engine, Machine and Kitematic.
 
         Otherwise, you can use the usual commands to install/upgrade. Either download the binary:
 
