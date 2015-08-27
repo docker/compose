@@ -382,7 +382,7 @@ def parse_environment(environment):
         return dict(split_env(e) for e in environment)
 
     if isinstance(environment, dict):
-        return environment
+        return dict(environment)
 
     raise ConfigurationError(
         "environment \"%s\" must be a list or mapping," %

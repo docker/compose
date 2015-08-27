@@ -554,7 +554,6 @@ class Service(object):
             number,
             one_off=False,
             previous_container=None):
-
         add_config_hash = (not one_off and not override_options)
 
         container_options = dict(
@@ -566,13 +565,6 @@ class Service(object):
             container_options['name'] = self.custom_container_name()
         else:
             container_options['name'] = self.get_container_name(number, one_off)
-
-        if add_config_hash:
-            config_hash = self.config_hash()
-            if 'labels' not in container_options:
-                container_options['labels'] = {}
-            container_options['labels'][LABEL_CONFIG_HASH] = config_hash
-            log.debug("Added config hash: %s" % config_hash)
 
         if 'detach' not in container_options:
             container_options['detach'] = True
@@ -621,7 +613,8 @@ class Service(object):
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
             self.labels(one_off=one_off),
-            number)
+            number,
+            self.config_hash if add_config_hash else None)
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
@@ -943,11 +936,16 @@ def split_port(port):
 # Labels
 
 
-def build_container_labels(label_options, service_labels, number, one_off=False):
-    labels = label_options or {}
+def build_container_labels(label_options, service_labels, number, config_hash):
+    labels = dict(label_options or {})
     labels.update(label.split('=', 1) for label in service_labels)
     labels[LABEL_CONTAINER_NUMBER] = str(number)
     labels[LABEL_VERSION] = __version__
+
+    if config_hash:
+        log.debug("Added config hash: %s" % config_hash)
+        labels[LABEL_CONFIG_HASH] = config_hash
+
     return labels
 
 
