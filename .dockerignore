@@ -1,5 +1,10 @@
+*.egg-info
+.coverage
 .git
+.tox
 build
-dist
-venv
 coverage-html
+dist
+docker-compose.spec
+docs/_site
+venv
