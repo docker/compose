@@ -22,8 +22,8 @@ That'll install our application inside an image with Python installed alongside 
 
 Second, we define our Python dependencies in a file called `requirements.txt`:
 
-    Django==1.7.2
-    psycopg2==2.5.4
+    Django==1.8.4
+    psycopg2==2.6.1
 
 Simple enough. Finally, this is all tied together with a file called `fig.yml`. It describes the services that our app comprises of (a web server and database), what Docker images they use, how they link together, what volumes will be mounted inside the containers and what ports they expose.
 
