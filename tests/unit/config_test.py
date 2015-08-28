@@ -866,12 +866,17 @@ class ExtendsTest(unittest.TestCase):
 
         self.assertEquals(len(service), 1)
         self.assertIsInstance(service[0], dict)
+        self.assertEquals(service[0]['command'], "/bin/true")
 
     def test_extended_service_with_invalid_config(self):
         expected_error_msg = "Service 'myweb' has neither an image nor a build path specified"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
+
+    def test_extended_service_with_valid_config(self):
+        service = load_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')
+        self.assertEquals(service[0]['command'], "top")
 
     def test_extends_file_defaults_to_self(self):
         """
@@ -954,6 +959,10 @@ class ExtendsTest(unittest.TestCase):
         err_msg = r'''Cannot extend service 'foo' in .*: Service not found'''
         with self.assertRaisesRegexp(ConfigurationError, err_msg):
             load_from_filename('tests/fixtures/extends/nonexistent-service.yml')
+
+    def test_partial_service_config_in_extends_is_still_valid(self):
+        dicts = load_from_filename('tests/fixtures/extends/valid-common-config.yml')
+        self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
 
 
 class BuildPathTest(unittest.TestCase):

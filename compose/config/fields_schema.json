@@ -106,24 +106,6 @@
         "working_dir": {"type": "string"}
       },
 
-      "anyOf": [
-        {
-          "required": ["build"],
-          "not": {"required": ["image"]}
-        },
-        {
-          "required": ["image"],
-          "not": {"anyOf": [
-            {"required": ["build"]},
-            {"required": ["dockerfile"]}
-          ]}
-        },
-        {
-          "required": ["extends"],
-          "not": {"required": ["build", "image"]}
-        }
-      ],
-
       "dependencies": {
         "memswap_limit": ["mem_limit"]
       },

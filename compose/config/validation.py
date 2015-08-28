@@ -5,6 +5,7 @@ from functools import wraps
 from docker.utils.ports import split_port
 from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
+from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
@@ -210,14 +211,25 @@ def process_errors(errors):
     return "\n".join(root_msgs + invalid_keys + required + type_errors + other_errors)
 
 
-def validate_against_schema(config):
+def validate_against_fields_schema(config):
+    schema_filename = "fields_schema.json"
+    return _validate_against_schema(config, schema_filename)
+
+
+def validate_against_service_schema(config):
+    schema_filename = "service_schema.json"
+    return _validate_against_schema(config, schema_filename)
+
+
+def _validate_against_schema(config, schema_filename):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
-    schema_file = os.path.join(config_source_dir, "schema.json")
+    schema_file = os.path.join(config_source_dir, schema_filename)
 
     with open(schema_file, "r") as schema_fh:
         schema = json.load(schema_fh)
 
-    validation_output = Draft4Validator(schema, format_checker=FormatChecker(["ports"]))
+    resolver = RefResolver('file://' + config_source_dir + '/', schema)
+    validation_output = Draft4Validator(schema, resolver=resolver, format_checker=FormatChecker(["ports"]))
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
     if errors:

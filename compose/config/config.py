@@ -10,7 +10,8 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
-from .validation import validate_against_schema
+from .validation import validate_against_fields_schema
+from .validation import validate_against_service_schema
 from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
 from .validation import validate_service_names
@@ -139,7 +140,7 @@ def load(config_details):
     config, working_dir, filename = config_details
 
     processed_config = pre_process_config(config)
-    validate_against_schema(processed_config)
+    validate_against_fields_schema(processed_config)
 
     service_dicts = []
 
@@ -193,7 +194,7 @@ class ServiceLoader(object):
                 full_extended_config,
                 self.extended_config_path
             )
-            validate_against_schema(full_extended_config)
+            validate_against_fields_schema(full_extended_config)
 
             self.extended_config = full_extended_config[self.extended_service_name]
         else:
@@ -205,6 +206,10 @@ class ServiceLoader(object):
 
     def make_service_dict(self):
         self.service_dict = self.resolve_extends()
+
+        if not self.already_seen:
+            validate_against_service_schema(self.service_dict)
+
         return process_container_options(self.service_dict, working_dir=self.working_dir)
 
     def resolve_environment(self):

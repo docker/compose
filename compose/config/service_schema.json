@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "type": "object",
+
+  "properties": {
+      "name": {"type": "string"}
+  },
+
+  "required": ["name"],
+
+  "allOf": [
+    {"$ref": "fields_schema.json#/definitions/service"},
+    {"$ref": "#/definitions/service_constraints"}
+  ],
+
+  "definitions": {
+    "service_constraints": {
+      "anyOf": [
+        {
+          "required": ["build"],
+          "not": {"required": ["image"]}
+        },
+        {
+          "required": ["image"],
+          "not": {"anyOf": [
+            {"required": ["build"]},
+            {"required": ["dockerfile"]}
+          ]}
+        },
+        {
+          "required": ["extends"],
+          "not": {"required": ["build", "image"]}
+        }
+      ]
+    }
+  }
+
+}
