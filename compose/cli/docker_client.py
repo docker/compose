@@ -19,6 +19,16 @@ def docker_client():
 
     tls_config = None
 
+    if os.environ.get('DOCKER_TLS', '') != '':
+        parts = base_url.split('://', 1)
+        base_url = '%s://%s' % ('https', parts[1])
+
+        tls_config = tls.TLSConfig(
+            ssl_version=ssl.PROTOCOL_TLSv1,
+            verify=False,
+            assert_hostname=False
+        )
+
     if os.environ.get('DOCKER_TLS_VERIFY', '') != '':
         parts = base_url.split('://', 1)
         base_url = '%s://%s' % ('https', parts[1])
