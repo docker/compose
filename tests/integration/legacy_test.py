@@ -104,7 +104,7 @@ class LegacyTestCase(DockerClientTestCase):
         nginx = self.create_service('nginx', links=[(web, 'web')])
 
         self.services = [db, web, nginx]
-        self.project = Project('composetest', self.services, self.client)
+        self.project = Project(self.project_name, self.services, self.client)
 
         # Create a legacy container for each service
         for service in self.services:
@@ -156,12 +156,16 @@ class LegacyTestCase(DockerClientTestCase):
 
         self.assertEqual(
             set(cm.exception.names),
-            set(['composetest_db_1', 'composetest_web_1', 'composetest_nginx_1']),
+            set([
+                '%s_db_1' % self.project_name,
+                '%s_web_1' % self.project_name,
+                '%s_nginx_1' % self.project_name,
+            ]),
         )
 
         self.assertEqual(
             set(cm.exception.one_off_names),
-            set(['composetest_db_run_1']),
+            set(['%s_db_run_1' % self.project_name]),
         )
 
         # Migrate the containers
@@ -195,12 +199,12 @@ class LegacyTestCase(DockerClientTestCase):
 
         self.assertEqual(
             set(cm.exception.one_off_names),
-            set(['composetest_db_run_1']),
+            set(['%s_db_run_1' % self.project_name]),
         )
 
         # Remove the old one-off container
 
-        c = self.client.inspect_container('composetest_db_run_1')
+        c = self.client.inspect_container('%s_db_run_1' % self.project_name)
         self.client.remove_container(c)
 
         # Checking no longer raises an exception
@@ -215,4 +219,4 @@ class LegacyTestCase(DockerClientTestCase):
         # Creating a one-off container no longer results in an API error
 
         self.project.get_service('db').create_container(one_off=True)
-        self.assertIsInstance(self.client.inspect_container('composetest_db_run_1'), dict)
+        self.assertIsInstance(self.client.inspect_container('%s_db_run_1' % self.project_name), dict)

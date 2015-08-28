@@ -10,7 +10,7 @@ from compose.service import ConvergenceStrategy
 class ResilienceTest(DockerClientTestCase):
     def setUp(self):
         self.db = self.create_service('db', volumes=['/var/db'], command='top')
-        self.project = Project('composetest', [self.db], self.client)
+        self.project = Project(self.project_name, [self.db], self.client)
 
         container = self.db.create_container()
         self.db.start_container(container)

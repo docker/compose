@@ -28,7 +28,7 @@ class ProjectTestCase(DockerClientTestCase):
             'working_dir',
             [config.ConfigFile(None, cfg)])
         return Project.from_dicts(
-            name='composetest',
+            name=self.project_name,
             client=self.client,
             service_dicts=config.load(details))
 
@@ -234,7 +234,7 @@ class ServiceStateTest(DockerClientTestCase):
         self.assertEqual(('recreate', [container]), web.convergence_plan())
 
     def test_trigger_recreate_with_image_change(self):
-        repo = 'composetest_myimage'
+        repo = '%s_myimage' % (self.project_name)
         tag = 'latest'
         image = '{}:{}'.format(repo, tag)
 
