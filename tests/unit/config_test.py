@@ -191,6 +191,17 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_image_and_dockerfile_raise_validation_error(self):
+        expected_error_msg = "Service 'web' has both an image and alternate Dockerfile."
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {'web': {'image': 'busybox', 'dockerfile': 'Dockerfile.alt'}},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
