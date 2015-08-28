@@ -22,6 +22,7 @@ class CLITestCase(DockerClientTestCase):
         sys.exit = lambda code=0: None
         self.command = TopLevelCommand()
         self.command.base_dir = 'tests/fixtures/simple-composefile'
+        os.environ['COMPOSE_PROJECT_NAME'] = self.project_name
 
     def tearDown(self):
         sys.exit = self.old_sys_exit
@@ -29,6 +30,7 @@ class CLITestCase(DockerClientTestCase):
         self.project.remove_stopped()
         for container in self.project.containers(stopped=True, one_off=True):
             container.remove(force=True)
+        del os.environ['COMPOSE_PROJECT_NAME']
         super(CLITestCase, self).tearDown()
 
     @property
@@ -56,7 +58,7 @@ class CLITestCase(DockerClientTestCase):
     def test_ps(self, mock_stdout):
         self.project.get_service('simple').create_container()
         self.command.dispatch(['ps'], None)
-        self.assertIn('simplecomposefile_simple_1', mock_stdout.getvalue())
+        self.assertIn('%s_simple_1' % self.project_name, mock_stdout.getvalue())
 
     @mock.patch('sys.stdout', new_callable=StringIO)
     def test_ps_default_composefile(self, mock_stdout):
@@ -65,9 +67,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['ps'], None)
 
         output = mock_stdout.getvalue()
-        self.assertIn('multiplecomposefiles_simple_1', output)
-        self.assertIn('multiplecomposefiles_another_1', output)
-        self.assertNotIn('multiplecomposefiles_yetanother_1', output)
+        self.assertIn('%s_simple_1' % self.project.name, output)
+        self.assertIn('%s_another_1' % self.project.name, output)
+        self.assertNotIn('%s_yetanother_1' % self.project.name, output)
 
     @mock.patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_composefile(self, mock_stdout):
@@ -80,9 +82,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
 
         output = mock_stdout.getvalue()
-        self.assertNotIn('multiplecomposefiles_simple_1', output)
-        self.assertNotIn('multiplecomposefiles_another_1', output)
-        self.assertIn('multiplecomposefiles_yetanother_1', output)
+        self.assertNotIn('%s_simple_1' % self.project.name, output)
+        self.assertNotIn('%s_another_1' % self.project.name, output)
+        self.assertIn('%s_yetanother_1' % self.project.name, output)
 
     @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
@@ -422,7 +424,12 @@ class CLITestCase(DockerClientTestCase):
 
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['run', '-d', '-p', '30000:3000', '--publish', '30001:3001', 'simple'], None)
+        self.command.dispatch([
+            'run', '-d',
+            '-p', '30003:3000',
+            '--publish', '30001:3001',
+            'simple'
+        ], None)
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -433,7 +440,7 @@ class CLITestCase(DockerClientTestCase):
         container.stop()
 
         # check the ports
-        self.assertEqual(port_short, "0.0.0.0:30000")
+        self.assertEqual(port_short, "0.0.0.0:30003")
         self.assertEqual(port_full, "0.0.0.0:30001")
 
     @mock.patch('dockerpty.start')
@@ -441,7 +448,12 @@ class CLITestCase(DockerClientTestCase):
 
         # create one off container
         self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish', '127.0.0.1:30001:3001', 'simple'], None)
+        self.command.dispatch([
+            'run', '-d',
+            '-p', '127.0.0.1:30000:3000',
+            '--publish', '127.0.0.1:30002:3001',
+            'simple'
+        ], None)
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -453,7 +465,7 @@ class CLITestCase(DockerClientTestCase):
 
         # check the ports
         self.assertEqual(port_short, "127.0.0.1:30000")
-        self.assertEqual(port_full, "127.0.0.1:30001")
+        self.assertEqual(port_full, "127.0.0.1:30002")
 
     @mock.patch('dockerpty.start')
     def test_run_with_custom_name(self, _):
@@ -691,7 +703,13 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 2)
         web = containers[1]
 
-        self.assertEqual(set(web.links()), set(['db', 'mydb_1', 'extends_mydb_1']))
+        self.assertEqual(
+            set(web.links()),
+            set([
+                'db',
+                'mydb_1',
+                '%s_mydb_1' % self.project_name,
+            ]))
 
         expected_env = set([
             "FOO=1",
