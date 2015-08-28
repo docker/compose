@@ -115,6 +115,7 @@ class TopLevelCommand(Command):
       help               Get help on a command
       kill               Kill containers
       logs               View output from containers
+      pause              Pause services
       port               Print the public port for a port binding
       ps                 List containers
       pull               Pulls service images
@@ -124,6 +125,7 @@ class TopLevelCommand(Command):
       scale              Set number of containers for a service
       start              Start services
       stop               Stop services
+      unpause            Unpause services
       up                 Create and start containers
       migrate-to-labels  Recreate containers to add labels
       version            Show the Docker-Compose version information
