@@ -10,6 +10,7 @@ set -e
 
 export DOCKER_VERSIONS=all
 export DOCKER_DAEMON_ARGS="--storage-driver=overlay"
+export PYTEST_NUM_PROCS=5
 GIT_VOLUME="--volumes-from=$(hostname)"
 . script/test-versions
 
