@@ -113,6 +113,22 @@ class CLITestCase(DockerClientTestCase):
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
 
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_build_pull(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.command.dispatch(['build', 'simple'], None)
+
+        mock_stdout.truncate(0)
+        pull_indicator = 'latest: Pulling from'
+        self.command.dispatch(['build', 'simple'], None)
+        output = mock_stdout.getvalue()
+        self.assertNotIn(pull_indicator, output)
+
+        mock_stdout.truncate(0)
+        self.command.dispatch(['build', '--pull', 'simple'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn(pull_indicator, output)
+
     def test_up(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
