@@ -10,36 +10,41 @@ docker run --rm \
   --entrypoint="tox" \
   "$TAG" -e pre-commit
 
+ALL_DOCKER_VERSIONS="1.7.1 1.8.2"
+DEFAULT_DOCKER_VERSION="1.8.2"
+
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="$DEFAULT_DOCKER_VERSION"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
 fi
 
+
+BUILD_NUMBER=${BUILD_NUMBER-$USER}
+
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
 
-  (
-    set -x
+  daemon_container="compose-dind-$version-$BUILD_NUMBER"
+  trap "docker rm -vf $daemon_container" EXIT
 
-    daemon_container_id=$(\
-      docker run \
-      -d \
-      --privileged \
-      --volume="/var/lib/docker" \
-      --expose="2375" \
-      dockerswarm/dind:$version \
-      docker -d -H tcp://0.0.0.0:2375 \
-    )
+  # TODO: remove when we stop testing against 1.7.x
+  daemon=$([[ "$version" == "1.7"* ]] && echo "-d" || echo "daemon")
 
-    docker run \
-      --rm \
-      --link="$daemon_container_id:docker" \
-      --env="DOCKER_HOST=tcp://docker:2375" \
-      --entrypoint="tox" \
-      "$TAG" \
-      -e py27,py34 -- "$@"
+  docker run \
+    -d \
+    --name "$daemon_container" \
+    --privileged \
+    --volume="/var/lib/docker" \
+    dockerswarm/dind:$version \
+    docker $daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
 
-    docker rm -vf "$daemon_container_id"
-  )
+  docker run \
+    --rm \
+    --link="$daemon_container:docker" \
+    --env="DOCKER_HOST=tcp://docker:2375" \
+    --entrypoint="tox" \
+    "$TAG" \
+    -e py27,py34 -- "$@"
+
 done
