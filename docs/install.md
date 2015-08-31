@@ -35,7 +35,7 @@ To install Compose, do the following:
 
 3. Go to the <a href="https://github.com/docker/compose/releases" target="_blank">repository release page</a>.
 
-4. Enter the `curl` command in your termial.
+4. Enter the `curl` command in your terminal.
 
      The command has the following format:
 
