@@ -125,7 +125,7 @@ def process_errors(errors):
 
     for error in errors:
         # handle root level errors
-        if len(error.path) == 0:
+        if len(error.path) == 0 and not error.instance.get('name'):
             if error.validator == 'type':
                 msg = "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
                 root_msgs.append(msg)
@@ -137,11 +137,13 @@ def process_errors(errors):
                 root_msgs.append(_clean_error_message(error.message))
 
         else:
-            # handle service level errors
-            service_name = error.path[0]
-
-            # pop the service name off our path
-            error.path.popleft()
+            try:
+                # field_schema errors will have service name on the path
+                service_name = error.path[0]
+                error.path.popleft()
+            except IndexError:
+                # service_schema errors will have the name in the instance
+                service_name = error.instance.get('name')
 
             if error.validator == 'additionalProperties':
                 invalid_config_key = _parse_key_from_error_msg(error)
