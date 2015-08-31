@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import json
 import os
 import shlex
 import signal
@@ -854,6 +855,16 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(get_port(3000, index=1), containers[0].get_local_port(3000))
         self.assertEqual(get_port(3000, index=2), containers[1].get_local_port(3000))
         self.assertEqual(get_port(3002), "")
+
+    def test_events_json(self):
+        events_proc = start_process(self.base_dir, ['events', '--json'])
+        self.dispatch(['up', '-d'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(events_proc.pid, signal.SIGINT)
+        result = wait_on_process(events_proc, returncode=1)
+        lines = [json.loads(line) for line in result.stdout.rstrip().split('\n')]
+        assert [e['event'] for e in lines] == ['create', 'start', 'create', 'start']
 
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')

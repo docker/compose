@@ -88,3 +88,7 @@ def json_hash(obj):
     h = hashlib.sha256()
     h.update(dump.encode('utf8'))
     return h.hexdigest()
+
+
+def microseconds_from_time_nano(time_nano):
+    return int(time_nano % 1000000000 / 1000)

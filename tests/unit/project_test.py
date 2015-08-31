@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import datetime
+
 import docker
 
 from .. import mock
@@ -196,6 +198,83 @@ class ProjectTest(unittest.TestCase):
             self.assertEqual(
                 project.get_service('test')._get_volumes_from(),
                 [container_ids[0] + ':rw'])
+
+    def test_events(self):
+        services = [Service(name='web'), Service(name='db')]
+        project = Project('test', services, self.mock_client)
+        self.mock_client.events.return_value = iter([
+            {
+                'status': 'create',
+                'from': 'example/image',
+                'id': 'abcde',
+                'time': 1420092061,
+                'timeNano': 14200920610000002000,
+            },
+            {
+                'status': 'attach',
+                'from': 'example/image',
+                'id': 'abcde',
+                'time': 1420092061,
+                'timeNano': 14200920610000003000,
+            },
+            {
+                'status': 'create',
+                'from': 'example/other',
+                'id': 'bdbdbd',
+                'time': 1420092061,
+                'timeNano': 14200920610000005000,
+            },
+            {
+                'status': 'create',
+                'from': 'example/db',
+                'id': 'ababa',
+                'time': 1420092061,
+                'timeNano': 14200920610000004000,
+            },
+        ])
+
+        def dt_with_microseconds(dt, us):
+            return datetime.datetime.fromtimestamp(dt).replace(microsecond=us)
+
+        def get_container(cid):
+            if cid == 'abcde':
+                labels = {LABEL_SERVICE: 'web'}
+            elif cid == 'ababa':
+                labels = {LABEL_SERVICE: 'db'}
+            else:
+                labels = {}
+            return {'Id': cid, 'Config': {'Labels': labels}}
+
+        self.mock_client.inspect_container.side_effect = get_container
+
+        events = project.events()
+
+        events_list = list(events)
+        # Assert the return value is a generator
+        assert not list(events)
+        assert events_list == [
+            {
+                'service': 'web',
+                'event': 'create',
+                'container': 'abcde',
+                'image': 'example/image',
+                'time': dt_with_microseconds(1420092061, 2),
+            },
+            {
+                'service': 'web',
+                'event': 'attach',
+                'container': 'abcde',
+                'image': 'example/image',
+                'time': dt_with_microseconds(1420092061, 3),
+            },
+            {
+                'service': 'db',
+                'event': 'create',
+                'container': 'ababa',
+                'image': 'example/db',
+                'time': dt_with_microseconds(1420092061, 4),
+            },
+        ]
 
     def test_net_unset(self):
         project = Project.from_config('test', Config(None, [
