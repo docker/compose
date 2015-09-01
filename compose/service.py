@@ -488,6 +488,9 @@ class Service(object):
         return {
             'options': self.options,
             'image_id': self.image()['Id'],
+            'links': [(service.name, alias) for service, alias in self.links],
+            'net': self.get_net_name() or getattr(self.net, 'id', self.net),
+            'volumes_from': self.get_volumes_from_names(),
         }
 
     def get_dependency_names(self):

@@ -189,7 +189,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(
             opts['labels'][LABEL_CONFIG_HASH],
-            'b30306d0a73b67f67a45b99b88d36c359e470e6fa0c04dda1cf62d2087205b81')
+            '3c85881a8903b9d73a06c41860c8be08acce1494ab4cf8408375966dccd714de')
         self.assertEqual(
             opts['environment'],
             {
@@ -330,6 +330,47 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(self.mock_client.build.call_count, 1)
         self.assertFalse(self.mock_client.build.call_args[1]['pull'])
+
+    def test_config_dict(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        service = Service(
+            'foo',
+            image='example.com/foo',
+            client=self.mock_client,
+            net=Service('other'),
+            links=[(Service('one'), 'one')],
+            volumes_from=[Service('two')])
+
+        config_dict = service.config_dict()
+        expected = {
+            'image_id': 'abcd',
+            'options': {'image': 'example.com/foo'},
+            'links': [('one', 'one')],
+            'net': 'other',
+            'volumes_from': ['two'],
+        }
+        self.assertEqual(config_dict, expected)
+
+    def test_config_dict_with_net_from_container(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        container = Container(
+            self.mock_client,
+            {'Id': 'aaabbb', 'Name': '/foo_1'})
+        service = Service(
+            'foo',
+            image='example.com/foo',
+            client=self.mock_client,
+            net=container)
+
+        config_dict = service.config_dict()
+        expected = {
+            'image_id': 'abcd',
+            'options': {'image': 'example.com/foo'},
+            'links': [],
+            'net': 'aaabbb',
+            'volumes_from': [],
+        }
+        self.assertEqual(config_dict, expected)
 
 
 def mock_get_image(images):
