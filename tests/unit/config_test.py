@@ -950,6 +950,27 @@ class ExtendsTest(unittest.TestCase):
             load_from_filename('tests/fixtures/extends/nonexistent-service.yml')
 
 
+class ExpandPathTest(unittest.TestCase):
+    working_dir = '/home/user/somedir'
+
+    def test_expand_path_normal(self):
+        result = config.expand_path(self.working_dir, 'myfile')
+        self.assertEqual(result, self.working_dir + '/' + 'myfile')
+
+    def test_expand_path_absolute(self):
+        abs_path = '/home/user/otherdir/somefile'
+        result = config.expand_path(self.working_dir, abs_path)
+        self.assertEqual(result, abs_path)
+
+    def test_expand_path_with_tilde(self):
+        test_path = '~/otherdir/somefile'
+        with mock.patch.dict(os.environ):
+            os.environ['HOME'] = user_path = '/home/user/'
+            result = config.expand_path(self.working_dir, test_path)
+
+        self.assertEqual(result, user_path + 'otherdir/somefile')
+
+
 class BuildPathTest(unittest.TestCase):
     def setUp(self):
         self.abs_context_path = os.path.join(os.getcwd(), 'tests/fixtures/build-ctx')
