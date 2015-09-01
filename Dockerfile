@@ -91,7 +91,7 @@ RUN pip install -r requirements-dev.txt
 RUN pip install tox==2.1.1
 
 ADD . /code/
-RUN python setup.py install
+RUN pip install --no-deps -e /code
 
 RUN chown -R user /code/
 
