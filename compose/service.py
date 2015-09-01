@@ -83,7 +83,16 @@ ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, net=None, **options):
+    def __init__(
+        self,
+        name,
+        client=None,
+        project='default',
+        links=None,
+        volumes_from=None,
+        net=None,
+        **options
+    ):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -97,7 +106,6 @@ class Service(object):
         self.client = client
         self.project = project
         self.links = links or []
-        self.external_links = external_links or []
         self.volumes_from = volumes_from or []
         self.net = net or None
         self.options = options
@@ -517,7 +525,7 @@ class Service(object):
                 links.append((container.name, self.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
-        for external_link in self.external_links:
+        for external_link in self.options.get('external_links') or []:
             if ':' not in external_link:
                 link_name = external_link
             else:
