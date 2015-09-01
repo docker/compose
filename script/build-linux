@@ -6,7 +6,6 @@ TAG="docker-compose"
 docker build -t "$TAG" .
 docker run \
   --rm \
-  --user=user \
   --volume="$(pwd):/code" \
   --entrypoint="script/build-linux-inner" \
   "$TAG"
