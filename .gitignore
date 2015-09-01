@@ -5,6 +5,5 @@
 /build
 /coverage-html
 /dist
-/docker-compose.spec
 /docs/_site
 /venv
