@@ -170,42 +170,18 @@ class ServiceLoader(object):
             self.filename = filename
         self.already_seen = already_seen or []
         self.service_dict = service_dict.copy()
+        self.service_name = service_name
         self.service_dict['name'] = service_name
-
-        self.resolve_environment()
-
-        if 'extends' in self.service_dict:
-            validate_extends_file_path(
-                service_name,
-                self.service_dict['extends'],
-                self.filename
-            )
-            self.extended_config_path = self.get_extended_config_path(
-                self.service_dict['extends']
-            )
-            self.extended_service_name = self.service_dict['extends']['service']
-
-            full_extended_config = pre_process_config(
-                load_yaml(self.extended_config_path)
-            )
-
-            validate_extended_service_exists(
-                self.extended_service_name,
-                full_extended_config,
-                self.extended_config_path
-            )
-            validate_against_fields_schema(full_extended_config)
-
-            self.extended_config = full_extended_config[self.extended_service_name]
-        else:
-            self.extended_config = None
 
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
     def make_service_dict(self):
-        self.service_dict = self.resolve_extends()
+        self.resolve_environment()
+        if 'extends' in self.service_dict:
+            self.validate_and_construct_extends()
+            self.service_dict = self.resolve_extends()
 
         if not self.already_seen:
             validate_against_service_schema(self.service_dict)
@@ -232,19 +208,38 @@ class ServiceLoader(object):
 
         self.service_dict['environment'] = env
 
+    def validate_and_construct_extends(self):
+        validate_extends_file_path(
+            self.service_name,
+            self.service_dict['extends'],
+            self.filename
+        )
+        self.extended_config_path = self.get_extended_config_path(
+            self.service_dict['extends']
+        )
+        self.extended_service_name = self.service_dict['extends']['service']
+
+        full_extended_config = pre_process_config(
+            load_yaml(self.extended_config_path)
+        )
+
+        validate_extended_service_exists(
+            self.extended_service_name,
+            full_extended_config,
+            self.extended_config_path
+        )
+        validate_against_fields_schema(full_extended_config)
+
+        self.extended_config = full_extended_config[self.extended_service_name]
+
     def resolve_extends(self):
-        if self.extended_config is None:
-            return self.service_dict
-
-        service_name = self.service_dict['name']
-
         other_working_dir = os.path.dirname(self.extended_config_path)
-        other_already_seen = self.already_seen + [self.signature(service_name)]
+        other_already_seen = self.already_seen + [self.signature(self.service_name)]
 
         other_loader = ServiceLoader(
             working_dir=other_working_dir,
             filename=self.extended_config_path,
-            service_name=service_name,
+            service_name=self.service_name,
             service_dict=self.extended_config,
             already_seen=other_already_seen,
         )
