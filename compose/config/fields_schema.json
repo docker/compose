@@ -102,6 +102,7 @@
         "tty": {"type": "string"},
         "user": {"type": "string"},
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "volume_driver": {"type": "string"},
         "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "working_dir": {"type": "string"}
       },
