@@ -2,9 +2,12 @@
 
 set -ex
 
+TARGET=dist/docker-compose-Linux-x86_64
+
 mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist
 
-pyinstaller -F bin/docker-compose
-mv dist/docker-compose dist/docker-compose-Linux-x86_64
-dist/docker-compose-Linux-x86_64 version
+pip install -r requirements-build.txt
+su -c "pyinstaller -F bin/docker-compose" user
+mv dist/docker-compose $TARGET
+$TARGET version
