@@ -221,6 +221,53 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
+    def test_get_container_create_options_with_name_option(self):
+        service = Service(
+            'foo',
+            image='foo',
+            client=self.mock_client,
+            container_name='foo1')
+        name = 'the_new_name'
+        opts = service._get_container_create_options(
+            {'name': name},
+            1,
+            one_off=True)
+        self.assertEqual(opts['name'], name)
+
+    def test_get_container_create_options_does_not_mutate_options(self):
+        labels = {'thing': 'real'}
+        environment = {'also': 'real'}
+        service = Service(
+            'foo',
+            image='foo',
+            labels=dict(labels),
+            client=self.mock_client,
+            environment=dict(environment),
+        )
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        prev_container = mock.Mock(
+            id='ababab',
+            image_config={'ContainerConfig': {}})
+
+        opts = service._get_container_create_options(
+            {},
+            1,
+            previous_container=prev_container)
+
+        self.assertEqual(service.options['labels'], labels)
+        self.assertEqual(service.options['environment'], environment)
+
+        self.assertEqual(
+            opts['labels'][LABEL_CONFIG_HASH],
+            '3c85881a8903b9d73a06c41860c8be08acce1494ab4cf8408375966dccd714de')
+        self.assertEqual(
+            opts['environment'],
+            {
+                'affinity:container': '=ababab',
+                'also': 'real',
+            }
+        )
+
     def test_get_container_not_found(self):
         self.mock_client.containers.return_value = []
         service = Service('foo', client=self.mock_client, image='foo')
@@ -339,6 +386,47 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(self.mock_client.build.call_count, 1)
         self.assertFalse(self.mock_client.build.call_args[1]['pull'])
+
+    def test_config_dict(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        service = Service(
+            'foo',
+            image='example.com/foo',
+            client=self.mock_client,
+            net=Service('other'),
+            links=[(Service('one'), 'one')],
+            volumes_from=[Service('two')])
+
+        config_dict = service.config_dict()
+        expected = {
+            'image_id': 'abcd',
+            'options': {'image': 'example.com/foo'},
+            'links': [('one', 'one')],
+            'net': 'other',
+            'volumes_from': ['two'],
+        }
+        self.assertEqual(config_dict, expected)
+
+    def test_config_dict_with_net_from_container(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        container = Container(
+            self.mock_client,
+            {'Id': 'aaabbb', 'Name': '/foo_1'})
+        service = Service(
+            'foo',
+            image='example.com/foo',
+            client=self.mock_client,
+            net=container)
+
+        config_dict = service.config_dict()
+        expected = {
+            'image_id': 'abcd',
+            'options': {'image': 'example.com/foo'},
+            'links': [],
+            'net': 'aaabbb',
+            'volumes_from': [],
+        }
+        self.assertEqual(config_dict, expected)
 
 
 def mock_get_image(images):
