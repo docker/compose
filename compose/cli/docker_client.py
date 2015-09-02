@@ -1,8 +1,11 @@
+import logging
 import os
 import ssl
 
 from docker import Client
 from docker import tls
+
+log = logging.getLogger(__name__)
 
 
 def docker_client():
@@ -34,5 +37,8 @@ def docker_client():
             ca_cert=ca_cert,
         )
 
+    if 'DOCKER_CLIENT_TIMEOUT' in os.environ:
+        log.warn('The DOCKER_CLIENT_TIMEOUT environment variable is deprecated. Please use COMPOSE_HTTP_TIMEOUT instead.')
     timeout = int(os.environ.get('COMPOSE_HTTP_TIMEOUT', os.environ.get('DOCKER_CLIENT_TIMEOUT', 60)))
+
     return Client(base_url=base_url, tls=tls_config, version=api_version, timeout=timeout)
