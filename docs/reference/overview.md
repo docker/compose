@@ -14,6 +14,13 @@ weight=-2
 
 This section describes the subcommands you can use with the `docker-compose` command.  You can run subcommand against one or more services. To run against a specific service, you supply the service name from your compose configuration. If you do not specify the service name, the command runs against all the services in your configuration.
 
+
+## Commands
+
+* [docker-compose Command](docker-compose.md)
+* [CLI Reference](index.md)
+
+
 ## Environment Variables
 
 Several environment variables are available for you to configure the Docker Compose command-line behaviour.
@@ -68,11 +75,6 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 
 Configures the time (in seconds) a request to the Docker daemon is allowed to hang before Compose considers
 it failed. Defaults to 60 seconds.
-
-
-
-
-
 
 
 ## Compose documentation
