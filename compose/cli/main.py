@@ -1,6 +1,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import json
 import logging
 import re
 import signal
@@ -253,6 +254,7 @@ class TopLevelCommand(DocoptCommand):
 
         Options:
             -q    Only display IDs
+            --json    List containers in JSON format
         """
         containers = sorted(
             project.containers(service_names=options['SERVICE'], stopped=True) +
@@ -280,7 +282,10 @@ class TopLevelCommand(DocoptCommand):
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
-            print(Formatter().table(headers, rows))
+            if (options['--json']):
+                print(json.dumps(rows))
+            else:
+                print(Formatter().table(headers, rows))
 
     def pull(self, project, options):
         """
