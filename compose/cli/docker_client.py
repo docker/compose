@@ -34,5 +34,5 @@ def docker_client():
             ca_cert=ca_cert,
         )
 
-    timeout = int(os.environ.get('DOCKER_CLIENT_TIMEOUT', 60))
+    timeout = int(os.environ.get('COMPOSE_HTTP_TIMEOUT', os.environ.get('DOCKER_CLIENT_TIMEOUT', 60)))
     return Client(base_url=base_url, tls=tls_config, version=api_version, timeout=timeout)

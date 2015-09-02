@@ -10,6 +10,7 @@ from operator import attrgetter
 
 import dockerpty
 from docker.errors import APIError
+from requests.exceptions import ReadTimeout
 
 from .. import __version__
 from .. import legacy
@@ -66,6 +67,12 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
+    except ReadTimeout as e:
+        log.error(
+            "HTTP request took too long to complete. Retry with --verbose to obtain debug information.\n"
+            "If you encounter this issue regularly because of slow network conditions, consider setting "
+            "COMPOSE_HTTP_TIMEOUT to a higher value."
+        )
 
 
 def setup_logging():
