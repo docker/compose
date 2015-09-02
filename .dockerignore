@@ -1,6 +1,5 @@
 *.egg-info
 .coverage
-.git
 .tox
 build
 coverage-html
