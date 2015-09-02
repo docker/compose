@@ -31,6 +31,16 @@ class CLIMainTestCase(unittest.TestCase):
         log_printer = build_log_printer(containers, service_names, True)
         self.assertEqual(log_printer.containers, containers[:3])
 
+    def test_build_log_printer_all_services(self):
+        containers = [
+            mock_container('web', 1),
+            mock_container('db', 1),
+            mock_container('other', 1),
+        ]
+        service_names = []
+        log_printer = build_log_printer(containers, service_names, True)
+        self.assertEqual(log_printer.containers, containers)
+
     def test_attach_to_logs(self):
         project = mock.create_autospec(Project)
         log_printer = mock.create_autospec(LogPrinter, containers=[])
