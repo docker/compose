@@ -31,6 +31,26 @@ Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME` def
 
 Specify the file containing the compose configuration. If not provided, Compose looks for a file named  `docker-compose.yml` in the current directory and then each parent directory in succession until a file by that name is found.
 
+### COMPOSE\_API\_VERSION
+
+The Docker API only supports requests from clients which report a specific
+version. If you receive a `client and server don't have same version error` using
+`docker-compose`, you can workaround this error by setting this environment
+variable. Set the version value to match the server version.
+
+Setting this variable is intended as a workaround for situations where you need
+to run temporarily with a mismatch between the client and server version. For
+example, if you can upgrade the client but need to wait to upgrade the server.
+
+Running with this variable set and a known mismatch does prevent some Docker
+features from working properly. The exact features that fail would depend on the
+Docker client and server versions. For this reason, running with this variable
+set is only intended as a workaround and it is not officially supported.
+
+If you run into problems running with this set, resolve the mismatch through
+upgrade and remove this setting to see if your problems resolve before notifying
+support.
+
 ### DOCKER\_HOST
 
 Sets the URL of the `docker` daemon. As with the Docker client, defaults to `unix:///var/run/docker.sock`.
