@@ -16,16 +16,11 @@ You can run Compose on OS X and 64-bit Linux.  It is currently not supported on
 the Windows operating system. To install Compose, you'll need to install Docker
 first.
 
-Depending on how your system is configured, you may require `sudo` access to
-install Compose. If your system requires `sudo`, you will receive "Permission
-denied" errors when installing Compose. If this is the case for you, preface the
-install commands with `sudo` to install.
-
 To install Compose, do the following:
 
 1. Install Docker Engine version 1.7.1 or greater:
 
-     * <a href="https://docs.docker.com/installation/mac/" target="_blank">Mac OS X installation</a> (installs both Engine and Compose)
+     * <a href="https://docs.docker.com/installation/mac/" target="_blank">Mac OS X installation</a> (Toolbox installation includes both Engine and Compose)
 
      * <a href="https://docs.docker.com/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
 
@@ -33,9 +28,13 @@ To install Compose, do the following:
 
 2. Mac OS X users are done installing. Others should continue to the next step.
 
-3. Go to the <a href="https://github.com/docker/compose/releases" target="_blank">repository release page</a>.
+3. Go to the <a href="https://github.com/docker/compose/releases" target="_blank">Compose repository release page on GitHub</a>.
 
-4. Enter the `curl` command in your terminal.
+4. Follow the instructions from the release page and run the `curl` command in your terminal.
+
+     > Note: If you get a "Permission denied" error, your `/usr/local/bin` directory
+     probably isn't writable and you'll need to install Compose as the superuser. Run
+     `sudo -i`, then the two commands below, then `exit`.
 
      The command has the following format:
 
@@ -69,7 +68,7 @@ to preserve) you can migrate them with the following command:
 
     $ docker-compose migrate-to-labels
 
-Alternatively, if you're not worried about keeping them, you can remove them &endash;
+Alternatively, if you're not worried about keeping them, you can remove them.
 Compose will just create new ones.
 
     $ docker rm -f -v myapp_web_1 myapp_db_1 ...
