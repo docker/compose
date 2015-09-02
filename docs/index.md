@@ -222,3 +222,14 @@ like-minded individuals, we have a number of open channels for communication.
 * To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
 
 For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/project/get-help/).
+
+## Where to go next
+
+- [Installing Compose](install.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Get started with Wordpress](wordpress.md)
+- [Command line reference](/reference)
+- [Yaml file reference](yml.md)
+- [Compose environment variables](env.md)
+- [Compose command line completion](completion.md)
