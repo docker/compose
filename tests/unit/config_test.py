@@ -11,11 +11,15 @@ from compose.config import config
 from compose.config.errors import ConfigurationError
 
 
-def make_service_dict(name, service_dict, working_dir):
+def make_service_dict(name, service_dict, working_dir, filename=None):
     """
     Test helper function to construct a ServiceLoader
     """
-    return config.ServiceLoader(working_dir=working_dir).make_service_dict(name, service_dict)
+    return config.ServiceLoader(
+        working_dir=working_dir,
+        filename=filename,
+        service_name=name,
+        service_dict=service_dict).make_service_dict()
 
 
 def service_sort(services):
@@ -202,6 +206,39 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_extra_hosts_string_raises_validation_error(self):
+        expected_error_msg = "Service 'web' configuration key 'extra_hosts' contains an invalid type"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'extra_hosts': 'somehost:162.242.195.82'
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+    def test_config_extra_hosts_list_of_dicts_validation_error(self):
+        expected_error_msg = "Service 'web' configuration key 'extra_hosts' contains an invalid type"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'extra_hosts': [
+                            {'somehost': '162.242.195.82'},
+                            {'otherhost': '50.31.209.229'}
+                        ]
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
@@ -236,7 +273,7 @@ class InterpolationTest(unittest.TestCase):
                 'web': {
                     'image': '${FOO}',
                     'command': '${BAR}',
-                    'entrypoint': '${BAR}',
+                    'container_name': '${BAR}',
                 },
             },
             working_dir='.',
@@ -282,12 +319,13 @@ class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
-        d = make_service_dict('foo', {'volumes': ['~:/container/path']}, working_dir='.')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['~:/container/path']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_local_dir_name_raises_warning(self):
         def make_dict(**config):
+            config['build'] = '.'
             make_service_dict('foo', config, working_dir='.')
 
         with mock.patch('compose.config.config.log.warn') as warn:
@@ -332,6 +370,7 @@ class InterpolationTest(unittest.TestCase):
 
     def test_named_volume_with_driver_does_not_expand(self):
         d = make_service_dict('foo', {
+            'build': '.',
             'volumes': ['namedvolume:/data'],
             'volume_driver': 'foodriver',
         }, working_dir='.')
@@ -341,6 +380,7 @@ class InterpolationTest(unittest.TestCase):
     def test_home_directory_with_driver_does_not_expand(self):
         os.environ['NAME'] = 'surprise!'
         d = make_service_dict('foo', {
+            'build': '.',
             'volumes': ['~:/data'],
             'volume_driver': 'foodriver',
         }, working_dir='.')
@@ -500,36 +540,36 @@ class MergeLabelsTest(unittest.TestCase):
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
-            make_service_dict('foo', {}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar']}, 'tests/'),
+            make_service_dict('foo', {'build': '.'}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
-            make_service_dict('foo', {}, 'tests/'),
-            make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
+            make_service_dict('foo', {'build': '.'}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['foo=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '2'})
 
     def test_override_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
-            make_service_dict('foo', {'labels': ['foo=2']}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar']}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['foo=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '2', 'bar': ''})
 
     def test_add_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            make_service_dict('foo', {'labels': ['foo=1', 'bar']}, 'tests/'),
-            make_service_dict('foo', {'labels': ['bar=2']}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar']}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['bar=2']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': '2'})
 
     def test_remove_explicit_value(self):
         service_dict = config.merge_service_dicts(
-            make_service_dict('foo', {'labels': ['foo=1', 'bar=2']}, 'tests/'),
-            make_service_dict('foo', {'labels': ['bar']}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar=2']}, 'tests/'),
+            make_service_dict('foo', {'build': '.', 'labels': ['bar']}, 'tests/'),
         )
         self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
 
@@ -611,6 +651,7 @@ class EnvTest(unittest.TestCase):
 
         service_dict = make_service_dict(
             'foo', {
+                'build': '.',
                 'environment': {
                     'FILE_DEF': 'F1',
                     'FILE_DEF_EMPTY': '',
@@ -629,7 +670,7 @@ class EnvTest(unittest.TestCase):
     def test_env_from_file(self):
         service_dict = make_service_dict(
             'foo',
-            {'env_file': 'one.env'},
+            {'build': '.', 'env_file': 'one.env'},
             'tests/fixtures/env',
         )
         self.assertEqual(
@@ -640,7 +681,7 @@ class EnvTest(unittest.TestCase):
     def test_env_from_multiple_files(self):
         service_dict = make_service_dict(
             'foo',
-            {'env_file': ['one.env', 'two.env']},
+            {'build': '.', 'env_file': ['one.env', 'two.env']},
             'tests/fixtures/env',
         )
         self.assertEqual(
@@ -662,7 +703,7 @@ class EnvTest(unittest.TestCase):
         os.environ['ENV_DEF'] = 'E3'
         service_dict = make_service_dict(
             'foo',
-            {'env_file': 'resolve.env'},
+            {'build': '.', 'env_file': 'resolve.env'},
             'tests/fixtures/env',
         )
         self.assertEqual(
@@ -862,6 +903,17 @@ class ExtendsTest(unittest.TestCase):
 
         self.assertEquals(len(service), 1)
         self.assertIsInstance(service[0], dict)
+        self.assertEquals(service[0]['command'], "/bin/true")
+
+    def test_extended_service_with_invalid_config(self):
+        expected_error_msg = "Service 'myweb' has neither an image nor a build path specified"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
+
+    def test_extended_service_with_valid_config(self):
+        service = load_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')
+        self.assertEquals(service[0]['command'], "top")
 
     def test_extends_file_defaults_to_self(self):
         """
@@ -887,37 +939,33 @@ class ExtendsTest(unittest.TestCase):
             }
         ]))
 
-    def test_blacklisted_options(self):
-        def load_config():
-            return make_service_dict('myweb', {
-                'extends': {
-                    'file': 'whatever',
-                    'service': 'web',
-                }
-            }, '.')
+    def test_invalid_links_in_extended_service(self):
+        expected_error_msg = "services with 'links' cannot be extended"
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/invalid-links.yml')
 
-        with self.assertRaisesRegexp(ConfigurationError, 'links'):
-            other_config = {'web': {'links': ['db']}}
+    def test_invalid_volumes_from_in_extended_service(self):
+        expected_error_msg = "services with 'volumes_from' cannot be extended"
 
-            with mock.patch.object(config, 'load_yaml', return_value=other_config):
-                print(load_config())
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/invalid-volumes.yml')
 
-        with self.assertRaisesRegexp(ConfigurationError, 'volumes_from'):
-            other_config = {'web': {'volumes_from': ['db']}}
+    def test_invalid_net_in_extended_service(self):
+        expected_error_msg = "services with 'net: container' cannot be extended"
 
-            with mock.patch.object(config, 'load_yaml', return_value=other_config):
-                print(load_config())
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            load_from_filename('tests/fixtures/extends/invalid-net.yml')
 
-        with self.assertRaisesRegexp(ConfigurationError, 'net'):
-            other_config = {'web': {'net': 'container:db'}}
+    @mock.patch.dict(os.environ)
+    def test_valid_interpolation_in_extended_service(self):
+        os.environ.update(
+            HOSTNAME_VALUE="penguin",
+        )
+        expected_interpolated_value = "host-penguin"
 
-            with mock.patch.object(config, 'load_yaml', return_value=other_config):
-                print(load_config())
-
-        other_config = {'web': {'net': 'host'}}
-
-        with mock.patch.object(config, 'load_yaml', return_value=other_config):
-            print(load_config())
+        service_dicts = load_from_filename('tests/fixtures/extends/valid-interpolation.yml')
+        for service in service_dicts:
+            self.assertTrue(service['hostname'], expected_interpolated_value)
 
     def test_volume_path(self):
         dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')
@@ -948,6 +996,10 @@ class ExtendsTest(unittest.TestCase):
         err_msg = r'''Cannot extend service 'foo' in .*: Service not found'''
         with self.assertRaisesRegexp(ConfigurationError, err_msg):
             load_from_filename('tests/fixtures/extends/nonexistent-service.yml')
+
+    def test_partial_service_config_in_extends_is_still_valid(self):
+        dicts = load_from_filename('tests/fixtures/extends/valid-common-config.yml')
+        self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
 
 
 class BuildPathTest(unittest.TestCase):

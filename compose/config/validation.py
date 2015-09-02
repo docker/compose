@@ -5,6 +5,7 @@ from functools import wraps
 from docker.utils.ports import split_port
 from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
+from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
@@ -66,6 +67,27 @@ def validate_top_level_object(func):
     return func_wrapper
 
 
+def validate_extends_file_path(service_name, extends_options, filename):
+    """
+    The service to be extended must either be defined in the config key 'file',
+    or within 'filename'.
+    """
+    error_prefix = "Invalid 'extends' configuration for %s:" % service_name
+
+    if 'file' not in extends_options and filename is None:
+        raise ConfigurationError(
+            "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
+        )
+
+
+def validate_extended_service_exists(extended_service_name, full_extended_config, extended_config_path):
+    if extended_service_name not in full_extended_config:
+        msg = (
+            "Cannot extend service '%s' in %s: Service not found"
+        ) % (extended_service_name, extended_config_path)
+        raise ConfigurationError(msg)
+
+
 def get_unsupported_config_msg(service_name, error_key):
     msg = "Unsupported config option for '{}' service: '{}'".format(service_name, error_key)
     if error_key in DOCKER_CONFIG_HINTS:
@@ -73,7 +95,7 @@ def get_unsupported_config_msg(service_name, error_key):
     return msg
 
 
-def process_errors(errors):
+def process_errors(errors, service_name=None):
     """
     jsonschema gives us an error tree full of information to explain what has
     gone wrong. Process each error and pull out relevant information and re-write
@@ -103,7 +125,7 @@ def process_errors(errors):
 
     for error in errors:
         # handle root level errors
-        if len(error.path) == 0:
+        if len(error.path) == 0 and not error.instance.get('name'):
             if error.validator == 'type':
                 msg = "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
                 root_msgs.append(msg)
@@ -115,11 +137,14 @@ def process_errors(errors):
                 root_msgs.append(_clean_error_message(error.message))
 
         else:
-            # handle service level errors
-            service_name = error.path[0]
-
-            # pop the service name off our path
-            error.path.popleft()
+            if not service_name:
+                # field_schema errors will have service name on the path
+                service_name = error.path[0]
+                error.path.popleft()
+            else:
+                # service_schema errors have the service name passed in, as that
+                # is not available on error.path or necessarily error.instance
+                service_name = service_name
 
             if error.validator == 'additionalProperties':
                 invalid_config_key = _parse_key_from_error_msg(error)
@@ -189,16 +214,27 @@ def process_errors(errors):
     return "\n".join(root_msgs + invalid_keys + required + type_errors + other_errors)
 
 
-def validate_against_schema(config):
+def validate_against_fields_schema(config):
+    schema_filename = "fields_schema.json"
+    return _validate_against_schema(config, schema_filename)
+
+
+def validate_against_service_schema(config, service_name):
+    schema_filename = "service_schema.json"
+    return _validate_against_schema(config, schema_filename, service_name)
+
+
+def _validate_against_schema(config, schema_filename, service_name=None):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
-    schema_file = os.path.join(config_source_dir, "schema.json")
+    schema_file = os.path.join(config_source_dir, schema_filename)
 
     with open(schema_file, "r") as schema_fh:
         schema = json.load(schema_fh)
 
-    validation_output = Draft4Validator(schema, format_checker=FormatChecker(["ports"]))
+    resolver = RefResolver('file://' + config_source_dir + '/', schema)
+    validation_output = Draft4Validator(schema, resolver=resolver, format_checker=FormatChecker(["ports"]))
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
     if errors:
-        error_msg = process_errors(errors)
+        error_msg = process_errors(errors, service_name)
         raise ConfigurationError("Validation failed, reason(s):\n{}".format(error_msg))

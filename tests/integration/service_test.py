@@ -165,16 +165,6 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(set(container.get('HostConfig.ExtraHosts')), set(extra_hosts))
 
-    def test_create_container_with_extra_hosts_string(self):
-        extra_hosts = 'somehost:162.242.195.82'
-        service = self.create_service('db', extra_hosts=extra_hosts)
-        self.assertRaises(ConfigError, lambda: service.create_container())
-
-    def test_create_container_with_extra_hosts_list_of_dicts(self):
-        extra_hosts = [{'somehost': '162.242.195.82'}, {'otherhost': '50.31.209.229'}]
-        service = self.create_service('db', extra_hosts=extra_hosts)
-        self.assertRaises(ConfigError, lambda: service.create_container())
-
     def test_create_container_with_extra_hosts_dicts(self):
         extra_hosts = {'somehost': '162.242.195.82', 'otherhost': '50.31.209.229'}
         extra_hosts_list = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
@@ -515,7 +505,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container['HostConfig']['Privileged'], True)
 
     def test_expose_does_not_publish_ports(self):
-        service = self.create_service('web', expose=[8000])
+        service = self.create_service('web', expose=["8000"])
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['NetworkSettings']['Ports'], {'8000/tcp': None})
 

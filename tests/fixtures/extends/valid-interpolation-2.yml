@@ -1,0 +1,3 @@
+web:
+  build: '.'
+  hostname: "host-${HOSTNAME_VALUE}"

@@ -1,0 +1,8 @@
+myweb:
+  build: '.'
+  extends:
+    service: web
+  command: top
+web:
+  build: '.'
+  net: "container:db"
