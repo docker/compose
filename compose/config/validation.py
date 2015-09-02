@@ -95,7 +95,7 @@ def get_unsupported_config_msg(service_name, error_key):
     return msg
 
 
-def process_errors(errors):
+def process_errors(errors, service_name=None):
     """
     jsonschema gives us an error tree full of information to explain what has
     gone wrong. Process each error and pull out relevant information and re-write
@@ -137,13 +137,14 @@ def process_errors(errors):
                 root_msgs.append(_clean_error_message(error.message))
 
         else:
-            try:
+            if not service_name:
                 # field_schema errors will have service name on the path
                 service_name = error.path[0]
                 error.path.popleft()
-            except IndexError:
-                # service_schema errors will have the name in the instance
-                service_name = error.instance.get('name')
+            else:
+                # service_schema errors have the service name passed in, as that
+                # is not available on error.path or necessarily error.instance
+                service_name = service_name
 
             if error.validator == 'additionalProperties':
                 invalid_config_key = _parse_key_from_error_msg(error)
@@ -218,12 +219,12 @@ def validate_against_fields_schema(config):
     return _validate_against_schema(config, schema_filename)
 
 
-def validate_against_service_schema(config):
+def validate_against_service_schema(config, service_name):
     schema_filename = "service_schema.json"
-    return _validate_against_schema(config, schema_filename)
+    return _validate_against_schema(config, schema_filename, service_name)
 
 
-def _validate_against_schema(config, schema_filename):
+def _validate_against_schema(config, schema_filename, service_name=None):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
     schema_file = os.path.join(config_source_dir, schema_filename)
 
@@ -235,5 +236,5 @@ def _validate_against_schema(config, schema_filename):
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
     if errors:
-        error_msg = process_errors(errors)
+        error_msg = process_errors(errors, service_name)
         raise ConfigurationError("Validation failed, reason(s):\n{}".format(error_msg))
