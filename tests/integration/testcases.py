@@ -31,10 +31,28 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
+        links = kwargs.get('links', None)
+        volumes_from = kwargs.get('volumes_from', None)
+        net = kwargs.get('net', None)
+
+        workaround_options = ['links', 'volumes_from', 'net']
+        for key in workaround_options:
+            try:
+                del kwargs[key]
+            except KeyError:
+                pass
+
         options = ServiceLoader(working_dir='.', filename=None, service_name=name, service_dict=kwargs).make_service_dict()
 
         labels = options.setdefault('labels', {})
         labels['com.docker.compose.test-name'] = self.id()
+
+        if links:
+            options['links'] = links
+        if volumes_from:
+            options['volumes_from'] = volumes_from
+        if net:
+            options['net'] = net
 
         return Service(
             project='composetest',
