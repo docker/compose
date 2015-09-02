@@ -20,7 +20,12 @@
         "cgroup_parent": {"type": "string"},
         "command": {"$ref": "#/definitions/string_or_list"},
         "container_name": {"type": "string"},
-        "cpu_shares": {"type": "string"},
+        "cpu_shares": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "string"}
+          ]
+        },
         "cpuset": {"type": "string"},
         "detach": {"type": "boolean"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
@@ -28,7 +33,7 @@
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
-        "entrypoint": {"type": "string"},
+        "entrypoint": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "env_file": {"$ref": "#/definitions/string_or_list"},
 
         "environment": {
@@ -76,7 +81,7 @@
         },
         "name": {"type": "string"},
         "net": {"type": "string"},
-        "pid": {"type": "string"},
+        "pid": {"type": ["string", "null"]},
 
         "ports": {
           "type": "array",
@@ -95,10 +100,10 @@
           "uniqueItems": true
         },
 
-        "privileged": {"type": "string"},
+        "privileged": {"type": "boolean"},
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
-        "security_opt": {"type": "string"},
+        "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "stdin_open": {"type": "string"},
         "tty": {"type": "string"},
         "user": {"type": "string"},
