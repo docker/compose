@@ -19,6 +19,7 @@ from ..progress_stream import StreamOutputError
 from ..project import ConfigurationError
 from ..project import NoSuchService
 from ..service import BuildError
+from ..service import ConvergenceStrategy
 from ..service import NeedsBuildError
 from .command import Command
 from .docopt_command import NoSuchCommand
@@ -332,7 +333,7 @@ class TopLevelCommand(Command):
                 project.up(
                     service_names=deps,
                     start_deps=True,
-                    allow_recreate=False,
+                    strategy=ConvergenceStrategy.never,
                 )
 
         tty = True
@@ -514,30 +515,21 @@ class TopLevelCommand(Command):
         """
         if options['--allow-insecure-ssl']:
             log.warn(INSECURE_SSL_WARNING)
-            
-        detached = options['-d']
 
         monochrome = options['--no-color']
-
         start_deps = not options['--no-deps']
-        allow_recreate = not options['--no-recreate']
-        force_recreate = options['--force-recreate']
         service_names = options['SERVICE']
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
-
-        if force_recreate and not allow_recreate:
-            raise UserError("--force-recreate and --no-recreate cannot be combined.")
 
         to_attach = project.up(
             service_names=service_names,
             start_deps=start_deps,
-            allow_recreate=allow_recreate,
-            force_recreate=force_recreate,
+            strategy=convergence_strategy_from_opts(options),
             do_build=not options['--no-build'],
             timeout=timeout
         )
 
-        if not detached:
+        if not options['-d']:
             log_printer = build_log_printer(to_attach, service_names, monochrome)
             attach_to_logs(project, log_printer, service_names, timeout)
 
@@ -580,6 +572,21 @@ class TopLevelCommand(Command):
             print(__version__)
         else:
             print(get_version_info('full'))
+
+
+def convergence_strategy_from_opts(options):
+    no_recreate = options['--no-recreate']
+    force_recreate = options['--force-recreate']
+    if force_recreate and no_recreate:
+        raise UserError("--force-recreate and --no-recreate cannot be combined.")
+
+    if force_recreate:
+        return ConvergenceStrategy.always
+
+    if no_recreate:
+        return ConvergenceStrategy.never
+
+    return ConvergenceStrategy.changed
 
 
 def build_log_printer(containers, service_names, monochrome):

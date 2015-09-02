@@ -45,8 +45,9 @@ tests_require = [
 ]
 
 
-if sys.version_info[:1] < (3,):
+if sys.version_info[:2] < (3, 4):
     tests_require.append('mock >= 1.0.1')
+    install_requires.append('enum34 >= 1.0.4, < 2')
 
 
 setup(
