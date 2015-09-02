@@ -74,7 +74,7 @@ Next, you'll want to make a directory for the project:
     $ mkdir composetest
     $ cd composetest
 
-Inside this directory, create `app.py`, a simple web app that uses the Flask
+Inside this directory, create `app.py`, a simple Python web app that uses the Flask
 framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
 
     from flask import Flask
@@ -113,12 +113,12 @@ This tells Docker to:
 * Build an image starting with the Python 2.7 image.
 * Add the current directory `.` into the path `/code` in the image.
 * Set the working directory to `/code`.
-* Install your Python dependencies.
+* Install the Python dependencies.
 * Set the default command for the container to `python app.py`
 
 For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
-You can test that this builds by running `docker build -t web .`.
+You can build the image by running `docker build -t web .`.
 
 ### Define services
 
@@ -135,18 +135,14 @@ Next, define a set of services using `docker-compose.yml`:
     redis:
       image: redis
 
-This defines two services:
-
-#### web
+This template defines two services, `web` and `redis`. The `web` service:
 
 * Builds from the `Dockerfile` in the current directory.
 * Forwards the exposed port 5000 on the container to port 5000 on the host machine.
-* Connects the web container to the Redis service via a link.
-* Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
+* Mounts the current directory on the host to ``/code` inside the container allowing you to modify the code without having to rebuild the image.
+* Links the web container to the Redis service.
 
-#### redis
-
-* Uses the public [Redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
+The `redis` service uses the latest public [Redis](https://registry.hub.docker.com/_/redis/) image pulled from the Docker Hub registry.
 
 ### Build and run your app with Compose
 
@@ -163,7 +159,7 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
 
 If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser.
 
-If you're not using Boot2docker and are on linux, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try localhost:5000.
+If you're using Docker on Linux natively, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try http://localhost:5000.
 
 You should get a message in your browser saying:
 
