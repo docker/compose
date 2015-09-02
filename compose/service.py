@@ -8,6 +8,7 @@ import sys
 from collections import namedtuple
 from operator import attrgetter
 
+import enum
 import six
 from docker.errors import APIError
 from docker.utils import create_host_config
@@ -84,6 +85,20 @@ ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
+
+
+@enum.unique
+class ConvergenceStrategy(enum.Enum):
+    """Enumeration for all possible convergence strategies. Values refer to
+    when containers should be recreated.
+    """
+    changed = 1
+    always = 2
+    never = 3
+
+    @property
+    def allows_recreate(self):
+        return self is not type(self).never
 
 
 class Service(object):
@@ -326,22 +341,19 @@ class Service(object):
         else:
             return self.options['image']
 
-    def convergence_plan(self,
-                         allow_recreate=True,
-                         force_recreate=False):
-
-        if force_recreate and not allow_recreate:
-            raise ValueError("force_recreate and allow_recreate are in conflict")
-
+    def convergence_plan(self, strategy=ConvergenceStrategy.changed):
         containers = self.containers(stopped=True)
 
         if not containers:
             return ConvergencePlan('create', [])
 
-        if not allow_recreate:
+        if strategy is ConvergenceStrategy.never:
             return ConvergencePlan('start', containers)
 
-        if force_recreate or self._containers_have_diverged(containers):
+        if (
+            strategy is ConvergenceStrategy.always or
+            self._containers_have_diverged(containers)
+        ):
             return ConvergencePlan('recreate', containers)
 
         stopped = [c for c in containers if not c.is_running]

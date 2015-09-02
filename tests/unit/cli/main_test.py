@@ -1,10 +1,13 @@
 from __future__ import absolute_import
 
 from compose import container
+from compose.cli.errors import UserError
 from compose.cli.log_printer import LogPrinter
 from compose.cli.main import attach_to_logs
 from compose.cli.main import build_log_printer
+from compose.cli.main import convergence_strategy_from_opts
 from compose.project import Project
+from compose.service import ConvergenceStrategy
 from tests import mock
 from tests import unittest
 
@@ -55,3 +58,32 @@ class CLIMainTestCase(unittest.TestCase):
         project.stop.assert_called_once_with(
             service_names=service_names,
             timeout=timeout)
+
+
+class ConvergeStrategyFromOptsTestCase(unittest.TestCase):
+
+    def test_invalid_opts(self):
+        options = {'--force-recreate': True, '--no-recreate': True}
+        with self.assertRaises(UserError):
+            convergence_strategy_from_opts(options)
+
+    def test_always(self):
+        options = {'--force-recreate': True, '--no-recreate': False}
+        self.assertEqual(
+            convergence_strategy_from_opts(options),
+            ConvergenceStrategy.always
+        )
+
+    def test_never(self):
+        options = {'--force-recreate': False, '--no-recreate': True}
+        self.assertEqual(
+            convergence_strategy_from_opts(options),
+            ConvergenceStrategy.never
+        )
+
+    def test_changed(self):
+        options = {'--force-recreate': False, '--no-recreate': False}
+        self.assertEqual(
+            convergence_strategy_from_opts(options),
+            ConvergenceStrategy.changed
+        )

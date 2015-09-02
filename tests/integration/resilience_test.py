@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from .. import mock
 from .testcases import DockerClientTestCase
 from compose.project import Project
+from compose.service import ConvergenceStrategy
 
 
 class ResilienceTest(DockerClientTestCase):
@@ -16,14 +17,14 @@ class ResilienceTest(DockerClientTestCase):
         self.host_path = container.get('Volumes')['/var/db']
 
     def test_successful_recreate(self):
-        self.project.up(force_recreate=True)
+        self.project.up(strategy=ConvergenceStrategy.always)
         container = self.db.containers()[0]
         self.assertEqual(container.get('Volumes')['/var/db'], self.host_path)
 
     def test_create_failure(self):
         with mock.patch('compose.service.Service.create_container', crash):
             with self.assertRaises(Crash):
-                self.project.up(force_recreate=True)
+                self.project.up(strategy=ConvergenceStrategy.always)
 
         self.project.up()
         container = self.db.containers()[0]
@@ -32,7 +33,7 @@ class ResilienceTest(DockerClientTestCase):
     def test_start_failure(self):
         with mock.patch('compose.service.Service.start_container', crash):
             with self.assertRaises(Crash):
-                self.project.up(force_recreate=True)
+                self.project.up(strategy=ConvergenceStrategy.always)
 
         self.project.up()
         container = self.db.containers()[0]

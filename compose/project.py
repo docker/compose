@@ -15,6 +15,7 @@ from .const import LABEL_SERVICE
 from .container import Container
 from .legacy import check_for_legacy_containers
 from .service import ContainerNet
+from .service import ConvergenceStrategy
 from .service import Net
 from .service import Service
 from .service import ServiceNet
@@ -266,24 +267,16 @@ class Project(object):
     def up(self,
            service_names=None,
            start_deps=True,
-           allow_recreate=True,
-           force_recreate=False,
+           strategy=ConvergenceStrategy.changed,
            do_build=True,
            timeout=DEFAULT_TIMEOUT):
-
-        if force_recreate and not allow_recreate:
-            raise ValueError("force_recreate and allow_recreate are in conflict")
 
         services = self.get_services(service_names, include_deps=start_deps)
 
         for service in services:
             service.remove_duplicate_containers()
 
-        plans = self._get_convergence_plans(
-            services,
-            allow_recreate=allow_recreate,
-            force_recreate=force_recreate,
-        )
+        plans = self._get_convergence_plans(services, strategy)
 
         return [
             container
@@ -295,11 +288,7 @@ class Project(object):
             )
         ]
 
-    def _get_convergence_plans(self,
-                               services,
-                               allow_recreate=True,
-                               force_recreate=False):
-
+    def _get_convergence_plans(self, services, strategy):
         plans = {}
 
         for service in services:
@@ -310,20 +299,13 @@ class Project(object):
                 and plans[name].action == 'recreate'
             ]
 
-            if updated_dependencies and allow_recreate:
-                log.debug(
-                    '%s has upstream changes (%s)',
-                    service.name, ", ".join(updated_dependencies),
-                )
-                plan = service.convergence_plan(
-                    allow_recreate=allow_recreate,
-                    force_recreate=True,
-                )
+            if updated_dependencies and strategy.allows_recreate:
+                log.debug('%s has upstream changes (%s)',
+                          service.name,
+                          ", ".join(updated_dependencies))
+                plan = service.convergence_plan(ConvergenceStrategy.always)
             else:
-                plan = service.convergence_plan(
-                    allow_recreate=allow_recreate,
-                    force_recreate=force_recreate,
-                )
+                plan = service.convergence_plan(strategy)
 
             plans[service.name] = plan
 
