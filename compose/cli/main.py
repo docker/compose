@@ -8,7 +8,6 @@ import sys
 from inspect import getdoc
 from operator import attrgetter
 
-import dockerpty
 from docker.errors import APIError
 from requests.exceptions import ReadTimeout
 
@@ -30,6 +29,11 @@ from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
+
+WINDOWS = (sys.platform == 'win32')
+
+if not WINDOWS:
+    import dockerpty
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
@@ -335,6 +339,14 @@ class TopLevelCommand(Command):
         """
         service = project.get_service(options['SERVICE'])
 
+        detach = options['-d']
+
+        if WINDOWS and not detach:
+            raise UserError(
+                "Interactive mode is not yet supported on Windows.\n"
+                "Please pass the -d flag when using `docker-compose run`."
+            )
+
         if options['--allow-insecure-ssl']:
             log.warn(INSECURE_SSL_WARNING)
 
@@ -349,7 +361,7 @@ class TopLevelCommand(Command):
                 )
 
         tty = True
-        if options['-d'] or options['-T'] or not sys.stdin.isatty():
+        if detach or options['-T'] or not sys.stdin.isatty():
             tty = False
 
         if options['COMMAND']:
@@ -360,8 +372,8 @@ class TopLevelCommand(Command):
         container_options = {
             'command': command,
             'tty': tty,
-            'stdin_open': not options['-d'],
-            'detach': options['-d'],
+            'stdin_open': not detach,
+            'detach': detach,
         }
 
         if options['-e']:
@@ -407,7 +419,7 @@ class TopLevelCommand(Command):
 
             raise e
 
-        if options['-d']:
+        if detach:
             service.start_container(container)
             print(container.name)
         else:
