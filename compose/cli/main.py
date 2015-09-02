@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
+import os
 import re
 import signal
 import sys
@@ -68,9 +69,9 @@ def main():
         sys.exit(1)
     except ReadTimeout as e:
         log.error(
-            "HTTP request took too long to complete. Retry with --verbose to obtain debug information.\n"
+            "An HTTP request took too long to complete. Retry with --verbose to obtain debug information.\n"
             "If you encounter this issue regularly because of slow network conditions, consider setting "
-            "COMPOSE_HTTP_TIMEOUT to a higher value."
+            "COMPOSE_HTTP_TIMEOUT to a higher value (current value: %s)." % os.environ.get('COMPOSE_HTTP_TIMEOUT', 60)
         )
 
 
