@@ -44,6 +44,11 @@ the `docker` daemon.
 
 Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
 
+### COMPOSE\_HTTP\_TIMEOUT
+
+Configures the time (in seconds) a request to the Docker daemon is allowed to hang before Compose considers
+it failed. Defaults to 60 seconds.
+
 
 
 
