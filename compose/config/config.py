@@ -184,7 +184,7 @@ class ServiceLoader(object):
             self.service_dict = self.resolve_extends()
 
         if not self.already_seen:
-            validate_against_service_schema(self.service_dict)
+            validate_against_service_schema(self.service_dict, self.service_name)
 
         return process_container_options(self.service_dict, working_dir=self.working_dir)
 
