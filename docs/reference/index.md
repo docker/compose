@@ -27,3 +27,8 @@ The following pages describe the usage information for the [docker-compose](/ref
 * [rm](/reference/rm.md)
 * [scale](/reference/scale.md)
 * [stop](/reference/stop.md)
+
+## Where to go next
+
+* [CLI environment variables](overview.md)
+* [docker-compose Command](docker-compose.md)

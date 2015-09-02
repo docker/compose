@@ -55,3 +55,8 @@ used all paths in the configuration are relative to the current working
 directory.
 
 Each configuration can has a project name. If you supply a `-p` flag, you can specify a project name. If you don't specify the flag, Compose uses the current directory name.
+
+## Where to go next
+
+* [CLI environment variables](overview.md)
+* [Command line reference](index.md)
