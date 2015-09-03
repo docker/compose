@@ -8,6 +8,6 @@ mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist
 
 pip install -r requirements-build.txt
-su -c "pyinstaller -F bin/docker-compose" user
+su -c "pyinstaller docker-compose.spec" user
 mv dist/docker-compose $TARGET
 $TARGET version
