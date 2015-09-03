@@ -69,6 +69,17 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplecomposefiles_yetanother_1', output)
 
     @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_ps_default_composefile_csv_output(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['ps', '--csv'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertIn('multiplecomposefiles_simple_1;top;Up', output)
+        self.assertIn('multiplecomposefiles_another_1;top;Up', output)
+        self.assertNotIn('multiplecomposefiles_yetanother_1    top', output)
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
     def test_ps_alternate_composefile(self, mock_stdout):
         config_path = os.path.abspath(
             'tests/fixtures/multiple-composefiles/compose2.yml')
