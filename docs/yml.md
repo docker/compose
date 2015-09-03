@@ -184,17 +184,21 @@ Mount all of the volumes from another service or container.
 
 ### environment
 
-Add environment variables. You can use either an array or a dictionary.
+Add environment variables. You can use either a dictionary or an array. Enclose
+boolean variables in quotes to prevent them being parsed into True/False (capitalized)
+when using a dictionary.
 
 Environment variables with only a key are resolved to their values on the
 machine Compose is running on, which can be helpful for secret or host-specific values.
 
     environment:
       RACK_ENV: development
+      SMTP_ENABLED: 'true'
       SESSION_SECRET:
 
     environment:
       - RACK_ENV=development
+      - SMTP_ENABLED=true
       - SESSION_SECRET
 
 ### env_file
