@@ -206,17 +206,8 @@ At this point, you have seen the basics of how Compose works.
 
 ## Release Notes
 
-### Version 1.2.0 (April 7, 2015)
-
-For complete information on this release, see the [1.2.0 Milestone project page](https://github.com/docker/compose/wiki/1.2.0-Milestone-Project-Page).
-In addition to bug fixes and refinements, this release adds the following:
-
-* The `extends` keyword, which adds the ability to extend services by sharing  common configurations. For details, see
-[PR #1088](https://github.com/docker/compose/pull/1088).
-
-* Better integration with Swarm. Swarm will now schedule inter-dependent
-containers on the same host. For details, see
-[PR #972](https://github.com/docker/compose/pull/972).
+To see a detailed list of changes for past and current releases of Docker 
+Compose, please refer to the [CHANGELOG](https://github.com/docker/compose/blob/master/CHANGELOG.md).
 
 ## Getting help
 
