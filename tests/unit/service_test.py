@@ -7,21 +7,27 @@ import mock
 import docker
 from docker.utils import LogConfig
 
-from compose.service import Service
+from .. import mock
+from .. import unittest
+from compose.const import LABEL_CONFIG_HASH
+from compose.const import LABEL_ONE_OFF
+from compose.const import LABEL_PROJECT
+from compose.const import LABEL_SERVICE
 from compose.container import Container
-from compose.const import LABEL_SERVICE, LABEL_PROJECT, LABEL_ONE_OFF
-from compose.service import (
-    ConfigError,
-    NeedsBuildError,
-    NoSuchImageError,
-    build_port_bindings,
-    build_volume_binding,
-    get_container_data_volumes,
-    merge_volume_bindings,
-    parse_repository_tag,
-    parse_volume_spec,
-    split_port,
-)
+from compose.service import ConfigError
+from compose.service import ContainerNet
+from compose.service import NeedsBuildError
+from compose.service import Net
+from compose.service import NoSuchImageError
+from compose.service import Service
+from compose.service import ServiceNet
+from compose.service import build_port_bindings
+from compose.service import build_volume_binding
+from compose.service import get_container_data_volumes
+from compose.service import merge_volume_bindings
+from compose.service import parse_repository_tag
+from compose.service import parse_volume_spec
+from compose.service import split_port
 
 
 class ServiceTest(unittest.TestCase):
@@ -393,7 +399,7 @@ class ServiceTest(unittest.TestCase):
             'foo',
             image='example.com/foo',
             client=self.mock_client,
-            net=Service('other'),
+            net=ServiceNet(Service('other')),
             links=[(Service('one'), 'one')],
             volumes_from=[Service('two')])
 
@@ -427,6 +433,49 @@ class ServiceTest(unittest.TestCase):
             'volumes_from': [],
         }
         self.assertEqual(config_dict, expected)
+
+
+class NetTestCase(unittest.TestCase):
+
+    def test_net(self):
+        net = Net('host')
+        self.assertEqual(net.id, 'host')
+        self.assertEqual(net.mode, 'host')
+        self.assertEqual(net.service_name, None)
+
+    def test_net_container(self):
+        container_id = 'abcd'
+        net = ContainerNet(Container(None, {'Id': container_id}))
+        self.assertEqual(net.id, container_id)
+        self.assertEqual(net.mode, 'container:' + container_id)
+        self.assertEqual(net.service_name, None)
+
+    def test_net_service(self):
+        container_id = 'bbbb'
+        service_name = 'web'
+        mock_client = mock.create_autospec(docker.Client)
+        mock_client.containers.return_value = [
+            {'Id': container_id, 'Name': container_id, 'Image': 'abcd'},
+        ]
+
+        service = Service(name=service_name, client=mock_client)
+        net = ServiceNet(service)
+
+        self.assertEqual(net.id, service_name)
+        self.assertEqual(net.mode, 'container:' + container_id)
+        self.assertEqual(net.service_name, service_name)
+
+    def test_net_service_no_containers(self):
+        service_name = 'web'
+        mock_client = mock.create_autospec(docker.Client)
+        mock_client.containers.return_value = []
+
+        service = Service(name=service_name, client=mock_client)
+        net = ServiceNet(service)
+
+        self.assertEqual(net.id, service_name)
+        self.assertEqual(net.mode, None)
+        self.assertEqual(net.service_name, service_name)
 
 
 def mock_get_image(images):

@@ -9,7 +9,10 @@ from .config import get_service_name_from_net, ConfigurationError
 from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
 from .container import Container
 from .legacy import check_for_legacy_containers
+from .service import ContainerNet
+from .service import Net
 from .service import Service
+from .service import ServiceNet
 from .utils import parallel_execute
 
 log = logging.getLogger(__name__)
@@ -180,18 +183,18 @@ class Project(object):
     def get_net(self, service_dict):
         net = service_dict.pop('net', None)
         if not net:
-            return
+            return Net(None)
 
         net_name = get_service_name_from_net(net)
         if not net_name:
-            return net
+            return Net(net)
 
         try:
-            return self.get_service(net_name)
+            return ServiceNet(self.get_service(net_name))
         except NoSuchService:
             pass
         try:
-            return Container.from_id(self.client, net_name)
+            return ContainerNet(Container.from_id(self.client, net_name))
         except APIError:
             raise ConfigurationError(
                 'Service "%s" is trying to use the network of "%s", '
