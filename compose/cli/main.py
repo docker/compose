@@ -304,7 +304,7 @@ class TopLevelCommand(Command):
             log.warn(INSECURE_SSL_WARNING)
 
         if not options['--no-deps']:
-            deps = service.get_linked_names()
+            deps = service.get_linked_service_names()
 
             if len(deps) > 0:
                 project.up(

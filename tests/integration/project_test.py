@@ -112,7 +112,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web._get_net(), 'container:' + net.containers()[0].id)
+        self.assertEqual(web.net.mode, 'container:' + net.containers()[0].id)
 
     def test_net_from_container(self):
         net_container = Container.create(
@@ -138,7 +138,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web._get_net(), 'container:' + net_container.id)
+        self.assertEqual(web.net.mode, 'container:' + net_container.id)
 
     def test_start_stop_kill_remove(self):
         web = self.create_service('web')

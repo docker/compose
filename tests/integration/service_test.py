@@ -9,6 +9,7 @@ import tempfile
 import shutil
 from six import StringIO, text_type
 
+from .testcases import DockerClientTestCase
 from compose import __version__
 from compose.const import (
     LABEL_CONTAINER_NUMBER,
@@ -17,14 +18,12 @@ from compose.const import (
     LABEL_SERVICE,
     LABEL_VERSION,
 )
-from compose.service import (
-    ConfigError,
-    ConvergencePlan,
-    Service,
-    build_extra_hosts,
-)
 from compose.container import Container
-from .testcases import DockerClientTestCase
+from compose.service import build_extra_hosts
+from compose.service import ConfigError
+from compose.service import ConvergencePlan
+from compose.service import Net
+from compose.service import Service
 
 
 def create_and_start_container(service, **override_options):
@@ -743,17 +742,17 @@ class ServiceTest(DockerClientTestCase):
             self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
 
     def test_network_mode_none(self):
-        service = self.create_service('web', net='none')
+        service = self.create_service('web', net=Net('none'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'none')
 
     def test_network_mode_bridged(self):
-        service = self.create_service('web', net='bridge')
+        service = self.create_service('web', net=Net('bridge'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'bridge')
 
     def test_network_mode_host(self):
-        service = self.create_service('web', net='host')
+        service = self.create_service('web', net=Net('host'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
