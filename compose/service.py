@@ -106,7 +106,7 @@ class Service(object):
         self.project = project
         self.links = links or []
         self.volumes_from = volumes_from or []
-        self.net = net or None
+        self.net = net or Net(None)
         self.options = options
 
     def containers(self, stopped=False, one_off=False, filters={}):
@@ -490,12 +490,12 @@ class Service(object):
             'options': self.options,
             'image_id': self.image()['Id'],
             'links': [(service.name, alias) for service, alias in self.links],
-            'net': self.get_net_name() or getattr(self.net, 'id', self.net),
+            'net': self.net.id,
             'volumes_from': self.get_volumes_from_names(),
         }
 
     def get_dependency_names(self):
-        net_name = self.get_net_name()
+        net_name = self.net.service_name
         return (self.get_linked_names() +
                 self.get_volumes_from_names() +
                 ([net_name] if net_name else []))
@@ -505,12 +505,6 @@ class Service(object):
 
     def get_volumes_from_names(self):
         return [s.name for s in self.volumes_from if isinstance(s, Service)]
-
-    def get_net_name(self):
-        if isinstance(self.net, Service):
-            return self.net.name
-        else:
-            return
 
     def get_container_name(self, number, one_off=False):
         # TODO: Implement issue #652 here
@@ -562,25 +556,6 @@ class Service(object):
                 volumes_from.append(volume_source.id)
 
         return volumes_from
-
-    def _get_net(self):
-        if not self.net:
-            return None
-
-        if isinstance(self.net, Service):
-            containers = self.net.containers()
-            if len(containers) > 0:
-                net = 'container:' + containers[0].id
-            else:
-                log.warning("Warning: Service %s is trying to use reuse the network stack "
-                            "of another service that is not running." % (self.net.name))
-                net = None
-        elif isinstance(self.net, Container):
-            net = 'container:' + self.net.id
-        else:
-            net = self.net
-
-        return net
 
     def _get_container_create_options(
             self,
@@ -696,7 +671,7 @@ class Service(object):
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=privileged,
-            network_mode=self._get_net(),
+            network_mode=self.net.mode,
             devices=devices,
             dns=dns,
             dns_search=dns_search,
@@ -794,6 +769,61 @@ class Service(object):
             stream=True,
         )
         stream_output(output, sys.stdout)
+
+
+class Net(object):
+    """A `standard` network mode (ex: host, bridge)"""
+
+    service_name = None
+
+    def __init__(self, net):
+        self.net = net
+
+    @property
+    def id(self):
+        return self.net
+
+    mode = id
+
+
+class ContainerNet(object):
+    """A network mode that uses a containers network stack."""
+
+    service_name = None
+
+    def __init__(self, container):
+        self.container = container
+
+    @property
+    def id(self):
+        return self.container.id
+
+    @property
+    def mode(self):
+        return 'container:' + self.container.id
+
+
+class ServiceNet(object):
+    """A network mode that uses a service's network stack."""
+
+    def __init__(self, service):
+        self.service = service
+
+    @property
+    def id(self):
+        return self.service.name
+
+    service_name = id
+
+    @property
+    def mode(self):
+        containers = self.service.containers()
+        if containers:
+            return 'container:' + containers[0].id
+
+        log.warn("Warning: Service %s is trying to use reuse the network stack "
+                 "of another service that is not running." % (self.id))
+        return None
 
 
 # Names
