@@ -489,19 +489,22 @@ class Service(object):
         return {
             'options': self.options,
             'image_id': self.image()['Id'],
-            'links': [(service.name, alias) for service, alias in self.links],
+            'links': self.get_link_names(),
             'net': self.net.id,
             'volumes_from': self.get_volumes_from_names(),
         }
 
     def get_dependency_names(self):
         net_name = self.net.service_name
-        return (self.get_linked_names() +
+        return (self.get_linked_service_names() +
                 self.get_volumes_from_names() +
                 ([net_name] if net_name else []))
 
-    def get_linked_names(self):
-        return [s.name for (s, _) in self.links]
+    def get_linked_service_names(self):
+        return [service.name for (service, _) in self.links]
+
+    def get_link_names(self):
+        return [(service.name, alias) for service, alias in self.links]
 
     def get_volumes_from_names(self):
         return [s.name for s in self.volumes_from if isinstance(s, Service)]
@@ -787,7 +790,7 @@ class Net(object):
 
 
 class ContainerNet(object):
-    """A network mode that uses a containers network stack."""
+    """A network mode that uses a container's network stack."""
 
     service_name = None
 
