@@ -239,6 +239,21 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_valid_config_which_allows_two_type_definitions(self):
+        expose_values = [["8000"], [8000]]
+        for expose in expose_values:
+            service = config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'expose': expose
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+            self.assertEqual(service[0]['expose'], expose)
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)

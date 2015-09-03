@@ -43,7 +43,11 @@
           ]
         },
 
-        "expose": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "expose": {
+          "type": "array",
+          "items": {"type": ["string", "number"]},
+          "uniqueItems": true
+        },
 
         "extends": {
           "type": "object",
