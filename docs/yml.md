@@ -37,13 +37,48 @@ Using `image` together with either `build`  or `dockerfile` is not allowed. Atte
 
 ### build
 
-Path to a directory containing a Dockerfile. When the value supplied is a
-relative path, it is interpreted as relative to the location of the yml file
-itself. This directory is also the build context that is sent to the Docker daemon.
+Path to a Dockerfile or to a context containing a Dockerfile. When the
+value supplied is a relative filesystem path, it is interpreted as relative
+to the location of the config file.
+
+The value supplied to this parameter can have any of the forms accepted by
+the docker remote api `/build` endpoint:
+
+* An http(s) or git URL. The resource at the other end of the URL can be
+either a compressed tarball or raw Dockerfile in the case of http(s) or a
+souce code repository having a Dockerfile at the root in the case of git.
+To be interpreted as a remote URL the value must have one of the following
+prefixes: `http://`, `https://`, `git@`, `git://` or `github.com`.
+
+    + Examples: 
+      + A git repo: `build: https://github.com/<user>/<repo>.git`. The
+docker daemon clones the repo and builds from the resultant git workdir.
+      + A remote tarball: `build: http://remote/context.tar.bz2` The docker
+daemon downloads the context, unpacks it, and builds the image.
+
+* The build context can also be given as a path to a single Dockerfile.
+Compose will create a tar archive with that Dockerfile inside and ship it
+to the docker daemon to build:
+
+    + `build: /path/to/Dockerfile`
+ 
+* You can also build from generated tarball contexts. The tar archive is
+sent 'as is' to the daemon - Compose does not validate its contents, it
+just checks to see if the supplied value points to a readable tar file.
+The docker daemon supports archives compressed in the following formats:
+`identity` (no compression), `gzip`, `xz` and `bzip2`.
+
+   + `build: /path/to/localcontext.tar.gz`
+
+* Finally, `build` can be a path to a local directory containing a Dockerfile
+in it. The contents of the directory are packaged in a uncompressed tar
+archive and sent to the daemon. If there's a `.dockerignore` file inside
+the directory, Compose will filter the directory accordingly.
+
+   + `build: /path/to/localdir`
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 
-    build: /path/to/build/dir
 
 Using `build` together with `image` is not allowed. Attempting to do so results in an error.
 
