@@ -206,7 +206,7 @@ At this point, you have seen the basics of how Compose works.
 
 ## Release Notes
 
-To see a detailed list of changes for past and current releases of Docker 
+To see a detailed list of changes for past and current releases of Docker
 Compose, please refer to the [CHANGELOG](https://github.com/docker/compose/blob/master/CHANGELOG.md).
 
 ## Getting help
