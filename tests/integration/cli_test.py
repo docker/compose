@@ -323,7 +323,7 @@ class CLITestCase(DockerClientTestCase):
 
     @mock.patch('dockerpty.start')
     def test_run_service_with_entrypoint_overridden(self, _):
-        self.command.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
+        self.command.base_dir = 'tests/fixtures/dockerfile-with-entrypoint'
         name = 'service'
         self.command.dispatch(
             ['run', '--entrypoint', '/bin/echo', name, 'helloworld'],

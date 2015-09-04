@@ -9,6 +9,7 @@ import shutil
 import tempfile
 
 from .testcases import DockerClientTestCase
+from .testcases import LABEL_TEST_IMAGE
 from compose.config import config
 from compose.const import LABEL_CONFIG_HASH
 from compose.project import Project
@@ -258,7 +259,10 @@ class ServiceStateTest(DockerClientTestCase):
 
     def test_trigger_recreate_with_build(self):
         context = tempfile.mkdtemp()
-        base_image = "FROM busybox\nLABEL com.docker.compose.test_image=true\n"
+        base_image = (
+            "FROM busybox\n"
+            "LABEL %s=%s\n" % (LABEL_TEST_IMAGE, self.project_name)
+        )
 
         try:
             dockerfile = os.path.join(context, 'Dockerfile')

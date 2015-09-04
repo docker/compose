@@ -15,6 +15,9 @@ from compose.service import Service
 log = logging.getLogger(__name__)
 
 
+LABEL_TEST_IMAGE = 'com.docker.compose.test-image'
+
+
 class DockerClientTestCase(unittest.TestCase):
 
     @classmethod
@@ -29,7 +32,7 @@ class DockerClientTestCase(unittest.TestCase):
             self.client.kill(c['Id'])
             self.client.remove_container(c['Id'])
         for i in self.client.images(
-                filters={'label': 'com.docker.compose.test_image'}):
+                filters={'label': LABEL_TEST_IMAGE}):
             try:
                 self.client.remove_image(i)
             except Exception as e:
@@ -52,7 +55,11 @@ class DockerClientTestCase(unittest.TestCase):
             except KeyError:
                 pass
 
-        options = ServiceLoader(working_dir='.', filename=None, service_name=name, service_dict=kwargs).make_service_dict()
+        options = ServiceLoader(
+            working_dir='.',
+            filename=None,
+            service_name=name,
+            service_dict=kwargs).make_service_dict()
 
         labels = options.setdefault('labels', {})
         labels['com.docker.compose.test-name'] = self.id()

@@ -460,7 +460,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(self.client.images(name='%s_test' % self.project_name)), 1)
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
-        self.check_build('tests/fixtures/simple-dockerfile', tag='%s_test' % self.project_name)
+        self.check_build(
+            'tests/fixtures/simple-dockerfile',
+            tag='%s_test' % self.project_name)
         service = Service(
             name='test',
             client=self.client,
