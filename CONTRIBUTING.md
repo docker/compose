@@ -64,8 +64,8 @@ you can specify a test directory, file, module, class or method:
 
     $ script/test tests/unit
     $ script/test tests/unit/cli_test.py
-    $ script/test tests.integration.service_test
-    $ script/test tests.integration.service_test:ServiceTest.test_containers
+    $ script/test tests/unit/config_test.py::ConfigTest
+    $ script/test tests/unit/config_test.py::ConfigTest::test_load
 
 ## Finding things to work on
 
