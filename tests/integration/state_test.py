@@ -12,6 +12,7 @@ from .testcases import DockerClientTestCase
 from compose import config
 from compose.const import LABEL_CONFIG_HASH
 from compose.project import Project
+from compose.service import ConvergenceStrategy
 
 
 class ProjectTestCase(DockerClientTestCase):
@@ -151,7 +152,9 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         old_containers = self.run_up(self.cfg)
 
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
-        new_containers = self.run_up(self.cfg, allow_recreate=False)
+        new_containers = self.run_up(
+            self.cfg,
+            strategy=ConvergenceStrategy.never)
 
         self.assertEqual(new_containers - old_containers, set())
 
@@ -175,23 +178,11 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
 
 def converge(service,
-             allow_recreate=True,
-             force_recreate=False,
+             strategy=ConvergenceStrategy.changed,
              do_build=True):
-    """
-    If a container for this service doesn't exist, create and start one. If there are
-    any, stop them, create+start new ones, and remove the old containers.
-    """
-    plan = service.convergence_plan(
-        allow_recreate=allow_recreate,
-        force_recreate=force_recreate,
-    )
-
-    return service.execute_convergence_plan(
-        plan,
-        do_build=do_build,
-        timeout=1,
-    )
+    """Create a converge plan from a strategy and execute the plan."""
+    plan = service.convergence_plan(strategy)
+    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
 
 
 class ServiceStateTest(DockerClientTestCase):

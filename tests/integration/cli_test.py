@@ -223,7 +223,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertTrue(config['AttachStdin'])
 
     @mock.patch('dockerpty.start')
-    def test_run_service_with_links(self, __):
+    def test_run_service_with_links(self, _):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['run', 'web', '/bin/true'], None)
         db = self.project.get_service('db')
@@ -232,14 +232,14 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     @mock.patch('dockerpty.start')
-    def test_run_with_no_deps(self, __):
+    def test_run_with_no_deps(self, _):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
         db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
     @mock.patch('dockerpty.start')
-    def test_run_does_not_recreate_linked_containers(self, __):
+    def test_run_does_not_recreate_linked_containers(self, _):
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['up', '-d', 'db'], None)
         db = self.project.get_service('db')

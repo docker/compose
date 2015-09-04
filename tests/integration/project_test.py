@@ -5,6 +5,7 @@ from compose import config
 from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
+from compose.service import ConvergenceStrategy
 
 
 def build_service_dicts(service_config):
@@ -224,7 +225,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].get('Volumes./etc')
 
-        project.up(force_recreate=True)
+        project.up(strategy=ConvergenceStrategy.always)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
@@ -243,7 +244,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
 
-        project.up(allow_recreate=False)
+        project.up(strategy=ConvergenceStrategy.never)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
@@ -267,7 +268,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = old_containers[0].id
         db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
 
-        project.up(allow_recreate=False)
+        project.up(strategy=ConvergenceStrategy.never)
 
         new_containers = project.containers(stopped=True)
         self.assertEqual(len(new_containers), 2)
