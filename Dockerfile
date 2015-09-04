@@ -66,13 +66,13 @@ RUN set -ex; \
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
 ENV LANG en_US.UTF-8
 
-ENV ALL_DOCKER_VERSIONS 1.7.1 1.8.1
+ENV ALL_DOCKER_VERSIONS 1.7.1 1.8.2-rc1
 
 RUN set -ex; \
     curl https://get.docker.com/builds/Linux/x86_64/docker-1.7.1 -o /usr/local/bin/docker-1.7.1; \
     chmod +x /usr/local/bin/docker-1.7.1; \
-    curl https://get.docker.com/builds/Linux/x86_64/docker-1.8.1 -o /usr/local/bin/docker-1.8.1; \
-    chmod +x /usr/local/bin/docker-1.8.1
+    curl https://test.docker.com/builds/Linux/x86_64/docker-1.8.2-rc1 -o /usr/local/bin/docker-1.8.2-rc1; \
+    chmod +x /usr/local/bin/docker-1.8.2-rc1
 
 # Set the default Docker to be run
 RUN ln -s /usr/local/bin/docker-1.7.1 /usr/local/bin/docker
