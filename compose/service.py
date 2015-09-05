@@ -159,27 +159,27 @@ class Service(object):
     # TODO: remove these functions, project takes care of starting/stopping,
     def stop(self, **options):
         for c in self.containers():
-            log.info("Stopping %s..." % c.name)
+            log.info("Stopping %s" % c.name)
             c.stop(**options)
 
     def pause(self, **options):
         for c in self.containers(filters={'status': 'running'}):
-            log.info("Pausing %s..." % c.name)
+            log.info("Pausing %s" % c.name)
             c.pause(**options)
 
     def unpause(self, **options):
         for c in self.containers(filters={'status': 'paused'}):
-            log.info("Unpausing %s..." % c.name)
+            log.info("Unpausing %s" % c.name)
             c.unpause()
 
     def kill(self, **options):
         for c in self.containers():
-            log.info("Killing %s..." % c.name)
+            log.info("Killing %s" % c.name)
             c.kill(**options)
 
     def restart(self, **options):
         for c in self.containers():
-            log.info("Restarting %s..." % c.name)
+            log.info("Restarting %s" % c.name)
             c.restart(**options)
 
     # end TODO
@@ -305,7 +305,7 @@ class Service(object):
         )
 
         if 'name' in container_options and not quiet:
-            log.info("Creating %s..." % container_options['name'])
+            log.info("Creating %s" % container_options['name'])
 
         return Container.create(self.client, **container_options)
 
@@ -436,7 +436,7 @@ class Service(object):
         volumes can be copied to the new container, before the original
         container is removed.
         """
-        log.info("Recreating %s..." % container.name)
+        log.info("Recreating %s" % container.name)
         try:
             container.stop(timeout=timeout)
         except APIError as e:
@@ -466,7 +466,7 @@ class Service(object):
         if container.is_running:
             return container
         else:
-            log.info("Starting %s..." % container.name)
+            log.info("Starting %s" % container.name)
             return self.start_container(container)
 
     def start_container(self, container):
@@ -475,7 +475,7 @@ class Service(object):
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
-            log.info('Removing %s...' % c.name)
+            log.info('Removing %s' % c.name)
             c.stop(timeout=timeout)
             c.remove()
 
@@ -704,7 +704,7 @@ class Service(object):
         )
 
     def build(self, no_cache=False):
-        log.info('Building %s...' % self.name)
+        log.info('Building %s' % self.name)
 
         path = self.options['build']
         # python2 os.path() doesn't support unicode, so we need to encode it to

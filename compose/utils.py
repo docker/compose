@@ -90,13 +90,13 @@ def write_out_msg(stream, lines, msg_index, msg, status="done"):
         stream.write("%c[%dA" % (27, diff))
         # erase
         stream.write("%c[2K\r" % 27)
-        stream.write("{} {}... {}\n".format(msg, obj_index, status))
+        stream.write("{} {} ... {}\n".format(msg, obj_index, status))
         # move back down
         stream.write("%c[%dB" % (27, diff))
     else:
         diff = 0
         lines.append(obj_index)
-        stream.write("{} {}... \r\n".format(msg, obj_index))
+        stream.write("{} {} ... \r\n".format(msg, obj_index))
 
     stream.flush()
 
