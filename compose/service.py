@@ -159,32 +159,27 @@ class Service(object):
     # TODO: remove these functions, project takes care of starting/stopping,
     def stop(self, **options):
         for c in self.containers():
-            status = "Stopping %s..." % c.name
-            title_and_log(log, status)
+            log.info("Stopping %s" % c.name)
             c.stop(**options)
 
     def pause(self, **options):
         for c in self.containers(filters={'status': 'running'}):
-            status = "Pausing %s..." % c.name
-            title_and_log(log, status)
+            log.info("Pausing %s" % c.name)
             c.pause(**options)
 
     def unpause(self, **options):
         for c in self.containers(filters={'status': 'paused'}):
-            status = "Unpausing %s..." % c.name
-            title_and_log(log, status)
+            log.info("Unpausing %s" % c.name)
             c.unpause()
 
     def kill(self, **options):
         for c in self.containers():
-            status = "Killing %s..." % c.nam
-            title_and_log(log, status)
+            log.info("Killing %s" % c.name)
             c.kill(**options)
 
     def restart(self, **options):
         for c in self.containers():
-            status = "Restarting %s..." % c.name
-            title_and_log(log, status)
+            log.info("Restarting %s" % c.name)
             c.restart(**options)
 
     # end TODO
@@ -310,8 +305,7 @@ class Service(object):
         )
 
         if 'name' in container_options and not quiet:
-            status = "Creating %s..." % container_options['name']
-            title_and_log(log, status)
+            log.info("Creating %s" % container_options['name'])
 
         return Container.create(self.client, **container_options)
 
@@ -442,8 +436,7 @@ class Service(object):
         volumes can be copied to the new container, before the original
         container is removed.
         """
-        status = "Recreating %s..." % container.name
-        title_and_log(log, status)
+        log.info("Recreating %s" % container.name)
         try:
             container.stop(timeout=timeout)
         except APIError as e:
@@ -473,8 +466,7 @@ class Service(object):
         if container.is_running:
             return container
         else:
-            status = "Starting %s..." % container.name
-            title_and_log(log, status)
+            log.info("Starting %s" % container.name)
             return self.start_container(container)
 
     def start_container(self, container):
@@ -483,8 +475,7 @@ class Service(object):
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
-            status = 'Removing %s...' % c.name
-            title_and_log(log, status)
+            log.info('Removing %s' % c.name)
             c.stop(timeout=timeout)
             c.remove()
 
@@ -711,8 +702,8 @@ class Service(object):
         )
 
     def build(self, no_cache=False):
-        status = 'Building %s...' % self.name
-        title_and_log(log, status)
+        log.info('Building %s' % self.name)
+
         path = self.options['build']
         # python2 os.path() doesn't support unicode, so we need to encode it to
         # a byte string
