@@ -16,6 +16,7 @@ Usage: ps [options] [SERVICE...]
 
 Options:
 -q    Only display IDs
+--csv    show status in row csv format
 ```
 
 Lists containers.

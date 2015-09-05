@@ -230,6 +230,7 @@ class TopLevelCommand(Command):
 
         Options:
             -q    Only display IDs
+            --csv    show status in row csv format
         """
         containers = sorted(
             project.containers(service_names=options['SERVICE'], stopped=True) +
@@ -257,7 +258,10 @@ class TopLevelCommand(Command):
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
-            print(Formatter().table(headers, rows))
+            if options['--csv']:
+                print(Formatter().csv(headers, rows))
+            else:
+                print(Formatter().table(headers, rows))
 
     def pull(self, project, options):
         """
