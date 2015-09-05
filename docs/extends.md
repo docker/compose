@@ -45,8 +45,8 @@ looks like this:
         - "/data"
 
 In this case, you'll get exactly the same result as if you wrote
-`docker-compose.yml` with that `build`, `ports` and `volumes` configuration
-defined directly under `web`.
+`docker-compose.yml` with the same `build`, `ports` and `volumes`
+configuration values defined directly under `web`.
 
 You can go further and define (or re-define) configuration locally in
 `docker-compose.yml`:
@@ -84,13 +84,17 @@ Compose both to develop an application locally and then deploy it to a
 production environment.
 
 The local and production environments are similar, but there are some
-differences. In development, you mount the application code as a volume so that
-it can pick up changes; in production, the code should be immutable from the
-outside. This ensures it’s not accidentally changed. The development environment
-uses a local Redis container, but in production another team manages the Redis
-service, which is listening at `redis-production.example.com`.
+differences.
 
-To configure with `extends` for this sample, you must:
+* In development, you mount the application code as a volume inside
+the container so that changes are picked up automatically; in production,
+the code should be immutable outside of the container.
+
+* The development environment
+uses a local Redis service, but in production another team manages the Redis
+service, available at `redis-production.example.com`.
+
+To implement this scenario using `extends`, you must:
 
 1.  Define the web application as a Docker image in `Dockerfile` and a Compose
     service in `common.yml`.
@@ -98,13 +102,14 @@ To configure with `extends` for this sample, you must:
 2.  Define the development environment in the standard Compose file,
     `docker-compose.yml`.
 
-    - Use `extends` to pull in the web service.
+    - Use `extends` to pull in the web service from `common.yml`.
     - Configure a volume to enable code reloading.
-    - Create an additional Redis service for the application to use locally.
+    - Starts a local Redis service for development.
+    - Configure the web service to talk to the local, development Redis service.
 
 3.  Define the production environment in a third Compose file, `production.yml`.
 
-    - Use `extends` to pull in the web service.
+    - Use `extends` to pull in the web service from `common.yml`.
     - Configure the web service to talk to the external, production Redis service.
 
 #### Define the web app
@@ -158,7 +163,7 @@ Defining the web application requires the following:
 
     Typically, you would have dropped this configuration into
     `docker-compose.yml` file, but in order to pull it into multiple files with
-    `extends`, it needs to be in a separate file.
+    `extends`, we will put it in a separate file.
 
 #### Define the development environment
 
@@ -180,13 +185,14 @@ Defining the web application requires the following:
         redis:
           image: redis
 
-    The new addition defines a `web` service that:
+    The file defines a `web` service that:
 
-    - Fetches the base configuration for `web` out of `common.yml`.
-    - Adds `volumes` and `links` configuration to the base (`common.yml`)
+    - Fetches the base configuration for `web` from `common.yml`.
+    - Adds `volumes` and `links` configuration on top of the base (`common.yml`)
     configuration.
     - Sets the `REDIS_HOST` environment variable to point to the linked redis
     container. This environment uses a stock `redis` image from the Docker Hub.
+
 
 2.  Run `docker-compose up`.
 
@@ -221,7 +227,8 @@ You are almost done. Now, define your production environment:
     Redis instance.
 
     > **Note**: If you try to load up the webapp in your browser you'll get an
-    > error&mdash;`redis-production.example.com` isn't actually a Redis server.
+    > error &mdash; The DNS `redis-production.example.com` doesn't actually
+    > point to any Redis server.
 
 You've now done a basic `extends` configuration. As your application develops,
 you can make any necessary changes to the web service in `common.yml`. Compose
@@ -232,8 +239,12 @@ manually keep both environments in sync.
 
 ### Reference
 
-You can use `extends` on any service together with other configuration keys. It
-always expects a dictionary that should always contain the key: `service` and optionally the `file` key.
+You can use `extends` on any service together with other configuration keys. The
+command expects a dictionary with the mandatory key `service` and optionally
+the `file` key.
+
+The `service` key specifies the name of the service to extend, for example `web`
+or `database`.
 
 The `file` key specifies the location of a Compose configuration file defining
 the extension. The `file` value can be an absolute or relative path. If you
@@ -241,29 +252,19 @@ specify a relative path, Docker Compose treats it as relative to the location
 of the current file. If you don't specify a `file`, Compose looks in the
 current configuration file.
 
-The `service` key specifies the name of the service to extend, for example `web`
-or `database`.
-
 You can extend a service that itself extends another. You can extend
 indefinitely. Compose does not support circular references and `docker-compose`
 returns an error if it encounters them.
 
 #### Adding and overriding configuration
 
-Compose copies configurations from the original service over to the local one,
-**except** for `links` and `volumes_from`. These exceptions exist to avoid
-implicit dependencies&mdash;you always define `links` and `volumes_from`
-locally. This ensures dependencies between services are clearly visible when
-reading the current file. Defining these locally also ensures changes to the
-referenced file don't result in breakage.
+Generally, if a configuration option is defined in both the original service
+and the local service, the local value *replaces*s or *extend*s the definition
+of the original service. However, there are a number of exceptions to the rule,
+and these are explained in the following sections.
 
-If a configuration option is defined in both the original service and the local
-service, the local value either *override*s or *extend*s the definition of the
-original service. This works differently for other configuration options.
-
-For single-value options like `image`, `command` or `mem_limit`, the new value
-replaces the old value. **This is the default behaviour - all exceptions are
-listed below.**
+For **single-value** options such as `image`, `command` or `mem_limit`, the new
+value replaces the old value:
 
     # original service
     command: python app.py
@@ -274,29 +275,8 @@ listed below.**
     # result
     command: python otherapp.py
 
-In the case of `build` and `image`, using one in the local service causes
-Compose to discard the other, if it was defined in the original service.
-
-    # original service
-    build: .
-
-    # local service
-    image: redis
-
-    # result
-    image: redis
-
-    # original service
-    image: redis
-
-    # local service
-    build: .
-
-    # result
-    build: .
-
-For the **multi-value options** `ports`, `expose`, `external_links`, `dns` and
-`dns_search`, Compose concatenates both sets of values:
+For **multi-value options** such as `ports`, `expose`, `external_links`,
+`dns` and `dns_search`, Compose concatenates both sets of values:
 
     # original service
     expose:
@@ -313,8 +293,8 @@ For the **multi-value options** `ports`, `expose`, `external_links`, `dns` and
       - "4000"
       - "5000"
 
-In the case of `environment` and `labels`, Compose "merges" entries together
-with locally-defined values taking precedence:
+In the case of `environment`, `labels`, `volumes` and `devices`, Compose
+"merges" entries together with locally-defined values taking precedence:
 
     # original service
     environment:
@@ -332,8 +312,7 @@ with locally-defined values taking precedence:
       - BAR=local
       - BAZ=local
 
-Finally, for `volumes` and `devices`, Compose "merges" entries together with
-locally-defined bindings taking precedence:
+    ##########################
 
     # original service
     volumes:
@@ -350,6 +329,38 @@ locally-defined bindings taking precedence:
       - /original-dir/foo:/foo
       - /local-dir/bar:/bar
       - /local-dir/baz/:baz
+
+For the case of `build` and `image`, these 2 options are mutually exclusive.
+Using one of these options in the local service causes Compose to discard the
+configuration defined in the original service (if it was defined).
+
+    # original service
+    build: .
+
+    # local service
+    image: redis
+
+    # result
+    image: redis
+
+    ##########################
+
+    # original service
+    image: redis
+
+    # local service
+    build: .
+
+    # result
+    build: .
+
+As a general rule, Compose copies all configurations from the original
+service over to the local definition, **except** for `links` and `volumes_from`.
+These exceptions exist to avoid implicit dependencies&mdash;Compose requires
+`links` and `volumes_from` to be defined locally. This ensures dependencies
+between services are clearly visible when reading the current file. Defining
+these locally also ensures changes to the referenced file don't result in
+breakage.
 
 ## Compose documentation
 
