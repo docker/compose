@@ -37,6 +37,7 @@ DOCKER_CONFIG_KEYS = [
     'extra_hosts',
     'hostname',
     'image',
+    'ipc',
     'labels',
     'links',
     'log_driver',
