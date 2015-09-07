@@ -1059,6 +1059,7 @@ class GetConfigPathTestCase(unittest.TestCase):
 
     files = [
         'docker-compose.yml',
+        'docker-compose.yml.dist',
         'docker-compose.yaml',
         'fig.yml',
         'fig.yaml',
@@ -1067,9 +1068,10 @@ class GetConfigPathTestCase(unittest.TestCase):
     def test_get_config_path_default_file_in_basedir(self):
         files = self.files
         self.assertEqual('docker-compose.yml', get_config_filename_for_files(files[0:]))
-        self.assertEqual('docker-compose.yaml', get_config_filename_for_files(files[1:]))
-        self.assertEqual('fig.yml', get_config_filename_for_files(files[2:]))
-        self.assertEqual('fig.yaml', get_config_filename_for_files(files[3:]))
+        self.assertEqual('docker-compose.yml.dist', get_config_filename_for_files(files[1:]))
+        self.assertEqual('docker-compose.yaml', get_config_filename_for_files(files[2:]))
+        self.assertEqual('fig.yml', get_config_filename_for_files(files[3:]))
+        self.assertEqual('fig.yaml', get_config_filename_for_files(files[4:]))
         with self.assertRaises(config.ComposeFileNotFound):
             get_config_filename_for_files([])
 
@@ -1081,9 +1083,10 @@ class GetConfigPathTestCase(unittest.TestCase):
             return get_config_filename_for_files(files, subdir=True)
 
         self.assertEqual('docker-compose.yml', get_config_in_subdir(files[0:]))
-        self.assertEqual('docker-compose.yaml', get_config_in_subdir(files[1:]))
-        self.assertEqual('fig.yml', get_config_in_subdir(files[2:]))
-        self.assertEqual('fig.yaml', get_config_in_subdir(files[3:]))
+        self.assertEqual('docker-compose.yml.dist', get_config_in_subdir(files[1:]))
+        self.assertEqual('docker-compose.yaml', get_config_in_subdir(files[2:]))
+        self.assertEqual('fig.yml', get_config_in_subdir(files[3:]))
+        self.assertEqual('fig.yaml', get_config_in_subdir(files[4:]))
         with self.assertRaises(config.ComposeFileNotFound):
             get_config_in_subdir([])
 
