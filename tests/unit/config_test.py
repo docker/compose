@@ -254,6 +254,21 @@ class ConfigTest(unittest.TestCase):
             )
             self.assertEqual(service[0]['expose'], expose)
 
+    def test_valid_config_oneof_string_or_list(self):
+        entrypoint_values = [["sh"], "sh"]
+        for entrypoint in entrypoint_values:
+            service = config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'entrypoint': entrypoint
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+            self.assertEqual(service[0]['entrypoint'], entrypoint)
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
