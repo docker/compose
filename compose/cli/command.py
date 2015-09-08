@@ -41,7 +41,7 @@ class Command(DocoptCommand):
                 else:
                     raise errors.DockerNotFoundGeneric()
             elif call_silently(['which', 'boot2docker']) == 0:
-                raise errors.ConnectionErrorBoot2Docker()
+                raise errors.ConnectionErrorDockerMachine()
             else:
                 raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
