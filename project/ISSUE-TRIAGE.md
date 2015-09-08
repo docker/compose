@@ -20,13 +20,15 @@ The following labels are provided in additional to the standard labels:
 
 Most issues should fit into one of the following functional areas:
 
-| Area        |
-|-------------|
-| area/build  |
-| area/cli    |
-| area/config |
-| area/logs   |
-| area/run    |
-| area/scale  |
-| area/tests  |
-| area/up     |
+| Area           |
+|----------------|
+| area/build     |
+| area/cli       |
+| area/config    |
+| area/logs      |
+| area/packaging |
+| area/run       |
+| area/scale     |
+| area/tests     |
+| area/up        |
+| area/volumes   |
