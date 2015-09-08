@@ -32,7 +32,7 @@
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
-        "entrypoint": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "entrypoint": {"$ref": "#/definitions/string_or_list"},
         "env_file": {"$ref": "#/definitions/string_or_list"},
 
         "environment": {
