@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 
 import os
 import platform
+import sys
 import ssl
 import subprocess
 
@@ -107,3 +108,16 @@ def get_version_info(scope):
             + "OpenSSL version: %s" % ssl.OPENSSL_VERSION
     else:
         raise RuntimeError('passed unallowed value to `cli.utils.get_version_info`')
+
+def get_term_title():
+    # Haha this is difficult apparently.
+    out = subprocess.check_output(['xprop',  '-id', os.getenv("WINDOWID"), "WM_NAME"])
+    title = out.split('=')[1].strip().split('"')[1]
+    return title
+
+def set_term_title(title):
+    sys.stdout.write(b'\33]0;%s\a' % title)
+
+def title_and_log(logger, status):
+    set_term_title("docker-compose: %s" % status)
+    logger.info(status)

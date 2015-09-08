@@ -33,6 +33,7 @@ from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
 from .utils import parallel_execute
+from compose.cli.utils import title_and_log
 
 log = logging.getLogger(__name__)
 
@@ -701,8 +702,8 @@ class Service(object):
         )
 
     def build(self, no_cache=False):
-        log.info('Building %s...' % self.name)
-
+        status = 'Building %s...' % self.name
+        title_and_log(log, status)
         path = self.options['build']
         # python2 os.path() doesn't support unicode, so we need to encode it to
         # a byte string

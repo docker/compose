@@ -30,6 +30,7 @@ from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
+from .utils import set_term_title, get_term_title
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
@@ -42,6 +43,7 @@ It will be removed in a future version of Compose.
 
 def main():
     setup_logging()
+    prev_title = get_term_title()
     try:
         command = TopLevelCommand()
         command.sys_dispatch()
@@ -74,6 +76,9 @@ def main():
             "If you encounter this issue regularly because of slow network conditions, consider setting "
             "COMPOSE_HTTP_TIMEOUT to a higher value (current value: %s)." % HTTP_TIMEOUT
         )
+    finally:
+        # Clean up term title
+        set_term_title(prev_title)
 
 
 def setup_logging():
