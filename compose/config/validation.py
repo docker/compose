@@ -117,6 +117,38 @@ def process_errors(errors, service_name=None):
         else:
             return str(schema['type'])
 
+    def _parse_valid_types_from_validator(validator):
+        """
+        A validator value can be either an array of valid types or a string of
+        a valid type. Parse the valid types and prefix with the correct article.
+        """
+        pre_msg_type_prefix = "a"
+        last_msg_type_prefix = "a"
+        types_requiring_an = ["array", "object"]
+
+        if isinstance(validator, list):
+            last_type = validator.pop()
+            types_from_validator = ", ".join(validator)
+
+            if validator[0] in types_requiring_an:
+                pre_msg_type_prefix = "an"
+
+            if last_type in types_requiring_an:
+                last_msg_type_prefix = "an"
+
+            msg = "{} {} or {} {}".format(
+                pre_msg_type_prefix,
+                types_from_validator,
+                last_msg_type_prefix,
+                last_type
+            )
+        else:
+            if validator in types_requiring_an:
+                pre_msg_type_prefix = "an"
+            msg = "{} {}".format(pre_msg_type_prefix, validator)
+
+        return msg
+
     root_msgs = []
     invalid_keys = []
     required = []
@@ -176,19 +208,16 @@ def process_errors(errors, service_name=None):
                     service_name, config_key, valid_type_msg)
                 )
             elif error.validator == 'type':
-                msg = "a"
-                if error.validator_value == "array":
-                    msg = "an"
+                msg = _parse_valid_types_from_validator(error.validator_value)
 
                 if len(error.path) > 0:
                     config_key = " ".join(["'%s'" % k for k in error.path])
                     type_errors.append(
                         "Service '{}' configuration key {} contains an invalid "
-                        "type, it should be {} {}".format(
+                        "type, it should be {}".format(
                             service_name,
                             config_key,
-                            msg,
-                            error.validator_value))
+                            msg))
                 else:
                     root_msgs.append(
                         "Service '{}' doesn\'t have any configuration options. "
