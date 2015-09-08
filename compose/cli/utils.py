@@ -109,6 +109,8 @@ def get_version_info(scope):
     else:
         raise RuntimeError('passed unallowed value to `cli.utils.get_version_info`')
 
+
+
 def get_term_title():
     # Haha this is difficult apparently.
     out = subprocess.check_output(['xprop',  '-id', os.getenv("WINDOWID"), "WM_NAME"])
@@ -116,8 +118,11 @@ def get_term_title():
     return title
 
 def set_term_title(title):
+    # ref https://github.com/ipython/ipython/blob/master/IPython/utils/terminal.py
+    # For windows https://stackoverflow.com/questions/7387276/set-windows-command-line-terminal-title-in-python
     sys.stdout.write(b'\33]0;%s\a' % title)
 
 def title_and_log(logger, status):
+    "Convenience function takes the logger and a status and sets terminal title."
     set_term_title("docker-compose: %s" % status)
     logger.info(status)
