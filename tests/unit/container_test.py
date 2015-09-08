@@ -83,8 +83,14 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.name, "composetest_db_1")
 
     def test_name_without_project(self):
+        self.container_dict['Name'] = "/composetest_web_7"
         container = Container(None, self.container_dict, has_been_inspected=True)
         self.assertEqual(container.name_without_project, "web_7")
+
+    def test_name_without_project_custom_container_name(self):
+        self.container_dict['Name'] = "/custom_name_of_container"
+        container = Container(None, self.container_dict, has_been_inspected=True)
+        self.assertEqual(container.name_without_project, "custom_name_of_container")
 
     def test_inspect_if_not_inspected(self):
         mock_client = mock.create_autospec(docker.Client)
