@@ -269,6 +269,21 @@ class ConfigTest(unittest.TestCase):
             )
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
+    def test_validation_message_for_invalid_type_when_multiple_types_allowed(self):
+        expected_error_msg = "Service 'web' configuration key 'mem_limit' contains an invalid type, it should be a number or a string"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'mem_limit': ['incorrect']
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
