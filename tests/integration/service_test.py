@@ -638,8 +638,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(service.containers()[0].is_running)
         self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_api_returns_unexpected_exception(self, mock_stdout):
+    def test_scale_with_api_returns_unexpected_exception(self):
         """
         Test that when scaling if the API returns an error, that is not of type
         APIError, that error is re-raised.
@@ -650,7 +649,8 @@ class ServiceTest(DockerClientTestCase):
 
         with mock.patch(
             'compose.container.Container.create',
-                side_effect=ValueError("BOOM")):
+            side_effect=ValueError("BOOM")
+        ):
             with self.assertRaises(ValueError):
                 service.scale(3)
 

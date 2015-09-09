@@ -21,7 +21,6 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
     """
     stream = get_output_stream(sys.stdout)
     lines = []
-    errors = {}
 
     for obj in objects:
         write_out_msg(stream, lines, msg_index(obj), msg)
@@ -29,16 +28,17 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
     q = Queue()
 
     def inner_execute_function(an_callable, parameter, msg_index):
+        error = None
         try:
             result = an_callable(parameter)
         except APIError as e:
-            errors[msg_index] = e.explanation
+            error = e.explanation
             result = "error"
         except Exception as e:
-            errors[msg_index] = e
+            error = e
             result = 'unexpected_exception'
 
-        q.put((msg_index, result))
+        q.put((msg_index, result, error))
 
     for an_object in objects:
         t = Thread(
@@ -49,15 +49,17 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
         t.start()
 
     done = 0
+    errors = {}
     total_to_execute = len(objects)
 
     while done < total_to_execute:
         try:
-            msg_index, result = q.get(timeout=1)
+            msg_index, result, error = q.get(timeout=1)
 
             if result == 'unexpected_exception':
-                raise errors[msg_index]
+                errors[msg_index] = result, error
             if result == 'error':
+                errors[msg_index] = result, error
                 write_out_msg(stream, lines, msg_index, msg, status='error')
             else:
                 write_out_msg(stream, lines, msg_index, msg)
@@ -65,10 +67,14 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
         except Empty:
             pass
 
-    if errors:
-        stream.write("\n")
-        for error in errors:
-            stream.write("ERROR: for {}  {} \n".format(error, errors[error]))
+    if not errors:
+        return
+
+    stream.write("\n")
+    for msg_index, (result, error) in errors.items():
+        stream.write("ERROR: for {}  {} \n".format(msg_index, error))
+        if result == 'unexpected_exception':
+            raise error
 
 
 def get_output_stream(stream):
