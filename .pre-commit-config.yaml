@@ -16,3 +16,4 @@
   sha: 3d86483455ab5bd06cc1069fdd5ac57be5463f10
   hooks:
     - id: reorder-python-imports
+      language_version: 'python2.7'
