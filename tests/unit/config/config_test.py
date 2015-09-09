@@ -1115,6 +1115,26 @@ class ExtendsTest(unittest.TestCase):
         dicts = load_from_filename('tests/fixtures/extends/valid-common-config.yml')
         self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
 
+    def test_extended_service_with_verbose_and_shorthand_way(self):
+        services = load_from_filename('tests/fixtures/extends/verbose-and-shorthand.yml')
+        self.assertEqual(service_sort(services), service_sort([
+            {
+                'name': 'base',
+                'image': 'busybox',
+                'environment': {'BAR': '1'},
+            },
+            {
+                'name': 'verbose',
+                'image': 'busybox',
+                'environment': {'BAR': '1', 'FOO': '1'},
+            },
+            {
+                'name': 'shorthand',
+                'image': 'busybox',
+                'environment': {'BAR': '1', 'FOO': '2'},
+            },
+        ]))
+
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ExpandPathTest(unittest.TestCase):
