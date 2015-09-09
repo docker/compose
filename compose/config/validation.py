@@ -107,16 +107,6 @@ def process_errors(errors, service_name=None):
     def _clean_error_message(message):
         return message.replace("u'", "'")
 
-    def _parse_valid_types_from_schema(schema):
-        """
-        Our defined types using $ref in the schema require some extra parsing
-        retrieve a helpful type for error message display.
-        """
-        if '$ref' in schema:
-            return schema['$ref'].replace("#/definitions/", "").replace("_", " ")
-        else:
-            return str(schema['type'])
-
     def _parse_valid_types_from_validator(validator):
         """
         A validator value can be either an array of valid types or a string of
@@ -146,6 +136,39 @@ def process_errors(errors, service_name=None):
             if validator in types_requiring_an:
                 pre_msg_type_prefix = "an"
             msg = "{} {}".format(pre_msg_type_prefix, validator)
+
+        return msg
+
+    def _parse_oneof_validator(error):
+        """
+        oneOf has multiple schemas, so we need to reason about which schema, sub
+        schema or constraint the validation is failing on.
+        Inspecting the context value of a ValidationError gives us information about
+        which sub schema failed and which kind of error it is.
+        """
+        constraint = [context for context in error.context if len(context.path) > 0]
+        if constraint:
+            valid_types = _parse_valid_types_from_validator(constraint[0].validator_value)
+            msg = "contains {}, which is an invalid type, it should be {}".format(
+                constraint[0].instance,
+                valid_types
+            )
+            return msg
+
+        uniqueness = [context for context in error.context if context.validator == 'uniqueItems']
+        if uniqueness:
+            msg = "contains non unique items, please remove duplicates from {}".format(
+                uniqueness[0].instance
+            )
+            return msg
+
+        types = [context.validator_value for context in error.context if context.validator == 'type']
+        if len(types) == 1:
+            valid_types = _parse_valid_types_from_validator(types[0])
+        else:
+            valid_types = _parse_valid_types_from_validator(types)
+
+        msg = "contains an invalid type, it should be {}".format(valid_types)
 
         return msg
 
@@ -200,12 +223,10 @@ def process_errors(errors, service_name=None):
                     required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
                 config_key = error.path[0]
+                msg = _parse_oneof_validator(error)
 
-                valid_types = [_parse_valid_types_from_schema(schema) for schema in error.schema['oneOf']]
-                valid_type_msg = " or ".join(valid_types)
-
-                type_errors.append("Service '{}' configuration key '{}' contains an invalid type, valid types are {}".format(
-                    service_name, config_key, valid_type_msg)
+                type_errors.append("Service '{}' configuration key '{}' {}".format(
+                    service_name, config_key, msg)
                 )
             elif error.validator == 'type':
                 msg = _parse_valid_types_from_validator(error.validator_value)
