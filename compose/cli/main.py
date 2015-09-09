@@ -193,7 +193,7 @@ class TopLevelCommand(Command):
 
         monochrome = options['--no-color']
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, attach_params={'logs': True}, monochrome=monochrome).run()
+        LogPrinter(containers, monochrome=monochrome).run()
 
     def pause(self, project, options):
         """
@@ -602,11 +602,7 @@ def convergence_strategy_from_opts(options):
 def build_log_printer(containers, service_names, monochrome):
     if service_names:
         containers = [c for c in containers if c.service in service_names]
-
-    return LogPrinter(
-        containers,
-        attach_params={"logs": True},
-        monochrome=monochrome)
+    return LogPrinter(containers, monochrome=monochrome)
 
 
 def attach_to_logs(project, log_printer, service_names, timeout):

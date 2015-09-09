@@ -13,9 +13,9 @@ from compose import utils
 
 
 class LogPrinter(object):
-    def __init__(self, containers, attach_params=None, output=sys.stdout, monochrome=False):
+    # TODO: move logic to run
+    def __init__(self, containers, output=sys.stdout, monochrome=False):
         self.containers = containers
-        self.attach_params = attach_params or {}
         self.prefix_width = self._calculate_prefix_width(containers)
         self.generators = self._make_log_generators(monochrome)
         self.output = utils.get_output_stream(output)
@@ -25,6 +25,7 @@ class LogPrinter(object):
         for line in mux.loop():
             self.output.write(line)
 
+    # TODO: doesn't use self, remove from class
     def _calculate_prefix_width(self, containers):
         """
         Calculate the maximum width of container names so we can make the log
@@ -56,14 +57,10 @@ class LogPrinter(object):
 
     def _make_log_generator(self, container, color_fn):
         prefix = color_fn(self._generate_prefix(container))
-        # Attach to container before log printer starts running
-        line_generator = split_buffer(self._attach(container), u'\n')
 
-        for line in line_generator:
-            yield prefix + line
-
-        exit_code = container.wait()
-        yield color_fn("%s exited with code %s\n" % (container.name, exit_code))
+        if container.has_api_logs:
+            return build_log_generator(container, prefix, color_fn)
+        return build_no_log_generator(container, prefix, color_fn)
 
     def _generate_prefix(self, container):
         """
@@ -73,12 +70,27 @@ class LogPrinter(object):
         padding = ' ' * (self.prefix_width - len(name))
         return ''.join([name, padding, ' | '])
 
-    def _attach(self, container):
-        params = {
-            'stdout': True,
-            'stderr': True,
-            'stream': True,
-        }
-        params.update(self.attach_params)
-        params = dict((name, 1 if value else 0) for (name, value) in list(params.items()))
-        return container.attach(**params)
+
+def build_no_log_generator(container, prefix, color_fn):
+    """Return a generator that prints a warning about logs and waits for
+    container to exit.
+    """
+    yield "{} WARNING: no logs are available with the '{}' log driver\n".format(
+        prefix,
+        container.log_driver)
+    yield color_fn(wait_on_exit(container))
+
+
+def build_log_generator(container, prefix, color_fn):
+    # Attach to container before log printer starts running
+    stream = container.attach(stdout=True, stderr=True,  stream=True, logs=True)
+    line_generator = split_buffer(stream, u'\n')
+
+    for line in line_generator:
+        yield prefix + line
+    yield color_fn(wait_on_exit(container))
+
+
+def wait_on_exit(container):
+    exit_code = container.wait()
+    return "%s exited with code %s\n" % (container.name, exit_code)
