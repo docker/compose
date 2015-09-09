@@ -137,6 +137,15 @@ class Container(object):
     def is_paused(self):
         return self.get('State.Paused')
 
+    @property
+    def log_driver(self):
+        return self.get('HostConfig.LogConfig.Type')
+
+    @property
+    def has_api_logs(self):
+        log_type = self.log_driver
+        return not log_type or log_type == 'json-file'
+
     def get(self, key):
         """Return a value from the container or None if the value is not set.
 
