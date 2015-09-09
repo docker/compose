@@ -17,7 +17,12 @@
         "build": {"type": "string"},
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-        "command": {"$ref": "#/definitions/string_or_list"},
+        "command": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
         "container_name": {"type": "string"},
         "cpu_shares": {
           "oneOf": [
