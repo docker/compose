@@ -27,7 +27,6 @@
           ]
         },
         "cpuset": {"type": "string"},
-        "detach": {"type": "boolean"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
