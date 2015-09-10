@@ -516,7 +516,7 @@ def split_label(label):
 
 
 def expand_path(working_dir, path):
-    return os.path.abspath(os.path.join(working_dir, path))
+    return os.path.abspath(os.path.join(working_dir, os.path.expanduser(path)))
 
 
 def to_list(value):
