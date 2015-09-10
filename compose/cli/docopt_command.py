@@ -43,6 +43,10 @@ class DocoptCommand(object):
 
     def get_handler(self, command):
         command = command.replace('-', '_')
+        # we certainly want to have "exec" command, since that's what docker client has
+        # but in python exec is a keyword
+        if command == "exec":
+            command = "exec_command"
 
         if not hasattr(self, command):
             raise NoSuchCommand(command, self)
