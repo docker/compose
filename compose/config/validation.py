@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from functools import wraps
 
@@ -9,6 +10,9 @@ from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
+
+
+log = logging.getLogger(__name__)
 
 
 DOCKER_CONFIG_HINTS = {
@@ -41,6 +45,21 @@ def format_ports(instance):
         split_port(instance)
     except ValueError:
         return False
+    return True
+
+
+@FormatChecker.cls_checks(format="environment")
+def format_boolean_in_environment(instance):
+    """
+    Check if there is a boolean in the environment and display a warning.
+    Always return True here so the validation won't raise an error.
+    """
+    if isinstance(instance, bool):
+        log.warn(
+            "Warning: There is a boolean value, {0} in the 'environment' key.\n"
+            "Environment variables can only be strings.\nPlease add quotes to any boolean values to make them string "
+            "(eg, '{0}').\nThis warning will become an error in a future release. \r\n".format(instance)
+        )
     return True
 
 
@@ -259,15 +278,17 @@ def process_errors(errors, service_name=None):
 
 def validate_against_fields_schema(config):
     schema_filename = "fields_schema.json"
-    return _validate_against_schema(config, schema_filename)
+    format_checkers = ["ports", "environment"]
+    return _validate_against_schema(config, schema_filename, format_checkers)
 
 
 def validate_against_service_schema(config, service_name):
     schema_filename = "service_schema.json"
-    return _validate_against_schema(config, schema_filename, service_name)
+    format_checkers = ["ports"]
+    return _validate_against_schema(config, schema_filename, format_checkers, service_name)
 
 
-def _validate_against_schema(config, schema_filename, service_name=None):
+def _validate_against_schema(config, schema_filename, format_checker=[], service_name=None):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
     schema_file = os.path.join(config_source_dir, schema_filename)
 
@@ -275,7 +296,7 @@ def _validate_against_schema(config, schema_filename, service_name=None):
         schema = json.load(schema_fh)
 
     resolver = RefResolver('file://' + config_source_dir + '/', schema)
-    validation_output = Draft4Validator(schema, resolver=resolver, format_checker=FormatChecker(["ports"]))
+    validation_output = Draft4Validator(schema, resolver=resolver, format_checker=FormatChecker(format_checker))
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
     if errors:

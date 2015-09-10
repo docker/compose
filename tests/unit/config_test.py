@@ -270,20 +270,22 @@ class ConfigTest(unittest.TestCase):
             )
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
-    def test_config_environment_contains_boolean_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'environment' contains an invalid type"
-
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            config.load(
-                config.ConfigDetails(
-                    {'web': {
-                        'image': 'busybox',
-                        'environment': {'SHOW_STUFF': True}
-                    }},
-                    'working_dir',
-                    'filename.yml'
-                )
+    @mock.patch('compose.config.validation.log')
+    def test_logs_warning_for_boolean_in_environment(self, mock_logging):
+        expected_warning_msg = "Warning: There is a boolean value, True in the 'environment' key."
+        config.load(
+            config.ConfigDetails(
+                {'web': {
+                    'image': 'busybox',
+                    'environment': {'SHOW_STUFF': True}
+                }},
+                'working_dir',
+                'filename.yml'
             )
+        )
+
+        self.assertTrue(mock_logging.warn.called)
+        self.assertTrue(expected_warning_msg in mock_logging.warn.call_args[0][0])
 
 
 class InterpolationTest(unittest.TestCase):
