@@ -1,6 +1,22 @@
 Change log
 ==========
 
+1.4.1 (2015-09-10)
+------------------
+
+The following bugs have been fixed:
+
+-   Some configuration changes (notably changes to `links`, `volumes_from`, and
+    `net`) were not properly triggering a container recreate as part of
+    `docker-compose up`.
+-   `docker-compose up <service>` was showing logs for all services instead of
+    just the specified services.
+-   Containers with custom container names were showing up in logs as
+    `service_number` instead of their custom container name.
+-   When scaling a service sometimes containers would be recreated even when
+    the configuration had not changed.
+
+
 1.4.0 (2015-08-04)
 ------------------
 

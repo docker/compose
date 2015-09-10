@@ -52,7 +52,7 @@ To install Compose, do the following:
 6. Test the installation.
 
         $ docker-compose --version
-        docker-compose version: 1.4.0
+        docker-compose version: 1.4.1
 
 ## Upgrading
 
