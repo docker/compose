@@ -41,7 +41,8 @@
               "type": "object",
               "patternProperties": {
                 "^[a-zA-Z0-9_]+$": {
-                  "type": ["string", "number"]
+                  "type": ["string", "number", "boolean"],
+                  "format": "environment"
                 }
               },
               "additionalProperties": false
