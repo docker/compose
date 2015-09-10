@@ -7,8 +7,6 @@ import mock
 import docker
 from docker.utils import LogConfig
 
-from .. import mock
-from .. import unittest
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -227,19 +225,6 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
-    def test_get_container_create_options_with_name_option(self):
-        service = Service(
-            'foo',
-            image='foo',
-            client=self.mock_client,
-            container_name='foo1')
-        name = 'the_new_name'
-        opts = service._get_container_create_options(
-            {'name': name},
-            1,
-            one_off=True)
-        self.assertEqual(opts['name'], name)
-
     def test_get_container_create_options_does_not_mutate_options(self):
         labels = {'thing': 'real'}
         environment = {'also': 'real'}
@@ -266,40 +251,6 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(
             opts['labels'][LABEL_CONFIG_HASH],
             '3c85881a8903b9d73a06c41860c8be08acce1494ab4cf8408375966dccd714de')
-        self.assertEqual(
-            opts['environment'],
-            {
-                'affinity:container': '=ababab',
-                'also': 'real',
-            }
-        )
-
-    def test_get_container_create_options_does_not_mutate_options(self):
-        labels = {'thing': 'real'}
-        environment = {'also': 'real'}
-        service = Service(
-            'foo',
-            image='foo',
-            labels=dict(labels),
-            client=self.mock_client,
-            environment=dict(environment),
-        )
-        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
-        prev_container = mock.Mock(
-            id='ababab',
-            image_config={'ContainerConfig': {}})
-
-        opts = service._get_container_create_options(
-            {},
-            1,
-            previous_container=prev_container)
-
-        self.assertEqual(service.options['labels'], labels)
-        self.assertEqual(service.options['environment'], environment)
-
-        self.assertEqual(
-            opts['labels'][LABEL_CONFIG_HASH],
-            'b30306d0a73b67f67a45b99b88d36c359e470e6fa0c04dda1cf62d2087205b81')
         self.assertEqual(
             opts['environment'],
             {
@@ -433,9 +384,9 @@ class ServiceTest(unittest.TestCase):
             'foo',
             image='example.com/foo',
             client=self.mock_client,
-            net=ServiceNet(Service('other')),
-            links=[(Service('one'), 'one')],
-            volumes_from=[Service('two')])
+            net=ServiceNet(Service('other', image='foo')),
+            links=[(Service('one', image='foo'), 'one')],
+            volumes_from=[Service('two', image='foo')])
 
         config_dict = service.config_dict()
         expected = {
@@ -492,7 +443,7 @@ class NetTestCase(unittest.TestCase):
             {'Id': container_id, 'Name': container_id, 'Image': 'abcd'},
         ]
 
-        service = Service(name=service_name, client=mock_client)
+        service = Service(name=service_name, client=mock_client, image='foo')
         net = ServiceNet(service)
 
         self.assertEqual(net.id, service_name)
@@ -504,7 +455,7 @@ class NetTestCase(unittest.TestCase):
         mock_client = mock.create_autospec(docker.Client)
         mock_client.containers.return_value = []
 
-        service = Service(name=service_name, client=mock_client)
+        service = Service(name=service_name, client=mock_client, image='foo')
         net = ServiceNet(service)
 
         self.assertEqual(net.id, service_name)

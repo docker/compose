@@ -614,7 +614,7 @@ class Service(object):
             container_options.get('labels', {}),
             self.labels(one_off=one_off),
             number,
-            self.config_hash if add_config_hash else None)
+            self.config_hash() if add_config_hash else None)
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
