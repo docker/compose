@@ -287,6 +287,21 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue(mock_logging.warn.called)
         self.assertTrue(expected_warning_msg in mock_logging.warn.call_args[0][0])
 
+    def test_config_invalid_environment_dict_key_raises_validation_error(self):
+        expected_error_msg = "Service 'web' configuration key 'environment' contains an invalid type"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'environment': {'---': 'nope'}
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
