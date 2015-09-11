@@ -5,19 +5,18 @@ Building a Compose release
 
 Create a branch, update version, and add release notes by running `make-branch`
 
-        git checkout -b bump-$VERSION $BASE_VERSION
+        ./script/release/make-branch $VERSION [$BASE_VERSION]
 
-`$BASE_VERSION` will default to master. Use the last version tag for a bug fix
+`$BASE_VERSION` will default to master. Use the last version tag for a bug fix 
 release.
 
-        git fetch origin
-        git merge --strategy=ours origin/release
+As part of this script you'll be asked to:
 
-3.  Update the version in `docs/install.md` and `compose/__init__.py`.
+1.  Update the version in `docs/install.md` and `compose/__init__.py`.
 
     If the next release will be an RC, append `rcN`, e.g. `1.4.0rc1`.
 
-4.  Write release notes in `CHANGES.md`.
+2.  Write release notes in `CHANGES.md`.
 
     Almost every feature enhancement should be mentioned, with the most visible/exciting ones first. Use descriptive sentences and give context where appropriate.
 
@@ -25,37 +24,19 @@ release.
 
     Improvements to the code are not worth mentioning.
 
-5.   Add a bump commit:
-
-        git commit -am "Bump $VERSION"
-
-6.   Push the bump branch to your fork:
-
-        git push --set-upstream $USERNAME bump-$VERSION
-
-7.  Open a PR from the bump branch against the `release` branch on the upstream repo, **not** against master.
 
 ## When a PR is merged into master that we want in the release
 
-1.  Check out the bump branch:
+1. Check out the bump branch and run the cherry pick script
 
         git checkout bump-$VERSION
+        ./script/release/cherry-pick-pr $PR_NUMBER
 
-2.   Cherry-pick the merge commit, fixing any conflicts if necessary:
+2. When you are done cherry-picking branches move the bump version commit to HEAD
 
-        git cherry-pick -xm1 $MERGE_COMMIT_HASH
-
-3.  Add a signoff (it’s missing from merge commits):
-
-        git commit --amend --signoff
-
-4.  Move the bump commit back to the tip of the branch:
-
-        git rebase --interactive $PARENT_OF_BUMP_COMMIT
-
-5.  Force-push the bump branch to your fork:
-
+        ./script/release/rebase-bump-commit
         git push --force $USERNAME bump-$VERSION
+
 
 ## To release a version (whether RC or stable)
 
