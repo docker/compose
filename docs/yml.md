@@ -289,17 +289,22 @@ Because Docker container names must be unique, you cannot scale a service
 beyond 1 container if you have specified a custom name. Attempting to do so
 results in an error.
 
-### log driver
+### log_driver
 
-Specify a logging driver for the service's containers, as with the ``--log-driver`` option for docker run ([documented here](http://docs.docker.com/reference/run/#logging-drivers-log-driver)).
-
-Allowed values are currently ``json-file``, ``syslog`` and ``none``. The list will change over time as more drivers are added to the Docker engine.
+Specify a logging driver for the service's containers, as with the ``--log-driver``
+option for docker run ([documented here](https://docs.docker.com/reference/logging/overview/)).
 
 The default value is json-file.
 
     log_driver: "json-file"
     log_driver: "syslog"
     log_driver: "none"
+
+> **Note:** Only the `json-file` driver makes the logs available directly from
+> `docker-compose up` and `docker-compose logs`. Using any other driver will not
+> print any logs.
+
+### log_opt
 
 Specify logging options with `log_opt` for the logging driver, as with the ``--log-opt`` option for `docker run`.
 
