@@ -55,53 +55,61 @@ class Command(DocoptCommand):
             log.warn('The FIG_FILE environment variable is deprecated.')
             log.warn('Please use COMPOSE_FILE instead.')
 
-        explicit_config_path = options.get('--file') or os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')
-        project = self.get_project(
+        explicit_config_path = (
+            options.get('--file') or
+            os.environ.get('COMPOSE_FILE') or
+            os.environ.get('FIG_FILE'))
+
+        project = get_project(
+            self.base_dir,
             explicit_config_path,
             project_name=options.get('--project-name'),
             verbose=options.get('--verbose'))
 
         handler(project, command_options)
 
-    def get_client(self, verbose=False):
-        client = docker_client()
-        if verbose:
-            version_info = six.iteritems(client.version())
-            log.info("Compose version %s", __version__)
-            log.info("Docker base_url: %s", client.base_url)
-            log.info("Docker version: %s",
-                     ", ".join("%s=%s" % item for item in version_info))
-            return verbose_proxy.VerboseProxy('docker', client)
-        return client
 
-    def get_project(self, config_path=None, project_name=None, verbose=False):
-        config_details = config.find(self.base_dir, config_path)
+def get_client(verbose=False):
+    client = docker_client()
+    if verbose:
+        version_info = six.iteritems(client.version())
+        log.info("Compose version %s", __version__)
+        log.info("Docker base_url: %s", client.base_url)
+        log.info("Docker version: %s",
+                 ", ".join("%s=%s" % item for item in version_info))
+        return verbose_proxy.VerboseProxy('docker', client)
+    return client
 
-        try:
-            return Project.from_dicts(
-                self.get_project_name(config_details.working_dir, project_name),
-                config.load(config_details),
-                self.get_client(verbose=verbose))
-        except ConfigError as e:
-            raise errors.UserError(six.text_type(e))
 
-    def get_project_name(self, working_dir, project_name=None):
-        def normalize_name(name):
-            return re.sub(r'[^a-z0-9]', '', name.lower())
+def get_project(base_dir, config_path=None, project_name=None, verbose=False):
+    config_details = config.find(base_dir, config_path)
 
-        if 'FIG_PROJECT_NAME' in os.environ:
-            log.warn('The FIG_PROJECT_NAME environment variable is deprecated.')
-            log.warn('Please use COMPOSE_PROJECT_NAME instead.')
+    try:
+        return Project.from_dicts(
+            get_project_name(config_details.working_dir, project_name),
+            config.load(config_details),
+            get_client(verbose=verbose))
+    except ConfigError as e:
+        raise errors.UserError(six.text_type(e))
 
-        project_name = (
-            project_name or
-            os.environ.get('COMPOSE_PROJECT_NAME') or
-            os.environ.get('FIG_PROJECT_NAME'))
-        if project_name is not None:
-            return normalize_name(project_name)
 
-        project = os.path.basename(os.path.abspath(working_dir))
-        if project:
-            return normalize_name(project)
+def get_project_name(working_dir, project_name=None):
+    def normalize_name(name):
+        return re.sub(r'[^a-z0-9]', '', name.lower())
 
-        return 'default'
+    if 'FIG_PROJECT_NAME' in os.environ:
+        log.warn('The FIG_PROJECT_NAME environment variable is deprecated.')
+        log.warn('Please use COMPOSE_PROJECT_NAME instead.')
+
+    project_name = (
+        project_name or
+        os.environ.get('COMPOSE_PROJECT_NAME') or
+        os.environ.get('FIG_PROJECT_NAME'))
+    if project_name is not None:
+        return normalize_name(project_name)
+
+    project = os.path.basename(os.path.abspath(working_dir))
+    if project:
+        return normalize_name(project)
+
+    return 'default'
