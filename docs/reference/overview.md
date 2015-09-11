@@ -14,6 +14,13 @@ weight=-2
 
 This section describes the subcommands you can use with the `docker-compose` command.  You can run subcommand against one or more services. To run against a specific service, you supply the service name from your compose configuration. If you do not specify the service name, the command runs against all the services in your configuration.
 
+
+## Commands
+
+* [docker-compose Command](docker-compose.md)
+* [CLI Reference](index.md)
+
+
 ## Environment Variables
 
 Several environment variables are available for you to configure the Docker Compose command-line behaviour.
@@ -30,6 +37,26 @@ Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME` def
 ### COMPOSE\_FILE
 
 Specify the file containing the compose configuration. If not provided, Compose looks for a file named  `docker-compose.yml` in the current directory and then each parent directory in succession until a file by that name is found.
+
+### COMPOSE\_API\_VERSION
+
+The Docker API only supports requests from clients which report a specific
+version. If you receive a `client and server don't have same version error` using
+`docker-compose`, you can workaround this error by setting this environment
+variable. Set the version value to match the server version.
+
+Setting this variable is intended as a workaround for situations where you need
+to run temporarily with a mismatch between the client and server version. For
+example, if you can upgrade the client but need to wait to upgrade the server.
+
+Running with this variable set and a known mismatch does prevent some Docker
+features from working properly. The exact features that fail would depend on the
+Docker client and server versions. For this reason, running with this variable
+set is only intended as a workaround and it is not officially supported.
+
+If you run into problems running with this set, resolve the mismatch through
+upgrade and remove this setting to see if your problems resolve before notifying
+support.
 
 ### DOCKER\_HOST
 
@@ -48,11 +75,6 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 
 Configures the time (in seconds) a request to the Docker daemon is allowed to hang before Compose considers
 it failed. Defaults to 60 seconds.
-
-
-
-
-
 
 
 ## Compose documentation
