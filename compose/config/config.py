@@ -152,7 +152,8 @@ def load(config_details):
             service_dict=service_dict)
         service_dict = loader.make_service_dict()
         validate_paths(service_dict)
-        service_dicts.append(service_dict)
+        if not service_dict.get('abstract', False):
+            service_dicts.append(service_dict)
 
     return service_dicts
 
@@ -251,6 +252,7 @@ class ServiceLoader(object):
             filename=self.extended_config_path,
             service=self.extended_service_name,
         )
+        other_service_dict.pop('abstract', None)
 
         return merge_service_dicts(other_service_dict, self.service_dict)
 
