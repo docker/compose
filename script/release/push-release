@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# Create the official release
+#
+
+set -e
+set -o pipefail
+
+. script/release/utils.sh
+
+function usage() {
+    >&2 cat << EOM
+Publish a release by building all artifacts and pushing them.
+
+This script requires that 'git config branch.${BRANCH}.release' is set to the
+release version for the release branch.
+
+EOM
+    exit 1
+}
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+VERSION="$(git config "branch.${BRANCH}.release")" || usage
+
+API=https://api.github.com/repos
+REPO=docker/compose
+GITHUB_REPO=git@github.com:$REPO
+
+# Check the build status is green
+sha=$(git rev-parse HEAD)
+url=$API/$REPO/statuses/$sha
+build_status=$(curl -s $url | jq -r '.[0].state')
+if [[ "$build_status" != "success" ]]; then
+    >&2 echo "Build status is $build_status, but it should be success."
+    exit -1
+fi
+
+
+# Build the binaries and sdists
+script/build-linux
+# TODO: build osx binary
+# script/prepare-osx
+# script/build-osx
+python setup.py sdist --formats=gztar,zip
+
+
+echo "Test those binaries! Exit the shell to continue."
+$SHELL
+
+
+echo "Tagging the release as $VERSION"
+git tag $VERSION
+git push $GITHUB_REPO $VERSION
+
+
+echo "Create a github release"
+# TODO: script more of this https://developer.github.com/v3/repos/releases/
+browser https://github.com/$REPO/releases/new
+
+echo "Uploading sdist to pypi"
+python setup.py sdist upload
+
+echo "Testing pip package"
+virtualenv venv-test
+source venv-test/bin/activate
+pip install docker-compose==$VERSION
+docker-compose version
+deactivate
+
+echo "Now publish the github release, and test the downloads."
+echo "Email maintainers@dockerproject.org and engineering@docker.com about the new release.

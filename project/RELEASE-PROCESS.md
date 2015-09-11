@@ -3,11 +3,12 @@ Building a Compose release
 
 ## To get started with a new release
 
-1.  Create a `bump-$VERSION` branch off master:
+Create a branch, update version, and add release notes by running `make-branch`
 
-        git checkout -b bump-$VERSION master
+        git checkout -b bump-$VERSION $BASE_VERSION
 
-2.  Merge in the `release` branch on the upstream repo, discarding its tree entirely:
+`$BASE_VERSION` will default to master. Use the last version tag for a bug fix
+release.
 
         git fetch origin
         git merge --strategy=ours origin/release
@@ -58,38 +59,21 @@ Building a Compose release
 
 ## To release a version (whether RC or stable)
 
-1.  Check that CI is passing on the bump PR.
-
-2.  Check out the bump branch:
+Check out the bump branch and run the `push-release` script
 
         git checkout bump-$VERSION
+        ./script/release/push-release $VERSION
 
-3.  Build the Linux binary:
 
-        script/build-linux
+When prompted test the binaries.
 
-4.  Build the Mac binary in a Mountain Lion VM:
 
-        script/prepare-osx
-        script/build-osx
+1.  Draft a release from the tag on GitHub (the script will open the window for
+    you)
 
-5.  Test the binaries and/or get some other people to test them.
+    In the "Tag version" dropdown, select the tag you just pushed.
 
-6.  Create a tag:
-
-        TAG=$VERSION # or $VERSION-rcN, if it's an RC
-        git tag $TAG
-
-7.  Push the tag to the upstream repo:
-
-        git push git@github.com:docker/compose.git $TAG
-
-8.  Draft a release from the tag on GitHub.
-
-    - Go to https://github.com/docker/compose/releases and click "Draft a new release".
-    - In the "Tag version" dropdown, select the tag you just pushed.
-
-9.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
+2.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
 
         Firstly, note that Compose 1.5.0 requires Docker 1.8.0 or later.
 
@@ -108,24 +92,13 @@ Building a Compose release
 
         ...release notes go here...
 
-10.  Attach the binaries.
+3.  Attach the binaries.
 
-11. Don’t publish it just yet!
+4.  Publish the release on GitHub.
 
-12. Upload the latest version to PyPi:
+5.  Check that both binaries download (following the install instructions) and run.
 
-        python setup.py sdist upload
-
-13. Check that the pip package installs and runs (best done in a virtualenv):
-
-        pip install -U docker-compose==$TAG
-        docker-compose version
-
-14. Publish the release on GitHub.
-
-15. Check that both binaries download (following the install instructions) and run.
-
-16. Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+6.  Email maintainers@dockerproject.org and engineering@docker.com about the new release.
 
 ## If it’s a stable release (not an RC)
 

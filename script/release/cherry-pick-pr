@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Cherry-pick a PR into the release branch
+#
+
+set -e
+set -o pipefail
+
+
+function usage() {
+    >&2 cat << EOM
+Cherry-pick commits from a github pull request.
+
+Usage:
+
+    $0 <github PR number>
+EOM
+    exit 1
+}
+
+[ -n "$1" ] || usage
+
+
+REPO=docker/compose
+GITHUB=https://github.com/$REPO/pull
+PR=$1
+url="$GITHUB/$PR"
+hub am -3 $url
