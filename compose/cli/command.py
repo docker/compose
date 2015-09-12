@@ -51,22 +51,24 @@ class Command(DocoptCommand):
             handler(None, command_options)
             return
 
-        if 'FIG_FILE' in os.environ:
-            log.warn('The FIG_FILE environment variable is deprecated.')
-            log.warn('Please use COMPOSE_FILE instead.')
-
-        explicit_config_path = (
-            options.get('--file') or
-            os.environ.get('COMPOSE_FILE') or
-            os.environ.get('FIG_FILE'))
-
         project = get_project(
             self.base_dir,
-            explicit_config_path,
+            get_config_path(options.get('--file')),
             project_name=options.get('--project-name'),
             verbose=options.get('--verbose'))
 
         handler(project, command_options)
+
+
+def get_config_path(file_option):
+    if file_option:
+        return file_option
+
+    if 'FIG_FILE' in os.environ:
+        log.warn('The FIG_FILE environment variable is deprecated.')
+        log.warn('Please use COMPOSE_FILE instead.')
+
+    return [os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')]
 
 
 def get_client(verbose=False):

@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from collections import namedtuple
+from functools import reduce
 
 import six
 import yaml
@@ -88,18 +89,24 @@ PATH_START_CHARS = [
 log = logging.getLogger(__name__)
 
 
-ConfigDetails = namedtuple('ConfigDetails', 'config working_dir filename')
+ConfigDetails = namedtuple('ConfigDetails', 'working_dir configs')
+
+ConfigFile = namedtuple('ConfigFile', 'filename config')
 
 
-def find(base_dir, filename):
-    if filename == '-':
-        return ConfigDetails(yaml.safe_load(sys.stdin), os.getcwd(), None)
+def find(base_dir, filenames):
+    if filenames == ['-']:
+        return ConfigDetails(
+            os.getcwd(),
+            [ConfigFile(None, yaml.safe_load(sys.stdin))])
 
-    if filename:
-        filename = os.path.join(base_dir, filename)
+    if filenames:
+        filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filename = get_config_path(base_dir)
-    return ConfigDetails(load_yaml(filename), os.path.dirname(filename), filename)
+        filenames = [get_config_path(base_dir)]
+    return ConfigDetails(
+        os.path.dirname(filenames[0]),
+        [ConfigFile(f, load_yaml(f)) for f in filenames])
 
 
 def get_config_path(base_dir):
@@ -133,29 +140,40 @@ def pre_process_config(config):
     Pre validation checks and processing of the config file to interpolate env
     vars returning a config dict ready to be tested against the schema.
     """
-    config = interpolate_environment_variables(config)
-    return config
+    return interpolate_environment_variables(config)
 
 
 def load(config_details):
-    config, working_dir, filename = config_details
+    working_dir, configs = config_details
 
-    processed_config = pre_process_config(config)
-    validate_against_fields_schema(processed_config)
-
-    service_dicts = []
-
-    for service_name, service_dict in list(processed_config.items()):
-        loader = ServiceLoader(
-            working_dir=working_dir,
-            filename=filename,
-            service_name=service_name,
-            service_dict=service_dict)
+    def build_service(filename, service_name, service_dict):
+        loader = ServiceLoader(working_dir, filename, service_name, service_dict)
         service_dict = loader.make_service_dict()
         validate_paths(service_dict)
-        service_dicts.append(service_dict)
+        return service_dict
 
-    return service_dicts
+    def load_file(filename, config):
+        processed_config = pre_process_config(config)
+        validate_against_fields_schema(processed_config)
+        return [
+            build_service(filename, name, service_config)
+            for name, service_config in processed_config.items()
+        ]
+
+    def merge_services(base, override):
+        return {
+            name: merge_service_dicts(base.get(name, {}), override.get(name, {}))
+            for name in set(base) | set(override)
+        }
+
+    def combine_configs(override, base):
+        service_dicts = load_file(base.filename, base.config)
+        if not override:
+            return service_dicts
+
+        return merge_service_dicts(base.config, override.config)
+
+    return reduce(combine_configs, configs, None)
 
 
 class ServiceLoader(object):
