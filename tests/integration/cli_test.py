@@ -9,6 +9,7 @@ from six import StringIO
 
 from .. import mock
 from .testcases import DockerClientTestCase
+from compose.cli.command import get_project
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.project import NoSuchService
@@ -38,7 +39,7 @@ class CLITestCase(DockerClientTestCase):
         if hasattr(self, '_project'):
             return self._project
 
-        return self.command.get_project()
+        return get_project(self.command.base_dir)
 
     def test_help(self):
         old_base_dir = self.command.base_dir
@@ -72,7 +73,7 @@ class CLITestCase(DockerClientTestCase):
     def test_ps_alternate_composefile(self, mock_stdout):
         config_path = os.path.abspath(
             'tests/fixtures/multiple-composefiles/compose2.yml')
-        self._project = self.command.get_project(config_path)
+        self._project = get_project(self.command.base_dir, [config_path])
 
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
@@ -607,7 +608,7 @@ class CLITestCase(DockerClientTestCase):
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
         self.command.dispatch(['-f', config_path, 'up', '-d'], None)
-        self._project = self.command.get_project(config_path)
+        self._project = get_project(self.command.base_dir, [config_path])
 
         containers = self.project.containers(stopped=True)
         self.assertEqual(len(containers), 1)

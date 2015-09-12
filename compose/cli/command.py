@@ -68,7 +68,8 @@ def get_config_path(file_option):
         log.warn('The FIG_FILE environment variable is deprecated.')
         log.warn('Please use COMPOSE_FILE instead.')
 
-    return [os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')]
+    config_file = os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')
+    return [config_file] if config_file else None
 
 
 def get_client(verbose=False):
