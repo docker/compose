@@ -9,7 +9,7 @@ import shutil
 import tempfile
 
 from .testcases import DockerClientTestCase
-from compose import config
+from compose.config import config
 from compose.const import LABEL_CONFIG_HASH
 from compose.project import Project
 from compose.service import ConvergenceStrategy
@@ -24,11 +24,13 @@ class ProjectTestCase(DockerClientTestCase):
         return set(project.containers(stopped=True))
 
     def make_project(self, cfg):
+        details = config.ConfigDetails(
+            'working_dir',
+            [config.ConfigFile(None, cfg)])
         return Project.from_dicts(
             name='composetest',
             client=self.client,
-            service_dicts=config.load(config.ConfigDetails(cfg, 'working_dir', None))
-        )
+            service_dicts=config.load(details))
 
 
 class BasicProjectTest(ProjectTestCase):

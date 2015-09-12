@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
 from .testcases import DockerClientTestCase
-from compose import config
+from compose.config import config
 from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
@@ -9,7 +9,10 @@ from compose.service import ConvergenceStrategy
 
 
 def build_service_dicts(service_config):
-    return config.load(config.ConfigDetails(service_config, 'working_dir', None))
+    return config.load(
+        config.ConfigDetails(
+            'working_dir',
+            [config.ConfigFile(None, service_config)]))
 
 
 class ProjectTest(DockerClientTestCase):
