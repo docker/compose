@@ -16,6 +16,7 @@ Usage: build [options] [SERVICE...]
 
 Options:
 --no-cache  Do not use cache when building the image.
+--pull      Always attempt to pull a newer version of the image.
 ```
 
 Services are built once and then tagged as `project_service`, e.g.,
