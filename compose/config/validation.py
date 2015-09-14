@@ -95,6 +95,12 @@ def get_unsupported_config_msg(service_name, error_key):
     return msg
 
 
+def anglicize_validator(validator):
+    if validator in ["array", "object"]:
+        return 'an ' + validator
+    return 'a ' + validator
+
+
 def process_errors(errors, service_name=None):
     """
     jsonschema gives us an error tree full of information to explain what has
@@ -112,30 +118,20 @@ def process_errors(errors, service_name=None):
         A validator value can be either an array of valid types or a string of
         a valid type. Parse the valid types and prefix with the correct article.
         """
-        pre_msg_type_prefix = "a"
-        last_msg_type_prefix = "a"
-        types_requiring_an = ["array", "object"]
-
         if isinstance(validator, list):
-            last_type = validator.pop()
-            types_from_validator = ", ".join(validator)
+            if len(validator) >= 2:
+                first_type = anglicize_validator(validator[0])
+                last_type = anglicize_validator(validator[-1])
+                types_from_validator = "{}{}".format(first_type, ", ".join(validator[1:-1]))
 
-            if validator[0] in types_requiring_an:
-                pre_msg_type_prefix = "an"
-
-            if last_type in types_requiring_an:
-                last_msg_type_prefix = "an"
-
-            msg = "{} {} or {} {}".format(
-                pre_msg_type_prefix,
-                types_from_validator,
-                last_msg_type_prefix,
-                last_type
-            )
+                msg = "{} or {}".format(
+                    types_from_validator,
+                    last_type
+                )
+            else:
+                msg = "{}".format(anglicize_validator(validator[0]))
         else:
-            if validator in types_requiring_an:
-                pre_msg_type_prefix = "an"
-            msg = "{} {}".format(pre_msg_type_prefix, validator)
+            msg = "{}".format(anglicize_validator(validator))
 
         return msg
 
@@ -163,10 +159,7 @@ def process_errors(errors, service_name=None):
             return msg
 
         types = [context.validator_value for context in error.context if context.validator == 'type']
-        if len(types) == 1:
-            valid_types = _parse_valid_types_from_validator(types[0])
-        else:
-            valid_types = _parse_valid_types_from_validator(types)
+        valid_types = _parse_valid_types_from_validator(types)
 
         msg = "contains an invalid type, it should be {}".format(valid_types)
 
