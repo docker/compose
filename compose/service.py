@@ -657,7 +657,7 @@ class Service(object):
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
         log_config = LogConfig(
-            type=options.get('log_driver', 'json-file'),
+            type=options.get('log_driver', ""),
             config=options.get('log_opt', None)
         )
         pid = options.get('pid', None)

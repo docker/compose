@@ -864,7 +864,10 @@ class ServiceTest(DockerClientTestCase):
 
     def test_log_drive_invalid(self):
         service = self.create_service('web', log_driver='xxx')
-        self.assertRaises(APIError, lambda: create_and_start_container(service))
+        expected_error_msg = "logger: no log driver named 'xxx' is registered"
+
+        with self.assertRaisesRegexp(APIError, expected_error_msg):
+            create_and_start_container(service)
 
     def test_log_drive_empty_default_jsonfile(self):
         service = self.create_service('web')
