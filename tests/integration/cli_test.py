@@ -549,7 +549,6 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(get_port(3002), "0.0.0.0:49153")
 
     def test_port_with_scale(self):
-
         self.command.base_dir = 'tests/fixtures/ports-composefile-scale'
         self.command.dispatch(['scale', 'simple=2'], None)
         containers = sorted(
@@ -592,6 +591,44 @@ class CLITestCase(DockerClientTestCase):
         components = actual_host_path.split('/')
         self.assertTrue(components[-2:] == ['home-dir', 'my-volume'],
                         msg="Last two components differ: %s, %s" % (actual_host_path, expected_host_path))
+
+    def test_up_with_default_override_file(self):
+        self.command.base_dir = 'tests/fixtures/override-files'
+        self.command.dispatch(['up', '-d'], None)
+
+        containers = self.project.containers()
+        self.assertEqual(len(containers), 2)
+
+        web, db = containers
+        self.assertEqual(web.human_readable_command, 'top')
+        self.assertEqual(db.human_readable_command, 'top')
+
+    def test_up_with_multiple_files(self):
+        self.command.base_dir = 'tests/fixtures/override-files'
+        config_paths = [
+            'docker-compose.yml',
+            'docker-compose.override.yml',
+            'extra.yml',
+
+        ]
+        self._project = get_project(self.command.base_dir, config_paths)
+        self.command.dispatch(
+            [
+                '-f', config_paths[0],
+                '-f', config_paths[1],
+                '-f', config_paths[2],
+                'up', '-d',
+            ],
+            None)
+
+        containers = self.project.containers()
+        self.assertEqual(len(containers), 3)
+
+        web, other, db = containers
+        self.assertEqual(web.human_readable_command, 'top')
+        self.assertTrue({'db', 'other'} <= set(web.links()))
+        self.assertEqual(db.human_readable_command, 'top')
+        self.assertEqual(other.human_readable_command, 'top')
 
     def test_up_with_extends(self):
         self.command.base_dir = 'tests/fixtures/extends'

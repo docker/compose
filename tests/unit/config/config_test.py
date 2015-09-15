@@ -1213,6 +1213,7 @@ def get_config_filename_for_files(filenames, subdir=None):
             base_dir = tempfile.mkdtemp(dir=project_dir)
         else:
             base_dir = project_dir
-        return os.path.basename(config.get_config_path(base_dir))
+        filename, = config.get_default_config_files(base_dir)
+        return os.path.basename(filename)
     finally:
         shutil.rmtree(project_dir)
