@@ -1167,7 +1167,7 @@ class BuildPathTest(unittest.TestCase):
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
 
 
-class GetConfigPathTestCase(unittest.TestCase):
+class GetDefaultConfigFilesTestCase(unittest.TestCase):
 
     files = [
         'docker-compose.yml',
@@ -1177,25 +1177,21 @@ class GetConfigPathTestCase(unittest.TestCase):
     ]
 
     def test_get_config_path_default_file_in_basedir(self):
-        files = self.files
-        self.assertEqual('docker-compose.yml', get_config_filename_for_files(files[0:]))
-        self.assertEqual('docker-compose.yaml', get_config_filename_for_files(files[1:]))
-        self.assertEqual('fig.yml', get_config_filename_for_files(files[2:]))
-        self.assertEqual('fig.yaml', get_config_filename_for_files(files[3:]))
+        for index, filename in enumerate(self.files):
+            self.assertEqual(
+                filename,
+                get_config_filename_for_files(self.files[index:]))
         with self.assertRaises(config.ComposeFileNotFound):
             get_config_filename_for_files([])
 
     def test_get_config_path_default_file_in_parent_dir(self):
         """Test with files placed in the subdir"""
-        files = self.files
 
         def get_config_in_subdir(files):
             return get_config_filename_for_files(files, subdir=True)
 
-        self.assertEqual('docker-compose.yml', get_config_in_subdir(files[0:]))
-        self.assertEqual('docker-compose.yaml', get_config_in_subdir(files[1:]))
-        self.assertEqual('fig.yml', get_config_in_subdir(files[2:]))
-        self.assertEqual('fig.yaml', get_config_in_subdir(files[3:]))
+        for index, filename in enumerate(self.files):
+            self.assertEqual(filename, get_config_in_subdir(self.files[index:]))
         with self.assertRaises(config.ComposeFileNotFound):
             get_config_in_subdir([])
 
