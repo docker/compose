@@ -78,6 +78,7 @@ SUPPORTED_FILENAMES = [
     'fig.yaml',
 ]
 
+DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 
 PATH_START_CHARS = [
     '/',
@@ -103,16 +104,16 @@ def find(base_dir, filenames):
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filenames = get_default_config_path(base_dir)
+        filenames = get_default_config_files(base_dir)
     return ConfigDetails(
         os.path.dirname(filenames[0]),
         [ConfigFile(f, load_yaml(f)) for f in filenames])
 
 
-def get_default_config_path(base_dir):
+def get_default_config_files(base_dir):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
-    if len(candidates) == 0:
+    if not candidates:
         raise ComposeFileNotFound(SUPPORTED_FILENAMES)
 
     winner = candidates[0]
@@ -130,7 +131,12 @@ def get_default_config_path(base_dir):
         log.warn("%s is deprecated and will not be supported in future. "
                  "Please rename your config file to docker-compose.yml\n" % winner)
 
-    return os.path.join(path, winner)
+    return [os.path.join(path, winner)] + get_default_override_file(path)
+
+
+def get_default_override_file(path):
+    override_filename = os.path.join(path, DEFAULT_OVERRIDE_FILENAME)
+    return [override_filename] if os.path.exists(override_filename) else []
 
 
 def find_candidates_in_parent_dirs(filenames, path):
@@ -144,7 +150,7 @@ def find_candidates_in_parent_dirs(filenames, path):
     candidates = [filename for filename in filenames
                   if os.path.exists(os.path.join(path, filename))]
 
-    if len(candidates) == 0:
+    if not candidates:
         parent_dir = os.path.join(path, '..')
         if os.path.abspath(parent_dir) != os.path.abspath(path):
             return find_candidates_in_parent_dirs(filenames, parent_dir)

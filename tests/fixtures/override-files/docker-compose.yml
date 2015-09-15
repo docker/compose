@@ -1,0 +1,10 @@
+
+web:
+    image: busybox:latest
+    command: "sleep 200"
+    links:
+        - db
+
+db:
+    image: busybox:latest
+    command: "sleep 200"
