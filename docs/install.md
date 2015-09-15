@@ -69,7 +69,7 @@ to preserve) you can migrate them with the following command:
 
     $ docker-compose migrate-to-labels
 
-Alternatively, if you're not worried about keeping them, you can remove them &endash;
+Alternatively, if you're not worried about keeping them, you can remove them &ndash;
 Compose will just create new ones.
 
     $ docker rm -f -v myapp_web_1 myapp_db_1 ...
