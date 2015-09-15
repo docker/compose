@@ -167,14 +167,16 @@ def load(config_details):
             for name in set(base) | set(override)
         }
 
-    def combine_configs(override, base):
+    def combine_configs(base, override):
         service_dicts = load_file(base.filename, base.config)
         if not override:
             return service_dicts
 
-        return merge_service_dicts(base.config, override.config)
+        return ConfigFile(
+            override.filename,
+            merge_services(base.config, override.config))
 
-    return reduce(combine_configs, configs, None)
+    return reduce(combine_configs, configs + [None])
 
 
 class ServiceLoader(object):

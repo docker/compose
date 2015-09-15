@@ -5,10 +5,10 @@ import shutil
 import tempfile
 from operator import itemgetter
 
-from .. import mock
-from .. import unittest
 from compose.config import config
 from compose.config.errors import ConfigurationError
+from tests import mock
+from tests import unittest
 
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
@@ -91,6 +91,43 @@ class ConfigTest(unittest.TestCase):
                     'filename.yml'
                 )
             )
+
+    def test_load_with_multiple_files(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'web': {
+                    'image': 'example/web',
+                    'links': ['db'],
+                },
+                'db': {
+                    'image': 'example/db',
+                },
+            })
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'web': {
+                    'build': '/',
+                    'volumes': ['/home/user/project:/code'],
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        service_dicts = config.load(details)
+        expected = [
+            {
+                'name': 'web',
+                'build': '/',
+                'links': ['db'],
+                'volumes': ['/home/user/project:/code'],
+            },
+            {
+                'name': 'db',
+                'image': 'example/db',
+            },
+        ]
+        self.assertEqual(service_sort(service_dicts), service_sort(expected))
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
