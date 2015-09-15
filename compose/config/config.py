@@ -409,6 +409,8 @@ def env_vars_from_file(filename):
     for line in open(filename, 'r'):
         line = line.strip()
         if line and not line.startswith('#'):
+            if line.startswith('export '):
+                line = line.replace('export ', '', 1)
             k, v = split_env(line)
             env[k] = v
     return env

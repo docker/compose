@@ -752,6 +752,17 @@ class EnvTest(unittest.TestCase):
             {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'},
         )
 
+    def test_env_with_export(self):
+        service_dict = make_service_dict(
+            'foo',
+            {'build': '.', 'env_file': 'export.env'},
+            'tests/fixtures/env',
+        )
+        self.assertEqual(
+            service_dict['environment'],
+            {'HELLO': '1'}
+        )
+
     def test_env_nonexistent_file(self):
         options = {'env_file': 'nonexistent.env'}
         self.assertRaises(
