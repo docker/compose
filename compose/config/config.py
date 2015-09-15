@@ -17,7 +17,6 @@ from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
 from .validation import validate_service_names
 from .validation import validate_top_level_object
-from compose.cli.utils import find_candidates_in_parent_dirs
 
 
 DOCKER_CONFIG_KEYS = [
@@ -104,13 +103,13 @@ def find(base_dir, filenames):
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filenames = [get_config_path(base_dir)]
+        filenames = get_default_config_path(base_dir)
     return ConfigDetails(
         os.path.dirname(filenames[0]),
         [ConfigFile(f, load_yaml(f)) for f in filenames])
 
 
-def get_config_path(base_dir):
+def get_default_config_path(base_dir):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
     if len(candidates) == 0:
@@ -132,6 +131,25 @@ def get_config_path(base_dir):
                  "Please rename your config file to docker-compose.yml\n" % winner)
 
     return os.path.join(path, winner)
+
+
+def find_candidates_in_parent_dirs(filenames, path):
+    """
+    Given a directory path to start, looks for filenames in the
+    directory, and then each parent directory successively,
+    until found.
+
+    Returns tuple (candidates, path).
+    """
+    candidates = [filename for filename in filenames
+                  if os.path.exists(os.path.join(path, filename))]
+
+    if len(candidates) == 0:
+        parent_dir = os.path.join(path, '..')
+        if os.path.abspath(parent_dir) != os.path.abspath(path):
+            return find_candidates_in_parent_dirs(filenames, parent_dir)
+
+    return (candidates, path)
 
 
 @validate_top_level_object
