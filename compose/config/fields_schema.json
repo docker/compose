@@ -36,7 +36,16 @@
 
         "environment": {
           "oneOf": [
-            {"type": "object"},
+            {
+              "type": "object",
+              "patternProperties": {
+                "^[^-]+$": {
+                  "type": ["string", "number", "boolean"],
+                  "format": "environment"
+                }
+              },
+              "additionalProperties": false
+            },
             {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
           ]
         },
