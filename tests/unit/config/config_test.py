@@ -280,7 +280,7 @@ class ConfigTest(unittest.TestCase):
     def test_logs_warning_for_boolean_in_environment(self, mock_logging):
         expected_warning_msg = "Warning: There is a boolean value, True in the 'environment' key."
         config.load(
-            config.ConfigDetails(
+            build_config_details(
                 {'web': {
                     'image': 'busybox',
                     'environment': {'SHOW_STUFF': True}
@@ -298,7 +298,7 @@ class ConfigTest(unittest.TestCase):
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {
                         'image': 'busybox',
                         'environment': {'---': 'nope'}
