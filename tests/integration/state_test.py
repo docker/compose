@@ -1,3 +1,7 @@
+"""
+Integration tests which cover state convergence (aka smart recreate) performed
+by `docker-compose up`.
+"""
 from __future__ import unicode_literals
 import tempfile
 import shutil
@@ -150,6 +154,24 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         new_containers = self.run_up(self.cfg, allow_recreate=False)
 
         self.assertEqual(new_containers - old_containers, set())
+
+    def test_service_removed_while_down(self):
+        next_cfg = {
+            'web': {
+                'image': 'busybox:latest',
+                'command': 'tail -f /dev/null',
+            },
+            'nginx': self.cfg['nginx'],
+        }
+
+        containers = self.run_up(self.cfg)
+        self.assertEqual(len(containers), 3)
+
+        project = self.make_project(self.cfg)
+        project.stop(timeout=1)
+
+        containers = self.run_up(next_cfg)
+        self.assertEqual(len(containers), 2)
 
 
 def converge(service,

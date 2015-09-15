@@ -512,7 +512,7 @@ class ExtendsTest(unittest.TestCase):
         We specify a 'file' key that is the filename we're already in.
         """
         service_dicts = load_from_filename('tests/fixtures/extends/specify-file-as-self.yml')
-        self.assertEqual(service_dicts, [
+        self.assertEqual(sorted(service_dicts), sorted([
             {
                 'environment':
                 {
@@ -532,7 +532,7 @@ class ExtendsTest(unittest.TestCase):
                 'image': 'busybox',
                 'name': 'web'
             }
-        ])
+        ]))
 
     def test_circular(self):
         try:

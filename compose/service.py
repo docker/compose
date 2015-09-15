@@ -83,7 +83,16 @@ ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 
 class Service(object):
-    def __init__(self, name, client=None, project='default', links=None, external_links=None, volumes_from=None, net=None, **options):
+    def __init__(
+        self,
+        name,
+        client=None,
+        project='default',
+        links=None,
+        volumes_from=None,
+        net=None,
+        **options
+    ):
         if not re.match('^%s+$' % VALID_NAME_CHARS, name):
             raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
@@ -97,9 +106,8 @@ class Service(object):
         self.client = client
         self.project = project
         self.links = links or []
-        self.external_links = external_links or []
         self.volumes_from = volumes_from or []
-        self.net = net or None
+        self.net = net or Net(None)
         self.options = options
 
     def containers(self, stopped=False, one_off=False):
@@ -469,25 +477,25 @@ class Service(object):
         return {
             'options': self.options,
             'image_id': self.image()['Id'],
+            'links': self.get_link_names(),
+            'net': self.net.id,
+            'volumes_from': self.get_volumes_from_names(),
         }
 
     def get_dependency_names(self):
-        net_name = self.get_net_name()
-        return (self.get_linked_names() +
+        net_name = self.net.service_name
+        return (self.get_linked_service_names() +
                 self.get_volumes_from_names() +
                 ([net_name] if net_name else []))
 
-    def get_linked_names(self):
-        return [s.name for (s, _) in self.links]
+    def get_linked_service_names(self):
+        return [service.name for (service, _) in self.links]
+
+    def get_link_names(self):
+        return [(service.name, alias) for service, alias in self.links]
 
     def get_volumes_from_names(self):
         return [s.name for s in self.volumes_from if isinstance(s, Service)]
-
-    def get_net_name(self):
-        if isinstance(self.net, Service):
-            return self.net.name
-        else:
-            return
 
     def get_container_name(self, number, one_off=False):
         # TODO: Implement issue #652 here
@@ -517,7 +525,7 @@ class Service(object):
                 links.append((container.name, self.name))
                 links.append((container.name, container.name))
                 links.append((container.name, container.name_without_project))
-        for external_link in self.external_links:
+        for external_link in self.options.get('external_links') or []:
             if ':' not in external_link:
                 link_name = external_link
             else:
@@ -540,32 +548,12 @@ class Service(object):
 
         return volumes_from
 
-    def _get_net(self):
-        if not self.net:
-            return None
-
-        if isinstance(self.net, Service):
-            containers = self.net.containers()
-            if len(containers) > 0:
-                net = 'container:' + containers[0].id
-            else:
-                log.warning("Warning: Service %s is trying to use reuse the network stack "
-                            "of another service that is not running." % (self.net.name))
-                net = None
-        elif isinstance(self.net, Container):
-            net = 'container:' + self.net.id
-        else:
-            net = self.net
-
-        return net
-
     def _get_container_create_options(
             self,
             override_options,
             number,
             one_off=False,
             previous_container=None):
-
         add_config_hash = (not one_off and not override_options)
 
         container_options = dict(
@@ -577,13 +565,6 @@ class Service(object):
             container_options['name'] = self.custom_container_name()
         else:
             container_options['name'] = self.get_container_name(number, one_off)
-
-        if add_config_hash:
-            config_hash = self.config_hash()
-            if 'labels' not in container_options:
-                container_options['labels'] = {}
-            container_options['labels'][LABEL_CONFIG_HASH] = config_hash
-            log.debug("Added config hash: %s" % config_hash)
 
         if 'detach' not in container_options:
             container_options['detach'] = True
@@ -632,7 +613,8 @@ class Service(object):
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
             self.labels(one_off=one_off),
-            number)
+            number,
+            self.config_hash() if add_config_hash else None)
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
@@ -679,7 +661,7 @@ class Service(object):
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=privileged,
-            network_mode=self._get_net(),
+            network_mode=self.net.mode,
             devices=devices,
             dns=dns,
             dns_search=dns_search,
@@ -772,6 +754,61 @@ class Service(object):
             stream=True,
         )
         stream_output(output, sys.stdout)
+
+
+class Net(object):
+    """A `standard` network mode (ex: host, bridge)"""
+
+    service_name = None
+
+    def __init__(self, net):
+        self.net = net
+
+    @property
+    def id(self):
+        return self.net
+
+    mode = id
+
+
+class ContainerNet(object):
+    """A network mode that uses a container's network stack."""
+
+    service_name = None
+
+    def __init__(self, container):
+        self.container = container
+
+    @property
+    def id(self):
+        return self.container.id
+
+    @property
+    def mode(self):
+        return 'container:' + self.container.id
+
+
+class ServiceNet(object):
+    """A network mode that uses a service's network stack."""
+
+    def __init__(self, service):
+        self.service = service
+
+    @property
+    def id(self):
+        return self.service.name
+
+    service_name = id
+
+    @property
+    def mode(self):
+        containers = self.service.containers()
+        if containers:
+            return 'container:' + containers[0].id
+
+        log.warn("Warning: Service %s is trying to use reuse the network stack "
+                 "of another service that is not running." % (self.id))
+        return None
 
 
 # Names
@@ -899,11 +936,16 @@ def split_port(port):
 # Labels
 
 
-def build_container_labels(label_options, service_labels, number, one_off=False):
-    labels = label_options or {}
+def build_container_labels(label_options, service_labels, number, config_hash):
+    labels = dict(label_options or {})
     labels.update(label.split('=', 1) for label in service_labels)
     labels[LABEL_CONTAINER_NUMBER] = str(number)
     labels[LABEL_VERSION] = __version__
+
+    if config_hash:
+        log.debug("Added config hash: %s" % config_hash)
+        labels[LABEL_CONFIG_HASH] = config_hash
+
     return labels
 
 
