@@ -63,8 +63,12 @@ class Container(object):
         return self.dictionary['Name'][1:]
 
     @property
+    def service(self):
+        return self.labels.get(LABEL_SERVICE)
+
+    @property
     def name_without_project(self):
-        return '{0}_{1}'.format(self.labels.get(LABEL_SERVICE), self.number)
+        return '{0}_{1}'.format(self.service, self.number)
 
     @property
     def number(self):

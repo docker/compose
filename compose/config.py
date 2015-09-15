@@ -12,9 +12,9 @@ from compose.cli.utils import find_candidates_in_parent_dirs
 DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
+    'command',
     'cpu_shares',
     'cpuset',
-    'command',
     'detach',
     'devices',
     'dns',
@@ -28,12 +28,12 @@ DOCKER_CONFIG_KEYS = [
     'image',
     'labels',
     'links',
+    'log_driver',
+    'log_opt',
     'mac_address',
     'mem_limit',
     'memswap_limit',
     'net',
-    'log_driver',
-    'log_opt',
     'pid',
     'ports',
     'privileged',
@@ -382,7 +382,7 @@ def parse_environment(environment):
         return dict(split_env(e) for e in environment)
 
     if isinstance(environment, dict):
-        return environment
+        return dict(environment)
 
     raise ConfigurationError(
         "environment \"%s\" must be a list or mapping," %
@@ -440,12 +440,12 @@ def resolve_volume_path(volume, working_dir, service_name):
 
         if not any(host_path.startswith(c) for c in PATH_START_CHARS):
             log.warn(
-                'Warning: the mapping "{0}" in the volumes config for '
-                'service "{1}" is ambiguous. In a future version of Docker, '
+                'Warning: the mapping "{0}:{1}" in the volumes config for '
+                'service "{2}" is ambiguous. In a future version of Docker, '
                 'it will designate a "named" volume '
                 '(see https://github.com/docker/docker/pull/14242). '
-                'To prevent unexpected behaviour, change it to "./{0}"'
-                .format(volume, service_name)
+                'To prevent unexpected behaviour, change it to "./{0}:{1}"'
+                .format(host_path, container_path, service_name)
             )
 
         return "%s:%s" % (expand_path(working_dir, host_path), container_path)

@@ -9,7 +9,10 @@ from .config import get_service_name_from_net, ConfigurationError
 from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
 from .container import Container
 from .legacy import check_for_legacy_containers
+from .service import ContainerNet
+from .service import Net
 from .service import Service
+from .service import ServiceNet
 from .utils import parallel_execute
 
 log = logging.getLogger(__name__)
@@ -81,8 +84,14 @@ class Project(object):
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)
 
-            project.services.append(Service(client=client, project=name, links=links, net=net,
-                                            volumes_from=volumes_from, **service_dict))
+            project.services.append(
+                Service(
+                    client=client,
+                    project=name,
+                    links=links,
+                    net=net,
+                    volumes_from=volumes_from,
+                    **service_dict))
         return project
 
     @property
@@ -172,26 +181,26 @@ class Project(object):
         return volumes_from
 
     def get_net(self, service_dict):
-        if 'net' in service_dict:
-            net_name = get_service_name_from_net(service_dict.get('net'))
+        net = service_dict.pop('net', None)
+        if not net:
+            return Net(None)
 
-            if net_name:
-                try:
-                    net = self.get_service(net_name)
-                except NoSuchService:
-                    try:
-                        net = Container.from_id(self.client, net_name)
-                    except APIError:
-                        raise ConfigurationError('Service "%s" is trying to use the network of "%s", which is not the name of a service or container.' % (service_dict['name'], net_name))
-            else:
-                net = service_dict['net']
+        net_name = get_service_name_from_net(net)
+        if not net_name:
+            return Net(net)
 
-            del service_dict['net']
-
-        else:
-            net = None
-
-        return net
+        try:
+            return ServiceNet(self.get_service(net_name))
+        except NoSuchService:
+            pass
+        try:
+            return ContainerNet(Container.from_id(self.client, net_name))
+        except APIError:
+            raise ConfigurationError(
+                'Service "%s" is trying to use the network of "%s", '
+                'which is not the name of a service or container.' % (
+                    service_dict['name'],
+                    net_name))
 
     def start(self, service_names=None, **options):
         for service in self.get_services(service_names):
