@@ -95,6 +95,12 @@ def get_unsupported_config_msg(service_name, error_key):
     return msg
 
 
+def anglicize_validator(validator):
+    if validator in ["array", "object"]:
+        return 'an ' + validator
+    return 'a ' + validator
+
+
 def process_errors(errors, service_name=None):
     """
     jsonschema gives us an error tree full of information to explain what has
@@ -107,15 +113,57 @@ def process_errors(errors, service_name=None):
     def _clean_error_message(message):
         return message.replace("u'", "'")
 
-    def _parse_valid_types_from_schema(schema):
+    def _parse_valid_types_from_validator(validator):
         """
-        Our defined types using $ref in the schema require some extra parsing
-        retrieve a helpful type for error message display.
+        A validator value can be either an array of valid types or a string of
+        a valid type. Parse the valid types and prefix with the correct article.
         """
-        if '$ref' in schema:
-            return schema['$ref'].replace("#/definitions/", "").replace("_", " ")
+        if isinstance(validator, list):
+            if len(validator) >= 2:
+                first_type = anglicize_validator(validator[0])
+                last_type = anglicize_validator(validator[-1])
+                types_from_validator = "{}{}".format(first_type, ", ".join(validator[1:-1]))
+
+                msg = "{} or {}".format(
+                    types_from_validator,
+                    last_type
+                )
+            else:
+                msg = "{}".format(anglicize_validator(validator[0]))
         else:
-            return str(schema['type'])
+            msg = "{}".format(anglicize_validator(validator))
+
+        return msg
+
+    def _parse_oneof_validator(error):
+        """
+        oneOf has multiple schemas, so we need to reason about which schema, sub
+        schema or constraint the validation is failing on.
+        Inspecting the context value of a ValidationError gives us information about
+        which sub schema failed and which kind of error it is.
+        """
+        constraint = [context for context in error.context if len(context.path) > 0]
+        if constraint:
+            valid_types = _parse_valid_types_from_validator(constraint[0].validator_value)
+            msg = "contains {}, which is an invalid type, it should be {}".format(
+                constraint[0].instance,
+                valid_types
+            )
+            return msg
+
+        uniqueness = [context for context in error.context if context.validator == 'uniqueItems']
+        if uniqueness:
+            msg = "contains non unique items, please remove duplicates from {}".format(
+                uniqueness[0].instance
+            )
+            return msg
+
+        types = [context.validator_value for context in error.context if context.validator == 'type']
+        valid_types = _parse_valid_types_from_validator(types)
+
+        msg = "contains an invalid type, it should be {}".format(valid_types)
+
+        return msg
 
     root_msgs = []
     invalid_keys = []
@@ -168,27 +216,22 @@ def process_errors(errors, service_name=None):
                     required.append(_clean_error_message(error.message))
             elif error.validator == 'oneOf':
                 config_key = error.path[0]
+                msg = _parse_oneof_validator(error)
 
-                valid_types = [_parse_valid_types_from_schema(schema) for schema in error.schema['oneOf']]
-                valid_type_msg = " or ".join(valid_types)
-
-                type_errors.append("Service '{}' configuration key '{}' contains an invalid type, valid types are {}".format(
-                    service_name, config_key, valid_type_msg)
+                type_errors.append("Service '{}' configuration key '{}' {}".format(
+                    service_name, config_key, msg)
                 )
             elif error.validator == 'type':
-                msg = "a"
-                if error.validator_value == "array":
-                    msg = "an"
+                msg = _parse_valid_types_from_validator(error.validator_value)
 
                 if len(error.path) > 0:
                     config_key = " ".join(["'%s'" % k for k in error.path])
                     type_errors.append(
                         "Service '{}' configuration key {} contains an invalid "
-                        "type, it should be {} {}".format(
+                        "type, it should be {}".format(
                             service_name,
                             config_key,
-                            msg,
-                            error.validator_value))
+                            msg))
                 else:
                     root_msgs.append(
                         "Service '{}' doesn\'t have any configuration options. "

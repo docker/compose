@@ -183,7 +183,8 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_invalid_list_of_strings_format(self):
-        expected_error_msg = "'command' contains an invalid type, valid types are string or array"
+        expected_error_msg = "Service 'web' configuration key 'command' contains 1"
+        expected_error_msg += ", which is an invalid type, it should be a string"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 config.ConfigDetails(
@@ -222,7 +223,7 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_config_extra_hosts_list_of_dicts_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'extra_hosts' contains an invalid type"
+        expected_error_msg = "key 'extra_hosts' contains {'somehost': '162.242.195.82'}, which is an invalid type, it should be a string"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
@@ -268,6 +269,21 @@ class ConfigTest(unittest.TestCase):
                 )
             )
             self.assertEqual(service[0]['entrypoint'], entrypoint)
+
+    def test_validation_message_for_invalid_type_when_multiple_types_allowed(self):
+        expected_error_msg = "Service 'web' configuration key 'mem_limit' contains an invalid type, it should be a number or a string"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                config.ConfigDetails(
+                    {'web': {
+                        'image': 'busybox',
+                        'mem_limit': ['incorrect']
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
 
 
 class InterpolationTest(unittest.TestCase):
