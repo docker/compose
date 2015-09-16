@@ -96,7 +96,7 @@ To uninstall Docker Compose if you installed using `pip`:
 - [User guide](/)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
+- [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)

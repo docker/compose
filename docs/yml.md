@@ -444,7 +444,7 @@ dollar sign (`$$`).
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
+- [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
