@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
-from docker.utils import LogConfig
 
 from .. import mock
 from .. import unittest
@@ -108,19 +107,33 @@ class ServiceTest(unittest.TestCase):
         self.assertFalse('domainname' in opts, 'domainname')
 
     def test_memory_swap_limit(self):
+        self.mock_client.create_host_config.return_value = {}
+
         service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, mem_limit=1000000000, memswap_limit=2000000000)
-        opts = service._get_container_create_options({'some': 'overrides'}, 1)
-        self.assertEqual(opts['host_config']['MemorySwap'], 2000000000)
-        self.assertEqual(opts['host_config']['Memory'], 1000000000)
+        service._get_container_create_options({'some': 'overrides'}, 1)
+
+        self.assertTrue(self.mock_client.create_host_config.called)
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['mem_limit'],
+            1000000000
+        )
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['memswap_limit'],
+            2000000000
+        )
 
     def test_log_opt(self):
+        self.mock_client.create_host_config.return_value = {}
+
         log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
         service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
-        opts = service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'}, 1)
 
-        self.assertIsInstance(opts['host_config']['LogConfig'], LogConfig)
-        self.assertEqual(opts['host_config']['LogConfig'].type, 'syslog')
-        self.assertEqual(opts['host_config']['LogConfig'].config, log_opt)
+        self.assertTrue(self.mock_client.create_host_config.called)
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['log_config'],
+            {'Type': 'syslog', 'Config': {'syslog-address': 'tcp://192.168.0.42:123'}}
+        )
 
     def test_split_domainname_fqdn(self):
         service = Service(
