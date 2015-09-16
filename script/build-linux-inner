@@ -3,11 +3,12 @@
 set -ex
 
 TARGET=dist/docker-compose-Linux-x86_64
+VENV=/code/.tox/py27
 
 mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist
 
-pip install -r requirements-build.txt
-su -c "pyinstaller docker-compose.spec" user
+$VENV/bin/pip install -r requirements-build.txt
+su -c "$VENV/bin/pyinstaller docker-compose.spec" user
 mv dist/docker-compose $TARGET
 $TARGET version

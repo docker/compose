@@ -10,14 +10,15 @@ RUN set -ex; \
         zlib1g-dev \
         libssl-dev \
         git \
-        apt-transport-https \
         ca-certificates \
         curl \
-        lxc \
-        iptables \
         libsqlite3-dev \
     ; \
     rm -rf /var/lib/apt/lists/*
+
+RUN curl https://get.docker.com/builds/Linux/x86_64/docker-latest \
+        -o /usr/local/bin/docker && \
+    chmod +x /usr/local/bin/docker
 
 # Build Python 2.7.9 from source
 RUN set -ex; \
@@ -69,19 +70,17 @@ ENV LANG en_US.UTF-8
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
 
-RUN pip install tox
-
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
-
-ADD requirements-dev.txt /code/
-RUN pip install -r requirements-dev.txt
-
 RUN pip install tox==2.1.1
 
-ADD . /code/
-RUN pip install --no-deps -e /code
+ADD requirements.txt /code/
+ADD requirements-dev.txt /code/
+ADD .pre-commit-config.yaml /code/
+ADD setup.py /code/
+ADD tox.ini /code/
+ADD compose /code/compose/
+RUN tox --notest
 
+ADD . /code/
 RUN chown -R user /code/
 
-ENTRYPOINT ["/usr/local/bin/docker-compose"]
+ENTRYPOINT ["/code/.tox/py27/bin/docker-compose"]
