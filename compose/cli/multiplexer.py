@@ -2,6 +2,8 @@ from __future__ import absolute_import
 
 from threading import Thread
 
+from six.moves import _thread as thread
+
 try:
     from Queue import Queue, Empty
 except ImportError:
@@ -38,6 +40,9 @@ class Multiplexer(object):
                     yield item
             except Empty:
                 pass
+            # See https://github.com/docker/compose/issues/189
+            except thread.error:
+                raise KeyboardInterrupt()
 
     def _init_readers(self):
         for iterator in self.iterators:
