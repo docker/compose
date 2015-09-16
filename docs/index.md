@@ -139,7 +139,7 @@ This template defines two services, `web` and `redis`. The `web` service:
 
 * Builds from the `Dockerfile` in the current directory.
 * Forwards the exposed port 5000 on the container to port 5000 on the host machine.
-* Mounts the current directory on the host to ``/code` inside the container allowing you to modify the code without having to rebuild the image.
+* Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
 * Links the web container to the Redis service.
 
 The `redis` service uses the latest public [Redis](https://registry.hub.docker.com/_/redis/) image pulled from the Docker Hub registry.
