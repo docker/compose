@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
-from docker.utils import LogConfig
 
 from .. import mock
 from .. import unittest
@@ -108,19 +107,33 @@ class ServiceTest(unittest.TestCase):
         self.assertFalse('domainname' in opts, 'domainname')
 
     def test_memory_swap_limit(self):
+        self.mock_client.create_host_config.return_value = {}
+
         service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, mem_limit=1000000000, memswap_limit=2000000000)
-        opts = service._get_container_create_options({'some': 'overrides'}, 1)
-        self.assertEqual(opts['host_config']['MemorySwap'], 2000000000)
-        self.assertEqual(opts['host_config']['Memory'], 1000000000)
+        service._get_container_create_options({'some': 'overrides'}, 1)
+
+        self.assertTrue(self.mock_client.create_host_config.called)
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['mem_limit'],
+            1000000000
+        )
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['memswap_limit'],
+            2000000000
+        )
 
     def test_log_opt(self):
+        self.mock_client.create_host_config.return_value = {}
+
         log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
         service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
-        opts = service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'}, 1)
 
-        self.assertIsInstance(opts['host_config']['LogConfig'], LogConfig)
-        self.assertEqual(opts['host_config']['LogConfig'].type, 'syslog')
-        self.assertEqual(opts['host_config']['LogConfig'].config, log_opt)
+        self.assertTrue(self.mock_client.create_host_config.called)
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['log_config'],
+            {'Type': 'syslog', 'Config': {'syslog-address': 'tcp://192.168.0.42:123'}}
+        )
 
     def test_split_domainname_fqdn(self):
         service = Service(
@@ -530,13 +543,13 @@ class ServiceVolumesTest(unittest.TestCase):
             }
         }
 
-        create_options = service._get_container_create_options(
+        service._get_container_create_options(
             override_options={},
             number=1,
         )
 
         self.assertEqual(
-            set(create_options['host_config']['Binds']),
+            set(self.mock_client.create_host_config.call_args[1]['binds']),
             set([
                 '/host/path:/data1:rw',
                 '/host/path:/data2:rw',
@@ -568,14 +581,14 @@ class ServiceVolumesTest(unittest.TestCase):
             },
         }
 
-        create_options = service._get_container_create_options(
+        service._get_container_create_options(
             override_options={},
             number=1,
             previous_container=Container(self.mock_client, {'Id': '123123123'}),
         )
 
         self.assertEqual(
-            create_options['host_config']['Binds'],
+            self.mock_client.create_host_config.call_args[1]['binds'],
             ['/mnt/sda1/host/path:/data:rw'],
         )
 
@@ -600,4 +613,4 @@ class ServiceVolumesTest(unittest.TestCase):
         ).create_container()
 
         self.assertEqual(len(create_calls), 1)
-        self.assertEqual(create_calls[0][1]['host_config']['Binds'], volumes)
+        self.assertEqual(self.mock_client.create_host_config.call_args[1]['binds'], volumes)

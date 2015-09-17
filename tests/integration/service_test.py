@@ -813,6 +813,13 @@ class ServiceTest(DockerClientTestCase):
         for k, v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
             self.assertEqual(env[k], v)
 
+    def test_with_high_enough_api_version_we_get_default_network_mode(self):
+        # TODO: remove this test once minimum docker version is 1.8.x
+        with mock.patch.object(self.client, '_version', '1.20'):
+            service = self.create_service('web')
+            service_config = service._get_container_host_config({})
+            self.assertEquals(service_config['NetworkMode'], 'default')
+
     def test_labels(self):
         labels_dict = {
             'com.example.description': "Accounting webapp",
