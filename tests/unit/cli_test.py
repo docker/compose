@@ -144,8 +144,11 @@ class CLITestCase(unittest.TestCase):
             '--rm': None,
             '--name': None,
         })
-        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
-        self.assertEquals(call_kwargs['host_config']['RestartPolicy']['Name'], 'always')
+
+        self.assertEquals(
+            mock_client.create_host_config.call_args[1]['restart_policy']['Name'],
+            'always'
+        )
 
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
@@ -170,8 +173,10 @@ class CLITestCase(unittest.TestCase):
             '--rm': True,
             '--name': None,
         })
-        _, _, call_kwargs = mock_client.create_container.mock_calls[0]
-        self.assertFalse('RestartPolicy' in call_kwargs['host_config'])
+
+        self.assertFalse(
+            mock_client.create_host_config.call_args[1].get('restart_policy')
+        )
 
     def test_command_manula_and_service_ports_together(self):
         command = TopLevelCommand()

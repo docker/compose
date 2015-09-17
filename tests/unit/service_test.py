@@ -550,13 +550,13 @@ class ServiceVolumesTest(unittest.TestCase):
             }
         }
 
-        create_options = service._get_container_create_options(
+        service._get_container_create_options(
             override_options={},
             number=1,
         )
 
         self.assertEqual(
-            set(create_options['host_config']['Binds']),
+            set(self.mock_client.create_host_config.call_args[1]['binds']),
             set([
                 '/host/path:/data1:rw',
                 '/host/path:/data2:rw',
@@ -588,14 +588,14 @@ class ServiceVolumesTest(unittest.TestCase):
             },
         }
 
-        create_options = service._get_container_create_options(
+        service._get_container_create_options(
             override_options={},
             number=1,
             previous_container=Container(self.mock_client, {'Id': '123123123'}),
         )
 
         self.assertEqual(
-            create_options['host_config']['Binds'],
+            self.mock_client.create_host_config.call_args[1]['binds'],
             ['/mnt/sda1/host/path:/data:rw'],
         )
 
@@ -620,4 +620,4 @@ class ServiceVolumesTest(unittest.TestCase):
         ).create_container()
 
         self.assertEqual(len(create_calls), 1)
-        self.assertEqual(create_calls[0][1]['host_config']['Binds'], volumes)
+        self.assertEqual(self.mock_client.create_host_config.call_args[1]['binds'], volumes)
