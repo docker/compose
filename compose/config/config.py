@@ -105,6 +105,8 @@ def find(base_dir, filenames):
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
         filenames = get_default_config_files(base_dir)
+
+    log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
         os.path.dirname(filenames[0]),
         [ConfigFile(f, load_yaml(f)) for f in filenames])
