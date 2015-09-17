@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 from collections import namedtuple
-from functools import reduce
 
 import six
 import yaml
@@ -89,9 +88,22 @@ PATH_START_CHARS = [
 log = logging.getLogger(__name__)
 
 
-ConfigDetails = namedtuple('ConfigDetails', 'working_dir configs')
+class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files')):
+    """
+    :param working_dir: the directory to use for relative paths in the config
+    :type  working_dir: string
+    :param config_files: list of configuration files to load
+    :type  config_files: list of :class:`ConfigFile`
+     """
 
-ConfigFile = namedtuple('ConfigFile', 'filename config')
+
+class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
+    """
+    :param filename: filename of the config file
+    :type  filename: string
+    :param config: contents of the config file
+    :type  config: :class:`dict`
+    """
 
 
 def find(base_dir, filenames):
@@ -170,10 +182,19 @@ def pre_process_config(config):
 
 
 def load(config_details):
-    working_dir, configs = config_details
+    """Load the configuration from a working directory and a list of
+    configuration files.  Files are loaded in order, and merged on top
+    of each other to create the final configuration.
+
+    Return a fully interpolated, extended and validated configuration.
+    """
 
     def build_service(filename, service_name, service_dict):
-        loader = ServiceLoader(working_dir, filename, service_name, service_dict)
+        loader = ServiceLoader(
+            config_details.working_dir,
+            filename,
+            service_name,
+            service_dict)
         service_dict = loader.make_service_dict()
         validate_paths(service_dict)
         return service_dict
@@ -187,21 +208,19 @@ def load(config_details):
         ]
 
     def merge_services(base, override):
+        all_service_names = set(base) | set(override)
         return {
             name: merge_service_dicts(base.get(name, {}), override.get(name, {}))
-            for name in set(base) | set(override)
+            for name in all_service_names
         }
 
-    def combine_configs(base, override):
-        service_dicts = load_file(base.filename, base.config)
-        if not override:
-            return service_dicts
+    config_file = config_details.config_files[0]
+    for next_file in config_details.config_files[1:]:
+        config_file = ConfigFile(
+            config_file.filename,
+            merge_services(config_file.config, next_file.config))
 
-        return ConfigFile(
-            override.filename,
-            merge_services(base.config, override.config))
-
-    return reduce(combine_configs, configs + [None])
+    return load_file(config_file.filename, config_file.config)
 
 
 class ServiceLoader(object):
