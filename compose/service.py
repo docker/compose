@@ -45,6 +45,7 @@ DOCKER_START_KEYS = [
     'dns_search',
     'env_file',
     'extra_hosts',
+    'ipc',
     'read_only',
     'net',
     'log_driver',
@@ -697,7 +698,8 @@ class Service(object):
             extra_hosts=extra_hosts,
             read_only=read_only,
             pid_mode=pid,
-            security_opt=security_opt
+            security_opt=security_opt,
+            ipc_mode=options.get('ipc')
         )
 
     def build(self, no_cache=False):
