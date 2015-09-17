@@ -1,5 +1,7 @@
 Docker Compose
 ==============
+![Docker Compose](logo.png?raw=true "Docker Compose Logo")
+
 *(Previously known as Fig)*
 
 Compose is a tool for defining and running multi-container applications with
