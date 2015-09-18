@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import sys
 from functools import wraps
 
 from docker.utils.ports import split_port
@@ -290,12 +291,20 @@ def validate_against_service_schema(config, service_name):
 
 def _validate_against_schema(config, schema_filename, format_checker=[], service_name=None):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if sys.platform == "win32":
+        file_pre_fix = "///"
+        config_source_dir = config_source_dir.replace('\\', '/')
+    else:
+        file_pre_fix = "//"
+
+    resolver_full_path = "file:{}{}/".format(file_pre_fix, config_source_dir)
     schema_file = os.path.join(config_source_dir, schema_filename)
 
     with open(schema_file, "r") as schema_fh:
         schema = json.load(schema_fh)
 
-    resolver = RefResolver('file://' + config_source_dir + '/', schema)
+    resolver = RefResolver(resolver_full_path, schema)
     validation_output = Draft4Validator(schema, resolver=resolver, format_checker=FormatChecker(format_checker))
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
