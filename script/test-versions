@@ -10,22 +10,41 @@ docker run --rm \
   --entrypoint="tox" \
   "$TAG" -e pre-commit
 
+ALL_DOCKER_VERSIONS="1.7.1 1.8.2"
+DEFAULT_DOCKER_VERSION="1.8.2"
+
 if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="default"
+  DOCKER_VERSIONS="$DEFAULT_DOCKER_VERSION"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
 fi
 
+
+BUILD_NUMBER=${BUILD_NUMBER-$USER}
+
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
+
+  daemon_container="compose-dind-$version-$BUILD_NUMBER"
+  trap "docker rm -vf $daemon_container" EXIT
+
+  # TODO: remove when we stop testing against 1.7.x
+  daemon=$([[ "$version" == "1.7"* ]] && echo "-d" || echo "daemon")
+
   docker run \
-    --rm \
+    -d \
+    --name "$daemon_container" \
     --privileged \
     --volume="/var/lib/docker" \
-    --volume="${COVERAGE_DIR:-$(pwd)/coverage-html}:/code/coverage-html" \
-    -e "DOCKER_VERSION=$version" \
-    -e "DOCKER_DAEMON_ARGS" \
-    --entrypoint="script/dind" \
+    dockerswarm/dind:$version \
+    docker $daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
+
+  docker run \
+    --rm \
+    --link="$daemon_container:docker" \
+    --env="DOCKER_HOST=tcp://docker:2375" \
+    --entrypoint="tox" \
     "$TAG" \
-    script/wrapdocker tox -e py27,py34 -- "$@"
+    -e py27,py34 -- "$@"
+
 done
