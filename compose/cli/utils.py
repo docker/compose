@@ -85,7 +85,12 @@ def call_silently(*args, **kwargs):
     Like subprocess.call(), but redirects stdout and stderr to /dev/null.
     """
     with open(os.devnull, 'w') as shutup:
-        return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
+        try:
+            return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
+        except WindowsError:
+            # On Windows, subprocess.call() can still raise exceptions. Normalize
+            # to POSIXy behaviour by returning a nonzero exit code.
+            return 1
 
 
 def is_mac():
