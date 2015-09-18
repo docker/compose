@@ -51,8 +51,10 @@ Using `build` together with `image` is not allowed. Attempting to do so results 
 
 Alternate Dockerfile.
 
-Compose will use an alternate file to build with.
+Compose will use an alternate file to build with. You still must provide a build-
+path with the `build`-key.
 
+    build: /path/to/build/dir
     dockerfile: Dockerfile-alternate
 
 Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
