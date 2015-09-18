@@ -44,7 +44,7 @@ __docker_compose_services_all() {
 # All services that have an entry with the given key in their compose_file section
 ___docker_compose_services_with_key() {
 	# flatten sections to one line, then filter lines containing the key and return section name.
-	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker_compose_compose_file)}" | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
+	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker_compose_compose_file)}" 2>/dev/null | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
 }
 
 # All services that are defined by a Dockerfile reference
@@ -87,7 +87,7 @@ __docker_compose_services_stopped() {
 _docker_compose_build() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --no-cache" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --no-cache --pull" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_build
