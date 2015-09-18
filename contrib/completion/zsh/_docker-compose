@@ -250,6 +250,7 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '-d[Detached mode: Run container in the background, print new container name.]' \
+                '--name[Assign a name to the container]:name: ' \
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
                 '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
