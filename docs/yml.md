@@ -352,7 +352,7 @@ Mount all of the volumes from another service or container.
      - service_name
      - container_name
 
-### working\_dir, entrypoint, user, hostname, domainname, mac\_address, mem\_limit, memswap\_limit, privileged, ipc, restart, stdin\_open, tty, cpu\_shares, cpuset, read\_only, volume\_driver
+### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, volume\_driver, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -360,26 +360,24 @@ Each of these is a single value, analogous to its
     cpu_shares: 73
     cpuset: 0,1
 
-    working_dir: /code
     entrypoint: /code/entrypoint.sh
     user: postgresql
+    working_dir: /code
 
-    hostname: foo
     domainname: foo.com
-
+    hostname: foo
+    ipc: host
     mac_address: 02:42:ac:11:65:43
 
     mem_limit: 1000000000
     memswap_limit: 2000000000
     privileged: true
 
-    ipc: host
-
     restart: always
 
+    read_only: true
     stdin_open: true
     tty: true
-    read_only: true
 
     volume_driver: mydriver
 
