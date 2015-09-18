@@ -2,6 +2,8 @@
 
 set -ex
 
+./script/clean
+
 TAG="docker-compose"
 docker build -t "$TAG" .
 docker run \

@@ -3,7 +3,9 @@ set -ex
 
 PATH="/usr/local/bin:$PATH"
 
+./script/clean
 rm -rf venv
+
 virtualenv -p /usr/local/bin/python venv
 venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-build.txt
