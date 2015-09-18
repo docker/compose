@@ -98,20 +98,56 @@ class CLITestCase(DockerClientTestCase):
             'sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
 
     @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_build_plain(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.command.dispatch(['build', 'simple'], None)
+
+        mock_stdout.truncate(0)
+        cache_indicator = 'Using cache'
+        pull_indicator = 'Status: Image is up to date for busybox:latest'
+        self.command.dispatch(['build', 'simple'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn(cache_indicator, output)
+        self.assertNotIn(pull_indicator, output)
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
     def test_build_no_cache(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
 
         mock_stdout.truncate(0)
         cache_indicator = 'Using cache'
-        self.command.dispatch(['build', 'simple'], None)
-        output = mock_stdout.getvalue()
-        self.assertIn(cache_indicator, output)
-
-        mock_stdout.truncate(0)
+        pull_indicator = 'Status: Image is up to date for busybox:latest'
         self.command.dispatch(['build', '--no-cache', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
+        self.assertNotIn(pull_indicator, output)
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_build_pull(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.command.dispatch(['build', 'simple'], None)
+
+        mock_stdout.truncate(0)
+        cache_indicator = 'Using cache'
+        pull_indicator = 'Status: Image is up to date for busybox:latest'
+        self.command.dispatch(['build', '--pull', 'simple'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn(cache_indicator, output)
+        self.assertIn(pull_indicator, output)
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_build_no_cache_pull(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.command.dispatch(['build', 'simple'], None)
+
+        mock_stdout.truncate(0)
+        cache_indicator = 'Using cache'
+        pull_indicator = 'Status: Image is up to date for busybox:latest'
+        self.command.dispatch(['build', '--no-cache', '--pull', 'simple'], None)
+        output = mock_stdout.getvalue()
+        self.assertNotIn(cache_indicator, output)
+        self.assertIn(pull_indicator, output)
 
     def test_up_detached(self):
         self.command.dispatch(['up', '-d'], None)

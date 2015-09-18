@@ -701,7 +701,7 @@ class Service(object):
             ipc_mode=options.get('ipc')
         )
 
-    def build(self, no_cache=False):
+    def build(self, no_cache=False, pull=False):
         log.info('Building %s' % self.name)
 
         path = self.options['build']
@@ -715,7 +715,7 @@ class Service(object):
             tag=self.image_name,
             stream=True,
             rm=True,
-            pull=False,
+            pull=pull,
             nocache=no_cache,
             dockerfile=self.options.get('dockerfile', None),
         )
