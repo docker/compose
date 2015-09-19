@@ -72,6 +72,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
 
 SUPPORTED_FILENAMES = [
     'docker-compose.yml',
+    'docker-compose.yml.dist',
     'docker-compose.yaml',
     'fig.yml',
     'fig.yaml',
@@ -110,7 +111,7 @@ def get_config_path(base_dir):
 
     winner = candidates[0]
 
-    if len(candidates) > 1:
+    if len(candidates) > 1 and not (len(candidates) == 2 and candidates[1].endswith('.dist')):
         log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
         log.warn("Using %s\n", winner)
 
