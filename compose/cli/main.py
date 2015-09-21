@@ -270,6 +270,7 @@ class TopLevelCommand(Command):
         Usage: pull [options] [SERVICE...]
 
         Options:
+            --ignore-pull-failures  Pull what it can and ignores images with pull failures.
             --allow-insecure-ssl    Deprecated - no effect.
         """
         if options['--allow-insecure-ssl']:
@@ -277,6 +278,7 @@ class TopLevelCommand(Command):
 
         project.pull(
             service_names=options['SERVICE'],
+            ignore_pull_failures=options.get('--ignore-pull-failures')
         )
 
     def rm(self, project, options):

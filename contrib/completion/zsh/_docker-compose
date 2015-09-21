@@ -238,6 +238,7 @@ __docker-compose_subcommand() {
         (pull)
             _arguments \
                 $opts_help \
+                '--ignore-pull-failures[Pull what it can and ignores images with pull failures.]' \
                 '*:services:__docker-compose_services_from_image' && ret=0
             ;;
         (rm)

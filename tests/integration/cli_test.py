@@ -98,6 +98,13 @@ class CLITestCase(DockerClientTestCase):
             'Pulling digest (busybox@'
             'sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
 
+    @mock.patch('compose.service.log')
+    def test_pull_with_ignore_pull_failures(self, mock_logging):
+        self.command.dispatch(['-f', 'ignore-pull-failures.yml', 'pull', '--ignore-pull-failures'], None)
+        mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
+        mock_logging.info.assert_any_call('Pulling another (nonexisting-image:latest)...')
+        mock_logging.error.assert_any_call('Error: image library/nonexisting-image:latest not found')
+
     @mock.patch('sys.stdout', new_callable=StringIO)
     def test_build_plain(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
