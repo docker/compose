@@ -212,7 +212,7 @@ _docker_compose_ps() {
 _docker_compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_image
