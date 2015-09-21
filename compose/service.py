@@ -772,7 +772,7 @@ class Service(object):
                 return True
         return False
 
-    def pull(self):
+    def pull(self, ignore_pull_failures=False):
         if 'image' not in self.options:
             return
 
@@ -784,7 +784,14 @@ class Service(object):
             tag=tag,
             stream=True,
         )
-        stream_output(output, sys.stdout)
+
+        try:
+            stream_output(output, sys.stdout)
+        except StreamOutputError as e:
+            if not ignore_pull_failures:
+                raise
+            else:
+                log.error(six.text_type(e))
 
 
 class Net(object):
