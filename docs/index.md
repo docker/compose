@@ -196,7 +196,7 @@ your services once you've finished with them:
 At this point, you have seen the basics of how Compose works.
 
 - Next, try the quick start guide for [Django](django.md),
-  [Rails](rails.md), or [Wordpress](wordpress.md).
+  [Rails](rails.md), or [WordPress](wordpress.md).
 - See the reference guides for complete details on the [commands](/reference), the
   [configuration file](yml.md) and [environment variables](env.md).
 
@@ -224,7 +224,7 @@ For more information and resources, please visit the [Getting Help project page]
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
+- [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
