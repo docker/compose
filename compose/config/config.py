@@ -16,7 +16,6 @@ from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
 from .validation import validate_service_names
 from .validation import validate_top_level_object
-from compose.cli.utils import find_candidates_in_parent_dirs
 
 
 DOCKER_CONFIG_KEYS = [
@@ -77,6 +76,7 @@ SUPPORTED_FILENAMES = [
     'fig.yaml',
 ]
 
+DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 
 PATH_START_CHARS = [
     '/',
@@ -88,24 +88,45 @@ PATH_START_CHARS = [
 log = logging.getLogger(__name__)
 
 
-ConfigDetails = namedtuple('ConfigDetails', 'config working_dir filename')
+class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files')):
+    """
+    :param working_dir: the directory to use for relative paths in the config
+    :type  working_dir: string
+    :param config_files: list of configuration files to load
+    :type  config_files: list of :class:`ConfigFile`
+     """
 
 
-def find(base_dir, filename):
-    if filename == '-':
-        return ConfigDetails(yaml.safe_load(sys.stdin), os.getcwd(), None)
+class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
+    """
+    :param filename: filename of the config file
+    :type  filename: string
+    :param config: contents of the config file
+    :type  config: :class:`dict`
+    """
 
-    if filename:
-        filename = os.path.join(base_dir, filename)
+
+def find(base_dir, filenames):
+    if filenames == ['-']:
+        return ConfigDetails(
+            os.getcwd(),
+            [ConfigFile(None, yaml.safe_load(sys.stdin))])
+
+    if filenames:
+        filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filename = get_config_path(base_dir)
-    return ConfigDetails(load_yaml(filename), os.path.dirname(filename), filename)
+        filenames = get_default_config_files(base_dir)
+
+    log.debug("Using configuration files: {}".format(",".join(filenames)))
+    return ConfigDetails(
+        os.path.dirname(filenames[0]),
+        [ConfigFile(f, load_yaml(f)) for f in filenames])
 
 
-def get_config_path(base_dir):
+def get_default_config_files(base_dir):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
-    if len(candidates) == 0:
+    if not candidates:
         raise ComposeFileNotFound(SUPPORTED_FILENAMES)
 
     winner = candidates[0]
@@ -123,7 +144,31 @@ def get_config_path(base_dir):
         log.warn("%s is deprecated and will not be supported in future. "
                  "Please rename your config file to docker-compose.yml\n" % winner)
 
-    return os.path.join(path, winner)
+    return [os.path.join(path, winner)] + get_default_override_file(path)
+
+
+def get_default_override_file(path):
+    override_filename = os.path.join(path, DEFAULT_OVERRIDE_FILENAME)
+    return [override_filename] if os.path.exists(override_filename) else []
+
+
+def find_candidates_in_parent_dirs(filenames, path):
+    """
+    Given a directory path to start, looks for filenames in the
+    directory, and then each parent directory successively,
+    until found.
+
+    Returns tuple (candidates, path).
+    """
+    candidates = [filename for filename in filenames
+                  if os.path.exists(os.path.join(path, filename))]
+
+    if not candidates:
+        parent_dir = os.path.join(path, '..')
+        if os.path.abspath(parent_dir) != os.path.abspath(path):
+            return find_candidates_in_parent_dirs(filenames, parent_dir)
+
+    return (candidates, path)
 
 
 @validate_top_level_object
@@ -133,29 +178,49 @@ def pre_process_config(config):
     Pre validation checks and processing of the config file to interpolate env
     vars returning a config dict ready to be tested against the schema.
     """
-    config = interpolate_environment_variables(config)
-    return config
+    return interpolate_environment_variables(config)
 
 
 def load(config_details):
-    config, working_dir, filename = config_details
+    """Load the configuration from a working directory and a list of
+    configuration files.  Files are loaded in order, and merged on top
+    of each other to create the final configuration.
 
-    processed_config = pre_process_config(config)
-    validate_against_fields_schema(processed_config)
+    Return a fully interpolated, extended and validated configuration.
+    """
 
-    service_dicts = []
-
-    for service_name, service_dict in list(processed_config.items()):
+    def build_service(filename, service_name, service_dict):
         loader = ServiceLoader(
-            working_dir=working_dir,
-            filename=filename,
-            service_name=service_name,
-            service_dict=service_dict)
+            config_details.working_dir,
+            filename,
+            service_name,
+            service_dict)
         service_dict = loader.make_service_dict()
         validate_paths(service_dict)
-        service_dicts.append(service_dict)
+        return service_dict
 
-    return service_dicts
+    def load_file(filename, config):
+        processed_config = pre_process_config(config)
+        validate_against_fields_schema(processed_config)
+        return [
+            build_service(filename, name, service_config)
+            for name, service_config in processed_config.items()
+        ]
+
+    def merge_services(base, override):
+        all_service_names = set(base) | set(override)
+        return {
+            name: merge_service_dicts(base.get(name, {}), override.get(name, {}))
+            for name in all_service_names
+        }
+
+    config_file = config_details.config_files[0]
+    for next_file in config_details.config_files[1:]:
+        config_file = ConfigFile(
+            config_file.filename,
+            merge_services(config_file.config, next_file.config))
+
+    return load_file(config_file.filename, config_file.config)
 
 
 class ServiceLoader(object):

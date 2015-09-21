@@ -5,10 +5,10 @@ import shutil
 import tempfile
 from operator import itemgetter
 
-from .. import mock
-from .. import unittest
 from compose.config import config
 from compose.config.errors import ConfigurationError
+from tests import mock
+from tests import unittest
 
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
@@ -26,10 +26,16 @@ def service_sort(services):
     return sorted(services, key=itemgetter('name'))
 
 
+def build_config_details(contents, working_dir, filename):
+    return config.ConfigDetails(
+        working_dir,
+        [config.ConfigFile(filename, contents)])
+
+
 class ConfigTest(unittest.TestCase):
     def test_load(self):
         service_dicts = config.load(
-            config.ConfigDetails(
+            build_config_details(
                 {
                     'foo': {'image': 'busybox'},
                     'bar': {'image': 'busybox', 'environment': ['FOO=1']},
@@ -57,7 +63,7 @@ class ConfigTest(unittest.TestCase):
     def test_load_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': 'busybox:latest'},
                     'working_dir',
                     'filename.yml'
@@ -68,7 +74,7 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
                 config.load(
-                    config.ConfigDetails(
+                    build_config_details(
                         {invalid_name: {'image': 'busybox'}},
                         'working_dir',
                         'filename.yml'
@@ -79,17 +85,54 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "Service name: 1 needs to be a string, eg '1'"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {1: {'image': 'busybox'}},
                     'working_dir',
                     'filename.yml'
                 )
             )
 
+    def test_load_with_multiple_files(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'web': {
+                    'image': 'example/web',
+                    'links': ['db'],
+                },
+                'db': {
+                    'image': 'example/db',
+                },
+            })
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'web': {
+                    'build': '/',
+                    'volumes': ['/home/user/project:/code'],
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        service_dicts = config.load(details)
+        expected = [
+            {
+                'name': 'web',
+                'build': '/',
+                'links': ['db'],
+                'volumes': ['/home/user/project:/code'],
+            },
+            {
+                'name': 'db',
+                'image': 'example/db',
+            },
+        ]
+        self.assertEqual(service_sort(service_dicts), service_sort(expected))
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {valid_name: {'image': 'busybox'}},
                     'tests/fixtures/extends',
                     'common.yml'
@@ -101,7 +144,7 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             for invalid_ports in [{"1": "8000"}, False, 0, "8000", 8000, ["8000", "8000"]]:
                 config.load(
-                    config.ConfigDetails(
+                    build_config_details(
                         {'web': {'image': 'busybox', 'ports': invalid_ports}},
                         'working_dir',
                         'filename.yml'
@@ -112,7 +155,7 @@ class ConfigTest(unittest.TestCase):
         valid_ports = [["8000", "9000"], ["8000/8050"], ["8000"], [8000], ["49153-49154:3002-3003"]]
         for ports in valid_ports:
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {'image': 'busybox', 'ports': ports}},
                     'working_dir',
                     'filename.yml'
@@ -123,7 +166,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "(did you mean 'privileged'?)"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'foo': {'image': 'busybox', 'privilige': 'something'},
                     },
@@ -136,7 +179,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "Service 'foo' has both an image and build path specified."
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'foo': {'image': 'busybox', 'build': '.'},
                     },
@@ -149,7 +192,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "Service 'foo' configuration key 'links' contains an invalid type, it should be an array"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'foo': {'image': 'busybox', 'links': 'an_link'},
                     },
@@ -162,7 +205,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "Top level object needs to be a dictionary."
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     ['foo', 'lol'],
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -173,7 +216,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "has non-unique elements"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'web': {'build': '.', 'devices': ['/dev/foo:/dev/foo', '/dev/foo:/dev/foo']}
                     },
@@ -187,7 +230,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg += ", which is an invalid type, it should be a string"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'web': {'build': '.', 'command': [1]}
                     },
@@ -200,7 +243,7 @@ class ConfigTest(unittest.TestCase):
         expected_error_msg = "Service 'web' has both an image and alternate Dockerfile."
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {'image': 'busybox', 'dockerfile': 'Dockerfile.alt'}},
                     'working_dir',
                     'filename.yml'
@@ -212,7 +255,7 @@ class ConfigTest(unittest.TestCase):
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {
                         'image': 'busybox',
                         'extra_hosts': 'somehost:162.242.195.82'
@@ -227,7 +270,7 @@ class ConfigTest(unittest.TestCase):
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {
                         'image': 'busybox',
                         'extra_hosts': [
@@ -244,7 +287,7 @@ class ConfigTest(unittest.TestCase):
         expose_values = [["8000"], [8000]]
         for expose in expose_values:
             service = config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {
                         'image': 'busybox',
                         'expose': expose
@@ -259,7 +302,7 @@ class ConfigTest(unittest.TestCase):
         entrypoint_values = [["sh"], "sh"]
         for entrypoint in entrypoint_values:
             service = config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {
                         'image': 'busybox',
                         'entrypoint': entrypoint
@@ -274,7 +317,7 @@ class ConfigTest(unittest.TestCase):
     def test_logs_warning_for_boolean_in_environment(self, mock_logging):
         expected_warning_msg = "Warning: There is a boolean value, True in the 'environment' key."
         config.load(
-            config.ConfigDetails(
+            build_config_details(
                 {'web': {
                     'image': 'busybox',
                     'environment': {'SHOW_STUFF': True}
@@ -292,7 +335,7 @@ class ConfigTest(unittest.TestCase):
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {
                         'image': 'busybox',
                         'environment': {'---': 'nope'}
@@ -331,16 +374,16 @@ class InterpolationTest(unittest.TestCase):
     def test_unset_variable_produces_warning(self):
         os.environ.pop('FOO', None)
         os.environ.pop('BAR', None)
-        config_details = config.ConfigDetails(
-            config={
+        config_details = build_config_details(
+            {
                 'web': {
                     'image': '${FOO}',
                     'command': '${BAR}',
                     'container_name': '${BAR}',
                 },
             },
-            working_dir='.',
-            filename=None,
+            '.',
+            None,
         )
 
         with mock.patch('compose.config.interpolation.log') as log:
@@ -355,7 +398,7 @@ class InterpolationTest(unittest.TestCase):
     def test_invalid_interpolation(self):
         with self.assertRaises(config.ConfigurationError) as cm:
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {'web': {'image': '${'}},
                     'working_dir',
                     'filename.yml'
@@ -371,10 +414,10 @@ class InterpolationTest(unittest.TestCase):
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
         d = config.load(
-            config.ConfigDetails(
-                config={'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
-                working_dir='.',
-                filename=None,
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
+                '.',
+                None,
             )
         )[0]
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
@@ -649,7 +692,7 @@ class MemoryOptionsTest(unittest.TestCase):
         )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'foo': {'image': 'busybox', 'memswap_limit': 2000000},
                     },
@@ -660,7 +703,7 @@ class MemoryOptionsTest(unittest.TestCase):
 
     def test_validation_with_correct_memswap_values(self):
         service_dict = config.load(
-            config.ConfigDetails(
+            build_config_details(
                 {'foo': {'image': 'busybox', 'mem_limit': 1000000, 'memswap_limit': 2000000}},
                 'tests/fixtures/extends',
                 'common.yml'
@@ -670,7 +713,7 @@ class MemoryOptionsTest(unittest.TestCase):
 
     def test_memswap_can_be_a_string(self):
         service_dict = config.load(
-            config.ConfigDetails(
+            build_config_details(
                 {'foo': {'image': 'busybox', 'mem_limit': "1G", 'memswap_limit': "512M"}},
                 'tests/fixtures/extends',
                 'common.yml'
@@ -780,26 +823,26 @@ class EnvTest(unittest.TestCase):
         os.environ['CONTAINERENV'] = '/host/tmp'
 
         service_dict = config.load(
-            config.ConfigDetails(
-                config={'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
-                working_dir="tests/fixtures/env",
-                filename=None,
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
+                "tests/fixtures/env",
+                None,
             )
         )[0]
         self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
 
         service_dict = config.load(
-            config.ConfigDetails(
-                config={'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
-                working_dir="tests/fixtures/env",
-                filename=None,
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
+                "tests/fixtures/env",
+                None,
             )
         )[0]
         self.assertEqual(set(service_dict['volumes']), set(['/opt/tmp:/opt/host/tmp']))
 
 
 def load_from_filename(filename):
-    return config.load(config.find('.', filename))
+    return config.load(config.find('.', [filename]))
 
 
 class ExtendsTest(unittest.TestCase):
@@ -885,7 +928,7 @@ class ExtendsTest(unittest.TestCase):
     def test_extends_validation_empty_dictionary(self):
         with self.assertRaisesRegexp(ConfigurationError, 'service'):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'web': {'image': 'busybox', 'extends': {}},
                     },
@@ -897,7 +940,7 @@ class ExtendsTest(unittest.TestCase):
     def test_extends_validation_missing_service_key(self):
         with self.assertRaisesRegexp(ConfigurationError, "'service' is a required property"):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'web': {'image': 'busybox', 'extends': {'file': 'common.yml'}},
                     },
@@ -910,7 +953,7 @@ class ExtendsTest(unittest.TestCase):
         expected_error_msg = "Unsupported config option for 'web' service: 'rogue_key'"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'web': {
                             'image': 'busybox',
@@ -930,7 +973,7 @@ class ExtendsTest(unittest.TestCase):
         expected_error_msg = "Service 'web' configuration key 'extends' 'file' contains an invalid type"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'web': {
                             'image': 'busybox',
@@ -955,7 +998,7 @@ class ExtendsTest(unittest.TestCase):
 
     def test_extends_validation_valid_config(self):
         service = config.load(
-            config.ConfigDetails(
+            build_config_details(
                 {
                     'web': {'image': 'busybox', 'extends': {'service': 'web', 'file': 'common.yml'}},
                 },
@@ -1093,7 +1136,7 @@ class BuildPathTest(unittest.TestCase):
     def test_nonexistent_path(self):
         with self.assertRaises(ConfigurationError):
             config.load(
-                config.ConfigDetails(
+                build_config_details(
                     {
                         'foo': {'build': 'nonexistent.path'},
                     },
@@ -1124,7 +1167,7 @@ class BuildPathTest(unittest.TestCase):
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
 
 
-class GetConfigPathTestCase(unittest.TestCase):
+class GetDefaultConfigFilesTestCase(unittest.TestCase):
 
     files = [
         'docker-compose.yml',
@@ -1134,25 +1177,21 @@ class GetConfigPathTestCase(unittest.TestCase):
     ]
 
     def test_get_config_path_default_file_in_basedir(self):
-        files = self.files
-        self.assertEqual('docker-compose.yml', get_config_filename_for_files(files[0:]))
-        self.assertEqual('docker-compose.yaml', get_config_filename_for_files(files[1:]))
-        self.assertEqual('fig.yml', get_config_filename_for_files(files[2:]))
-        self.assertEqual('fig.yaml', get_config_filename_for_files(files[3:]))
+        for index, filename in enumerate(self.files):
+            self.assertEqual(
+                filename,
+                get_config_filename_for_files(self.files[index:]))
         with self.assertRaises(config.ComposeFileNotFound):
             get_config_filename_for_files([])
 
     def test_get_config_path_default_file_in_parent_dir(self):
         """Test with files placed in the subdir"""
-        files = self.files
 
         def get_config_in_subdir(files):
             return get_config_filename_for_files(files, subdir=True)
 
-        self.assertEqual('docker-compose.yml', get_config_in_subdir(files[0:]))
-        self.assertEqual('docker-compose.yaml', get_config_in_subdir(files[1:]))
-        self.assertEqual('fig.yml', get_config_in_subdir(files[2:]))
-        self.assertEqual('fig.yaml', get_config_in_subdir(files[3:]))
+        for index, filename in enumerate(self.files):
+            self.assertEqual(filename, get_config_in_subdir(self.files[index:]))
         with self.assertRaises(config.ComposeFileNotFound):
             get_config_in_subdir([])
 
@@ -1170,6 +1209,7 @@ def get_config_filename_for_files(filenames, subdir=None):
             base_dir = tempfile.mkdtemp(dir=project_dir)
         else:
             base_dir = project_dir
-        return os.path.basename(config.get_config_path(base_dir))
+        filename, = config.get_default_config_files(base_dir)
+        return os.path.basename(filename)
     finally:
         shutil.rmtree(project_dir)

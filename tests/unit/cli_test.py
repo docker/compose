@@ -4,9 +4,12 @@ from __future__ import unicode_literals
 import os
 
 import docker
+import py
 
 from .. import mock
 from .. import unittest
+from compose.cli.command import get_project
+from compose.cli.command import get_project_name
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
@@ -14,55 +17,45 @@ from compose.service import Service
 
 
 class CLITestCase(unittest.TestCase):
-    def test_default_project_name(self):
-        cwd = os.getcwd()
 
-        try:
-            os.chdir('tests/fixtures/simple-composefile')
-            command = TopLevelCommand()
-            project_name = command.get_project_name('.')
+    def test_default_project_name(self):
+        test_dir = py._path.local.LocalPath('tests/fixtures/simple-composefile')
+        with test_dir.as_cwd():
+            project_name = get_project_name('.')
             self.assertEquals('simplecomposefile', project_name)
-        finally:
-            os.chdir(cwd)
 
     def test_project_name_with_explicit_base_dir(self):
-        command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/simple-composefile'
-        project_name = command.get_project_name(command.base_dir)
+        base_dir = 'tests/fixtures/simple-composefile'
+        project_name = get_project_name(base_dir)
         self.assertEquals('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
-        command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/UpperCaseDir'
-        project_name = command.get_project_name(command.base_dir)
+        base_dir = 'tests/fixtures/UpperCaseDir'
+        project_name = get_project_name(base_dir)
         self.assertEquals('uppercasedir', project_name)
 
     def test_project_name_with_explicit_project_name(self):
-        command = TopLevelCommand()
         name = 'explicit-project-name'
-        project_name = command.get_project_name(None, project_name=name)
+        project_name = get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
     def test_project_name_from_environment_old_var(self):
-        command = TopLevelCommand()
         name = 'namefromenv'
         with mock.patch.dict(os.environ):
             os.environ['FIG_PROJECT_NAME'] = name
-            project_name = command.get_project_name(None)
+            project_name = get_project_name(None)
         self.assertEquals(project_name, name)
 
     def test_project_name_from_environment_new_var(self):
-        command = TopLevelCommand()
         name = 'namefromenv'
         with mock.patch.dict(os.environ):
             os.environ['COMPOSE_PROJECT_NAME'] = name
-            project_name = command.get_project_name(None)
+            project_name = get_project_name(None)
         self.assertEquals(project_name, name)
 
     def test_get_project(self):
-        command = TopLevelCommand()
-        command.base_dir = 'tests/fixtures/longer-filename-composefile'
-        project = command.get_project()
+        base_dir = 'tests/fixtures/longer-filename-composefile'
+        project = get_project(base_dir)
         self.assertEqual(project.name, 'longerfilenamecomposefile')
         self.assertTrue(project.client)
         self.assertTrue(project.services)
