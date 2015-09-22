@@ -4,6 +4,7 @@ import sys
 import os
 import shlex
 
+import mock
 from six import StringIO
 from mock import patch
 
@@ -104,7 +105,7 @@ class CLITestCase(DockerClientTestCase):
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
 
-    def test_up(self):
+    def test_up_detached(self):
         self.command.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
@@ -112,10 +113,28 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(another.containers()), 1)
 
         # Ensure containers don't have stdin and stdout connected in -d mode
-        config = service.containers()[0].inspect()['Config']
-        self.assertFalse(config['AttachStderr'])
-        self.assertFalse(config['AttachStdout'])
-        self.assertFalse(config['AttachStdin'])
+        container, = service.containers()
+        self.assertFalse(container.get('Config.AttachStderr'))
+        self.assertFalse(container.get('Config.AttachStdout'))
+        self.assertFalse(container.get('Config.AttachStdin'))
+
+    def test_up_attached(self):
+        with mock.patch(
+            'compose.cli.main.attach_to_logs',
+            autospec=True
+        ) as mock_attach:
+            self.command.dispatch(['up'], None)
+            _, args, kwargs = mock_attach.mock_calls[0]
+            _project, log_printer, _names, _timeout = args
+
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(len(another.containers()), 1)
+        self.assertEqual(
+            set(log_printer.containers),
+            set(self.project.containers())
+        )
 
     def test_up_with_links(self):
         self.command.base_dir = 'tests/fixtures/links-composefile'
