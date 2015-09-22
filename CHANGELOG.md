@@ -1,6 +1,12 @@
 Change log
 ==========
 
+1.4.2 (2015-09-22)
+------------------
+
+-  Fixed a regression in the 1.4.1 release that would cause `docker-compose up`
+   without the `-d` option to exit immediately.
+
 1.4.1 (2015-09-10)
 ------------------
 
