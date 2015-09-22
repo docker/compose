@@ -2,6 +2,7 @@ import os
 import sys
 
 DEFAULT_TIMEOUT = 10
+IS_WINDOWS_PLATFORM = (sys.platform == "win32")
 LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
 LABEL_ONE_OFF = 'com.docker.compose.oneoff'
 LABEL_PROJECT = 'com.docker.compose.project'

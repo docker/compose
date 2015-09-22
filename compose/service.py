@@ -20,6 +20,7 @@ from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.validation import VALID_NAME_CHARS
 from .const import DEFAULT_TIMEOUT
+from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -937,7 +938,19 @@ def build_volume_binding(volume_spec):
 
 
 def parse_volume_spec(volume_config):
+    """
+    A volume_config string, which is a path, split it into external:internal[:mode]
+    parts to be returned as a valid VolumeSpec tuple.
+    """
     parts = volume_config.split(':')
+
+    if IS_WINDOWS_PLATFORM:
+        # relative paths in windows expand to include the drive, eg C:\
+        # so we join the first 2 parts back together to count as one
+        windows_parts = [":".join(parts[0:2])]
+        windows_parts.extend(parts[2:])
+        parts = windows_parts
+
     if len(parts) > 3:
         raise ConfigError("Volume %s has incorrect format, should be "
                           "external:internal[:mode]" % volume_config)

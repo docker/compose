@@ -1138,7 +1138,21 @@ class ExpandPathTest(unittest.TestCase):
         self.assertEqual(result, user_path + 'otherdir/somefile')
 
 
-@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
+class VolumePathTest(unittest.TestCase):
+
+    def test_split_path_mapping_with_windows_path(self):
+        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:/opt/connect/config:ro"
+        expected_mapping = (
+            "/opt/connect/config:ro",
+            "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
+        )
+
+        with mock.patch('compose.config.config.IS_WINDOWS_PLATFORM', True):
+            mapping = config.split_path_mapping(windows_volume_path)
+
+        self.assertEqual(mapping, expected_mapping)
+
+
 class BuildPathTest(unittest.TestCase):
     def setUp(self):
         self.abs_context_path = os.path.join(os.getcwd(), 'tests/fixtures/build-ctx')

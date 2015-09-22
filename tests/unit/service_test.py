@@ -466,6 +466,21 @@ class ServiceVolumesTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             parse_volume_spec('one:two:three:four')
 
+    def test_parse_volume_windows_relative_path(self):
+        windows_relative_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:\\opt\\connect\\config:ro"
+
+        with mock.patch('compose.service.IS_WINDOWS_PLATFORM', True):
+            spec = parse_volume_spec(windows_relative_path)
+
+        self.assertEqual(
+            spec,
+            (
+                "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config",
+                "\\opt\\connect\\config",
+                "ro"
+            )
+        )
+
     def test_build_volume_binding(self):
         binding = build_volume_binding(parse_volume_spec('/outside:/inside'))
         self.assertEqual(binding, ('/inside', '/outside:/inside:rw'))
