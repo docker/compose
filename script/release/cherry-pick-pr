@@ -20,6 +20,12 @@ EOM
 
 [ -n "$1" ] || usage
 
+if [ -z "$(command -v hub 2> /dev/null)" ]; then
+    >&2 echo "$0 requires https://hub.github.com/."
+    >&2 echo "Please install it and ake sure it is available on your \$PATH."
+    exit 2
+fi
+
 
 REPO=docker/compose
 GITHUB=https://github.com/$REPO/pull

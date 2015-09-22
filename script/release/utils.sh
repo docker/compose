@@ -4,6 +4,7 @@
 #
 
 set -e
+set -o pipefail
 
 
 function browser() {
@@ -17,4 +18,6 @@ function find_remote() {
     for remote in $(git remote); do
         git config --get remote.${remote}.url | grep $url > /dev/null && echo -n $remote
     done
+    # Always return true, extra remotes cause it to return false
+    true
 }

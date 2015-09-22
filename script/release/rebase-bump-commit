@@ -3,8 +3,7 @@
 # Move the "bump to <version>" commit to the HEAD of the branch
 #
 
-set -e
-
+. "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 function usage() {
     >&2 cat << EOM
@@ -23,7 +22,7 @@ VERSION="$(git config "branch.${BRANCH}.release")" || usage
 
 
 COMMIT_MSG="Bump $VERSION"
-sha=$(git log --grep $COMMIT_MSG --format="%H")
+sha="$(git log --grep "$COMMIT_MSG" --format="%H")"
 if [ -z "$sha" ]; then
     >&2 echo "No commit with message \"$COMMIT_MSG\""
     exit 2
@@ -33,7 +32,7 @@ if [[ "$sha" == "$(git rev-parse HEAD)" ]]; then
     exit 0
 fi
 
-commits=$(git log --format="%H" HEAD..$sha | wc -l)
+commits=$(git log --format="%H" "$sha..HEAD" | wc -l)
 
 git rebase --onto $sha~1 HEAD~$commits $BRANCH
 git cherry-pick $sha

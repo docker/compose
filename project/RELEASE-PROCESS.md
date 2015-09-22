@@ -7,7 +7,7 @@ Create a branch, update version, and add release notes by running `make-branch`
 
         ./script/release/make-branch $VERSION [$BASE_VERSION]
 
-`$BASE_VERSION` will default to master. Use the last version tag for a bug fix 
+`$BASE_VERSION` will default to master. Use the last version tag for a bug fix
 release.
 
 As part of this script you'll be asked to:
@@ -40,14 +40,13 @@ As part of this script you'll be asked to:
 
 ## To release a version (whether RC or stable)
 
-Check out the bump branch and run the `push-release` script
+Check out the bump branch and run the `build-binary` script
 
         git checkout bump-$VERSION
-        ./script/release/push-release $VERSION
+        ./script/release/build-binary
 
 
 When prompted test the binaries.
-
 
 1.  Draft a release from the tag on GitHub (the script will open the window for
     you)
@@ -75,11 +74,17 @@ When prompted test the binaries.
 
 3.  Attach the binaries.
 
-4.  Publish the release on GitHub.
+4. If everything looks good, it's time to push the release.
 
-5.  Check that both binaries download (following the install instructions) and run.
 
-6.  Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+        ./script/release/push-release
+
+
+5.  Publish the release on GitHub.
+
+6.  Check that both binaries download (following the install instructions) and run.
+
+7.  Email maintainers@dockerproject.org and engineering@docker.com about the new release.
 
 ## If it’s a stable release (not an RC)
 

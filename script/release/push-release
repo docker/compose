@@ -3,10 +3,7 @@
 # Create the official release
 #
 
-set -e
-set -o pipefail
-
-. script/release/utils.sh
+. "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 function usage() {
     >&2 cat << EOM
@@ -22,6 +19,13 @@ EOM
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 VERSION="$(git config "branch.${BRANCH}.release")" || usage
 
+if [ -z "$(command -v jq 2> /dev/null)" ]; then
+    >&2 echo "$0 requires https://stedolan.github.io/jq/"
+    >&2 echo "Please install it and ake sure it is available on your \$PATH."
+    exit 2
+fi
+
+
 API=https://api.github.com/repos
 REPO=docker/compose
 GITHUB_REPO=git@github.com:$REPO
@@ -35,30 +39,18 @@ if [[ "$build_status" != "success" ]]; then
     exit -1
 fi
 
-
-# Build the binaries and sdists
-script/build-linux
-# TODO: build osx binary
-# script/prepare-osx
-# script/build-osx
-python setup.py sdist --formats=gztar,zip
-
-
-echo "Test those binaries! Exit the shell to continue."
-$SHELL
-
-
 echo "Tagging the release as $VERSION"
 git tag $VERSION
 git push $GITHUB_REPO $VERSION
 
-
-echo "Create a github release"
-# TODO: script more of this https://developer.github.com/v3/repos/releases/
-browser https://github.com/$REPO/releases/new
-
 echo "Uploading sdist to pypi"
-python setup.py sdist upload
+python setup.py sdist
+
+if [ "$(command -v twine 2> /dev/null)" ]; then
+    twine upload ./dist/docker-compose-${VERSION}.tar.gz
+else
+    python setup.py upload
+fi
 
 echo "Testing pip package"
 virtualenv venv-test
@@ -68,4 +60,4 @@ docker-compose version
 deactivate
 
 echo "Now publish the github release, and test the downloads."
-echo "Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+echo "Email maintainers@dockerproject.org and engineering@docker.com about the new release."

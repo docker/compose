@@ -3,17 +3,11 @@
 # Prepare a new release branch
 #
 
-set -e
-set -o pipefail
-
-. script/release/utils.sh
-
-REPO=git@github.com:docker/compose
-
+. "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 function usage() {
     >&2 cat << EOM
-Create a new release branch `release-<version>`
+Create a new release branch 'release-<version>'
 
 Usage:
 
@@ -29,9 +23,12 @@ EOM
     exit 1
 }
 
+
 [ -n "$1" ] || usage
 VERSION=$1
 BRANCH=bump-$VERSION
+REPO=docker/compose
+GITHUB_REPO=git@github.com:$REPO
 
 if [ -z "$2" ]; then
     BASE_VERSION="master"
@@ -41,11 +38,11 @@ fi
 
 
 DEFAULT_REMOTE=release
-REMOTE=$(find_remote $REPO)
+REMOTE="$(find_remote "$GITHUB_REPO")"
 # If we don't have a docker origin add one
 if [ -z "$REMOTE" ]; then
     echo "Creating $DEFAULT_REMOTE remote"
-    git remote add ${DEFAULT_REMOTE} ${REPO} 
+    git remote add ${DEFAULT_REMOTE} ${GITHUB_REPO}
 fi
 
 # handle the difference between a branch and a tag
@@ -65,7 +62,6 @@ git config "branch.${BRANCH}.release" $VERSION
 
 
 echo "Update versions in docs/install.md and compose/__init__.py"
-# TODO: automate this
 $EDITOR docs/install.md
 $EDITOR compose/__init__.py
 
@@ -75,22 +71,26 @@ browser "https://github.com/docker/compose/issues?q=milestone%3A$VERSION+is%3Acl
 $EDITOR CHANGELOG.md
 
 
-echo "Verify changes before commit. Exit the shell to commit changes"
 git diff
-$SHELL
-git commit -a -m "Bump $VERSION" --signoff
+echo "Verify changes before commit. Exit the shell to commit changes"
+$SHELL || true
+git commit -a -m "Bump $VERSION" --signoff --no-verify
 
 
 echo "Push branch to user remote"
 GITHUB_USER=$USER
-USER_REMOTE=$(find_remote $GITHUB_USER/compose)
+USER_REMOTE="$(find_remote $GITHUB_USER/compose)"
 if [ -z "$USER_REMOTE" ]; then
     echo "No user remote found for $GITHUB_USER"
-    read -n1 -r -p "Enter the name of your github user: " GITHUB_USER
+    read -r -p "Enter the name of your github user: " GITHUB_USER
     # assumes there is already a user remote somewhere
     USER_REMOTE=$(find_remote $GITHUB_USER/compose)
+fi
+if [ -z "$USER_REMOTE" ]; then
+    >&2 echo "No user remote found. You need to 'git push' your branch."
+    exit 2
 fi
 
 
 git push $USER_REMOTE
-browser https://github.com/docker/compose/compare/docker:release...$GITHUB_USER:$BRANCH?expand=1
+browser https://github.com/$REPO/compare/docker:release...$GITHUB_USER:$BRANCH?expand=1
