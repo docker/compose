@@ -1,12 +1,21 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from docker import errors
+
 from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import ServiceLoader
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
+
+
+def pull_busybox(client):
+    try:
+        client.inspect_image('busybox:latest')
+    except errors.APIError:
+        client.pull('busybox:latest', stream=False)
 
 
 class DockerClientTestCase(unittest.TestCase):
