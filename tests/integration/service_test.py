@@ -10,6 +10,7 @@ import shutil
 from six import StringIO, text_type
 
 from .testcases import DockerClientTestCase
+from .testcases import pull_busybox
 from compose import __version__
 from compose.const import (
     LABEL_CONTAINER_NUMBER,
@@ -577,8 +578,10 @@ class ServiceTest(DockerClientTestCase):
         })
 
     def test_create_with_image_id(self):
-        # Image id for the current busybox:latest
-        service = self.create_service('foo', image='8c2e06607696')
+        # Get image id for the current busybox:latest
+        pull_busybox(self.client)
+        image_id = self.client.inspect_image('busybox:latest')['Id'][:12]
+        service = self.create_service('foo', image=image_id)
         service.create_container()
 
     def test_scale(self):
