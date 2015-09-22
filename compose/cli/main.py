@@ -541,8 +541,11 @@ class TopLevelCommand(Command):
 
 
 def build_log_printer(containers, service_names, monochrome):
+    if service_names:
+        containers = [c for c in containers if c.service in service_names]
+
     return LogPrinter(
-        [c for c in containers if c.service in service_names],
+        containers,
         attach_params={"logs": True},
         monochrome=monochrome)
 
