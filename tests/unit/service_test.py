@@ -2,9 +2,11 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
+import pytest
 
 from .. import mock
 from .. import unittest
+from compose.const import IS_WINDOWS_PLATFORM
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -439,6 +441,7 @@ def mock_get_image(images):
         raise NoSuchImageError()
 
 
+@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ServiceVolumesTest(unittest.TestCase):
 
     def setUp(self):

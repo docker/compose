@@ -5,6 +5,7 @@ import os
 
 import docker
 import py
+import pytest
 
 from .. import mock
 from .. import unittest
@@ -13,6 +14,7 @@ from compose.cli.command import get_project_name
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
+from compose.const import IS_WINDOWS_PLATFORM
 from compose.service import Service
 
 
@@ -81,6 +83,7 @@ class CLITestCase(unittest.TestCase):
         with self.assertRaises(NoSuchCommand):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)
 
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
     @mock.patch('compose.cli.main.dockerpty', autospec=True)
     def test_run_with_environment_merged_with_options_list(self, mock_dockerpty):
         command = TopLevelCommand()
