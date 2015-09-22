@@ -5,8 +5,11 @@ import shutil
 import tempfile
 from operator import itemgetter
 
+import pytest
+
 from compose.config import config
 from compose.config.errors import ConfigurationError
+from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
 
@@ -92,6 +95,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     def test_load_with_multiple_files(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -410,6 +414,7 @@ class InterpolationTest(unittest.TestCase):
         self.assertIn('in service "web"', cm.exception.msg)
         self.assertIn('"${"', cm.exception.msg)
 
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
@@ -422,6 +427,7 @@ class InterpolationTest(unittest.TestCase):
         )[0]
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
@@ -817,6 +823,7 @@ class EnvTest(unittest.TestCase):
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
 
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)
     def test_resolve_path(self):
         os.environ['HOSTENV'] = '/tmp'
@@ -1073,6 +1080,7 @@ class ExtendsTest(unittest.TestCase):
         for service in service_dicts:
             self.assertTrue(service['hostname'], expected_interpolated_value)
 
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     def test_volume_path(self):
         dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')
 
@@ -1108,6 +1116,7 @@ class ExtendsTest(unittest.TestCase):
         self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
 
 
+@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ExpandPathTest(unittest.TestCase):
     working_dir = '/home/user/somedir'
 
@@ -1129,6 +1138,7 @@ class ExpandPathTest(unittest.TestCase):
         self.assertEqual(result, user_path + 'otherdir/somefile')
 
 
+@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class BuildPathTest(unittest.TestCase):
     def setUp(self):
         self.abs_context_path = os.path.join(os.getcwd(), 'tests/fixtures/build-ctx')
