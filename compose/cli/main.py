@@ -16,6 +16,7 @@ from .. import legacy
 from ..config import parse_environment
 from ..const import DEFAULT_TIMEOUT
 from ..const import HTTP_TIMEOUT
+from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import ConfigurationError
 from ..project import NoSuchService
@@ -30,9 +31,8 @@ from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
 
-WINDOWS = (sys.platform == 'win32')
 
-if not WINDOWS:
+if not IS_WINDOWS_PLATFORM:
     import dockerpty
 
 log = logging.getLogger(__name__)
@@ -343,7 +343,7 @@ class TopLevelCommand(Command):
 
         detach = options['-d']
 
-        if WINDOWS and not detach:
+        if IS_WINDOWS_PLATFORM and not detach:
             raise UserError(
                 "Interactive mode is not yet supported on Windows.\n"
                 "Please pass the -d flag when using `docker-compose run`."
