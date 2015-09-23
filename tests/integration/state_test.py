@@ -9,6 +9,7 @@ import shutil
 import tempfile
 
 from .testcases import DockerClientTestCase
+from .testcases import LABEL_TEST_IMAGE
 from compose.config import config
 from compose.const import LABEL_CONFIG_HASH
 from compose.project import Project
@@ -28,7 +29,7 @@ class ProjectTestCase(DockerClientTestCase):
             'working_dir',
             [config.ConfigFile(None, cfg)])
         return Project.from_dicts(
-            name='composetest',
+            name=self.project_name,
             client=self.client,
             service_dicts=config.load(details))
 
@@ -234,7 +235,7 @@ class ServiceStateTest(DockerClientTestCase):
         self.assertEqual(('recreate', [container]), web.convergence_plan())
 
     def test_trigger_recreate_with_image_change(self):
-        repo = 'composetest_myimage'
+        repo = '%s_myimage' % (self.project_name)
         tag = 'latest'
         image = '{}:{}'.format(repo, tag)
 
@@ -258,7 +259,10 @@ class ServiceStateTest(DockerClientTestCase):
 
     def test_trigger_recreate_with_build(self):
         context = tempfile.mkdtemp()
-        base_image = "FROM busybox\nLABEL com.docker.compose.test_image=true\n"
+        base_image = (
+            "FROM busybox\n"
+            "LABEL %s=%s\n" % (LABEL_TEST_IMAGE, self.project_name)
+        )
 
         try:
             dockerfile = os.path.join(context, 'Dockerfile')
