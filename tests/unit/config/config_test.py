@@ -335,7 +335,7 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue(expected_warning_msg in mock_logging.warn.call_args[0][0])
 
     def test_config_invalid_environment_dict_key_raises_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'environment' contains an invalid type"
+        expected_error_msg = "Service 'web' configuration key 'environment' contains unsupported option: '---'"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
@@ -957,7 +957,10 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_invalid_key(self):
-        expected_error_msg = "Unsupported config option for 'web' service: 'rogue_key'"
+        expected_error_msg = (
+            "Service 'web' configuration key 'extends' "
+            "contains unsupported option: 'rogue_key'"
+        )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(
@@ -977,7 +980,10 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_sub_property_key(self):
-        expected_error_msg = "Service 'web' configuration key 'extends' 'file' contains an invalid type"
+        expected_error_msg = (
+            "Service 'web' configuration key 'extends' 'file' contains 1, "
+            "which is an invalid type, it should be a string"
+        )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(

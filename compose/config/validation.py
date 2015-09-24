@@ -4,6 +4,7 @@ import os
 import sys
 from functools import wraps
 
+import six
 from docker.utils.ports import split_port
 from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
@@ -162,10 +163,25 @@ def process_errors(errors, service_name=None):
         Inspecting the context value of a ValidationError gives us information about
         which sub schema failed and which kind of error it is.
         """
+
+        required = [context for context in error.context if context.validator == 'required']
+        if required:
+            return required[0].message
+
+        additionalProperties = [context for context in error.context if context.validator == 'additionalProperties']
+        if additionalProperties:
+            invalid_config_key = _parse_key_from_error_msg(additionalProperties[0])
+            return "contains unsupported option: '{}'".format(invalid_config_key)
+
         constraint = [context for context in error.context if len(context.path) > 0]
         if constraint:
             valid_types = _parse_valid_types_from_validator(constraint[0].validator_value)
-            msg = "contains {}, which is an invalid type, it should be {}".format(
+            invalid_config_key = "".join(
+                "'{}' ".format(fragment) for fragment in constraint[0].path
+                if isinstance(fragment, six.string_types)
+            )
+            msg = "{}contains {}, which is an invalid type, it should be {}".format(
+                invalid_config_key,
                 constraint[0].instance,
                 valid_types
             )
