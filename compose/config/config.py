@@ -16,7 +16,6 @@ from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
 from .validation import validate_service_names
 from .validation import validate_top_level_object
-from compose.const import IS_WINDOWS_PLATFORM
 
 
 DOCKER_CONFIG_KEYS = [
@@ -542,19 +541,13 @@ def path_mappings_from_dict(d):
     return [join_path_mapping(v) for v in d.items()]
 
 
-def split_path_mapping(path):
-    if IS_WINDOWS_PLATFORM:
-        if len(path.split(":")) > 2:
-            parts = path.split(":")
-            host = ":".join(parts[0:2])
-            container = ":".join(parts[2:])
-            return (container, host)
+def split_path_mapping(volume_path):
+    drive, volume_config = os.path.splitdrive(volume_path)
+    if ':' in volume_config:
+        (host, container) = volume_config.split(':', 1)
+        return (container, drive + host)
     else:
-        if ':' in path:
-            host, container = path.split(':', 1)
-            return (container, host)
-
-    return (path, None)
+        return (volume_path, None)
 
 
 def join_path_mapping(pair):

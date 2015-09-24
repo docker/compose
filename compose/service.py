@@ -947,8 +947,9 @@ def parse_volume_spec(volume_config):
     if IS_WINDOWS_PLATFORM:
         # relative paths in windows expand to include the drive, eg C:\
         # so we join the first 2 parts back together to count as one
-        windows_parts = [":".join(parts[0:2])]
-        windows_parts.extend(parts[2:])
+        drive, volume_path = os.path.splitdrive(volume_config)
+        windows_parts = volume_path.split(":")
+        windows_parts[0] = os.path.join(drive, windows_parts[0])
         parts = windows_parts
 
     if len(parts) > 3:

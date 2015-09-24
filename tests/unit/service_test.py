@@ -466,11 +466,11 @@ class ServiceVolumesTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             parse_volume_spec('one:two:three:four')
 
+    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_parse_volume_windows_relative_path(self):
         windows_relative_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:\\opt\\connect\\config:ro"
 
-        with mock.patch('compose.service.IS_WINDOWS_PLATFORM', True):
-            spec = parse_volume_spec(windows_relative_path)
+        spec = parse_volume_spec(windows_relative_path)
 
         self.assertEqual(
             spec,
