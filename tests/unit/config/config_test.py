@@ -1138,6 +1138,21 @@ class ExpandPathTest(unittest.TestCase):
         self.assertEqual(result, user_path + 'otherdir/somefile')
 
 
+class VolumePathTest(unittest.TestCase):
+
+    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
+    def test_split_path_mapping_with_windows_path(self):
+        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:/opt/connect/config:ro"
+        expected_mapping = (
+            "/opt/connect/config:ro",
+            "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
+        )
+
+        mapping = config.split_path_mapping(windows_volume_path)
+
+        self.assertEqual(mapping, expected_mapping)
+
+
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class BuildPathTest(unittest.TestCase):
     def setUp(self):
