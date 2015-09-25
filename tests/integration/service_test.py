@@ -273,7 +273,13 @@ class ServiceTest(DockerClientTestCase):
             command=["top"],
             labels={LABEL_PROJECT: 'composetest'},
         )
-        host_service = self.create_service('host', volumes_from=[VolumeFromSpec(volume_service, 'rw'), VolumeFromSpec(volume_container_2, 'rw')])
+        host_service = self.create_service(
+            'host',
+            volumes_from=[
+                VolumeFromSpec(volume_service, 'rw'),
+                VolumeFromSpec(volume_container_2, 'rw')
+            ]
+        )
         host_container = host_service.create_container()
         host_service.start_container(host_container)
         self.assertIn(volume_container_1.id + ':rw',

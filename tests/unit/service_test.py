@@ -379,7 +379,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             net=ServiceNet(Service('other')),
             links=[(Service('one'), 'one')],
-            volumes_from=[Service('two')])
+            volumes_from=[VolumeFromSpec(Service('two'), 'rw')])
 
         config_dict = service.config_dict()
         expected = {

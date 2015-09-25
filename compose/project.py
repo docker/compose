@@ -37,7 +37,10 @@ def sort_service_dicts(services):
         return [link.split(':')[0] for link in links]
 
     def get_service_names_from_volumes_from(volumes_from):
-        return [volume_from.split(':')[0] for volume_from in volumes_from]
+        return [
+            parse_volume_from_spec(volume_from).source
+            for volume_from in volumes_from
+        ]
 
     def get_service_dependents(service_dict, services):
         name = service_dict['name']
@@ -195,7 +198,7 @@ class Project(object):
                         raise ConfigurationError(
                             'Service "%s" mounts volumes from "%s", which is '
                             'not the name of a service or container.' % (
-                                volume_from_config,
+                                service_dict['name'],
                                 volume_from_spec.source))
                 volumes_from.append(volume_from_spec)
             del service_dict['volumes_from']

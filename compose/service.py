@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from collections import namedtuple
+from operator import attrgetter
 
 import enum
 import six
@@ -1008,10 +1009,6 @@ def parse_volume_from_spec(volume_from_config):
         mode = 'rw'
     else:
         source, mode = parts
-
-    if mode not in ('rw', 'ro'):
-        raise ConfigError("VolumeFrom %s has invalid mode (%s), should be "
-                          "one of: rw, ro." % (volume_from_config, mode))
 
     return VolumeFromSpec(source, mode)
 
