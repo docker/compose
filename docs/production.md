@@ -40,7 +40,7 @@ For this reason, you'll probably want to define a separate Compose file, say
 Once you've got an alternate configuration file, make Compose use it
 by setting the `COMPOSE_FILE` environment variable:
 
-    $ COMPOSE_FILE=production.yml
+    $ export COMPOSE_FILE=production.yml
     $ docker-compose up -d
 
 > **Note:** You can also use the file for a one-off command without setting
@@ -88,9 +88,8 @@ guide</a>.
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
+- [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
 - [Yaml file reference](yml.md)
 - [Compose environment variables](env.md)
 - [Compose command line completion](completion.md)
-

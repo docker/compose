@@ -18,27 +18,44 @@
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cgroup_parent": {"type": "string"},
-        "command": {"$ref": "#/definitions/string_or_list"},
+        "command": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
         "container_name": {"type": "string"},
-        "cpu_shares": {"type": "string"},
+        "cpu_shares": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
-        "detach": {"type": "boolean"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
-        "entrypoint": {"type": "string"},
+        "entrypoint": {"$ref": "#/definitions/string_or_list"},
         "env_file": {"$ref": "#/definitions/string_or_list"},
 
         "environment": {
           "oneOf": [
-            {"type": "object"},
+            {
+              "type": "object",
+              "patternProperties": {
+                "^[^-]+$": {
+                  "type": ["string", "number", "boolean"],
+                  "format": "environment"
+                }
+              },
+              "additionalProperties": false
+            },
             {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
           ]
         },
 
-        "expose": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "expose": {
+          "type": "array",
+          "items": {"type": ["string", "number"]},
+          "uniqueItems": true
+        },
 
         "extends": {
           "type": "object",
@@ -55,35 +72,19 @@
         "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
+        "ipc": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+
         "log_driver": {"type": "string"},
-
-        "log_opt": {
-          "type": "object",
-
-          "properties": {
-            "address": {"type": "string"}
-          },
-          "required": ["address"]
-        },
+        "log_opt": {"type": "object"},
 
         "mac_address": {"type": "string"},
-        "mem_limit": {
-          "oneOf": [
-            {"type": "number"},
-            {"type": "string"}
-          ]
-        },
-        "memswap_limit": {
-          "oneOf": [
-            {"type": "number"},
-            {"type": "string"}
-          ]
-        },
+        "mem_limit": {"type": ["number", "string"]},
+        "memswap_limit": {"type": ["number", "string"]},
         "name": {"type": "string"},
         "net": {"type": "string"},
-        "pid": {"type": "string"},
+        "pid": {"type": ["string", "null"]},
 
         "ports": {
           "type": "array",
@@ -102,32 +103,18 @@
           "uniqueItems": true
         },
 
-        "privileged": {"type": "string"},
+        "privileged": {"type": "boolean"},
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
-        "security_opt": {"type": "string"},
-        "stdin_open": {"type": "string"},
-        "tty": {"type": "string"},
+        "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "stdin_open": {"type": "boolean"},
+        "tty": {"type": "boolean"},
         "user": {"type": "string"},
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "volume_driver": {"type": "string"},
         "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "working_dir": {"type": "string"}
       },
-
-      "anyOf": [
-        {
-          "required": ["build"],
-          "not": {"required": ["image"]}
-        },
-        {
-          "required": ["image"],
-          "not": {"required": ["build"]}
-        },
-        {
-          "required": ["extends"],
-          "not": {"required": ["build", "image"]}
-        }
-      ],
 
       "dependencies": {
         "memswap_limit": ["mem_limit"]

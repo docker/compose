@@ -1,12 +1,13 @@
 from __future__ import unicode_literals
-from .. import unittest
-from compose.service import Service
-from compose.project import Project
-from compose.container import Container
-from compose.const import LABEL_SERVICE
 
-import mock
 import docker
+
+from .. import mock
+from .. import unittest
+from compose.const import LABEL_SERVICE
+from compose.container import Container
+from compose.project import Project
+from compose.service import Service
 
 
 class ProjectTest(unittest.TestCase):
@@ -220,7 +221,7 @@ class ProjectTest(unittest.TestCase):
             }
         ], self.mock_client)
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), None)
+        self.assertEqual(service.net.id, None)
         self.assertNotIn('NetworkMode', service._get_container_host_config({}))
 
     def test_use_net_from_container(self):
@@ -235,7 +236,7 @@ class ProjectTest(unittest.TestCase):
             }
         ], self.mock_client)
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), 'container:' + container_id)
+        self.assertEqual(service.net.mode, 'container:' + container_id)
 
     def test_use_net_from_service(self):
         container_name = 'test_aaa_1'
@@ -260,7 +261,7 @@ class ProjectTest(unittest.TestCase):
         ], self.mock_client)
 
         service = project.get_service('test')
-        self.assertEqual(service._get_net(), 'container:' + container_name)
+        self.assertEqual(service.net.mode, 'container:' + container_name)
 
     def test_container_without_name(self):
         self.mock_client.containers.return_value = [

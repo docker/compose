@@ -1,7 +1,8 @@
 import unittest
 
-from compose.config.interpolation import interpolate, InvalidInterpolation
 from compose.config.interpolation import BlankDefaultDict as bddict
+from compose.config.interpolation import interpolate
+from compose.config.interpolation import InvalidInterpolation
 
 
 class InterpolationTest(unittest.TestCase):

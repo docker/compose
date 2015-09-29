@@ -1,28 +1,30 @@
 import logging
 import os
 import sys
-import yaml
 from collections import namedtuple
+
 import six
+import yaml
 
-from compose.cli.utils import find_candidates_in_parent_dirs
-
+from .errors import CircularReference
+from .errors import ComposeFileNotFound
+from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
-from .errors import (
-    ConfigurationError,
-    CircularReference,
-    ComposeFileNotFound,
-)
-from .validation import validate_against_schema
+from .validation import validate_against_fields_schema
+from .validation import validate_against_service_schema
+from .validation import validate_extended_service_exists
+from .validation import validate_extends_file_path
+from .validation import validate_service_names
+from .validation import validate_top_level_object
 
 
 DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
     'cgroup_parent',
+    'command',
     'cpu_shares',
     'cpuset',
-    'command',
     'detach',
     'devices',
     'dns',
@@ -34,14 +36,15 @@ DOCKER_CONFIG_KEYS = [
     'extra_hosts',
     'hostname',
     'image',
+    'ipc',
     'labels',
     'links',
+    'log_driver',
+    'log_opt',
     'mac_address',
     'mem_limit',
     'memswap_limit',
     'net',
-    'log_driver',
-    'log_opt',
     'pid',
     'ports',
     'privileged',
@@ -74,6 +77,7 @@ SUPPORTED_FILENAMES = [
     'fig.yaml',
 ]
 
+DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 
 PATH_START_CHARS = [
     '/',
@@ -85,24 +89,45 @@ PATH_START_CHARS = [
 log = logging.getLogger(__name__)
 
 
-ConfigDetails = namedtuple('ConfigDetails', 'config working_dir filename')
+class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files')):
+    """
+    :param working_dir: the directory to use for relative paths in the config
+    :type  working_dir: string
+    :param config_files: list of configuration files to load
+    :type  config_files: list of :class:`ConfigFile`
+     """
 
 
-def find(base_dir, filename):
-    if filename == '-':
-        return ConfigDetails(yaml.safe_load(sys.stdin), os.getcwd(), None)
+class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
+    """
+    :param filename: filename of the config file
+    :type  filename: string
+    :param config: contents of the config file
+    :type  config: :class:`dict`
+    """
 
-    if filename:
-        filename = os.path.join(base_dir, filename)
+
+def find(base_dir, filenames):
+    if filenames == ['-']:
+        return ConfigDetails(
+            os.getcwd(),
+            [ConfigFile(None, yaml.safe_load(sys.stdin))])
+
+    if filenames:
+        filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filename = get_config_path(base_dir)
-    return ConfigDetails(load_yaml(filename), os.path.dirname(filename), filename)
+        filenames = get_default_config_files(base_dir)
+
+    log.debug("Using configuration files: {}".format(",".join(filenames)))
+    return ConfigDetails(
+        os.path.dirname(filenames[0]),
+        [ConfigFile(f, load_yaml(f)) for f in filenames])
 
 
-def get_config_path(base_dir):
+def get_default_config_files(base_dir):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
-    if len(candidates) == 0:
+    if not candidates:
         raise ComposeFileNotFound(SUPPORTED_FILENAMES)
 
     winner = candidates[0]
@@ -120,100 +145,196 @@ def get_config_path(base_dir):
         log.warn("%s is deprecated and will not be supported in future. "
                  "Please rename your config file to docker-compose.yml\n" % winner)
 
-    return os.path.join(path, winner)
+    return [os.path.join(path, winner)] + get_default_override_file(path)
+
+
+def get_default_override_file(path):
+    override_filename = os.path.join(path, DEFAULT_OVERRIDE_FILENAME)
+    return [override_filename] if os.path.exists(override_filename) else []
+
+
+def find_candidates_in_parent_dirs(filenames, path):
+    """
+    Given a directory path to start, looks for filenames in the
+    directory, and then each parent directory successively,
+    until found.
+
+    Returns tuple (candidates, path).
+    """
+    candidates = [filename for filename in filenames
+                  if os.path.exists(os.path.join(path, filename))]
+
+    if not candidates:
+        parent_dir = os.path.join(path, '..')
+        if os.path.abspath(parent_dir) != os.path.abspath(path):
+            return find_candidates_in_parent_dirs(filenames, parent_dir)
+
+    return (candidates, path)
+
+
+@validate_top_level_object
+@validate_service_names
+def pre_process_config(config):
+    """
+    Pre validation checks and processing of the config file to interpolate env
+    vars returning a config dict ready to be tested against the schema.
+    """
+    return interpolate_environment_variables(config)
 
 
 def load(config_details):
-    config, working_dir, filename = config_details
-    if not isinstance(config, dict):
-        raise ConfigurationError(
-            "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
-        )
+    """Load the configuration from a working directory and a list of
+    configuration files.  Files are loaded in order, and merged on top
+    of each other to create the final configuration.
 
-    config = interpolate_environment_variables(config)
-    validate_against_schema(config)
+    Return a fully interpolated, extended and validated configuration.
+    """
 
-    service_dicts = []
-
-    for service_name, service_dict in list(config.items()):
-        loader = ServiceLoader(working_dir=working_dir, filename=filename)
-        service_dict = loader.make_service_dict(service_name, service_dict)
+    def build_service(filename, service_name, service_dict):
+        loader = ServiceLoader(
+            config_details.working_dir,
+            filename,
+            service_name,
+            service_dict)
+        service_dict = loader.make_service_dict()
         validate_paths(service_dict)
-        service_dicts.append(service_dict)
+        return service_dict
 
-    return service_dicts
+    def load_file(filename, config):
+        processed_config = pre_process_config(config)
+        validate_against_fields_schema(processed_config)
+        return [
+            build_service(filename, name, service_config)
+            for name, service_config in processed_config.items()
+        ]
+
+    def merge_services(base, override):
+        all_service_names = set(base) | set(override)
+        return {
+            name: merge_service_dicts(base.get(name, {}), override.get(name, {}))
+            for name in all_service_names
+        }
+
+    config_file = config_details.config_files[0]
+    for next_file in config_details.config_files[1:]:
+        config_file = ConfigFile(
+            config_file.filename,
+            merge_services(config_file.config, next_file.config))
+
+    return load_file(config_file.filename, config_file.config)
 
 
 class ServiceLoader(object):
-    def __init__(self, working_dir, filename=None, already_seen=None):
+    def __init__(self, working_dir, filename, service_name, service_dict, already_seen=None):
+        if working_dir is None:
+            raise Exception("No working_dir passed to ServiceLoader()")
+
         self.working_dir = os.path.abspath(working_dir)
+
         if filename:
             self.filename = os.path.abspath(filename)
         else:
             self.filename = filename
         self.already_seen = already_seen or []
+        self.service_dict = service_dict.copy()
+        self.service_name = service_name
+        self.service_dict['name'] = service_name
 
     def detect_cycle(self, name):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
-    def make_service_dict(self, name, service_dict):
-        service_dict = service_dict.copy()
-        service_dict['name'] = name
-        service_dict = resolve_environment(service_dict, working_dir=self.working_dir)
-        service_dict = self.resolve_extends(service_dict)
-        return process_container_options(service_dict, working_dir=self.working_dir)
+    def make_service_dict(self):
+        self.resolve_environment()
+        if 'extends' in self.service_dict:
+            self.validate_and_construct_extends()
+            self.service_dict = self.resolve_extends()
 
-    def resolve_extends(self, service_dict):
-        if 'extends' not in service_dict:
-            return service_dict
+        if not self.already_seen:
+            validate_against_service_schema(self.service_dict, self.service_name)
 
-        extends_options = self.validate_extends_options(service_dict['name'], service_dict['extends'])
+        return process_container_options(self.service_dict, working_dir=self.working_dir)
 
-        if self.working_dir is None:
-            raise Exception("No working_dir passed to ServiceLoader()")
+    def resolve_environment(self):
+        """
+        Unpack any environment variables from an env_file, if set.
+        Interpolate environment values if set.
+        """
+        if 'environment' not in self.service_dict and 'env_file' not in self.service_dict:
+            return
 
-        if 'file' in extends_options:
-            extends_from_filename = extends_options['file']
-            other_config_path = expand_path(self.working_dir, extends_from_filename)
-        else:
-            other_config_path = self.filename
+        env = {}
 
-        other_working_dir = os.path.dirname(other_config_path)
-        other_already_seen = self.already_seen + [self.signature(service_dict['name'])]
+        if 'env_file' in self.service_dict:
+            for f in get_env_files(self.service_dict, working_dir=self.working_dir):
+                env.update(env_vars_from_file(f))
+            del self.service_dict['env_file']
+
+        env.update(parse_environment(self.service_dict.get('environment')))
+        env = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
+
+        self.service_dict['environment'] = env
+
+    def validate_and_construct_extends(self):
+        validate_extends_file_path(
+            self.service_name,
+            self.service_dict['extends'],
+            self.filename
+        )
+        self.extended_config_path = self.get_extended_config_path(
+            self.service_dict['extends']
+        )
+        self.extended_service_name = self.service_dict['extends']['service']
+
+        full_extended_config = pre_process_config(
+            load_yaml(self.extended_config_path)
+        )
+
+        validate_extended_service_exists(
+            self.extended_service_name,
+            full_extended_config,
+            self.extended_config_path
+        )
+        validate_against_fields_schema(full_extended_config)
+
+        self.extended_config = full_extended_config[self.extended_service_name]
+
+    def resolve_extends(self):
+        other_working_dir = os.path.dirname(self.extended_config_path)
+        other_already_seen = self.already_seen + [self.signature(self.service_name)]
+
         other_loader = ServiceLoader(
             working_dir=other_working_dir,
-            filename=other_config_path,
+            filename=self.extended_config_path,
+            service_name=self.service_name,
+            service_dict=self.extended_config,
             already_seen=other_already_seen,
         )
 
-        other_config = load_yaml(other_config_path)
-        other_service_dict = other_config[extends_options['service']]
-        other_loader.detect_cycle(extends_options['service'])
-        other_service_dict = other_loader.make_service_dict(
-            service_dict['name'],
-            other_service_dict,
-        )
+        other_loader.detect_cycle(self.extended_service_name)
+        other_service_dict = other_loader.make_service_dict()
         validate_extended_service_dict(
             other_service_dict,
-            filename=other_config_path,
-            service=extends_options['service'],
+            filename=self.extended_config_path,
+            service=self.extended_service_name,
         )
 
-        return merge_service_dicts(other_service_dict, service_dict)
+        return merge_service_dicts(other_service_dict, self.service_dict)
+
+    def get_extended_config_path(self, extends_options):
+        """
+        Service we are extending either has a value for 'file' set, which we
+        need to obtain a full path too or we are extending from a service
+        defined in our own file.
+        """
+        if 'file' in extends_options:
+            extends_from_filename = extends_options['file']
+            return expand_path(self.working_dir, extends_from_filename)
+
+        return self.filename
 
     def signature(self, name):
         return (self.filename, name)
-
-    def validate_extends_options(self, service_name, extends_options):
-        error_prefix = "Invalid 'extends' configuration for %s:" % service_name
-
-        if 'file' not in extends_options and self.filename is None:
-            raise ConfigurationError(
-                "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
-            )
-
-        return extends_options
 
 
 def validate_extended_service_dict(service_dict, filename, service):
@@ -306,34 +427,11 @@ def get_env_files(options, working_dir=None):
     if 'env_file' not in options:
         return {}
 
-    if working_dir is None:
-        raise Exception("No working_dir passed to get_env_files()")
-
     env_files = options.get('env_file', [])
     if not isinstance(env_files, list):
         env_files = [env_files]
 
     return [expand_path(working_dir, path) for path in env_files]
-
-
-def resolve_environment(service_dict, working_dir=None):
-    service_dict = service_dict.copy()
-
-    if 'environment' not in service_dict and 'env_file' not in service_dict:
-        return service_dict
-
-    env = {}
-
-    if 'env_file' in service_dict:
-        for f in get_env_files(service_dict, working_dir=working_dir):
-            env.update(env_vars_from_file(f))
-        del service_dict['env_file']
-
-    env.update(parse_environment(service_dict.get('environment')))
-    env = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
-
-    service_dict['environment'] = env
-    return service_dict
 
 
 def parse_environment(environment):
@@ -344,7 +442,7 @@ def parse_environment(environment):
         return dict(split_env(e) for e in environment)
 
     if isinstance(environment, dict):
-        return environment
+        return dict(environment)
 
     raise ConfigurationError(
         "environment \"%s\" must be a list or mapping," %
@@ -400,12 +498,12 @@ def resolve_volume_path(volume, working_dir, service_name):
     if host_path is not None:
         if not any(host_path.startswith(c) for c in PATH_START_CHARS):
             log.warn(
-                'Warning: the mapping "{0}" in the volumes config for '
-                'service "{1}" is ambiguous. In a future version of Docker, '
+                'Warning: the mapping "{0}:{1}" in the volumes config for '
+                'service "{2}" is ambiguous. In a future version of Docker, '
                 'it will designate a "named" volume '
                 '(see https://github.com/docker/docker/pull/14242). '
-                'To prevent unexpected behaviour, change it to "./{0}"'
-                .format(volume, service_name)
+                'To prevent unexpected behaviour, change it to "./{0}:{1}"'
+                .format(host_path, container_path, service_name)
             )
 
         host_path = os.path.expanduser(host_path)
@@ -485,7 +583,7 @@ def split_label(label):
 
 
 def expand_path(working_dir, path):
-    return os.path.abspath(os.path.join(working_dir, path))
+    return os.path.abspath(os.path.join(working_dir, os.path.expanduser(path)))
 
 
 def to_list(value):

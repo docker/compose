@@ -3,11 +3,13 @@ set -ex
 
 PATH="/usr/local/bin:$PATH"
 
+./script/clean
 rm -rf venv
+
 virtualenv -p /usr/local/bin/python venv
 venv/bin/pip install -r requirements.txt
-venv/bin/pip install -r requirements-dev.txt
-venv/bin/pip install .
-venv/bin/pyinstaller -F bin/docker-compose
+venv/bin/pip install -r requirements-build.txt
+venv/bin/pip install --no-deps .
+venv/bin/pyinstaller docker-compose.spec
 mv dist/docker-compose dist/docker-compose-Darwin-x86_64
 dist/docker-compose-Darwin-x86_64 version

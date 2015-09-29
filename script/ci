@@ -10,7 +10,8 @@ set -e
 
 export DOCKER_VERSIONS=all
 export DOCKER_DAEMON_ARGS="--storage-driver=overlay"
+GIT_VOLUME="--volumes-from=$(hostname)"
 . script/test-versions
 
 >&2 echo "Building Linux binary"
-su -c script/build-linux-inner user
+. script/build-linux-inner

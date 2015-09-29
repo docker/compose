@@ -5,7 +5,7 @@ description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
 identifier = "smn_compose_cli"
-parent = "smn_compose_ref"	
+parent = "smn_compose_ref"
 +++
 <![end-metadata]-->
 
@@ -15,7 +15,7 @@ The following pages describe the usage information for the [docker-compose](/ref
 
 * [build](/reference/build.md)
 * [help](/reference/help.md)
-* [kill](/reference/kill.md)          
+* [kill](/reference/kill.md)
 * [ps](/reference/ps.md)
 * [restart](/reference/restart.md)
 * [run](/reference/run.md)
@@ -23,7 +23,12 @@ The following pages describe the usage information for the [docker-compose](/ref
 * [up](/reference/up.md)
 * [logs](/reference/logs.md)
 * [port](/reference/port.md)
-* [pull](/reference/pull.md) 
+* [pull](/reference/pull.md)
 * [rm](/reference/rm.md)
 * [scale](/reference/scale.md)
 * [stop](/reference/stop.md)
+
+## Where to go next
+
+* [CLI environment variables](overview.md)
+* [docker-compose Command](docker-compose.md)

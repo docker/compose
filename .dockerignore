@@ -1,5 +1,9 @@
+*.egg-info
+.coverage
 .git
+.tox
 build
-dist
-venv
 coverage-html
+dist
+docs/_site
+venv

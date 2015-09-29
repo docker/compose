@@ -1,7 +1,4 @@
-mock >= 1.0.1
-nose==1.3.4
-git+https://github.com/pyinstaller/pyinstaller.git@12e40471c77f588ea5be352f7219c873ddaae056#egg=pyinstaller
-unittest2==0.8.0
-flake8==2.3.0
-pep8==1.6.1
 coverage==3.7.1
+mock>=1.0.1
+pytest==2.7.2
+pytest-cov==2.1.0

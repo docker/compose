@@ -1,14 +1,18 @@
 from __future__ import unicode_literals
 
-from compose import config
-from compose.const import LABEL_PROJECT
-from compose.project import Project
-from compose.container import Container
 from .testcases import DockerClientTestCase
+from compose.config import config
+from compose.const import LABEL_PROJECT
+from compose.container import Container
+from compose.project import Project
+from compose.service import ConvergenceStrategy
 
 
 def build_service_dicts(service_config):
-    return config.load(config.ConfigDetails(service_config, 'working_dir', None))
+    return config.load(
+        config.ConfigDetails(
+            'working_dir',
+            [config.ConfigFile(None, service_config)]))
 
 
 class ProjectTest(DockerClientTestCase):
@@ -112,7 +116,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web._get_net(), 'container:' + net.containers()[0].id)
+        self.assertEqual(web.net.mode, 'container:' + net.containers()[0].id)
 
     def test_net_from_container(self):
         net_container = Container.create(
@@ -138,9 +142,9 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web._get_net(), 'container:' + net_container.id)
+        self.assertEqual(web.net.mode, 'container:' + net_container.id)
 
-    def test_start_stop_kill_remove(self):
+    def test_start_pause_unpause_stop_kill_remove(self):
         web = self.create_service('web')
         db = self.create_service('db')
         project = Project('composetest', [web, db], self.client)
@@ -158,7 +162,22 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name]))
 
         project.start()
-        self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name, db_container.name]))
+        self.assertEqual(set(c.name for c in project.containers()),
+                         set([web_container_1.name, web_container_2.name, db_container.name]))
+
+        project.pause(service_names=['web'])
+        self.assertEqual(set([c.name for c in project.containers() if c.is_paused]),
+                         set([web_container_1.name, web_container_2.name]))
+
+        project.pause()
+        self.assertEqual(set([c.name for c in project.containers() if c.is_paused]),
+                         set([web_container_1.name, web_container_2.name, db_container.name]))
+
+        project.unpause(service_names=['db'])
+        self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 2)
+
+        project.unpause()
+        self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 0)
 
         project.stop(service_names=['web'], timeout=1)
         self.assertEqual(set(c.name for c in project.containers()), set([db_container.name]))
@@ -209,7 +228,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].get('Volumes./etc')
 
-        project.up(force_recreate=True)
+        project.up(strategy=ConvergenceStrategy.always)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
@@ -228,7 +247,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
 
-        project.up(allow_recreate=False)
+        project.up(strategy=ConvergenceStrategy.never)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
@@ -252,7 +271,7 @@ class ProjectTest(DockerClientTestCase):
         old_db_id = old_containers[0].id
         db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
 
-        project.up(allow_recreate=False)
+        project.up(strategy=ConvergenceStrategy.never)
 
         new_containers = project.containers(stopped=True)
         self.assertEqual(len(new_containers), 2)

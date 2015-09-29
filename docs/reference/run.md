@@ -27,7 +27,7 @@ Options:
 -T                    Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.
 ```
 
-Runs a one-time command against a service. For example, the following command starts the `web` service and runs `bash` as its command. 
+Runs a one-time command against a service. For example, the following command starts the `web` service and runs `bash` as its command.
 
     $ docker-compose run web bash
 
@@ -52,7 +52,3 @@ This would open up an interactive PostgreSQL shell for the linked `db` container
 If you do not want the `run` command to start linked containers, specify the `--no-deps` flag:
 
     $ docker-compose run --no-deps web python manage.py shell
-
-
-
-

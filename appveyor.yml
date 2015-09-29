@@ -1,0 +1,20 @@
+
+version: '{branch}-{build}'
+
+install:
+  - "SET PATH=C:\\Python27-x64;C:\\Python27-x64\\Scripts;%PATH%"
+  - "python --version"
+  - "pip install tox==2.1.1 virtualenv==13.1.2"
+
+# Build the binary after tests
+build: false
+
+test_script:
+  - "tox -e py27,py34 -- tests/unit"
+
+after_test:
+  - ps: ".\\script\\build-windows.ps1"
+
+artifacts:
+  - path: .\dist\docker-compose-Windows-x86_64.exe
+    name: "Compose Windows binary"
