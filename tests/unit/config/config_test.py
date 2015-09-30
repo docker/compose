@@ -65,6 +65,37 @@ class ConfigTest(unittest.TestCase):
             ])
         )
 
+    def test_load_v2(self):
+        service_dicts = config.load(
+            build_config_details({
+                'version': 2,
+                'services': {
+                    'foo': {'image': 'busybox'},
+                    'bar': {'image': 'busybox', 'environment': ['FOO=1']},
+                },
+                'volumes': {
+                    'hello': {
+                        'driver': 'default',
+                        'driver_opts': {'beep': 'boop'}
+                    }
+                }
+            }, 'working_dir', 'filename.yml')
+        )
+        self.assertEqual(
+            service_sort(service_dicts),
+            service_sort([
+                {
+                    'name': 'bar',
+                    'image': 'busybox',
+                    'environment': {'FOO': '1'},
+                },
+                {
+                    'name': 'foo',
+                    'image': 'busybox',
+                }
+            ])
+        )
+
     def test_load_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
             config.load(
@@ -191,6 +222,50 @@ class ConfigTest(unittest.TestCase):
                 'image': 'example/web',
                 'volumes': ['/home/user/project:/code'],
                 'labels': {'label': 'one'},
+            },
+        ]
+        self.assertEqual(service_sort(service_dicts), service_sort(expected))
+
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
+    def test_load_with_multiple_files_v2(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': 2,
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'links': ['db'],
+                    },
+                    'db': {
+                        'image': 'example/db',
+                    }
+                },
+            })
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': 2,
+                'services': {
+                    'web': {
+                        'build': '/',
+                        'volumes': ['/home/user/project:/code'],
+                    },
+                }
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        service_dicts = config.load(details)
+        expected = [
+            {
+                'name': 'web',
+                'build': '/',
+                'links': ['db'],
+                'volumes': ['/home/user/project:/code'],
+            },
+            {
+                'name': 'db',
+                'image': 'example/db',
             },
         ]
         self.assertEqual(service_sort(service_dicts), service_sort(expected))
