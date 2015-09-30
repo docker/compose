@@ -21,6 +21,7 @@ from .validation import validate_top_level_object
 DOCKER_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
+    'cgroup_parent',
     'command',
     'cpu_shares',
     'cpuset',

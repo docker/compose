@@ -39,6 +39,7 @@ log = logging.getLogger(__name__)
 DOCKER_START_KEYS = [
     'cap_add',
     'cap_drop',
+    'cgroup_parent',
     'devices',
     'dns',
     'dns_search',
@@ -677,6 +678,7 @@ class Service(object):
         read_only = options.get('read_only', None)
 
         devices = options.get('devices', None)
+        cgroup_parent = options.get('cgroup_parent', None)
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
@@ -698,7 +700,8 @@ class Service(object):
             read_only=read_only,
             pid_mode=pid,
             security_opt=security_opt,
-            ipc_mode=options.get('ipc')
+            ipc_mode=options.get('ipc'),
+            cgroup_parent=cgroup_parent
         )
 
     def build(self, no_cache=False, pull=False):

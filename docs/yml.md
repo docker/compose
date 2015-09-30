@@ -51,6 +51,12 @@ Override the default command.
 
     command: bundle exec thin -p 3000
 
+### cgroup_parent
+
+Specify an optional parent cgroup for the container.
+
+    cgroup_parent: m-executor-abcd
+
 ### container_name
 
 Specify a custom container name, rather than a generated default name.
