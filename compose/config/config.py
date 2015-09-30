@@ -165,6 +165,27 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
+def get_services(config, version):
+    if version == 2:
+        return config.get('services', {})
+    else:
+        return config
+
+
+@validate_top_level_object
+def get_config_version(config):
+    return config.get('version')
+
+
+@validate_top_level_object
+def pre_process_config(config):
+    """
+    Pre validation checks and processing of the config file to interpolate env
+    vars returning a config dict ready to be tested against the schema.
+    """
+    return interpolate_environment_variables(config, get_config_version(config))
+
+
 def load(config_details):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
@@ -184,30 +205,46 @@ def load(config_details):
         return service_dict
 
     def load_file(filename, config):
-        processed_config = interpolate_environment_variables(config)
-        validate_against_fields_schema(processed_config)
+        processed_config = pre_process_config(config)
+        version = get_config_version(config)
+        validate_against_fields_schema(processed_config, version)
         return [
             build_service(filename, name, service_config)
-            for name, service_config in processed_config.items()
+            for name, service_config in get_services(processed_config, version).items()
         ]
 
-    def merge_services(base, override):
-        all_service_names = set(base) | set(override)
-        return {
-            name: merge_service_dicts_from_files(
-                base.get(name, {}),
-                override.get(name, {}))
+    def merge_services(base, override, version=None):
+        base_services, override_services = get_services(base, version), get_services(override, version)
+        all_service_names = set(base_services) | set(override_services)
+        services = {
+            name: merge_service_dicts(base_services.get(name, {}), override_services.get(name, {}))
             for name in all_service_names
         }
+        if version == 2:
+            volumes = base.get('volumes', {}).copy()
+            volumes.update(override.get('volumes', {}))
+            return {
+                'version': version,
+                'volumes': volumes,
+                'services': services
+            }
+        else:
+            return services
 
     config_file = config_details.config_files[0]
-    validate_top_level_object(config_file.config)
+    version = get_config_version(config_file.config)
     for next_file in config_details.config_files[1:]:
-        validate_top_level_object(next_file.config)
-
+        next_file_version = get_config_version(config_file.config)
+        if version != next_file_version:
+            raise ConfigurationError(
+                'Version mismatch: main file {0} specifies version {1} but extension file {2} uses version {3}'.format(
+                    config_file.filename, version, next_file.filename, next_file_version
+                )
+            )
         config_file = ConfigFile(
             config_file.filename,
-            merge_services(config_file.config, next_file.config))
+            merge_services(config_file.config, next_file.config, version)
+        )
 
     return load_file(config_file.filename, config_file.config)
 
