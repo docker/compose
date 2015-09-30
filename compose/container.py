@@ -19,6 +19,7 @@ class Container(object):
         self.client = client
         self.dictionary = dictionary
         self.has_been_inspected = has_been_inspected
+        self.image_name = dictionary['Image']
 
     @classmethod
     def from_ps(cls, client, dictionary, **kwargs):

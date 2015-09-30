@@ -257,9 +257,11 @@ class Project(object):
         for service in self.get_services(service_names):
             service.restart(**options)
 
-    def build(self, service_names=None, no_cache=False, pull=False):
+    def build(self, service_names=None, no_cache=False, pull=False, version=None):
         for service in self.get_services(service_names):
             if service.can_be_built():
+                if version is not None:
+                    service.put_version(version)
                 service.build(no_cache, pull)
             else:
                 log.info('%s uses an image, skipping' % service.name)
@@ -269,9 +271,13 @@ class Project(object):
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
            do_build=True,
-           timeout=DEFAULT_TIMEOUT):
+           timeout=DEFAULT_TIMEOUT,
+           version=None):
 
         services = self.get_services(service_names, include_deps=start_deps)
+        if version is not None:
+            for service in services:
+                service.put_version(version)
 
         for service in services:
             service.remove_duplicate_containers()

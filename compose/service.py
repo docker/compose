@@ -118,6 +118,7 @@ class Service(object):
         self.name = name
         self.client = client
         self.project = project
+        self.version = 'latest'
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.net = net or Net(None)
@@ -340,6 +341,9 @@ class Service(object):
             return self.full_name
         else:
             return self.options['image']
+
+    def put_version(self, version):
+        self.version = version
 
     def convergence_plan(self, strategy=ConvergenceStrategy.changed):
         containers = self.containers(stopped=True)
@@ -702,7 +706,7 @@ class Service(object):
         )
 
     def build(self, no_cache=False, pull=False):
-        log.info('Building %s' % self.name)
+        log.info('Building %s, version=%s' % (self.name, self.version))
 
         path = self.options['build']
         # python2 os.path() doesn't support unicode, so we need to encode it to
@@ -751,7 +755,7 @@ class Service(object):
         """
         The tag to give to images built for this service.
         """
-        return '%s_%s' % (self.project, self.name)
+        return '%s_%s:%s' % (self.project, self.name, self.version)
 
     def labels(self, one_off=False):
         return [
