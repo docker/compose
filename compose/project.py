@@ -92,16 +92,16 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client, use_networking=False, network_driver=None):
+    def from_dicts(cls, name, config_data, client, use_networking=False, network_driver=None):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
         project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
 
         if use_networking:
-            remove_links(service_dicts)
+            remove_links(config_data.services)
 
-        for service_dict in sort_service_dicts(service_dicts):
+        for service_dict in sort_service_dicts(config_data.services):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)

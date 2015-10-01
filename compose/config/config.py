@@ -100,6 +100,17 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     """
 
 
+class Config(namedtuple('_Config', 'version services volumes')):
+    """
+    :param version: configuration version
+    :type  version: int
+    :param services: List of service description dictionaries
+    :type  services: :class:`list`
+    :param volumes: List of volume description dictionaries
+    :type  volumes: :class:`list`
+    """
+
+
 def find(base_dir, filenames):
     if filenames == ['-']:
         return ConfigDetails(
@@ -198,7 +209,11 @@ def load(config_details):
         service_dicts = [
             config_file.config for config_file in config_details.config_files
         ]
-        return load_services(config_details.working_dir, filename, service_dicts)
+        return Config(
+            version,
+            load_services(config_details.working_dir, filename, service_dicts),
+            []
+        )
     elif version == 2:
         return load_v2(config_details, filename)
 
@@ -209,7 +224,11 @@ def load_v2(config_details, filename):
     service_dicts = [
         config_file.config.get('services', {}) for config_file in config_details.config_files
     ]
-    return load_services(config_details.working_dir, filename, service_dicts)
+    return Config(
+        2,
+        load_services(config_details.working_dir, filename, service_dicts),
+        []
+    )
 
 
 def load_services(working_dir, filename, service_configs):

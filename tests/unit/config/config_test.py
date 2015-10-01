@@ -48,7 +48,7 @@ class ConfigTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
 
         self.assertEqual(
             service_sort(service_dicts),
@@ -80,7 +80,7 @@ class ConfigTest(unittest.TestCase):
                     }
                 }
             }, 'working_dir', 'filename.yml')
-        )
+        ).services
         self.assertEqual(
             service_sort(service_dicts),
             service_sort([
@@ -151,7 +151,7 @@ class ConfigTest(unittest.TestCase):
             })
         details = config.ConfigDetails('.', [base_file, override_file])
 
-        service_dicts = config.load(details)
+        service_dicts = config.load(details).services
         expected = [
             {
                 'name': 'web',
@@ -255,7 +255,7 @@ class ConfigTest(unittest.TestCase):
             })
         details = config.ConfigDetails('.', [base_file, override_file])
 
-        service_dicts = config.load(details)
+        service_dicts = config.load(details).services
         expected = [
             {
                 'name': 'web',
@@ -436,7 +436,7 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
-            )
+            ).services
             self.assertEqual(service[0]['expose'], expose)
 
     def test_valid_config_oneof_string_or_list(self):
@@ -451,7 +451,7 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
-            )
+            ).services
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
     @mock.patch('compose.config.validation.log')
@@ -511,7 +511,7 @@ class InterpolationTest(unittest.TestCase):
 
         service_dicts = config.load(
             config.find('tests/fixtures/environment-interpolation', None),
-        )
+        ).services
 
         self.assertEqual(service_dicts, [
             {
@@ -596,7 +596,7 @@ class VolumeConfigTest(unittest.TestCase):
                 '.',
                 None,
             )
-        )[0]
+        ).services[0]
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
@@ -871,7 +871,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
         self.assertEqual(service_dict[0]['memswap_limit'], 2000000)
 
     def test_memswap_can_be_a_string(self):
@@ -881,7 +881,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
         self.assertEqual(service_dict[0]['memswap_limit'], "512M")
 
 
@@ -997,7 +997,7 @@ class EnvTest(unittest.TestCase):
                 "tests/fixtures/env",
                 None,
             )
-        )[0]
+        ).services[0]
         self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
 
         service_dict = config.load(
@@ -1006,17 +1006,17 @@ class EnvTest(unittest.TestCase):
                 "tests/fixtures/env",
                 None,
             )
-        )[0]
+        ).services[0]
         self.assertEqual(set(service_dict['volumes']), set(['/opt/tmp:/opt/host/tmp']))
 
 
-def load_from_filename(filename):
-    return config.load(config.find('.', [filename]))
+def load_services_from_filename(filename):
+    return config.load(config.find('.', [filename])).services
 
 
 class ExtendsTest(unittest.TestCase):
     def test_extends(self):
-        service_dicts = load_from_filename('tests/fixtures/extends/docker-compose.yml')
+        service_dicts = load_services_from_filename('tests/fixtures/extends/docker-compose.yml')
 
         self.assertEqual(service_sort(service_dicts), service_sort([
             {
@@ -1038,7 +1038,7 @@ class ExtendsTest(unittest.TestCase):
         ]))
 
     def test_nested(self):
-        service_dicts = load_from_filename('tests/fixtures/extends/nested.yml')
+        service_dicts = load_services_from_filename('tests/fixtures/extends/nested.yml')
 
         self.assertEqual(service_dicts, [
             {
@@ -1056,7 +1056,7 @@ class ExtendsTest(unittest.TestCase):
         """
         We specify a 'file' key that is the filename we're already in.
         """
-        service_dicts = load_from_filename('tests/fixtures/extends/specify-file-as-self.yml')
+        service_dicts = load_services_from_filename('tests/fixtures/extends/specify-file-as-self.yml')
         self.assertEqual(service_sort(service_dicts), service_sort([
             {
                 'environment':
@@ -1082,7 +1082,7 @@ class ExtendsTest(unittest.TestCase):
 
     def test_circular(self):
         try:
-            load_from_filename('tests/fixtures/extends/circle-1.yml')
+            load_services_from_filename('tests/fixtures/extends/circle-1.yml')
             raise Exception("Expected config.CircularReference to be raised")
         except config.CircularReference as e:
             self.assertEqual(
@@ -1180,7 +1180,7 @@ class ExtendsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
 
         self.assertEquals(len(service), 1)
         self.assertIsInstance(service[0], dict)
@@ -1190,10 +1190,10 @@ class ExtendsTest(unittest.TestCase):
         expected_error_msg = "Service 'myweb' has neither an image nor a build path specified"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
+            load_services_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
 
     def test_extended_service_with_valid_config(self):
-        service = load_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')
+        service = load_services_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')
         self.assertEquals(service[0]['command'], "top")
 
     def test_extends_file_defaults_to_self(self):
@@ -1201,7 +1201,7 @@ class ExtendsTest(unittest.TestCase):
         Test not specifying a file in our extends options that the
         config is valid and correctly extends from itself.
         """
-        service_dicts = load_from_filename('tests/fixtures/extends/no-file-specified.yml')
+        service_dicts = load_services_from_filename('tests/fixtures/extends/no-file-specified.yml')
         self.assertEqual(service_sort(service_dicts), service_sort([
             {
                 'name': 'myweb',
@@ -1223,19 +1223,19 @@ class ExtendsTest(unittest.TestCase):
     def test_invalid_links_in_extended_service(self):
         expected_error_msg = "services with 'links' cannot be extended"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            load_from_filename('tests/fixtures/extends/invalid-links.yml')
+            load_services_from_filename('tests/fixtures/extends/invalid-links.yml')
 
     def test_invalid_volumes_from_in_extended_service(self):
         expected_error_msg = "services with 'volumes_from' cannot be extended"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            load_from_filename('tests/fixtures/extends/invalid-volumes.yml')
+            load_services_from_filename('tests/fixtures/extends/invalid-volumes.yml')
 
     def test_invalid_net_in_extended_service(self):
         expected_error_msg = "services with 'net: container' cannot be extended"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            load_from_filename('tests/fixtures/extends/invalid-net.yml')
+            load_services_from_filename('tests/fixtures/extends/invalid-net.yml')
 
     @mock.patch.dict(os.environ)
     def test_valid_interpolation_in_extended_service(self):
@@ -1244,13 +1244,13 @@ class ExtendsTest(unittest.TestCase):
         )
         expected_interpolated_value = "host-penguin"
 
-        service_dicts = load_from_filename('tests/fixtures/extends/valid-interpolation.yml')
+        service_dicts = load_services_from_filename('tests/fixtures/extends/valid-interpolation.yml')
         for service in service_dicts:
             self.assertTrue(service['hostname'], expected_interpolated_value)
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     def test_volume_path(self):
-        dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')
+        dicts = load_services_from_filename('tests/fixtures/volume-path/docker-compose.yml')
 
         paths = [
             '%s:/foo' % os.path.abspath('tests/fixtures/volume-path/common/foo'),
@@ -1260,7 +1260,7 @@ class ExtendsTest(unittest.TestCase):
         self.assertEqual(set(dicts[0]['volumes']), set(paths))
 
     def test_parent_build_path_dne(self):
-        child = load_from_filename('tests/fixtures/extends/nonexistent-path-child.yml')
+        child = load_services_from_filename('tests/fixtures/extends/nonexistent-path-child.yml')
 
         self.assertEqual(child, [
             {
@@ -1277,10 +1277,10 @@ class ExtendsTest(unittest.TestCase):
     def test_load_throws_error_when_base_service_does_not_exist(self):
         err_msg = r'''Cannot extend service 'foo' in .*: Service not found'''
         with self.assertRaisesRegexp(ConfigurationError, err_msg):
-            load_from_filename('tests/fixtures/extends/nonexistent-service.yml')
+            load_services_from_filename('tests/fixtures/extends/nonexistent-service.yml')
 
     def test_partial_service_config_in_extends_is_still_valid(self):
-        dicts = load_from_filename('tests/fixtures/extends/valid-common-config.yml')
+        dicts = load_services_from_filename('tests/fixtures/extends/valid-common-config.yml')
         self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
 
     def test_extended_service_with_verbose_and_shorthand_way(self):
@@ -1376,7 +1376,7 @@ class BuildPathTest(unittest.TestCase):
         self.assertEquals(service_dict['build'], self.abs_context_path)
 
     def test_from_file(self):
-        service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
+        service_dict = load_services_from_filename('tests/fixtures/build-path/docker-compose.yml')
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
 
 

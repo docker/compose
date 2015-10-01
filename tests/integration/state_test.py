@@ -28,7 +28,7 @@ class ProjectTestCase(DockerClientTestCase):
         return Project.from_dicts(
             name='composetest',
             client=self.client,
-            service_dicts=config.load(details))
+            config_data=config.load(details))
 
 
 class BasicProjectTest(ProjectTestCase):
