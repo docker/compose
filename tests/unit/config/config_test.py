@@ -420,7 +420,6 @@ class VolumeConfigTest(unittest.TestCase):
         d = make_service_dict('foo', {'build': '.', 'volumes': ['/data']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/data'])
 
-    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
@@ -433,7 +432,7 @@ class VolumeConfigTest(unittest.TestCase):
         )[0]
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
-    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
+    @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'

@@ -441,7 +441,6 @@ def mock_get_image(images):
         raise NoSuchImageError()
 
 
-@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ServiceVolumesTest(unittest.TestCase):
 
     def setUp(self):
@@ -468,15 +467,15 @@ class ServiceVolumesTest(unittest.TestCase):
 
     @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_parse_volume_windows_relative_path(self):
-        windows_relative_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:\\opt\\connect\\config:ro"
+        windows_relative_path = "c:\\Users\\me\\Documents\\shiny\\config:\\opt\\shiny\\config:ro"
 
         spec = parse_volume_spec(windows_relative_path)
 
         self.assertEqual(
             spec,
             (
-                "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config",
-                "\\opt\\connect\\config",
+                "/c/Users/me/Documents/shiny/config",
+                "/opt/shiny/config",
                 "ro"
             )
         )
