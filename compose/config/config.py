@@ -78,13 +78,6 @@ SUPPORTED_FILENAMES = [
 
 DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 
-PATH_START_CHARS = [
-    '/',
-    '.',
-    '~',
-]
-
-
 log = logging.getLogger(__name__)
 
 
@@ -495,18 +488,10 @@ def resolve_volume_path(volume, working_dir, service_name):
     container_path = os.path.expanduser(container_path)
 
     if host_path is not None:
-        if not any(host_path.startswith(c) for c in PATH_START_CHARS):
-            log.warn(
-                'Warning: the mapping "{0}:{1}" in the volumes config for '
-                'service "{2}" is ambiguous. In a future version of Docker, '
-                'it will designate a "named" volume '
-                '(see https://github.com/docker/docker/pull/14242). '
-                'To prevent unexpected behaviour, change it to "./{0}:{1}"'
-                .format(host_path, container_path, service_name)
-            )
-
+        if host_path.startswith('.'):
+            host_path = expand_path(working_dir, host_path)
         host_path = os.path.expanduser(host_path)
-        return "%s:%s" % (expand_path(working_dir, host_path), container_path)
+        return "{}:{}".format(host_path, container_path)
     else:
         return container_path
 
