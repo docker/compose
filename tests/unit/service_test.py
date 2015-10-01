@@ -466,10 +466,10 @@ class ServiceVolumesTest(unittest.TestCase):
             parse_volume_spec('one:two:three:four')
 
     @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
-    def test_parse_volume_windows_relative_path(self):
-        windows_relative_path = "c:\\Users\\me\\Documents\\shiny\\config:\\opt\\shiny\\config:ro"
+    def test_parse_volume_windows_absolute_path(self):
+        windows_absolute_path = "c:\\Users\\me\\Documents\\shiny\\config:\\opt\\shiny\\config:ro"
 
-        spec = parse_volume_spec(windows_relative_path)
+        spec = parse_volume_spec(windows_absolute_path)
 
         self.assertEqual(
             spec,
