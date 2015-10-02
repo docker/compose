@@ -171,6 +171,12 @@ class Container(object):
         port = self.ports.get("%s/%s" % (port, protocol))
         return "{HostIp}:{HostPort}".format(**port[0]) if port else None
 
+    def get_mount(self, mount_dest):
+        for mount in self.get('Mounts'):
+            if mount['Destination'] == mount_dest:
+                return mount
+        return None
+
     def start(self, **options):
         return self.client.start(self.id, **options)
 
