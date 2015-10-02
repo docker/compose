@@ -6,8 +6,8 @@ from itertools import cycle
 
 from . import colors
 from .multiplexer import Multiplexer
-from .utils import split_buffer
 from compose import utils
+from compose.utils import split_buffer
 
 
 class LogPrinter(object):
@@ -75,7 +75,7 @@ def build_no_log_generator(container, prefix, color_func):
 def build_log_generator(container, prefix, color_func):
     # Attach to container before log printer starts running
     stream = container.attach(stdout=True, stderr=True,  stream=True, logs=True)
-    line_generator = split_buffer(stream, u'\n')
+    line_generator = split_buffer(stream)
 
     for line in line_generator:
         yield prefix + line

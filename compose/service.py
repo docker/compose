@@ -33,6 +33,8 @@ from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
 from .utils import parallel_execute
+from .utils import split_buffer
+
 
 log = logging.getLogger(__name__)
 
@@ -722,7 +724,7 @@ class Service(object):
         )
 
         try:
-            all_events = stream_output(build_output, sys.stdout)
+            all_events = stream_output(split_buffer(build_output), sys.stdout)
         except StreamOutputError as e:
             raise BuildError(self, six.text_type(e))
 

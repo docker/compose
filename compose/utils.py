@@ -83,6 +83,44 @@ def get_output_stream(stream):
     return codecs.getwriter('utf-8')(stream)
 
 
+def stream_as_text(stream):
+    """Given a stream of bytes or text, if any of the items in the stream
+    are bytes convert them to text.
+
+    This function can be removed once docker-py returns text streams instead
+    of byte streams.
+    """
+    for data in stream:
+        if not isinstance(data, six.text_type):
+            data = data.decode('utf-8')
+        yield data
+
+
+def split_buffer(reader, separator=u'\n'):
+    """
+    Given a generator which yields strings and a separator string,
+    joins all input, splits on the separator and yields each chunk.
+
+    Unlike string.split(), each chunk includes the trailing
+    separator, except for the last one if none was found on the end
+    of the input.
+    """
+    buffered = six.text_type('')
+    separator = six.text_type(separator)
+
+    for data in stream_as_text(reader):
+        buffered += data
+        while True:
+            index = buffered.find(separator)
+            if index == -1:
+                break
+            yield buffered[:index + 1]
+            buffered = buffered[index + 1:]
+
+    if len(buffered) > 0:
+        yield buffered
+
+
 def write_out_msg(stream, lines, msg_index, msg, status="done"):
     """
     Using special ANSI code characters we can write out the msg over the top of

@@ -1,7 +1,5 @@
 import json
 
-import six
-
 from compose import utils
 
 
@@ -16,9 +14,7 @@ def stream_output(output, stream):
     lines = {}
     diff = 0
 
-    for chunk in output:
-        if six.PY3:
-            chunk = chunk.decode('utf-8')
+    for chunk in utils.stream_as_text(output):
         event = json.loads(chunk)
         all_events.append(event)
 
