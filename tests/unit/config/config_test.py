@@ -463,6 +463,7 @@ class VolumeConfigTest(unittest.TestCase):
         self.assertEqual(d['volumes'], ['/home/me/otherproject:/data'])
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
+    @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='waiting for this to be resolved: https://github.com/docker/compose/issues/2128')
     def test_relative_path_does_expand_windows(self):
         d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='C:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['C:\\Users\\me\\myproject\\data:/data'])
