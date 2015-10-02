@@ -45,15 +45,23 @@ Check out the bump branch and run the `build-binary` script
         git checkout bump-$VERSION
         ./script/release/build-binary
 
+When prompted build the non-linux binaries and test them.
 
-When prompted test the binaries.
+1.  Build the Mac binary in a Mountain Lion VM:
 
-1.  Draft a release from the tag on GitHub (the script will open the window for
+        script/prepare-osx
+        script/build-osx
+
+2.  Download the windows binary from AppVeyor
+
+    https://ci.appveyor.com/project/docker/compose/build/<build id>/artifacts
+
+3.  Draft a release from the tag on GitHub (the script will open the window for
     you)
 
     In the "Tag version" dropdown, select the tag you just pushed.
 
-2.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
+4.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
 
         Firstly, note that Compose 1.5.0 requires Docker 1.8.0 or later.
 
@@ -72,19 +80,19 @@ When prompted test the binaries.
 
         ...release notes go here...
 
-3.  Attach the binaries.
+5.  Attach the binaries.
 
-4. If everything looks good, it's time to push the release.
+6. If everything looks good, it's time to push the release.
 
 
         ./script/release/push-release
 
 
-5.  Publish the release on GitHub.
+7.  Publish the release on GitHub.
 
-6.  Check that both binaries download (following the install instructions) and run.
+8.  Check that both binaries download (following the install instructions) and run.
 
-7.  Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+9.  Email maintainers@dockerproject.org and engineering@docker.com about the new release.
 
 ## If it’s a stable release (not an RC)
 
