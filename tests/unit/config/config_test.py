@@ -420,7 +420,6 @@ class VolumeConfigTest(unittest.TestCase):
         d = make_service_dict('foo', {'build': '.', 'volumes': ['/data']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/data'])
 
-    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
@@ -433,7 +432,7 @@ class VolumeConfigTest(unittest.TestCase):
         )[0]
         self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
-    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
+    @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
@@ -464,6 +463,7 @@ class VolumeConfigTest(unittest.TestCase):
         self.assertEqual(d['volumes'], ['/home/me/otherproject:/data'])
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
+    @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='waiting for this to be resolved: https://github.com/docker/compose/issues/2128')
     def test_relative_path_does_expand_windows(self):
         d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='C:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['C:\\Users\\me\\myproject\\data:/data'])
@@ -1122,6 +1122,21 @@ class ExpandPathTest(unittest.TestCase):
             result = config.expand_path(self.working_dir, test_path)
 
         self.assertEqual(result, user_path + 'otherdir/somefile')
+
+
+class VolumePathTest(unittest.TestCase):
+
+    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
+    def test_split_path_mapping_with_windows_path(self):
+        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:/opt/connect/config:ro"
+        expected_mapping = (
+            "/opt/connect/config:ro",
+            "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
+        )
+
+        mapping = config.split_path_mapping(windows_volume_path)
+
+        self.assertEqual(mapping, expected_mapping)
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')

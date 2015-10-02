@@ -526,12 +526,13 @@ def path_mappings_from_dict(d):
     return [join_path_mapping(v) for v in d.items()]
 
 
-def split_path_mapping(string):
-    if ':' in string:
-        (host, container) = string.split(':', 1)
-        return (container, host)
+def split_path_mapping(volume_path):
+    drive, volume_config = os.path.splitdrive(volume_path)
+    if ':' in volume_config:
+        (host, container) = volume_config.split(':', 1)
+        return (container, drive + host)
     else:
-        return (string, None)
+        return (volume_path, None)
 
 
 def join_path_mapping(pair):

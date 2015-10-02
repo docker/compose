@@ -20,6 +20,7 @@ from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.validation import VALID_NAME_CHARS
 from .const import DEFAULT_TIMEOUT
+from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -936,20 +937,54 @@ def build_volume_binding(volume_spec):
     return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
 
 
+def normalize_paths_for_engine(external_path, internal_path):
+    """
+    Windows paths, c:\my\path\shiny, need to be changed to be compatible with
+    the Engine. Volume paths are expected to be linux style /c/my/path/shiny/
+    """
+    if IS_WINDOWS_PLATFORM:
+        if external_path:
+            drive, tail = os.path.splitdrive(external_path)
+
+            if drive:
+                reformatted_drive = "/{}".format(drive.replace(":", ""))
+                external_path = reformatted_drive + tail
+
+            external_path = "/".join(external_path.split("\\"))
+
+        return external_path, "/".join(internal_path.split("\\"))
+    else:
+        return external_path, internal_path
+
+
 def parse_volume_spec(volume_config):
-    parts = volume_config.split(':')
+    """
+    Parse a volume_config path and split it into external:internal[:mode]
+    parts to be returned as a valid VolumeSpec.
+    """
+    if IS_WINDOWS_PLATFORM:
+        # relative paths in windows expand to include the drive, eg C:\
+        # so we join the first 2 parts back together to count as one
+        drive, tail = os.path.splitdrive(volume_config)
+        parts = tail.split(":")
+
+        if drive:
+            parts[0] = drive + parts[0]
+    else:
+        parts = volume_config.split(':')
+
     if len(parts) > 3:
         raise ConfigError("Volume %s has incorrect format, should be "
                           "external:internal[:mode]" % volume_config)
 
     if len(parts) == 1:
-        external = None
-        internal = os.path.normpath(parts[0])
+        external, internal = normalize_paths_for_engine(None, os.path.normpath(parts[0]))
     else:
-        external = os.path.normpath(parts[0])
-        internal = os.path.normpath(parts[1])
+        external, internal = normalize_paths_for_engine(os.path.normpath(parts[0]), os.path.normpath(parts[1]))
 
-    mode = parts[2] if len(parts) == 3 else 'rw'
+    mode = 'rw'
+    if len(parts) == 3:
+        mode = parts[2]
 
     return VolumeSpec(external, internal, mode)
 
