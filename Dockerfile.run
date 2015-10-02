@@ -1,0 +1,15 @@
+
+FROM    alpine:edge
+RUN     apk -U add \
+            python \
+            py-pip
+
+COPY    requirements.txt /code/requirements.txt
+RUN     pip install -r /code/requirements.txt
+
+ENV     VERSION 1.4.0dev
+
+COPY    dist/docker-compose-$VERSION.tar.gz /code/docker-compose/
+RUN     pip install /code/docker-compose/docker-compose-$VERSION/
+
+ENTRYPOINT ["/usr/bin/docker-compose"]

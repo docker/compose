@@ -40,19 +40,37 @@ To install Compose, do the following:
 
         curl -L https://github.com/docker/compose/releases/download/VERSION_NUM/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 
-     If you have problems installing with `curl`, you can use `pip` instead: `pip install -U docker-compose`
+     If you have problems installing with `curl`, see
+     [Alternative Install Options](#alternative-install-options).
 
-4. Apply executable permissions to the binary:
+5. Apply executable permissions to the binary:
 
         $ chmod +x /usr/local/bin/docker-compose
 
-5.  Optionally, install [command completion](completion.md) for the
+6.  Optionally, install [command completion](completion.md) for the
 `bash` and `zsh` shell.
 
-6. Test the installation.
+7. Test the installation.
 
         $ docker-compose --version
         docker-compose version: 1.4.2
+
+
+## Alternative install options
+
+### Install using pip
+
+    $ sudo pip install -U docker-compose
+
+
+### Install as a container
+
+Compose can also be run inside a container, from a small bash script wrapper.
+To install compose as a container run:
+
+    $ curl -L https://github.com/docker/compose/releases/download/1.5.0/compose-run > /usr/local/bin/docker-compose
+    $ chmod +x /usr/local/bin/docker-compose
+
 
 ## Upgrading
 

@@ -4,6 +4,6 @@
 .tox
 build
 coverage-html
-dist
 docs/_site
 venv
+.tox
