@@ -331,15 +331,19 @@ class ProjectTest(DockerClientTestCase):
         project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
         old_db_id = project.containers()[0].id
-        db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
+
+        container, = project.containers()
+        db_volume_path = container.get_mount('/var/db')['Source']
 
         project.up(strategy=ConvergenceStrategy.never)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
-        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
-                         db_volume_path)
+        mount, = db_container.get('Mounts')
+        self.assertEqual(
+            db_container.get_mount('/var/db')['Source'],
+            db_volume_path)
 
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
@@ -354,8 +358,9 @@ class ProjectTest(DockerClientTestCase):
         old_containers = project.containers(stopped=True)
 
         self.assertEqual(len(old_containers), 1)
-        old_db_id = old_containers[0].id
-        db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
+        old_container, = old_containers
+        old_db_id = old_container.id
+        db_volume_path = old_container.get_mount('/var/db')['Source']
 
         project.up(strategy=ConvergenceStrategy.never)
 
@@ -365,8 +370,9 @@ class ProjectTest(DockerClientTestCase):
 
         db_container = [c for c in new_containers if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
-        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
-                         db_volume_path)
+        self.assertEqual(
+            db_container.get_mount('/var/db')['Source'],
+            db_volume_path)
 
     def test_project_up_without_all_services(self):
         console = self.create_service('console')
