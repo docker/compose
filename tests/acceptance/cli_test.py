@@ -809,7 +809,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'], None)
 
         container = self.project.containers(stopped=True)[0]
-        actual_host_path = container.get('Volumes')['/container-path']
+        actual_host_path = container.get_mount('/container-path')['Source']
         components = actual_host_path.split('/')
         assert components[-2:] == ['home-dir', 'my-volume']
 
