@@ -3,20 +3,20 @@ Building a Compose release
 
 ## To get started with a new release
 
-1.  Create a `bump-$VERSION` branch off master:
+Create a branch, update version, and add release notes by running `make-branch`
 
-        git checkout -b bump-$VERSION master
+        ./script/release/make-branch $VERSION [$BASE_VERSION]
 
-2.  Merge in the `release` branch on the upstream repo, discarding its tree entirely:
+`$BASE_VERSION` will default to master. Use the last version tag for a bug fix
+release.
 
-        git fetch origin
-        git merge --strategy=ours origin/release
+As part of this script you'll be asked to:
 
-3.  Update the version in `docs/install.md` and `compose/__init__.py`.
+1.  Update the version in `docs/install.md` and `compose/__init__.py`.
 
     If the next release will be an RC, append `rcN`, e.g. `1.4.0rc1`.
 
-4.  Write release notes in `CHANGES.md`.
+2.  Write release notes in `CHANGES.md`.
 
     Almost every feature enhancement should be mentioned, with the most visible/exciting ones first. Use descriptive sentences and give context where appropriate.
 
@@ -24,72 +24,44 @@ Building a Compose release
 
     Improvements to the code are not worth mentioning.
 
-5.   Add a bump commit:
-
-        git commit -am "Bump $VERSION"
-
-6.   Push the bump branch to your fork:
-
-        git push --set-upstream $USERNAME bump-$VERSION
-
-7.  Open a PR from the bump branch against the `release` branch on the upstream repo, **not** against master.
 
 ## When a PR is merged into master that we want in the release
 
-1.  Check out the bump branch:
+1. Check out the bump branch and run the cherry pick script
 
         git checkout bump-$VERSION
+        ./script/release/cherry-pick-pr $PR_NUMBER
 
-2.   Cherry-pick the merge commit, fixing any conflicts if necessary:
+2. When you are done cherry-picking branches move the bump version commit to HEAD
 
-        git cherry-pick -xm1 $MERGE_COMMIT_HASH
-
-3.  Add a signoff (it’s missing from merge commits):
-
-        git commit --amend --signoff
-
-4.  Move the bump commit back to the tip of the branch:
-
-        git rebase --interactive $PARENT_OF_BUMP_COMMIT
-
-5.  Force-push the bump branch to your fork:
-
+        ./script/release/rebase-bump-commit
         git push --force $USERNAME bump-$VERSION
+
 
 ## To release a version (whether RC or stable)
 
-1.  Check that CI is passing on the bump PR.
-
-2.  Check out the bump branch:
+Check out the bump branch and run the `build-binary` script
 
         git checkout bump-$VERSION
+        ./script/release/build-binary
 
-3.  Build the Linux binary:
+When prompted build the non-linux binaries and test them.
 
-        script/build-linux
-
-4.  Build the Mac binary in a Mountain Lion VM:
+1.  Build the Mac binary in a Mountain Lion VM:
 
         script/prepare-osx
         script/build-osx
 
-5.  Test the binaries and/or get some other people to test them.
+2.  Download the windows binary from AppVeyor
 
-6.  Create a tag:
+    https://ci.appveyor.com/project/docker/compose/build/<build id>/artifacts
 
-        TAG=$VERSION # or $VERSION-rcN, if it's an RC
-        git tag $TAG
+3.  Draft a release from the tag on GitHub (the script will open the window for
+    you)
 
-7.  Push the tag to the upstream repo:
+    In the "Tag version" dropdown, select the tag you just pushed.
 
-        git push git@github.com:docker/compose.git $TAG
-
-8.  Draft a release from the tag on GitHub.
-
-    - Go to https://github.com/docker/compose/releases and click "Draft a new release".
-    - In the "Tag version" dropdown, select the tag you just pushed.
-
-9.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
+4.  Paste in installation instructions and release notes. Here's an example - change the Compose version and Docker version as appropriate:
 
         Firstly, note that Compose 1.5.0 requires Docker 1.8.0 or later.
 
@@ -108,24 +80,19 @@ Building a Compose release
 
         ...release notes go here...
 
-10.  Attach the binaries.
+5.  Attach the binaries.
 
-11. Don’t publish it just yet!
+6. If everything looks good, it's time to push the release.
 
-12. Upload the latest version to PyPi:
 
-        python setup.py sdist upload
+        ./script/release/push-release
 
-13. Check that the pip package installs and runs (best done in a virtualenv):
 
-        pip install -U docker-compose==$TAG
-        docker-compose version
+7.  Publish the release on GitHub.
 
-14. Publish the release on GitHub.
+8.  Check that both binaries download (following the install instructions) and run.
 
-15. Check that both binaries download (following the install instructions) and run.
-
-16. Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+9.  Email maintainers@dockerproject.org and engineering@docker.com about the new release.
 
 ## If it’s a stable release (not an RC)
 

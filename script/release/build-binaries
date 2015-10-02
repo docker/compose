@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# Build the release binaries
+#
+
+. "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
+
+REPO=docker/compose
+
+# Build the binaries
+script/clean
+script/build-linux
+# TODO: build osx binary
+# script/prepare-osx
+# script/build-osx
+# TODO: build or fetch the windows binary
+echo "You need to build the osx/windows binaries, that step is not automated yet."
+
+echo "Create a github release"
+# TODO: script more of this https://developer.github.com/v3/repos/releases/
+browser https://github.com/$REPO/releases/new
