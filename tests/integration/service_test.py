@@ -597,8 +597,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertNotIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_stopped_containers_and_needing_creation(self, mock_stdout):
+    def test_scale_with_stopped_containers_and_needing_creation(self):
         """
         Given there are some stopped containers and scale is called with a
         desired number that is greater than the number of stopped containers,
@@ -611,7 +610,8 @@ class ServiceTest(DockerClientTestCase):
         for container in service.containers():
             self.assertFalse(container.is_running)
 
-        service.scale(2)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            service.scale(2)
 
         self.assertEqual(len(service.containers()), 2)
         for container in service.containers():
@@ -621,8 +621,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_api_returns_errors(self, mock_stdout):
+    def test_scale_with_api_returns_errors(self):
         """
         Test that when scaling if the API returns an error, that error is handled
         and the remaining threads continue.
@@ -635,7 +634,8 @@ class ServiceTest(DockerClientTestCase):
             'compose.container.Container.create',
                 side_effect=APIError(message="testing", response={}, explanation="Boom")):
 
-            service.scale(3)
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                service.scale(3)
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
