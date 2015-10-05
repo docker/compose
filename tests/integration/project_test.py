@@ -67,7 +67,7 @@ class ProjectTest(DockerClientTestCase):
                 'volumes_from': ['data'],
             },
         })
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
             config_data=service_dicts,
             client=self.client,
@@ -84,7 +84,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest_data_container',
             labels={LABEL_PROJECT: 'composetest'},
         )
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
             config_data=build_service_dicts({
                 'db': {
@@ -114,7 +114,7 @@ class ProjectTest(DockerClientTestCase):
         assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
             config_data=build_service_dicts({
                 'net': {
@@ -146,7 +146,7 @@ class ProjectTest(DockerClientTestCase):
         )
         net_container.start()
 
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
             config_data=build_service_dicts({
                 'web': {
@@ -334,7 +334,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     def test_project_up_starts_depends(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
             config_data=build_service_dicts({
                 'console': {
@@ -369,7 +369,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
     def test_project_up_with_no_deps(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
             config_data=build_service_dicts({
                 'console': {
