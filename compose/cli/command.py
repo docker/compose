@@ -38,10 +38,10 @@ def friendly_error_message():
                 raise errors.DockerNotFoundUbuntu()
             else:
                 raise errors.DockerNotFoundGeneric()
-        elif call_silently(['which', 'boot2docker']) == 0:
+        elif call_silently(['which', 'docker-machine']) == 0:
             raise errors.ConnectionErrorDockerMachine()
         else:
-            raise errors.ConnectionErrorGeneric(self.get_client().base_url)
+            raise errors.ConnectionErrorGeneric(get_client().base_url)
 
 
 def project_from_options(base_dir, options):
