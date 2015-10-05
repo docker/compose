@@ -47,7 +47,7 @@ class SplitBufferTest(unittest.TestCase):
         self.assert_produces(reader, [string])
 
     def assert_produces(self, reader, expectations):
-        split = split_buffer(reader(), u'\n')
+        split = split_buffer(reader())
 
         for (actual, expected) in zip(split, expectations):
             self.assertEqual(type(actual), type(expected))

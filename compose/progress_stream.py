@@ -1,5 +1,3 @@
-import json
-
 from compose import utils
 
 
@@ -14,8 +12,7 @@ def stream_output(output, stream):
     lines = {}
     diff = 0
 
-    for chunk in utils.stream_as_text(output):
-        event = json.loads(chunk)
+    for event in utils.json_stream(output):
         all_events.append(event)
 
         if 'progress' in event or 'progressDetail' in event:

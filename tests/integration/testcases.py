@@ -9,8 +9,6 @@ from compose.config.config import ServiceLoader
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
-from compose.utils import split_buffer
-from compose.utils import stream_as_text
 
 
 def pull_busybox(client):
@@ -73,5 +71,5 @@ class DockerClientTestCase(unittest.TestCase):
 
     def check_build(self, *args, **kwargs):
         kwargs.setdefault('rm', True)
-        build_output = stream_as_text(self.client.build(*args, **kwargs))
-        stream_output(split_buffer(build_output), open('/dev/null', 'w'))
+        build_output = self.client.build(*args, **kwargs)
+        stream_output(build_output, open('/dev/null', 'w'))
