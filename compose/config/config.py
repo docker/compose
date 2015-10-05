@@ -212,7 +212,7 @@ def load(config_details):
         return Config(
             version,
             load_services(config_details.working_dir, filename, service_dicts),
-            []
+            {}
         )
     elif version == 2:
         return load_v2(config_details, filename)
@@ -224,10 +224,14 @@ def load_v2(config_details, filename):
     service_dicts = [
         config_file.config.get('services', {}) for config_file in config_details.config_files
     ]
+    volumes = {}
+    for config_file in config_details.config_files:
+        for name, volume_config in config_file.config.get('volumes', {}).items():
+            volumes.update({name: volume_config})
     return Config(
         2,
         load_services(config_details.working_dir, filename, service_dicts),
-        []
+        volumes
     )
 
 
