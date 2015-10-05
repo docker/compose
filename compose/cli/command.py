@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import contextlib
 import logging
 import os
 import re
@@ -16,7 +17,6 @@ from .. import config
 from ..project import Project
 from ..service import ConfigError
 from .docker_client import docker_client
-from .docopt_command import DocoptCommand
 from .utils import call_silently
 from .utils import is_mac
 from .utils import is_ubuntu
@@ -24,40 +24,32 @@ from .utils import is_ubuntu
 log = logging.getLogger(__name__)
 
 
-class Command(DocoptCommand):
-    base_dir = '.'
-
-    def dispatch(self, *args, **kwargs):
-        try:
-            super(Command, self).dispatch(*args, **kwargs)
-        except SSLError as e:
-            raise errors.UserError('SSL error: %s' % e)
-        except ConnectionError:
-            if call_silently(['which', 'docker']) != 0:
-                if is_mac():
-                    raise errors.DockerNotFoundMac()
-                elif is_ubuntu():
-                    raise errors.DockerNotFoundUbuntu()
-                else:
-                    raise errors.DockerNotFoundGeneric()
-            elif call_silently(['which', 'boot2docker']) == 0:
-                raise errors.ConnectionErrorDockerMachine()
+@contextlib.contextmanager
+def friendly_error_message():
+    try:
+        yield
+    except SSLError as e:
+        raise errors.UserError('SSL error: %s' % e)
+    except ConnectionError:
+        if call_silently(['which', 'docker']) != 0:
+            if is_mac():
+                raise errors.DockerNotFoundMac()
+            elif is_ubuntu():
+                raise errors.DockerNotFoundUbuntu()
             else:
-                raise errors.ConnectionErrorGeneric(self.get_client().base_url)
+                raise errors.DockerNotFoundGeneric()
+        elif call_silently(['which', 'boot2docker']) == 0:
+            raise errors.ConnectionErrorDockerMachine()
+        else:
+            raise errors.ConnectionErrorGeneric(self.get_client().base_url)
 
-    def perform_command(self, options, handler, command_options):
-        if options['COMMAND'] in ('help', 'version'):
-            # Skip looking up the compose file.
-            handler(None, command_options)
-            return
 
-        project = get_project(
-            self.base_dir,
-            get_config_path(options.get('--file')),
-            project_name=options.get('--project-name'),
-            verbose=options.get('--verbose'))
-
-        handler(project, command_options)
+def project_from_options(base_dir, options):
+    return get_project(
+        base_dir,
+        get_config_path(options.get('--file')),
+        project_name=options.get('--project-name'),
+        verbose=options.get('--verbose'))
 
 
 def get_config_path(file_option):
