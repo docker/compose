@@ -1,0 +1,19 @@
+sudo: required
+
+language: python
+
+services:
+  - docker
+
+matrix:
+  include:
+    - os: linux
+    - os: osx
+      language: generic
+
+
+install: ./script/travis/install
+
+script:
+  - ./script/travis/ci
+  - ./script/travis/build-binary

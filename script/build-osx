@@ -3,7 +3,6 @@ set -ex
 
 PATH="/usr/local/bin:$PATH"
 
-./script/clean
 rm -rf venv
 
 virtualenv -p /usr/local/bin/python venv

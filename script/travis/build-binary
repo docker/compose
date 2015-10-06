@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -e
+
+if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+    script/build-linux
+    # TODO: add script/build-image
+else
+    script/prepare-osx
+    script/build-osx
+fi
