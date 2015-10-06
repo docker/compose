@@ -10,13 +10,15 @@ docker run --rm \
   --entrypoint="tox" \
   "$TAG" -e pre-commit
 
-ALL_DOCKER_VERSIONS="1.7.1 1.8.2"
-DEFAULT_DOCKER_VERSION="1.8.2"
+get_versions="docker run --rm
+    --entrypoint=/code/.tox/py27/bin/python
+    $TAG
+    /code/script/versions.py docker/docker"
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="$DEFAULT_DOCKER_VERSION"
+  DOCKER_VERSIONS="$($get_versions default)"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
-  DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
+  DOCKER_VERSIONS="$($get_versions recent -n 2)"
 fi
 
 
