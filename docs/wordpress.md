@@ -55,7 +55,7 @@ and a separate MySQL instance:
       environment:
         MYSQL_DATABASE: wordpress
 
-Two supporting files are needed to get this working - first, `wp-config.php` is
+A supporting file is needed to get this working. `wp-config.php` is
 the standard WordPress config file with a single change to point the database
 configuration at the `db` container:
 
@@ -84,25 +84,6 @@ configuration at the `db` container:
         define('ABSPATH', dirname(__FILE__) . '/');
 
     require_once(ABSPATH . 'wp-settings.php');
-
-Second, `router.php` tells PHP's built-in web server how to run WordPress:
-
-    <?php
-
-    $root = $_SERVER['DOCUMENT_ROOT'];
-    chdir($root);
-    $path = '/'.ltrim(parse_url($_SERVER['REQUEST_URI'])['path'],'/');
-    set_include_path(get_include_path().':'.__DIR__);
-    if(file_exists($root.$path))
-    {
-        if(is_dir($root.$path) && substr($path,strlen($path) - 1, 1) !== '/')
-            $path = rtrim($path,'/').'/index.php';
-        if(strpos($path,'.php') === false) return false;
-        else {
-            chdir(dirname($root.$path));
-            require_once $root.$path;
-        }
-    }else include_once 'index.php';
 
 ### Build the project
 
