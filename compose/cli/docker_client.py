@@ -9,7 +9,7 @@ from ..const import HTTP_TIMEOUT
 log = logging.getLogger(__name__)
 
 
-DEFAULT_API_VERSION = '1.20'
+DEFAULT_API_VERSION = '1.21'
 
 
 def docker_client(version=None):
