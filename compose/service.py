@@ -986,16 +986,18 @@ def parse_volume_spec(volume_config):
 
 
 def build_volume_from(volume_from_spec):
-    volumes_from = []
+    """
+    volume_from can be either a service or a container. We want to return the
+    container.id and format it into a string complete with the mode.
+    """
     if isinstance(volume_from_spec.source, Service):
         containers = volume_from_spec.source.containers(stopped=True)
         if not containers:
-            volumes_from = ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
+            return ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
         else:
-            volumes_from = ["{}:{}".format(container.id, volume_from_spec.mode) for container in containers]
+            return ["{}:{}".format(container.id, volume_from_spec.mode) for container in containers]
     elif isinstance(volume_from_spec.source, Container):
-        volumes_from = ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
-    return volumes_from
+        return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
 
 
 def parse_volume_from_spec(volume_from_config):
