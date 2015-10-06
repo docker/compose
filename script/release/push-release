@@ -46,6 +46,9 @@ git push $GITHUB_REPO $VERSION
 echo "Uploading sdist to pypi"
 python setup.py sdist
 
+echo "Uploading the docker image"
+docker push docker/compose:$VERSION
+
 if [ "$(command -v twine 2> /dev/null)" ]; then
     twine upload ./dist/docker-compose-${VERSION}.tar.gz
 else

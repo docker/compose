@@ -80,7 +80,7 @@ When prompted build the non-linux binaries and test them.
 
         ...release notes go here...
 
-5.  Attach the binaries.
+5.  Attach the binaries and `script/run.sh`
 
 6. If everything looks good, it's time to push the release.
 
