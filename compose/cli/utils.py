@@ -7,7 +7,6 @@ import platform
 import ssl
 import subprocess
 
-import six
 from docker import version as docker_py_version
 from six.moves import input
 
@@ -34,31 +33,6 @@ def yesno(prompt, default=None):
         return default
     else:
         return None
-
-
-def split_buffer(reader, separator):
-    """
-    Given a generator which yields strings and a separator string,
-    joins all input, splits on the separator and yields each chunk.
-
-    Unlike string.split(), each chunk includes the trailing
-    separator, except for the last one if none was found on the end
-    of the input.
-    """
-    buffered = six.text_type('')
-    separator = six.text_type(separator)
-
-    for data in reader:
-        buffered += data.decode('utf-8')
-        while True:
-            index = buffered.find(separator)
-            if index == -1:
-                break
-            yield buffered[:index + 1]
-            buffered = buffered[index + 1:]
-
-    if len(buffered) > 0:
-        yield buffered
 
 
 def call_silently(*args, **kwargs):

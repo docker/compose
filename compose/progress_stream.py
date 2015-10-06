@@ -1,7 +1,3 @@
-import json
-
-import six
-
 from compose import utils
 
 
@@ -16,10 +12,7 @@ def stream_output(output, stream):
     lines = {}
     diff = 0
 
-    for chunk in output:
-        if six.PY3:
-            chunk = chunk.decode('utf-8')
-        event = json.loads(chunk)
+    for event in utils.json_stream(output):
         all_events.append(event)
 
         if 'progress' in event or 'progressDetail' in event:

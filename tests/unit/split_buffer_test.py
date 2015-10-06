@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from .. import unittest
-from compose.cli.utils import split_buffer
+from compose.utils import split_buffer
 
 
 class SplitBufferTest(unittest.TestCase):
@@ -47,7 +47,7 @@ class SplitBufferTest(unittest.TestCase):
         self.assert_produces(reader, [string])
 
     def assert_produces(self, reader, expectations):
-        split = split_buffer(reader(), u'\n')
+        split = split_buffer(reader())
 
         for (actual, expected) in zip(split, expectations):
             self.assertEqual(type(actual), type(expected))

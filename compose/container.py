@@ -212,9 +212,6 @@ class Container(object):
     def attach(self, *args, **kwargs):
         return self.client.attach(self.id, *args, **kwargs)
 
-    def attach_socket(self, **kwargs):
-        return self.client.attach_socket(self.id, **kwargs)
-
     def __repr__(self):
         return '<Container: %s (%s)>' % (self.name, self.id[:6])
 
