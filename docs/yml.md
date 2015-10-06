@@ -346,8 +346,8 @@ should always begin with `.` or `..`.
 
 ### volumes_from
 
-Mount all of the volumes from another service or container, with the
-supported flags by docker : ``ro``, ``rw``.
+Mount all of the volumes from another service or container, optionally
+specifying read-only access(``ro``) or read-write(``rw``).
 
     volumes_from:
      - service_name
