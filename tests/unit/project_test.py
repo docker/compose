@@ -211,7 +211,7 @@ class ProjectTest(unittest.TestCase):
                 'volumes_from': ['vol']
             }
         ], None)
-        self.assertEqual(project.get_service('test')._get_volumes_from(), [cid + ':rw' for cid in container_ids])
+        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_ids[0] + ':rw'])
 
     def test_net_unset(self):
         project = Project.from_dicts('test', [

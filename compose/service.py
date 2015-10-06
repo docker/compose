@@ -994,8 +994,9 @@ def build_volume_from(volume_from_spec):
         containers = volume_from_spec.source.containers(stopped=True)
         if not containers:
             return ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
-        else:
-            return ["{}:{}".format(container.id, volume_from_spec.mode) for container in containers]
+
+        container = containers[0]
+        return ["{}:{}".format(container.id, volume_from_spec.mode)]
     elif isinstance(volume_from_spec.source, Container):
         return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
 

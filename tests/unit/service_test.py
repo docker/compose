@@ -98,7 +98,7 @@ class ServiceTest(unittest.TestCase):
         ]
         service = Service('test', volumes_from=[VolumeFromSpec(from_service, 'rw')], image='foo')
 
-        self.assertEqual(service._get_volumes_from(), [cid + ":rw" for cid in container_ids])
+        self.assertEqual(service._get_volumes_from(), [container_ids[0] + ":rw"])
 
     def test_get_volumes_from_service_container_exists_with_flags(self):
         for mode in ['ro', 'rw', 'z', 'rw,z', 'z,rw']:
@@ -110,7 +110,7 @@ class ServiceTest(unittest.TestCase):
             ]
             service = Service('test', volumes_from=[VolumeFromSpec(from_service, mode)], image='foo')
 
-            self.assertEqual(service._get_volumes_from(), container_ids)
+            self.assertEqual(service._get_volumes_from(), [container_ids[0]])
 
     def test_get_volumes_from_service_no_container(self):
         container_id = 'abababab'
