@@ -17,3 +17,13 @@ install: ./script/travis/install
 script:
   - ./script/travis/ci
   - ./script/travis/build-binary
+
+before_deploy:
+  - "./script/travis/render-bintray-config.py < ./script/travis/bintray.json.tmpl > ./bintray.json"
+
+deploy:
+  provider: bintray
+  user: docker-compose-roleuser
+  key: '$BINTRAY_API_KEY'
+  file: ./bintray.json
+  skip_cleanup: true
