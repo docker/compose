@@ -23,7 +23,9 @@ from ..project import NoSuchService
 from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import NeedsBuildError
-from .command import Command
+from .command import friendly_error_message
+from .command import project_from_options
+from .docopt_command import DocoptCommand
 from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import Formatter
@@ -89,6 +91,15 @@ def setup_logging():
     logging.getLogger("requests").propagate = False
 
 
+def setup_console_handler(verbose):
+    if verbose:
+        console_handler.setFormatter(logging.Formatter('%(name)s.%(funcName)s: %(message)s'))
+        console_handler.setLevel(logging.DEBUG)
+    else:
+        console_handler.setFormatter(logging.Formatter())
+        console_handler.setLevel(logging.INFO)
+
+
 # stolen from docopt master
 def parse_doc_section(name, source):
     pattern = re.compile('^([^\n]*' + name + '[^\n]*\n?(?:[ \t].*?(?:\n|$))*)',
@@ -96,7 +107,7 @@ def parse_doc_section(name, source):
     return [s.strip() for s in pattern.findall(source)]
 
 
-class TopLevelCommand(Command):
+class TopLevelCommand(DocoptCommand):
     """Define and run multi-container applications with Docker.
 
     Usage:
@@ -130,20 +141,24 @@ class TopLevelCommand(Command):
       version            Show the Docker-Compose version information
 
     """
+    base_dir = '.'
+
     def docopt_options(self):
         options = super(TopLevelCommand, self).docopt_options()
         options['version'] = get_version_info('compose')
         return options
 
-    def perform_command(self, options, *args, **kwargs):
-        if options.get('--verbose'):
-            console_handler.setFormatter(logging.Formatter('%(name)s.%(funcName)s: %(message)s'))
-            console_handler.setLevel(logging.DEBUG)
-        else:
-            console_handler.setFormatter(logging.Formatter())
-            console_handler.setLevel(logging.INFO)
+    def perform_command(self, options, handler, command_options):
+        setup_console_handler(options.get('--verbose'))
 
-        return super(TopLevelCommand, self).perform_command(options, *args, **kwargs)
+        if options['COMMAND'] in ('help', 'version'):
+            # Skip looking up the compose file.
+            handler(None, command_options)
+            return
+
+        project = project_from_options(self.base_dir, options)
+        with friendly_error_message():
+            handler(project, command_options)
 
     def build(self, project, options):
         """
