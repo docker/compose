@@ -52,32 +52,32 @@ class CLITestCase(DockerClientTestCase):
         self.command.base_dir = old_base_dir
 
     # TODO: address the "Inappropriate ioctl for device" warnings in test output
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_ps(self, mock_stdout):
+    def test_ps(self):
         self.project.get_service('simple').create_container()
-        self.command.dispatch(['ps'], None)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps'], None)
         self.assertIn('simplecomposefile_simple_1', mock_stdout.getvalue())
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_ps_default_composefile(self, mock_stdout):
+    def test_ps_default_composefile(self):
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
-        self.command.dispatch(['up', '-d'], None)
-        self.command.dispatch(['ps'], None)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['up', '-d'], None)
+            self.command.dispatch(['ps'], None)
 
         output = mock_stdout.getvalue()
         self.assertIn('multiplecomposefiles_simple_1', output)
         self.assertIn('multiplecomposefiles_another_1', output)
         self.assertNotIn('multiplecomposefiles_yetanother_1', output)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_ps_alternate_composefile(self, mock_stdout):
+    def test_ps_alternate_composefile(self):
         config_path = os.path.abspath(
             'tests/fixtures/multiple-composefiles/compose2.yml')
         self._project = get_project(self.command.base_dir, [config_path])
 
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
-        self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
-        self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
+            self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
 
         output = mock_stdout.getvalue()
         self.assertNotIn('multiplecomposefiles_simple_1', output)
@@ -105,54 +105,51 @@ class CLITestCase(DockerClientTestCase):
         mock_logging.info.assert_any_call('Pulling another (nonexisting-image:latest)...')
         mock_logging.error.assert_any_call('Error: image library/nonexisting-image:latest not found')
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_build_plain(self, mock_stdout):
+    def test_build_plain(self):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
 
-        mock_stdout.truncate(0)
         cache_indicator = 'Using cache'
         pull_indicator = 'Status: Image is up to date for busybox:latest'
-        self.command.dispatch(['build', 'simple'], None)
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['build', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertIn(cache_indicator, output)
         self.assertNotIn(pull_indicator, output)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_build_no_cache(self, mock_stdout):
+    def test_build_no_cache(self):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
 
-        mock_stdout.truncate(0)
         cache_indicator = 'Using cache'
         pull_indicator = 'Status: Image is up to date for busybox:latest'
-        self.command.dispatch(['build', '--no-cache', 'simple'], None)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['build', '--no-cache', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
         self.assertNotIn(pull_indicator, output)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_build_pull(self, mock_stdout):
+    def test_build_pull(self):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
 
-        mock_stdout.truncate(0)
         cache_indicator = 'Using cache'
         pull_indicator = 'Status: Image is up to date for busybox:latest'
-        self.command.dispatch(['build', '--pull', 'simple'], None)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['build', '--pull', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertIn(cache_indicator, output)
         self.assertIn(pull_indicator, output)
 
-    @mock.patch('sys.stdout', new_callable=StringIO)
-    def test_build_no_cache_pull(self, mock_stdout):
+    def test_build_no_cache_pull(self):
         self.command.base_dir = 'tests/fixtures/simple-dockerfile'
         self.command.dispatch(['build', 'simple'], None)
 
-        mock_stdout.truncate(0)
         cache_indicator = 'Using cache'
         pull_indicator = 'Status: Image is up to date for busybox:latest'
-        self.command.dispatch(['build', '--no-cache', '--pull', 'simple'], None)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['build', '--no-cache', '--pull', 'simple'], None)
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
         self.assertIn(pull_indicator, output)
