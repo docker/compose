@@ -6,6 +6,7 @@ from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
 from compose.service import ConvergenceStrategy
+from compose.service import VolumeFromSpec
 
 
 def build_service_dicts(service_config):
@@ -72,7 +73,7 @@ class ProjectTest(DockerClientTestCase):
         )
         db = project.get_service('db')
         data = project.get_service('data')
-        self.assertEqual(db.volumes_from, [data])
+        self.assertEqual(db.volumes_from, [VolumeFromSpec(data, 'rw')])
 
     def test_volumes_from_container(self):
         data_container = Container.create(
@@ -93,7 +94,7 @@ class ProjectTest(DockerClientTestCase):
             client=self.client,
         )
         db = project.get_service('db')
-        self.assertEqual(db.volumes_from, [data_container])
+        self.assertEqual(db._get_volumes_from(), [data_container.id + ':rw'])
 
     def test_net_from_service(self):
         project = Project.from_dicts(

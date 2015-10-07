@@ -346,11 +346,13 @@ should always begin with `.` or `..`.
 
 ### volumes_from
 
-Mount all of the volumes from another service or container.
+Mount all of the volumes from another service or container, optionally
+specifying read-only access(``ro``) or read-write(``rw``).
 
     volumes_from:
      - service_name
      - container_name
+     - service_name:rw
 
 ### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, volume\_driver, working\_dir
 

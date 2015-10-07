@@ -83,6 +83,9 @@ class NoSuchImageError(Exception):
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
+VolumeFromSpec = namedtuple('VolumeFromSpec', 'source mode')
+
+
 ServiceName = namedtuple('ServiceName', 'project service number')
 
 
@@ -520,7 +523,7 @@ class Service(object):
         return [(service.name, alias) for service, alias in self.links]
 
     def get_volumes_from_names(self):
-        return [s.name for s in self.volumes_from if isinstance(s, Service)]
+        return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
     def get_container_name(self, number, one_off=False):
         # TODO: Implement issue #652 here
@@ -560,16 +563,9 @@ class Service(object):
 
     def _get_volumes_from(self):
         volumes_from = []
-        for volume_source in self.volumes_from:
-            if isinstance(volume_source, Service):
-                containers = volume_source.containers(stopped=True)
-                if not containers:
-                    volumes_from.append(volume_source.create_container().id)
-                else:
-                    volumes_from.extend(map(attrgetter('id'), containers))
-
-            elif isinstance(volume_source, Container):
-                volumes_from.append(volume_source.id)
+        for volume_from_spec in self.volumes_from:
+            volumes = build_volume_from(volume_from_spec)
+            volumes_from.extend(volumes)
 
         return volumes_from
 
@@ -988,6 +984,38 @@ def parse_volume_spec(volume_config):
         mode = parts[2]
 
     return VolumeSpec(external, internal, mode)
+
+
+def build_volume_from(volume_from_spec):
+    """
+    volume_from can be either a service or a container. We want to return the
+    container.id and format it into a string complete with the mode.
+    """
+    if isinstance(volume_from_spec.source, Service):
+        containers = volume_from_spec.source.containers(stopped=True)
+        if not containers:
+            return ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
+
+        container = containers[0]
+        return ["{}:{}".format(container.id, volume_from_spec.mode)]
+    elif isinstance(volume_from_spec.source, Container):
+        return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
+
+
+def parse_volume_from_spec(volume_from_config):
+    parts = volume_from_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Volume %s has incorrect format, should be "
+                          "external:internal[:mode]" % volume_from_config)
+
+    if len(parts) == 1:
+        source = parts[0]
+        mode = 'rw'
+    else:
+        source, mode = parts
+
+    return VolumeFromSpec(source, mode)
+
 
 # Labels
 
