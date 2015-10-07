@@ -68,7 +68,7 @@ To install Compose, do the following:
 Compose can also be run inside a container, from a small bash script wrapper.
 To install compose as a container run:
 
-    $ curl -L https://github.com/docker/compose/releases/download/1.5.0/compose-run > /usr/local/bin/docker-compose
+    $ curl -L https://github.com/docker/compose/releases/download/1.5.0/run.sh > /usr/local/bin/docker-compose
     $ chmod +x /usr/local/bin/docker-compose
 
 

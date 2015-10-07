@@ -5,6 +5,19 @@
 
 . "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
+function usage() {
+    >&2 cat << EOM
+Build binaries for the release.
+
+This script requires that 'git config branch.${BRANCH}.release' is set to the
+release version for the release branch.
+
+EOM
+    exit 1
+}
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+VERSION="$(git config "branch.${BRANCH}.release")" || usage
 REPO=docker/compose
 
 # Build the binaries
@@ -15,6 +28,9 @@ script/build-linux
 # script/build-osx
 # TODO: build or fetch the windows binary
 echo "You need to build the osx/windows binaries, that step is not automated yet."
+
+echo "Building the container distribution"
+script/build-image $VERSION
 
 echo "Create a github release"
 # TODO: script more of this https://developer.github.com/v3/repos/releases/
