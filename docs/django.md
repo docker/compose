@@ -64,9 +64,8 @@ and a `docker-compose.yml` file.
 
     The `docker-compose.yml` file describes the services that make your app. In
     this example those services are a web server and database.  The compose file
-    also describes which Docker images these services use, how they link
-    together, any volumes they might need mounted inside the containers.
-    Finally, the `docker-compose.yml` file describes which ports these services
+    also describes which Docker images these services use, any volumes they might
+    need mounted inside the containers, and any ports they might
     expose. See the [`docker-compose.yml` reference](yml.md) for more
     information on how this file works.
 
@@ -81,8 +80,6 @@ and a `docker-compose.yml` file.
             - .:/code
           ports:
             - "8000:8000"
-          links:
-            - db
 
     This file defines two services: The `db` service and the `web` service.
 
