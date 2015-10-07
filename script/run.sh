@@ -15,9 +15,8 @@
 
 set -e
 
-VERSION="1.4.0dev"
-# TODO: move this to an official repo
-IMAGE="dnephin/docker-compose:$VERSION"
+VERSION="1.5.0"
+IMAGE="docker/compose:$VERSION"
 
 
 # Setup options for connecting to docker host

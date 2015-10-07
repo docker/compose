@@ -61,9 +61,10 @@ git checkout -b $BRANCH $BASE_VERSION
 git config "branch.${BRANCH}.release" $VERSION
 
 
-echo "Update versions in docs/install.md and compose/__init__.py"
+echo "Update versions in docs/install.md, compose/__init__.py, script/run.sh"
 $EDITOR docs/install.md
 $EDITOR compose/__init__.py
+$EDITOR script/run.sh
 
 
 echo "Write release notes in CHANGELOG.md"
