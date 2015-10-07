@@ -84,6 +84,29 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplecomposefiles_another_1', output)
         self.assertIn('multiplecomposefiles_yetanother_1', output)
 
+    def test_ls_default_composefile(self):
+        self.command.base_dir = 'tests/fixtures/multiple-composefiles'
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ls'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertIn('simple', output)
+        self.assertIn('another', output)
+        self.assertNotIn('yetanother', output)
+
+    def test_ls_alternate_composefile(self):
+        config_path = os.path.abspath(
+            'tests/fixtures/multiple-composefiles/compose2.yml')
+        self._project = get_project(self.command.base_dir, [config_path])
+
+        self.command.base_dir = 'tests/fixtures/multiple-composefiles'
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['-f', 'compose2.yml', 'ls'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertNotIn('simple', output)
+        self.assertIn('yetanother', output)
+
     @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
         self.command.dispatch(['pull'], None)

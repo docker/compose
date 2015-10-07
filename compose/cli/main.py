@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
+import os
 import re
 import signal
 import sys
@@ -124,6 +125,7 @@ class TopLevelCommand(DocoptCommand):
       build              Build or rebuild services
       help               Get help on a command
       kill               Kill containers
+      ls                 List available services
       logs               View output from containers
       pause              Pause services
       port               Print the public port for a port binding
@@ -200,6 +202,36 @@ class TopLevelCommand(DocoptCommand):
         signal = options.get('-s', 'SIGKILL')
 
         project.kill(service_names=options['SERVICE'], signal=signal)
+
+    def ls(self, project, options):
+        """
+        List available services.
+
+        Usage: ls [options]
+        """
+        services = sorted(project.get_services(), key=attrgetter('name'))
+        for item in dir(services[0]):
+            print(item + " " + str(getattr(services[0], item)))
+
+        headers = ['Name', 'Links', 'Source']
+        rows = []
+        for service in services:
+            if service.links:
+                links = " ".join([link[1] for link in service.links])
+            else:
+                links = "--"
+
+            dockerfile = service.options.get('dockerfile')
+            build = service.options.get('build')
+            if build and dockerfile:
+                source = os.path.join(build, dockerfile)
+                if source.startswith(os.getcwd()):
+                    source = source[len(os.getcwd())+1:]
+            else:
+                source = service.image_name
+
+            rows.append((service.name, links, source))
+        print(Formatter().table(headers, rows))
 
     def logs(self, project, options):
         """
