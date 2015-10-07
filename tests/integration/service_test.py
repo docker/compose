@@ -217,7 +217,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn(container_path, volumes)
 
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
-        actual_host_path = volumes[container_path]
+        actual_host_path = container.get_mount(container_path)['Source']
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
@@ -228,10 +228,10 @@ class ServiceTest(DockerClientTestCase):
         """
         service = self.create_service('data', volumes=['/data/'])
         old_container = create_and_start_container(service)
-        volume_path = old_container.get('Volumes')['/data']
+        volume_path = old_container.get_mount('/data')['Source']
 
         new_container = service.recreate_container(old_container)
-        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+        self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
     def test_duplicate_volume_trailing_slash(self):
         """
@@ -305,7 +305,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.name, 'composetest_db_1')
         old_container.start()
         old_container.inspect()  # reload volume data
-        volume_path = old_container.get('Volumes')['/etc']
+        volume_path = old_container.get_mount('/etc')['Source']
 
         num_containers_before = len(self.client.containers(all=True))
 
@@ -317,7 +317,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=2', new_container.get('Config.Env'))
         self.assertEqual(new_container.name, 'composetest_db_1')
-        self.assertEqual(new_container.get('Volumes')['/etc'], volume_path)
+        self.assertEqual(new_container.get_mount('/etc')['Source'], volume_path)
         self.assertIn(
             'affinity:container==%s' % old_container.id,
             new_container.get('Config.Env'))
@@ -360,8 +360,10 @@ class ServiceTest(DockerClientTestCase):
         )
 
         old_container = create_and_start_container(service)
-        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
-        volume_path = old_container.get('Volumes')['/data']
+        self.assertEqual(
+            [mount['Destination'] for mount in old_container.get('Mounts')], ['/data']
+        )
+        volume_path = old_container.get_mount('/data')['Source']
 
         new_container, = service.execute_convergence_plan(
             ConvergencePlan('recreate', [old_container]))
