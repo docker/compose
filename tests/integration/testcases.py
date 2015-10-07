@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from docker import errors
+from docker.utils import version_lt
+from pytest import skip
 
 from .. import unittest
 from compose.cli.docker_client import docker_client
@@ -73,3 +75,12 @@ class DockerClientTestCase(unittest.TestCase):
         kwargs.setdefault('rm', True)
         build_output = self.client.build(*args, **kwargs)
         stream_output(build_output, open('/dev/null', 'w'))
+
+    def require_engine_version(self, minimum):
+        # Drop '-dev' or '-rcN' suffix
+        engine = self.client.version()['Version'].split('-', 1)[0]
+        if version_lt(engine, minimum):
+            skip(
+                "Engine version is too low ({} < {})"
+                .format(engine, minimum)
+            )

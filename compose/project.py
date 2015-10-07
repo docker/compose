@@ -77,10 +77,12 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client):
+    def __init__(self, name, services, client, use_networking=False, network_driver=None):
         self.name = name
         self.services = services
         self.client = client
+        self.use_networking = use_networking
+        self.network_driver = network_driver or 'bridge'
 
     def labels(self, one_off=False):
         return [
@@ -89,11 +91,15 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, service_dicts, client, use_networking=False, network_driver=None):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
-        project = cls(name, [], client)
+        project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
+
+        if use_networking:
+            remove_links(service_dicts)
+
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
@@ -103,6 +109,7 @@ class Project(object):
                 Service(
                     client=client,
                     project=name,
+                    use_networking=use_networking,
                     links=links,
                     net=net,
                     volumes_from=volumes_from,
@@ -207,6 +214,8 @@ class Project(object):
     def get_net(self, service_dict):
         net = service_dict.pop('net', None)
         if not net:
+            if self.use_networking:
+                return Net(self.name)
             return Net(None)
 
         net_name = get_service_name_from_net(net)
@@ -289,6 +298,9 @@ class Project(object):
 
         plans = self._get_convergence_plans(services, strategy)
 
+        if self.use_networking:
+            self.ensure_network_exists()
+
         return [
             container
             for service in services
@@ -350,6 +362,26 @@ class Project(object):
 
         return [c for c in containers if matches_service_names(c)]
 
+    def get_network(self):
+        networks = self.client.networks(names=[self.name])
+        if networks:
+            return networks[0]
+        return None
+
+    def ensure_network_exists(self):
+        # TODO: recreate network if driver has changed?
+        if self.get_network() is None:
+            log.info(
+                'Creating network "{}" with driver "{}"'
+                .format(self.name, self.network_driver)
+            )
+            self.client.create_network(self.name, driver=self.network_driver)
+
+    def remove_network(self):
+        network = self.get_network()
+        if network:
+            self.client.remove_network(network['id'])
+
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
 
@@ -363,6 +395,26 @@ class Project(object):
 
         dep_services.append(service)
         return acc + dep_services
+
+
+def remove_links(service_dicts):
+    services_with_links = [s for s in service_dicts if 'links' in s]
+    if not services_with_links:
+        return
+
+    if len(services_with_links) == 1:
+        prefix = '"{}" defines'.format(services_with_links[0]['name'])
+    else:
+        prefix = 'Some services ({}) define'.format(
+            ", ".join('"{}"'.format(s['name']) for s in services_with_links))
+
+    log.warn(
+        '\n{} links, which are not compatible with Docker networking and will be ignored.\n'
+        'Future versions of Docker will not support links - you should remove them for '
+        'forwards-compatibility.\n'.format(prefix))
+
+    for s in services_with_links:
+        del s['links']
 
 
 class NoSuchService(Exception):

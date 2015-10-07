@@ -49,7 +49,10 @@ def project_from_options(base_dir, options):
         base_dir,
         get_config_path(options.get('--file')),
         project_name=options.get('--project-name'),
-        verbose=options.get('--verbose'))
+        verbose=options.get('--verbose'),
+        use_networking=options.get('--x-networking'),
+        network_driver=options.get('--x-network-driver'),
+    )
 
 
 def get_config_path(file_option):
@@ -76,14 +79,18 @@ def get_client(verbose=False):
     return client
 
 
-def get_project(base_dir, config_path=None, project_name=None, verbose=False):
+def get_project(base_dir, config_path=None, project_name=None, verbose=False,
+                use_networking=False, network_driver=None):
     config_details = config.find(base_dir, config_path)
 
     try:
         return Project.from_dicts(
             get_project_name(config_details.working_dir, project_name),
             config.load(config_details),
-            get_client(verbose=verbose))
+            get_client(verbose=verbose),
+            use_networking=use_networking,
+            network_driver=network_driver,
+        )
     except ConfigError as e:
         raise errors.UserError(six.text_type(e))
 

@@ -112,6 +112,7 @@ class Service(object):
         name,
         client=None,
         project='default',
+        use_networking=False,
         links=None,
         volumes_from=None,
         net=None,
@@ -123,6 +124,7 @@ class Service(object):
         self.name = name
         self.client = client
         self.project = project
+        self.use_networking = use_networking
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.net = net or Net(None)
@@ -600,6 +602,9 @@ class Service(object):
             parts = container_options['hostname'].partition('.')
             container_options['hostname'] = parts[0]
             container_options['domainname'] = parts[2]
+
+        if 'hostname' not in container_options and self.use_networking:
+            container_options['hostname'] = self.name
 
         if 'ports' in container_options or 'expose' in self.options:
             ports = []

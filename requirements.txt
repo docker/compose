@@ -1,8 +1,8 @@
 PyYAML==3.10
-docker-py==1.4.0
 dockerpty==0.3.4
 docopt==0.6.1
 enum34==1.0.4
+git+https://github.com/aanand/docker-py.git@1df3226c9bd9d2e8ff79d5929741c1e8f1a92b0d#egg=docker-py
 jsonschema==2.5.1
 requests==2.7.0
 six==1.7.3
