@@ -9,7 +9,7 @@ parent = "smn_compose_cli"
 +++
 <![end-metadata]-->
 
-# ps
+# ls
 
 ```
 Usage: ls [options]
