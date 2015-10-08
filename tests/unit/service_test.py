@@ -614,6 +614,33 @@ class ServiceVolumesTest(unittest.TestCase):
                 '/removed/volume': '/var/lib/docker/bbbbbbbb',
                 '/mnt/image/data': '/var/lib/docker/cccccccc',
             },
+            'Mounts': [
+                {
+                    'Source': '/host/volume',
+                    'Destination': '/host/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'hostvolume',
+                }, {
+                    'Source': '/var/lib/docker/aaaaaaaa',
+                    'Destination': '/existing/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'existingvolume',
+                }, {
+                    'Source': '/var/lib/docker/bbbbbbbb',
+                    'Destination': '/removed/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'removedvolume',
+                }, {
+                    'Source': '/var/lib/docker/cccccccc',
+                    'Destination': '/mnt/image/data',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'imagedata',
+                },
+            ]
         }, has_been_inspected=True)
 
         expected = {
@@ -638,6 +665,13 @@ class ServiceVolumesTest(unittest.TestCase):
 
         intermediate_container = Container(self.mock_client, {
             'Image': 'ababab',
+            'Mounts': [{
+                'Source': '/var/lib/docker/aaaaaaaa',
+                'Destination': '/existing/volume',
+                'Mode': '',
+                'RW': True,
+                'Name': 'existingvolume',
+            }],
             'Volumes': {'/existing/volume': '/var/lib/docker/aaaaaaaa'},
         }, has_been_inspected=True)
 
@@ -704,6 +738,16 @@ class ServiceVolumesTest(unittest.TestCase):
             'Volumes': {
                 '/data': '/mnt/sda1/host/path',
             },
+            'Mounts': [
+                {
+                    'Destination': '/data',
+                    'Source': '/mnt/sda1/host/path',
+                    'Mode': '',
+                    'RW': True,
+                    'Driver': 'local',
+                    'Name': 'abcdefff1234'
+                },
+            ]
         }
 
         service._get_container_create_options(
