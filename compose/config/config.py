@@ -205,7 +205,7 @@ def pre_process_config(config):
 
 def load(config_details):
     version, filename = get_config_version(config_details)
-    if not version:
+    if not version or isinstance(version, dict):
         service_dicts = [
             config_file.config for config_file in config_details.config_files
         ]
