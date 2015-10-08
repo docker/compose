@@ -66,4 +66,3 @@ Enjoy working with Compose faster and with less typos!
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
 - [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)

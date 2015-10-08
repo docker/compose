@@ -418,5 +418,3 @@ dollar sign (`$$`).
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)

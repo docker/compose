@@ -360,4 +360,3 @@ locally-defined bindings taking precedence:
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](/reference)
 - [Yaml file reference](yml.md)
-- [Compose command line completion](completion.md)
