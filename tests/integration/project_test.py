@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+import random
+
 from .testcases import DockerClientTestCase
 from compose.cli.docker_client import docker_client
 from compose.config import config
@@ -221,6 +223,84 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(web.containers()), 0)
+
+    def test_project_up_volumes(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {'driver': 'local'}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.up()
+        self.assertEqual(len(project.containers()), 1)
+
+        volume_data = self.client.inspect_volume(vol_name)
+        self.assertEqual(volume_data['Name'], vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_initialize_volumes(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {'driver': 'local'}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.initialize_volumes()
+
+        volume_data = self.client.inspect_volume(vol_name)
+        self.assertEqual(volume_data['Name'], vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_project_up_implicit_volume_driver(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.up()
+
+        volume_data = self.client.inspect_volume(vol_name)
+        self.assertEqual(volume_data['Name'], vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_project_up_invalid_volume_driver(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {'driver': 'foobar'}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        with self.assertRaises(config.ConfigurationError):
+            project.initialize_volumes()
 
     def test_project_up_starts_uncreated_services(self):
         db = self.create_service('db')

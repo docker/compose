@@ -66,7 +66,7 @@ class ConfigTest(unittest.TestCase):
         )
 
     def test_load_v2(self):
-        service_dicts = config.load(
+        config_data = config.load(
             build_config_details({
                 'version': 2,
                 'services': {
@@ -80,7 +80,9 @@ class ConfigTest(unittest.TestCase):
                     }
                 }
             }, 'working_dir', 'filename.yml')
-        ).services
+        )
+        service_dicts = config_data.services
+        volume_dict = config_data.volumes
         self.assertEqual(
             service_sort(service_dicts),
             service_sort([
@@ -95,6 +97,52 @@ class ConfigTest(unittest.TestCase):
                 }
             ])
         )
+        self.assertEqual(volume_dict, {
+            'hello': {
+                'driver': 'default',
+                'driver_opts': {'beep': 'boop'}
+            }
+        })
+
+    def test_load_service_with_name_version(self):
+        config_data = config.load(
+            build_config_details({
+                'version': {
+                    'image': 'busybox'
+                }
+            }, 'working_dir', 'filename.yml')
+        )
+        service_dicts = config_data.services
+        self.assertEqual(
+            service_sort(service_dicts),
+            service_sort([
+                {
+                    'name': 'version',
+                    'image': 'busybox',
+                }
+            ])
+        )
+
+    def test_load_invalid_version(self):
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': 18,
+                    'services': {
+                        'foo': {'image': 'busybox'}
+                    }
+                }, 'working_dir', 'filename.yml')
+            )
+
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': 'two point oh',
+                    'services': {
+                        'foo': {'image': 'busybox'}
+                    }
+                }, 'working_dir', 'filename.yml')
+            )
 
     def test_load_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
@@ -106,9 +154,18 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    def test_config_invalid_service_names(self):
         with self.assertRaises(ConfigurationError):
-            for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
+            config.load(
+                build_config_details(
+                    {'version': 2, 'services': {'web': 'busybox:latest'}},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+    def test_config_invalid_service_names(self):
+        for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
+            with self.assertRaises(ConfigurationError):
                 config.load(
                     build_config_details(
                         {invalid_name: {'image': 'busybox'}},
@@ -117,12 +174,32 @@ class ConfigTest(unittest.TestCase):
                     )
                 )
 
+            with self.assertRaises(ConfigurationError):
+                config.load(
+                    build_config_details({
+                        'version': 2,
+                        'services': {invalid_name: {'image': 'busybox'}}
+                    }, 'working_dir', 'filename.yml')
+                )
+
     def test_config_integer_service_name_raise_validation_error(self):
         expected_error_msg = "Service name: 1 needs to be a string, eg '1'"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(
                     {1: {'image': 'busybox'}},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                build_config_details(
+                    {
+                        'version': 2,
+                        'services': {1: {'image': 'busybox'}}
+                    },
                     'working_dir',
                     'filename.yml'
                 )
