@@ -205,13 +205,14 @@ Compose, please refer to the [CHANGELOG](https://github.com/docker/compose/blob/
 
 ## Getting help
 
-Docker Compose is still in its infancy and under active development. If you need
-help, would like to contribute, or simply want to talk about the project with
-like-minded individuals, we have a number of open channels for communication.
+Docker Compose is under active development. If you need help, would like to
+contribute, or simply want to talk about the project with like-minded
+individuals, we have a number of open channels for communication.
 
 * To report bugs or file feature requests: please use the [issue tracker on Github](https://github.com/docker/compose/issues).
 
-* To talk about the project with people in real time: please join the `#docker-compose` channel on IRC.
+* To talk about the project with people in real time: please join the
+  `#docker-compose` channel on freenode IRC.
 
 * To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
 
