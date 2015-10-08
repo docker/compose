@@ -17,8 +17,8 @@ This section describes the subcommands you can use with the `docker-compose` com
 
 ## Commands
 
-* [docker-compose Command](docker-compose.md)
-* [CLI Reference](index.md)
+* [docker-compose Command](/reference/docker-compose.md)
+* [CLI Reference](/reference)
 
 
 ## Environment Variables
