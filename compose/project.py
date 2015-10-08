@@ -119,7 +119,7 @@ class Project(object):
                     **service_dict))
 
         for vol_name, data in config_data.volumes.items():
-            project.services.append(
+            project.volumes.append(
                 Volume(
                     client=client, project=name, name=vol_name,
                     driver=data.get('driver'), driver_opts=data.get('driver_opts')
@@ -286,8 +286,13 @@ class Project(object):
         )
 
     def initialize_volumes(self):
-        for volume in self.volumes:
-            volume.create()
+        try:
+            for volume in self.volumes:
+                volume.create()
+        except NotFound:
+            raise ConfigurationError(
+                "Volume %s specifies nonexistent driver %s" % (volume.name, volume.driver)
+            )
 
     def restart(self, service_names=None, **options):
         for service in self.get_services(service_names):
