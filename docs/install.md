@@ -60,7 +60,14 @@ To install Compose, do the following:
 
 ### Install using pip
 
-    $ sudo pip install -U docker-compose
+Compose can be installed from [pypi](https://pypi.python.org/pypi/docker-compose)
+using `pip`.  If you install using `pip` it is highly recommended that you use a
+[virtualenv](https://virtualenv.pypa.io/en/latest/) because many operating systems
+have python system packages that conflict with docker-compose dependencies. See
+the [virtualenv tutorial](http://docs.python-guide.org/en/latest/dev/virtualenvs/)
+to get started.
+
+    $ pip install docker-compose
 
 
 ### Install as a container
