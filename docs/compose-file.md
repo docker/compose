@@ -166,44 +166,29 @@ accessible to linked services. Only the internal port can be specified.
 Extend another service, in the current file or another, optionally overriding
 configuration.
 
-Here's a simple example. Suppose we have 2 files - **common.yml** and
-**development.yml**. We can use `extends` to define a service in
-**development.yml** which uses configuration defined in **common.yml**:
+You can use `extends` on any service together with other configuration keys.
+The value must be a dictionary with the key: `service` and may optionally have
+the `file` key.
 
-**common.yml**
+    extends:
+      file: common.yml
+      service: webapp
 
-    webapp:
-      build: ./webapp
-      environment:
-        - DEBUG=false
-        - SEND_EMAILS=false
+The `file` key specifies the location of a Compose configuration file defining
+the service which is being extended. The `file` value can be an absolute or
+relative path. If you specify a relative path, Docker Compose treats it as
+relative to the location of the current file. If you don't specify a `file`,
+Compose looks in the current configuration file.
 
-**development.yml**
+The `service` key specifies the name of the service to extend, for example `web`
+or `database`.
 
-    web:
-      extends:
-        file: common.yml
-        service: webapp
-      ports:
-        - "8000:8000"
-      links:
-        - db
-      environment:
-        - DEBUG=true
-    db:
-      image: postgres
+You can extend a service that itself extends another. You can extend
+indefinitely. Compose does not support circular references and `docker-compose`
+returns an error if it encounters one.
 
-Here, the `web` service in **development.yml** inherits the configuration of
-the `webapp` service in **common.yml** - the `build` and `environment` keys -
-and adds `ports` and `links` configuration. It overrides one of the defined
-environment variables (DEBUG) with a new value, and the other one
-(SEND_EMAILS) is left untouched.
-
-The `file` key is optional, if it is not set then Compose will look for the
-service within the current file.
-
-For more on `extends`, see the [tutorial](extends.md#example) and
-[reference](extends.md#reference).
+For more on `extends`, see the
+[the extends documentation](extends.md#extending-services).
 
 ### external_links
 
