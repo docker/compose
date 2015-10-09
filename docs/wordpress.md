@@ -95,8 +95,8 @@ database containers. If you're using [Docker Machine](https://docs.docker.com/ma
 
 - [User guide](/)
 - [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
 - [Compose file reference](compose-file.md)

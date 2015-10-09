@@ -360,6 +360,7 @@ locally-defined bindings taking precedence:
 
 - [User guide](/)
 - [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)

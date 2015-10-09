@@ -173,6 +173,7 @@ In this section, you set up the database connection for Django.
 
 - [User guide](../index.md)
 - [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
