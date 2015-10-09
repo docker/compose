@@ -39,6 +39,9 @@ Once you've got a second configuration file, tell Compose to use it with the
 
     $ docker-compose -f docker-compose.yml -f production.yml up -d
 
+See [Using multiple compose files](extends.md#different-environments) for a more
+complete example.
+
 ### Deploying changes
 
 When you make changes to your app code, you'll need to rebuild your image and

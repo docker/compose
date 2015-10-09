@@ -10,16 +10,15 @@ weight=2
 <![end-metadata]-->
 
 
-## Extending services and Compose files
+# Extending services and Compose files
 
-Compose supports two ways to sharing common configuration and
-extend a service with that shared configuration.
+Compose supports two methods of sharing common configuration:
 
 1. Extending individual services with [the `extends` field](#extending-services)
 2. Extending entire compositions by
-   [exnteding compose files](#extending-compose-files)
+   [using multiple compose files](#multiple-compose-files)
 
-### Extending services
+## Extending services
 
 Docker Compose's `extends` keyword enables sharing of common configurations
 among different files, or even different projects entirely. Extending services
@@ -30,9 +29,9 @@ place and refer to it from anywhere.
 > **Note:** `links` and `volumes_from` are never shared between services using
 > `extends`. See
 > [Adding and overriding configuration](#adding-and-overriding-configuration)
-> for more information.
+ > for more information.
 
-#### Understand the extends configuration
+### Understand the extends configuration
 
 When defining any service in `docker-compose.yml`, you can declare that you are
 extending another service like this:
@@ -54,8 +53,8 @@ looks like this:
         - "/data"
 
 In this case, you'll get exactly the same result as if you wrote
-`docker-compose.yml` with that `build`, `ports` and `volumes` configuration
-defined directly under `web`.
+`docker-compose.yml` with the same `build`, `ports` and `volumes` configuration
+values defined directly under `web`.
 
 You can go further and define (or re-define) configuration locally in
 `docker-compose.yml`:
@@ -86,14 +85,14 @@ You can also write other services and link your `web` service to them:
     db:
       image: postgres
 
-#### Example use case
+### Example use case
 
 Extending an individual service is useful when you have multiple services that
-have a common configuration.  In this example we have a composition that with
-a web application and a queue worker. Both services use the same codebase and
-share many configuration options.
+have a common configuration.  The example below is a composition with
+two services: a web application and a queue worker. Both services use the same
+codebase and share many configuration options.
 
-In a **common.yml** we'll define the common configuration:
+In a **common.yml** we define the common configuration:
 
     app:
       build: .
@@ -102,9 +101,8 @@ In a **common.yml** we'll define the common configuration:
         API_KEY: xxxyyy
       cpu_shares: 5
 
-In a **docker-compose.yml** we'll define the concrete services which use the
+In a **docker-compose.yml** we define the concrete services which use the
 common configuration:
-
 
     webapp:
       extends:
@@ -121,11 +119,11 @@ common configuration:
       extends:
         file: common.yml
         service: app
-    command: /code/run_worker
-    links:
-      - queue
+      command: /code/run_worker
+      links:
+        - queue
 
-#### Adding  and overriding configuration
+### Adding and overriding configuration
 
 Compose copies configurations from the original service over to the local one,
 **except** for `links` and `volumes_from`. These exceptions exist to avoid
@@ -134,13 +132,11 @@ locally. This ensures dependencies between services are clearly visible when
 reading the current file. Defining these locally also ensures changes to the
 referenced file don't result in breakage.
 
-If a configuration option is defined in both the original service and the local
-service, the local value either *override*s or *extend*s the definition of the
-original service. This works differently for other configuration options.
+If a configuration option is defined in both the original service the local
+service, the local value *replaces* or *extends* the original value.
 
 For single-value options like `image`, `command` or `mem_limit`, the new value
-replaces the old value. **This is the default behaviour - all exceptions are
-listed below.**
+replaces the old value.
 
     # original service
     command: python app.py
@@ -195,8 +191,8 @@ For the **multi-value options** `ports`, `expose`, `external_links`, `dns` and
       - "4000"
       - "5000"
 
-In the case of `environment` and `labels`, Compose "merges" entries together
-with locally-defined values taking precedence:
+In the case of `environment`, `labels`, `volumes` and `devices`, Compose
+"merges" entries together with locally-defined values taking precedence:
 
     # original service
     environment:
@@ -214,30 +210,154 @@ with locally-defined values taking precedence:
       - BAR=local
       - BAZ=local
 
-Finally, for `volumes` and `devices`, Compose "merges" entries together with
-locally-defined bindings taking precedence:
 
-    # original service
-    volumes:
-      - /original-dir/foo:/foo
-      - /original-dir/bar:/bar
+## Multiple Compose files
 
-    # local service
-    volumes:
-      - /local-dir/bar:/bar
-      - /local-dir/baz/:baz
+Using multiple Compose files enables you to customize a composition for
+different environments or different workflows.
 
-    # result
-    volumes:
-      - /original-dir/foo:/foo
-      - /local-dir/bar:/bar
-      - /local-dir/baz/:baz
+### Understanding multiple Compose files
+
+By default, Compose reads two files, a `docker-compose.yml` and an optional
+`docker-compose.override.yml` file. By convention, the `docker-compose.yml`
+contains your base configuration. The override file, as its name implies, can
+contain configuration overrides for existing services or entirely new
+services.
+
+If a service is defined in both files, Compose merges the configurations using
+the same rules as the `extends` field (see [Adding and overriding
+configuration](#adding-and-overriding-configuration)), with one exception.  If a
+service contains `links` or `volumes_from` those fields are copied over and
+replace any values in the original service, in the same way single-valued fields
+are copied.
+
+To use multiple override files, or an override file with a different name, you
+can use the `-f` option to specify the list of files. Compose merges files in
+the order they're specified on the command line. See the [`docker-compose`
+command reference](./reference/docker-compose.md) for more information about
+using `-f`.
+
+When you use multiple configuration files, you must make sure all paths in the
+files are relative to the base Compose file (the first Compose file specified
+with `-f`). This is required because override files need not be valid
+Compose files. Override files can contain small fragments of configuration.
+Tracking which fragment of a service is relative to which path is difficult and
+confusing, so to keep paths easier to understand, all paths must be defined
+relative to the base file.
+
+### Example use case
+
+In this section are two common use cases for multiple compose files: changing a
+composition for different environments, and running administrative tasks
+against a composition.
+
+#### Different environments
+
+A common use case for multiple files is changing a development composition
+for a production-like environment (which may be production, staging or CI).
+To support these differences, you can split your Compose configuration into
+a few different files:
+
+Start with a base file that defines the canonical configuration for the
+services.
+
+**docker-compose.yml**
+
+    web:
+      image: example/my_web_app:latest
+      links:
+        - db
+        - cache
+
+    db:
+      image: postgres:latest
+
+    cache:
+      image: redis:latest
+
+In this example the development configuration exposes some ports to the
+host, mounts our code as a volume, and builds the web image.
+
+**docker-compose.override.yml**
 
 
-### Extending Compose files
+    web:
+      build: .
+      volumes:
+        - '.:/code'
+      ports:
+        - 8883:80
+      environment:
+        DEBUG: 'true'
 
-> **Note:** This feature is new in `docker-compose` 1.5
+    db:
+      command: '-d'
+      ports:
+        - 5432:5432
 
+    cache:
+      ports:
+        - 6379:6379
+
+When you run `docker-compose up` it reads the overrides automatically.
+
+Now, it would be nice to use this composition in a production environment. So,
+create another override file (which might be stored in a different git
+repo or managed by a different team).
+
+**docker-compose.prod.yml**
+
+    web:
+      ports:
+        - 80:80
+      environment:
+        PRODUCTION: 'true'
+
+    cache:
+      environment:
+        TTL: '500'
+
+To deploy with this production Compose file you can run
+
+    docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+This deploys all three services using the configuration in
+`docker-compose.yml` and `docker-compose.prod.yml` (but not the
+dev configuration in `docker-compose.override.yml`).
+
+
+See [production](production.md) for more information about Compose in
+production.
+
+#### Administrative tasks
+
+Another common use case is running adhoc or administrative tasks against one
+or more services in a composition. This example demonstrates running a
+database backup.
+
+Start with a **docker-compose.yml**.
+
+    web:
+      image: example/my_web_app:latest
+      links:
+        - db
+
+    db:
+      image: postgres:latest
+
+In a **docker-compose.admin.yml** add a new service to run the database
+export or backup.
+
+    dbadmin:
+      build: database_admin/
+      links:
+        - db
+
+To start a normal environment run `docker-compose up -d`. To run a database
+backup, include the `docker-compose.admin.yml` as well.
+
+    docker-compose -f docker-compose.yml -f docker-compose.admin.yml \
+        run dbadmin db-backup
 
 
 ## Compose documentation
