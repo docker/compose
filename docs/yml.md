@@ -334,7 +334,7 @@ Override the default labeling scheme for each container.
         - label:user:USER
         - label:role:ROLE
 
-### volumes
+### volumes, volume\_driver
 
 Mount paths as volumes, optionally specifying a path on the host machine
 (`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
@@ -348,8 +348,18 @@ You can mount a relative path on the host, which will expand relative to
 the directory of the Compose configuration file being used. Relative paths
 should always begin with `.` or `..`.
 
+If you use a volume name (instead of a volume path), you may also specify
+a `volume_driver`.
+
+    volume_driver: mydriver
+
+
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
+
+See [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/) and
+[Volume Plugins](https://docs.docker.com/extend/plugins_volume/) for more
+information.
 
 ### volumes_from
 
@@ -361,7 +371,7 @@ specifying read-only access(``ro``) or read-write(``rw``).
      - container_name
      - service_name:rw
 
-### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, volume\_driver, working\_dir
+### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -387,8 +397,6 @@ Each of these is a single value, analogous to its
     read_only: true
     stdin_open: true
     tty: true
-
-    volume_driver: mydriver
 
 ## Variable substitution
 
