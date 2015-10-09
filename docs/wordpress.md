@@ -99,4 +99,4 @@ database containers. If you're using [Docker Machine](https://docs.docker.com/ma
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
-- [Yaml file reference](yml.md)
+- [Compose file reference](yml.md)

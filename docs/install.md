@@ -130,4 +130,4 @@ To uninstall Docker Compose if you installed using `pip`:
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
-- [Yaml file reference](yml.md)
+- [Compose file reference](yml.md)

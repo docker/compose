@@ -1,15 +1,19 @@
 <!--[metadata]>
 +++
-title = "docker-compose.yml reference"
-description = "docker-compose.yml reference"
-keywords = ["fig, composition, compose,  docker"]
+title = "Compose file reference"
+description = "Compose file reference"
+keywords = ["fig, composition, compose, docker"]
 [menu.main]
 parent="smn_compose_ref"
 +++
 <![end-metadata]-->
 
 
-# docker-compose.yml reference
+# Compose file reference
+
+The compose file is a [YAML](http://yaml.org/) file where all the top level
+keys are the name of a service, and the values are the service definition.
+The default path for a compose file is `./docker-compose.yml`.
 
 Each service defined in `docker-compose.yml` must specify exactly one of
 `image` or `build`. Other keys are optional, and are analogous to their
