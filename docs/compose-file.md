@@ -169,21 +169,21 @@ Extend another service, in the current file or another, optionally overriding
 configuration.
 
 You can use `extends` on any service together with other configuration keys.
-The value must be a dictionary with the key: `service` and may optionally have
-the `file` key.
+The `extends` value must be a dictionary defined with a required `service`
+and an optional `file` key.
 
     extends:
       file: common.yml
       service: webapp
 
-The `file` key specifies the location of a Compose configuration file defining
-the service which is being extended. The `file` value can be an absolute or
-relative path. If you specify a relative path, Docker Compose treats it as
-relative to the location of the current file. If you don't specify a `file`,
-Compose looks in the current configuration file.
+The `service` the name of the service being extended, for example
+`web` or `database`. The `file` is the location of a Compose configuration
+file defining that service.
 
-The `service` key specifies the name of the service to extend, for example `web`
-or `database`.
+If you omit the `file` Compose looks for the service configuration in the
+current file. The `file` value can be an absolute or relative path. If you
+specify a relative path, Compose treats it as relative to the location of the
+current file.
 
 You can extend a service that itself extends another. You can extend
 indefinitely. Compose does not support circular references and `docker-compose`
