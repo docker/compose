@@ -135,8 +135,8 @@ That's it. Your app should now be running on port 3000 on your Docker daemon. If
 
 - [User guide](/)
 - [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
-- [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
 - [Compose file reference](compose-file.md)
