@@ -7,6 +7,7 @@ import subprocess
 import time
 from collections import namedtuple
 from operator import attrgetter
+from textwrap import dedent
 
 from docker import errors
 
@@ -90,10 +91,11 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/simple-composefile'
 
     def tearDown(self):
-        self.project.kill()
-        self.project.remove_stopped()
-        for container in self.project.containers(stopped=True, one_off=True):
-            container.remove(force=True)
+        if self.base_dir:
+            self.project.kill()
+            self.project.remove_stopped()
+            for container in self.project.containers(stopped=True, one_off=True):
+                container.remove(force=True)
         super(CLITestCase, self).tearDown()
 
     @property
@@ -109,13 +111,39 @@ class CLITestCase(DockerClientTestCase):
         return wait_on_process(proc, returncode=returncode)
 
     def test_help(self):
-        old_base_dir = self.base_dir
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'up'], returncode=1)
         assert 'Usage: up [options] [SERVICE...]' in result.stderr
-        # self.project.kill() fails during teardown
-        # unless there is a composefile.
-        self.base_dir = old_base_dir
+        # Prevent tearDown from trying to create a project
+        self.base_dir = None
+
+    def test_config_list_services(self):
+        result = self.dispatch(['config', '--services'])
+        assert set(result.stdout.rstrip().split('\n')) == {'simple', 'another'}
+
+    def test_config_quiet_with_error(self):
+        self.base_dir = None
+        result = self.dispatch([
+            '-f', 'tests/fixtures/invalid-composefile/invalid.yml',
+            'config', '-q'
+        ], returncode=1)
+        assert "'notaservice' doesn't have any configuration" in result.stderr
+
+    def test_config_quiet(self):
+        assert self.dispatch(['config', '-q']).stdout == ''
+
+    def test_config_default(self):
+        result = self.dispatch(['config'])
+        assert dedent("""
+            simple:
+              command: top
+              image: busybox:latest
+        """).lstrip() in result.stdout
+        assert dedent("""
+            another:
+              command: top
+              image: busybox:latest
+        """).lstrip() in result.stdout
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
