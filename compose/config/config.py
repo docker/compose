@@ -317,10 +317,11 @@ class ServiceLoader(object):
             self.service_dict['extends']
         )
         self.extended_service_name = self.service_dict['extends']['service']
+        other_working_dir = os.path.dirname(self.extended_config_path)
 
         full_extended_config = pre_process_config(
             load_yaml(self.extended_config_path),
-            self.working_dir
+            other_working_dir
         )
 
         validate_extended_service_exists(
