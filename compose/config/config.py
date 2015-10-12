@@ -183,7 +183,7 @@ def expand_volume_paths(config, working_dir):
     For every volume in the volumes list in a service, expand any relative paths.
     """
     for (service_name, service_dict) in config.items():
-        if 'volumes' in service_dict:
+        if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
             try:
                 expanded_volumes = [
                     expand_volume_path(volume, working_dir)
