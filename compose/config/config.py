@@ -388,9 +388,6 @@ def validate_extended_service_dict(service_dict, filename, service):
 def process_container_options(service_dict, working_dir=None):
     service_dict = service_dict.copy()
 
-    if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
-        service_dict['volumes'] = resolve_volume_paths(service_dict, working_dir=working_dir)
-
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
 
@@ -513,28 +510,6 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
-
-
-def resolve_volume_paths(service_dict, working_dir=None):
-    if working_dir is None:
-        raise Exception("No working_dir passed to resolve_volume_paths()")
-
-    return [
-        resolve_volume_path(v, working_dir)
-        for v in service_dict['volumes']
-    ]
-
-
-def resolve_volume_path(volume, working_dir):
-    container_path, host_path = split_path_mapping(volume)
-
-    if host_path is not None:
-        if host_path.startswith('.'):
-            host_path = expand_path(working_dir, host_path)
-        host_path = os.path.expanduser(host_path)
-        return "{}:{}".format(host_path, container_path)
-    else:
-        return container_path
 
 
 def resolve_build_path(build_path, working_dir=None):
