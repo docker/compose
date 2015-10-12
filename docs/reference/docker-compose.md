@@ -40,6 +40,7 @@ Commands:
   stop               Stop services
   unpause            Unpause services
   up                 Create and start containers
+  clean              Remove orphan containers
   migrate-to-labels  Recreate containers to add labels
   version            Show the Docker-Compose version information
 ```

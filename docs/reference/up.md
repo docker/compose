@@ -27,6 +27,7 @@ Options:
 -t, --timeout TIMEOUT  Use this timeout in seconds for container shutdown
                        when attached or when containers are already
                        running. (default: 10)
+--clean                Kill orphan containers.
 ```
 
 Builds, (re)creates, starts, and attaches to containers for a service.
@@ -45,3 +46,5 @@ flag.
 
 If you want to force Compose to stop and recreate all containers, use the
 `--force-recreate` flag.
+
+You can kill all orphan containers using the `--clean` flag.
