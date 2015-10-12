@@ -526,7 +526,6 @@ def resolve_volume_paths(service_dict, working_dir=None):
 
 def resolve_volume_path(volume, working_dir):
     container_path, host_path = split_path_mapping(volume)
-    container_path = os.path.expanduser(container_path)
 
     if host_path is not None:
         if host_path.startswith('.'):
