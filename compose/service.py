@@ -18,6 +18,7 @@ from docker.utils.ports import split_port
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
+from .config.errors import ConfigError
 from .config.validation import VALID_NAME_CHARS
 from .const import DEFAULT_TIMEOUT
 from .const import IS_WINDOWS_PLATFORM
@@ -65,10 +66,6 @@ class BuildError(Exception):
     def __init__(self, service, reason):
         self.service = service
         self.reason = reason
-
-
-class ConfigError(ValueError):
-    pass
 
 
 class NeedsBuildError(Exception):

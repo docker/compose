@@ -1,3 +1,7 @@
+class ConfigError(ValueError):
+    pass
+
+
 class ConfigurationError(Exception):
     def __init__(self, msg):
         self.msg = msg
