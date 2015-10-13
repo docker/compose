@@ -359,4 +359,4 @@ locally-defined bindings taking precedence:
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
-- [Compose file reference](yml.md)
+- [Compose file reference](compose-file.md)

@@ -54,7 +54,7 @@ Compose has commands for managing the whole lifecycle of your application:
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
-- [Compose file reference](yml.md)
+- [Compose file reference](compose-file.md)
 
 ## Quick start
 
@@ -196,7 +196,7 @@ At this point, you have seen the basics of how Compose works.
 - Next, try the quick start guide for [Django](django.md),
   [Rails](rails.md), or [WordPress](wordpress.md).
 - See the reference guides for complete details on the [commands](./reference/index.md), the
-  [configuration file](yml.md) and [environment variables](env.md).
+  [configuration file](compose-file.md) and [environment variables](env.md).
 
 ## Release Notes
 

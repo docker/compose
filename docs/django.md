@@ -164,4 +164,4 @@ In this section, you set up the database connection for Django.
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
-- [Compose file reference](yml.md)
+- [Compose file reference](compose-file.md)
