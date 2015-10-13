@@ -417,72 +417,141 @@ class InterpolationTest(unittest.TestCase):
 
 class VolumeConfigTest(unittest.TestCase):
     def test_no_binding(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['/data']}, working_dir='.')
-        self.assertEqual(d['volumes'], ['/data'])
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['/data']}},
+                '.',
+                None
+            )
+        )[0]
+        self.assertEqual(service_dict['volumes'], ['/data'])
 
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = config.load(
+        service_dict = config.load(
             build_config_details(
                 {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
                 '.',
                 None,
             )
         )[0]
-        self.assertEqual(d['volumes'], ['/host/path:/container/path'])
+        self.assertEqual(service_dict['volumes'], ['/host/path:/container/path'])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['~:/container/path']}, working_dir='.')
-        self.assertEqual(d['volumes'], ['/home/user:/container/path'])
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['~:/container/path']}},
+                '.',
+                None
+            )
+        )[0]
+        self.assertEqual(service_dict['volumes'], ['/home/user:/container/path'])
 
     def test_name_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['mydatavolume:/data']}, working_dir='.')
-        self.assertEqual(d['volumes'], ['mydatavolume:/data'])
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['mydatavolume:/data']}},
+                '.',
+                None
+            )
+        )[0]
+        self.assertEqual(service_dict['volumes'], ['mydatavolume:/data'])
 
     def test_absolute_posix_path_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['/var/lib/data:/data']}, working_dir='.')
-        self.assertEqual(d['volumes'], ['/var/lib/data:/data'])
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['/var/lib/data:/data']}},
+                '.',
+                None
+            )
+        )[0]
+        self.assertEqual(service_dict['volumes'], ['/var/lib/data:/data'])
 
     def test_absolute_windows_path_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['C:\\data:/data']}, working_dir='.')
-        self.assertEqual(d['volumes'], ['C:\\data:/data'])
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['C:\\data:/data']}},
+                '.',
+                None
+            )
+        )[0]
+        self.assertEqual(service_dict['volumes'], ['C:\\data:/data'])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     def test_relative_path_does_expand_posix(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='/home/me/myproject')
-        self.assertEqual(d['volumes'], ['/home/me/myproject/data:/data'])
+        with mock.patch('compose.config.config.validate_paths'):
+            service_dict = config.load(
+                build_config_details(
+                    {'foo': {'build': '.', 'volumes': ['./data:/data']}},
+                    '/home/me/myproject',
+                    None
+                )
+            )[0]
+            self.assertEqual(service_dict['volumes'], ['/home/me/myproject/data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='/home/me/myproject')
-        self.assertEqual(d['volumes'], ['/home/me/myproject:/data'])
+            service_dict = config.load(
+                build_config_details(
+                    {'foo': {'build': '.', 'volumes': ['.:/data']}},
+                    '/home/me/myproject',
+                    None
+                )
+            )[0]
+            self.assertEqual(service_dict['volumes'], ['/home/me/myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='/home/me/myproject')
-        self.assertEqual(d['volumes'], ['/home/me/otherproject:/data'])
+            service_dict = config.load(
+                build_config_details(
+                    {'foo': {'build': '.', 'volumes': ['../otherproject:/data']}},
+                    '/home/me/myproject',
+                    None
+                )
+            )[0]
+            self.assertEqual(service_dict['volumes'], ['/home/me/otherproject:/data'])
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
-    @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='waiting for this to be resolved: https://github.com/docker/compose/issues/2128')
     def test_relative_path_does_expand_windows(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='C:\\Users\\me\\myproject')
-        self.assertEqual(d['volumes'], ['C:\\Users\\me\\myproject\\data:/data'])
+        with mock.patch('compose.config.config.validate_paths'):
+            service_dict = config.load(
+                build_config_details(
+                    {'foo': {'build': '.', 'volumes': ['./data:/data']}},
+                    'C:\\Users\\me\\myproject',
+                    None
+                )
+            )[0]
+            self.assertEqual(service_dict['volumes'], ['C:\\Users\\me\\myproject\\data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='C:\\Users\\me\\myproject')
-        self.assertEqual(d['volumes'], ['C:\\Users\\me\\myproject:/data'])
+            service_dict = config.load(
+                build_config_details(
+                    {'foo': {'build': '.', 'volumes': ['.:/data']}},
+                    'C:\\Users\\me\\myproject',
+                    None
+                )
+            )[0]
+            self.assertEqual(service_dict['volumes'], ['C:\\Users\\me\\myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='C:\\Users\\me\\myproject')
-        self.assertEqual(d['volumes'], ['C:\\Users\\me\\otherproject:/data'])
+            service_dict = config.load(
+                build_config_details(
+                    {'foo': {'build': '.', 'volumes': ['../otherproject:/data']}},
+                    'C:\\Users\\me\\myproject',
+                    None
+                )
+            )[0]
+            self.assertEqual(service_dict['volumes'], ['C:\\Users\\me\\otherproject:/data'])
 
     @mock.patch.dict(os.environ)
     def test_home_directory_with_driver_does_not_expand(self):
         os.environ['NAME'] = 'surprise!'
-        d = make_service_dict('foo', {
-            'build': '.',
-            'volumes': ['~:/data'],
-            'volume_driver': 'foodriver',
-        }, working_dir='.')
-        self.assertEqual(d['volumes'], ['~:/data'])
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['~:/data'], 'volume_driver': 'foodriver'}},
+                '.',
+                None
+            )
+        )[0]
+        self.assertEqual(service_dict['volumes'], ['~:/data'])
 
 
 class MergePathMappingTest(object):

@@ -8,6 +8,7 @@ import yaml
 
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
+from .errors import ConfigError
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
 from .validation import validate_against_fields_schema
@@ -166,12 +167,52 @@ def find_candidates_in_parent_dirs(filenames, path):
 
 @validate_top_level_object
 @validate_service_names
-def pre_process_config(config):
+def pre_process_config(config, working_dir):
     """
     Pre validation checks and processing of the config file to interpolate env
-    vars returning a config dict ready to be tested against the schema.
+    vars and expand volume paths, returning a config dict ready to be tested
+    against the schema.
     """
-    return interpolate_environment_variables(config)
+    interpolated_config = interpolate_environment_variables(config)
+    expanded_paths_config = expand_volume_paths(interpolated_config, working_dir)
+    return expanded_paths_config
+
+
+def expand_volume_paths(config, working_dir):
+    """
+    For every volume in the volumes list in a service, expand any relative paths.
+    """
+    for (service_name, service_dict) in config.items():
+        if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
+            try:
+                expanded_volumes = [
+                    expand_volume_path(volume, working_dir)
+                    for volume in service_dict['volumes']
+                ]
+                service_dict['volumes'] = expanded_volumes
+            except ConfigError as e:
+                msg = "Service {} contains a config error.".format(service_name)
+                raise ConfigError(msg + e)
+    return config
+
+
+def expand_volume_path(volume_path, working_dir):
+    """
+    A volume path can be relative, eg('./stuff', '../stuff') or it can be
+    absolute, eg('/stuff', 'c:/stuff'). Relative paths need to be expanded.
+    """
+    if volume_path.startswith('.') or volume_path.startswith('~'):
+        # we're relative
+        path_parts = volume_path.split(':')
+        if len(path_parts) == 1:
+            raise ConfigError(
+                "Volume %s has incorrect format, external path can"
+                "not be a relative path." % volume_path
+            )
+
+        path_parts[0] = expand_path(working_dir, path_parts[0])
+        return ":".join(path_parts)
+    return volume_path
 
 
 def load(config_details):
@@ -193,7 +234,7 @@ def load(config_details):
         return service_dict
 
     def load_file(filename, config):
-        processed_config = pre_process_config(config)
+        processed_config = pre_process_config(config, config_details.working_dir)
         validate_against_fields_schema(processed_config)
         return [
             build_service(filename, name, service_config)
@@ -212,7 +253,6 @@ def load(config_details):
         config_file = ConfigFile(
             config_file.filename,
             merge_services(config_file.config, next_file.config))
-
     return load_file(config_file.filename, config_file.config)
 
 
@@ -277,9 +317,11 @@ class ServiceLoader(object):
             self.service_dict['extends']
         )
         self.extended_service_name = self.service_dict['extends']['service']
+        other_working_dir = os.path.dirname(self.extended_config_path)
 
         full_extended_config = pre_process_config(
-            load_yaml(self.extended_config_path)
+            load_yaml(self.extended_config_path),
+            other_working_dir
         )
 
         validate_extended_service_exists(
@@ -345,9 +387,6 @@ def validate_extended_service_dict(service_dict, filename, service):
 
 def process_container_options(service_dict, working_dir=None):
     service_dict = service_dict.copy()
-
-    if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
-        service_dict['volumes'] = resolve_volume_paths(service_dict, working_dir=working_dir)
 
     if 'build' in service_dict:
         service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
@@ -471,29 +510,6 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
-
-
-def resolve_volume_paths(service_dict, working_dir=None):
-    if working_dir is None:
-        raise Exception("No working_dir passed to resolve_volume_paths()")
-
-    return [
-        resolve_volume_path(v, working_dir, service_dict['name'])
-        for v in service_dict['volumes']
-    ]
-
-
-def resolve_volume_path(volume, working_dir, service_name):
-    container_path, host_path = split_path_mapping(volume)
-    container_path = os.path.expanduser(container_path)
-
-    if host_path is not None:
-        if host_path.startswith('.'):
-            host_path = expand_path(working_dir, host_path)
-        host_path = os.path.expanduser(host_path)
-        return "{}:{}".format(host_path, container_path)
-    else:
-        return container_path
 
 
 def resolve_build_path(build_path, working_dir=None):
