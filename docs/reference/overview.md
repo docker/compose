@@ -17,8 +17,8 @@ This section describes the subcommands you can use with the `docker-compose` com
 
 ## Commands
 
-* [docker-compose Command](/reference/docker-compose.md)
-* [CLI Reference](/reference)
+* [docker-compose Command](docker-compose.md)
+* [CLI Reference](index.md)
 
 
 ## Environment Variables
@@ -77,8 +77,8 @@ Configures the time (in seconds) a request to the Docker daemon is allowed to ha
 it failed. Defaults to 60 seconds.
 
 
-## Compose documentation
+## Related Information
 
-- [User guide](/)
-- [Installing Compose](install.md)
-- [Yaml file reference](yml.md)
+- [User guide](../index.md)
+- [Installing Compose](../install.md)
+- [Yaml file reference](../yml.md)

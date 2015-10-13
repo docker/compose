@@ -415,9 +415,9 @@ dollar sign (`$$`).
 
 ## Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
-- [Command line reference](/reference)
+- [Command line reference](./reference/index.md)
