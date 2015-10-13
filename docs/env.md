@@ -37,9 +37,9 @@ Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 
 [Docker links]: http://docs.docker.com/userguide/dockerlinks/
 
-## Compose documentation
+## Related Information
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
-- [Command line reference](/reference)
+- [Command line reference](./reference/index.md)
 - [Yaml file reference](yml.md)

@@ -11,24 +11,24 @@ parent = "smn_compose_ref"
 
 ## Compose CLI reference
 
-The following pages describe the usage information for the [docker-compose](/reference/docker-compose.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
+The following pages describe the usage information for the [docker-compose](docker-compose.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
 
-* [build](/reference/build.md)
-* [help](/reference/help.md)
-* [kill](/reference/kill.md)
-* [ps](/reference/ps.md)
-* [restart](/reference/restart.md)
-* [run](/reference/run.md)
-* [start](/reference/start.md)
-* [up](/reference/up.md)
-* [logs](/reference/logs.md)
-* [port](/reference/port.md)
-* [pull](/reference/pull.md)
-* [rm](/reference/rm.md)
-* [scale](/reference/scale.md)
-* [stop](/reference/stop.md)
+* [build](build.md)
+* [help](help.md)
+* [kill](kill.md)
+* [ps](ps.md)
+* [restart](restart.md)
+* [run](run.md)
+* [start](start.md)
+* [up](up.md)
+* [logs](logs.md)
+* [port](port.md)
+* [pull](pull.md)
+* [rm](rm.md)
+* [scale](scale.md)
+* [stop](stop.md)
 
 ## Where to go next
 
-* [CLI environment variables](/reference/overview)
-* [docker-compose Command](/reference/docker-compose)
+* [CLI environment variables](overview.md)
+* [docker-compose Command](docker-compose.md)
