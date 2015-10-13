@@ -100,5 +100,5 @@ directory name.
 
 ## Where to go next
 
-* [CLI environment variables](overview.md)
-* [Command line reference](index.md)
+* [CLI environment variables](/reference/overview.md)
+* [Command line reference](/reference)

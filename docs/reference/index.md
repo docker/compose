@@ -30,5 +30,5 @@ The following pages describe the usage information for the [docker-compose](/ref
 
 ## Where to go next
 
-* [CLI environment variables](overview.md)
-* [docker-compose Command](docker-compose.md)
+* [CLI environment variables](/reference/overview)
+* [docker-compose Command](/reference/docker-compose)

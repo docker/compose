@@ -17,8 +17,8 @@ This section describes the subcommands you can use with the `docker-compose` com
 
 ## Commands
 
-* [docker-compose Command](docker-compose.md)
-* [CLI Reference](index.md)
+* [docker-compose Command](/reference/docker-compose.md)
+* [CLI Reference](/reference)
 
 
 ## Environment Variables
@@ -81,9 +81,4 @@ it failed. Defaults to 60 seconds.
 
 - [User guide](/)
 - [Installing Compose](install.md)
-- [Get started with Django](django.md)
-- [Get started with Rails](rails.md)
-- [Get started with WordPress](wordpress.md)
 - [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
