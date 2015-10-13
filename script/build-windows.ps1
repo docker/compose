@@ -29,7 +29,6 @@
 #        .\script\build-windows.ps1
 
 $ErrorActionPreference = "Stop"
-Set-PSDebug -trace 1
 
 # Remove virtualenv
 if (Test-Path venv) {

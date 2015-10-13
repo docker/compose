@@ -5,6 +5,7 @@
     - id: check-docstring-first
     - id: check-merge-conflict
     - id: check-yaml
+    - id: check-json
     - id: debug-statements
     - id: end-of-file-fixer
     - id: flake8

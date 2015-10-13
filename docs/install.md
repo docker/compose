@@ -71,6 +71,13 @@ To install compose as a container run:
     $ curl -L https://github.com/docker/compose/releases/download/1.5.0/run.sh > /usr/local/bin/docker-compose
     $ chmod +x /usr/local/bin/docker-compose
 
+## Master builds
+
+If you're interested in trying out a pre-release build you can download a
+binary from https://dl.bintray.com/docker-compose/master/. Pre-release
+builds allow you to try out new features before they are released, but may
+be less stable.
+
 
 ## Upgrading
 
