@@ -59,6 +59,10 @@ You can go further and define (or re-define) configuration locally in
         - DEBUG=1
       cpu_shares: 5
 
+    important_web:
+      extends: web
+      cpu_shares: 10
+
 You can also write other services and link your `web` service to them:
 
     web:
@@ -233,7 +237,8 @@ manually keep both environments in sync.
 ### Reference
 
 You can use `extends` on any service together with other configuration keys. It
-always expects a dictionary that should always contain the key: `service` and optionally the `file` key.
+expects a dictionary that contains a `service` key and optionally a `file` key.
+The `extends` key can also take a string, whose value is the name of a `service` defined in the same file.
 
 The `file` key specifies the location of a Compose configuration file defining
 the extension. The `file` value can be an absolute or relative path. If you
