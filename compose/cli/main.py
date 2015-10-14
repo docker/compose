@@ -173,10 +173,12 @@ class TopLevelCommand(DocoptCommand):
         Options:
             --no-cache  Do not use cache when building the image.
             --pull      Always attempt to pull a newer version of the image.
+            -v VERSION  Put a version, latest by default
         """
         no_cache = bool(options.get('--no-cache', False))
         pull = bool(options.get('--pull', False))
-        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull)
+        version = options.get('-v', None)
+        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull, version=version)
 
     def help(self, project, options):
         """
@@ -265,6 +267,7 @@ class TopLevelCommand(DocoptCommand):
         else:
             headers = [
                 'Name',
+                'Image',
                 'Command',
                 'State',
                 'Ports',
@@ -276,6 +279,7 @@ class TopLevelCommand(DocoptCommand):
                     command = '%s ...' % command[:26]
                 rows.append([
                     container.name,
+                    container.image_name,
                     command,
                     container.human_readable_state,
                     container.human_readable_ports,
@@ -553,6 +557,7 @@ class TopLevelCommand(DocoptCommand):
             -t, --timeout TIMEOUT  Use this timeout in seconds for container shutdown
                                    when attached or when containers are already
                                    running. (default: 10)
+            -v VERSION             Put a version, latest by default
         """
         if options['--allow-insecure-ssl']:
             log.warn(INSECURE_SSL_WARNING)
@@ -561,13 +566,15 @@ class TopLevelCommand(DocoptCommand):
         start_deps = not options['--no-deps']
         service_names = options['SERVICE']
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        version = options.get('-v', None)
 
         to_attach = project.up(
             service_names=service_names,
             start_deps=start_deps,
             strategy=convergence_strategy_from_opts(options),
             do_build=not options['--no-build'],
-            timeout=timeout
+            timeout=timeout,
+            version=version
         )
 
         if not options['-d']:
