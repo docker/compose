@@ -54,7 +54,7 @@ When prompted build the non-linux binaries and test them.
 
 2.  Download the windows binary from AppVeyor
 
-    https://ci.appveyor.com/project/docker/compose/build/<build id>/artifacts
+    https://ci.appveyor.com/project/docker/compose
 
 3.  Draft a release from the tag on GitHub (the script will open the window for
     you)
@@ -93,7 +93,7 @@ When prompted build the non-linux binaries and test them.
 
 8.  Publish the release on GitHub.
 
-9.  Check that both binaries download (following the install instructions) and run.
+9.  Check that all the binaries download (following the install instructions) and run.
 
 10. Email maintainers@dockerproject.org and engineering@docker.com about the new release.
 
