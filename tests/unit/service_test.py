@@ -353,6 +353,13 @@ class ServiceTest(unittest.TestCase):
         service.create_container(do_build=False)
         self.assertFalse(self.mock_client.build.called)
 
+    def test_create_container_no_build_cgroup_parent(self):
+        service = Service('foo', client=self.mock_client, build='.')
+        service.image = lambda: {'Id': 'abc123'}
+
+        service.create_container(do_build=False, cgroup_parent='test')
+        self.assertFalse(self.mock_client.build.called)
+
     def test_create_container_no_build_but_needs_build(self):
         service = Service('foo', client=self.mock_client, build='.')
         service.image = lambda *args, **kwargs: mock_get_image([])
