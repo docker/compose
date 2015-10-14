@@ -58,14 +58,21 @@
         },
 
         "extends": {
-          "type": "object",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
 
-          "properties": {
-            "service": {"type": "string"},
-            "file": {"type": "string"}
-          },
-          "required": ["service"],
-          "additionalProperties": false
+              "properties": {
+                "service": {"type": "string"},
+                "file": {"type": "string"}
+              },
+              "required": ["service"],
+              "additionalProperties": false
+            }
+          ]
         },
 
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},

@@ -335,7 +335,7 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue(expected_warning_msg in mock_logging.warn.call_args[0][0])
 
     def test_config_invalid_environment_dict_key_raises_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'environment' contains an invalid type"
+        expected_error_msg = "Service 'web' configuration key 'environment' contains unsupported option: '---'"
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
@@ -942,7 +942,10 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_invalid_key(self):
-        expected_error_msg = "Unsupported config option for 'web' service: 'rogue_key'"
+        expected_error_msg = (
+            "Service 'web' configuration key 'extends' "
+            "contains unsupported option: 'rogue_key'"
+        )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(
@@ -962,7 +965,10 @@ class ExtendsTest(unittest.TestCase):
             )
 
     def test_extends_validation_sub_property_key(self):
-        expected_error_msg = "Service 'web' configuration key 'extends' 'file' contains an invalid type"
+        expected_error_msg = (
+            "Service 'web' configuration key 'extends' 'file' contains 1, "
+            "which is an invalid type, it should be a string"
+        )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(
@@ -1099,6 +1105,26 @@ class ExtendsTest(unittest.TestCase):
     def test_partial_service_config_in_extends_is_still_valid(self):
         dicts = load_from_filename('tests/fixtures/extends/valid-common-config.yml')
         self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
+
+    def test_extended_service_with_verbose_and_shorthand_way(self):
+        services = load_from_filename('tests/fixtures/extends/verbose-and-shorthand.yml')
+        self.assertEqual(service_sort(services), service_sort([
+            {
+                'name': 'base',
+                'image': 'busybox',
+                'environment': {'BAR': '1'},
+            },
+            {
+                'name': 'verbose',
+                'image': 'busybox',
+                'environment': {'BAR': '1', 'FOO': '1'},
+            },
+            {
+                'name': 'shorthand',
+                'image': 'busybox',
+                'environment': {'BAR': '1', 'FOO': '2'},
+            },
+        ]))
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
