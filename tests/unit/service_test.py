@@ -203,6 +203,26 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
+    def test_no_default_hostname_when_not_using_networking(self):
+        service = Service(
+            'foo',
+            image='foo',
+            use_networking=False,
+            client=self.mock_client,
+        )
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        self.assertIsNone(opts.get('hostname'))
+
+    def test_hostname_defaults_to_service_name_when_using_networking(self):
+        service = Service(
+            'foo',
+            image='foo',
+            use_networking=True,
+            client=self.mock_client,
+        )
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        self.assertEqual(opts['hostname'], 'foo')
+
     def test_get_container_create_options_with_name_option(self):
         service = Service(
             'foo',
