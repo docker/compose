@@ -81,4 +81,4 @@ it failed. Defaults to 60 seconds.
 
 - [User guide](../index.md)
 - [Installing Compose](../install.md)
-- [Yaml file reference](../yml.md)
+- [Compose file reference](../compose-file.md)

@@ -129,4 +129,4 @@ That's it. Your app should now be running on port 3000 on your Docker daemon. If
 - [Get started with Rails](rails.md)
 - [Get started with WordPress](wordpress.md)
 - [Command line reference](./reference/index.md)
-- [Yaml file reference](yml.md)
+- [Compose file reference](compose-file.md)

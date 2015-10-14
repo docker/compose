@@ -1,15 +1,20 @@
 <!--[metadata]>
 +++
-title = "docker-compose.yml reference"
-description = "docker-compose.yml reference"
-keywords = ["fig, composition, compose,  docker"]
+title = "Compose file reference"
+description = "Compose file reference"
+keywords = ["fig, composition, compose, docker"]
+aliases = ["/compose/yml"]
 [menu.main]
 parent="smn_compose_ref"
 +++
 <![end-metadata]-->
 
 
-# docker-compose.yml reference
+# Compose file reference
+
+The compose file is a [YAML](http://yaml.org/) file where all the top level
+keys are the name of a service, and the values are the service definition.
+The default path for a compose file is `./docker-compose.yml`.
 
 Each service defined in `docker-compose.yml` must specify exactly one of
 `image` or `build`. Other keys are optional, and are analogous to their
@@ -330,7 +335,7 @@ Override the default labeling scheme for each container.
         - label:user:USER
         - label:role:ROLE
 
-### volumes
+### volumes, volume\_driver
 
 Mount paths as volumes, optionally specifying a path on the host machine
 (`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
@@ -344,8 +349,18 @@ You can mount a relative path on the host, which will expand relative to
 the directory of the Compose configuration file being used. Relative paths
 should always begin with `.` or `..`.
 
+If you use a volume name (instead of a volume path), you may also specify
+a `volume_driver`.
+
+    volume_driver: mydriver
+
+
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
+
+See [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/) and
+[Volume Plugins](https://docs.docker.com/extend/plugins_volume/) for more
+information.
 
 ### volumes_from
 
@@ -357,7 +372,7 @@ specifying read-only access(``ro``) or read-write(``rw``).
      - container_name
      - service_name:rw
 
-### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, volume\_driver, working\_dir
+### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/reference/run/) counterpart.
@@ -383,8 +398,6 @@ Each of these is a single value, analogous to its
     read_only: true
     stdin_open: true
     tty: true
-
-    volume_driver: mydriver
 
 ## Variable substitution
 

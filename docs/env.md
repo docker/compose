@@ -42,4 +42,4 @@ Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 - [User guide](index.md)
 - [Installing Compose](install.md)
 - [Command line reference](./reference/index.md)
-- [Yaml file reference](yml.md)
+- [Compose file reference](compose-file.md)
