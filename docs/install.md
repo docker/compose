@@ -53,7 +53,7 @@ To install Compose, do the following:
 7. Test the installation.
 
         $ docker-compose --version
-        docker-compose version: 1.4.2
+        docker-compose version: 1.5.0rc1
 
 
 ## Alternative install options
@@ -75,7 +75,7 @@ to get started.
 Compose can also be run inside a container, from a small bash script wrapper.
 To install compose as a container run:
 
-    $ curl -L https://github.com/docker/compose/releases/download/1.5.0/run.sh > /usr/local/bin/docker-compose
+    $ curl -L https://github.com/docker/compose/releases/download/1.5.0rc1/run.sh > /usr/local/bin/docker-compose
     $ chmod +x /usr/local/bin/docker-compose
 
 ## Master builds

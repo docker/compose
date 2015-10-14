@@ -1,6 +1,54 @@
 Change log
 ==========
 
+1.5.0 (2015-10-13)
+------------------
+
+Major Features
+
+-   Compose is now available on windows.
+-   Environment variable can be used in the compose file. See
+    https://github.com/docker/compose/blob/129092b7/docs/yml.md#variable-substitution
+-   Multiple compose files can be specified, allowing you to override
+    setting in the default compose file. See
+    https://github.com/docker/compose/blob/129092b7/docs/reference/docker-compose.md
+    for more details.
+-   Configuration validation is now a lot more strict
+-   `up` now waits for all services to exit before shutting down
+-   Support for the new docker networking can be enabled with
+    the `--x-networking` flag
+
+New Features
+
+-   `volumes_from` now supports a mode option allowing for read-only
+    `volumes_from`
+-   Volumes that don't start with a path indicator (`.` or `/`) will now be
+    treated as a named volume. Previously this was a warning.
+-   `--pull` flag added to `build`
+-   `--ignore-pull-failures` flag added to `pull`
+-   Support for the `ipc` field added to the compose file
+-   Containers created by `run` can now be named with the `--name` flag
+-   If you install Compose with pip or use it as a library, it now
+    works with Python 3
+-   `image` field now supports image digests (in addition to ids and tags)
+-   `ports` now supports ranges of ports
+-   `--publish` flag added to `run`
+-   New subcommands `pause` and `unpause`
+-   services may be extended from the same file without a `file` key in
+    `extends`
+-   Compose can be installed and run as a docker image. This is an experimental
+    feature.
+
+
+Bug Fixes
+
+-   Support all `log_drivers`
+-   Fixed `build` when running against swarm
+-   `~` is no longer expanded on the host when included as part of a container
+    volume path
+
+
+
 1.4.2 (2015-09-22)
 ------------------
 
