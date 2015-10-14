@@ -486,7 +486,6 @@ def resolve_volume_paths(service_dict, working_dir=None):
 
 def resolve_volume_path(volume, working_dir, service_name):
     container_path, host_path = split_path_mapping(volume)
-    container_path = os.path.expanduser(container_path)
 
     if host_path is not None:
         if host_path.startswith('.'):
@@ -528,7 +527,18 @@ def path_mappings_from_dict(d):
 
 
 def split_path_mapping(volume_path):
-    drive, volume_config = os.path.splitdrive(volume_path)
+    """
+    Ascertain if the volume_path contains a host path as well as a container
+    path. Using splitdrive so windows absolute paths won't cause issues with
+    splitting on ':'.
+    """
+    # splitdrive has limitations when it comes to relative paths, so when it's
+    # relative, handle special case to set the drive to ''
+    if volume_path.startswith('.') or volume_path.startswith('~'):
+        drive, volume_config = '', volume_path
+    else:
+        drive, volume_config = os.path.splitdrive(volume_path)
+
     if ':' in volume_config:
         (host, container) = volume_config.split(':', 1)
         return (container, drive + host)
