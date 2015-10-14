@@ -10,6 +10,7 @@ from six import StringIO
 from .. import mock
 from .testcases import DockerClientTestCase
 from compose.cli.command import get_project
+from compose.cli.docker_client import docker_client
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.project import NoSuchService
@@ -190,8 +191,9 @@ class CLITestCase(DockerClientTestCase):
 
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['up', '-d'], None)
+        client = docker_client(version='1.21')
 
-        networks = [n for n in self.client.networks(names=[self.project.name])]
+        networks = client.networks(names=[self.project.name])
         self.assertEqual(len(networks), 0)
 
         for service in self.project.get_services():
@@ -207,16 +209,17 @@ class CLITestCase(DockerClientTestCase):
 
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['--x-networking', 'up', '-d'], None)
+        client = docker_client(version='1.21')
 
         services = self.project.get_services()
 
-        networks = [n for n in self.client.networks(names=[self.project.name])]
+        networks = client.networks(names=[self.project.name])
         for n in networks:
-            self.addCleanup(self.client.remove_network, n['id'])
+            self.addCleanup(client.remove_network, n['id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['driver'], 'bridge')
 
-        network = self.client.inspect_network(networks[0]['id'])
+        network = client.inspect_network(networks[0]['id'])
         self.assertEqual(len(network['containers']), len(services))
 
         for service in services:
