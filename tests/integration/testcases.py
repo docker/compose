@@ -1,14 +1,16 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 from docker import errors
+from docker.utils import version_lt
+from pytest import skip
 
-from compose.service import Service
-from compose.config import ServiceLoader
-from compose.const import LABEL_PROJECT
-from compose.cli.docker_client import docker_client
-from compose.progress_stream import stream_output
 from .. import unittest
+from compose.cli.docker_client import docker_client
+from compose.config.config import ServiceLoader
+from compose.const import LABEL_PROJECT
+from compose.progress_stream import stream_output
+from compose.service import Service
 
 
 def pull_busybox(client):
@@ -40,7 +42,28 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        options = ServiceLoader(working_dir='.').make_service_dict(name, kwargs)
+        links = kwargs.get('links', None)
+        volumes_from = kwargs.get('volumes_from', None)
+        net = kwargs.get('net', None)
+
+        workaround_options = ['links', 'volumes_from', 'net']
+        for key in workaround_options:
+            try:
+                del kwargs[key]
+            except KeyError:
+                pass
+
+        options = ServiceLoader(working_dir='.', filename=None, service_name=name, service_dict=kwargs).make_service_dict()
+
+        labels = options.setdefault('labels', {})
+        labels['com.docker.compose.test-name'] = self.id()
+
+        if links:
+            options['links'] = links
+        if volumes_from:
+            options['volumes_from'] = volumes_from
+        if net:
+            options['net'] = net
 
         return Service(
             project='composetest',
@@ -52,3 +75,12 @@ class DockerClientTestCase(unittest.TestCase):
         kwargs.setdefault('rm', True)
         build_output = self.client.build(*args, **kwargs)
         stream_output(build_output, open('/dev/null', 'w'))
+
+    def require_engine_version(self, minimum):
+        # Drop '-dev' or '-rcN' suffix
+        engine = self.client.version()['Version'].split('-', 1)[0]
+        if version_lt(engine, minimum):
+            skip(
+                "Engine version is too low ({} < {})"
+                .format(engine, minimum)
+            )

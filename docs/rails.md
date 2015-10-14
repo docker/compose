@@ -26,6 +26,7 @@ Dockerfile consists of:
     RUN mkdir /myapp
     WORKDIR /myapp
     ADD Gemfile /myapp/Gemfile
+    ADD Gemfile.lock /myapp/Gemfile.lock
     RUN bundle install
     ADD . /myapp
 
@@ -36,7 +37,7 @@ Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten 
     source 'https://rubygems.org'
     gem 'rails', '4.2.0'
 
-Finally, `docker-compose.yml` is where the magic happens. This file describes the services that comprise your app (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration needed to link them together and expose the web app's port.
+Finally, `docker-compose.yml` is where the magic happens. This file describes the services that comprise your app (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration needed to expose the web app's port.
 
     db:
       image: postgres
@@ -47,8 +48,6 @@ Finally, `docker-compose.yml` is where the magic happens. This file describes th
         - .:/myapp
       ports:
         - "3000:3000"
-      links:
-        - db
 
 ### Build the project
 
@@ -117,7 +116,7 @@ Finally, you need to create the database. In another terminal, run:
 
     $ docker-compose run web rake db:create
 
-That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` returns the Docker host IP address. 
+That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` returns the Docker host IP address.
 
 
 ## More Compose documentation
@@ -126,8 +125,6 @@ That's it. Your app should now be running on port 3000 on your Docker daemon. If
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

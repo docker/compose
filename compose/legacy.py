@@ -2,7 +2,8 @@ import logging
 import re
 
 from .const import LABEL_VERSION
-from .container import get_container_name, Container
+from .container import Container
+from .container import get_container_name
 
 
 log = logging.getLogger(__name__)
@@ -16,7 +17,8 @@ Compose found the following containers without labels:
 
 {names_list}
 
-As of Compose 1.3.0, containers are identified with labels instead of naming convention. If you want to continue using these containers, run:
+As of Compose 1.3.0, containers are identified with labels instead of naming
+convention. If you want to continue using these containers, run:
 
     $ docker-compose migrate-to-labels
 

@@ -1,11 +1,11 @@
 import unittest
-from mock import Mock
 
 from docker.errors import APIError
 
+from .. import mock
+from .testcases import DockerClientTestCase
 from compose import legacy
 from compose.project import Project
-from .testcases import DockerClientTestCase
 
 
 class UtilitiesTestCase(unittest.TestCase):
@@ -66,7 +66,7 @@ class UtilitiesTestCase(unittest.TestCase):
         )
 
     def test_get_legacy_containers(self):
-        client = Mock()
+        client = mock.Mock()
         client.containers.return_value = [
             {
                 "Id": "abc123",

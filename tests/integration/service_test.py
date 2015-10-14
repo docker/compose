@@ -1,30 +1,31 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import os
+import shutil
+import tempfile
 from os import path
 
 from docker.errors import APIError
-from mock import patch
-import tempfile
-import shutil
-from six import StringIO, text_type
+from six import StringIO
+from six import text_type
 
+from .. import mock
 from .testcases import DockerClientTestCase
 from .testcases import pull_busybox
 from compose import __version__
-from compose.const import (
-    LABEL_CONTAINER_NUMBER,
-    LABEL_ONE_OFF,
-    LABEL_PROJECT,
-    LABEL_SERVICE,
-    LABEL_VERSION,
-)
+from compose.const import LABEL_CONTAINER_NUMBER
+from compose.const import LABEL_ONE_OFF
+from compose.const import LABEL_PROJECT
+from compose.const import LABEL_SERVICE
+from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.service import build_extra_hosts
 from compose.service import ConfigError
 from compose.service import ConvergencePlan
 from compose.service import Net
 from compose.service import Service
+from compose.service import VolumeFromSpec
 
 
 def create_and_start_container(service, **override_options):
@@ -167,16 +168,6 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(set(container.get('HostConfig.ExtraHosts')), set(extra_hosts))
 
-    def test_create_container_with_extra_hosts_string(self):
-        extra_hosts = 'somehost:162.242.195.82'
-        service = self.create_service('db', extra_hosts=extra_hosts)
-        self.assertRaises(ConfigError, lambda: service.create_container())
-
-    def test_create_container_with_extra_hosts_list_of_dicts(self):
-        extra_hosts = [{'somehost': '162.242.195.82'}, {'otherhost': '50.31.209.229'}]
-        service = self.create_service('db', extra_hosts=extra_hosts)
-        self.assertRaises(ConfigError, lambda: service.create_container())
-
     def test_create_container_with_extra_hosts_dicts(self):
         extra_hosts = {'somehost': '162.242.195.82', 'otherhost': '50.31.209.229'}
         extra_hosts_list = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
@@ -273,24 +264,6 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(service.containers(stopped=False), [new_container])
 
-    @patch.dict(os.environ)
-    def test_create_container_with_home_and_env_var_in_volume_path(self):
-        os.environ['VOLUME_NAME'] = 'my-volume'
-        os.environ['HOME'] = '/tmp/home-dir'
-        expected_host_path = os.path.join(os.environ['HOME'], os.environ['VOLUME_NAME'])
-
-        host_path = '~/${VOLUME_NAME}'
-        container_path = '/container-path'
-
-        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
-        container = service.create_container()
-        service.start_container(container)
-
-        actual_host_path = container.get('Volumes')[container_path]
-        components = actual_host_path.split('/')
-        self.assertTrue(components[-2:] == ['home-dir', 'my-volume'],
-                        msg="Last two components differ: %s, %s" % (actual_host_path, expected_host_path))
-
     def test_create_container_with_volumes_from(self):
         volume_service = self.create_service('data')
         volume_container_1 = volume_service.create_container()
@@ -300,12 +273,18 @@ class ServiceTest(DockerClientTestCase):
             command=["top"],
             labels={LABEL_PROJECT: 'composetest'},
         )
-        host_service = self.create_service('host', volumes_from=[volume_service, volume_container_2])
+        host_service = self.create_service(
+            'host',
+            volumes_from=[
+                VolumeFromSpec(volume_service, 'rw'),
+                VolumeFromSpec(volume_container_2, 'rw')
+            ]
+        )
         host_container = host_service.create_container()
         host_service.start_container(host_container)
-        self.assertIn(volume_container_1.id,
+        self.assertIn(volume_container_1.id + ':rw',
                       host_container.get('HostConfig.VolumesFrom'))
-        self.assertIn(volume_container_2.id,
+        self.assertIn(volume_container_2.id + ':rw',
                       host_container.get('HostConfig.VolumesFrom'))
 
     def test_execute_convergence_plan_recreate(self):
@@ -378,12 +357,12 @@ class ServiceTest(DockerClientTestCase):
         )
 
         old_container = create_and_start_container(service)
-        self.assertEqual(old_container.get('Volumes').keys(), ['/data'])
+        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
         volume_path = old_container.get('Volumes')['/data']
 
         new_container, = service.execute_convergence_plan(
             ConvergencePlan('recreate', [old_container]))
-        self.assertEqual(new_container.get('Volumes').keys(), ['/data'])
+        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
     def test_start_container_passes_through_options(self):
@@ -480,7 +459,7 @@ class ServiceTest(DockerClientTestCase):
         )
         container = create_and_start_container(service)
         container.wait()
-        self.assertIn('success', container.logs())
+        self.assertIn(b'success', container.logs())
         self.assertEqual(len(self.client.images(name='composetest_test')), 1)
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
@@ -493,7 +472,7 @@ class ServiceTest(DockerClientTestCase):
         )
         container = create_and_start_container(service)
         container.wait()
-        self.assertIn('success', container.logs())
+        self.assertIn(b'success', container.logs())
 
     def test_start_container_creates_ports(self):
         service = self.create_service('web', ports=[8000])
@@ -518,7 +497,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        with open(os.path.join(base_dir, b'foo\xE2bar'), 'w') as f:
+        with open(os.path.join(base_dir.encode('utf8'), b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
         self.create_service('web', build=text_type(base_dir)).build()
@@ -535,7 +514,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container['HostConfig']['Privileged'], True)
 
     def test_expose_does_not_publish_ports(self):
-        service = self.create_service('web', expose=[8000])
+        service = self.create_service('web', expose=["8000"])
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['NetworkSettings']['Ports'], {'8000/tcp': None})
 
@@ -603,8 +582,7 @@ class ServiceTest(DockerClientTestCase):
         service.scale(0)
         self.assertEqual(len(service.containers()), 0)
 
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_stopped_containers(self, mock_stdout):
+    def test_scale_with_stopped_containers(self):
         """
         Given there are some stopped containers and scale is called with a
         desired number that is the same as the number of stopped containers,
@@ -613,15 +591,11 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web')
         next_number = service._next_container_number()
         valid_numbers = [next_number, next_number + 1]
-        service.create_container(number=next_number, quiet=True)
-        service.create_container(number=next_number + 1, quiet=True)
+        service.create_container(number=next_number)
+        service.create_container(number=next_number + 1)
 
-        for container in service.containers():
-            self.assertFalse(container.is_running)
-
-        service.scale(2)
-
-        self.assertEqual(len(service.containers()), 2)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            service.scale(2)
         for container in service.containers():
             self.assertTrue(container.is_running)
             self.assertTrue(container.number in valid_numbers)
@@ -630,8 +604,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertNotIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_stopped_containers_and_needing_creation(self, mock_stdout):
+    def test_scale_with_stopped_containers_and_needing_creation(self):
         """
         Given there are some stopped containers and scale is called with a
         desired number that is greater than the number of stopped containers,
@@ -644,7 +617,8 @@ class ServiceTest(DockerClientTestCase):
         for container in service.containers():
             self.assertFalse(container.is_running)
 
-        service.scale(2)
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            service.scale(2)
 
         self.assertEqual(len(service.containers()), 2)
         for container in service.containers():
@@ -654,8 +628,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_api_returns_errors(self, mock_stdout):
+    def test_scale_with_api_returns_errors(self):
         """
         Test that when scaling if the API returns an error, that error is handled
         and the remaining threads continue.
@@ -664,18 +637,18 @@ class ServiceTest(DockerClientTestCase):
         next_number = service._next_container_number()
         service.create_container(number=next_number, quiet=True)
 
-        with patch(
+        with mock.patch(
             'compose.container.Container.create',
                 side_effect=APIError(message="testing", response={}, explanation="Boom")):
 
-            service.scale(3)
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                service.scale(3)
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
         self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
 
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_scale_with_api_returns_unexpected_exception(self, mock_stdout):
+    def test_scale_with_api_returns_unexpected_exception(self):
         """
         Test that when scaling if the API returns an error, that is not of type
         APIError, that error is re-raised.
@@ -684,16 +657,17 @@ class ServiceTest(DockerClientTestCase):
         next_number = service._next_container_number()
         service.create_container(number=next_number, quiet=True)
 
-        with patch(
+        with mock.patch(
             'compose.container.Container.create',
-                side_effect=ValueError("BOOM")):
+            side_effect=ValueError("BOOM")
+        ):
             with self.assertRaises(ValueError):
                 service.scale(3)
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-    @patch('compose.service.log')
+    @mock.patch('compose.service.log')
     def test_scale_with_desired_number_already_achieved(self, mock_log):
         """
         Test that calling scale with a desired number that is equal to the
@@ -716,14 +690,13 @@ class ServiceTest(DockerClientTestCase):
         captured_output = mock_log.info.call_args[0]
         self.assertIn('Desired container number already achieved', captured_output)
 
-    @patch('compose.service.log')
+    @mock.patch('compose.service.log')
     def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
         """
         Test that calling scale on a service that has a custom container name
         results in warning output.
         """
-        service = self.create_service('web', container_name='custom-container')
-
+        service = self.create_service('app', container_name='custom-container')
         self.assertEqual(service.custom_container_name(), 'custom-container')
 
         service.scale(3)
@@ -832,12 +805,15 @@ class ServiceTest(DockerClientTestCase):
             self.assertEqual(env[k], v)
 
     def test_env_from_file_combined_with_env(self):
-        service = self.create_service('web', environment=['ONE=1', 'TWO=2', 'THREE=3'], env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
+        service = self.create_service(
+            'web',
+            environment=['ONE=1', 'TWO=2', 'THREE=3'],
+            env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
         for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
             self.assertEqual(env[k], v)
 
-    @patch.dict(os.environ)
+    @mock.patch.dict(os.environ)
     def test_resolve_env(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
@@ -846,6 +822,13 @@ class ServiceTest(DockerClientTestCase):
         env = create_and_start_container(service).environment
         for k, v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
             self.assertEqual(env[k], v)
+
+    def test_with_high_enough_api_version_we_get_default_network_mode(self):
+        # TODO: remove this test once minimum docker version is 1.8.x
+        with mock.patch.object(self.client, '_version', '1.20'):
+            service = self.create_service('web')
+            service_config = service._get_container_host_config({})
+            self.assertEquals(service_config['NetworkMode'], 'default')
 
     def test_labels(self):
         labels_dict = {
@@ -898,7 +881,10 @@ class ServiceTest(DockerClientTestCase):
 
     def test_log_drive_invalid(self):
         service = self.create_service('web', log_driver='xxx')
-        self.assertRaises(ValueError, lambda: create_and_start_container(service))
+        expected_error_msg = "logger: no log driver named 'xxx' is registered"
+
+        with self.assertRaisesRegexp(APIError, expected_error_msg):
+            create_and_start_container(service)
 
     def test_log_drive_empty_default_jsonfile(self):
         service = self.create_service('web')

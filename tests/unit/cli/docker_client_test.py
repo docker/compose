@@ -1,11 +1,11 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import os
 
-import mock
-from tests import unittest
-
 from compose.cli import docker_client
+from tests import mock
+from tests import unittest
 
 
 class DockerClientTestCase(unittest.TestCase):
@@ -16,7 +16,7 @@ class DockerClientTestCase(unittest.TestCase):
             docker_client.docker_client()
 
     def test_docker_client_with_custom_timeout(self):
-        with mock.patch.dict(os.environ):
-            os.environ['DOCKER_CLIENT_TIMEOUT'] = timeout = "300"
+        timeout = 300
+        with mock.patch('compose.cli.docker_client.HTTP_TIMEOUT', 300):
             client = docker_client.docker_client()
-        self.assertEqual(client.timeout, int(timeout))
+            self.assertEqual(client.timeout, int(timeout))
