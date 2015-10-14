@@ -6,7 +6,9 @@
 # $ docker build -t "$TAG" .
 # $ docker run --rm --volume="/var/run/docker.sock:/var/run/docker.sock" --volume="$(pwd)/.git:/code/.git" -e "TAG=$TAG" --entrypoint="script/ci" "$TAG"
 
-set -e
+set -ex
+
+docker version
 
 export DOCKER_VERSIONS=all
 export DOCKER_DAEMON_ARGS="--storage-driver=overlay"

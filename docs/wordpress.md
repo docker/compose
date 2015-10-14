@@ -46,8 +46,6 @@ and a separate MySQL instance:
       command: php -S 0.0.0.0:8000 -t /code
       ports:
         - "8000:8000"
-      links:
-        - db
       volumes:
         - .:/code
     db:

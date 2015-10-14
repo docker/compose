@@ -10,6 +10,7 @@ from six import StringIO
 from .. import mock
 from .testcases import DockerClientTestCase
 from compose.cli.command import get_project
+from compose.cli.docker_client import docker_client
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.project import NoSuchService
@@ -184,6 +185,51 @@ class CLITestCase(DockerClientTestCase):
             set(log_printer.containers),
             set(self.project.containers())
         )
+
+    def test_up_without_networking(self):
+        self.require_engine_version("1.9")
+
+        self.command.base_dir = 'tests/fixtures/links-composefile'
+        self.command.dispatch(['up', '-d'], None)
+        client = docker_client(version='1.21')
+
+        networks = client.networks(names=[self.project.name])
+        self.assertEqual(len(networks), 0)
+
+        for service in self.project.get_services():
+            containers = service.containers()
+            self.assertEqual(len(containers), 1)
+            self.assertNotEqual(containers[0].get('Config.Hostname'), service.name)
+
+        web_container = self.project.get_service('web').containers()[0]
+        self.assertTrue(web_container.get('HostConfig.Links'))
+
+    def test_up_with_networking(self):
+        self.require_engine_version("1.9")
+
+        self.command.base_dir = 'tests/fixtures/links-composefile'
+        self.command.dispatch(['--x-networking', 'up', '-d'], None)
+        client = docker_client(version='1.21')
+
+        services = self.project.get_services()
+
+        networks = client.networks(names=[self.project.name])
+        for n in networks:
+            self.addCleanup(client.remove_network, n['id'])
+        self.assertEqual(len(networks), 1)
+        self.assertEqual(networks[0]['driver'], 'bridge')
+
+        network = client.inspect_network(networks[0]['id'])
+        self.assertEqual(len(network['containers']), len(services))
+
+        for service in services:
+            containers = service.containers()
+            self.assertEqual(len(containers), 1)
+            self.assertIn(containers[0].id, network['containers'])
+            self.assertEqual(containers[0].get('Config.Hostname'), service.name)
+
+        web_container = self.project.get_service('web').containers()[0]
+        self.assertFalse(web_container.get('HostConfig.Links'))
 
     def test_up_with_links(self):
         self.command.base_dir = 'tests/fixtures/links-composefile'
