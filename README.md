@@ -56,4 +56,4 @@ Want to help build Compose? Check out our [contributing documentation](https://g
 Releasing
 ---------
 
-Releases are built by maintainers, following an outline of the [release process](https://github.com/docker/compose/blob/master/RELEASE_PROCESS.md).
+Releases are built by maintainers, following an outline of the [release process](https://github.com/docker/compose/blob/master/project/RELEASE-PROCESS.md).
