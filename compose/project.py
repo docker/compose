@@ -335,7 +335,7 @@ class Project(object):
         return plans
 
     def pull(self, service_names=None, ignore_pull_failures=False):
-        for service in self.get_services(service_names, include_deps=True):
+        for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
