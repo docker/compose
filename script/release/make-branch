@@ -39,7 +39,7 @@ fi
 
 DEFAULT_REMOTE=release
 REMOTE="$(find_remote "$GITHUB_REPO")"
-# If we don't have a docker origin add one
+# If we don't have a docker remote add one
 if [ -z "$REMOTE" ]; then
     echo "Creating $DEFAULT_REMOTE remote"
     git remote add ${DEFAULT_REMOTE} ${GITHUB_REPO}
@@ -55,6 +55,8 @@ read -n1 -r -p "Continue? (ctrl+c to cancel)"
 git fetch $REMOTE -p
 git checkout -b $BRANCH $BASE_VERSION
 
+echo "Merging remote release branch into new release branch"
+git merge --strategy=ours --no-edit $REMOTE/release
 
 # Store the release version for this branch in git, so that other release
 # scripts can use it
