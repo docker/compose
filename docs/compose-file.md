@@ -48,8 +48,6 @@ See `man 7 capabilities` for a full list.
       - NET_ADMIN
       - SYS_ADMIN
 
-Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
-
 ### command
 
 Override the default command.
@@ -105,6 +103,8 @@ Alternate Dockerfile.
 Compose will use an alternate file to build with.
 
     dockerfile: Dockerfile-alternate
+
+Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
 ### env_file
 
