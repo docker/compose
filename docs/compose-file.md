@@ -428,9 +428,18 @@ Both `$VARIABLE` and `${VARIABLE}` syntax are supported. Extended shell-style
 features, such as `${VARIABLE-default}` and `${VARIABLE/foo/bar}`, are not
 supported.
 
-If you need to put a literal dollar sign in a configuration value, use a double
-dollar sign (`$$`).
+You can use a `$$` (double-dollar sign) when your configuration needs a literal
+dollar sign. This also prevents Compose from interpolating a value, so a `$$`
+allows you to refer to environment variables that you don't want processed by
+Compose.
 
+    web:
+      build: .
+      command: "$$VAR_NOT_INTERPOLATED_BY_COMPOSE"
+
+If you forget and use a single dollar sign (`$`), Compose interprets the value as an environment variable and will warn you:
+
+  The VAR_NOT_INTERPOLATED_BY_COMPOSE is not set. Substituting an empty string.
 
 ## Compose documentation
 
