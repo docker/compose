@@ -4,48 +4,88 @@ Change log
 1.5.0 (2015-10-13)
 ------------------
 
-Major Features
+Major features:
 
--   Compose is now available on windows.
--   Environment variable can be used in the compose file. See
+-   Compose is now available for Windows.
+
+-   Environment variables can be used in the Compose file. See
     https://github.com/docker/compose/blob/129092b7/docs/yml.md#variable-substitution
+
 -   Multiple compose files can be specified, allowing you to override
-    setting in the default compose file. See
+    settings in the default Compose file. See
     https://github.com/docker/compose/blob/129092b7/docs/reference/docker-compose.md
     for more details.
--   Configuration validation is now a lot more strict
--   `up` now waits for all services to exit before shutting down
--   Support for the new docker networking can be enabled with
-    the `--x-networking` flag
 
-New Features
+-   Compose now produces better error messages when a file contains
+    invalid configuration.
 
--   `volumes_from` now supports a mode option allowing for read-only
-    `volumes_from`
--   Volumes that don't start with a path indicator (`.` or `/`) will now be
-    treated as a named volume. Previously this was a warning.
--   `--pull` flag added to `build`
--   `--ignore-pull-failures` flag added to `pull`
--   Support for the `ipc` field added to the compose file
--   Containers created by `run` can now be named with the `--name` flag
--   If you install Compose with pip or use it as a library, it now
-    works with Python 3
--   `image` field now supports image digests (in addition to ids and tags)
--   `ports` now supports ranges of ports
--   `--publish` flag added to `run`
--   New subcommands `pause` and `unpause`
--   services may be extended from the same file without a `file` key in
-    `extends`
--   Compose can be installed and run as a docker image. This is an experimental
+-   `up` now waits for all services to exit before shutting down,
+    rather than shutting down as soon as one container exits.
+
+-   Experimental support for the new docker networking system can be
+    enabled with the `--x-networking` flag. Read more here:
+    https://github.com/docker/docker/blob/8fee1c20/docs/userguide/dockernetworks.md
+
+New features:
+
+-   You can now optionally pass a mode to `volumes_from`, e.g.
+    `volumes_from: ["servicename:ro"]`.
+
+-   Since Docker now lets you create volumes with names, you can refer to those
+    volumes by name in `docker-compose.yml`. For example,
+    `volumes: ["mydatavolume:/data"]` will mount the volume named
+    `mydatavolume` at the path `/data` inside the container.
+
+    If the first component of an entry in `volumes` starts with a `.`, `/` or
+    `~`, it is treated as a path and expansion of relative paths is performed as
+    necessary. Otherwise, it is treated as a volume name and passed straight
+    through to Docker.
+
+    Read more on named volumes and volume drivers here:
+    https://github.com/docker/docker/blob/244d9c33/docs/userguide/dockervolumes.md
+
+-   `docker-compose build --pull` instructs Compose to pull the base image for
+    each Dockerfile before building.
+
+-   `docker-compose pull --ignore-pull-failures` instructs Compose to continue
+    if it fails to pull a single service's image, rather than aborting.
+
+-   You can now specify an IPC namespace in `docker-compose.yml` with the `ipc`
+    option.
+
+-   Containers created by `docker-compose run` can now be named with the
+    `--name` flag.
+
+-   If you install Compose with pip or use it as a library, it now works with
+    Python 3.
+
+-   `image` now supports image digests (in addition to ids and tags), e.g.
+    `image: "busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d"`
+
+-   `ports` now supports ranges of ports, e.g.
+
+        ports:
+          - "3000-3005"
+          - "9000-9001:8000-8001"
+
+-   `docker-compose run` now supports a `-p|--publish` parameter, much like
+    `docker run -p`, for publishing specific ports to the host.
+
+-   `docker-compose pause` and `docker-compose unpause` have been implemented,
+    analogous to `docker pause` and `docker unpause`.
+
+-   When using `extends` to copy configuration from another service in the same
+    Compose file, you can omit the `file` option.
+
+-   Compose can be installed and run as a Docker image. This is an experimental
     feature.
 
+Bug fixes:
 
-Bug Fixes
+-   All values for the `log_driver` option which are supported by the Docker
+    daemon are now supported by Compose.
 
--   Support all `log_drivers`
--   Fixed `build` when running against swarm
--   `~` is no longer expanded on the host when included as part of a container
-    volume path
+-   `docker-compose build` can now be run successfully against a Swarm cluster.
 
 
 
