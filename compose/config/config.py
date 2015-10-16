@@ -14,7 +14,6 @@ from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
-from .validation import validate_service_names
 from .validation import validate_top_level_object
 
 
@@ -165,16 +164,6 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
-@validate_top_level_object
-@validate_service_names
-def pre_process_config(config):
-    """
-    Pre validation checks and processing of the config file to interpolate env
-    vars returning a config dict ready to be tested against the schema.
-    """
-    return interpolate_environment_variables(config)
-
-
 def load(config_details):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
@@ -194,7 +183,7 @@ def load(config_details):
         return service_dict
 
     def load_file(filename, config):
-        processed_config = pre_process_config(config)
+        processed_config = interpolate_environment_variables(config)
         validate_against_fields_schema(processed_config)
         return [
             build_service(filename, name, service_config)
@@ -209,7 +198,10 @@ def load(config_details):
         }
 
     config_file = config_details.config_files[0]
+    validate_top_level_object(config_file.config)
     for next_file in config_details.config_files[1:]:
+        validate_top_level_object(next_file.config)
+
         config_file = ConfigFile(
             config_file.filename,
             merge_services(config_file.config, next_file.config))
@@ -283,9 +275,9 @@ class ServiceLoader(object):
         )
         self.extended_service_name = extends['service']
 
-        full_extended_config = pre_process_config(
-            load_yaml(self.extended_config_path)
-        )
+        config = load_yaml(self.extended_config_path)
+        validate_top_level_object(config)
+        full_extended_config = interpolate_environment_variables(config)
 
         validate_extended_service_exists(
             self.extended_service_name,
