@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from operator import itemgetter
 
+import py
 import pytest
 
 from compose.config import config
@@ -348,6 +349,18 @@ class ConfigTest(unittest.TestCase):
                     'filename.yml'
                 )
             )
+
+    def test_load_yaml_with_yaml_error(self):
+        tmpdir = py.test.ensuretemp('invalid_yaml_test')
+        invalid_yaml_file = tmpdir.join('docker-compose.yml')
+        invalid_yaml_file.write("""
+            web:
+              this is bogus: ok: what
+        """)
+        with pytest.raises(ConfigurationError) as exc:
+            config.load_yaml(str(invalid_yaml_file))
+
+        assert 'line 3, column 32' in exc.exconly()
 
 
 class InterpolationTest(unittest.TestCase):
