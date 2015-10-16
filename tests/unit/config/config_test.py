@@ -156,6 +156,43 @@ class ConfigTest(unittest.TestCase):
             config.load(details)
         assert 'Top level object needs to be a dictionary' in exc.exconly()
 
+    def test_load_with_multiple_files_and_extends_in_override_file(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'web': {'image': 'example/web'},
+            })
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'web': {
+                    'extends': {
+                        'file': 'common.yml',
+                        'service': 'base',
+                    },
+                    'volumes': ['/home/user/project:/code'],
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        tmpdir = py.test.ensuretemp('config_test')
+        tmpdir.join('common.yml').write("""
+            base:
+              labels: ['label=one']
+        """)
+        with tmpdir.as_cwd():
+            service_dicts = config.load(details)
+
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'volumes': ['/home/user/project:/code'],
+                'labels': {'label': 'one'},
+            },
+        ]
+        self.assertEqual(service_sort(service_dicts), service_sort(expected))
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             config.load(
