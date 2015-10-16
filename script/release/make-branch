@@ -46,7 +46,7 @@ if [ -z "$REMOTE" ]; then
 fi
 
 # handle the difference between a branch and a tag
-if [ -z "$(git name-rev $BASE_VERSION | grep tags)" ]; then
+if [ -z "$(git name-rev --tags $BASE_VERSION | grep tags)" ]; then
     BASE_VERSION=$REMOTE/$BASE_VERSION
 fi
 
