@@ -17,6 +17,12 @@
 #    . ~/.docker-compose-completion.sh
 
 
+# suppress trailing whitespace
+__docker_compose_nospace() {
+	# compopt is not available in ancient bash versions
+	type compopt &>/dev/null && compopt -o nospace
+}
+
 # For compatibility reasons, Compose and therefore its completion supports several
 # stack compositon files as listed here, in descending priority.
 # Support for these filenames might be dropped in some future version.
@@ -255,7 +261,7 @@ _docker_compose_run() {
 	case "$prev" in
 		-e)
 			COMPREPLY=( $( compgen -e -- "$cur" ) )
-			compopt -o nospace
+			__docker_compose_nospace
 			return
 			;;
 		--entrypoint|--name|--user|-u)
@@ -291,7 +297,7 @@ _docker_compose_scale() {
 			;;
 		*)
 			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
-			compopt -o nospace
+			__docker_compose_nospace
 			;;
 	esac
 }
