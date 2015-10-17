@@ -444,6 +444,68 @@ class ServiceTest(unittest.TestCase):
         }
         self.assertEqual(config_dict, expected)
 
+    def test_specifies_host_port_with_no_ports(self):
+        service = Service(
+            'foo',
+            image='foo')
+        self.assertEqual(service.specifies_host_port(), False)
+
+    def test_specifies_host_port_with_container_port(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["2000"])
+        self.assertEqual(service.specifies_host_port(), False)
+
+    def test_specifies_host_port_with_host_port(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["1000:2000"])
+        self.assertEqual(service.specifies_host_port(), True)
+
+    def test_specifies_host_port_with_host_ip_no_port(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["127.0.0.1::2000"])
+        self.assertEqual(service.specifies_host_port(), False)
+
+    def test_specifies_host_port_with_host_ip_and_port(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["127.0.0.1:1000:2000"])
+        self.assertEqual(service.specifies_host_port(), True)
+
+    def test_specifies_host_port_with_container_port_range(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["2000-3000"])
+        self.assertEqual(service.specifies_host_port(), False)
+
+    def test_specifies_host_port_with_host_port_range(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["1000-2000:2000-3000"])
+        self.assertEqual(service.specifies_host_port(), True)
+
+    def test_specifies_host_port_with_host_ip_no_port_range(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["127.0.0.1::2000-3000"])
+        self.assertEqual(service.specifies_host_port(), False)
+
+    def test_specifies_host_port_with_host_ip_and_port_range(self):
+        service = Service(
+            'foo',
+            image='foo',
+            ports=["127.0.0.1:1000-2000:2000-3000"])
+        self.assertEqual(service.specifies_host_port(), True)
+
 
 class NetTestCase(unittest.TestCase):
 
