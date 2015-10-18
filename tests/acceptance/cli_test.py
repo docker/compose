@@ -3,10 +3,12 @@ from __future__ import absolute_import
 import os
 import shlex
 import signal
+import shutil
 import subprocess
 import time
 from collections import namedtuple
 from operator import attrgetter
+from time import sleep
 
 from docker import errors
 
@@ -16,7 +18,6 @@ from compose.cli.docker_client import docker_client
 from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import pull_busybox
-
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
@@ -143,6 +144,60 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplecomposefiles_simple_1', result.stdout)
         self.assertNotIn('multiplecomposefiles_another_1', result.stdout)
         self.assertIn('multiplecomposefiles_yetanother_1', result.stdout)
+
+    def test_ps_with_orphan(self):
+        shutil.copyfile('tests/fixtures/orphan-services/docker-compose.before.yml',
+                        'tests/fixtures/orphan-services/docker-compose.yml')
+        self.base_dir = 'tests/fixtures/orphan-services'
+        self.dispatch(['up', '-d'])
+        self.dispatch(['scale', 'test2=2'])
+        # Wait 1 second to let test3 container the time to exit
+        sleep(1)
+        shutil.copyfile('tests/fixtures/orphan-services/docker-compose.after.yml',
+                        'tests/fixtures/orphan-services/docker-compose.yml')
+
+        result = self.dispatch(['ps', '--all'])
+        self.assertIn('orphanservices_test1_1', result.stdout)
+        self.assertIn('orphanservices_test2_1', result.stdout)
+        self.assertIn('orphanservices_test2_2', result.stdout)
+        self.assertIn('orphanservices_test3_1', result.stdout)
+        self.assertIn('orphan', result.stdout)
+
+        result = self.dispatch(['ps', '--all', '-q'])
+        lines = result.stdout.splitlines()
+        self.assertEqual(len(lines), 4)
+
+        result = self.dispatch(['ps', '--all', 'test1'])
+        self.assertIn('orphanservices_test1_1', result.stdout)
+        self.assertNotIn('orphanservices_test2_1', result.stdout)
+        self.assertNotIn('orphanservices_test3_1', result.stdout)
+
+        result = self.dispatch(['ps', '--all', 'test2'])
+        self.assertNotIn('orphanservices_test1_1', result.stdout)
+        self.assertIn('orphanservices_test2_1', result.stdout)
+        self.assertIn('orphanservices_test2_2', result.stdout)
+        self.assertNotIn('orphanservices_test3_1', result.stdout)
+        self.assertIn('Up (orphan)', result.stdout)
+
+        result = self.dispatch(['ps', '--all', 'test3'])
+        self.assertNotIn('orphanservices_test1_1', result.stdout)
+        self.assertNotIn('orphanservices_test2_1', result.stdout)
+        self.assertIn('orphanservices_test3_1', result.stdout)
+        self.assertIn('Exit 0 (orphan)', result.stdout)
+
+        result = self.dispatch(['ps', '--all', 'test1', 'test2'])
+        self.assertIn('orphanservices_test1_1', result.stdout)
+        self.assertIn('orphanservices_test2_1', result.stdout)
+        self.assertIn('orphanservices_test2_2', result.stdout)
+        self.assertNotIn('orphanservices_test3_1', result.stdout)
+        self.assertIn('Up (orphan)', result.stdout)
+
+        result = self.dispatch(['ps', '--all', 'test4', 'test2'])
+        self.assertNotIn('orphanservices_test1_1', result.stdout)
+        self.assertIn('orphanservices_test2_1', result.stdout)
+        self.assertIn('orphanservices_test2_2', result.stdout)
+        self.assertNotIn('orphanservices_test3_1', result.stdout)
+        self.assertIn('Up (orphan)', result.stdout)
 
     def test_pull(self):
         result = self.dispatch(['pull'])
@@ -844,3 +899,33 @@ class CLITestCase(DockerClientTestCase):
             "BAZ=2",
         ])
         self.assertTrue(expected_env <= set(web.get('Config.Env')))
+
+    def test_up_with_clean(self):
+        shutil.copyfile('tests/fixtures/orphan-services/docker-compose.before.yml',
+                        'tests/fixtures/orphan-services/docker-compose.yml')
+        self.base_dir = 'tests/fixtures/orphan-services'
+        self.dispatch(['up', '-d'], None)
+        self.dispatch(['scale', 'test2=1'], None)
+        shutil.copyfile('tests/fixtures/orphan-services/docker-compose.after.yml',
+                        'tests/fixtures/orphan-services/docker-compose.yml')
+        self.dispatch(['up', '-d', '--clean'], None)
+        self.assertEqual(len(self.project.containers(stopped=True, orphan=True)), 2)
+        self.assertEqual(len(self.project.containers(stopped=False, orphan=True)), 0)
+        self.assertEqual(len(self.project.containers(stopped=False)), 1)
+
+    def test_clean(self):
+        shutil.copyfile('tests/fixtures/orphan-services/docker-compose.before.yml',
+                        'tests/fixtures/orphan-services/docker-compose.yml')
+        self.base_dir = 'tests/fixtures/orphan-services'
+        self.dispatch(['up', '-d'], None)
+        self.dispatch(['scale', 'test2=1'], None)
+        shutil.copyfile('tests/fixtures/orphan-services/docker-compose.after.yml',
+                        'tests/fixtures/orphan-services/docker-compose.yml')
+        self.assertEqual(len(self.project.containers(stopped=True, orphan=True)), 2)
+        self.assertEqual(len(self.project.containers(stopped=False, orphan=True)), 1)
+        self.dispatch(['clean', '--keep'], None)
+        self.assertEqual(len(self.project.containers(stopped=True)), 1)
+        self.assertEqual(len(self.project.containers(stopped=True, orphan=True)), 2)
+        self.dispatch(['clean', '--force'], None)
+        self.assertEqual(len(self.project.containers(stopped=True)), 1)
+        self.assertEqual(len(self.project.containers(stopped=True, orphan=True)), 0)

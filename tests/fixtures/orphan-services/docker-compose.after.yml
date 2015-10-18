@@ -1,0 +1,12 @@
+test1:
+    image: busybox
+    command: sleep 3600
+
+# Services are orphan now
+# test2:
+#     image: busybox
+#     command: sleep 3600
+#
+# test3:
+#     image: busybox
+#     command: "true"
