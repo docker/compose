@@ -212,9 +212,16 @@ def load(config_details):
 
 
 class ServiceLoader(object):
-    def __init__(self, working_dir, filename, service_name, service_dict, already_seen=None):
+    def __init__(
+        self,
+        working_dir,
+        filename,
+        service_name,
+        service_dict,
+        already_seen=None
+    ):
         if working_dir is None:
-            raise Exception("No working_dir passed to ServiceLoader()")
+            raise ValueError("No working_dir passed to ServiceLoader()")
 
         self.working_dir = os.path.abspath(working_dir)
 
@@ -311,33 +318,33 @@ class ServiceLoader(object):
         return merge_service_dicts(other_service_dict, self.service_dict)
 
     def get_extended_config_path(self, extends_options):
-        """
-        Service we are extending either has a value for 'file' set, which we
+        """Service we are extending either has a value for 'file' set, which we
         need to obtain a full path too or we are extending from a service
         defined in our own file.
         """
         if 'file' in extends_options:
-            extends_from_filename = extends_options['file']
-            return expand_path(self.working_dir, extends_from_filename)
-
+            return expand_path(self.working_dir, extends_options['file'])
         return self.filename
 
     def signature(self, name):
-        return (self.filename, name)
+        return self.filename, name
 
 
 def validate_extended_service_dict(service_dict, filename, service):
     error_prefix = "Cannot extend service '%s' in %s:" % (service, filename)
 
     if 'links' in service_dict:
-        raise ConfigurationError("%s services with 'links' cannot be extended" % error_prefix)
+        raise ConfigurationError(
+            "%s services with 'links' cannot be extended" % error_prefix)
 
     if 'volumes_from' in service_dict:
-        raise ConfigurationError("%s services with 'volumes_from' cannot be extended" % error_prefix)
+        raise ConfigurationError(
+            "%s services with 'volumes_from' cannot be extended" % error_prefix)
 
     if 'net' in service_dict:
         if get_service_name_from_net(service_dict['net']) is not None:
-            raise ConfigurationError("%s services with 'net: container' cannot be extended" % error_prefix)
+            raise ConfigurationError(
+                "%s services with 'net: container' cannot be extended" % error_prefix)
 
 
 def process_container_options(service_dict, working_dir=None):
