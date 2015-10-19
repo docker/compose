@@ -240,80 +240,61 @@ class ServiceLoader(object):
             raise CircularReference(self.already_seen + [self.signature(name)])
 
     def make_service_dict(self):
-        self.resolve_environment()
-        if 'extends' in self.service_dict:
-            self.validate_and_construct_extends()
-            self.service_dict = self.resolve_extends()
+        service_dict = dict(self.service_dict)
+        env = resolve_environment(self.working_dir, self.service_dict)
+        if env:
+            service_dict['environment'] = env
+            service_dict.pop('env_file', None)
+
+        if 'extends' in service_dict:
+            service_dict = self.resolve_extends(*self.validate_and_construct_extends())
 
         if not self.already_seen:
-            validate_against_service_schema(self.service_dict, self.service_name)
+            validate_against_service_schema(service_dict, self.service_name)
 
-        return process_container_options(self.service_dict, working_dir=self.working_dir)
-
-    def resolve_environment(self):
-        """
-        Unpack any environment variables from an env_file, if set.
-        Interpolate environment values if set.
-        """
-        if 'environment' not in self.service_dict and 'env_file' not in self.service_dict:
-            return
-
-        env = {}
-
-        if 'env_file' in self.service_dict:
-            for f in get_env_files(self.service_dict, working_dir=self.working_dir):
-                env.update(env_vars_from_file(f))
-            del self.service_dict['env_file']
-
-        env.update(parse_environment(self.service_dict.get('environment')))
-        env = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
-
-        self.service_dict['environment'] = env
+        return process_container_options(service_dict, working_dir=self.working_dir)
 
     def validate_and_construct_extends(self):
         extends = self.service_dict['extends']
         if not isinstance(extends, dict):
             extends = {'service': extends}
 
-        validate_extends_file_path(
-            self.service_name,
-            extends,
-            self.filename
-        )
-        self.extended_config_path = self.get_extended_config_path(extends)
-        self.extended_service_name = extends['service']
+        validate_extends_file_path(self.service_name, extends, self.filename)
+        config_path = self.get_extended_config_path(extends)
+        service_name = extends['service']
 
-        config = load_yaml(self.extended_config_path)
+        config = load_yaml(config_path)
         validate_top_level_object(config)
         full_extended_config = interpolate_environment_variables(config)
 
         validate_extended_service_exists(
-            self.extended_service_name,
+            service_name,
             full_extended_config,
-            self.extended_config_path
+            config_path
         )
         validate_against_fields_schema(full_extended_config)
 
-        self.extended_config = full_extended_config[self.extended_service_name]
+        service_config = full_extended_config[service_name]
+        return config_path, service_config, service_name
 
-    def resolve_extends(self):
-        other_working_dir = os.path.dirname(self.extended_config_path)
+    def resolve_extends(self, extended_config_path, service_config, service_name):
+        other_working_dir = os.path.dirname(extended_config_path)
         other_already_seen = self.already_seen + [self.signature(self.service_name)]
 
         other_loader = ServiceLoader(
-            working_dir=other_working_dir,
-            filename=self.extended_config_path,
-            service_name=self.service_name,
-            service_dict=self.extended_config,
+            other_working_dir,
+            extended_config_path,
+            self.service_name,
+            service_config,
             already_seen=other_already_seen,
         )
 
-        other_loader.detect_cycle(self.extended_service_name)
+        other_loader.detect_cycle(service_name)
         other_service_dict = other_loader.make_service_dict()
         validate_extended_service_dict(
             other_service_dict,
-            filename=self.extended_config_path,
-            service=self.extended_service_name,
+            extended_config_path,
+            service_name,
         )
 
         return merge_service_dicts(other_service_dict, self.service_dict)
@@ -329,6 +310,22 @@ class ServiceLoader(object):
 
     def signature(self, name):
         return self.filename, name
+
+
+def resolve_environment(working_dir, service_dict):
+    """Unpack any environment variables from an env_file, if set.
+    Interpolate environment values if set.
+    """
+    if 'environment' not in service_dict and 'env_file' not in service_dict:
+        return {}
+
+    env = {}
+    if 'env_file' in service_dict:
+        for env_file in get_env_files(service_dict, working_dir=working_dir):
+            env.update(env_vars_from_file(env_file))
+
+    env.update(parse_environment(service_dict.get('environment')))
+    return dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
 
 
 def validate_extended_service_dict(service_dict, filename, service):
