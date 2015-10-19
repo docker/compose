@@ -136,7 +136,7 @@ def process_errors(errors, service_name=None):
             if len(validator) >= 2:
                 first_type = anglicize_validator(validator[0])
                 last_type = anglicize_validator(validator[-1])
-                types_from_validator = "{}".format(", ".join([first_type] + validator[1:-1]))
+                types_from_validator = ", ".join([first_type] + validator[1:-1])
 
                 msg = "{} or {}".format(
                     types_from_validator,

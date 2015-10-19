@@ -449,6 +449,23 @@ class InterpolationTest(unittest.TestCase):
         self.assertIn('in service "web"', cm.exception.msg)
         self.assertIn('"${"', cm.exception.msg)
 
+    def test_empty_environment_key_allowed(self):
+        service_dict = config.load(
+            build_config_details(
+                {
+                    'web': {
+                        'build': '.',
+                        'environment': {
+                            'POSTGRES_PASSWORD': ''
+                        },
+                    },
+                },
+                '.',
+                None,
+            )
+        )[0]
+        self.assertEquals(service_dict['environment']['POSTGRES_PASSWORD'], '')
+
 
 class VolumeConfigTest(unittest.TestCase):
     def test_no_binding(self):
