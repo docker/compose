@@ -66,4 +66,8 @@ setup(
     [console_scripts]
     docker-compose=compose.cli.main:main
     """,
+    classifiers=[
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
+    ],
 )
