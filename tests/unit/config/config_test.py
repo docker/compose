@@ -134,6 +134,28 @@ class ConfigTest(unittest.TestCase):
         ]
         self.assertEqual(service_sort(service_dicts), service_sort(expected))
 
+    def test_load_with_multiple_files_and_empty_override(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {'web': {'image': 'example/web'}})
+        override_file = config.ConfigFile('override.yaml', None)
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        assert 'Top level object needs to be a dictionary' in exc.exconly()
+
+    def test_load_with_multiple_files_and_empty_base(self):
+        base_file = config.ConfigFile('base.yaml', None)
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {'web': {'image': 'example/web'}})
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        assert 'Top level object needs to be a dictionary' in exc.exconly()
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             config.load(

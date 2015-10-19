@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import sys
-from functools import wraps
 
 import six
 from docker.utils.ports import split_port
@@ -65,27 +64,21 @@ def format_boolean_in_environment(instance):
     return True
 
 
-def validate_service_names(func):
-    @wraps(func)
-    def func_wrapper(config):
-        for service_name in config.keys():
-            if type(service_name) is int:
-                raise ConfigurationError(
-                    "Service name: {} needs to be a string, eg '{}'".format(service_name, service_name)
-                )
-        return func(config)
-    return func_wrapper
-
-
-def validate_top_level_object(func):
-    @wraps(func)
-    def func_wrapper(config):
-        if not isinstance(config, dict):
+def validate_service_names(config):
+    for service_name in config.keys():
+        if not isinstance(service_name, six.string_types):
             raise ConfigurationError(
-                "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
-            )
-        return func(config)
-    return func_wrapper
+                "Service name: {} needs to be a string, eg '{}'".format(
+                    service_name,
+                    service_name))
+
+
+def validate_top_level_object(config):
+    if not isinstance(config, dict):
+        raise ConfigurationError(
+            "Top level object needs to be a dictionary. Check your .yml file "
+            "that you have defined a service at the top level.")
+    validate_service_names(config)
 
 
 def validate_extends_file_path(service_name, extends_options, filename):
