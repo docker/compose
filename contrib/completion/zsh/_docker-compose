@@ -330,6 +330,8 @@ _docker-compose() {
         '(- :)'{-v,--version}'[Print version and exit]' \
         '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
+        '--x-networking[(EXPERIMENTAL) Use new Docker networking functionality. Requires Docker 1.9 or later.]' \
+        '--x-network-driver[(EXPERIMENTAL) Specify a network driver (default: "bridge"). Requires Docker 1.9 or later.]:Network Driver:(bridge host none overlay)' \
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 
