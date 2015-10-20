@@ -7,6 +7,7 @@ from __future__ import unicode_literals
 import py
 
 from .testcases import DockerClientTestCase
+from .testcases import get_links
 from compose.config import config
 from compose.project import Project
 from compose.service import ConvergenceStrategy
@@ -186,8 +187,8 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         web, = [c for c in containers if c.service == 'web']
         nginx, = [c for c in containers if c.service == 'nginx']
 
-        self.assertEqual(web.links(), ['composetest_db_1', 'db', 'db_1'])
-        self.assertEqual(nginx.links(), ['composetest_web_1', 'web', 'web_1'])
+        self.assertEqual(set(get_links(web)), {'composetest_db_1', 'db', 'db_1'})
+        self.assertEqual(set(get_links(nginx)), {'composetest_web_1', 'web', 'web_1'})
 
 
 class ServiceStateTest(DockerClientTestCase):
