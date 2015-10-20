@@ -300,9 +300,7 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        self.ensure_image_exists(
-            do_build=do_build,
-        )
+        self.ensure_image_exists(do_build=do_build)
 
         container_options = self._get_container_create_options(
             override_options,
@@ -316,9 +314,7 @@ class Service(object):
 
         return Container.create(self.client, **container_options)
 
-    def ensure_image_exists(self,
-                            do_build=True):
-
+    def ensure_image_exists(self, do_build=True):
         try:
             self.image()
             return
@@ -403,9 +399,7 @@ class Service(object):
         (action, containers) = plan
 
         if action == 'create':
-            container = self.create_container(
-                do_build=do_build,
-            )
+            container = self.create_container(do_build=do_build)
             self.start_container(container)
 
             return [container]
