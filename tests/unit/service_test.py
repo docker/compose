@@ -339,44 +339,37 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(parse_repository_tag("user/repo@sha256:digest"), ("user/repo", "sha256:digest", "@"))
         self.assertEqual(parse_repository_tag("url:5000/repo@sha256:digest"), ("url:5000/repo", "sha256:digest", "@"))
 
-    @mock.patch('compose.service.Container', autospec=True)
-    def test_create_container_latest_is_used_when_no_tag_specified(self, mock_container):
-        service = Service('foo', client=self.mock_client, image='someimage')
-        images = []
-
-        def pull(repo, tag=None, **kwargs):
-            self.assertEqual('someimage', repo)
-            self.assertEqual('latest', tag)
-            images.append({'Id': 'abc123'})
-            return []
-
-        service.image = lambda *args, **kwargs: mock_get_image(images)
-        self.mock_client.pull = pull
-
-        service.create_container()
-        self.assertEqual(1, len(images))
-
     def test_create_container_with_build(self):
         service = Service('foo', client=self.mock_client, build='.')
-
-        images = []
-        service.image = lambda *args, **kwargs: mock_get_image(images)
-        service.build = lambda: images.append({'Id': 'abc123'})
+        self.mock_client.inspect_image.side_effect = [
+            NoSuchImageError,
+            {'Id': 'abc123'},
+        ]
+        self.mock_client.build.return_value = [
+            '{"stream": "Successfully built abcd"}',
+        ]
 
         service.create_container(do_build=True)
-        self.assertEqual(1, len(images))
+        self.mock_client.build.assert_called_once_with(
+            tag='default_foo',
+            dockerfile=None,
+            stream=True,
+            path='.',
+            pull=False,
+            nocache=False,
+            rm=True,
+        )
 
     def test_create_container_no_build(self):
         service = Service('foo', client=self.mock_client, build='.')
-        service.image = lambda: {'Id': 'abc123'}
+        self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
 
         service.create_container(do_build=False)
         self.assertFalse(self.mock_client.build.called)
 
     def test_create_container_no_build_but_needs_build(self):
         service = Service('foo', client=self.mock_client, build='.')
-        service.image = lambda *args, **kwargs: mock_get_image([])
-
+        self.mock_client.inspect_image.side_effect = NoSuchImageError
         with self.assertRaises(NeedsBuildError):
             service.create_container(do_build=False)
 
@@ -482,13 +475,6 @@ class NetTestCase(unittest.TestCase):
         self.assertEqual(net.id, service_name)
         self.assertEqual(net.mode, None)
         self.assertEqual(net.service_name, service_name)
-
-
-def mock_get_image(images):
-    if images:
-        return images[0]
-    else:
-        raise NoSuchImageError()
 
 
 class ServiceVolumesTest(unittest.TestCase):
