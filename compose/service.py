@@ -952,7 +952,7 @@ def normalize_paths_for_engine(external_path, internal_path):
             drive, tail = os.path.splitdrive(external_path)
 
             if drive:
-                reformatted_drive = "/{}".format(drive.replace(":", ""))
+                reformatted_drive = "/{}".format(drive.lower().replace(":", ""))
                 external_path = reformatted_drive + tail
 
             external_path = "/".join(external_path.split("\\"))
