@@ -943,23 +943,21 @@ def build_volume_binding(volume_spec):
 
 
 def normalize_paths_for_engine(external_path, internal_path):
-    """
-    Windows paths, c:\my\path\shiny, need to be changed to be compatible with
+    """Windows paths, c:\my\path\shiny, need to be changed to be compatible with
     the Engine. Volume paths are expected to be linux style /c/my/path/shiny/
     """
-    if IS_WINDOWS_PLATFORM:
-        if external_path:
-            drive, tail = os.path.splitdrive(external_path)
-
-            if drive:
-                reformatted_drive = "/{}".format(drive.lower().replace(":", ""))
-                external_path = reformatted_drive + tail
-
-            external_path = "/".join(external_path.split("\\"))
-
-        return external_path, "/".join(internal_path.split("\\"))
-    else:
+    if not IS_WINDOWS_PLATFORM:
         return external_path, internal_path
+
+    if external_path:
+        drive, tail = os.path.splitdrive(external_path)
+
+        if drive:
+            external_path = '/' + drive.lower().rstrip(':') + tail
+
+        external_path = external_path.replace('\\', '/')
+
+    return external_path, internal_path.replace('\\', '/')
 
 
 def parse_volume_spec(volume_config):
