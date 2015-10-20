@@ -193,7 +193,9 @@ def load(config_details):
     def merge_services(base, override):
         all_service_names = set(base) | set(override)
         return {
-            name: merge_service_dicts(base.get(name, {}), override.get(name, {}))
+            name: merge_service_dicts_from_files(
+                base.get(name, {}),
+                override.get(name, {}))
             for name in all_service_names
         }
 
@@ -270,9 +272,7 @@ class ServiceLoader(object):
             extends,
             self.filename
         )
-        self.extended_config_path = self.get_extended_config_path(
-            extends
-        )
+        self.extended_config_path = self.get_extended_config_path(extends)
         self.extended_service_name = extends['service']
 
         config = load_yaml(self.extended_config_path)
@@ -353,6 +353,17 @@ def process_container_options(service_dict, working_dir=None):
         service_dict['labels'] = parse_labels(service_dict['labels'])
 
     return service_dict
+
+
+def merge_service_dicts_from_files(base, override):
+    """When merging services from multiple files we need to merge the `extends`
+    field. This is not handled by `merge_service_dicts()` which is used to
+    perform the `extends`.
+    """
+    new_service = merge_service_dicts(base, override)
+    if 'extends' in override:
+        new_service['extends'] = override['extends']
+    return new_service
 
 
 def merge_service_dicts(base, override):
