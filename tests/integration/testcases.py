@@ -16,6 +16,16 @@ def pull_busybox(client):
     client.pull('busybox:latest', stream=False)
 
 
+def get_links(container):
+    links = container.get('HostConfig.Links') or []
+
+    def format_link(link):
+        _, alias = link.split(':')
+        return alias.split('/')[-1]
+
+    return [format_link(link) for link in links]
+
+
 class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

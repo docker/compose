@@ -12,6 +12,7 @@ from six import text_type
 
 from .. import mock
 from .testcases import DockerClientTestCase
+from .testcases import get_links
 from .testcases import pull_busybox
 from compose import __version__
 from compose.config.types import VolumeFromSpec
@@ -88,7 +89,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         container = service.create_container()
         container.start()
-        self.assertIsNotNone(container.get_mount('/var/db'))
+        assert container.get_mount('/var/db')
 
     def test_create_container_with_volume_driver(self):
         service = self.create_service('db', volume_driver='foodriver')
@@ -158,7 +159,7 @@ class ServiceTest(DockerClientTestCase):
             volumes=[VolumeSpec(host_path, container_path, 'rw')])
         container = service.create_container()
         container.start()
-        self.assertIsNotNone(container.get_mount(container_path))
+        assert container.get_mount(container_path)
 
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
         actual_host_path = container.get_mount(container_path)['Source']
@@ -385,7 +386,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(web)
 
         self.assertEqual(
-            set(web.containers()[0].links()),
+            set(get_links(web.containers()[0])),
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
@@ -401,7 +402,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(web)
 
         self.assertEqual(
-            set(web.containers()[0].links()),
+            set(get_links(web.containers()[0])),
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
@@ -419,7 +420,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(web)
 
         self.assertEqual(
-            set(web.containers()[0].links()),
+            set(get_links(web.containers()[0])),
             set([
                 'composetest_db_1',
                 'composetest_db_2',
@@ -433,7 +434,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
 
         c = create_and_start_container(db)
-        self.assertEqual(set(c.links()), set([]))
+        self.assertEqual(set(get_links(c)), set([]))
 
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
@@ -444,7 +445,7 @@ class ServiceTest(DockerClientTestCase):
         c = create_and_start_container(db, one_off=True)
 
         self.assertEqual(
-            set(c.links()),
+            set(get_links(c)),
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',

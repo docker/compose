@@ -340,7 +340,6 @@ class ProjectTest(DockerClientTestCase):
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
-        mount, = db_container.get('Mounts')
         self.assertEqual(
             db_container.get_mount('/var/db')['Source'],
             db_volume_path)
