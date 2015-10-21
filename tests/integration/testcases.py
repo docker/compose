@@ -76,11 +76,7 @@ class DockerClientTestCase(unittest.TestCase):
         build_output = self.client.build(*args, **kwargs)
         stream_output(build_output, open('/dev/null', 'w'))
 
-    def require_engine_version(self, minimum):
-        # Drop '-dev' or '-rcN' suffix
-        engine = self.client.version()['Version'].split('-', 1)[0]
-        if version_lt(engine, minimum):
-            skip(
-                "Engine version is too low ({} < {})"
-                .format(engine, minimum)
-            )
+    def require_api_version(self, minimum):
+        api_version = self.client.version()['ApiVersion']
+        if version_lt(api_version, minimum):
+            skip("API version is too low ({} < {})".format(api_version, minimum))

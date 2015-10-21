@@ -98,14 +98,14 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(db._get_volumes_from(), [data_container.id + ':rw'])
 
     def test_get_network_does_not_exist(self):
-        self.require_engine_version("1.9")
+        self.require_api_version('1.21')
         client = docker_client(version='1.21')
 
         project = Project('composetest', [], client)
         assert project.get_network() is None
 
     def test_get_network(self):
-        self.require_engine_version("1.9")
+        self.require_api_version('1.21')
         client = docker_client(version='1.21')
 
         network_name = 'network_does_exist'

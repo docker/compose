@@ -187,7 +187,7 @@ class CLITestCase(DockerClientTestCase):
         )
 
     def test_up_without_networking(self):
-        self.require_engine_version("1.9")
+        self.require_api_version('1.21')
 
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['up', '-d'], None)
@@ -205,7 +205,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertTrue(web_container.get('HostConfig.Links'))
 
     def test_up_with_networking(self):
-        self.require_engine_version("1.9")
+        self.require_api_version('1.21')
 
         self.command.base_dir = 'tests/fixtures/links-composefile'
         self.command.dispatch(['--x-networking', 'up', '-d'], None)
