@@ -21,13 +21,13 @@ Python.
 
 First, [install Docker and Compose](install.md).
 
-Next, you'll want to make a directory for the project:
+Create a directory for the project:
 
     $ mkdir composetest
     $ cd composetest
 
 Inside this directory, create `app.py`, a simple Python web app that uses the Flask
-framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
+framework and increments a value in Redis.
 
     from flask import Flask
     from redis import Redis
@@ -74,7 +74,7 @@ You can build the image by running `docker build -t web .`.
 
 ### Define services
 
-Next, define a set of services using `docker-compose.yml`:
+Define a set of services using `docker-compose.yml`:
 
     web:
       build: .
@@ -91,8 +91,8 @@ This template defines two services, `web` and `redis`. The `web` service:
 
 * Builds from the `Dockerfile` in the current directory.
 * Forwards the exposed port 5000 on the container to port 5000 on the host machine.
-* Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
-* Links the web container to the Redis service.
+* Mounts the project directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
+* Links the web service to the Redis service.
 
 The `redis` service uses the latest public [Redis](https://registry.hub.docker.com/_/redis/) image pulled from the Docker Hub registry.
 
@@ -113,7 +113,7 @@ If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-
 
 If you're using Docker on Linux natively, then the web app should now be listening on port 5000 on your Docker daemon host. If `http://0.0.0.0:5000` doesn't resolve, you can also try `http://localhost:5000`.
 
-You should get a message in your browser saying:
+You will see a message in your browser saying:
 
 `Hello World! I have been seen 1 times.`
 
