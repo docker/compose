@@ -537,8 +537,8 @@ class VolumeConfigTest(unittest.TestCase):
         self.assertEqual(d['volumes'], ['/var/lib/data:/data'])
 
     def test_absolute_windows_path_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['C:\\data:/data']}, working_dir='.')
-        self.assertEqual(d['volumes'], ['C:\\data:/data'])
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['c:\\data:/data']}, working_dir='.')
+        self.assertEqual(d['volumes'], ['c:\\data:/data'])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     def test_relative_path_does_expand_posix(self):
@@ -553,14 +553,14 @@ class VolumeConfigTest(unittest.TestCase):
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
     def test_relative_path_does_expand_windows(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='C:\\Users\\me\\myproject')
-        self.assertEqual(d['volumes'], ['C:\\Users\\me\\myproject\\data:/data'])
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='c:\\Users\\me\\myproject')
+        self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject\\data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='C:\\Users\\me\\myproject')
-        self.assertEqual(d['volumes'], ['C:\\Users\\me\\myproject:/data'])
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='c:\\Users\\me\\myproject')
+        self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='C:\\Users\\me\\myproject')
-        self.assertEqual(d['volumes'], ['C:\\Users\\me\\otherproject:/data'])
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='c:\\Users\\me\\myproject')
+        self.assertEqual(d['volumes'], ['c:\\Users\\me\\otherproject:/data'])
 
     @mock.patch.dict(os.environ)
     def test_home_directory_with_driver_does_not_expand(self):
