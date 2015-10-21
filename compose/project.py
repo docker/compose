@@ -5,6 +5,7 @@ import logging
 from functools import reduce
 
 from docker.errors import APIError
+from docker.errors import NotFound
 
 from .config import ConfigurationError
 from .config import get_service_name_from_net
@@ -363,10 +364,10 @@ class Project(object):
         return [c for c in containers if matches_service_names(c)]
 
     def get_network(self):
-        networks = self.client.networks(names=[self.name])
-        if networks:
-            return networks[0]
-        return None
+        try:
+            return self.client.inspect_network(self.name)
+        except NotFound:
+            return None
 
     def ensure_network_exists(self):
         # TODO: recreate network if driver has changed?
