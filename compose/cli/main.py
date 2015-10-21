@@ -565,16 +565,18 @@ class TopLevelCommand(DocoptCommand):
         start_deps = not options['--no-deps']
         service_names = options['SERVICE']
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        detached = options.get('-d')
 
         to_attach = project.up(
             service_names=service_names,
             start_deps=start_deps,
             strategy=convergence_strategy_from_opts(options),
             do_build=not options['--no-build'],
-            timeout=timeout
+            timeout=timeout,
+            detached=detached
         )
 
-        if not options['-d']:
+        if not detached:
             log_printer = build_log_printer(to_attach, service_names, monochrome)
             attach_to_logs(project, log_printer, service_names, timeout)
 
@@ -636,7 +638,10 @@ def convergence_strategy_from_opts(options):
 
 def build_log_printer(containers, service_names, monochrome):
     if service_names:
-        containers = [c for c in containers if c.service in service_names]
+        containers = [
+            container
+            for container in containers if container.service in service_names
+        ]
     return LogPrinter(containers, monochrome=monochrome)
 
 

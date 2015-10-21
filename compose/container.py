@@ -19,6 +19,7 @@ class Container(object):
         self.client = client
         self.dictionary = dictionary
         self.has_been_inspected = has_been_inspected
+        self.log_stream = None
 
     @classmethod
     def from_ps(cls, client, dictionary, **kwargs):
@@ -145,6 +146,13 @@ class Container(object):
     def has_api_logs(self):
         log_type = self.log_driver
         return not log_type or log_type == 'json-file'
+
+    def attach_log_stream(self):
+        """A log stream can only be attached if the container uses a json-file
+        log driver.
+        """
+        if self.has_api_logs:
+            self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
 
     def get(self, key):
         """Return a value from the container or None if the value is not set.

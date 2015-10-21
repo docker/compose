@@ -18,6 +18,7 @@ from compose.service import ConvergenceStrategy
 class ProjectTestCase(DockerClientTestCase):
     def run_up(self, cfg, **kwargs):
         kwargs.setdefault('timeout', 1)
+        kwargs.setdefault('detached', True)
 
         project = self.make_project(cfg)
         project.up(**kwargs)
@@ -184,7 +185,8 @@ def converge(service,
              do_build=True):
     """Create a converge plan from a strategy and execute the plan."""
     plan = service.convergence_plan(strategy)
-    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
+    containers, logging_threads = zip(*service.execute_convergence_plan(plan, do_build=do_build, timeout=1))
+    return containers
 
 
 class ServiceStateTest(DockerClientTestCase):

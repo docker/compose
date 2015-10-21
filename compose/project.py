@@ -290,7 +290,8 @@ class Project(object):
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
            do_build=True,
-           timeout=DEFAULT_TIMEOUT):
+           timeout=DEFAULT_TIMEOUT,
+           detached=False):
 
         services = self.get_services(service_names, include_deps=start_deps)
 
@@ -308,7 +309,8 @@ class Project(object):
             for container in service.execute_convergence_plan(
                 plans[service.name],
                 do_build=do_build,
-                timeout=timeout
+                timeout=timeout,
+                detached=detached
             )
         ]
 
