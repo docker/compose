@@ -1,3 +1,4 @@
+# encoding: utf-8
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
@@ -98,7 +99,7 @@ class CLITestCase(unittest.TestCase):
         command.run(mock_project, {
             'SERVICE': 'service',
             'COMMAND': None,
-            '-e': ['BAR=NEW', 'OTHER=THREE'],
+            '-e': ['BAR=NEW', 'OTHER=bär'.encode('utf-8')],
             '--user': None,
             '--no-deps': None,
             '--allow-insecure-ssl': None,
@@ -114,7 +115,7 @@ class CLITestCase(unittest.TestCase):
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
         self.assertEqual(
             call_kwargs['environment'],
-            {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': 'THREE'})
+            {'FOO': 'ONE', 'BAR': 'NEW', 'OTHER': u'bär'})
 
     def test_run_service_with_restart_always(self):
         command = TopLevelCommand()

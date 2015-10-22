@@ -1,3 +1,4 @@
+# encoding: utf-8
 from __future__ import print_function
 
 import os
@@ -894,7 +895,12 @@ class EnvTest(unittest.TestCase):
         )
         self.assertEqual(
             service_dict['environment'],
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
+            {
+                'FILE_DEF': u'bär',
+                'FILE_DEF_EMPTY': '',
+                'ENV_DEF': 'E3',
+                'NO_DEF': ''
+            },
         )
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
