@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 from .testcases import DockerClientTestCase
+from compose.cli.docker_client import docker_client
 from compose.config import config
 from compose.const import LABEL_PROJECT
 from compose.container import Container
@@ -95,6 +96,22 @@ class ProjectTest(DockerClientTestCase):
         )
         db = project.get_service('db')
         self.assertEqual(db._get_volumes_from(), [data_container.id + ':rw'])
+
+    def test_get_network_does_not_exist(self):
+        self.require_api_version('1.21')
+        client = docker_client(version='1.21')
+
+        project = Project('composetest', [], client)
+        assert project.get_network() is None
+
+    def test_get_network(self):
+        self.require_api_version('1.21')
+        client = docker_client(version='1.21')
+
+        network_name = 'network_does_exist'
+        project = Project(network_name, [], client)
+        client.create_network(network_name)
+        assert project.get_network()['name'] == network_name
 
     def test_net_from_service(self):
         project = Project.from_dicts(
