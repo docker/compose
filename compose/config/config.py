@@ -1,3 +1,4 @@
+import codecs
 import logging
 import os
 import sys
@@ -451,6 +452,8 @@ def parse_environment(environment):
 
 
 def split_env(env):
+    if isinstance(env, six.binary_type):
+        env = env.decode('utf-8')
     if '=' in env:
         return env.split('=', 1)
     else:
@@ -473,7 +476,7 @@ def env_vars_from_file(filename):
     if not os.path.exists(filename):
         raise ConfigurationError("Couldn't find env file: %s" % filename)
     env = {}
-    for line in open(filename, 'r'):
+    for line in codecs.open(filename, 'r', 'utf-8'):
         line = line.strip()
         if line and not line.startswith('#'):
             k, v = split_env(line)
