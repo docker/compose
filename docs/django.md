@@ -67,7 +67,7 @@ and a `docker-compose.yml` file.
     also describes which Docker images these services use, how they link
     together, any volumes they might need mounted inside the containers.
     Finally, the `docker-compose.yml` file describes which ports these services
-    expose. See the [`docker-compose.yml` reference](yml.md) for more
+    expose. See the [`docker-compose.yml` reference](compose-file.md) for more
     information on how this file works.
 
 9. Add the following configuration to the file.
