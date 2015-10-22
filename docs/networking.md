@@ -12,11 +12,11 @@ weight=6
 
 # Networking in Compose
 
-> **Note:** Compose’s networking support is experimental, and must be explicitly enabled with the `docker-compose --x-networking` flag.
+> **Note:** Compose's networking support is experimental, and must be explicitly enabled with the `docker-compose --x-networking` flag.
 
-Compose sets up a single default [network](http://TODO/docker-networking-docs) for your app. Each container for a service joins the default network and is both *reachable* by other containers on that network, and *discoverable* by them at a hostname identical to the service's name.
+Compose sets up a single default [network](/engine/reference/commandline/network_create.md) for your app. Each container for a service joins the default network and is both *reachable* by other containers on that network, and *discoverable* by them at a hostname identical to the service's name.
 
-> **Note:** Your app's network is given the same name as the "project name", which is based on the name of the directory it lives in. See the [CLI docs](cli.md#p-project-name-name) for how to override it.
+> **Note:** Your app's network is given the same name as the "project name", which is based on the name of the directory it lives in. See the [Command line overview](reference/docker-compose.md) for how to override it.
 
 For example, suppose your app is in a directory called `myapp`, and your `docker-compose.yml` looks like this:
 
@@ -65,7 +65,7 @@ Docker links are a one-way, single-host communication system. They should now be
 
 ## Specifying the network driver
 
-By default, Compose uses the `bridge` driver when creating the app’s network. The Docker Engine provides one other driver out-of-the-box: `overlay`, which implements secure communication between containers on different hosts (see the next section for how to set up and use the `overlay` driver). Docker also allows you to install [custom network drivers](http://TODO/custom-driver-docs).
+By default, Compose uses the `bridge` driver when creating the app’s network. The Docker Engine provides one other driver out-of-the-box: `overlay`, which implements secure communication between containers on different hosts (see the next section for how to set up and use the `overlay` driver). Docker also allows you to install [custom network drivers](/engine/extend/plugins_network.md).
 
 You can specify which one to use with the `--x-network-driver` flag:
 
