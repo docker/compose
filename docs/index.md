@@ -154,7 +154,7 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
 
 If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser.
 
-If you're using Docker on Linux natively, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try http://localhost:5000.
+If you're using Docker on Linux natively, then the web app should now be listening on port 5000 on your Docker daemon host. If `http://0.0.0.0:5000` doesn't resolve, you can also try `http://localhost:5000`.
 
 You should get a message in your browser saying:
 
