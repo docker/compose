@@ -764,10 +764,28 @@ class Service(object):
         return self.options.get('container_name')
 
     def specifies_host_port(self):
-        for port in self.options.get('ports', []):
-            if ':' in str(port):
+        def has_host_port(binding):
+            _, external_bindings = split_port(binding)
+
+            # there are no external bindings
+            if external_bindings is None:
+                return False
+
+            # we only need to check the first binding from the range
+            external_binding = external_bindings[0]
+
+            # non-tuple binding means there is a host port specified
+            if not isinstance(external_binding, tuple):
                 return True
-        return False
+
+            # extract actual host port from tuple of (host_ip, host_port)
+            _, host_port = external_binding
+            if host_port is not None:
+                return True
+
+            return False
+
+        return any(has_host_port(binding) for binding in self.options.get('ports', []))
 
     def pull(self, ignore_pull_failures=False):
         if 'image' not in self.options:
