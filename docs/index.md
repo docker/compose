@@ -43,7 +43,7 @@ A `docker-compose.yml` looks like this:
       image: redis
 
 For more information about the Compose file, see the
-[Compose file reference](yml.md)
+[Compose file reference](compose-file.md)
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -64,6 +64,12 @@ Compose has commands for managing the whole lifecycle of your application:
 
 ## Features
 
+The features of Compose that make it effective are:
+
+* [Preserve volume data](#preserve-volume-data)
+* [Only recreate containers that have changed](#only-recreate-containers-that-have-changed)
+* [Variables and moving a composition between environments](#variables-and-moving-a-composition-between-environments)
+
 #### Preserve volume data
 
 Compose preserves all volumes used by your services. When `docker-compose up`
@@ -80,18 +86,15 @@ containers. Re-using containers means that you can make changes to your
 environment very quickly.
 
 
-#### Variables and moving a composition to different environments
-
-> New in `docker-compose` 1.5
+#### Variables and moving a composition between environments
 
 Compose supports variables in the Compose file. You can use these variables
 to customize your composition for different environments, or different users.
 See [Variable substitution](compose-file.md#variable-substitution) for more
 details.
 
-Compose files can also be extended from other files using the `extends`
-field in a compose file, or by using multiple files. See [extends](extends.md)
-for more details.
+You can extend a Compose file using the `extends` field or by creating multiple
+Compose files. See [extends](extends.md) for more details.
 
 
 ## Common Use Cases
@@ -101,14 +104,19 @@ below.
 
 ### Development environments
 
-When you're developing software it is often helpful to be able to run the
-application and interact with it. If the application has any service dependencies
-(databases, queues, caches, web services, etc) you need a way to document the
-dependencies, configuration and operation of each. Compose provides a convenient
-format for definition these dependencies (the [Compose file](yml.md)) and a CLI
-tool for starting an isolated environment. Compose can replace a multi-page
-"developer getting started guide" with a single machine readable configuration
-file and a single command `docker-compose up`.
+When you're developing software, the ability to run an application in an
+isolated environment and interact with it is crucial.  The Compose command
+line tool can be used to create the environment and interact with it.
+
+The [Compose file](compose-file.md) provides a way to document and configure
+all of the application's service dependencies (databases, queues, caches,
+web service APIs, etc). Using the Compose command line tool you can create
+and start one or more containers for each dependency with a single command
+(`docker-compose up`).
+
+Together, these features provide a convenient way for developers to get
+started on a project.  Compose can reduce a multi-page "developer getting
+started guide" to a single machine readable Compose file and a few commands.
 
 ### Automated testing environments
 
@@ -116,7 +124,7 @@ An important part of any Continuous Deployment or Continuous Integration process
 is the automated test suite. Automated end-to-end testing requires an
 environment in which to run tests. Compose provides a convenient way to create
 and destroy isolated testing environments for your test suite. By defining the full
-environment in a [Compose file](yml.md) you can create and destroy these
+environment in a [Compose file](compose-file.md) you can create and destroy these
 environments in just a few commands:
 
     $ docker-compose up -d
@@ -128,11 +136,13 @@ environments in just a few commands:
 
 Compose has traditionally been focused on development and testing workflows,
 but with each release we're making progress on more production-oriented features.
-Compose can be used to deploy to a remote docker engine, for example a cloud
-instance provisioned with [Docker Machine](https://docs.docker.com/machine/) or
-a [Docker Swarm](https://docs.docker.com/swarm/) cluster.
+You can use Compose to deploy to a remote Docker Engine. The Docker Engine may
+be a single instance provisioned with
+[Docker Machine](https://docs.docker.com/machine/) or an entire
+[Docker Swarm](https://docs.docker.com/swarm/) cluster.
 
-See [compose in production](production.md) for more details.
+For details on using production-oriented features, see
+[compose in production](production.md) in this documentation.
 
 
 ## Release Notes

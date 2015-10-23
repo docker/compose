@@ -2,8 +2,6 @@ Docker Compose
 ==============
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
-*(Previously known as Fig)*
-
 Compose is a tool for defining and running multi-container Docker applications.
 With Compose, you define a multi-container application in a compose
 file then, using a single command, you create and start all the containers
@@ -36,7 +34,7 @@ A `docker-compose.yml` looks like this:
       image: redis
 
 For more information about the Compose file, see the
-[Compose file reference](docs/yml.md)
+[Compose file reference](docs/compose-file.md)
 
 Compose has commands for managing the whole lifecycle of your application:
 
