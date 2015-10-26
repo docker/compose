@@ -323,9 +323,7 @@ class ServiceTest(unittest.TestCase):
         new_container = service.recreate_container(mock_container)
 
         mock_container.stop.assert_called_once_with(timeout=10)
-        self.mock_client.rename.assert_called_once_with(
-            mock_container.id,
-            '%s_%s' % (mock_container.short_id, mock_container.name))
+        mock_container.rename_to_tmp_name.assert_called_once_with()
 
         new_container.start.assert_called_once_with()
         mock_container.remove.assert_called_once_with()
