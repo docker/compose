@@ -116,6 +116,25 @@
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "stdin_open": {"type": "boolean"},
         "tty": {"type": "boolean"},
+        "ulimits": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-z]+$": {
+              "oneOf": [
+                {"type": "integer"},
+                {
+                  "type":"object",
+                  "properties": {
+                    "hard": {"type": "integer"},
+                    "soft": {"type": "integer"}
+                  },
+                  "required": ["soft", "hard"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
         "user": {"type": "string"},
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "volume_driver": {"type": "string"},

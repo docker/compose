@@ -331,6 +331,17 @@ Override the default labeling scheme for each container.
         - label:user:USER
         - label:role:ROLE
 
+### ulimits
+
+Override the default ulimits for a container. You can either use a number
+to set the hard and soft limits, or specify them in a dictionary.
+
+      ulimits:
+        nproc: 65535
+        nofile:
+          soft: 20000
+          hard: 40000
+
 ### volumes, volume\_driver
 
 Mount paths as volumes, optionally specifying a path on the host machine
