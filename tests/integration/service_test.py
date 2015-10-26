@@ -21,6 +21,7 @@ from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.service import build_extra_hosts
+from compose.service import build_ulimits
 from compose.service import ConfigError
 from compose.service import ConvergencePlan
 from compose.service import Net
@@ -160,6 +161,40 @@ class ServiceTest(DockerClientTestCase):
              'api.example.com': '192.168.0.18'}),
             {'www.example.com': '192.168.0.17',
              'api.example.com': '192.168.0.18'})
+
+    def test_build_ulimits(self):
+        # invalid options
+        self.assertRaises(ConfigError, lambda: build_ulimits({'nofile': {'not_soft_or_hard': 10000}}))
+
+        # dictionaries
+        self.assertEqual(build_ulimits(
+            {'nofile': {'soft': 10000, 'hard': 20000}}),
+            [{'Name': 'nofile', 'soft': 10000, 'hard': 20000}])
+        self.assertEqual(build_ulimits(
+            {'nofile': {'hard': 20000}}),
+            [{'Name': 'nofile', 'hard': 20000}])
+        self.assertEqual(build_ulimits(
+            {'nofile': {'soft': 10000}}),
+            [{'Name': 'nofile', 'soft': 10000}])
+        self.assertEqual(build_ulimits(
+            {'nofile': {'soft': 10000, 'hard': 20000}, 'nproc': {'soft': 65535, 'hard': 65535}}),
+            [{'Name': 'nofile', 'soft': 10000, 'hard': 20000},
+             {'Name': 'nproc', 'soft': 65535, 'hard': 65535}])
+
+        # integers
+        self.assertEqual(build_extra_hosts(
+            {'nofile': 20000}),
+            [{'Name': 'nofile', 'soft': 20000, 'hard': 20000}])
+        self.assertEqual(build_extra_hosts(
+            {'nofile': 20000, 'nproc': 65535}),
+            [{'Name': 'nofile', 'soft': 20000, 'hard': 20000},
+             {'Name': 'nproc', 'soft': 65535, 'hard': 65535}])
+
+        # mix of dictionaries and integers
+        self.assertEqual(build_extra_hosts(
+            {'nproc': 65535, 'nofile': {'soft': 10000, 'hard': 20000}}),
+            [{'Name': 'nofile', 'soft': 10000, 'hard': 20000},
+             {'Name': 'nproc', 'soft': 65535, 'hard': 65535}])
 
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']

@@ -116,6 +116,7 @@
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "stdin_open": {"type": "boolean"},
         "tty": {"type": "boolean"},
+        "ulimits": {"type": "object"},
         "user": {"type": "string"},
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "volume_driver": {"type": "string"},

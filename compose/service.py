@@ -679,6 +679,7 @@ class Service(object):
 
         devices = options.get('devices', None)
         cgroup_parent = options.get('cgroup_parent', None)
+        ulimits = build_ulimits(options.get('ulimits', None))
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
@@ -695,6 +696,7 @@ class Service(object):
             cap_drop=cap_drop,
             mem_limit=options.get('mem_limit'),
             memswap_limit=options.get('memswap_limit'),
+            ulimits=ulimits,
             log_config=log_config,
             extra_hosts=extra_hosts,
             read_only=read_only,
@@ -1071,6 +1073,30 @@ def parse_restart_spec(restart_config):
         max_retry_count = 0
 
     return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+# Ulimits
+
+
+def build_ulimits(ulimit_config):
+    valid_keys = set(['hard', 'soft'])
+
+    if not ulimit_config:
+        return None
+    ulimits = []
+    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+        if isinstance(soft_hard_values, six.integer_types):
+            ulimits.append({'Name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
+        elif isinstance(soft_hard_values, dict):
+            if not set(soft_hard_values) <= valid_keys:
+                raise ConfigError(
+                    "ulimit_config \"%s\" must contain only 'hard' and/or 'soft' as secondary keys" %
+                    ulimit_config
+                )
+            ulimit_dict = {'Name': limit_name}
+            ulimit_dict.update(soft_hard_values)
+            ulimits.append(ulimit_dict)
+
+    return ulimits
 
 
 # Extra hosts
