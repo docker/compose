@@ -16,6 +16,7 @@ def build_mock_container(reader):
         name='myapp_web_1',
         name_without_project='web_1',
         has_api_logs=True,
+        log_stream=None,
         attach=reader,
         wait=mock.Mock(return_value=0),
     )

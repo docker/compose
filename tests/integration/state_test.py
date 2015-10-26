@@ -185,8 +185,7 @@ def converge(service,
              do_build=True):
     """Create a converge plan from a strategy and execute the plan."""
     plan = service.convergence_plan(strategy)
-    containers, logging_threads = zip(*service.execute_convergence_plan(plan, do_build=do_build, timeout=1))
-    return containers
+    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
 
 
 class ServiceStateTest(DockerClientTestCase):
