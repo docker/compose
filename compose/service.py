@@ -545,6 +545,9 @@ class Service(object):
         return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):
+        if self.use_networking:
+            return []
+
         links = []
         for service, link_name in self.links:
             for container in service.containers():

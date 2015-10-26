@@ -444,6 +444,14 @@ class ServiceTest(unittest.TestCase):
         }
         self.assertEqual(config_dict, expected)
 
+    def test_get_links_with_networking(self):
+        service = Service(
+            'foo',
+            image='foo',
+            links=[(Service('one'), 'one')],
+            use_networking=True)
+        self.assertEqual(service._get_links(link_to_self=True), [])
+
 
 class NetTestCase(unittest.TestCase):
 
