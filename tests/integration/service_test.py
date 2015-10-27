@@ -165,17 +165,14 @@ class ServiceTest(DockerClientTestCase):
     def test_build_ulimits(self):
         # invalid options
         self.assertRaises(ConfigError, lambda: build_ulimits({'nofile': {'not_soft_or_hard': 10000}}))
+        self.assertRaises(ConfigError, lambda: build_ulimits({'nofile': {'soft': 10000, 'hard': 10}}))
+        self.assertRaises(ConfigError, lambda: build_ulimits({'nofile': {'hard': 10000}}))
+        self.assertRaises(ConfigError, lambda: build_ulimits({'nofile': {'soft': 10000}}))
 
         # dictionaries
         self.assertEqual(build_ulimits(
             {'nofile': {'soft': 10000, 'hard': 20000}}),
             [{'Name': 'nofile', 'soft': 10000, 'hard': 20000}])
-        self.assertEqual(build_ulimits(
-            {'nofile': {'hard': 20000}}),
-            [{'Name': 'nofile', 'hard': 20000}])
-        self.assertEqual(build_ulimits(
-            {'nofile': {'soft': 10000}}),
-            [{'Name': 'nofile', 'soft': 10000}])
         self.assertEqual(build_ulimits(
             {'nofile': {'soft': 10000, 'hard': 20000}, 'nproc': {'soft': 65535, 'hard': 65535}}),
             [{'Name': 'nofile', 'soft': 10000, 'hard': 20000},

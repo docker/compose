@@ -1087,9 +1087,14 @@ def build_ulimits(ulimit_config):
         if isinstance(soft_hard_values, six.integer_types):
             ulimits.append({'Name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
         elif isinstance(soft_hard_values, dict):
-            if not set(soft_hard_values) <= valid_keys:
+            if not set(soft_hard_values) == valid_keys:
                 raise ConfigError(
-                    "ulimit_config \"%s\" must contain only 'hard' and/or 'soft' as secondary keys" %
+                    "ulimit_config \"%s\" must contain both 'hard' and 'soft' as secondary keys, and nothing else" %
+                    ulimit_config
+                )
+            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
+                raise ConfigError(
+                    "ulimit_config \"%s\" cannot contain a 'soft' value higher than 'hard' value" %
                     ulimit_config
                 )
             ulimit_dict = {'Name': limit_name}
