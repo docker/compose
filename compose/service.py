@@ -395,11 +395,17 @@ class Service(object):
     def execute_convergence_plan(self,
                                  plan,
                                  do_build=True,
-                                 timeout=DEFAULT_TIMEOUT):
+                                 timeout=DEFAULT_TIMEOUT,
+                                 detached=False):
         (action, containers) = plan
+        should_attach_logs = not detached
 
         if action == 'create':
             container = self.create_container(do_build=do_build)
+
+            if should_attach_logs:
+                container.attach_log_stream()
+
             self.start_container(container)
 
             return [container]
@@ -407,15 +413,16 @@ class Service(object):
         elif action == 'recreate':
             return [
                 self.recreate_container(
-                    c,
-                    timeout=timeout
+                    container,
+                    timeout=timeout,
+                    attach_logs=should_attach_logs
                 )
-                for c in containers
+                for container in containers
             ]
 
         elif action == 'start':
-            for c in containers:
-                self.start_container_if_stopped(c)
+            for container in containers:
+                self.start_container_if_stopped(container, attach_logs=should_attach_logs)
 
             return containers
 
@@ -430,7 +437,8 @@ class Service(object):
 
     def recreate_container(self,
                            container,
-                           timeout=DEFAULT_TIMEOUT):
+                           timeout=DEFAULT_TIMEOUT,
+                           attach_logs=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -438,36 +446,28 @@ class Service(object):
         container is removed.
         """
         log.info("Recreating %s" % container.name)
-        try:
-            container.stop(timeout=timeout)
-        except APIError as e:
-            if (e.response.status_code == 500
-                    and e.explanation
-                    and 'no such process' in str(e.explanation)):
-                pass
-            else:
-                raise
 
-        # Use a hopefully unique container name by prepending the short id
-        self.client.rename(
-            container.id,
-            '%s_%s' % (container.short_id, container.name))
-
+        container.stop(timeout=timeout)
+        container.rename_to_tmp_name()
         new_container = self.create_container(
             do_build=False,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
         )
+        if attach_logs:
+            new_container.attach_log_stream()
         self.start_container(new_container)
         container.remove()
         return new_container
 
-    def start_container_if_stopped(self, container):
+    def start_container_if_stopped(self, container, attach_logs=False):
         if container.is_running:
             return container
         else:
             log.info("Starting %s" % container.name)
+            if attach_logs:
+                container.attach_log_stream()
             return self.start_container(container)
 
     def start_container(self, container):

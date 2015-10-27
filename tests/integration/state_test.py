@@ -18,6 +18,7 @@ from compose.service import ConvergenceStrategy
 class ProjectTestCase(DockerClientTestCase):
     def run_up(self, cfg, **kwargs):
         kwargs.setdefault('timeout', 1)
+        kwargs.setdefault('detached', True)
 
         project = self.make_project(cfg)
         project.up(**kwargs)
