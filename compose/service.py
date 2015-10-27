@@ -450,13 +450,6 @@ class Service(object):
             else:
                 raise
 
-    def _recreate_rename_container(self, container):
-        # Use a hopefully unique container name by prepending the short id
-        self.client.rename(
-            container.id,
-            '%s_%s' % (container.short_id, container.name)
-        )
-
     def recreate_container(self,
                            container,
                            timeout=DEFAULT_TIMEOUT,
@@ -470,7 +463,7 @@ class Service(object):
         log.info("Recreating %s" % container.name)
 
         self._recreate_stop_container(container, timeout)
-        self._recreate_rename_container(container)
+        container.rename_to_tmp_name()
         new_container = self.create_container(
             do_build=False,
             previous_container=container,

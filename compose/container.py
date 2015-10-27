@@ -192,6 +192,15 @@ class Container(object):
     def remove(self, **options):
         return self.client.remove_container(self.id, **options)
 
+    def rename_to_tmp_name(self):
+        """Rename the container to a hopefully unique temporary container name
+        by prepending the short id.
+        """
+        self.client.rename(
+            self.id,
+            '%s_%s' % (self.short_id, self.name)
+        )
+
     def inspect_if_not_inspected(self):
         if not self.has_been_inspected:
             self.inspect()
