@@ -37,6 +37,10 @@ Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten 
     source 'https://rubygems.org'
     gem 'rails', '4.2.0'
 
+You'll need an empty `Gemfile.lock` in order to build our `Dockerfile`.
+
+    $ touch Gemfile.lock
+
 Finally, `docker-compose.yml` is where the magic happens. This file describes the services that comprise your app (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration needed to link them together and expose the web app's port.
 
     db:
@@ -69,6 +73,12 @@ image. Once it's done, you should have generated a fresh app:
     README.rdoc  config.ru    public
     Rakefile     db           test
 
+
+The files `rails new` created are owned by root. This happens because the
+container runs as the `root` user.  Change the ownership of the new files.
+
+    sudo chown -R $USER:$USER .
+
 Uncomment the line in your new `Gemfile` which loads `therubyracer`, so you've
 got a Javascript runtime:
 
@@ -80,6 +90,7 @@ rebuild.)
 
     $ docker-compose build
 
+
 ### Connect the database
 
 The app is now bootable, but you're not quite there yet. By default, Rails
@@ -87,8 +98,7 @@ expects a database to be running on `localhost` - so you need to point it at the
 `db` container instead. You also need to change the database and username to
 align with the defaults set by the `postgres` image.
 
-Open up your newly-generated `database.yml` file. Replace its contents with the
-following:
+Replace the contents of `config/database.yml` with the following:
 
     development: &default
       adapter: postgresql
