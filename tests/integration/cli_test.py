@@ -13,7 +13,9 @@ from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
+from compose.container import Container
 from compose.project import NoSuchService
+from compose.service import BuildError
 
 
 class CLITestCase(DockerClientTestCase):
@@ -154,6 +156,37 @@ class CLITestCase(DockerClientTestCase):
         output = mock_stdout.getvalue()
         self.assertNotIn(cache_indicator, output)
         self.assertIn(pull_indicator, output)
+
+    def test_build_failed(self):
+        self.command.base_dir = 'tests/fixtures/simple-failing-dockerfile'
+
+        with self.assertRaises(BuildError):
+            self.command.dispatch(['build', 'simple'], None)
+
+        labels = [
+            "com.docker.compose.test_failing_image=true",
+        ]
+
+        containers = [Container.from_ps(self.project.client, c) for c in self.project.client.containers(
+            all=True,
+            filters={"label": labels})]
+
+        self.assertEqual(len(containers), 1)
+
+    def test_build_failed_forcerm(self):
+        self.command.base_dir = 'tests/fixtures/simple-failing-dockerfile'
+        with self.assertRaises(BuildError):
+            self.command.dispatch(['build', '--force-rm', 'simple'], None)
+
+        labels = [
+            "com.docker.compose.test_failing_image=true",
+        ]
+
+        containers = [Container.from_ps(self.project.client, c) for c in self.project.client.containers(
+            all=True,
+            filters={"label": labels})]
+
+        self.assertEqual(len(containers), 0)
 
     def test_up_detached(self):
         self.command.dispatch(['up', '-d'], None)

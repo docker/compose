@@ -175,12 +175,14 @@ class TopLevelCommand(DocoptCommand):
         Usage: build [options] [SERVICE...]
 
         Options:
+            --force-rm  Always remove intermediate containers.
             --no-cache  Do not use cache when building the image.
             --pull      Always attempt to pull a newer version of the image.
         """
+        force_rm = bool(options.get('--force-rm', False))
         no_cache = bool(options.get('--no-cache', False))
         pull = bool(options.get('--pull', False))
-        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull)
+        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull, force_rm=force_rm)
 
     def help(self, project, options):
         """

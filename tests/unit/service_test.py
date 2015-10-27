@@ -366,6 +366,7 @@ class ServiceTest(unittest.TestCase):
             stream=True,
             path='.',
             pull=False,
+            forcerm=False,
             nocache=False,
             rm=True,
         )
