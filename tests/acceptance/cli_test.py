@@ -9,6 +9,7 @@ from operator import attrgetter
 from .. import mock
 from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
+from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
 
 
@@ -144,6 +145,33 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['build', '--no-cache', '--pull', 'simple'])
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
+
+    def test_build_failed(self):
+        self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
+        self.dispatch(['build', 'simple'], returncode=1)
+
+        labels = ["com.docker.compose.test_failing_image=true"]
+        containers = [
+            Container.from_ps(self.project.client, c)
+            for c in self.project.client.containers(
+                all=True,
+                filters={"label": labels})
+        ]
+        assert len(containers) == 1
+
+    def test_build_failed_forcerm(self):
+        self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
+        self.dispatch(['build', '--force-rm', 'simple'], returncode=1)
+
+        labels = ["com.docker.compose.test_failing_image=true"]
+
+        containers = [
+            Container.from_ps(self.project.client, c)
+            for c in self.project.client.containers(
+                all=True,
+                filters={"label": labels})
+        ]
+        assert not containers
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
