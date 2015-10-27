@@ -499,6 +499,14 @@ class ServiceTest(unittest.TestCase):
             ports=["127.0.0.1:1000-2000:2000-3000"])
         self.assertEqual(service.specifies_host_port(), True)
 
+    def test_get_links_with_networking(self):
+        service = Service(
+            'foo',
+            image='foo',
+            links=[(Service('one'), 'one')],
+            use_networking=True)
+        self.assertEqual(service._get_links(link_to_self=True), [])
+
 
 class NetTestCase(unittest.TestCase):
 
