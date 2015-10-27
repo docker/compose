@@ -66,11 +66,29 @@ Compose has commands for managing the whole lifecycle of your application:
 
 The features of Compose that make it effective are:
 
-* [Preserve volume data](#preserve-volume-data)
+* [Multiple isolated environments on a single host](#Multiple-isolated-environments-on-a-single-host)
+* [Preserve volume data when containers are created](#preserve-volume-data-when-containers-are-created)
 * [Only recreate containers that have changed](#only-recreate-containers-that-have-changed)
 * [Variables and moving a composition between environments](#variables-and-moving-a-composition-between-environments)
 
-#### Preserve volume data
+#### Multiple isolated environments on a single host
+
+Compose uses a project name to isolate environments from each other. You can use
+this project name to:
+
+* on a dev host, to create multiple copies of a single environment (ex: you want
+  to run a stable copy for each feature branch of a project)
+* on a CI server, to keep builds from interfering with each other, you can set
+  the project name to a unique build number
+* on a shared host or dev host, to prevent different projects which may use the
+  same service names, from interfering with each other
+
+The default project name is the basename of the project directory. You can set
+a custom project name by using the
+[`-p` command line option](./reference/docker-compose.md) or the
+[`COMPOSE_PROJECT_NAME` environment variable](./reference/overview.md#compose-project-name).
+
+#### Preserve volume data when containers are created
 
 Compose preserves all volumes used by your services. When `docker-compose up`
 runs, if it finds any containers from previous runs, it copies the volumes from
