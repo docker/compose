@@ -1078,26 +1078,19 @@ def parse_restart_spec(restart_config):
 
 
 def build_ulimits(ulimit_config):
-    valid_keys = set(['hard', 'soft'])
-
     if not ulimit_config:
         return None
     ulimits = []
     for limit_name, soft_hard_values in six.iteritems(ulimit_config):
         if isinstance(soft_hard_values, six.integer_types):
-            ulimits.append({'Name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
+            ulimits.append({'name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
         elif isinstance(soft_hard_values, dict):
-            if not set(soft_hard_values) == valid_keys:
-                raise ConfigError(
-                    "ulimit_config \"%s\" must contain both 'hard' and 'soft' as secondary keys, and nothing else" %
-                    ulimit_config
-                )
             if not soft_hard_values['soft'] <= soft_hard_values['hard']:
                 raise ConfigError(
                     "ulimit_config \"%s\" cannot contain a 'soft' value higher than 'hard' value" %
                     ulimit_config
                 )
-            ulimit_dict = {'Name': limit_name}
+            ulimit_dict = {'name': limit_name}
             ulimit_dict.update(soft_hard_values)
             ulimits.append(ulimit_dict)
 
