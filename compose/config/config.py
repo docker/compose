@@ -501,7 +501,7 @@ def resolve_volume_path(volume, working_dir, service_name):
         if host_path.startswith('.'):
             host_path = expand_path(working_dir, host_path)
         host_path = os.path.expanduser(host_path)
-        return "{}:{}".format(host_path, container_path)
+        return u"{}:{}".format(host_path, container_path)
     else:
         return container_path
 
