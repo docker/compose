@@ -110,8 +110,20 @@ In this step, you create a Django started project by building the image from the
 
 3. After the `docker-compose` command completes, list the contents of your project.
 
-        $ ls
-        Dockerfile       docker-compose.yml          composeexample       manage.py        requirements.txt
+        $ ls -l
+        drwxr-xr-x 2 root   root   composeexample
+        -rw-rw-r-- 1 user   user   docker-compose.yml
+        -rw-rw-r-- 1 user   user   Dockerfile
+        -rwxr-xr-x 1 root   root   manage.py
+        -rw-rw-r-- 1 user   user   requirements.txt
+
+    The files `django-admin` created are owned by root. This happens because
+    the container runs as the `root` user.
+
+4. Change the ownership of the new files.
+
+        sudo chown -R $USER:$USER .
+
 
 ## Connect the database
 
