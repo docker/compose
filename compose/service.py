@@ -435,17 +435,6 @@ class Service(object):
         else:
             raise Exception("Invalid action: {}".format(action))
 
-    def _recreate_stop_container(self, container, timeout):
-        try:
-            container.stop(timeout=timeout)
-        except APIError as e:
-            if (e.response.status_code == 500
-                    and e.explanation
-                    and 'no such process' in str(e.explanation)):
-                pass
-            else:
-                raise
-
     def recreate_container(self,
                            container,
                            timeout=DEFAULT_TIMEOUT,
@@ -458,7 +447,7 @@ class Service(object):
         """
         log.info("Recreating %s" % container.name)
 
-        self._recreate_stop_container(container, timeout)
+        container.stop(timeout=timeout)
         container.rename_to_tmp_name()
         new_container = self.create_container(
             do_build=False,
