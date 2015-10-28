@@ -32,11 +32,16 @@ Docker command-line client. If you're using `docker-machine`, then the `eval "$(
 
 Sets the project name. This value is prepended along with the service name to the container container on start up. For example, if you project name is `myapp` and it includes two services `db` and `web` then compose starts containers named  `myapp_db_1` and `myapp_web_1` respectively.
 
-Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME` defaults to the `basename` of the current working directory.
+Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME`
+defaults to the `basename` of the project directory. See also the `-p`
+[command-line option](docker-compose.md).
 
 ### COMPOSE\_FILE
 
-Specify the file containing the compose configuration. If not provided, Compose looks for a file named  `docker-compose.yml` in the current directory and then each parent directory in succession until a file by that name is found.
+Specify the file containing the compose configuration. If not provided,
+Compose looks for a file named  `docker-compose.yml` in the current directory
+and then each parent directory in succession until a file by that name is
+found. See also the `-f` [command-line option](docker-compose.md).
 
 ### COMPOSE\_API\_VERSION
 
