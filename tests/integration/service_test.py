@@ -14,6 +14,7 @@ from .. import mock
 from .testcases import DockerClientTestCase
 from .testcases import pull_busybox
 from compose import __version__
+from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -23,6 +24,7 @@ from compose.container import Container
 from compose.service import build_extra_hosts
 from compose.service import ConfigError
 from compose.service import ConvergencePlan
+from compose.service import ConvergenceStrategy
 from compose.service import Net
 from compose.service import Service
 from compose.service import VolumeFromSpec
@@ -929,3 +931,38 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(set(service.containers(stopped=True)), set([original, duplicate]))
         self.assertEqual(set(service.duplicate_containers()), set([duplicate]))
+
+
+def converge(service,
+             strategy=ConvergenceStrategy.changed,
+             do_build=True):
+    """Create a converge plan from a strategy and execute the plan."""
+    plan = service.convergence_plan(strategy)
+    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
+
+
+class ConfigHashTest(DockerClientTestCase):
+    def test_no_config_hash_when_one_off(self):
+        web = self.create_service('web')
+        container = web.create_container(one_off=True)
+        self.assertNotIn(LABEL_CONFIG_HASH, container.labels)
+
+    def test_no_config_hash_when_overriding_options(self):
+        web = self.create_service('web')
+        container = web.create_container(environment={'FOO': '1'})
+        self.assertNotIn(LABEL_CONFIG_HASH, container.labels)
+
+    def test_config_hash_with_custom_labels(self):
+        web = self.create_service('web', labels={'foo': '1'})
+        container = converge(web)[0]
+        self.assertIn(LABEL_CONFIG_HASH, container.labels)
+        self.assertIn('foo', container.labels)
+
+    def test_config_hash_sticks_around(self):
+        web = self.create_service('web', command=["top"])
+        container = converge(web)[0]
+        self.assertIn(LABEL_CONFIG_HASH, container.labels)
+
+        web = self.create_service('web', command=["top", "-d", "1"])
+        container = converge(web)[0]
+        self.assertIn(LABEL_CONFIG_HASH, container.labels)
