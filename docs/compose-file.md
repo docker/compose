@@ -100,8 +100,10 @@ Custom DNS search domains. Can be a single value or a list.
 
 Alternate Dockerfile.
 
-Compose will use an alternate file to build with.
+Compose will use an alternate file to build with. A build path must also be
+specified using the `build` key.
 
+    build: /path/to/build/dir
     dockerfile: Dockerfile-alternate
 
 Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
