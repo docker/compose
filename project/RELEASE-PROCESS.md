@@ -1,6 +1,14 @@
 Building a Compose release
 ==========================
 
+## Prerequisites
+
+The release scripts require the following tools installed on the host:
+
+* https://hub.github.com/
+* https://stedolan.github.io/jq/
+* http://pandoc.org/
+
 ## To get started with a new release
 
 Create a branch, update version, and add release notes by running `make-branch`
@@ -40,10 +48,10 @@ As part of this script you'll be asked to:
 
 ## To release a version (whether RC or stable)
 
-Check out the bump branch and run the `build-binary` script
+Check out the bump branch and run the `build-binaries` script
 
         git checkout bump-$VERSION
-        ./script/release/build-binary
+        ./script/release/build-binaries
 
 When prompted build the non-linux binaries and test them.
 
