@@ -28,10 +28,15 @@ for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
 
   daemon_container="compose-dind-$version-$BUILD_NUMBER"
-  trap "docker rm -vf $daemon_container" EXIT
 
-  # TODO: remove when we stop testing against 1.7.x
-  daemon=$([[ "$version" == "1.7"* ]] && echo "-d" || echo "daemon")
+  function on_exit() {
+    if [[ "$?" != "0" ]]; then
+        docker logs "$daemon_container"
+    fi
+    docker rm -vf "$daemon_container"
+  }
+
+  trap "on_exit" EXIT
 
   docker run \
     -d \
@@ -39,7 +44,7 @@ for version in $DOCKER_VERSIONS; do
     --privileged \
     --volume="/var/lib/docker" \
     dockerswarm/dind:$version \
-    docker $daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
+    docker daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
 
   docker run \
     --rm \
