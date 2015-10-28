@@ -10,7 +10,6 @@ import tempfile
 
 from .testcases import DockerClientTestCase
 from compose.config import config
-from compose.const import LABEL_CONFIG_HASH
 from compose.project import Project
 from compose.service import ConvergenceStrategy
 
@@ -180,14 +179,6 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.assertEqual(len(containers), 2)
 
 
-def converge(service,
-             strategy=ConvergenceStrategy.changed,
-             do_build=True):
-    """Create a converge plan from a strategy and execute the plan."""
-    plan = service.convergence_plan(strategy)
-    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
-
-
 class ServiceStateTest(DockerClientTestCase):
     """Test cases for Service.convergence_plan."""
 
@@ -278,30 +269,3 @@ class ServiceStateTest(DockerClientTestCase):
             self.assertEqual(('recreate', [container]), web.convergence_plan())
         finally:
             shutil.rmtree(context)
-
-
-class ConfigHashTest(DockerClientTestCase):
-    def test_no_config_hash_when_one_off(self):
-        web = self.create_service('web')
-        container = web.create_container(one_off=True)
-        self.assertNotIn(LABEL_CONFIG_HASH, container.labels)
-
-    def test_no_config_hash_when_overriding_options(self):
-        web = self.create_service('web')
-        container = web.create_container(environment={'FOO': '1'})
-        self.assertNotIn(LABEL_CONFIG_HASH, container.labels)
-
-    def test_config_hash_with_custom_labels(self):
-        web = self.create_service('web', labels={'foo': '1'})
-        container = converge(web)[0]
-        self.assertIn(LABEL_CONFIG_HASH, container.labels)
-        self.assertIn('foo', container.labels)
-
-    def test_config_hash_sticks_around(self):
-        web = self.create_service('web', command=["top"])
-        container = converge(web)[0]
-        self.assertIn(LABEL_CONFIG_HASH, container.labels)
-
-        web = self.create_service('web', command=["top", "-d", "1"])
-        container = converge(web)[0]
-        self.assertIn(LABEL_CONFIG_HASH, container.labels)
