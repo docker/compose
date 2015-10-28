@@ -693,10 +693,11 @@ class ServiceTest(DockerClientTestCase):
 
     @mock.patch('compose.service.log')
     def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
-        """
-        Test that calling scale on a service that has a custom container name
+        """Test that calling scale on a service that has a custom container name
         results in warning output.
         """
+        # Disable this test against earlier versions because it is flaky
+        self.require_api_version('1.21')
         service = self.create_service('app', container_name='custom-container')
         self.assertEqual(service.custom_container_name(), 'custom-container')
 
