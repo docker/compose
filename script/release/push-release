@@ -34,7 +34,9 @@ GITHUB_REPO=git@github.com:$REPO
 sha=$(git rev-parse HEAD)
 url=$API/$REPO/statuses/$sha
 build_status=$(curl -s $url | jq -r '.[0].state')
-if [[ "$build_status" != "success" ]]; then
+if [ -n "$SKIP_BUILD_CHECK" ]; then
+    echo "Skipping build status check..."
+elif [[ "$build_status" != "success" ]]; then
     >&2 echo "Build status is $build_status, but it should be success."
     exit -1
 fi
@@ -61,6 +63,7 @@ source venv-test/bin/activate
 pip install docker-compose==$VERSION
 docker-compose version
 deactivate
+rm -rf venv-test
 
 echo "Now publish the github release, and test the downloads."
 echo "Email maintainers@dockerproject.org and engineering@docker.com about the new release."
