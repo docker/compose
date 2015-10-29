@@ -145,7 +145,7 @@ class Container(object):
     @property
     def has_api_logs(self):
         log_type = self.log_driver
-        return not log_type or log_type == 'json-file'
+        return not log_type or log_type != 'none'
 
     def attach_log_stream(self):
         """A log stream can only be attached if the container uses a json-file
