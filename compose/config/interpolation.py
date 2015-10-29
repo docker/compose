@@ -78,7 +78,7 @@ class BlankDefaultDict(dict):
         except KeyError:
             if key not in self.missing_keys:
                 log.warn(
-                    "The {} variable is not set. Substituting a blank string."
+                    "The {} variable is not set. Defaulting to a blank string."
                     .format(key)
                 )
                 self.missing_keys.append(key)

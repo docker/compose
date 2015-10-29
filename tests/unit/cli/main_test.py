@@ -1,11 +1,15 @@
 from __future__ import absolute_import
 
+import logging
+
 from compose import container
 from compose.cli.errors import UserError
+from compose.cli.formatter import ConsoleWarningFormatter
 from compose.cli.log_printer import LogPrinter
 from compose.cli.main import attach_to_logs
 from compose.cli.main import build_log_printer
 from compose.cli.main import convergence_strategy_from_opts
+from compose.cli.main import setup_console_handler
 from compose.project import Project
 from compose.service import ConvergenceStrategy
 from tests import mock
@@ -58,6 +62,31 @@ class CLIMainTestCase(unittest.TestCase):
         project.stop.assert_called_once_with(
             service_names=service_names,
             timeout=timeout)
+
+
+class SetupConsoleHandlerTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.stream = mock.Mock()
+        self.stream.isatty.return_value = True
+        self.handler = logging.StreamHandler(stream=self.stream)
+
+    def test_with_tty_verbose(self):
+        setup_console_handler(self.handler, True)
+        assert type(self.handler.formatter) == ConsoleWarningFormatter
+        assert '%(name)s' in self.handler.formatter._fmt
+        assert '%(funcName)s' in self.handler.formatter._fmt
+
+    def test_with_tty_not_verbose(self):
+        setup_console_handler(self.handler, False)
+        assert type(self.handler.formatter) == ConsoleWarningFormatter
+        assert '%(name)s' not in self.handler.formatter._fmt
+        assert '%(funcName)s' not in self.handler.formatter._fmt
+
+    def test_with_not_a_tty(self):
+        self.stream.isatty.return_value = False
+        setup_console_handler(self.handler, False)
+        assert type(self.handler.formatter) == logging.Formatter
 
 
 class ConvergeStrategyFromOptsTestCase(unittest.TestCase):
