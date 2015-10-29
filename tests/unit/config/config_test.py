@@ -573,6 +573,11 @@ class VolumeConfigTest(unittest.TestCase):
         }, working_dir='.')
         self.assertEqual(d['volumes'], ['~:/data'])
 
+    def test_volume_path_with_non_ascii_directory(self):
+        volume = u'/Füü/data:/data'
+        container_path = config.resolve_volume_path(volume, ".", "test")
+        self.assertEqual(container_path, volume)
+
 
 class MergePathMappingTest(object):
     def config_name(self):
