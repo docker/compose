@@ -28,6 +28,7 @@ from .command import project_from_options
 from .docopt_command import DocoptCommand
 from .docopt_command import NoSuchCommand
 from .errors import UserError
+from .formatter import ConsoleWarningFormatter
 from .formatter import Formatter
 from .log_printer import LogPrinter
 from .utils import get_version_info
@@ -41,7 +42,7 @@ log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
 
 INSECURE_SSL_WARNING = """
-Warning: --allow-insecure-ssl is deprecated and has no effect.
+--allow-insecure-ssl is deprecated and has no effect.
 It will be removed in a future version of Compose.
 """
 
@@ -91,13 +92,18 @@ def setup_logging():
     logging.getLogger("requests").propagate = False
 
 
-def setup_console_handler(verbose):
-    if verbose:
-        console_handler.setFormatter(logging.Formatter('%(name)s.%(funcName)s: %(message)s'))
-        console_handler.setLevel(logging.DEBUG)
+def setup_console_handler(handler, verbose):
+    if handler.stream.isatty():
+        format_class = ConsoleWarningFormatter
     else:
-        console_handler.setFormatter(logging.Formatter())
-        console_handler.setLevel(logging.INFO)
+        format_class = logging.Formatter
+
+    if verbose:
+        handler.setFormatter(format_class('%(name)s.%(funcName)s: %(message)s'))
+        handler.setLevel(logging.DEBUG)
+    else:
+        handler.setFormatter(format_class())
+        handler.setLevel(logging.INFO)
 
 
 # stolen from docopt master
@@ -153,7 +159,7 @@ class TopLevelCommand(DocoptCommand):
         return options
 
     def perform_command(self, options, handler, command_options):
-        setup_console_handler(options.get('--verbose'))
+        setup_console_handler(console_handler, options.get('--verbose'))
 
         if options['COMMAND'] in ('help', 'version'):
             # Skip looking up the compose file.
