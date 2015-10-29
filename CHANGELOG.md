@@ -1,19 +1,33 @@
 Change log
 ==========
 
-1.5.0 (2015-10-13)
+1.5.0 (2015-11-02)
 ------------------
+
+**Breaking changes:**
+
+With the introduction of variable substitution support in the Compose file, any
+Compose file that uses an environment variable (`$VAR` or `${VAR}`) in the `command:`
+or `entrypoint:` field will break.
+
+Previously these values were interpolated inside the container, with a value
+from the container environment.  In Compose 1.5.0, the values will be
+interpolated on the host, with a value from the host environment.
+
+To migrate a Compose file to 1.5.0, escape the variables with an extra `$`
+(ex: `$$VAR` or `$${VAR}`).  See
+https://github.com/docker/compose/blob/8cc8e61/docs/compose-file.md#variable-substitution
 
 Major features:
 
 -   Compose is now available for Windows.
 
 -   Environment variables can be used in the Compose file. See
-    https://github.com/docker/compose/blob/129092b7/docs/yml.md#variable-substitution
+    https://github.com/docker/compose/blob/8cc8e61/docs/compose-file.md#variable-substitution
 
 -   Multiple compose files can be specified, allowing you to override
     settings in the default Compose file. See
-    https://github.com/docker/compose/blob/129092b7/docs/reference/docker-compose.md
+    https://github.com/docker/compose/blob/8cc8e61/docs/reference/docker-compose.md
     for more details.
 
 -   Compose now produces better error messages when a file contains
