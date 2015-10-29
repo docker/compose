@@ -59,9 +59,8 @@ def main():
         log.error(e.msg)
         sys.exit(1)
     except NoSuchCommand as e:
-        log.error("No such command: %s", e.command)
-        log.error("")
-        log.error("\n".join(parse_doc_section("commands:", getdoc(e.supercommand))))
+        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
+        log.error("No such command: %s\n\n%s", e.command, commands)
         sys.exit(1)
     except APIError as e:
         log.error(e.explanation)
