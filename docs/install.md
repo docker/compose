@@ -30,13 +30,14 @@ To install Compose, do the following:
 
 3. Go to the <a href="https://github.com/docker/compose/releases" target="_blank">Compose repository release page on GitHub</a>.
 
-4. Follow the instructions from the release page and run the `curl` command in your terminal.
+4. Follow the instructions from the release page and run the `curl` command,
+which the release page specifies, in your terminal.
 
      > Note: If you get a "Permission denied" error, your `/usr/local/bin` directory
      probably isn't writable and you'll need to install Compose as the superuser. Run
      `sudo -i`, then the two commands below, then `exit`.
 
-     The command has the following format:
+     The following is an example command illustrating the format:
 
         curl -L https://github.com/docker/compose/releases/download/VERSION_NUM/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 
