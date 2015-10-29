@@ -380,6 +380,8 @@ class TopLevelCommand(DocoptCommand):
                     start_deps=True,
                     strategy=ConvergenceStrategy.never,
                 )
+            elif project.use_networking:
+                project.ensure_network_exists()
 
         tty = True
         if detach or options['-T'] or not sys.stdin.isatty():
