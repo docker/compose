@@ -13,8 +13,8 @@ DOCKER_ENVS := \
 	-e TIMEOUT
 # note: we _cannot_ add "-e DOCKER_BUILDTAGS" here because even if it's unset in the shell, that would shadow the "ENV DOCKER_BUILDTAGS" set in our Dockerfile, which is very important for our official builds
 
-# to allow `make DOCSDIR=docs docs-shell` (to create a bind mount in docs)
-DOCS_MOUNT := $(if $(DOCSDIR),-v $(CURDIR)/$(DOCSDIR):/$(DOCSDIR))
+# to allow `make DOCSDIR=1 docs-shell` (to create a bind mount in docs)
+DOCS_MOUNT := $(if $(DOCSDIR),-v $(CURDIR):/docs/content/compose)
 
 # to allow `make DOCSPORT=9000 docs`
 DOCSPORT := 8000
@@ -37,7 +37,7 @@ GITCOMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
 default: docs
 
 docs: docs-build
-	$(DOCKER_RUN_DOCS) -p $(if $(DOCSPORT),$(DOCSPORT):)8000 -e DOCKERHOST "$(DOCKER_DOCS_IMAGE)" hugo server --port=$(DOCSPORT) --baseUrl=$(HUGO_BASE_URL) --bind=$(HUGO_BIND_IP)
+	$(DOCKER_RUN_DOCS) -p $(if $(DOCSPORT),$(DOCSPORT):)8000 -e DOCKERHOST "$(DOCKER_DOCS_IMAGE)" hugo server --port=$(DOCSPORT) --baseUrl=$(HUGO_BASE_URL) --bind=$(HUGO_BIND_IP) --watch
 
 docs-draft: docs-build
 	$(DOCKER_RUN_DOCS) -p $(if $(DOCSPORT),$(DOCSPORT):)8000 -e DOCKERHOST "$(DOCKER_DOCS_IMAGE)" hugo server --buildDrafts="true" --port=$(DOCSPORT) --baseUrl=$(HUGO_BASE_URL) --bind=$(HUGO_BIND_IP)
