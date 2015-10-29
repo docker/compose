@@ -57,9 +57,11 @@ def format_boolean_in_environment(instance):
     """
     if isinstance(instance, bool):
         log.warn(
-            "Warning: There is a boolean value in the 'environment' key.\n"
-            "Environment variables can only be strings.\nPlease add quotes to any boolean values to make them string "
-            "(eg, 'True', 'yes', 'N').\nThis warning will become an error in a future release. \r\n"
+            "There is a boolean value in the 'environment' key.\n"
+            "Environment variables can only be strings.\n"
+            "Please add quotes to any boolean values to make them string "
+            "(eg, 'True', 'yes', 'N').\n"
+            "This warning will become an error in a future release. \r\n"
         )
     return True
 
