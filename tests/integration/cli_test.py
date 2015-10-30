@@ -508,6 +508,20 @@ class CLITestCase(DockerClientTestCase):
         container, = service.containers(stopped=True, one_off=True)
         self.assertEqual(container.name, name)
 
+    @mock.patch('dockerpty.start')
+    def test_run_with_networking(self, _):
+        self.require_api_version('1.21')
+        client = docker_client(version='1.21')
+        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.command.dispatch(['--x-networking', 'run', 'simple', 'true'], None)
+        service = self.project.get_service('simple')
+        container, = service.containers(stopped=True, one_off=True)
+        networks = client.networks(names=[self.project.name])
+        for n in networks:
+            self.addCleanup(client.remove_network, n['id'])
+        self.assertEqual(len(networks), 1)
+        self.assertEqual(container.human_readable_command, u'true')
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
