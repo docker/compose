@@ -1,0 +1,17 @@
+web:
+  # unbracketed name
+  image: $IMAGE
+
+  # array element
+  ports:
+    - "${HOST_PORT}:8000"
+
+  # dictionary item value
+  labels:
+    mylabel: "${LABEL_VALUE}"
+
+  # unset value
+  hostname: "host-${UNSET_VALUE}"
+
+  # escaped interpolation
+  command: "$${ESCAPED}"

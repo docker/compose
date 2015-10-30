@@ -52,11 +52,9 @@ Compose has commands for managing the whole lifecycle of your application:
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)
 
 ## Quick start
 
@@ -74,7 +72,7 @@ Next, you'll want to make a directory for the project:
     $ mkdir composetest
     $ cd composetest
 
-Inside this directory, create `app.py`, a simple web app that uses the Flask
+Inside this directory, create `app.py`, a simple Python web app that uses the Flask
 framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
 
     from flask import Flask
@@ -113,12 +111,12 @@ This tells Docker to:
 * Build an image starting with the Python 2.7 image.
 * Add the current directory `.` into the path `/code` in the image.
 * Set the working directory to `/code`.
-* Install your Python dependencies.
+* Install the Python dependencies.
 * Set the default command for the container to `python app.py`
 
 For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
-You can test that this builds by running `docker build -t web .`.
+You can build the image by running `docker build -t web .`.
 
 ### Define services
 
@@ -130,23 +128,16 @@ Next, define a set of services using `docker-compose.yml`:
        - "5000:5000"
       volumes:
        - .:/code
-      links:
-       - redis
     redis:
       image: redis
 
-This defines two services:
-
-#### web
+This template defines two services, `web` and `redis`. The `web` service:
 
 * Builds from the `Dockerfile` in the current directory.
 * Forwards the exposed port 5000 on the container to port 5000 on the host machine.
-* Connects the web container to the Redis service via a link.
 * Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
 
-#### redis
-
-* Uses the public [Redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
+The `redis` service uses the latest public [Redis](https://registry.hub.docker.com/_/redis/) image pulled from the Docker Hub registry.
 
 ### Build and run your app with Compose
 
@@ -161,9 +152,9 @@ Now, when you run `docker-compose up`, Compose will pull a Redis image, build an
     web_1   |  * Running on http://0.0.0.0:5000/
     web_1   |  * Restarting with stat
 
-If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser. 
+If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser.
 
-If you're not using Boot2docker and are on linux, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try localhost:5000.
+If you're using Docker on Linux natively, then the web app should now be listening on port 5000 on your Docker daemon host. If `http://0.0.0.0:5000` doesn't resolve, you can also try `http://localhost:5000`.
 
 You should get a message in your browser saying:
 
@@ -200,33 +191,25 @@ your services once you've finished with them:
 At this point, you have seen the basics of how Compose works.
 
 - Next, try the quick start guide for [Django](django.md),
-  [Rails](rails.md), or [Wordpress](wordpress.md).
-- See the reference guides for complete details on the [commands](cli.md), the
-  [configuration file](yml.md) and [environment variables](env.md).
+  [Rails](rails.md), or [WordPress](wordpress.md).
+- See the reference guides for complete details on the [commands](./reference/index.md), the
+  [configuration file](compose-file.md) and [environment variables](env.md).
 
 ## Release Notes
 
-### Version 1.2.0 (April 7, 2015)
-
-For complete information on this release, see the [1.2.0 Milestone project page](https://github.com/docker/compose/wiki/1.2.0-Milestone-Project-Page).
-In addition to bug fixes and refinements, this release adds the following:
-
-* The `extends` keyword, which adds the ability to extend services by sharing  common configurations. For details, see
-[PR #1088](https://github.com/docker/compose/pull/1088).
-
-* Better integration with Swarm. Swarm will now schedule inter-dependent
-containers on the same host. For details, see
-[PR #972](https://github.com/docker/compose/pull/972).
+To see a detailed list of changes for past and current releases of Docker
+Compose, please refer to the [CHANGELOG](https://github.com/docker/compose/blob/master/CHANGELOG.md).
 
 ## Getting help
 
-Docker Compose is still in its infancy and under active development. If you need
-help, would like to contribute, or simply want to talk about the project with
-like-minded individuals, we have a number of open channels for communication.
+Docker Compose is under active development. If you need help, would like to
+contribute, or simply want to talk about the project with like-minded
+individuals, we have a number of open channels for communication.
 
 * To report bugs or file feature requests: please use the [issue tracker on Github](https://github.com/docker/compose/issues).
 
-* To talk about the project with people in real time: please join the `#docker-compose` channel on IRC.
+* To talk about the project with people in real time: please join the
+  `#docker-compose` channel on freenode IRC.
 
 * To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
 

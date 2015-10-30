@@ -3,19 +3,22 @@ FROM debian:wheezy
 RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
+        locales \
         gcc \
         make \
         zlib1g \
         zlib1g-dev \
         libssl-dev \
         git \
-        apt-transport-https \
         ca-certificates \
         curl \
-        lxc \
-        iptables \
+        libsqlite3-dev \
     ; \
     rm -rf /var/lib/apt/lists/*
+
+RUN curl https://get.docker.com/builds/Linux/x86_64/docker-latest \
+        -o /usr/local/bin/docker && \
+    chmod +x /usr/local/bin/docker
 
 # Build Python 2.7.9 from source
 RUN set -ex; \
@@ -28,6 +31,18 @@ RUN set -ex; \
     cd ..; \
     rm -rf /Python-2.7.9; \
     rm Python-2.7.9.tgz
+
+# Build python 3.4 from source
+RUN set -ex; \
+    curl -LO https://www.python.org/ftp/python/3.4.3/Python-3.4.3.tgz; \
+    tar -xzf Python-3.4.3.tgz; \
+    cd Python-3.4.3; \
+    ./configure --enable-shared; \
+    make; \
+    make install; \
+    cd ..; \
+    rm -rf /Python-3.4.3; \
+    rm Python-3.4.3.tgz
 
 # Make libpython findable
 ENV LD_LIBRARY_PATH /usr/local/lib
@@ -48,29 +63,24 @@ RUN set -ex; \
     rm -rf pip-7.0.1; \
     rm pip-7.0.1.tar.gz
 
-ENV ALL_DOCKER_VERSIONS 1.7.1 1.8.0-rc3
-
-RUN set -ex; \
-    curl https://get.docker.com/builds/Linux/x86_64/docker-1.7.1 -o /usr/local/bin/docker-1.7.1; \
-    chmod +x /usr/local/bin/docker-1.7.1; \
-    curl https://test.docker.com/builds/Linux/x86_64/docker-1.8.0-rc3 -o /usr/local/bin/docker-1.8.0-rc3; \
-    chmod +x /usr/local/bin/docker-1.8.0-rc3
-
-# Set the default Docker to be run
-RUN ln -s /usr/local/bin/docker-1.7.1 /usr/local/bin/docker
+# Python3 requires a valid locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
+ENV LANG en_US.UTF-8
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
 
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
+RUN pip install tox==2.1.1
 
+ADD requirements.txt /code/
 ADD requirements-dev.txt /code/
-RUN pip install -r requirements-dev.txt
+ADD .pre-commit-config.yaml /code/
+ADD setup.py /code/
+ADD tox.ini /code/
+ADD compose /code/compose/
+RUN tox --notest
 
 ADD . /code/
-RUN python setup.py install
-
 RUN chown -R user /code/
 
-ENTRYPOINT ["/usr/local/bin/docker-compose"]
+ENTRYPOINT ["/code/.tox/py27/bin/docker-compose"]

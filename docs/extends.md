@@ -59,6 +59,10 @@ You can go further and define (or re-define) configuration locally in
         - DEBUG=1
       cpu_shares: 5
 
+    important_web:
+      extends: web
+      cpu_shares: 10
+
 You can also write other services and link your `web` service to them:
 
     web:
@@ -78,7 +82,7 @@ For full details on how to use `extends`, refer to the [reference](#reference).
 ### Example use case
 
 In this example, you’ll repurpose the example app from the [quick start
-guide](index.md). (If you're not familiar with Compose, it's recommended that
+guide](/). (If you're not familiar with Compose, it's recommended that
 you go through the quick start first.) This example assumes you want to use
 Compose both to develop an application locally and then deploy it to a
 production environment.
@@ -233,7 +237,8 @@ manually keep both environments in sync.
 ### Reference
 
 You can use `extends` on any service together with other configuration keys. It
-always expects a dictionary that should always contain the key: `service` and optionally the `file` key.
+expects a dictionary that contains a `service` key and optionally a `file` key.
+The `extends` key can also take a string, whose value is the name of a `service` defined in the same file.
 
 The `file` key specifies the location of a Compose configuration file defining
 the extension. The `file` value can be an absolute or relative path. If you
@@ -357,7 +362,6 @@ locally-defined bindings taking precedence:
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose command line completion](completion.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

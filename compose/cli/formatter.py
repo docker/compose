@@ -1,7 +1,12 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
+import logging
 import os
+
 import texttable
+
+from compose.cli import colors
 
 
 def get_tty_width():
@@ -13,6 +18,7 @@ def get_tty_width():
 
 
 class Formatter(object):
+    """Format tabular data for printing."""
     def table(self, headers, rows):
         table = texttable.Texttable(max_width=get_tty_width())
         table.set_cols_dtype(['t' for h in headers])
@@ -21,3 +27,22 @@ class Formatter(object):
         table.set_chars(['-', '|', '+', '-'])
 
         return table.draw()
+
+
+class ConsoleWarningFormatter(logging.Formatter):
+    """A logging.Formatter which prints WARNING and ERROR messages with
+    a prefix of the log level colored appropriate for the log level.
+    """
+
+    def get_level_message(self, record):
+        separator = ': '
+        if record.levelno == logging.WARNING:
+            return colors.yellow(record.levelname) + separator
+        if record.levelno == logging.ERROR:
+            return colors.red(record.levelname) + separator
+
+        return ''
+
+    def format(self, record):
+        message = super(ConsoleWarningFormatter, self).format(record)
+        return self.get_level_message(record) + message

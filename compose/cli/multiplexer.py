@@ -1,5 +1,8 @@
 from __future__ import absolute_import
+
 from threading import Thread
+
+from six.moves import _thread as thread
 
 try:
     from Queue import Queue, Empty
@@ -7,36 +10,51 @@ except ImportError:
     from queue import Queue, Empty  # Python 3.x
 
 
-# Yield STOP from an input generator to stop the
-# top-level loop without processing any more input.
 STOP = object()
 
 
 class Multiplexer(object):
-    def __init__(self, generators):
-        self.generators = generators
+    """
+    Create a single iterator from several iterators by running all of them in
+    parallel and yielding results as they come in.
+    """
+
+    def __init__(self, iterators):
+        self.iterators = iterators
+        self._num_running = len(iterators)
         self.queue = Queue()
 
     def loop(self):
         self._init_readers()
 
-        while True:
+        while self._num_running > 0:
             try:
-                item = self.queue.get(timeout=0.1)
+                item, exception = self.queue.get(timeout=0.1)
+
+                if exception:
+                    raise exception
+
                 if item is STOP:
-                    break
+                    self._num_running -= 1
                 else:
                     yield item
             except Empty:
                 pass
+            # See https://github.com/docker/compose/issues/189
+            except thread.error:
+                raise KeyboardInterrupt()
 
     def _init_readers(self):
-        for generator in self.generators:
-            t = Thread(target=_enqueue_output, args=(generator, self.queue))
+        for iterator in self.iterators:
+            t = Thread(target=_enqueue_output, args=(iterator, self.queue))
             t.daemon = True
             t.start()
 
 
-def _enqueue_output(generator, queue):
-    for item in generator:
-        queue.put(item)
+def _enqueue_output(iterator, queue):
+    try:
+        for item in iterator:
+            queue.put((item, None))
+        queue.put((STOP, None))
+    except Exception as e:
+        queue.put((None, e))

@@ -13,6 +13,9 @@ parent = "smn_compose_cli"
 
 ```
 Usage: pull [options] [SERVICE...]
+
+Options:
+--ignore-pull-failures  Pull what it can and ignores images with pull failures.
 ```
 
 Pulls service images.

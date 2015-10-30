@@ -3,31 +3,35 @@ Integration tests which cover state convergence (aka smart recreate) performed
 by `docker-compose up`.
 """
 from __future__ import unicode_literals
-import tempfile
-import shutil
-import os
 
-from compose import config
-from compose.project import Project
-from compose.const import LABEL_CONFIG_HASH
+import os
+import shutil
+import tempfile
 
 from .testcases import DockerClientTestCase
+from compose.config import config
+from compose.const import LABEL_CONFIG_HASH
+from compose.project import Project
+from compose.service import ConvergenceStrategy
 
 
 class ProjectTestCase(DockerClientTestCase):
     def run_up(self, cfg, **kwargs):
         kwargs.setdefault('timeout', 1)
+        kwargs.setdefault('detached', True)
 
         project = self.make_project(cfg)
         project.up(**kwargs)
         return set(project.containers(stopped=True))
 
     def make_project(self, cfg):
+        details = config.ConfigDetails(
+            'working_dir',
+            [config.ConfigFile(None, cfg)])
         return Project.from_dicts(
             name='composetest',
             client=self.client,
-            service_dicts=config.load(config.ConfigDetails(cfg, 'working_dir', None))
-        )
+            service_dicts=config.load(details))
 
 
 class BasicProjectTest(ProjectTestCase):
@@ -151,7 +155,9 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         old_containers = self.run_up(self.cfg)
 
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
-        new_containers = self.run_up(self.cfg, allow_recreate=False)
+        new_containers = self.run_up(
+            self.cfg,
+            strategy=ConvergenceStrategy.never)
 
         self.assertEqual(new_containers - old_containers, set())
 
@@ -175,23 +181,11 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
 
 def converge(service,
-             allow_recreate=True,
-             force_recreate=False,
+             strategy=ConvergenceStrategy.changed,
              do_build=True):
-    """
-    If a container for this service doesn't exist, create and start one. If there are
-    any, stop them, create+start new ones, and remove the old containers.
-    """
-    plan = service.convergence_plan(
-        allow_recreate=allow_recreate,
-        force_recreate=force_recreate,
-    )
-
-    return service.execute_convergence_plan(
-        plan,
-        do_build=do_build,
-        timeout=1,
-    )
+    """Create a converge plan from a strategy and execute the plan."""
+    plan = service.convergence_plan(strategy)
+    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
 
 
 class ServiceStateTest(DockerClientTestCase):
@@ -221,7 +215,6 @@ class ServiceStateTest(DockerClientTestCase):
 
         self.assertEqual([c.is_running for c in containers], [False, True])
 
-        web = self.create_service('web', **options)
         self.assertEqual(
             ('start', containers[0:1]),
             web.convergence_plan(),
