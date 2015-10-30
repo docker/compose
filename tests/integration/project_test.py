@@ -111,7 +111,7 @@ class ProjectTest(DockerClientTestCase):
         network_name = 'network_does_exist'
         project = Project(network_name, [], client)
         client.create_network(network_name)
-        assert project.get_network()['name'] == network_name
+        assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):
         project = Project.from_dicts(
