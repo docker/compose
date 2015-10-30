@@ -83,7 +83,7 @@ class Project(object):
         self.services = services
         self.client = client
         self.use_networking = use_networking
-        self.network_driver = network_driver or 'bridge'
+        self.network_driver = network_driver
 
     def labels(self, one_off=False):
         return [
