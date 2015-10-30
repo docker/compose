@@ -862,7 +862,7 @@ class ServiceNet(object):
         if containers:
             return 'container:' + containers[0].id
 
-        log.warn("Warning: Service %s is trying to use reuse the network stack "
+        log.warn("Service %s is trying to use reuse the network stack "
                  "of another service that is not running." % (self.id))
         return None
 
