@@ -215,17 +215,17 @@ class CLITestCase(DockerClientTestCase):
 
         networks = client.networks(names=[self.project.name])
         for n in networks:
-            self.addCleanup(client.remove_network, n['id'])
+            self.addCleanup(client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
-        self.assertEqual(networks[0]['driver'], 'bridge')
+        self.assertEqual(networks[0]['Driver'], 'bridge')
 
-        network = client.inspect_network(networks[0]['id'])
-        self.assertEqual(len(network['containers']), len(services))
+        network = client.inspect_network(networks[0]['Id'])
+        self.assertEqual(len(network['Containers']), len(services))
 
         for service in services:
             containers = service.containers()
             self.assertEqual(len(containers), 1)
-            self.assertIn(containers[0].id, network['containers'])
+            self.assertIn(containers[0].id, network['Containers'])
             self.assertEqual(containers[0].get('Config.Hostname'), service.name)
 
         web_container = self.project.get_service('web').containers()[0]
@@ -518,7 +518,7 @@ class CLITestCase(DockerClientTestCase):
         container, = service.containers(stopped=True, one_off=True)
         networks = client.networks(names=[self.project.name])
         for n in networks:
-            self.addCleanup(client.remove_network, n['id'])
+            self.addCleanup(client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(container.human_readable_command, u'true')
 
