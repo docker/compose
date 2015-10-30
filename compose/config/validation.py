@@ -254,7 +254,8 @@ def _parse_oneof_validator(error):
             )
             return "{}contains {}, which is an invalid type, it should be {}".format(
                 invalid_config_key,
-                context.instance,
+                # Always print the json repr of the invalid value
+                json.dumps(context.instance),
                 _parse_valid_types_from_validator(context.validator_value))
 
         if context.validator == 'uniqueItems':

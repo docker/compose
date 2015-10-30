@@ -552,7 +552,9 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_config_extra_hosts_list_of_dicts_validation_error(self):
-        expected_error_msg = "key 'extra_hosts' contains {'somehost': '162.242.195.82'}, which is an invalid type, it should be a string"
+        expected_error_msg = (
+            "key 'extra_hosts' contains {\"somehost\": \"162.242.195.82\"}, "
+            "which is an invalid type, it should be a string")
 
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
