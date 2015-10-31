@@ -1085,11 +1085,6 @@ def build_ulimits(ulimit_config):
         if isinstance(soft_hard_values, six.integer_types):
             ulimits.append({'name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
         elif isinstance(soft_hard_values, dict):
-            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
-                raise ConfigError(
-                    "ulimit_config \"%s\" cannot contain a 'soft' value higher than 'hard' value" %
-                    ulimit_config
-                )
             ulimit_dict = {'name': limit_name}
             ulimit_dict.update(soft_hard_values)
             ulimits.append(ulimit_dict)

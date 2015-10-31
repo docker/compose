@@ -388,6 +388,26 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_ulimits_soft_greater_than_hard_error(self):
+        expected_error_msg = "cannot contain a 'soft' value higher than 'hard' value"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                build_config_details(
+                    {'web': {
+                        'image': 'busybox',
+                        'ulimits': {
+                            'nofile': {
+                                "soft": 10000,
+                                "hard": 1000
+                            }
+                        }
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
     def test_valid_config_which_allows_two_type_definitions(self):
         expose_values = [["8000"], [8000]]
         for expose in expose_values:
