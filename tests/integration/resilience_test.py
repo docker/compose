@@ -13,7 +13,7 @@ class ResilienceTest(DockerClientTestCase):
         self.project = Project('composetest', [self.db], self.client)
 
         container = self.db.create_container()
-        self.db.start_container(container)
+        container.start()
         self.host_path = container.get('Volumes')['/var/db']
 
     def test_successful_recreate(self):
@@ -31,7 +31,7 @@ class ResilienceTest(DockerClientTestCase):
         self.assertEqual(container.get('Volumes')['/var/db'], self.host_path)
 
     def test_start_failure(self):
-        with mock.patch('compose.service.Service.start_container', crash):
+        with mock.patch('compose.container.Container.start', crash):
             with self.assertRaises(Crash):
                 self.project.up(strategy=ConvergenceStrategy.always)
 
