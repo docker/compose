@@ -59,7 +59,19 @@ class CLITestCase(DockerClientTestCase):
             self.command.dispatch(['ps'], None)
         self.assertIn('simplecomposefile_simple_1', mock_stdout.getvalue())
 
-    def test_ps_default_composefile(self):
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_ps_json_output_when_service_is_empty(self, mock_stdout):
+        self.command.dispatch(['ps', '--json'], None)
+        self.assertIn('[]', mock_stdout.getvalue())
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_ps_json_output(self, mock_stdout):
+        self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['ps', '--json'], None)
+        self.assertIn('["simplecomposefile_simple_1", "top", "Up", ""]', mock_stdout.getvalue())
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_ps_default_composefile(self, mock_stdout):
         self.command.base_dir = 'tests/fixtures/multiple-composefiles'
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['up', '-d'], None)
@@ -70,7 +82,19 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn('multiplecomposefiles_another_1', output)
         self.assertNotIn('multiplecomposefiles_yetanother_1', output)
 
-    def test_ps_alternate_composefile(self):
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_ps_json_output_with_multiple_services(self, mock_stdout):
+        self.command.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['ps', '--json'], None)
+
+        output = mock_stdout.getvalue()
+        self.assertIn('["multiplecomposefiles_another_1", "top", "Up", ""]', output)
+        self.assertIn('["multiplecomposefiles_simple_1", "top", "Up", ""]', output)
+        self.assertNotIn('multiplecomposefiles_yetanother_1', output)
+
+    @mock.patch('sys.stdout', new_callable=StringIO)
+    def test_ps_alternate_composefile(self, mock_stdout):
         config_path = os.path.abspath(
             'tests/fixtures/multiple-composefiles/compose2.yml')
         self._project = get_project(self.command.base_dir, [config_path])

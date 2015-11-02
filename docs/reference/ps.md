@@ -16,6 +16,7 @@ Usage: ps [options] [SERVICE...]
 
 Options:
 -q    Only display IDs
+--json    List containers in JSON format
 ```
 
 Lists containers.
