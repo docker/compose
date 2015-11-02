@@ -15,8 +15,8 @@ weight=2
 Compose supports two methods of sharing common configuration:
 
 1. Extending individual services with [the `extends` field](#extending-services)
-2. Extending entire compositions by
-   [using multiple compose files](#multiple-compose-files)
+2. Extending entire Compose file by
+   [using multiple Compose files](#multiple-compose-files)
 
 ## Extending services
 
@@ -88,7 +88,7 @@ You can also write other services and link your `web` service to them:
 ### Example use case
 
 Extending an individual service is useful when you have multiple services that
-have a common configuration.  The example below is a composition with
+have a common configuration.  The example below is a Compose app with
 two services: a web application and a queue worker. Both services use the same
 codebase and share many configuration options.
 
@@ -213,8 +213,8 @@ In the case of `environment`, `labels`, `volumes` and `devices`, Compose
 
 ## Multiple Compose files
 
-Using multiple Compose files enables you to customize a composition for
-different environments or different workflows.
+Using multiple Compose files enables you to customize a Compose application
+for different environments or different workflows.
 
 ### Understanding multiple Compose files
 
@@ -248,12 +248,12 @@ relative to the base file.
 ### Example use case
 
 In this section are two common use cases for multiple compose files: changing a
-composition for different environments, and running administrative tasks
-against a composition.
+Compose app for different environments, and running administrative tasks
+against a Compose app.
 
 #### Different environments
 
-A common use case for multiple files is changing a development composition
+A common use case for multiple files is changing a development Compose app
 for a production-like environment (which may be production, staging or CI).
 To support these differences, you can split your Compose configuration into
 a few different files:
@@ -301,7 +301,7 @@ host, mounts our code as a volume, and builds the web image.
 
 When you run `docker-compose up` it reads the overrides automatically.
 
-Now, it would be nice to use this composition in a production environment. So,
+Now, it would be nice to use this Compose app in a production environment. So,
 create another override file (which might be stored in a different git
 repo or managed by a different team).
 
@@ -332,7 +332,7 @@ production.
 #### Administrative tasks
 
 Another common use case is running adhoc or administrative tasks against one
-or more services in a composition. This example demonstrates running a
+or more services in a Compose app. This example demonstrates running a
 database backup.
 
 Start with a **docker-compose.yml**.
