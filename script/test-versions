@@ -31,7 +31,7 @@ for version in $DOCKER_VERSIONS; do
 
   function on_exit() {
     if [[ "$?" != "0" ]]; then
-        docker logs "$daemon_container"
+        docker logs "$daemon_container" 2>&1 | tail -n 100
     fi
     docker rm -vf "$daemon_container"
   }
@@ -45,6 +45,7 @@ for version in $DOCKER_VERSIONS; do
     --volume="/var/lib/docker" \
     dockerswarm/dind:$version \
     docker daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
+    2>&1 | tail -n 10
 
   docker run \
     --rm \
