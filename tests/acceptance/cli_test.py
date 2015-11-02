@@ -6,12 +6,10 @@ import subprocess
 from collections import namedtuple
 from operator import attrgetter
 
-import pytest
-
 from .. import mock
-from .testcases import DockerClientTestCase
 from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
+from tests.integration.testcases import DockerClientTestCase
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -45,8 +43,6 @@ class CLITestCase(DockerClientTestCase):
         project_options = project_options or []
         proc = subprocess.Popen(
             ['docker-compose'] + project_options + options,
-            # Note: this might actually be a patched sys.stdout, so we have
-            # to specify it here, even though it's the default
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=self.base_dir)
@@ -150,7 +146,7 @@ class CLITestCase(DockerClientTestCase):
         assert BUILD_PULL_TEXT in result.stdout
 
     def test_up_detached(self):
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'])
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
@@ -162,25 +158,12 @@ class CLITestCase(DockerClientTestCase):
         self.assertFalse(container.get('Config.AttachStdout'))
         self.assertFalse(container.get('Config.AttachStdin'))
 
-    # TODO: needs rework
-    @pytest.mark.skipif(True, reason="runs top")
     def test_up_attached(self):
-        with mock.patch(
-            'compose.cli.main.attach_to_logs',
-            autospec=True
-        ) as mock_attach:
-            self.dispatch(['up'], None)
-            _, args, kwargs = mock_attach.mock_calls[0]
-            _project, log_printer, _names, _timeout = args
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--no-color'])
 
-        service = self.project.get_service('simple')
-        another = self.project.get_service('another')
-        self.assertEqual(len(service.containers()), 1)
-        self.assertEqual(len(another.containers()), 1)
-        self.assertEqual(
-            set(log_printer.containers),
-            set(self.project.containers())
-        )
+        assert 'simple_1  | simple' in result.stdout
+        assert 'another_1 | another' in result.stdout
 
     def test_up_without_networking(self):
         self.require_api_version('1.21')
