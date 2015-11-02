@@ -410,7 +410,7 @@ class Service(object):
             if should_attach_logs:
                 container.attach_log_stream()
 
-            self.start_container(container)
+            container.start()
 
             return [container]
 
@@ -464,21 +464,16 @@ class Service(object):
         )
         if attach_logs:
             new_container.attach_log_stream()
-        self.start_container(new_container)
+        new_container.start()
         container.remove()
         return new_container
 
     def start_container_if_stopped(self, container, attach_logs=False):
-        if container.is_running:
-            return container
-        else:
+        if not container.is_running:
             log.info("Starting %s" % container.name)
             if attach_logs:
                 container.attach_log_stream()
-            return self.start_container(container)
-
-    def start_container(self, container):
-        container.start()
+            container.start()
         return container
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
