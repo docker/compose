@@ -1,0 +1,6 @@
+simple:
+  image: busybox:latest
+  command: echo simple
+another:
+  image: busybox:latest
+  command: echo another
