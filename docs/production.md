@@ -12,11 +12,9 @@ weight=1
 
 ## Using Compose in production
 
-While **Compose is not yet considered production-ready**, if you'd like to experiment and learn more about using it in production deployments, this guide
-can help.
-The project is actively working towards becoming
-production-ready; to learn more about the progress being made, check out the <a href="https://github.com/docker/compose/blob/master/ROADMAP.md">roadmap</a> for details
-on how it's coming along and what still needs to be done.
+> Compose is still primarily aimed at development and testing environments.
+> Compose may be used for smaller production deployments, but is probably
+> not yet suitable for larger deployments.
 
 When deploying to production, you'll almost certainly want to make changes to
 your app configuration that are more appropriate to a live environment. These
@@ -30,22 +28,19 @@ changes may include:
 - Specifying a restart policy (e.g., `restart: always`) to avoid downtime
 - Adding extra services (e.g., a log aggregator)
 
-For this reason, you'll probably want to define a separate Compose file, say
-`production.yml`, which specifies production-appropriate configuration.
+For this reason, you'll probably want to define an additional Compose file, say
+`production.yml`, which specifies production-appropriate
+configuration. This configuration file only needs to include the changes you'd
+like to make from the original Compose file.  The additional Compose file
+can be applied over the original `docker-compose.yml` to create a new configuration.
 
-> **Note:** The [extends](extends.md) keyword is useful for maintaining multiple
-> Compose files which re-use common services without having to manually copy and
-> paste.
+Once you've got a second configuration file, tell Compose to use it with the
+`-f` option:
 
-Once you've got an alternate configuration file, make Compose use it
-by setting the `COMPOSE_FILE` environment variable:
+    $ docker-compose -f docker-compose.yml -f production.yml up -d
 
-    $ export COMPOSE_FILE=production.yml
-    $ docker-compose up -d
-
-> **Note:** You can also use the file for a one-off command without setting
-> an environment variable. You do this by passing the `-f` flag, e.g.,
-> `docker-compose -f production.yml up -d`.
+See [Using multiple compose files](extends.md#different-environments) for a more
+complete example.
 
 ### Deploying changes
 
