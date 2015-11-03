@@ -2,30 +2,30 @@ from __future__ import absolute_import
 
 import os
 import shlex
-import sys
+import subprocess
+from collections import namedtuple
 from operator import attrgetter
 
-from six import StringIO
-
 from .. import mock
-from .testcases import DockerClientTestCase
 from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
-from compose.cli.errors import UserError
-from compose.cli.main import TopLevelCommand
-from compose.project import NoSuchService
+from tests.integration.testcases import DockerClientTestCase
+
+
+ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
+
+
+BUILD_CACHE_TEXT = 'Using cache'
+BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:latest'
 
 
 class CLITestCase(DockerClientTestCase):
+
     def setUp(self):
         super(CLITestCase, self).setUp()
-        self.old_sys_exit = sys.exit
-        sys.exit = lambda code=0: None
-        self.command = TopLevelCommand()
-        self.command.base_dir = 'tests/fixtures/simple-composefile'
+        self.base_dir = 'tests/fixtures/simple-composefile'
 
     def tearDown(self):
-        sys.exit = self.old_sys_exit
         self.project.kill()
         self.project.remove_stopped()
         for container in self.project.containers(stopped=True, one_off=True):
@@ -34,129 +34,119 @@ class CLITestCase(DockerClientTestCase):
 
     @property
     def project(self):
-        # Hack: allow project to be overridden. This needs refactoring so that
-        # the project object is built exactly once, by the command object, and
-        # accessed by the test case object.
-        if hasattr(self, '_project'):
-            return self._project
+        # Hack: allow project to be overridden
+        if not hasattr(self, '_project'):
+            self._project = get_project(self.base_dir)
+        return self._project
 
-        return get_project(self.command.base_dir)
+    def dispatch(self, options, project_options=None, returncode=0):
+        project_options = project_options or []
+        proc = subprocess.Popen(
+            ['docker-compose'] + project_options + options,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=self.base_dir)
+        print("Running process: %s" % proc.pid)
+        stdout, stderr = proc.communicate()
+        if proc.returncode != returncode:
+            print(stderr)
+            assert proc.returncode == returncode
+        return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
     def test_help(self):
-        old_base_dir = self.command.base_dir
-        self.command.base_dir = 'tests/fixtures/no-composefile'
-        with self.assertRaises(SystemExit) as exc_context:
-            self.command.dispatch(['help', 'up'], None)
-            self.assertIn('Usage: up [options] [SERVICE...]', str(exc_context.exception))
+        old_base_dir = self.base_dir
+        self.base_dir = 'tests/fixtures/no-composefile'
+        result = self.dispatch(['help', 'up'], returncode=1)
+        assert 'Usage: up [options] [SERVICE...]' in result.stderr
         # self.project.kill() fails during teardown
         # unless there is a composefile.
-        self.command.base_dir = old_base_dir
+        self.base_dir = old_base_dir
 
-    # TODO: address the "Inappropriate ioctl for device" warnings in test output
     def test_ps(self):
         self.project.get_service('simple').create_container()
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['ps'], None)
-        self.assertIn('simplecomposefile_simple_1', mock_stdout.getvalue())
+        result = self.dispatch(['ps'])
+        assert 'simplecomposefile_simple_1' in result.stdout
 
     def test_ps_default_composefile(self):
-        self.command.base_dir = 'tests/fixtures/multiple-composefiles'
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['up', '-d'], None)
-            self.command.dispatch(['ps'], None)
+        self.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['ps'])
 
-        output = mock_stdout.getvalue()
-        self.assertIn('multiplecomposefiles_simple_1', output)
-        self.assertIn('multiplecomposefiles_another_1', output)
-        self.assertNotIn('multiplecomposefiles_yetanother_1', output)
+        self.assertIn('multiplecomposefiles_simple_1', result.stdout)
+        self.assertIn('multiplecomposefiles_another_1', result.stdout)
+        self.assertNotIn('multiplecomposefiles_yetanother_1', result.stdout)
 
     def test_ps_alternate_composefile(self):
         config_path = os.path.abspath(
             'tests/fixtures/multiple-composefiles/compose2.yml')
-        self._project = get_project(self.command.base_dir, [config_path])
+        self._project = get_project(self.base_dir, [config_path])
 
-        self.command.base_dir = 'tests/fixtures/multiple-composefiles'
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['-f', 'compose2.yml', 'up', '-d'], None)
-            self.command.dispatch(['-f', 'compose2.yml', 'ps'], None)
+        self.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.dispatch(['-f', 'compose2.yml', 'up', '-d'])
+        result = self.dispatch(['-f', 'compose2.yml', 'ps'])
 
-        output = mock_stdout.getvalue()
-        self.assertNotIn('multiplecomposefiles_simple_1', output)
-        self.assertNotIn('multiplecomposefiles_another_1', output)
-        self.assertIn('multiplecomposefiles_yetanother_1', output)
+        self.assertNotIn('multiplecomposefiles_simple_1', result.stdout)
+        self.assertNotIn('multiplecomposefiles_another_1', result.stdout)
+        self.assertIn('multiplecomposefiles_yetanother_1', result.stdout)
 
-    @mock.patch('compose.service.log')
-    def test_pull(self, mock_logging):
-        self.command.dispatch(['pull'], None)
-        mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
-        mock_logging.info.assert_any_call('Pulling another (busybox:latest)...')
+    def test_pull(self):
+        result = self.dispatch(['pull'])
+        assert sorted(result.stderr.split('\n'))[1:] == [
+            'Pulling another (busybox:latest)...',
+            'Pulling simple (busybox:latest)...',
+        ]
 
-    @mock.patch('compose.service.log')
-    def test_pull_with_digest(self, mock_logging):
-        self.command.dispatch(['-f', 'digest.yml', 'pull'], None)
-        mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
-        mock_logging.info.assert_any_call(
-            'Pulling digest (busybox@'
-            'sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d)...')
+    def test_pull_with_digest(self):
+        result = self.dispatch(['-f', 'digest.yml', 'pull'])
 
-    @mock.patch('compose.service.log')
-    def test_pull_with_ignore_pull_failures(self, mock_logging):
-        self.command.dispatch(['-f', 'ignore-pull-failures.yml', 'pull', '--ignore-pull-failures'], None)
-        mock_logging.info.assert_any_call('Pulling simple (busybox:latest)...')
-        mock_logging.info.assert_any_call('Pulling another (nonexisting-image:latest)...')
-        mock_logging.error.assert_any_call('Error: image library/nonexisting-image:latest not found')
+        assert 'Pulling simple (busybox:latest)...' in result.stderr
+        assert ('Pulling digest (busybox@'
+                'sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b520'
+                '04ee8502d)...') in result.stderr
+
+    def test_pull_with_ignore_pull_failures(self):
+        result = self.dispatch([
+            '-f', 'ignore-pull-failures.yml',
+            'pull', '--ignore-pull-failures'])
+
+        assert 'Pulling simple (busybox:latest)...' in result.stderr
+        assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
+        assert 'Error: image library/nonexisting-image:latest not found' in result.stderr
 
     def test_build_plain(self):
-        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.command.dispatch(['build', 'simple'], None)
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['build', 'simple'])
 
-        cache_indicator = 'Using cache'
-        pull_indicator = 'Status: Image is up to date for busybox:latest'
-
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['build', 'simple'], None)
-        output = mock_stdout.getvalue()
-        self.assertIn(cache_indicator, output)
-        self.assertNotIn(pull_indicator, output)
+        result = self.dispatch(['build', 'simple'])
+        assert BUILD_CACHE_TEXT in result.stdout
+        assert BUILD_PULL_TEXT not in result.stdout
 
     def test_build_no_cache(self):
-        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.command.dispatch(['build', 'simple'], None)
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['build', 'simple'])
 
-        cache_indicator = 'Using cache'
-        pull_indicator = 'Status: Image is up to date for busybox:latest'
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['build', '--no-cache', 'simple'], None)
-        output = mock_stdout.getvalue()
-        self.assertNotIn(cache_indicator, output)
-        self.assertNotIn(pull_indicator, output)
+        result = self.dispatch(['build', '--no-cache', 'simple'])
+        assert BUILD_CACHE_TEXT not in result.stdout
+        assert BUILD_PULL_TEXT not in result.stdout
 
     def test_build_pull(self):
-        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.command.dispatch(['build', 'simple'], None)
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['build', 'simple'], None)
 
-        cache_indicator = 'Using cache'
-        pull_indicator = 'Status: Image is up to date for busybox:latest'
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['build', '--pull', 'simple'], None)
-        output = mock_stdout.getvalue()
-        self.assertIn(cache_indicator, output)
-        self.assertIn(pull_indicator, output)
+        result = self.dispatch(['build', '--pull', 'simple'])
+        assert BUILD_CACHE_TEXT in result.stdout
+        assert BUILD_PULL_TEXT in result.stdout
 
     def test_build_no_cache_pull(self):
-        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.command.dispatch(['build', 'simple'], None)
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['build', 'simple'])
 
-        cache_indicator = 'Using cache'
-        pull_indicator = 'Status: Image is up to date for busybox:latest'
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            self.command.dispatch(['build', '--no-cache', '--pull', 'simple'], None)
-        output = mock_stdout.getvalue()
-        self.assertNotIn(cache_indicator, output)
-        self.assertIn(pull_indicator, output)
+        result = self.dispatch(['build', '--no-cache', '--pull', 'simple'])
+        assert BUILD_CACHE_TEXT not in result.stdout
+        assert BUILD_PULL_TEXT in result.stdout
 
     def test_up_detached(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'])
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
@@ -169,28 +159,17 @@ class CLITestCase(DockerClientTestCase):
         self.assertFalse(container.get('Config.AttachStdin'))
 
     def test_up_attached(self):
-        with mock.patch(
-            'compose.cli.main.attach_to_logs',
-            autospec=True
-        ) as mock_attach:
-            self.command.dispatch(['up'], None)
-            _, args, kwargs = mock_attach.mock_calls[0]
-            _project, log_printer, _names, _timeout = args
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--no-color'])
 
-        service = self.project.get_service('simple')
-        another = self.project.get_service('another')
-        self.assertEqual(len(service.containers()), 1)
-        self.assertEqual(len(another.containers()), 1)
-        self.assertEqual(
-            set(log_printer.containers),
-            set(self.project.containers())
-        )
+        assert 'simple_1  | simple' in result.stdout
+        assert 'another_1 | another' in result.stdout
 
     def test_up_without_networking(self):
         self.require_api_version('1.21')
 
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['up', '-d'], None)
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['up', '-d'], None)
         client = docker_client(version='1.21')
 
         networks = client.networks(names=[self.project.name])
@@ -207,8 +186,8 @@ class CLITestCase(DockerClientTestCase):
     def test_up_with_networking(self):
         self.require_api_version('1.21')
 
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['--x-networking', 'up', '-d'], None)
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['--x-networking', 'up', '-d'], None)
         client = docker_client(version='1.21')
 
         services = self.project.get_services()
@@ -232,8 +211,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertFalse(web_container.get('HostConfig.Links'))
 
     def test_up_with_links(self):
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['up', '-d', 'web'], None)
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['up', '-d', 'web'], None)
         web = self.project.get_service('web')
         db = self.project.get_service('db')
         console = self.project.get_service('console')
@@ -242,8 +221,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     def test_up_with_no_deps(self):
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['up', '-d', '--no-deps', 'web'], None)
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['up', '-d', '--no-deps', 'web'], None)
         web = self.project.get_service('web')
         db = self.project.get_service('db')
         console = self.project.get_service('console')
@@ -252,13 +231,13 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     def test_up_with_force_recreate(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
 
         old_ids = [c.id for c in service.containers()]
 
-        self.command.dispatch(['up', '-d', '--force-recreate'], None)
+        self.dispatch(['up', '-d', '--force-recreate'], None)
         self.assertEqual(len(service.containers()), 1)
 
         new_ids = [c.id for c in service.containers()]
@@ -266,13 +245,13 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotEqual(old_ids, new_ids)
 
     def test_up_with_no_recreate(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
 
         old_ids = [c.id for c in service.containers()]
 
-        self.command.dispatch(['up', '-d', '--no-recreate'], None)
+        self.dispatch(['up', '-d', '--no-recreate'], None)
         self.assertEqual(len(service.containers()), 1)
 
         new_ids = [c.id for c in service.containers()]
@@ -280,11 +259,12 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(old_ids, new_ids)
 
     def test_up_with_force_recreate_and_no_recreate(self):
-        with self.assertRaises(UserError):
-            self.command.dispatch(['up', '-d', '--force-recreate', '--no-recreate'], None)
+        self.dispatch(
+            ['up', '-d', '--force-recreate', '--no-recreate'],
+            returncode=1)
 
     def test_up_with_timeout(self):
-        self.command.dispatch(['up', '-d', '-t', '1'], None)
+        self.dispatch(['up', '-d', '-t', '1'], None)
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
@@ -296,10 +276,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertFalse(config['AttachStdout'])
         self.assertFalse(config['AttachStdin'])
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_without_links(self, mock_stdout):
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['run', 'console', '/bin/true'], None)
+    def test_run_service_without_links(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['run', 'console', '/bin/true'])
         self.assertEqual(len(self.project.containers()), 0)
 
         # Ensure stdin/out was open
@@ -309,44 +288,40 @@ class CLITestCase(DockerClientTestCase):
         self.assertTrue(config['AttachStdout'])
         self.assertTrue(config['AttachStdin'])
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_links(self, _):
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['run', 'web', '/bin/true'], None)
+    def test_run_service_with_links(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['run', 'web', '/bin/true'], None)
         db = self.project.get_service('db')
         console = self.project.get_service('console')
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
-    @mock.patch('dockerpty.start')
-    def test_run_with_no_deps(self, _):
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['run', '--no-deps', 'web', '/bin/true'], None)
+    def test_run_with_no_deps(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['run', '--no-deps', 'web', '/bin/true'])
         db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 0)
 
-    @mock.patch('dockerpty.start')
-    def test_run_does_not_recreate_linked_containers(self, _):
-        self.command.base_dir = 'tests/fixtures/links-composefile'
-        self.command.dispatch(['up', '-d', 'db'], None)
+    def test_run_does_not_recreate_linked_containers(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['up', '-d', 'db'])
         db = self.project.get_service('db')
         self.assertEqual(len(db.containers()), 1)
 
         old_ids = [c.id for c in db.containers()]
 
-        self.command.dispatch(['run', 'web', '/bin/true'], None)
+        self.dispatch(['run', 'web', '/bin/true'], None)
         self.assertEqual(len(db.containers()), 1)
 
         new_ids = [c.id for c in db.containers()]
 
         self.assertEqual(old_ids, new_ids)
 
-    @mock.patch('dockerpty.start')
-    def test_run_without_command(self, _):
-        self.command.base_dir = 'tests/fixtures/commands-composefile'
+    def test_run_without_command(self):
+        self.base_dir = 'tests/fixtures/commands-composefile'
         self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
 
-        self.command.dispatch(['run', 'implicit'], None)
+        self.dispatch(['run', 'implicit'])
         service = self.project.get_service('implicit')
         containers = service.containers(stopped=True, one_off=True)
         self.assertEqual(
@@ -354,7 +329,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/sh -c echo "success"'],
         )
 
-        self.command.dispatch(['run', 'explicit'], None)
+        self.dispatch(['run', 'explicit'])
         service = self.project.get_service('explicit')
         containers = service.containers(stopped=True, one_off=True)
         self.assertEqual(
@@ -362,14 +337,10 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_entrypoint_overridden(self, _):
-        self.command.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
+    def test_run_service_with_entrypoint_overridden(self):
+        self.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
         name = 'service'
-        self.command.dispatch(
-            ['run', '--entrypoint', '/bin/echo', name, 'helloworld'],
-            None
-        )
+        self.dispatch(['run', '--entrypoint', '/bin/echo', name, 'helloworld'])
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(
@@ -377,37 +348,34 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/echo', u'helloworld'],
         )
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_user_overridden(self, _):
-        self.command.base_dir = 'tests/fixtures/user-composefile'
+    def test_run_service_with_user_overridden(self):
+        self.base_dir = 'tests/fixtures/user-composefile'
         name = 'service'
         user = 'sshd'
-        args = ['run', '--user={user}'.format(user=user), name]
-        self.command.dispatch(args, None)
+        self.dispatch(['run', '--user={user}'.format(user=user), name], returncode=1)
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(user, container.get('Config.User'))
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_user_overridden_short_form(self, _):
-        self.command.base_dir = 'tests/fixtures/user-composefile'
+    def test_run_service_with_user_overridden_short_form(self):
+        self.base_dir = 'tests/fixtures/user-composefile'
         name = 'service'
         user = 'sshd'
-        args = ['run', '-u', user, name]
-        self.command.dispatch(args, None)
+        self.dispatch(['run', '-u', user, name], returncode=1)
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
         self.assertEqual(user, container.get('Config.User'))
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_environement_overridden(self, _):
+    def test_run_service_with_environement_overridden(self):
         name = 'service'
-        self.command.base_dir = 'tests/fixtures/environment-composefile'
-        self.command.dispatch(
-            ['run', '-e', 'foo=notbar', '-e', 'allo=moto=bobo',
-             '-e', 'alpha=beta', name],
-            None
-        )
+        self.base_dir = 'tests/fixtures/environment-composefile'
+        self.dispatch([
+            'run', '-e', 'foo=notbar',
+            '-e', 'allo=moto=bobo',
+            '-e', 'alpha=beta',
+            name,
+            '/bin/true',
+        ])
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=True)[0]
         # env overriden
@@ -419,11 +387,10 @@ class CLITestCase(DockerClientTestCase):
         # make sure a value with a = don't crash out
         self.assertEqual('moto=bobo', container.environment['allo'])
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_without_map_ports(self, _):
+    def test_run_service_without_map_ports(self):
         # create one off container
-        self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['run', '-d', 'simple'], None)
+        self.base_dir = 'tests/fixtures/ports-composefile'
+        self.dispatch(['run', '-d', 'simple'])
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -437,12 +404,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_random, None)
         self.assertEqual(port_assigned, None)
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_map_ports(self, _):
-
+    def test_run_service_with_map_ports(self):
         # create one off container
-        self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['run', '-d', '--service-ports', 'simple'], None)
+        self.base_dir = 'tests/fixtures/ports-composefile'
+        self.dispatch(['run', '-d', '--service-ports', 'simple'])
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -460,12 +425,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_range[0], "0.0.0.0:49153")
         self.assertEqual(port_range[1], "0.0.0.0:49154")
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_explicitly_maped_ports(self, _):
-
+    def test_run_service_with_explicitly_maped_ports(self):
         # create one off container
-        self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['run', '-d', '-p', '30000:3000', '--publish', '30001:3001', 'simple'], None)
+        self.base_dir = 'tests/fixtures/ports-composefile'
+        self.dispatch(['run', '-d', '-p', '30000:3000', '--publish', '30001:3001', 'simple'])
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -479,12 +442,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "0.0.0.0:30000")
         self.assertEqual(port_full, "0.0.0.0:30001")
 
-    @mock.patch('dockerpty.start')
-    def test_run_service_with_explicitly_maped_ip_ports(self, _):
-
+    def test_run_service_with_explicitly_maped_ip_ports(self):
         # create one off container
-        self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish', '127.0.0.1:30001:3001', 'simple'], None)
+        self.base_dir = 'tests/fixtures/ports-composefile'
+        self.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish', '127.0.0.1:30001:3001', 'simple'], None)
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -498,22 +459,20 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "127.0.0.1:30000")
         self.assertEqual(port_full, "127.0.0.1:30001")
 
-    @mock.patch('dockerpty.start')
-    def test_run_with_custom_name(self, _):
-        self.command.base_dir = 'tests/fixtures/environment-composefile'
+    def test_run_with_custom_name(self):
+        self.base_dir = 'tests/fixtures/environment-composefile'
         name = 'the-container-name'
-        self.command.dispatch(['run', '--name', name, 'service'], None)
+        self.dispatch(['run', '--name', name, 'service', '/bin/true'])
 
         service = self.project.get_service('service')
         container, = service.containers(stopped=True, one_off=True)
         self.assertEqual(container.name, name)
 
-    @mock.patch('dockerpty.start')
-    def test_run_with_networking(self, _):
+    def test_run_with_networking(self):
         self.require_api_version('1.21')
         client = docker_client(version='1.21')
-        self.command.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.command.dispatch(['--x-networking', 'run', 'simple', 'true'], None)
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['--x-networking', 'run', 'simple', 'true'], None)
         service = self.project.get_service('simple')
         container, = service.containers(stopped=True, one_off=True)
         networks = client.networks(names=[self.project.name])
@@ -527,71 +486,70 @@ class CLITestCase(DockerClientTestCase):
         service.create_container()
         service.kill()
         self.assertEqual(len(service.containers(stopped=True)), 1)
-        self.command.dispatch(['rm', '--force'], None)
+        self.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
         service = self.project.get_service('simple')
         service.create_container()
         service.kill()
         self.assertEqual(len(service.containers(stopped=True)), 1)
-        self.command.dispatch(['rm', '-f'], None)
+        self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
     def test_stop(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['stop', '-t', '1'], None)
+        self.dispatch(['stop', '-t', '1'], None)
 
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
     def test_pause_unpause(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertFalse(service.containers()[0].is_paused)
 
-        self.command.dispatch(['pause'], None)
+        self.dispatch(['pause'], None)
         self.assertTrue(service.containers()[0].is_paused)
 
-        self.command.dispatch(['unpause'], None)
+        self.dispatch(['unpause'], None)
         self.assertFalse(service.containers()[0].is_paused)
 
     def test_logs_invalid_service_name(self):
-        with self.assertRaises(NoSuchService):
-            self.command.dispatch(['logs', 'madeupname'], None)
+        self.dispatch(['logs', 'madeupname'], returncode=1)
 
     def test_kill(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['kill'], None)
+        self.dispatch(['kill'], None)
 
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
     def test_kill_signal_sigstop(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
+        self.dispatch(['kill', '-s', 'SIGSTOP'], None)
 
         self.assertEqual(len(service.containers()), 1)
         # The container is still running. It has only been paused
         self.assertTrue(service.containers()[0].is_running)
 
     def test_kill_stopped_service(self):
-        self.command.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
-        self.command.dispatch(['kill', '-s', 'SIGSTOP'], None)
+        self.dispatch(['kill', '-s', 'SIGSTOP'], None)
         self.assertTrue(service.containers()[0].is_running)
 
-        self.command.dispatch(['kill', '-s', 'SIGKILL'], None)
+        self.dispatch(['kill', '-s', 'SIGKILL'], None)
 
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
@@ -601,7 +559,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
-        self.command.dispatch(['restart', '-t', '1'], None)
+        self.dispatch(['restart', '-t', '1'], None)
         container.inspect()
         self.assertNotEqual(
             container.dictionary['State']['FinishedAt'],
@@ -615,53 +573,51 @@ class CLITestCase(DockerClientTestCase):
     def test_scale(self):
         project = self.project
 
-        self.command.scale(project, {'SERVICE=NUM': ['simple=1']})
+        self.dispatch(['scale', 'simple=1'])
         self.assertEqual(len(project.get_service('simple').containers()), 1)
 
-        self.command.scale(project, {'SERVICE=NUM': ['simple=3', 'another=2']})
+        self.dispatch(['scale', 'simple=3', 'another=2'])
         self.assertEqual(len(project.get_service('simple').containers()), 3)
         self.assertEqual(len(project.get_service('another').containers()), 2)
 
-        self.command.scale(project, {'SERVICE=NUM': ['simple=1', 'another=1']})
+        self.dispatch(['scale', 'simple=1', 'another=1'])
         self.assertEqual(len(project.get_service('simple').containers()), 1)
         self.assertEqual(len(project.get_service('another').containers()), 1)
 
-        self.command.scale(project, {'SERVICE=NUM': ['simple=1', 'another=1']})
+        self.dispatch(['scale', 'simple=1', 'another=1'])
         self.assertEqual(len(project.get_service('simple').containers()), 1)
         self.assertEqual(len(project.get_service('another').containers()), 1)
 
-        self.command.scale(project, {'SERVICE=NUM': ['simple=0', 'another=0']})
+        self.dispatch(['scale', 'simple=0', 'another=0'])
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
     def test_port(self):
-        self.command.base_dir = 'tests/fixtures/ports-composefile'
-        self.command.dispatch(['up', '-d'], None)
+        self.base_dir = 'tests/fixtures/ports-composefile'
+        self.dispatch(['up', '-d'], None)
         container = self.project.get_service('simple').get_container()
 
-        @mock.patch('sys.stdout', new_callable=StringIO)
-        def get_port(number, mock_stdout):
-            self.command.dispatch(['port', 'simple', str(number)], None)
-            return mock_stdout.getvalue().rstrip()
+        def get_port(number):
+            result = self.dispatch(['port', 'simple', str(number)])
+            return result.stdout.rstrip()
 
         self.assertEqual(get_port(3000), container.get_local_port(3000))
         self.assertEqual(get_port(3001), "0.0.0.0:49152")
         self.assertEqual(get_port(3002), "0.0.0.0:49153")
 
     def test_port_with_scale(self):
-        self.command.base_dir = 'tests/fixtures/ports-composefile-scale'
-        self.command.dispatch(['scale', 'simple=2'], None)
+        self.base_dir = 'tests/fixtures/ports-composefile-scale'
+        self.dispatch(['scale', 'simple=2'], None)
         containers = sorted(
             self.project.containers(service_names=['simple']),
             key=attrgetter('name'))
 
-        @mock.patch('sys.stdout', new_callable=StringIO)
-        def get_port(number, mock_stdout, index=None):
+        def get_port(number, index=None):
             if index is None:
-                self.command.dispatch(['port', 'simple', str(number)], None)
+                result = self.dispatch(['port', 'simple', str(number)])
             else:
-                self.command.dispatch(['port', '--index=' + str(index), 'simple', str(number)], None)
-            return mock_stdout.getvalue().rstrip()
+                result = self.dispatch(['port', '--index=' + str(index), 'simple', str(number)])
+            return result.stdout.rstrip()
 
         self.assertEqual(get_port(3000), containers[0].get_local_port(3000))
         self.assertEqual(get_port(3000, index=1), containers[0].get_local_port(3000))
@@ -670,8 +626,8 @@ class CLITestCase(DockerClientTestCase):
 
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
-        self.command.dispatch(['-f', config_path, 'up', '-d'], None)
-        self._project = get_project(self.command.base_dir, [config_path])
+        self.dispatch(['-f', config_path, 'up', '-d'], None)
+        self._project = get_project(self.base_dir, [config_path])
 
         containers = self.project.containers(stopped=True)
         self.assertEqual(len(containers), 1)
@@ -681,20 +637,18 @@ class CLITestCase(DockerClientTestCase):
     def test_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
         os.environ['HOME'] = '/tmp/home-dir'
-        expected_host_path = os.path.join(os.environ['HOME'], os.environ['VOLUME_NAME'])
 
-        self.command.base_dir = 'tests/fixtures/volume-path-interpolation'
-        self.command.dispatch(['up', '-d'], None)
+        self.base_dir = 'tests/fixtures/volume-path-interpolation'
+        self.dispatch(['up', '-d'], None)
 
         container = self.project.containers(stopped=True)[0]
         actual_host_path = container.get('Volumes')['/container-path']
         components = actual_host_path.split('/')
-        self.assertTrue(components[-2:] == ['home-dir', 'my-volume'],
-                        msg="Last two components differ: %s, %s" % (actual_host_path, expected_host_path))
+        assert components[-2:] == ['home-dir', 'my-volume']
 
     def test_up_with_default_override_file(self):
-        self.command.base_dir = 'tests/fixtures/override-files'
-        self.command.dispatch(['up', '-d'], None)
+        self.base_dir = 'tests/fixtures/override-files'
+        self.dispatch(['up', '-d'], None)
 
         containers = self.project.containers()
         self.assertEqual(len(containers), 2)
@@ -704,15 +658,15 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(db.human_readable_command, 'top')
 
     def test_up_with_multiple_files(self):
-        self.command.base_dir = 'tests/fixtures/override-files'
+        self.base_dir = 'tests/fixtures/override-files'
         config_paths = [
             'docker-compose.yml',
             'docker-compose.override.yml',
             'extra.yml',
 
         ]
-        self._project = get_project(self.command.base_dir, config_paths)
-        self.command.dispatch(
+        self._project = get_project(self.base_dir, config_paths)
+        self.dispatch(
             [
                 '-f', config_paths[0],
                 '-f', config_paths[1],
@@ -731,8 +685,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(other.human_readable_command, 'top')
 
     def test_up_with_extends(self):
-        self.command.base_dir = 'tests/fixtures/extends'
-        self.command.dispatch(['up', '-d'], None)
+        self.base_dir = 'tests/fixtures/extends'
+        self.dispatch(['up', '-d'], None)
 
         self.assertEqual(
             set([s.name for s in self.project.services]),
