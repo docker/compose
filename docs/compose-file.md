@@ -24,6 +24,11 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
+## Service configuration reference
+
+This section contains a list of all configuration options supported by a service
+definition.
+
 ### build
 
 Path to a directory containing a Dockerfile. When the value supplied is a

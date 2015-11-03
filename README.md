@@ -2,15 +2,15 @@ Docker Compose
 ==============
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
-*(Previously known as Fig)*
+Compose is a tool for defining and running multi-container Docker applications.
+With Compose, you use a Compose file to configure your application's services.
+Then, using a single command, you create and start all the services
+from your configuration. To learn more about all the features of Compose
+see [the list of features](docs/index.md#features).
 
-Compose is a tool for defining and running multi-container applications with
-Docker. With Compose, you define a multi-container application in a single
-file, then spin your application up in a single command which does everything
-that needs to be done to get it running.
-
-Compose is great for development environments, staging servers, and CI. We don't
-recommend that you use it in production yet.
+Compose is great for development, testing, and staging environments, as well as
+CI workflows. You can learn more about each case in
+[Common Use Cases](#common-use-cases).
 
 Using Compose is basically a three-step process.
 
@@ -32,6 +32,9 @@ A `docker-compose.yml` looks like this:
        - redis
     redis:
       image: redis
+
+For more information about the Compose file, see the
+[Compose file reference](docs/compose-file.md)
 
 Compose has commands for managing the whole lifecycle of your application:
 

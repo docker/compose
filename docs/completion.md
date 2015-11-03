@@ -5,7 +5,7 @@ description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
 parent="smn_workw_compose"
-weight=3
+weight=10
 +++
 <![end-metadata]-->
 
