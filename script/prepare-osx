@@ -24,7 +24,7 @@ if !(which brew); then
   ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 fi
 
-brew update
+brew update > /dev/null
 
 if !(python_version | grep "$desired_python_version"); then
   if brew list | grep python; then

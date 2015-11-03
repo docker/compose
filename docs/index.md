@@ -11,20 +11,22 @@ parent="smn_workw_compose"
 
 # Overview of Docker Compose
 
-Compose is a tool for defining and running multi-container applications with
-Docker. With Compose, you define a multi-container application in a single
-file, then spin your application up in a single command which does everything
-that needs to be done to get it running.
+Compose is a tool for defining and running multi-container Docker applications.
+With Compose, you use a Compose file to configure your application's services.
+Then, using a single command, you create and start all the services
+from your configuration. To learn more about all the features of Compose
+see [the list of features](#features).
 
-Compose is great for development environments, staging servers, and CI. We don't
-recommend that you use it in production yet.
+Compose is great for development, testing, and staging environments, as well as
+CI workflows. You can learn more about each case in
+[Common Use Cases](#common-use-cases).
 
 Using Compose is basically a three-step process.
 
 1. Define your app's environment with a `Dockerfile` so it can be
 reproduced anywhere.
 2. Define the services that make up your app in `docker-compose.yml` so
-they can be run together in an isolated environment:
+they can be run together in an isolated environment.
 3. Lastly, run `docker-compose up` and Compose will start and run your entire app.
 
 A `docker-compose.yml` looks like this:
@@ -40,6 +42,9 @@ A `docker-compose.yml` looks like this:
     redis:
       image: redis
 
+For more information about the Compose file, see the
+[Compose file reference](compose-file.md)
+
 Compose has commands for managing the whole lifecycle of your application:
 
  * Start, stop and rebuild services
@@ -50,183 +55,130 @@ Compose has commands for managing the whole lifecycle of your application:
 ## Compose documentation
 
 - [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)
 
-## Quick start
+## Features
 
-Let's get started with a walkthrough of getting a simple Python web app running
-on Compose. It assumes a little knowledge of Python, but the concepts
-demonstrated here should be understandable even if you're not familiar with
-Python.
+The features of Compose that make it effective are:
 
-### Installation and set-up
+* [Multiple isolated environments on a single host](#Multiple-isolated-environments-on-a-single-host)
+* [Preserve volume data when containers are created](#preserve-volume-data-when-containers-are-created)
+* [Only recreate containers that have changed](#only-recreate-containers-that-have-changed)
+* [Variables and moving a composition between environments](#variables-and-moving-a-composition-between-environments)
 
-First, [install Docker and Compose](install.md).
+#### Multiple isolated environments on a single host
 
-Next, you'll want to make a directory for the project:
+Compose uses a project name to isolate environments from each other. You can use
+this project name to:
 
-    $ mkdir composetest
-    $ cd composetest
+* on a dev host, to create multiple copies of a single environment (ex: you want
+  to run a stable copy for each feature branch of a project)
+* on a CI server, to keep builds from interfering with each other, you can set
+  the project name to a unique build number
+* on a shared host or dev host, to prevent different projects which may use the
+  same service names, from interfering with each other
 
-Inside this directory, create `app.py`, a simple web app that uses the Flask
-framework and increments a value in Redis. Don't worry if you don't have Redis installed, docker is going to take care of that for you when we [define services](#define-services):
+The default project name is the basename of the project directory. You can set
+a custom project name by using the
+[`-p` command line option](./reference/docker-compose.md) or the
+[`COMPOSE_PROJECT_NAME` environment variable](./reference/overview.md#compose-project-name).
 
-    from flask import Flask
-    from redis import Redis
+#### Preserve volume data when containers are created
 
-    app = Flask(__name__)
-    redis = Redis(host='redis', port=6379)
+Compose preserves all volumes used by your services. When `docker-compose up`
+runs, if it finds any containers from previous runs, it copies the volumes from
+the old container to the new container. This process ensures that any data
+you've created in volumes isn't lost.
 
-    @app.route('/')
-    def hello():
-        redis.incr('hits')
-        return 'Hello World! I have been seen %s times.' % redis.get('hits')
 
-    if __name__ == "__main__":
-        app.run(host="0.0.0.0", debug=True)
+#### Only recreate containers that have changed
 
-Next, define the Python dependencies in a file called `requirements.txt`:
+Compose caches the configuration used to create a container. When you
+restart a service that has not changed, Compose re-uses the existing
+containers. Re-using containers means that you can make changes to your
+environment very quickly.
 
-    flask
-    redis
 
-### Create a Docker image
+#### Variables and moving a composition between environments
 
-Now, create a Docker image containing all of your app's dependencies. You
-specify how to build the image using a file called
-[`Dockerfile`](http://docs.docker.com/reference/builder/):
+Compose supports variables in the Compose file. You can use these variables
+to customize your composition for different environments, or different users.
+See [Variable substitution](compose-file.md#variable-substitution) for more
+details.
 
-    FROM python:2.7
-    ADD . /code
-    WORKDIR /code
-    RUN pip install -r requirements.txt
-    CMD python app.py
+You can extend a Compose file using the `extends` field or by creating multiple
+Compose files. See [extends](extends.md) for more details.
 
-This tells Docker to:
 
-* Build an image starting with the Python 2.7 image.
-* Add the current directory `.` into the path `/code` in the image.
-* Set the working directory to `/code`.
-* Install your Python dependencies.
-* Set the default command for the container to `python app.py`
+## Common Use Cases
 
-For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+Compose can be used in many different ways. Some common use cases are outlined
+below.
 
-You can test that this builds by running `docker build -t web .`.
+### Development environments
 
-### Define services
+When you're developing software, the ability to run an application in an
+isolated environment and interact with it is crucial.  The Compose command
+line tool can be used to create the environment and interact with it.
 
-Next, define a set of services using `docker-compose.yml`:
+The [Compose file](compose-file.md) provides a way to document and configure
+all of the application's service dependencies (databases, queues, caches,
+web service APIs, etc). Using the Compose command line tool you can create
+and start one or more containers for each dependency with a single command
+(`docker-compose up`).
 
-    web:
-      build: .
-      ports:
-       - "5000:5000"
-      volumes:
-       - .:/code
-      links:
-       - redis
-    redis:
-      image: redis
+Together, these features provide a convenient way for developers to get
+started on a project.  Compose can reduce a multi-page "developer getting
+started guide" to a single machine readable Compose file and a few commands.
 
-This defines two services:
+### Automated testing environments
 
-#### web
-
-* Builds from the `Dockerfile` in the current directory.
-* Forwards the exposed port 5000 on the container to port 5000 on the host machine.
-* Connects the web container to the Redis service via a link.
-* Mounts the current directory on the host to `/code` inside the container allowing you to modify the code without having to rebuild the image.
-
-#### redis
-
-* Uses the public [Redis](https://registry.hub.docker.com/_/redis/) image which gets pulled from the Docker Hub registry.
-
-### Build and run your app with Compose
-
-Now, when you run `docker-compose up`, Compose will pull a Redis image, build an image for your code, and start everything up:
-
-    $ docker-compose up
-    Pulling image redis...
-    Building web...
-    Starting composetest_redis_1...
-    Starting composetest_web_1...
-    redis_1 | [8] 02 Jan 18:43:35.576 # Server started, Redis version 2.8.3
-    web_1   |  * Running on http://0.0.0.0:5000/
-    web_1   |  * Restarting with stat
-
-If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` will tell you its address and you can open `http://MACHINE_VM_IP:5000` in a browser. 
-
-If you're not using Boot2docker and are on linux, then the web app should now be listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000 doesn't resolve, you can also try localhost:5000.
-
-You should get a message in your browser saying:
-
-`Hello World! I have been seen 1 times.`
-
-Refreshing the page will increment the number.
-
-If you want to run your services in the background, you can pass the `-d` flag
-(for "detached" mode) to `docker-compose up` and use `docker-compose ps` to
-see what is currently running:
+An important part of any Continuous Deployment or Continuous Integration process
+is the automated test suite. Automated end-to-end testing requires an
+environment in which to run tests. Compose provides a convenient way to create
+and destroy isolated testing environments for your test suite. By defining the full
+environment in a [Compose file](compose-file.md) you can create and destroy these
+environments in just a few commands:
 
     $ docker-compose up -d
-    Starting composetest_redis_1...
-    Starting composetest_web_1...
-    $ docker-compose ps
-	    Name                 Command            State       Ports
-    -------------------------------------------------------------------
-    composetest_redis_1   /usr/local/bin/run         Up
-    composetest_web_1     /bin/sh -c python app.py   Up      5000->5000/tcp
-
-The `docker-compose run` command allows you to run one-off commands for your
-services. For example, to see what environment variables are available to the
-`web` service:
-
-    $ docker-compose run web env
-
-See `docker-compose --help` to see other available commands. You can also install [command completion](completion.md) for the bash and zsh shell, which will also show you available commands.
-
-If you started Compose with `docker-compose up -d`, you'll probably want to stop
-your services once you've finished with them:
-
+    $ ./run_tests
     $ docker-compose stop
+    $ docker-compose rm -f
 
-At this point, you have seen the basics of how Compose works.
+### Single host deployments
 
-- Next, try the quick start guide for [Django](django.md),
-  [Rails](rails.md), or [Wordpress](wordpress.md).
-- See the reference guides for complete details on the [commands](cli.md), the
-  [configuration file](yml.md) and [environment variables](env.md).
+Compose has traditionally been focused on development and testing workflows,
+but with each release we're making progress on more production-oriented features.
+You can use Compose to deploy to a remote Docker Engine. The Docker Engine may
+be a single instance provisioned with
+[Docker Machine](https://docs.docker.com/machine/) or an entire
+[Docker Swarm](https://docs.docker.com/swarm/) cluster.
+
+For details on using production-oriented features, see
+[compose in production](production.md) in this documentation.
+
 
 ## Release Notes
 
-### Version 1.2.0 (April 7, 2015)
-
-For complete information on this release, see the [1.2.0 Milestone project page](https://github.com/docker/compose/wiki/1.2.0-Milestone-Project-Page).
-In addition to bug fixes and refinements, this release adds the following:
-
-* The `extends` keyword, which adds the ability to extend services by sharing  common configurations. For details, see
-[PR #1088](https://github.com/docker/compose/pull/1088).
-
-* Better integration with Swarm. Swarm will now schedule inter-dependent
-containers on the same host. For details, see
-[PR #972](https://github.com/docker/compose/pull/972).
+To see a detailed list of changes for past and current releases of Docker
+Compose, please refer to the
+[CHANGELOG](https://github.com/docker/compose/blob/master/CHANGELOG.md).
 
 ## Getting help
 
-Docker Compose is still in its infancy and under active development. If you need
-help, would like to contribute, or simply want to talk about the project with
-like-minded individuals, we have a number of open channels for communication.
+Docker Compose is under active development. If you need help, would like to
+contribute, or simply want to talk about the project with like-minded
+individuals, we have a number of open channels for communication.
 
 * To report bugs or file feature requests: please use the [issue tracker on Github](https://github.com/docker/compose/issues).
 
-* To talk about the project with people in real time: please join the `#docker-compose` channel on IRC.
+* To talk about the project with people in real time: please join the
+  `#docker-compose` channel on freenode IRC.
 
 * To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
 

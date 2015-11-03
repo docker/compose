@@ -10,126 +10,171 @@ weight=4
 <![end-metadata]-->
 
 
-## Quickstart Guide: Compose and Django
+# Quickstart Guide: Compose and Django
 
-
-This Quick-start Guide will demonstrate how to use Compose to set up and run a
+This quick-start guide demonstrates how to use Compose to set up and run a
 simple Django/PostgreSQL app. Before starting, you'll need to have
 [Compose installed](install.md).
 
-### Define the project
+## Define the project components
 
-Start by setting up the three files you'll need to build the app. First, since
-your app is going to run inside a Docker container containing all of its
-dependencies, you'll need to define exactly what needs to be included in the
-container. This is done using a file called `Dockerfile`. To begin with, the
-Dockerfile consists of:
+For this project, you need to create a Dockerfile, a Python dependencies file,
+and a `docker-compose.yml` file.
 
-    FROM python:2.7
-    ENV PYTHONUNBUFFERED 1
-    RUN mkdir /code
-    WORKDIR /code
-    ADD requirements.txt /code/
-    RUN pip install -r requirements.txt
-    ADD . /code/
+1. Create an empty project directory.
 
-This Dockerfile will define an image that is used to build a container that
-includes your application and has Python installed alongside all of your Python
-dependencies. For more information on how to write Dockerfiles, see the
-[Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+    You can name the directory something easy for you to remember. This directory is the context for your application image. The directory should only contain resources to build that image.
 
-Second, you'll define your Python dependencies in a file called
-`requirements.txt`:
+2. Create a new file called `Dockerfile` in your project directory.
 
-    Django
-    psycopg2
+    The Dockerfile defines an application's image content via one or more build
+    commands that configure that image. Once built, you can run the image in a
+    container.  For more information on `Dockerfiles`, see the [Docker user
+    guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile)
+    and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
-Finally, this is all tied together with a file called `docker-compose.yml`. It
-describes the services that comprise your app (here, a web server and database),
-which Docker images they use, how they link together, what volumes will be
-mounted inside the containers, and what ports they expose.
+3. Add the following content to the `Dockerfile`.
 
-    db:
-      image: postgres
-    web:
-      build: .
-      command: python manage.py runserver 0.0.0.0:8000
-      volumes:
-        - .:/code
-      ports:
-        - "8000:8000"
-      links:
-        - db
+        FROM python:2.7
+        ENV PYTHONUNBUFFERED 1
+        RUN mkdir /code
+        WORKDIR /code
+        ADD requirements.txt /code/
+        RUN pip install -r requirements.txt
+        ADD . /code/
 
-See the [`docker-compose.yml` reference](yml.md) for more information on how
-this file works.
+    This `Dockerfile` starts with a Python 2.7 base image. The base image is
+    modified by adding a new `code` directory. The base image is further modified
+    by installing the Python requirements defined in the `requirements.txt` file.
 
-### Build the project
+4. Save and close the `Dockerfile`.
 
-You can now start a Django project with `docker-compose run`:
+5. Create a `requirements.txt` in your project directory.
 
-    $ docker-compose run web django-admin.py startproject composeexample .
+    This file is used by the `RUN pip install -r requirements.txt` command in your `Dockerfile`.
 
-First, Compose will build an image for the `web` service using the `Dockerfile`.
-It will then run `django-admin.py startproject composeexample .` inside a
-container built using that image.
+6. Add the required software in the file.
 
-This will generate a Django app inside the current directory:
+        Django
+        psycopg2
 
-    $ ls
-    Dockerfile       docker-compose.yml          composeexample       manage.py        requirements.txt
+7. Save and close the `requirements.txt` file.
 
-### Connect the database
+8. Create a file called `docker-compose.yml` in your project directory.
 
-Now you need to set up the database connection. Replace the `DATABASES = ...`
-definition in `composeexample/settings.py` to read:
+    The `docker-compose.yml` file describes the services that make your app. In
+    this example those services are a web server and database.  The compose file
+    also describes which Docker images these services use, how they link
+    together, any volumes they might need mounted inside the containers.
+    Finally, the `docker-compose.yml` file describes which ports these services
+    expose. See the [`docker-compose.yml` reference](compose-file.md) for more
+    information on how this file works.
 
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': 'postgres',
-            'USER': 'postgres',
-            'HOST': 'db',
-            'PORT': 5432,
+9. Add the following configuration to the file.
+
+        db:
+          image: postgres
+        web:
+          build: .
+          command: python manage.py runserver 0.0.0.0:8000
+          volumes:
+            - .:/code
+          ports:
+            - "8000:8000"
+          links:
+            - db
+
+    This file defines two services: The `db` service and the `web` service.
+
+10. Save and close the `docker-compose.yml` file.
+
+## Create a Django project
+
+In this step, you create a Django started project by building the image from the build context defined in the previous procedure.
+
+1. Change to the root of your project directory.
+
+2. Create the Django project using the `docker-compose` command.
+
+        $ docker-compose run web django-admin.py startproject composeexample .
+
+    This instructs Compose to run `django-admin.py startproject composeeexample`
+    in a container, using the `web` service's image and configuration. Because
+    the `web` image doesn't exist yet, Compose builds it from the current
+    directory, as specified by the `build: .` line in `docker-compose.yml`.
+
+    Once the `web` service image is built, Compose runs it and executes the
+    `django-admin.py startproject` command in the container. This command
+    instructs Django to create a set of files and directories representing a
+    Django project.
+
+3. After the `docker-compose` command completes, list the contents of your project.
+
+        $ ls -l
+        drwxr-xr-x 2 root   root   composeexample
+        -rw-rw-r-- 1 user   user   docker-compose.yml
+        -rw-rw-r-- 1 user   user   Dockerfile
+        -rwxr-xr-x 1 root   root   manage.py
+        -rw-rw-r-- 1 user   user   requirements.txt
+
+    The files `django-admin` created are owned by root. This happens because
+    the container runs as the `root` user.
+
+4. Change the ownership of the new files.
+
+        sudo chown -R $USER:$USER .
+
+
+## Connect the database
+
+In this section, you set up the database connection for Django.
+
+1. In your project dirctory, edit the `composeexample/settings.py` file.
+
+2. Replace the `DATABASES = ...` with the following:
+
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql_psycopg2',
+                'NAME': 'postgres',
+                'USER': 'postgres',
+                'HOST': 'db',
+                'PORT': 5432,
+            }
         }
-    }
 
-These settings are determined by the
-[postgres](https://registry.hub.docker.com/_/postgres/) Docker image specified
-in the Dockerfile.
+    These settings are determined by the
+    [postgres](https://registry.hub.docker.com/_/postgres/) Docker image
+    specified in `docker-compose.yml`.
 
-Then, run `docker-compose up`:
+3. Save and close the file.
 
-    Recreating myapp_db_1...
-    Recreating myapp_web_1...
-    Attaching to myapp_db_1, myapp_web_1
-    myapp_db_1 |
-    myapp_db_1 | PostgreSQL stand-alone backend 9.1.11
-    myapp_db_1 | 2014-01-27 12:17:03 UTC LOG:  database system is ready to accept connections
-    myapp_db_1 | 2014-01-27 12:17:03 UTC LOG:  autovacuum launcher started
-    myapp_web_1 | Validating models...
-    myapp_web_1 |
-    myapp_web_1 | 0 errors found
-    myapp_web_1 | January 27, 2014 - 12:12:40
-    myapp_web_1 | Django version 1.6.1, using settings 'composeexample.settings'
-    myapp_web_1 | Starting development server at http://0.0.0.0:8000/
-    myapp_web_1 | Quit the server with CONTROL-C.
+4. Run the `docker-compose up` command.
 
-Your Django app should nw be running at port 8000 on your Docker daemon. If you are using a Docker Machine VM, you can use the `docker-machine ip MACHINE_NAME` to get the IP address.
+        $ docker-compose up
+        Starting composepractice_db_1...
+        Starting composepractice_web_1...
+        Attaching to composepractice_db_1, composepractice_web_1
+        ...
+        db_1  | PostgreSQL init process complete; ready for start up.
+        ...
+        db_1  | LOG:  database system is ready to accept connections
+        db_1  | LOG:  autovacuum launcher started
+        ..
+        web_1 | Django version 1.8.4, using settings 'composeexample.settings'
+        web_1 | Starting development server at http://0.0.0.0:8000/
+        web_1 | Quit the server with CONTROL-C.
 
-You can also run management commands with Docker. To set up your database, for
-example, run `docker-compose up` and in another terminal run:
-
-    $ docker-compose run web python manage.py syncdb
+    At this point, your Django app should be running at port `8000` on your
+    Docker host. If you are using a Docker Machine VM, you can use the
+    `docker-machine ip MACHINE_NAME` to get the IP address.
 
 ## More Compose documentation
 
-- [User guide](/)
+- [User guide](../index.md)
 - [Installing Compose](install.md)
-- [Get started with Django](django.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

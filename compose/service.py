@@ -1,31 +1,39 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from collections import namedtuple
+from __future__ import unicode_literals
+
 import logging
-import re
 import os
+import re
 import sys
+from collections import namedtuple
 from operator import attrgetter
 
+import enum
 import six
 from docker.errors import APIError
-from docker.utils import create_host_config, LogConfig
+from docker.utils import LogConfig
+from docker.utils.ports import build_port_bindings
+from docker.utils.ports import split_port
 
 from . import __version__
-from .config import DOCKER_CONFIG_KEYS, merge_environment
-from .const import (
-    DEFAULT_TIMEOUT,
-    LABEL_CONTAINER_NUMBER,
-    LABEL_ONE_OFF,
-    LABEL_PROJECT,
-    LABEL_SERVICE,
-    LABEL_VERSION,
-    LABEL_CONFIG_HASH,
-)
+from .config import DOCKER_CONFIG_KEYS
+from .config import merge_environment
+from .config.validation import VALID_NAME_CHARS
+from .const import DEFAULT_TIMEOUT
+from .const import IS_WINDOWS_PLATFORM
+from .const import LABEL_CONFIG_HASH
+from .const import LABEL_CONTAINER_NUMBER
+from .const import LABEL_ONE_OFF
+from .const import LABEL_PROJECT
+from .const import LABEL_SERVICE
+from .const import LABEL_VERSION
 from .container import Container
 from .legacy import check_for_legacy_containers
-from .progress_stream import stream_output, StreamOutputError
-from .utils import json_hash, parallel_execute
+from .progress_stream import stream_output
+from .progress_stream import StreamOutputError
+from .utils import json_hash
+from .utils import parallel_execute
+
 
 log = logging.getLogger(__name__)
 
@@ -33,11 +41,13 @@ log = logging.getLogger(__name__)
 DOCKER_START_KEYS = [
     'cap_add',
     'cap_drop',
+    'cgroup_parent',
     'devices',
     'dns',
     'dns_search',
     'env_file',
     'extra_hosts',
+    'ipc',
     'read_only',
     'net',
     'log_driver',
@@ -50,8 +60,6 @@ DOCKER_START_KEYS = [
     'volumes_from',
     'security_opt',
 ]
-
-VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 
 
 class BuildError(Exception):
@@ -76,10 +84,27 @@ class NoSuchImageError(Exception):
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
+VolumeFromSpec = namedtuple('VolumeFromSpec', 'source mode')
+
+
 ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
+
+
+@enum.unique
+class ConvergenceStrategy(enum.Enum):
+    """Enumeration for all possible convergence strategies. Values refer to
+    when containers should be recreated.
+    """
+    changed = 1
+    always = 2
+    never = 3
+
+    @property
+    def allows_recreate(self):
+        return self is not type(self).never
 
 
 class Service(object):
@@ -88,34 +113,32 @@ class Service(object):
         name,
         client=None,
         project='default',
+        use_networking=False,
         links=None,
         volumes_from=None,
         net=None,
         **options
     ):
-        if not re.match('^%s+$' % VALID_NAME_CHARS, name):
-            raise ConfigError('Invalid service name "%s" - only %s are allowed' % (name, VALID_NAME_CHARS))
         if not re.match('^%s+$' % VALID_NAME_CHARS, project):
             raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
-        if 'image' in options and 'build' in options:
-            raise ConfigError('Service %s has both an image and build path specified. A service can either be built to image or use an existing image, not both.' % name)
-        if 'image' not in options and 'build' not in options:
-            raise ConfigError('Service %s has neither an image nor a build path specified. Exactly one must be provided.' % name)
 
         self.name = name
         self.client = client
         self.project = project
+        self.use_networking = use_networking
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.net = net or Net(None)
         self.options = options
 
-    def containers(self, stopped=False, one_off=False):
-        containers = filter(None, [
+    def containers(self, stopped=False, one_off=False, filters={}):
+        filters.update({'label': self.labels(one_off=one_off)})
+
+        containers = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})])
+                filters=filters)]))
 
         if not containers:
             check_for_legacy_containers(
@@ -143,17 +166,27 @@ class Service(object):
     # TODO: remove these functions, project takes care of starting/stopping,
     def stop(self, **options):
         for c in self.containers():
-            log.info("Stopping %s..." % c.name)
+            log.info("Stopping %s" % c.name)
             c.stop(**options)
+
+    def pause(self, **options):
+        for c in self.containers(filters={'status': 'running'}):
+            log.info("Pausing %s" % c.name)
+            c.pause(**options)
+
+    def unpause(self, **options):
+        for c in self.containers(filters={'status': 'paused'}):
+            log.info("Unpausing %s" % c.name)
+            c.unpause()
 
     def kill(self, **options):
         for c in self.containers():
-            log.info("Killing %s..." % c.name)
+            log.info("Killing %s" % c.name)
             c.kill(**options)
 
     def restart(self, **options):
         for c in self.containers():
-            log.info("Restarting %s..." % c.name)
+            log.info("Restarting %s" % c.name)
             c.restart(**options)
 
     # end TODO
@@ -279,7 +312,7 @@ class Service(object):
         )
 
         if 'name' in container_options and not quiet:
-            log.info("Creating %s..." % container_options['name'])
+            log.info("Creating %s" % container_options['name'])
 
         return Container.create(self.client, **container_options)
 
@@ -316,22 +349,19 @@ class Service(object):
         else:
             return self.options['image']
 
-    def convergence_plan(self,
-                         allow_recreate=True,
-                         force_recreate=False):
-
-        if force_recreate and not allow_recreate:
-            raise ValueError("force_recreate and allow_recreate are in conflict")
-
+    def convergence_plan(self, strategy=ConvergenceStrategy.changed):
         containers = self.containers(stopped=True)
 
         if not containers:
             return ConvergencePlan('create', [])
 
-        if not allow_recreate:
+        if strategy is ConvergenceStrategy.never:
             return ConvergencePlan('start', containers)
 
-        if force_recreate or self._containers_have_diverged(containers):
+        if (
+            strategy is ConvergenceStrategy.always or
+            self._containers_have_diverged(containers)
+        ):
             return ConvergencePlan('recreate', containers)
 
         stopped = [c for c in containers if not c.is_running]
@@ -345,7 +375,7 @@ class Service(object):
         config_hash = None
 
         try:
-            config_hash = self.config_hash()
+            config_hash = self.config_hash
         except NoSuchImageError as e:
             log.debug(
                 'Service %s has diverged: %s',
@@ -369,13 +399,17 @@ class Service(object):
     def execute_convergence_plan(self,
                                  plan,
                                  do_build=True,
-                                 timeout=DEFAULT_TIMEOUT):
+                                 timeout=DEFAULT_TIMEOUT,
+                                 detached=False):
         (action, containers) = plan
+        should_attach_logs = not detached
 
         if action == 'create':
-            container = self.create_container(
-                do_build=do_build,
-            )
+            container = self.create_container(do_build=do_build)
+
+            if should_attach_logs:
+                container.attach_log_stream()
+
             self.start_container(container)
 
             return [container]
@@ -383,15 +417,16 @@ class Service(object):
         elif action == 'recreate':
             return [
                 self.recreate_container(
-                    c,
-                    timeout=timeout
+                    container,
+                    timeout=timeout,
+                    attach_logs=should_attach_logs
                 )
-                for c in containers
+                for container in containers
             ]
 
         elif action == 'start':
-            for c in containers:
-                self.start_container_if_stopped(c)
+            for container in containers:
+                self.start_container_if_stopped(container, attach_logs=should_attach_logs)
 
             return containers
 
@@ -406,44 +441,37 @@ class Service(object):
 
     def recreate_container(self,
                            container,
-                           timeout=DEFAULT_TIMEOUT):
+                           timeout=DEFAULT_TIMEOUT,
+                           attach_logs=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
         volumes can be copied to the new container, before the original
         container is removed.
         """
-        log.info("Recreating %s..." % container.name)
-        try:
-            container.stop(timeout=timeout)
-        except APIError as e:
-            if (e.response.status_code == 500
-                    and e.explanation
-                    and 'no such process' in str(e.explanation)):
-                pass
-            else:
-                raise
+        log.info("Recreating %s" % container.name)
 
-        # Use a hopefully unique container name by prepending the short id
-        self.client.rename(
-            container.id,
-            '%s_%s' % (container.short_id, container.name))
-
+        container.stop(timeout=timeout)
+        container.rename_to_tmp_name()
         new_container = self.create_container(
             do_build=False,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
         )
+        if attach_logs:
+            new_container.attach_log_stream()
         self.start_container(new_container)
         container.remove()
         return new_container
 
-    def start_container_if_stopped(self, container):
+    def start_container_if_stopped(self, container, attach_logs=False):
         if container.is_running:
             return container
         else:
-            log.info("Starting %s..." % container.name)
+            log.info("Starting %s" % container.name)
+            if attach_logs:
+                container.attach_log_stream()
             return self.start_container(container)
 
     def start_container(self, container):
@@ -452,7 +480,7 @@ class Service(object):
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
-            log.info('Removing %s...' % c.name)
+            log.info('Removing %s' % c.name)
             c.stop(timeout=timeout)
             c.remove()
 
@@ -470,6 +498,7 @@ class Service(object):
             else:
                 numbers.add(c.number)
 
+    @property
     def config_hash(self):
         return json_hash(self.config_dict())
 
@@ -495,7 +524,7 @@ class Service(object):
         return [(service.name, alias) for service, alias in self.links]
 
     def get_volumes_from_names(self):
-        return [s.name for s in self.volumes_from if isinstance(s, Service)]
+        return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
     def get_container_name(self, number, one_off=False):
         # TODO: Implement issue #652 here
@@ -514,6 +543,9 @@ class Service(object):
         return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):
+        if self.use_networking:
+            return []
+
         links = []
         for service, link_name in self.links:
             for container in service.containers():
@@ -535,16 +567,9 @@ class Service(object):
 
     def _get_volumes_from(self):
         volumes_from = []
-        for volume_source in self.volumes_from:
-            if isinstance(volume_source, Service):
-                containers = volume_source.containers(stopped=True)
-                if not containers:
-                    volumes_from.append(volume_source.create_container().id)
-                else:
-                    volumes_from.extend(map(attrgetter('id'), containers))
-
-            elif isinstance(volume_source, Container):
-                volumes_from.append(volume_source.id)
+        for volume_from_spec in self.volumes_from:
+            volumes = build_volume_from(volume_from_spec)
+            volumes_from.extend(volumes)
 
         return volumes_from
 
@@ -563,7 +588,7 @@ class Service(object):
 
         if self.custom_container_name() and not one_off:
             container_options['name'] = self.custom_container_name()
-        else:
+        elif not container_options.get('name'):
             container_options['name'] = self.get_container_name(number, one_off)
 
         if 'detach' not in container_options:
@@ -580,16 +605,19 @@ class Service(object):
             container_options['hostname'] = parts[0]
             container_options['domainname'] = parts[2]
 
+        if 'hostname' not in container_options and self.use_networking:
+            container_options['hostname'] = self.name
+
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
             all_ports = container_options.get('ports', []) + self.options.get('expose', [])
-            for port in all_ports:
-                port = str(port)
-                if ':' in port:
-                    port = port.split(':')[-1]
-                if '/' in port:
-                    port = tuple(port.split('/'))
-                ports.append(port)
+            for port_range in all_ports:
+                internal_range, _ = split_port(port_range)
+                for port in internal_range:
+                    port = str(port)
+                    if '/' in port:
+                        port = tuple(port.split('/'))
+                    ports.append(port)
             container_options['ports'] = ports
 
         override_options['binds'] = merge_volume_bindings(
@@ -614,7 +642,7 @@ class Service(object):
             container_options.get('labels', {}),
             self.labels(one_off=one_off),
             number,
-            self.config_hash() if add_config_hash else None)
+            self.config_hash if add_config_hash else None)
 
         # Delete options which are only used when starting
         for key in DOCKER_START_KEYS:
@@ -634,7 +662,7 @@ class Service(object):
         cap_add = options.get('cap_add', None)
         cap_drop = options.get('cap_drop', None)
         log_config = LogConfig(
-            type=options.get('log_driver', 'json-file'),
+            type=options.get('log_driver', ""),
             config=options.get('log_opt', None)
         )
         pid = options.get('pid', None)
@@ -654,8 +682,9 @@ class Service(object):
         read_only = options.get('read_only', None)
 
         devices = options.get('devices', None)
+        cgroup_parent = options.get('cgroup_parent', None)
 
-        return create_host_config(
+        return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=port_bindings,
             binds=options.get('binds'),
@@ -674,20 +703,26 @@ class Service(object):
             extra_hosts=extra_hosts,
             read_only=read_only,
             pid_mode=pid,
-            security_opt=security_opt
+            security_opt=security_opt,
+            ipc_mode=options.get('ipc'),
+            cgroup_parent=cgroup_parent
         )
 
-    def build(self, no_cache=False):
-        log.info('Building %s...' % self.name)
+    def build(self, no_cache=False, pull=False):
+        log.info('Building %s' % self.name)
 
-        path = six.binary_type(self.options['build'])
+        path = self.options['build']
+        # python2 os.path() doesn't support unicode, so we need to encode it to
+        # a byte string
+        if not six.PY3:
+            path = path.encode('utf8')
 
         build_output = self.client.build(
             path=path,
             tag=self.image_name,
             stream=True,
             rm=True,
-            pull=False,
+            pull=pull,
             nocache=no_cache,
             dockerfile=self.options.get('dockerfile', None),
         )
@@ -695,7 +730,7 @@ class Service(object):
         try:
             all_events = stream_output(build_output, sys.stdout)
         except StreamOutputError as e:
-            raise BuildError(self, unicode(e))
+            raise BuildError(self, six.text_type(e))
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes
@@ -741,19 +776,26 @@ class Service(object):
                 return True
         return False
 
-    def pull(self):
+    def pull(self, ignore_pull_failures=False):
         if 'image' not in self.options:
             return
 
-        repo, tag = parse_repository_tag(self.options['image'])
+        repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
-        log.info('Pulling %s (%s:%s)...' % (self.name, repo, tag))
+        log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
         output = self.client.pull(
             repo,
             tag=tag,
             stream=True,
         )
-        stream_output(output, sys.stdout)
+
+        try:
+            stream_output(output, sys.stdout)
+        except StreamOutputError as e:
+            if not ignore_pull_failures:
+                raise
+            else:
+                log.error(six.text_type(e))
 
 
 class Net(object):
@@ -806,7 +848,7 @@ class ServiceNet(object):
         if containers:
             return 'container:' + containers[0].id
 
-        log.warn("Warning: Service %s is trying to use reuse the network stack "
+        log.warn("Service %s is trying to use reuse the network stack "
                  "of another service that is not running." % (self.id))
         return None
 
@@ -823,14 +865,31 @@ def build_container_name(project, service, number, one_off=False):
 
 # Images
 
+def parse_repository_tag(repo_path):
+    """Splits image identification into base image path, tag/digest
+    and it's separator.
 
-def parse_repository_tag(s):
-    if ":" not in s:
-        return s, ""
-    repo, tag = s.rsplit(":", 1)
-    if "/" in tag:
-        return s, ""
-    return repo, tag
+    Example:
+
+    >>> parse_repository_tag('user/repo@sha256:digest')
+    ('user/repo', 'sha256:digest', '@')
+    >>> parse_repository_tag('user/repo:v1')
+    ('user/repo', 'v1', ':')
+    """
+    tag_separator = ":"
+    digest_separator = "@"
+
+    if digest_separator in repo_path:
+        repo, tag = repo_path.rsplit(digest_separator, 1)
+        return repo, tag, digest_separator
+
+    repo, tag = repo_path, ""
+    if tag_separator in repo_path:
+        repo, tag = repo_path.rsplit(tag_separator, 1)
+        if "/" in tag:
+            repo, tag = repo_path, ""
+
+    return repo, tag, tag_separator
 
 
 # Volumes
@@ -849,7 +908,7 @@ def merge_volume_bindings(volumes_option, previous_container):
         volume_bindings.update(
             get_container_data_volumes(previous_container, volumes_option))
 
-    return volume_bindings.values()
+    return list(volume_bindings.values())
 
 
 def get_container_data_volumes(container, volumes_option):
@@ -862,7 +921,7 @@ def get_container_data_volumes(container, volumes_option):
     container_volumes = container.get('Volumes') or {}
     image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
 
-    for volume in set(volumes_option + image_volumes.keys()):
+    for volume in set(volumes_option + list(image_volumes)):
         volume = parse_volume_spec(volume)
         # No need to preserve host volumes
         if volume.external:
@@ -884,53 +943,85 @@ def build_volume_binding(volume_spec):
     return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
 
 
+def normalize_paths_for_engine(external_path, internal_path):
+    """Windows paths, c:\my\path\shiny, need to be changed to be compatible with
+    the Engine. Volume paths are expected to be linux style /c/my/path/shiny/
+    """
+    if not IS_WINDOWS_PLATFORM:
+        return external_path, internal_path
+
+    if external_path:
+        drive, tail = os.path.splitdrive(external_path)
+
+        if drive:
+            external_path = '/' + drive.lower().rstrip(':') + tail
+
+        external_path = external_path.replace('\\', '/')
+
+    return external_path, internal_path.replace('\\', '/')
+
+
 def parse_volume_spec(volume_config):
-    parts = volume_config.split(':')
+    """
+    Parse a volume_config path and split it into external:internal[:mode]
+    parts to be returned as a valid VolumeSpec.
+    """
+    if IS_WINDOWS_PLATFORM:
+        # relative paths in windows expand to include the drive, eg C:\
+        # so we join the first 2 parts back together to count as one
+        drive, tail = os.path.splitdrive(volume_config)
+        parts = tail.split(":")
+
+        if drive:
+            parts[0] = drive + parts[0]
+    else:
+        parts = volume_config.split(':')
+
     if len(parts) > 3:
         raise ConfigError("Volume %s has incorrect format, should be "
                           "external:internal[:mode]" % volume_config)
 
     if len(parts) == 1:
-        external = None
-        internal = os.path.normpath(parts[0])
+        external, internal = normalize_paths_for_engine(None, os.path.normpath(parts[0]))
     else:
-        external = os.path.normpath(parts[0])
-        internal = os.path.normpath(parts[1])
+        external, internal = normalize_paths_for_engine(os.path.normpath(parts[0]), os.path.normpath(parts[1]))
 
-    mode = parts[2] if len(parts) == 3 else 'rw'
+    mode = 'rw'
+    if len(parts) == 3:
+        mode = parts[2]
 
     return VolumeSpec(external, internal, mode)
 
 
-# Ports
+def build_volume_from(volume_from_spec):
+    """
+    volume_from can be either a service or a container. We want to return the
+    container.id and format it into a string complete with the mode.
+    """
+    if isinstance(volume_from_spec.source, Service):
+        containers = volume_from_spec.source.containers(stopped=True)
+        if not containers:
+            return ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
+
+        container = containers[0]
+        return ["{}:{}".format(container.id, volume_from_spec.mode)]
+    elif isinstance(volume_from_spec.source, Container):
+        return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
 
 
-def build_port_bindings(ports):
-    port_bindings = {}
-    for port in ports:
-        internal_port, external = split_port(port)
-        if internal_port in port_bindings:
-            port_bindings[internal_port].append(external)
-        else:
-            port_bindings[internal_port] = [external]
-    return port_bindings
-
-
-def split_port(port):
-    parts = str(port).split(':')
-    if not 1 <= len(parts) <= 3:
-        raise ConfigError('Invalid port "%s", should be '
-                          '[[remote_ip:]remote_port:]port[/protocol]' % port)
+def parse_volume_from_spec(volume_from_config):
+    parts = volume_from_config.split(':')
+    if len(parts) > 2:
+        raise ConfigError("Volume %s has incorrect format, should be "
+                          "external:internal[:mode]" % volume_from_config)
 
     if len(parts) == 1:
-        internal_port, = parts
-        return internal_port, None
-    if len(parts) == 2:
-        external_port, internal_port = parts
-        return internal_port, external_port
+        source = parts[0]
+        mode = 'rw'
+    else:
+        source, mode = parts
 
-    external_ip, external_port, internal_port = parts
-    return internal_port, (external_ip, external_port or None)
+    return VolumeFromSpec(source, mode)
 
 
 # Labels

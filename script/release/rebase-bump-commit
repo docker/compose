@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# Move the "bump to <version>" commit to the HEAD of the branch
+#
+
+. "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
+
+function usage() {
+    >&2 cat << EOM
+Move the "bump to <version>" commit to the HEAD of the branch
+
+This script requires that 'git config branch.${BRANCH}.release' is set to the
+release version for the release branch.
+
+EOM
+    exit 1
+}
+
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+VERSION="$(git config "branch.${BRANCH}.release")" || usage
+
+
+COMMIT_MSG="Bump $VERSION"
+sha="$(git log --grep "$COMMIT_MSG" --format="%H")"
+if [ -z "$sha" ]; then
+    >&2 echo "No commit with message \"$COMMIT_MSG\""
+    exit 2
+fi
+if [[ "$sha" == "$(git rev-parse HEAD)" ]]; then
+    >&2 echo "Bump commit already at HEAD"
+    exit 0
+fi
+
+commits=$(git log --format="%H" "$sha..HEAD" | wc -l)
+
+git rebase --onto $sha~1 HEAD~$commits $BRANCH
+git cherry-pick $sha

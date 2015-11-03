@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# Create the official release
+#
+
+. "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
+
+function usage() {
+    >&2 cat << EOM
+Publish a release by building all artifacts and pushing them.
+
+This script requires that 'git config branch.${BRANCH}.release' is set to the
+release version for the release branch.
+
+EOM
+    exit 1
+}
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+VERSION="$(git config "branch.${BRANCH}.release")" || usage
+
+if [ -z "$(command -v jq 2> /dev/null)" ]; then
+    >&2 echo "$0 requires https://stedolan.github.io/jq/"
+    >&2 echo "Please install it and make sure it is available on your \$PATH."
+    exit 2
+fi
+
+
+if [ -z "$(command -v pandoc 2> /dev/null)" ]; then
+    >&2 echo "$0 requires http://pandoc.org/"
+    >&2 echo "Please install it and make sure it is available on your \$PATH."
+    exit 2
+fi
+
+API=https://api.github.com/repos
+REPO=docker/compose
+GITHUB_REPO=git@github.com:$REPO
+
+# Check the build status is green
+sha=$(git rev-parse HEAD)
+url=$API/$REPO/statuses/$sha
+build_status=$(curl -s $url | jq -r '.[0].state')
+if [ -n "$SKIP_BUILD_CHECK" ]; then
+    echo "Skipping build status check..."
+elif [[ "$build_status" != "success" ]]; then
+    >&2 echo "Build status is $build_status, but it should be success."
+    exit -1
+fi
+
+echo "Tagging the release as $VERSION"
+git tag $VERSION
+git push $GITHUB_REPO $VERSION
+
+echo "Uploading the docker image"
+docker push docker/compose:$VERSION
+
+echo "Uploading sdist to pypi"
+pandoc -f markdown -t rst README.md -o README.rst
+sed -i -e 's/logo.png?raw=true/https:\/\/github.com\/docker\/compose\/raw\/master\/logo.png?raw=true/' README.rst
+python setup.py sdist
+if [ "$(command -v twine 2> /dev/null)" ]; then
+    twine upload ./dist/docker-compose-${VERSION}.tar.gz
+else
+    python setup.py upload
+fi
+
+echo "Testing pip package"
+virtualenv venv-test
+source venv-test/bin/activate
+pip install docker-compose==$VERSION
+docker-compose version
+deactivate
+rm -rf venv-test
+
+echo "Now publish the github release, and test the downloads."
+echo "Email maintainers@dockerproject.org and engineering@docker.com about the new release."

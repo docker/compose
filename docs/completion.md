@@ -1,15 +1,15 @@
 <!--[metadata]>
 +++
-title = "Command Completion"
+title = "Command-line Completion"
 description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
 parent="smn_workw_compose"
-weight=3
+weight=10
 +++
 <![end-metadata]-->
 
-# Command Completion
+# Command-line Completion
 
 Compose comes with [command completion](http://en.wikipedia.org/wiki/Command-line_completion)
 for the bash and zsh shell.
@@ -59,11 +59,10 @@ Enjoy working with Compose faster and with less typos!
 
 ## Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

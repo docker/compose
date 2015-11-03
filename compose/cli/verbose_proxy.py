@@ -1,8 +1,7 @@
-
 import functools
-from itertools import chain
 import logging
 import pprint
+from itertools import chain
 
 import six
 

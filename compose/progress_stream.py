@@ -1,6 +1,4 @@
-import json
-import os
-import codecs
+from compose import utils
 
 
 class StreamOutputError(Exception):
@@ -8,14 +6,13 @@ class StreamOutputError(Exception):
 
 
 def stream_output(output, stream):
-    is_terminal = hasattr(stream, 'fileno') and os.isatty(stream.fileno())
-    stream = codecs.getwriter('utf-8')(stream)
+    is_terminal = hasattr(stream, 'isatty') and stream.isatty()
+    stream = utils.get_output_stream(stream)
     all_events = []
     lines = {}
     diff = 0
 
-    for chunk in output:
-        event = json.loads(chunk)
+    for event in utils.json_stream(output):
         all_events.append(event)
 
         if 'progress' in event or 'progressDetail' in event:
@@ -55,7 +52,6 @@ def print_output_event(event, stream, is_terminal):
         # erase current line
         stream.write("%c[2K\r" % 27)
         terminator = "\r"
-        pass
     elif 'progressDetail' in event:
         return
 

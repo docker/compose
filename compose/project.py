@@ -1,19 +1,29 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from functools import reduce
+from __future__ import unicode_literals
+
 import logging
+from functools import reduce
 
 from docker.errors import APIError
+from docker.errors import NotFound
 
-from .config import get_service_name_from_net, ConfigurationError
-from .const import DEFAULT_TIMEOUT, LABEL_PROJECT, LABEL_SERVICE, LABEL_ONE_OFF
+from .config import ConfigurationError
+from .config import get_service_name_from_net
+from .const import DEFAULT_TIMEOUT
+from .const import LABEL_ONE_OFF
+from .const import LABEL_PROJECT
+from .const import LABEL_SERVICE
 from .container import Container
 from .legacy import check_for_legacy_containers
 from .service import ContainerNet
+from .service import ConvergenceStrategy
 from .service import Net
+from .service import parse_volume_from_spec
 from .service import Service
 from .service import ServiceNet
+from .service import VolumeFromSpec
 from .utils import parallel_execute
+
 
 log = logging.getLogger(__name__)
 
@@ -27,12 +37,18 @@ def sort_service_dicts(services):
     def get_service_names(links):
         return [link.split(':')[0] for link in links]
 
+    def get_service_names_from_volumes_from(volumes_from):
+        return [
+            parse_volume_from_spec(volume_from).source
+            for volume_from in volumes_from
+        ]
+
     def get_service_dependents(service_dict, services):
         name = service_dict['name']
         return [
             service for service in services
             if (name in get_service_names(service.get('links', [])) or
-                name in service.get('volumes_from', []) or
+                name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
                 name == get_service_name_from_net(service.get('net')))
         ]
 
@@ -62,10 +78,12 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client):
+    def __init__(self, name, services, client, use_networking=False, network_driver=None):
         self.name = name
         self.services = services
         self.client = client
+        self.use_networking = use_networking
+        self.network_driver = network_driver
 
     def labels(self, one_off=False):
         return [
@@ -74,11 +92,15 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client):
+    def from_dicts(cls, name, service_dicts, client, use_networking=False, network_driver=None):
         """
         Construct a ServiceCollection from a list of dicts representing services.
         """
-        project = cls(name, [], client)
+        project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
+
+        if use_networking:
+            remove_links(service_dicts)
+
         for service_dict in sort_service_dicts(service_dicts):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
@@ -88,6 +110,7 @@ class Project(object):
                 Service(
                     client=client,
                     project=name,
+                    use_networking=use_networking,
                     links=links,
                     net=net,
                     volumes_from=volumes_from,
@@ -160,29 +183,40 @@ class Project(object):
                 try:
                     links.append((self.get_service(service_name), link_name))
                 except NoSuchService:
-                    raise ConfigurationError('Service "%s" has a link to service "%s" which does not exist.' % (service_dict['name'], service_name))
+                    raise ConfigurationError(
+                        'Service "%s" has a link to service "%s" which does not '
+                        'exist.' % (service_dict['name'], service_name))
             del service_dict['links']
         return links
 
     def get_volumes_from(self, service_dict):
         volumes_from = []
         if 'volumes_from' in service_dict:
-            for volume_name in service_dict.get('volumes_from', []):
+            for volume_from_config in service_dict.get('volumes_from', []):
+                volume_from_spec = parse_volume_from_spec(volume_from_config)
+                # Get service
                 try:
-                    service = self.get_service(volume_name)
-                    volumes_from.append(service)
+                    service_name = self.get_service(volume_from_spec.source)
+                    volume_from_spec = VolumeFromSpec(service_name, volume_from_spec.mode)
                 except NoSuchService:
                     try:
-                        container = Container.from_id(self.client, volume_name)
-                        volumes_from.append(container)
+                        container_name = Container.from_id(self.client, volume_from_spec.source)
+                        volume_from_spec = VolumeFromSpec(container_name, volume_from_spec.mode)
                     except APIError:
-                        raise ConfigurationError('Service "%s" mounts volumes from "%s", which is not the name of a service or container.' % (service_dict['name'], volume_name))
+                        raise ConfigurationError(
+                            'Service "%s" mounts volumes from "%s", which is '
+                            'not the name of a service or container.' % (
+                                service_dict['name'],
+                                volume_from_spec.source))
+                volumes_from.append(volume_from_spec)
             del service_dict['volumes_from']
         return volumes_from
 
     def get_net(self, service_dict):
         net = service_dict.pop('net', None)
         if not net:
+            if self.use_networking:
+                return Net(self.name)
             return Net(None)
 
         net_name = get_service_name_from_net(net)
@@ -214,6 +248,14 @@ class Project(object):
             msg="Stopping"
         )
 
+    def pause(self, service_names=None, **options):
+        for service in reversed(self.get_services(service_names)):
+            service.pause(**options)
+
+    def unpause(self, service_names=None, **options):
+        for service in self.get_services(service_names):
+            service.unpause(**options)
+
     def kill(self, service_names=None, **options):
         parallel_execute(
             objects=self.containers(service_names),
@@ -236,34 +278,30 @@ class Project(object):
         for service in self.get_services(service_names):
             service.restart(**options)
 
-    def build(self, service_names=None, no_cache=False):
+    def build(self, service_names=None, no_cache=False, pull=False):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache)
+                service.build(no_cache, pull)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
     def up(self,
            service_names=None,
            start_deps=True,
-           allow_recreate=True,
-           force_recreate=False,
+           strategy=ConvergenceStrategy.changed,
            do_build=True,
-           timeout=DEFAULT_TIMEOUT):
-
-        if force_recreate and not allow_recreate:
-            raise ValueError("force_recreate and allow_recreate are in conflict")
+           timeout=DEFAULT_TIMEOUT,
+           detached=False):
 
         services = self.get_services(service_names, include_deps=start_deps)
 
         for service in services:
             service.remove_duplicate_containers()
 
-        plans = self._get_convergence_plans(
-            services,
-            allow_recreate=allow_recreate,
-            force_recreate=force_recreate,
-        )
+        plans = self._get_convergence_plans(services, strategy)
+
+        if self.use_networking:
+            self.ensure_network_exists()
 
         return [
             container
@@ -271,15 +309,12 @@ class Project(object):
             for container in service.execute_convergence_plan(
                 plans[service.name],
                 do_build=do_build,
-                timeout=timeout
+                timeout=timeout,
+                detached=detached
             )
         ]
 
-    def _get_convergence_plans(self,
-                               services,
-                               allow_recreate=True,
-                               force_recreate=False):
-
+    def _get_convergence_plans(self, services, strategy):
         plans = {}
 
         for service in services:
@@ -290,28 +325,21 @@ class Project(object):
                 and plans[name].action == 'recreate'
             ]
 
-            if updated_dependencies and allow_recreate:
-                log.debug(
-                    '%s has upstream changes (%s)',
-                    service.name, ", ".join(updated_dependencies),
-                )
-                plan = service.convergence_plan(
-                    allow_recreate=allow_recreate,
-                    force_recreate=True,
-                )
+            if updated_dependencies and strategy.allows_recreate:
+                log.debug('%s has upstream changes (%s)',
+                          service.name,
+                          ", ".join(updated_dependencies))
+                plan = service.convergence_plan(ConvergenceStrategy.always)
             else:
-                plan = service.convergence_plan(
-                    allow_recreate=allow_recreate,
-                    force_recreate=force_recreate,
-                )
+                plan = service.convergence_plan(strategy)
 
             plans[service.name] = plan
 
         return plans
 
-    def pull(self, service_names=None):
-        for service in self.get_services(service_names, include_deps=True):
-            service.pull()
+    def pull(self, service_names=None, ignore_pull_failures=False):
+        for service in self.get_services(service_names, include_deps=False):
+            service.pull(ignore_pull_failures)
 
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:
@@ -319,11 +347,11 @@ class Project(object):
         else:
             service_names = self.service_names
 
-        containers = filter(None, [
+        containers = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters={'label': self.labels(one_off=one_off)})])
+                filters={'label': self.labels(one_off=one_off)})]))
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names
@@ -335,7 +363,27 @@ class Project(object):
                 self.service_names,
             )
 
-        return filter(matches_service_names, containers)
+        return [c for c in containers if matches_service_names(c)]
+
+    def get_network(self):
+        try:
+            return self.client.inspect_network(self.name)
+        except NotFound:
+            return None
+
+    def ensure_network_exists(self):
+        # TODO: recreate network if driver has changed?
+        if self.get_network() is None:
+            log.info(
+                'Creating network "{}" with driver "{}"'
+                .format(self.name, self.network_driver)
+            )
+            self.client.create_network(self.name, driver=self.network_driver)
+
+    def remove_network(self):
+        network = self.get_network()
+        if network:
+            self.client.remove_network(network['id'])
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
@@ -350,6 +398,26 @@ class Project(object):
 
         dep_services.append(service)
         return acc + dep_services
+
+
+def remove_links(service_dicts):
+    services_with_links = [s for s in service_dicts if 'links' in s]
+    if not services_with_links:
+        return
+
+    if len(services_with_links) == 1:
+        prefix = '"{}" defines'.format(services_with_links[0]['name'])
+    else:
+        prefix = 'Some services ({}) define'.format(
+            ", ".join('"{}"'.format(s['name']) for s in services_with_links))
+
+    log.warn(
+        '\n{} links, which are not compatible with Docker networking and will be ignored.\n'
+        'Future versions of Docker will not support links - you should remove them for '
+        'forwards-compatibility.\n'.format(prefix))
+
+    for s in services_with_links:
+        del s['links']
 
 
 class NoSuchService(Exception):

@@ -1,0 +1,9 @@
+
+web:
+    links:
+        - db
+        - other
+
+other:
+    image: busybox:latest
+    command: "top"

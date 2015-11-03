@@ -26,6 +26,7 @@ Dockerfile consists of:
     RUN mkdir /myapp
     WORKDIR /myapp
     ADD Gemfile /myapp/Gemfile
+    ADD Gemfile.lock /myapp/Gemfile.lock
     RUN bundle install
     ADD . /myapp
 
@@ -35,6 +36,10 @@ Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten 
 
     source 'https://rubygems.org'
     gem 'rails', '4.2.0'
+
+You'll need an empty `Gemfile.lock` in order to build our `Dockerfile`.
+
+    $ touch Gemfile.lock
 
 Finally, `docker-compose.yml` is where the magic happens. This file describes the services that comprise your app (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration needed to link them together and expose the web app's port.
 
@@ -68,6 +73,12 @@ image. Once it's done, you should have generated a fresh app:
     README.rdoc  config.ru    public
     Rakefile     db           test
 
+
+The files `rails new` created are owned by root. This happens because the
+container runs as the `root` user.  Change the ownership of the new files.
+
+    sudo chown -R $USER:$USER .
+
 Uncomment the line in your new `Gemfile` which loads `therubyracer`, so you've
 got a Javascript runtime:
 
@@ -79,6 +90,7 @@ rebuild.)
 
     $ docker-compose build
 
+
 ### Connect the database
 
 The app is now bootable, but you're not quite there yet. By default, Rails
@@ -86,8 +98,7 @@ expects a database to be running on `localhost` - so you need to point it at the
 `db` container instead. You also need to change the database and username to
 align with the defaults set by the `postgres` image.
 
-Open up your newly-generated `database.yml` file. Replace its contents with the
-following:
+Replace the contents of `config/database.yml` with the following:
 
     development: &default
       adapter: postgresql
@@ -117,17 +128,15 @@ Finally, you need to create the database. In another terminal, run:
 
     $ docker-compose run web rake db:create
 
-That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` returns the Docker host IP address. 
+That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` returns the Docker host IP address.
 
 
 ## More Compose documentation
 
 - [User guide](/)
 - [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
-- [Get started with Rails](rails.md)
-- [Get started with Wordpress](wordpress.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
+- [Get started with WordPress](wordpress.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

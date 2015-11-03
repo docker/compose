@@ -1,5 +1,9 @@
+import os
+import sys
 
 DEFAULT_TIMEOUT = 10
+HTTP_TIMEOUT = int(os.environ.get('COMPOSE_HTTP_TIMEOUT', os.environ.get('DOCKER_CLIENT_TIMEOUT', 60)))
+IS_WINDOWS_PLATFORM = (sys.platform == "win32")
 LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
 LABEL_ONE_OFF = 'com.docker.compose.oneoff'
 LABEL_PROJECT = 'com.docker.compose.project'

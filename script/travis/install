@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -ex
+
+if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+    pip install tox==2.1.1
+else
+    pip install --user tox==2.1.1
+fi

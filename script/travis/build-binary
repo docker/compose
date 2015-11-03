@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -ex
+
+if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+    script/build-linux
+    script/build-image master
+    # TODO: requires auth
+    # docker push docker/compose:master
+else
+    script/prepare-osx
+    script/build-osx
+fi
