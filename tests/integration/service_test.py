@@ -306,7 +306,8 @@ class ServiceTest(DockerClientTestCase):
             ConvergencePlan('recreate', [old_container]))
 
         self.assertEqual(
-            [mount['Destination'] for mount in new_container.get('Mounts')], ['/data']
+            [mount['Destination'] for mount in new_container.get('Mounts')],
+            ['/data']
         )
         self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
@@ -317,8 +318,11 @@ class ServiceTest(DockerClientTestCase):
         )
 
         old_container = create_and_start_container(service)
-        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
-        volume_path = old_container.get('Volumes')['/data']
+        self.assertEqual(
+            [mount['Destination'] for mount in old_container.get('Mounts')],
+            ['/data']
+        )
+        volume_path = old_container.get_mount('/data')['Source']
 
         service.options['volumes'] = [VolumeSpec.parse('/tmp:/data')]
 
@@ -332,8 +336,11 @@ class ServiceTest(DockerClientTestCase):
             "Service \"db\" is using volume \"/data\" from the previous container",
             args[0])
 
-        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
-        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+        self.assertEqual(
+            [mount['Destination'] for mount in new_container.get('Mounts')],
+            ['/data']
+        )
+        self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')

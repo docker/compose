@@ -234,6 +234,7 @@ class ServiceTest(unittest.TestCase):
         prev_container = mock.Mock(
             id='ababab',
             image_config={'ContainerConfig': {}})
+        prev_container.get.return_value = None
 
         opts = service._get_container_create_options(
             {},
@@ -573,6 +574,10 @@ class NetTestCase(unittest.TestCase):
         self.assertEqual(net.id, service_name)
         self.assertEqual(net.mode, None)
         self.assertEqual(net.service_name, service_name)
+
+
+def build_mount(destination, source, mode='rw'):
+    return {'Source': source, 'Destination': destination, 'Mode': mode}
 
 
 class ServiceVolumesTest(unittest.TestCase):
