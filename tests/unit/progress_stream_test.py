@@ -34,3 +34,34 @@ class ProgressStreamTestCase(unittest.TestCase):
         ]
         events = progress_stream.stream_output(output, StringIO())
         self.assertEqual(len(events), 1)
+
+    def test_stream_output_progress_event_tty(self):
+        events = [
+            b'{"status": "Already exists", "progressDetail": {}, "id": "8d05e3af52b0"}'
+        ]
+
+        class TTYStringIO(StringIO):
+            def isatty(self):
+                return True
+
+        output = TTYStringIO()
+        events = progress_stream.stream_output(events, output)
+        self.assertTrue(len(output.getvalue()) > 0)
+
+    def test_stream_output_progress_event_no_tty(self):
+        events = [
+            b'{"status": "Already exists", "progressDetail": {}, "id": "8d05e3af52b0"}'
+        ]
+        output = StringIO()
+
+        events = progress_stream.stream_output(events, output)
+        self.assertEqual(len(output.getvalue()), 0)
+
+    def test_stream_output_no_progress_event_no_tty(self):
+        events = [
+            b'{"status": "Pulling from library/xy", "id": "latest"}'
+        ]
+        output = StringIO()
+
+        events = progress_stream.stream_output(events, output)
+        self.assertTrue(len(output.getvalue()) > 0)
