@@ -418,6 +418,7 @@ class Service(object):
             return [
                 self.recreate_container(
                     container,
+                    do_build=do_build,
                     timeout=timeout,
                     attach_logs=should_attach_logs
                 )
@@ -439,10 +440,12 @@ class Service(object):
         else:
             raise Exception("Invalid action: {}".format(action))
 
-    def recreate_container(self,
-                           container,
-                           timeout=DEFAULT_TIMEOUT,
-                           attach_logs=False):
+    def recreate_container(
+            self,
+            container,
+            do_build=False,
+            timeout=DEFAULT_TIMEOUT,
+            attach_logs=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -454,7 +457,7 @@ class Service(object):
         container.stop(timeout=timeout)
         container.rename_to_tmp_name()
         new_container = self.create_container(
-            do_build=False,
+            do_build=do_build,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,

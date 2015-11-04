@@ -177,6 +177,7 @@ class ConfigTest(unittest.TestCase):
         details = config.ConfigDetails('.', [base_file, override_file])
 
         tmpdir = py.test.ensuretemp('config_test')
+        self.addCleanup(tmpdir.remove)
         tmpdir.join('common.yml').write("""
             base:
               labels: ['label=one']
@@ -412,6 +413,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_load_yaml_with_yaml_error(self):
         tmpdir = py.test.ensuretemp('invalid_yaml_test')
+        self.addCleanup(tmpdir.remove)
         invalid_yaml_file = tmpdir.join('docker-compose.yml')
         invalid_yaml_file.write("""
             web:

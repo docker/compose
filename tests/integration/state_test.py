@@ -4,9 +4,7 @@ by `docker-compose up`.
 """
 from __future__ import unicode_literals
 
-import os
-import shutil
-import tempfile
+import py
 
 from .testcases import DockerClientTestCase
 from compose.config import config
@@ -232,40 +230,49 @@ class ServiceStateTest(DockerClientTestCase):
 
         image_id = self.client.images(name='busybox')[0]['Id']
         self.client.tag(image_id, repository=repo, tag=tag)
+        self.addCleanup(self.client.remove_image, image)
 
-        try:
-            web = self.create_service('web', image=image)
-            container = web.create_container()
+        web = self.create_service('web', image=image)
+        container = web.create_container()
 
-            # update the image
-            c = self.client.create_container(image, ['touch', '/hello.txt'])
-            self.client.commit(c, repository=repo, tag=tag)
-            self.client.remove_container(c)
+        # update the image
+        c = self.client.create_container(image, ['touch', '/hello.txt'])
+        self.client.commit(c, repository=repo, tag=tag)
+        self.client.remove_container(c)
 
-            web = self.create_service('web', image=image)
-            self.assertEqual(('recreate', [container]), web.convergence_plan())
-
-        finally:
-            self.client.remove_image(image)
+        web = self.create_service('web', image=image)
+        self.assertEqual(('recreate', [container]), web.convergence_plan())
 
     def test_trigger_recreate_with_build(self):
-        context = tempfile.mkdtemp()
+        context = py.test.ensuretemp('test_trigger_recreate_with_build')
+        self.addCleanup(context.remove)
+
         base_image = "FROM busybox\nLABEL com.docker.compose.test_image=true\n"
+        dockerfile = context.join('Dockerfile')
+        dockerfile.write(base_image)
 
-        try:
-            dockerfile = os.path.join(context, 'Dockerfile')
+        web = self.create_service('web', build=str(context))
+        container = web.create_container()
 
-            with open(dockerfile, 'w') as f:
-                f.write(base_image)
+        dockerfile.write(base_image + 'CMD echo hello world\n')
+        web.build()
 
-            web = self.create_service('web', build=context)
-            container = web.create_container()
+        web = self.create_service('web', build=str(context))
+        self.assertEqual(('recreate', [container]), web.convergence_plan())
 
-            with open(dockerfile, 'w') as f:
-                f.write(base_image + 'CMD echo hello world\n')
-            web.build()
+    def test_image_changed_to_build(self):
+        context = py.test.ensuretemp('test_image_changed_to_build')
+        self.addCleanup(context.remove)
+        context.join('Dockerfile').write("""
+            FROM busybox
+            LABEL com.docker.compose.test_image=true
+        """)
 
-            web = self.create_service('web', build=context)
-            self.assertEqual(('recreate', [container]), web.convergence_plan())
-        finally:
-            shutil.rmtree(context)
+        web = self.create_service('web', image='busybox')
+        container = web.create_container()
+
+        web = self.create_service('web', build=str(context))
+        plan = web.convergence_plan()
+        self.assertEqual(('recreate', [container]), plan)
+        containers = web.execute_convergence_plan(plan)
+        self.assertEqual(len(containers), 1)
