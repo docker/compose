@@ -577,7 +577,7 @@ class VolumeConfigTest(unittest.TestCase):
 
     def test_volume_path_with_non_ascii_directory(self):
         volume = u'/Füü/data:/data'
-        container_path = config.resolve_volume_path(volume, ".", "test")
+        container_path = config.resolve_volume_path(".", volume, "test")
         self.assertEqual(container_path, volume)
 
 
