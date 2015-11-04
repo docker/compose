@@ -369,6 +369,33 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(list(new_container.get('Volumes')), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
+    def test_execute_convergence_plan_when_image_volume_masks_config(self):
+        service = Service(
+            project='composetest',
+            name='db',
+            client=self.client,
+            build='tests/fixtures/dockerfile-with-volume',
+        )
+
+        old_container = create_and_start_container(service)
+        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
+        volume_path = old_container.get('Volumes')['/data']
+
+        service.options['volumes'] = ['/tmp:/data']
+
+        with mock.patch('compose.service.log') as mock_log:
+            new_container, = service.execute_convergence_plan(
+                ConvergencePlan('recreate', [old_container]))
+
+        mock_log.warn.assert_called_once_with(mock.ANY)
+        _, args, kwargs = mock_log.warn.mock_calls[0]
+        self.assertIn(
+            "Service \"db\" is using volume \"/data\" from the previous container",
+            args[0])
+
+        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
+        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         create_and_start_container(db, environment={'FOO': 'BAR'})
