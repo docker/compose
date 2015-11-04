@@ -14,8 +14,14 @@ def stream_output(output, stream):
 
     for event in utils.json_stream(output):
         all_events.append(event)
+        is_progress_event = 'progress' in event or 'progressDetail' in event
 
-        if 'progress' in event or 'progressDetail' in event:
+        if not is_progress_event:
+            print_output_event(event, stream, is_terminal)
+            stream.flush()
+
+        # if it's a progress event and we have a terminal, then display the progress bars
+        elif is_terminal:
             image_id = event.get('id')
             if not image_id:
                 continue
@@ -27,17 +33,16 @@ def stream_output(output, stream):
                 stream.write("\n")
                 diff = 0
 
-            if is_terminal:
-                # move cursor up `diff` rows
-                stream.write("%c[%dA" % (27, diff))
+            # move cursor up `diff` rows
+            stream.write("%c[%dA" % (27, diff))
 
-        print_output_event(event, stream, is_terminal)
+            print_output_event(event, stream, is_terminal)
 
-        if 'id' in event and is_terminal:
-            # move cursor back down
-            stream.write("%c[%dB" % (27, diff))
+            if 'id' in event:
+                # move cursor back down
+                stream.write("%c[%dB" % (27, diff))
 
-        stream.flush()
+            stream.flush()
 
     return all_events
 
