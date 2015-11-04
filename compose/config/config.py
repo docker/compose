@@ -252,7 +252,7 @@ class ServiceLoader(object):
         if not self.already_seen:
             validate_against_service_schema(service_dict, self.service_name)
 
-        return process_container_options(service_dict, working_dir=self.working_dir)
+        return process_container_options(self.working_dir, service_dict)
 
     def validate_and_construct_extends(self):
         extends = self.service_dict['extends']
@@ -321,7 +321,7 @@ def resolve_environment(working_dir, service_dict):
 
     env = {}
     if 'env_file' in service_dict:
-        for env_file in get_env_files(service_dict, working_dir=working_dir):
+        for env_file in get_env_files(working_dir, service_dict):
             env.update(env_vars_from_file(env_file))
 
     env.update(parse_environment(service_dict.get('environment')))
@@ -345,14 +345,14 @@ def validate_extended_service_dict(service_dict, filename, service):
                 "%s services with 'net: container' cannot be extended" % error_prefix)
 
 
-def process_container_options(service_dict, working_dir=None):
-    service_dict = service_dict.copy()
+def process_container_options(working_dir, service_dict):
+    service_dict = dict(service_dict)
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
-        service_dict['volumes'] = resolve_volume_paths(service_dict, working_dir=working_dir)
+        service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
 
     if 'build' in service_dict:
-        service_dict['build'] = resolve_build_path(service_dict['build'], working_dir=working_dir)
+        service_dict['build'] = expand_path(working_dir, service_dict['build'])
 
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
@@ -428,7 +428,7 @@ def merge_environment(base, override):
     return env
 
 
-def get_env_files(options, working_dir=None):
+def get_env_files(working_dir, options):
     if 'env_file' not in options:
         return {}
 
@@ -488,17 +488,14 @@ def env_vars_from_file(filename):
     return env
 
 
-def resolve_volume_paths(service_dict, working_dir=None):
-    if working_dir is None:
-        raise Exception("No working_dir passed to resolve_volume_paths()")
-
+def resolve_volume_paths(working_dir, service_dict):
     return [
-        resolve_volume_path(v, working_dir, service_dict['name'])
-        for v in service_dict['volumes']
+        resolve_volume_path(working_dir, volume, service_dict['name'])
+        for volume in service_dict['volumes']
     ]
 
 
-def resolve_volume_path(volume, working_dir, service_name):
+def resolve_volume_path(working_dir, volume, service_name):
     container_path, host_path = split_path_mapping(volume)
 
     if host_path is not None:
@@ -508,12 +505,6 @@ def resolve_volume_path(volume, working_dir, service_name):
         return u"{}:{}".format(host_path, container_path)
     else:
         return container_path
-
-
-def resolve_build_path(build_path, working_dir=None):
-    if working_dir is None:
-        raise Exception("No working_dir passed to resolve_build_path")
-    return expand_path(working_dir, build_path)
 
 
 def validate_paths(service_dict):
@@ -582,7 +573,7 @@ def parse_labels(labels):
         return dict(split_label(e) for e in labels)
 
     if isinstance(labels, dict):
-        return labels
+        return dict(labels)
 
 
 def split_label(label):
