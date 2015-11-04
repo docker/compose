@@ -557,7 +557,7 @@ class CLITestCase(DockerClientTestCase):
     def test_restart(self):
         service = self.project.get_service('simple')
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         started_at = container.dictionary['State']['StartedAt']
         self.dispatch(['restart', '-t', '1'], None)
         container.inspect()

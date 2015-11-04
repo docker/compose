@@ -448,7 +448,7 @@ class TopLevelCommand(DocoptCommand):
             raise e
 
         if detach:
-            service.start_container(container)
+            container.start()
             print(container.name)
         else:
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
