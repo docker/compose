@@ -16,7 +16,7 @@ RUN set -ex; \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl https://get.docker.com/builds/Linux/x86_64/docker-latest \
+RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.8.3 \
         -o /usr/local/bin/docker && \
     chmod +x /usr/local/bin/docker
 
