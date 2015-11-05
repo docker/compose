@@ -26,6 +26,7 @@ class LogPrinter(object):
         generators = list(self._make_log_generators(self.monochrome, prefix_width))
         for line in Multiplexer(generators).loop():
             self.output.write(line)
+            self.output.flush()
 
     def _make_log_generators(self, monochrome, prefix_width):
         def no_color(text):
