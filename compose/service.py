@@ -599,9 +599,6 @@ class Service(object):
             container_options['hostname'] = parts[0]
             container_options['domainname'] = parts[2]
 
-        if 'hostname' not in container_options and self.use_networking:
-            container_options['hostname'] = self.name
-
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
             all_ports = container_options.get('ports', []) + self.options.get('expose', [])
