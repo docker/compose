@@ -226,7 +226,6 @@ class CLITestCase(DockerClientTestCase):
             containers = service.containers()
             self.assertEqual(len(containers), 1)
             self.assertIn(containers[0].id, network['Containers'])
-            self.assertEqual(containers[0].get('Config.Hostname'), service.name)
 
         web_container = self.project.get_service('web').containers()[0]
         self.assertFalse(web_container.get('HostConfig.Links'))
