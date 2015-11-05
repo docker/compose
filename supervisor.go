@@ -8,18 +8,20 @@ import (
 )
 
 // NewSupervisor returns an initialized Process supervisor.
-func NewSupervisor(stateDir string, concurrency int, runtime Runtime) (*Supervisor, error) {
+func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
-	s := &Supervisor{
-		stateDir:  stateDir,
-		processes: make(map[int]Process),
-		runtime:   runtime,
-		jobs:      make(chan Job, 1024),
+	runtime, err := NewRuntime(stateDir)
+	if err != nil {
+		return nil, err
 	}
-	s.state = &runningState{
-		s: s,
+	s := &Supervisor{
+		stateDir:   stateDir,
+		processes:  make(map[int]Container),
+		containers: make(map[string]Container),
+		runtime:    runtime,
+		jobs:       make(chan Job, 1024),
 	}
 	for i := 0; i < concurrency; i++ {
 		s.workerGroup.Add(1)
@@ -94,7 +96,7 @@ func (s *Supervisor) worker(id int) {
 	for job := range s.jobs {
 		switch j := job.(type) {
 		case *CreateJob:
-			container, err := r.s.runtime.Create(j.ID, j.BundlePath)
+			container, err := s.runtime.Create(j.ID, j.BundlePath)
 			if err != nil {
 				j.Err <- err
 			}

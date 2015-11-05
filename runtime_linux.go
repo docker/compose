@@ -13,11 +13,137 @@ import (
 	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/specs"
 )
+
+const (
+	RLIMIT_CPU        = iota // CPU time in sec
+	RLIMIT_FSIZE             // Maximum filesize
+	RLIMIT_DATA              // max data size
+	RLIMIT_STACK             // max stack size
+	RLIMIT_CORE              // max core file size
+	RLIMIT_RSS               // max resident set size
+	RLIMIT_NPROC             // max number of processes
+	RLIMIT_NOFILE            // max number of open files
+	RLIMIT_MEMLOCK           // max locked-in-memory address space
+	RLIMIT_AS                // address space limit
+	RLIMIT_LOCKS             // maximum file locks held
+	RLIMIT_SIGPENDING        // max number of pending signals
+	RLIMIT_MSGQUEUE          // maximum bytes in POSIX mqueues
+	RLIMIT_NICE              // max nice prio allowed to raise to
+	RLIMIT_RTPRIO            // maximum realtime priority
+	RLIMIT_RTTIME            // timeout for RT tasks in us
+)
+
+var rlimitMap = map[string]int{
+	"RLIMIT_CPU":       RLIMIT_CPU,
+	"RLIMIT_FSIZE":     RLIMIT_FSIZE,
+	"RLIMIT_DATA":      RLIMIT_DATA,
+	"RLIMIT_STACK":     RLIMIT_STACK,
+	"RLIMIT_CORE":      RLIMIT_CORE,
+	"RLIMIT_RSS":       RLIMIT_RSS,
+	"RLIMIT_NPROC":     RLIMIT_NPROC,
+	"RLIMIT_NOFILE":    RLIMIT_NOFILE,
+	"RLIMIT_MEMLOCK":   RLIMIT_MEMLOCK,
+	"RLIMIT_AS":        RLIMIT_AS,
+	"RLIMIT_LOCKS":     RLIMIT_LOCKS,
+	"RLIMIT_SGPENDING": RLIMIT_SIGPENDING,
+	"RLIMIT_MSGQUEUE":  RLIMIT_MSGQUEUE,
+	"RLIMIT_NICE":      RLIMIT_NICE,
+	"RLIMIT_RTPRIO":    RLIMIT_RTPRIO,
+	"RLIMIT_RTTIME":    RLIMIT_RTTIME,
+}
+
+func strToRlimit(key string) (int, error) {
+	rl, ok := rlimitMap[key]
+	if !ok {
+		return 0, fmt.Errorf("Wrong rlimit value: %s", key)
+	}
+	return rl, nil
+}
+
+const wildcard = -1
+
+var allowedDevices = []*configs.Device{
+	// allow mknod for any device
+	{
+		Type:        'c',
+		Major:       wildcard,
+		Minor:       wildcard,
+		Permissions: "m",
+	},
+	{
+		Type:        'b',
+		Major:       wildcard,
+		Minor:       wildcard,
+		Permissions: "m",
+	},
+	{
+		Path:        "/dev/console",
+		Type:        'c',
+		Major:       5,
+		Minor:       1,
+		Permissions: "rwm",
+	},
+	{
+		Path:        "/dev/tty0",
+		Type:        'c',
+		Major:       4,
+		Minor:       0,
+		Permissions: "rwm",
+	},
+	{
+		Path:        "/dev/tty1",
+		Type:        'c',
+		Major:       4,
+		Minor:       1,
+		Permissions: "rwm",
+	},
+	// /dev/pts/ - pts namespaces are "coming soon"
+	{
+		Path:        "",
+		Type:        'c',
+		Major:       136,
+		Minor:       wildcard,
+		Permissions: "rwm",
+	},
+	{
+		Path:        "",
+		Type:        'c',
+		Major:       5,
+		Minor:       2,
+		Permissions: "rwm",
+	},
+	// tuntap
+	{
+		Path:        "",
+		Type:        'c',
+		Major:       10,
+		Minor:       200,
+		Permissions: "rwm",
+	},
+}
+
+var namespaceMapping = map[specs.NamespaceType]configs.NamespaceType{
+	specs.PIDNamespace:     configs.NEWPID,
+	specs.NetworkNamespace: configs.NEWNET,
+	specs.MountNamespace:   configs.NEWNS,
+	specs.UserNamespace:    configs.NEWUSER,
+	specs.IPCNamespace:     configs.NEWIPC,
+	specs.UTSNamespace:     configs.NEWUTS,
+}
+
+var mountPropagationMapping = map[string]int{
+	"rprivate": syscall.MS_PRIVATE | syscall.MS_REC,
+	"private":  syscall.MS_PRIVATE,
+	"rslave":   syscall.MS_SLAVE | syscall.MS_REC,
+	"slave":    syscall.MS_SLAVE,
+	"rshared":  syscall.MS_SHARED | syscall.MS_REC,
+	"shared":   syscall.MS_SHARED,
+	"":         syscall.MS_PRIVATE | syscall.MS_REC,
+}
 
 func init() {
 	if len(os.Args) > 1 && os.Args[1] == "init" {
@@ -25,7 +151,8 @@ func init() {
 		runtime.LockOSThread()
 		factory, _ := libcontainer.New("")
 		if err := factory.StartInitialization(); err != nil {
-			fatal(err)
+			fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
 		}
 		panic("--this line should have never been executed, congratulations--")
 	}
@@ -48,16 +175,17 @@ func (c *libcontainerContainer) Delete() error {
 	return c.c.Destroy()
 }
 
-func NewLibcontainerRuntime(stateDir string) (Runtime, error) {
-	f, err := libcontainer.New(abs, libcontainer.Cgroupfs, func(l *libcontainer.LinuxFactory) error {
+func NewRuntime(stateDir string) (Runtime, error) {
+	f, err := libcontainer.New(stateDir, libcontainer.Cgroupfs, func(l *libcontainer.LinuxFactory) error {
 		//l.CriuPath = context.GlobalString("criu")
 		return nil
 	})
-	r := &libcontainerRuntime{
-		factory:    f,
-		containers: make(map[string]libcontainer.Container),
+	if err != nil {
+		return nil, err
 	}
-	return r, nil
+	return &libcontainerRuntime{
+		factory: f,
+	}, nil
 
 }
 
@@ -66,14 +194,14 @@ type libcontainerRuntime struct {
 }
 
 func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
-	spec, rspec, err := loadSpec(
+	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
 		filepath.Join(bundlePath, "runtime.json"),
 	)
 	if err != nil {
 		return nil, err
 	}
-	config, err := r.createLibcontainerConfig(id, spec, rspec)
+	config, err := r.createLibcontainerConfig(id, bundlePath, spec, rspec)
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +283,6 @@ func (r *libcontainerRuntime) createLibcontainerConfig(cgroupName, bundlePath st
 		Readonlyfs:   spec.Root.Readonly,
 		Hostname:     spec.Hostname,
 	}
-
-	exists := false
 	for _, ns := range rspec.Linux.Namespaces {
 		t, exists := namespaceMapping[ns.Type]
 		if !exists {
@@ -239,14 +365,10 @@ func (r *libcontainerRuntime) createLibcontainerMount(cwd, dest string, m specs.
 	}
 }
 
-func (r *libcontainerRuntime) createCgroupConfig(name string, spec *specs.LinuxRuntimeSpec, devices []*configs.Device) (*configs.Cgroup, error) {
-	myCgroupPath, err := cgroups.GetThisCgroupDir("devices")
-	if err != nil {
-		return nil, err
-	}
+func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.LinuxRuntimeSpec, devices []*configs.Device) (*configs.Cgroup, error) {
 	c := &configs.Cgroup{
 		Name:           name,
-		Parent:         myCgroupPath,
+		Parent:         "/containerd",
 		AllowedDevices: append(devices, allowedDevices...),
 	}
 	r := spec.Linux.Resources

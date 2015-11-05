@@ -25,8 +25,8 @@ type server struct {
 	supervisor *containerd.Supervisor
 }
 
-func (s *server) HandleHTTP(w http.ResponseWriter, r *http.Request) {
-	s.r.HandleHTTP(w, r)
+func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.r.ServeHTTP(w, r)
 }
 
 func (s *server) containers(w http.ResponseWriter, r *http.Request) {

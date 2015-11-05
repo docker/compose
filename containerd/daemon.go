@@ -26,11 +26,14 @@ var DaemonCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) {
+		if err := daemon(context.String("state-dir"), 20, context.Int("buffer-size")); err != nil {
+			logrus.Fatal(err)
+		}
 	},
 }
 
-func daemon(stateDir string, bufferSize int) error {
-	supervisor, err := container.NewSupervisor(stateDir)
+func daemon(stateDir string, concurrency, bufferSize int) error {
+	supervisor, err := containerd.NewSupervisor(stateDir, concurrency)
 	if err != nil {
 		return err
 	}
@@ -55,9 +58,7 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 				logrus.WithField("error", err).Error("containerd: reaping child processes")
 			}
 			for _, e := range exits {
-				if err := supervisor.Process(e); err != nil {
-					logrus.WithField("error", err).Error("containerd: processing events")
-				}
+				supervisor.SendEvent(e)
 			}
 		}
 	}
@@ -79,7 +80,7 @@ func reap() (exits []*containerd.ExitEvent, err error) {
 		if pid <= 0 {
 			return exits, nil
 		}
-		exits = append(exits, *conatinerd.ExitEvent{
+		exits = append(exits, &containerd.ExitEvent{
 			Pid:    pid,
 			Status: utils.ExitStatus(ws),
 		})

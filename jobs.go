@@ -4,5 +4,7 @@ type Job interface {
 }
 
 type CreateJob struct {
-	Err chan error
+	ID         string
+	BundlePath string
+	Err        chan error
 }
