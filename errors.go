@@ -10,6 +10,7 @@ var (
 	ErrContainerExists   = errors.New("containerd: container already exists")
 
 	// Internal errors
-	errShutdown   = errors.New("containerd: supervisor is shutdown")
-	errRootNotAbs = errors.New("containerd: rootfs path is not an absolute path")
+	errShutdown          = errors.New("containerd: supervisor is shutdown")
+	errRootNotAbs        = errors.New("containerd: rootfs path is not an absolute path")
+	errNoContainerForPid = errors.New("containerd: pid not registered for any container")
 )

@@ -43,7 +43,7 @@ var DaemonCommand = cli.Command{
 			}()
 			go metrics.Log(metrics.DefaultRegistry, 60*time.Second, l)
 		}
-		if err := daemon(context.String("state-dir"), 20, context.Int("buffer-size")); err != nil {
+		if err := daemon(context.String("state-dir"), 10, context.Int("buffer-size")); err != nil {
 			logrus.Fatal(err)
 		}
 	},

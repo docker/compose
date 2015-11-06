@@ -18,15 +18,6 @@ func (e *ExitEvent) String() string {
 	return "exit event"
 }
 
-type StartedEvent struct {
-	ID        string
-	Container Container
-}
-
-func (s *StartedEvent) String() string {
-	return "started event"
-}
-
 type CreateContainerEvent struct {
 	ID         string
 	BundlePath string

@@ -173,6 +173,10 @@ func (c *libcontainerContainer) Pid() (int, error) {
 	return c.initProcess.Pid()
 }
 
+func (c *libcontainerContainer) Start() error {
+	return c.c.Start(c.initProcess)
+}
+
 func (c *libcontainerContainer) SetExited(status int) {
 	c.exitStatus = status
 	// meh
@@ -221,10 +225,6 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
 	c := &libcontainerContainer{
 		c:           container,
 		initProcess: process,
-	}
-	if err := container.Start(process); err != nil {
-		container.Destroy()
-		return nil, err
 	}
 	return c, nil
 }
