@@ -195,7 +195,7 @@ def process_errors(errors, service_name=None):
 
     for error in errors:
         # handle root level errors
-        if len(error.path) == 0 and not error.instance.get('name'):
+        if len(error.path) == 0 and not service_name:
             if error.validator == 'type':
                 msg = "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
                 root_msgs.append(msg)

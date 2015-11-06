@@ -20,12 +20,12 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
     """
     Test helper function to construct a ServiceExtendsResolver
     """
-    resolver = config.ServiceExtendsResolver(
+    resolver = config.ServiceExtendsResolver(config.ServiceConfig(
         working_dir=working_dir,
         filename=filename,
-        service_name=name,
-        service_dict=service_dict)
-    return config.process_service(working_dir, resolver.run())
+        name=name,
+        config=service_dict))
+    return config.process_service(resolver.run())
 
 
 def service_sort(services):
@@ -651,7 +651,7 @@ class VolumeConfigTest(unittest.TestCase):
 
     def test_volume_path_with_non_ascii_directory(self):
         volume = u'/Füü/data:/data'
-        container_path = config.resolve_volume_path(".", volume, "test")
+        container_path = config.resolve_volume_path(".", volume)
         self.assertEqual(container_path, volume)
 
 
