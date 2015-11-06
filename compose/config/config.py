@@ -13,7 +13,6 @@ from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
-from .validation import validate_extended_service_exists
 from .validation import validate_extends_file_path
 from .validation import validate_top_level_object
 
@@ -99,6 +98,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     :type  config: :class:`dict`
     """
 
+    @classmethod
+    def from_filename(cls, filename):
+        return cls(filename, load_yaml(filename))
+
 
 def find(base_dir, filenames):
     if filenames == ['-']:
@@ -114,7 +117,7 @@ def find(base_dir, filenames):
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
         os.path.dirname(filenames[0]),
-        [ConfigFile(f, load_yaml(f)) for f in filenames])
+        [ConfigFile.from_filename(f) for f in filenames])
 
 
 def get_default_config_files(base_dir):
@@ -183,12 +186,10 @@ def load(config_details):
         validate_paths(service_dict)
         return service_dict
 
-    def load_file(filename, config):
-        processed_config = interpolate_environment_variables(config)
-        validate_against_fields_schema(processed_config)
+    def build_services(filename, config):
         return [
             build_service(filename, name, service_config)
-            for name, service_config in processed_config.items()
+            for name, service_config in config.items()
         ]
 
     def merge_services(base, override):
@@ -200,16 +201,27 @@ def load(config_details):
             for name in all_service_names
         }
 
-    config_file = config_details.config_files[0]
-    validate_top_level_object(config_file.config)
+    config_file = process_config_file(config_details.config_files[0])
     for next_file in config_details.config_files[1:]:
-        validate_top_level_object(next_file.config)
+        next_file = process_config_file(next_file)
 
-        config_file = ConfigFile(
-            config_file.filename,
-            merge_services(config_file.config, next_file.config))
+        config = merge_services(config_file.config, next_file.config)
+        config_file = config_file._replace(config=config)
 
-    return load_file(config_file.filename, config_file.config)
+    return build_services(config_file.filename, config_file.config)
+
+
+def process_config_file(config_file, service_name=None):
+    validate_top_level_object(config_file.config)
+    processed_config = interpolate_environment_variables(config_file.config)
+    validate_against_fields_schema(processed_config)
+
+    if service_name and service_name not in processed_config:
+        raise ConfigurationError(
+            "Cannot extend service '{}' in {}: Service not found".format(
+                service_name, config_file.filename))
+
+    return config_file._replace(config=processed_config)
 
 
 class ServiceLoader(object):
@@ -259,22 +271,13 @@ class ServiceLoader(object):
         if not isinstance(extends, dict):
             extends = {'service': extends}
 
-        validate_extends_file_path(self.service_name, extends, self.filename)
         config_path = self.get_extended_config_path(extends)
         service_name = extends['service']
 
-        config = load_yaml(config_path)
-        validate_top_level_object(config)
-        full_extended_config = interpolate_environment_variables(config)
-
-        validate_extended_service_exists(
-            service_name,
-            full_extended_config,
-            config_path
-        )
-        validate_against_fields_schema(full_extended_config)
-
-        service_config = full_extended_config[service_name]
+        extended_file = process_config_file(
+            ConfigFile.from_filename(config_path),
+            service_name=service_name)
+        service_config = extended_file.config[service_name]
         return config_path, service_config, service_name
 
     def resolve_extends(self, extended_config_path, service_config, service_name):
@@ -304,6 +307,7 @@ class ServiceLoader(object):
         need to obtain a full path too or we are extending from a service
         defined in our own file.
         """
+        validate_extends_file_path(self.service_name, extends_options, self.filename)
         if 'file' in extends_options:
             return expand_path(self.working_dir, extends_options['file'])
         return self.filename

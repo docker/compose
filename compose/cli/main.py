@@ -13,12 +13,12 @@ from requests.exceptions import ReadTimeout
 
 from .. import __version__
 from .. import legacy
+from ..config import ConfigurationError
 from ..config import parse_environment
 from ..const import DEFAULT_TIMEOUT
 from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
-from ..project import ConfigurationError
 from ..project import NoSuchService
 from ..service import BuildError
 from ..service import ConvergenceStrategy
