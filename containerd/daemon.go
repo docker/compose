@@ -1,14 +1,18 @@
 package main
 
 import (
+	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/crosbymichael/containerd"
 	"github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/rcrowley/go-metrics"
 )
 
 var DaemonCommand = cli.Command{
@@ -26,6 +30,17 @@ var DaemonCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) {
+		if context.GlobalBool("debug") {
+			l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
+			goRoutineCounter := metrics.NewMeter()
+			metrics.DefaultRegistry.Register("goroutines", goRoutineCounter)
+			go func() {
+				for range time.Tick(30 * time.Second) {
+					goRoutineCounter.Mark(int64(runtime.NumGoroutine()))
+				}
+			}()
+			go metrics.Log(metrics.DefaultRegistry, 60*time.Second, l)
+		}
 		if err := daemon(context.String("state-dir"), 20, context.Int("buffer-size")); err != nil {
 			logrus.Fatal(err)
 		}

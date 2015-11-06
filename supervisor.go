@@ -3,8 +3,14 @@ package containerd
 import (
 	"os"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/rcrowley/go-metrics"
+)
+
+var (
+	containerStartTimer = metrics.NewTimer()
 )
 
 // NewSupervisor returns an initialized Process supervisor.
@@ -12,6 +18,8 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
+	// register counters
+	metrics.DefaultRegistry.Register("container-start-time", containerStartTimer)
 	runtime, err := NewRuntime(stateDir)
 	if err != nil {
 		return nil, err
@@ -93,9 +101,11 @@ func (s *Supervisor) worker(id int) {
 		s.workerGroup.Done()
 		logrus.WithField("worker", id).Debug("containerd: worker finished")
 	}()
+	logrus.WithField("worker", id).Debug("containerd: starting worker")
 	for job := range s.jobs {
 		switch j := job.(type) {
 		case *CreateJob:
+			start := time.Now()
 			container, err := s.runtime.Create(j.ID, j.BundlePath)
 			if err != nil {
 				j.Err <- err
@@ -105,6 +115,7 @@ func (s *Supervisor) worker(id int) {
 				Container: container,
 			})
 			j.Err <- nil
+			containerStartTimer.UpdateSince(start)
 		}
 	}
 }

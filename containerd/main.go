@@ -28,6 +28,7 @@ func main() {
 	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{Name: "debug", Usage: "enable debug output in the logs"},
+		//		cli.StringFlag{Name: "metrics", Value: "stdout", Usage: "metrics file"},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
