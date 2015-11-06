@@ -48,7 +48,7 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	e := &containerd.CreateContainerEvent{
+	e := &containerd.StartContainerEvent{
 		ID:         id,
 		BundlePath: c.BundlePath,
 		Err:        make(chan error, 1),

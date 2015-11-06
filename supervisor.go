@@ -2,15 +2,9 @@ package containerd
 
 import (
 	"os"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer"
-	"github.com/rcrowley/go-metrics"
-)
-
-var (
-	containerStartTimer = metrics.NewTimer()
 )
 
 // NewSupervisor returns an initialized Process supervisor.
@@ -19,7 +13,6 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 		return nil, err
 	}
 	// register counters
-	metrics.DefaultRegistry.Register("container-start-time", containerStartTimer)
 	runtime, err := NewRuntime(stateDir)
 	if err != nil {
 		return nil, err
@@ -36,6 +29,7 @@ type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir string
 
+	processes  []Process
 	containers map[string]Container
 
 	runtime Runtime
@@ -57,10 +51,8 @@ func (s *Supervisor) Start(events chan Event) error {
 			logrus.WithField("event", evt).Debug("containerd: processing event")
 			switch e := evt.(type) {
 			case *ExitEvent:
-				logrus.WithFields(logrus.Fields{
-					"pid":    e.Pid,
-					"status": e.Status,
-				}).Debug("containerd: process exited")
+				logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
+					Debug("containerd: process exited")
 				container, err := s.getContainerForPid(e.Pid)
 				if err != nil {
 					if err != errNoContainerForPid {
@@ -73,8 +65,7 @@ func (s *Supervisor) Start(events chan Event) error {
 				if err := container.Delete(); err != nil {
 					logrus.WithField("error", err).Error("containerd: deleting container")
 				}
-			case *CreateContainerEvent:
-				start := time.Now()
+			case *StartContainerEvent:
 				container, err := s.runtime.Create(e.ID, e.BundlePath)
 				if err != nil {
 					e.Err <- err
@@ -86,7 +77,6 @@ func (s *Supervisor) Start(events chan Event) error {
 					continue
 				}
 				e.Err <- nil
-				containerStartTimer.UpdateSince(start)
 			}
 		}
 	}()
@@ -113,9 +103,4 @@ func (s *Supervisor) getContainerForPid(pid int) (Container, error) {
 
 func (s *Supervisor) SendEvent(evt Event) {
 	s.events <- evt
-}
-
-// Stop initiates a shutdown of the supervisor killing all processes under supervision.
-func (s *Supervisor) Stop() {
-
 }

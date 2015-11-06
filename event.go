@@ -18,12 +18,12 @@ func (e *ExitEvent) String() string {
 	return "exit event"
 }
 
-type CreateContainerEvent struct {
+type StartContainerEvent struct {
 	ID         string
 	BundlePath string
 	Err        chan error
 }
 
-func (c *CreateContainerEvent) String() string {
+func (c *StartContainerEvent) String() string {
 	return "create container"
 }

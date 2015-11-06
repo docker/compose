@@ -72,7 +72,6 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 		logrus.WithField("signal", s).Debug("containerd: received signal")
 		switch s {
 		case syscall.SIGTERM, syscall.SIGINT, syscall.SIGSTOP:
-			supervisor.Stop()
 			os.Exit(0)
 		case syscall.SIGCHLD:
 			exits, err := reap()
