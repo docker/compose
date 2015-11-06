@@ -165,6 +165,14 @@ type libcontainerContainer struct {
 	exited      bool
 }
 
+func (c *libcontainerContainer) ID() string {
+	return c.c.ID()
+}
+
+func (c *libcontainerContainer) Pid() (int, error) {
+	return c.initProcess.Pid()
+}
+
 func (c *libcontainerContainer) SetExited(status int) {
 	c.exitStatus = status
 	// meh

@@ -15,8 +15,8 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 		r:          r,
 	}
 	r.HandleFunc("/containers", s.containers).Methods("GET")
-	r.HandleFunc("/containers/{id:*}", s.createContainer).Methods("POST")
-	r.HandleFunc("/containers/{id:*}", s.deleteContainer).Methods("DELETE")
+	r.HandleFunc("/containers/{id:.*}", s.createContainer).Methods("POST")
+	r.HandleFunc("/containers/{id:.*}", s.deleteContainer).Methods("DELETE")
 	return s
 }
 

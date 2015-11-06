@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/crosbymichael/containerd"
+	"github.com/crosbymichael/containerd/api/v1"
 	"github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/rcrowley/go-metrics"
 )
@@ -55,7 +57,11 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 	events := make(chan containerd.Event, bufferSize)
 	// start the signal handler in the background.
 	go startSignalHandler(supervisor, bufferSize)
-	return supervisor.Run(events)
+	if err := supervisor.Start(events); err != nil {
+		return err
+	}
+	server := v1.NewServer(supervisor)
+	return http.ListenAndServe("localhost:8888", server)
 }
 
 func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
@@ -67,6 +73,7 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 		switch s {
 		case syscall.SIGTERM, syscall.SIGINT, syscall.SIGSTOP:
 			supervisor.Stop()
+			os.Exit(0)
 		case syscall.SIGCHLD:
 			exits, err := reap()
 			if err != nil {
