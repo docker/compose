@@ -300,7 +300,7 @@ class Project(object):
 
         plans = self._get_convergence_plans(services, strategy)
 
-        if self.use_networking:
+        if self.use_networking and self.uses_default_network():
             self.ensure_network_exists()
 
         return [
@@ -383,7 +383,10 @@ class Project(object):
     def remove_network(self):
         network = self.get_network()
         if network:
-            self.client.remove_network(network['id'])
+            self.client.remove_network(network['Id'])
+
+    def uses_default_network(self):
+        return any(service.net.mode == self.name for service in self.services)
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()

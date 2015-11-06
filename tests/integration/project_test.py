@@ -7,6 +7,7 @@ from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
 from compose.service import ConvergenceStrategy
+from compose.service import Net
 from compose.service import VolumeFromSpec
 
 
@@ -111,6 +112,7 @@ class ProjectTest(DockerClientTestCase):
         network_name = 'network_does_exist'
         project = Project(network_name, [], client)
         client.create_network(network_name)
+        self.addCleanup(client.remove_network, network_name)
         assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):
@@ -397,6 +399,20 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('data').containers()), 0)
         self.assertEqual(len(project.get_service('data').containers(stopped=True)), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
+
+    def test_project_up_with_custom_network(self):
+        self.require_api_version('1.21')
+        client = docker_client(version='1.21')
+        network_name = 'composetest-custom'
+
+        client.create_network(network_name)
+        self.addCleanup(client.remove_network, network_name)
+
+        web = self.create_service('web', net=Net(network_name))
+        project = Project('composetest', [web], client, use_networking=True)
+        project.up()
+
+        assert project.get_network() is None
 
     def test_unscale_after_restart(self):
         web = self.create_service('web')
