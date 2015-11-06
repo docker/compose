@@ -195,6 +195,19 @@ class ConfigTest(unittest.TestCase):
         ]
         self.assertEqual(service_sort(service_dicts), service_sort(expected))
 
+    def test_load_with_multiple_files_and_invalid_override(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {'web': {'image': 'example/web'}})
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {'bogus': 'thing'})
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        assert 'Service "bogus" doesn\'t have any configuration' in exc.exconly()
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             config.load(
