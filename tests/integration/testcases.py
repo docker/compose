@@ -7,7 +7,8 @@ from pytest import skip
 
 from .. import unittest
 from compose.cli.docker_client import docker_client
-from compose.config.config import ServiceLoader
+from compose.config.config import process_service
+from compose.config.config import resolve_environment
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
@@ -42,23 +43,15 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        workaround_options = {}
-        for option in ['links', 'volumes_from', 'net']:
-            if option in kwargs:
-                workaround_options[option] = kwargs.pop(option, None)
+        # TODO: remove this once #2299 is fixed
+        kwargs['name'] = name
 
-        options = ServiceLoader(
-            working_dir='.',
-            filename=None,
-            service_name=name,
-            service_dict=kwargs
-        ).make_service_dict()
-        options.update(workaround_options)
-
+        options = process_service('.', kwargs)
+        options['environment'] = resolve_environment('.', kwargs)
         labels = options.setdefault('labels', {})
         labels['com.docker.compose.test-name'] = self.id()
 
-        return Service(project='composetest', client=self.client, **options)
+        return Service(client=self.client, project='composetest', **options)
 
     def check_build(self, *args, **kwargs):
         kwargs.setdefault('rm', True)
