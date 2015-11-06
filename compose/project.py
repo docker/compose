@@ -23,6 +23,7 @@ from .service import Service
 from .service import ServiceNet
 from .service import VolumeFromSpec
 from .utils import parallel_execute
+from .volume import Volume
 
 
 log = logging.getLogger(__name__)
@@ -78,10 +79,11 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, use_networking=False, network_driver=None):
+    def __init__(self, name, services, client, volumes=None, use_networking=False, network_driver=None):
         self.name = name
         self.services = services
         self.client = client
+        self.volumes = volumes or []
         self.use_networking = use_networking
         self.network_driver = network_driver
 
@@ -92,16 +94,16 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client, use_networking=False, network_driver=None):
+    def from_config(cls, name, config_data, client, use_networking=False, network_driver=None):
         """
-        Construct a ServiceCollection from a list of dicts representing services.
+        Construct a Project from a config.Config object.
         """
         project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
 
         if use_networking:
-            remove_links(service_dicts)
+            remove_links(config_data.services)
 
-        for service_dict in sort_service_dicts(service_dicts):
+        for service_dict in sort_service_dicts(config_data.services):
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)
@@ -115,6 +117,15 @@ class Project(object):
                     net=net,
                     volumes_from=volumes_from,
                     **service_dict))
+
+        for vol_name, data in config_data.volumes.items():
+            project.volumes.append(
+                Volume(
+                    client=client, project=name, name=vol_name,
+                    driver=data.get('driver'), driver_opts=data.get('driver_opts')
+                )
+            )
+
         return project
 
     @property
@@ -274,6 +285,15 @@ class Project(object):
             msg="Removing"
         )
 
+    def initialize_volumes(self):
+        try:
+            for volume in self.volumes:
+                volume.create()
+        except NotFound:
+            raise ConfigurationError(
+                "Volume %s specifies nonexistent driver %s" % (volume.name, volume.driver)
+            )
+
     def restart(self, service_names=None, **options):
         for service in self.get_services(service_names):
             service.restart(**options)
@@ -292,6 +312,8 @@ class Project(object):
            do_build=True,
            timeout=DEFAULT_TIMEOUT,
            detached=False):
+
+        self.initialize_volumes()
 
         services = self.get_services(service_names, include_deps=start_deps)
 

@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+import random
+
 from .testcases import DockerClientTestCase
 from compose.cli.docker_client import docker_client
 from compose.config import config
@@ -67,9 +69,9 @@ class ProjectTest(DockerClientTestCase):
                 'volumes_from': ['data'],
             },
         })
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=service_dicts,
+            config_data=service_dicts,
             client=self.client,
         )
         db = project.get_service('db')
@@ -84,9 +86,9 @@ class ProjectTest(DockerClientTestCase):
             name='composetest_data_container',
             labels={LABEL_PROJECT: 'composetest'},
         )
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
@@ -114,9 +116,9 @@ class ProjectTest(DockerClientTestCase):
         assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'net': {
                     'image': 'busybox:latest',
                     'command': ["top"]
@@ -146,9 +148,9 @@ class ProjectTest(DockerClientTestCase):
         )
         net_container.start()
 
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:composetest_net_container'
@@ -222,10 +224,88 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(web.containers()), 0)
 
+    def test_project_up_volumes(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {'driver': 'local'}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.up()
+        self.assertEqual(len(project.containers()), 1)
+
+        volume_data = self.client.inspect_volume(vol_name)
+        self.assertEqual(volume_data['Name'], vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_initialize_volumes(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.initialize_volumes()
+
+        volume_data = self.client.inspect_volume(vol_name)
+        self.assertEqual(volume_data['Name'], vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_project_up_implicit_volume_driver(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.up()
+
+        volume_data = self.client.inspect_volume(vol_name)
+        self.assertEqual(volume_data['Name'], vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_project_up_invalid_volume_driver(self):
+        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        config_data = config.Config(
+            2, [{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], {vol_name: {'driver': 'foobar'}}
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        with self.assertRaises(config.ConfigurationError):
+            project.initialize_volumes()
+
     def test_project_up_starts_uncreated_services(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'db')])
-        project = Project('composetest', [db, web], self.client)
+        project = Project('composetest', [web, db], self.client)
         project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
 
@@ -263,15 +343,19 @@ class ProjectTest(DockerClientTestCase):
         project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
         old_db_id = project.containers()[0].id
-        db_volume_path = project.containers()[0].inspect()['Volumes']['/var/db']
+
+        container, = project.containers()
+        db_volume_path = container.get_mount('/var/db')['Source']
 
         project.up(strategy=ConvergenceStrategy.never)
         self.assertEqual(len(project.containers()), 2)
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
-        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
-                         db_volume_path)
+        mount, = db_container.get('Mounts')
+        self.assertEqual(
+            db_container.get_mount('/var/db')['Source'],
+            db_volume_path)
 
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
@@ -286,8 +370,9 @@ class ProjectTest(DockerClientTestCase):
         old_containers = project.containers(stopped=True)
 
         self.assertEqual(len(old_containers), 1)
-        old_db_id = old_containers[0].id
-        db_volume_path = old_containers[0].inspect()['Volumes']['/var/db']
+        old_container, = old_containers
+        old_db_id = old_container.id
+        db_volume_path = old_container.get_mount('/var/db')['Source']
 
         project.up(strategy=ConvergenceStrategy.never)
 
@@ -297,8 +382,9 @@ class ProjectTest(DockerClientTestCase):
 
         db_container = [c for c in new_containers if 'db' in c.name][0]
         self.assertEqual(db_container.id, old_db_id)
-        self.assertEqual(db_container.inspect()['Volumes']['/var/db'],
-                         db_volume_path)
+        self.assertEqual(
+            db_container.get_mount('/var/db')['Source'],
+            db_volume_path)
 
     def test_project_up_without_all_services(self):
         console = self.create_service('console')
@@ -328,9 +414,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     def test_project_up_starts_depends(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],
@@ -363,9 +449,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
     def test_project_up_with_no_deps(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],

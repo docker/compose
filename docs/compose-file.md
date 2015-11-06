@@ -24,6 +24,61 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
+## Versioning
+
+It is possible to use different versions of the `compose.yml` format.
+Below are the formats currently supported by compose.
+
+### Version 1
+
+Compose files that do not declare a version are considered "version 1". In
+those files, all the [services](#Services) are declared at the root of the
+document.
+
+Version 1 files do not support the declaration of named [volumes](#Volumes)
+
+Example:
+
+    web:
+      build: .
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+       - logvolume01:/var/log
+      links:
+       - redis
+    redis:
+      image: redis
+
+
+### Version 2
+
+Compose files using the version 2 syntax must indicate the version number at
+the root of the document. All [services](#Services) must be declared under the
+`services` key. Named [volumes](#Volumes) must be declared under the `volumes`
+key.
+
+Example:
+
+    version: 2
+    services:
+      web:
+        build: .
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+         - logvolume01:/var/log
+        links:
+         - redis
+      redis:
+        image: redis
+    volumes:
+      logvolume01:
+        driver: local
+
+
 ## Service configuration reference
 
 This section contains a list of all configuration options supported by a service
@@ -396,6 +451,33 @@ Each of these is a single value, analogous to its
     read_only: true
     stdin_open: true
     tty: true
+    volume_driver: mydriver
+
+## Volumes
+
+While it is possible to declare volumes on the fly as part of the service
+declaration, this section allows you to create named volumes that can be
+reused across multiple services (without relying on `volumes_from`), and are
+easily retrieved and inspected using the docker command line or API.
+See the [docker volume](http://docs.docker.com/reference/commandline/volume/)
+subcommand documentation for more information.
+
+### driver
+
+Specify which volume driver should be used for this volume. Defaults to
+`local`. An exception will be raised if the driver is not available.
+
+      driver: foobar
+
+### driver_opts
+
+Specify a list of options as key-value pairs to pass to the driver for this
+volume. Those options are driver dependent - consult the driver's
+documentation for more information. Optional.
+
+      driver_opts:
+        foo: "bar"
+        baz: 1
 
 ## Variable substitution
 

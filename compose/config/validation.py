@@ -287,8 +287,10 @@ def process_errors(errors, service_name=None):
     return "\n".join(root_msgs + invalid_keys + required + type_errors + other_errors)
 
 
-def validate_against_fields_schema(config):
+def validate_against_fields_schema(config, version=None):
     schema_filename = "fields_schema.json"
+    if version:
+        schema_filename = "fields_schema_v{0}.json".format(version)
     format_checkers = ["ports", "environment"]
     return _validate_against_schema(config, schema_filename, format_checkers)
 

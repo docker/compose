@@ -4,6 +4,7 @@ import docker
 
 from .. import mock
 from .. import unittest
+from compose.config.config import Config
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
@@ -15,7 +16,7 @@ class ProjectTest(unittest.TestCase):
         self.mock_client = mock.create_autospec(docker.Client)
 
     def test_from_dict(self):
-        project = Project.from_dicts('composetest', [
+        project = Project.from_config('composetest', Config(None, [
             {
                 'name': 'web',
                 'image': 'busybox:latest'
@@ -24,7 +25,7 @@ class ProjectTest(unittest.TestCase):
                 'name': 'db',
                 'image': 'busybox:latest'
             },
-        ], None)
+        ], {}), None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
@@ -32,7 +33,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
     def test_from_dict_sorts_in_dependency_order(self):
-        project = Project.from_dicts('composetest', [
+        project = Project.from_config('composetest', Config(None, [
             {
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -48,14 +49,14 @@ class ProjectTest(unittest.TestCase):
                 'image': 'busybox:latest',
                 'volumes': ['/tmp'],
             }
-        ], None)
+        ], {}), None)
 
         self.assertEqual(project.services[0].name, 'volume')
         self.assertEqual(project.services[1].name, 'db')
         self.assertEqual(project.services[2].name, 'web')
 
     def test_from_config(self):
-        dicts = [
+        dicts = Config(None, [
             {
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -64,8 +65,8 @@ class ProjectTest(unittest.TestCase):
                 'name': 'db',
                 'image': 'busybox:latest',
             },
-        ]
-        project = Project.from_dicts('composetest', dicts, None)
+        ], {})
+        project = Project.from_config('composetest', dicts, None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
@@ -161,13 +162,13 @@ class ProjectTest(unittest.TestCase):
         container_id = 'aabbccddee'
         container_dict = dict(Name='aaa', Id=container_id)
         self.mock_client.inspect_container.return_value = container_dict
-        project = Project.from_dicts('test', [
+        project = Project.from_config('test', Config(None, [
             {
                 'name': 'test',
                 'image': 'busybox:latest',
                 'volumes_from': ['aaa']
             }
-        ], self.mock_client)
+        ], {}), self.mock_client)
         self.assertEqual(project.get_service('test')._get_volumes_from(), [container_id + ":rw"])
 
     def test_use_volumes_from_service_no_container(self):
@@ -180,7 +181,7 @@ class ProjectTest(unittest.TestCase):
                 "Image": 'busybox:latest'
             }
         ]
-        project = Project.from_dicts('test', [
+        project = Project.from_config('test', Config(None, [
             {
                 'name': 'vol',
                 'image': 'busybox:latest'
@@ -190,7 +191,7 @@ class ProjectTest(unittest.TestCase):
                 'image': 'busybox:latest',
                 'volumes_from': ['vol']
             }
-        ], self.mock_client)
+        ], {}), self.mock_client)
         self.assertEqual(project.get_service('test')._get_volumes_from(), [container_name + ":rw"])
 
     @mock.patch.object(Service, 'containers')
@@ -200,7 +201,7 @@ class ProjectTest(unittest.TestCase):
             mock.Mock(id=container_id, spec=Container)
             for container_id in container_ids]
 
-        project = Project.from_dicts('test', [
+        project = Project.from_config('test', Config(None, [
             {
                 'name': 'vol',
                 'image': 'busybox:latest'
@@ -210,16 +211,16 @@ class ProjectTest(unittest.TestCase):
                 'image': 'busybox:latest',
                 'volumes_from': ['vol']
             }
-        ], None)
+        ], {}), None)
         self.assertEqual(project.get_service('test')._get_volumes_from(), [container_ids[0] + ':rw'])
 
     def test_net_unset(self):
-        project = Project.from_dicts('test', [
+        project = Project.from_config('test', Config(None, [
             {
                 'name': 'test',
                 'image': 'busybox:latest',
             }
-        ], self.mock_client)
+        ], {}), self.mock_client)
         service = project.get_service('test')
         self.assertEqual(service.net.id, None)
         self.assertNotIn('NetworkMode', service._get_container_host_config({}))
@@ -228,13 +229,13 @@ class ProjectTest(unittest.TestCase):
         container_id = 'aabbccddee'
         container_dict = dict(Name='aaa', Id=container_id)
         self.mock_client.inspect_container.return_value = container_dict
-        project = Project.from_dicts('test', [
+        project = Project.from_config('test', Config(None, [
             {
                 'name': 'test',
                 'image': 'busybox:latest',
                 'net': 'container:aaa'
             }
-        ], self.mock_client)
+        ], {}), self.mock_client)
         service = project.get_service('test')
         self.assertEqual(service.net.mode, 'container:' + container_id)
 
@@ -248,7 +249,7 @@ class ProjectTest(unittest.TestCase):
                 "Image": 'busybox:latest'
             }
         ]
-        project = Project.from_dicts('test', [
+        project = Project.from_config('test', Config(None, [
             {
                 'name': 'aaa',
                 'image': 'busybox:latest'
@@ -258,7 +259,7 @@ class ProjectTest(unittest.TestCase):
                 'image': 'busybox:latest',
                 'net': 'container:aaa'
             }
-        ], self.mock_client)
+        ], {}), self.mock_client)
 
         service = project.get_service('test')
         self.assertEqual(service.net.mode, 'container:' + container_name)
@@ -277,12 +278,12 @@ class ProjectTest(unittest.TestCase):
                 },
             },
         }
-        project = Project.from_dicts(
+        project = Project.from_config(
             'test',
-            [{
+            Config(None, [{
                 'name': 'web',
                 'image': 'busybox:latest',
-            }],
+            }], {}),
             self.mock_client,
         )
         self.assertEqual([c.id for c in project.containers()], ['1'])

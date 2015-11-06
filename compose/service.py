@@ -930,7 +930,7 @@ def get_container_data_volumes(container, volumes_option):
     volumes = []
 
     volumes_option = volumes_option or []
-    container_volumes = container.get('Volumes') or {}
+    container_volumes = container.get('Mounts') or []
     image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
 
     for volume in set(volumes_option + list(image_volumes)):
@@ -939,7 +939,11 @@ def get_container_data_volumes(container, volumes_option):
         if volume.external:
             continue
 
-        volume_path = container_volumes.get(volume.internal)
+        volume_path = None
+        for volume_config in container_volumes:
+            if volume_config['Destination'] == volume.internal:
+                volume_path = volume_config['Source']
+                break
         # New volume, doesn't exist in the old container
         if not volume_path:
             continue

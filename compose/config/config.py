@@ -100,6 +100,17 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     """
 
 
+class Config(namedtuple('_Config', 'version services volumes')):
+    """
+    :param version: configuration version
+    :type  version: int
+    :param services: List of service description dictionaries
+    :type  services: :class:`list`
+    :param volumes: List of volume description dictionaries
+    :type  volumes: :class:`list`
+    """
+
+
 def find(base_dir, filenames):
     if filenames == ['-']:
         return ConfigDetails(
@@ -165,17 +176,76 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
-def load(config_details):
-    """Load the configuration from a working directory and a list of
-    configuration files.  Files are loaded in order, and merged on top
-    of each other to create the final configuration.
+def get_config_version(config_details):
+    def get_version(config):
+        validate_top_level_object(config)
+        return config.get('version')
 
-    Return a fully interpolated, extended and validated configuration.
+    main_file = config_details.config_files[0]
+    version = get_version(main_file.config)
+    for next_file in config_details.config_files[1:]:
+        next_file_version = get_version(main_file.config)
+        if version != next_file_version:
+            raise ConfigurationError(
+                'Version mismatch: main file {0} specifies version {1} but extension file {2} uses version {3}'.format(
+                    main_file.filename, version, next_file.filename, next_file_version
+                )
+            )
+    return version, main_file.filename
+
+
+def pre_process_config(config):
+    """
+    Pre validation checks and processing of the config file to interpolate env
+    vars returning a config dict ready to be tested against the schema.
+    """
+    validate_top_level_object(config)
+    return interpolate_environment_variables(config)
+
+
+def load(config_details):
+    version, filename = get_config_version(config_details)
+    if not version or isinstance(version, dict):
+        service_dicts = [
+            config_file.config for config_file in config_details.config_files
+        ]
+        return Config(
+            version,
+            load_services(config_details.working_dir, filename, service_dicts),
+            {}
+        )
+    elif version == 2:
+        return load_v2(config_details, filename)
+
+    raise ConfigurationError('Invalid config version provided: {0}'.format(version))
+
+
+def load_v2(config_details, filename):
+    service_dicts = [
+        config_file.config.get('services', {}) for config_file in config_details.config_files
+    ]
+    volumes = {}
+    for config_file in config_details.config_files:
+        for name, volume_config in config_file.config.get('volumes', {}).items():
+            volumes.update({name: volume_config})
+    return Config(
+        2,
+        load_services(config_details.working_dir, filename, service_dicts),
+        volumes
+    )
+
+
+def load_services(working_dir, filename, service_configs):
+    """Load the configuration from a working directory, filename and a list of
+    services dicts.  Dicts are loaded in order, and merged on top of each
+    other to create the final configuration.
+
+    Return a fully interpolated, extended and validated service configuration.
     """
 
     def build_service(filename, service_name, service_dict):
         loader = ServiceLoader(
-            config_details.working_dir,
+            working_dir,
             filename,
             service_name,
             service_dict)
@@ -184,8 +254,8 @@ def load(config_details):
         return service_dict
 
     def load_file(filename, config):
-        processed_config = interpolate_environment_variables(config)
-        validate_against_fields_schema(processed_config)
+        processed_config = pre_process_config(config)
+        validate_against_fields_schema(processed_config, None)
         return [
             build_service(filename, name, service_config)
             for name, service_config in processed_config.items()
@@ -195,21 +265,17 @@ def load(config_details):
         all_service_names = set(base) | set(override)
         return {
             name: merge_service_dicts_from_files(
-                base.get(name, {}),
-                override.get(name, {}))
+                base.get(name, {}), override.get(name, {})
+            )
             for name in all_service_names
         }
 
-    config_file = config_details.config_files[0]
-    validate_top_level_object(config_file.config)
-    for next_file in config_details.config_files[1:]:
-        validate_top_level_object(next_file.config)
+    service_config = service_configs[0]
+    for next_config in service_configs[1:]:
+        validate_top_level_object(next_config)
+        service_config = merge_services(service_config, next_config)
 
-        config_file = ConfigFile(
-            config_file.filename,
-            merge_services(config_file.config, next_file.config))
-
-    return load_file(config_file.filename, config_file.config)
+    return load_file(filename, service_config)
 
 
 class ServiceLoader(object):

@@ -25,10 +25,10 @@ class ProjectTestCase(DockerClientTestCase):
         details = config.ConfigDetails(
             'working_dir',
             [config.ConfigFile(None, cfg)])
-        return Project.from_dicts(
+        return Project.from_config(
             name='composetest',
             client=self.client,
-            service_dicts=config.load(details))
+            config_data=config.load(details))
 
 
 class BasicProjectTest(ProjectTestCase):
