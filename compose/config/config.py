@@ -103,6 +103,20 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return cls(filename, load_yaml(filename))
 
 
+class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name config')):
+
+    @classmethod
+    def with_abs_paths(cls, working_dir, filename, name, config):
+        if not working_dir:
+            raise ValueError("No working_dir for ServiceConfig.")
+
+        return cls(
+            os.path.abspath(working_dir),
+            os.path.abspath(filename) if filename else filename,
+            name,
+            config)
+
+
 def find(base_dir, filenames):
     if filenames == ['-']:
         return ConfigDetails(
@@ -177,19 +191,22 @@ def load(config_details):
     """
 
     def build_service(filename, service_name, service_dict):
-        resolver = ServiceExtendsResolver(
+        service_config = ServiceConfig.with_abs_paths(
             config_details.working_dir,
             filename,
             service_name,
             service_dict)
-        service_dict = process_service(config_details.working_dir, resolver.run())
+        resolver = ServiceExtendsResolver(service_config)
+        service_dict = process_service(resolver.run())
+        validate_against_service_schema(service_dict, service_config.name)
         validate_paths(service_dict)
+        service_dict['name'] = service_config.name
         return service_dict
 
-    def build_services(filename, config):
+    def build_services(config_file):
         return [
-            build_service(filename, name, service_config)
-            for name, service_config in config.items()
+            build_service(config_file.filename, name, service_dict)
+            for name, service_dict in config_file.config.items()
         ]
 
     def merge_services(base, override):
@@ -208,7 +225,7 @@ def load(config_details):
         config = merge_services(config_file.config, next_file.config)
         config_file = config_file._replace(config=config)
 
-    return build_services(config_file.filename, config_file.config)
+    return build_services(config_file)
 
 
 def process_config_file(config_file, service_name=None):
@@ -225,31 +242,14 @@ def process_config_file(config_file, service_name=None):
 
 
 class ServiceExtendsResolver(object):
-    def __init__(
-        self,
-        working_dir,
-        filename,
-        service_name,
-        service_dict,
-        already_seen=None
-    ):
-        if working_dir is None:
-            raise ValueError("No working_dir passed to ServiceExtendsResolver()")
-
-        self.working_dir = os.path.abspath(working_dir)
-
-        if filename:
-            self.filename = os.path.abspath(filename)
-        else:
-            self.filename = filename
+    def __init__(self, service_config, already_seen=None):
+        self.service_config = service_config
+        self.working_dir = service_config.working_dir
         self.already_seen = already_seen or []
-        self.service_dict = service_dict.copy()
-        self.service_name = service_name
-        self.service_dict['name'] = service_name
 
     @property
     def signature(self):
-        return self.filename, self.service_name
+        return self.service_config.filename, self.service_config.name
 
     def detect_cycle(self):
         if self.signature in self.already_seen:
@@ -258,8 +258,8 @@ class ServiceExtendsResolver(object):
     def run(self):
         self.detect_cycle()
 
-        service_dict = dict(self.service_dict)
-        env = resolve_environment(self.working_dir, self.service_dict)
+        service_dict = dict(self.service_config.config)
+        env = resolve_environment(self.working_dir, self.service_config.config)
         if env:
             service_dict['environment'] = env
             service_dict.pop('env_file', None)
@@ -267,13 +267,10 @@ class ServiceExtendsResolver(object):
         if 'extends' in service_dict:
             service_dict = self.resolve_extends(*self.validate_and_construct_extends())
 
-        if not self.already_seen:
-            validate_against_service_schema(service_dict, self.service_name)
-
-        return service_dict
+        return self.service_config._replace(config=service_dict)
 
     def validate_and_construct_extends(self):
-        extends = self.service_dict['extends']
+        extends = self.service_config.config['extends']
         if not isinstance(extends, dict):
             extends = {'service': extends}
 
@@ -286,33 +283,38 @@ class ServiceExtendsResolver(object):
         service_config = extended_file.config[service_name]
         return config_path, service_config, service_name
 
-    def resolve_extends(self, extended_config_path, service_config, service_name):
+    def resolve_extends(self, extended_config_path, service_dict, service_name):
         resolver = ServiceExtendsResolver(
-            os.path.dirname(extended_config_path),
-            extended_config_path,
-            service_name,
-            service_config,
-            already_seen=self.already_seen + [self.signature],
-        )
+            ServiceConfig.with_abs_paths(
+                os.path.dirname(extended_config_path),
+                extended_config_path,
+                service_name,
+                service_dict),
+            already_seen=self.already_seen + [self.signature])
 
-        other_service_dict = process_service(resolver.working_dir, resolver.run())
+        service_config = resolver.run()
+        other_service_dict = process_service(service_config)
         validate_extended_service_dict(
             other_service_dict,
             extended_config_path,
             service_name,
         )
 
-        return merge_service_dicts(other_service_dict, self.service_dict)
+        return merge_service_dicts(other_service_dict, self.service_config.config)
 
     def get_extended_config_path(self, extends_options):
         """Service we are extending either has a value for 'file' set, which we
         need to obtain a full path too or we are extending from a service
         defined in our own file.
         """
-        validate_extends_file_path(self.service_name, extends_options, self.filename)
+        filename = self.service_config.filename
+        validate_extends_file_path(
+            self.service_config.name,
+            extends_options,
+            filename)
         if 'file' in extends_options:
             return expand_path(self.working_dir, extends_options['file'])
-        return self.filename
+        return filename
 
 
 def resolve_environment(working_dir, service_dict):
@@ -357,8 +359,9 @@ def validate_ulimits(ulimit_config):
                     "than 'hard' value".format(ulimit_config))
 
 
-def process_service(working_dir, service_dict):
-    service_dict = dict(service_dict)
+def process_service(service_config):
+    working_dir = service_config.working_dir
+    service_dict = dict(service_config.config)
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
@@ -505,12 +508,12 @@ def env_vars_from_file(filename):
 
 def resolve_volume_paths(working_dir, service_dict):
     return [
-        resolve_volume_path(working_dir, volume, service_dict['name'])
+        resolve_volume_path(working_dir, volume)
         for volume in service_dict['volumes']
     ]
 
 
-def resolve_volume_path(working_dir, volume, service_name):
+def resolve_volume_path(working_dir, volume):
     container_path, host_path = split_path_mapping(volume)
 
     if host_path is not None:
