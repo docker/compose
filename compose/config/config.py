@@ -177,8 +177,8 @@ def find_candidates_in_parent_dirs(filenames, path):
 
 
 def get_config_version(config_details):
-    @validate_top_level_object
     def get_version(config):
+        validate_top_level_object(config)
         return config.get('version')
 
     main_file = config_details.config_files[0]
@@ -194,12 +194,12 @@ def get_config_version(config_details):
     return version, main_file.filename
 
 
-@validate_top_level_object
 def pre_process_config(config):
     """
     Pre validation checks and processing of the config file to interpolate env
     vars returning a config dict ready to be tested against the schema.
     """
+    validate_top_level_object(config)
     return interpolate_environment_variables(config)
 
 
@@ -264,12 +264,15 @@ def load_services(working_dir, filename, service_configs):
     def merge_services(base, override):
         all_service_names = set(base) | set(override)
         return {
-            name: merge_service_dicts(base.get(name, {}), override.get(name, {}))
+            name: merge_service_dicts_from_files(
+                base.get(name, {}), override.get(name, {})
+            )
             for name in all_service_names
         }
 
     service_config = service_configs[0]
     for next_config in service_configs[1:]:
+        validate_top_level_object(next_config)
         service_config = merge_services(service_config, next_config)
 
     return load_file(filename, service_config)

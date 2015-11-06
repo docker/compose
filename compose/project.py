@@ -94,7 +94,7 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, config_data, client, use_networking=False, network_driver=None):
+    def from_config(cls, name, config_data, client, use_networking=False, network_driver=None):
         """
         Construct a Project from a config.Config object.
         """

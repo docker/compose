@@ -291,7 +291,7 @@ class ConfigTest(unittest.TestCase):
               labels: ['label=one']
         """)
         with tmpdir.as_cwd():
-            service_dicts = config.load(details)
+            service_dicts = config.load(details).services
 
         expected = [
             {
@@ -655,7 +655,7 @@ class InterpolationTest(unittest.TestCase):
                 '.',
                 None,
             )
-        )[0]
+        ).services[0]
         self.assertEquals(service_dict['environment']['POSTGRES_PASSWORD'], '')
 
 
@@ -1361,7 +1361,7 @@ class ExtendsTest(unittest.TestCase):
         self.assertEqual(dicts[0]['environment'], {'FOO': '1'})
 
     def test_extended_service_with_verbose_and_shorthand_way(self):
-        services = load_from_filename('tests/fixtures/extends/verbose-and-shorthand.yml')
+        services = load_services_from_filename('tests/fixtures/extends/verbose-and-shorthand.yml')
         self.assertEqual(service_sort(services), service_sort([
             {
                 'name': 'base',

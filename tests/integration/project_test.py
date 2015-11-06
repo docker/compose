@@ -252,7 +252,7 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], {vol_name: {'driver': 'local'}}
+            }], {vol_name: {}}
         )
 
         project = Project.from_config(

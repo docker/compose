@@ -119,13 +119,13 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', volumes=['/var/db'])
         container = service.create_container()
         container.start()
-        self.assertIn('/var/db', container.get('Volumes'))
+        self.assertIn('/var/db', container.get('Config.Volumes'))
 
     def test_create_container_with_volume_driver(self):
         service = self.create_service('db', volume_driver='foodriver')
         container = service.create_container()
         container.start()
-        self.assertEqual('foodriver', container.get('Config.VolumeDriver'))
+        self.assertEqual('foodriver', container.get('HostConfig.VolumeDriver'))
 
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
@@ -213,7 +213,7 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         container.start()
 
-        volumes = container.inspect()['Volumes']
+        volumes = container.inspect()['Config']['Volumes']
         self.assertIn(container_path, volumes)
 
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
@@ -368,8 +368,8 @@ class ServiceTest(DockerClientTestCase):
         new_container, = service.execute_convergence_plan(
             ConvergencePlan('recreate', [old_container]))
 
-        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
-        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+        self.assertEqual(list(new_container.get('Config.Volumes')), ['/data'])
+        self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')

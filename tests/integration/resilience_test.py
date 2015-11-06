@@ -13,7 +13,7 @@ class ResilienceTest(DockerClientTestCase):
         self.project = Project('composetest', [self.db], self.client)
 
         container = self.db.create_container()
-        self.db.start_container(container)
+        container.start()
         self.host_path = container.get_mount('/var/db')['Source']
 
     def test_successful_recreate(self):
