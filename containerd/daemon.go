@@ -34,11 +34,11 @@ var DaemonCommand = cli.Command{
 	Action: func(context *cli.Context) {
 		if context.GlobalBool("debug") {
 			l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
-			goRoutineCounter := metrics.NewMeter()
+			goRoutineCounter := metrics.NewGauge()
 			metrics.DefaultRegistry.Register("goroutines", goRoutineCounter)
 			go func() {
 				for range time.Tick(30 * time.Second) {
-					goRoutineCounter.Mark(int64(runtime.NumGoroutine()))
+					goRoutineCounter.Update(int64(runtime.NumGoroutine()))
 				}
 			}()
 			go metrics.Log(metrics.DefaultRegistry, 60*time.Second, l)
