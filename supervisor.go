@@ -73,11 +73,11 @@ func (s *Supervisor) Start(events chan Event) error {
 				}).Debug("containerd: process exited")
 				if container, ok := s.processes[e.Pid]; ok {
 					container.SetExited(e.Status)
+					delete(s.processes, e.Pid)
+					delete(s.containers, container.ID())
 					if err := container.Delete(); err != nil {
 						logrus.WithField("error", err).Error("containerd: deleting container")
 					}
-					delete(s.processes, e.Pid)
-					delete(s.containers, container.ID())
 				}
 			case *StartedEvent:
 				s.containers[e.ID] = e.Container
@@ -122,6 +122,7 @@ func (s *Supervisor) worker(id int) {
 			container, err := s.runtime.Create(j.ID, j.BundlePath)
 			if err != nil {
 				j.Err <- err
+				continue
 			}
 			s.SendEvent(&StartedEvent{
 				ID:        j.ID,
