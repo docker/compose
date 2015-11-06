@@ -177,12 +177,12 @@ def load(config_details):
     """
 
     def build_service(filename, service_name, service_dict):
-        loader = ServiceLoader(
+        resolver = ServiceExtendsResolver(
             config_details.working_dir,
             filename,
             service_name,
             service_dict)
-        service_dict = loader.make_service_dict()
+        service_dict = process_service(config_details.working_dir, resolver.run())
         validate_paths(service_dict)
         return service_dict
 
@@ -224,7 +224,7 @@ def process_config_file(config_file, service_name=None):
     return config_file._replace(config=processed_config)
 
 
-class ServiceLoader(object):
+class ServiceExtendsResolver(object):
     def __init__(
         self,
         working_dir,
@@ -234,7 +234,7 @@ class ServiceLoader(object):
         already_seen=None
     ):
         if working_dir is None:
-            raise ValueError("No working_dir passed to ServiceLoader()")
+            raise ValueError("No working_dir passed to ServiceExtendsResolver()")
 
         self.working_dir = os.path.abspath(working_dir)
 
@@ -251,7 +251,7 @@ class ServiceLoader(object):
         if self.signature(name) in self.already_seen:
             raise CircularReference(self.already_seen + [self.signature(name)])
 
-    def make_service_dict(self):
+    def run(self):
         service_dict = dict(self.service_dict)
         env = resolve_environment(self.working_dir, self.service_dict)
         if env:
@@ -264,7 +264,7 @@ class ServiceLoader(object):
         if not self.already_seen:
             validate_against_service_schema(service_dict, self.service_name)
 
-        return process_container_options(self.working_dir, service_dict)
+        return service_dict
 
     def validate_and_construct_extends(self):
         extends = self.service_dict['extends']
@@ -281,19 +281,16 @@ class ServiceLoader(object):
         return config_path, service_config, service_name
 
     def resolve_extends(self, extended_config_path, service_config, service_name):
-        other_working_dir = os.path.dirname(extended_config_path)
-        other_already_seen = self.already_seen + [self.signature(self.service_name)]
-
-        other_loader = ServiceLoader(
-            other_working_dir,
+        resolver = ServiceExtendsResolver(
+            os.path.dirname(extended_config_path),
             extended_config_path,
             self.service_name,
             service_config,
-            already_seen=other_already_seen,
+            already_seen=self.already_seen + [self.signature(self.service_name)],
         )
 
-        other_loader.detect_cycle(service_name)
-        other_service_dict = other_loader.make_service_dict()
+        resolver.detect_cycle(service_name)
+        other_service_dict = process_service(resolver.working_dir, resolver.run())
         validate_extended_service_dict(
             other_service_dict,
             extended_config_path,
@@ -358,7 +355,7 @@ def validate_ulimits(ulimit_config):
                     "than 'hard' value".format(ulimit_config))
 
 
-def process_container_options(working_dir, service_dict):
+def process_service(working_dir, service_dict):
     service_dict = dict(service_dict)
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:

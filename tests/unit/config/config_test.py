@@ -18,13 +18,14 @@ from tests import unittest
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
     """
-    Test helper function to construct a ServiceLoader
+    Test helper function to construct a ServiceExtendsResolver
     """
-    return config.ServiceLoader(
+    resolver = config.ServiceExtendsResolver(
         working_dir=working_dir,
         filename=filename,
         service_name=name,
-        service_dict=service_dict).make_service_dict()
+        service_dict=service_dict)
+    return config.process_service(working_dir, resolver.run())
 
 
 def service_sort(services):
