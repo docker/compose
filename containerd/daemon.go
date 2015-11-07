@@ -69,7 +69,6 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 	signals := make(chan os.Signal, bufferSize)
 	signal.Notify(signals)
 	for s := range signals {
-		logrus.WithField("signal", s).Debug("containerd: received signal")
 		switch s {
 		case syscall.SIGTERM, syscall.SIGINT, syscall.SIGSTOP:
 			os.Exit(0)
@@ -96,7 +95,7 @@ func reap() (exits []*containerd.ExitEvent, err error) {
 			if err == syscall.ECHILD {
 				return exits, nil
 			}
-			return nil, err
+			return exits, err
 		}
 		if pid <= 0 {
 			return exits, nil

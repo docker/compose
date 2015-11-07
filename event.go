@@ -27,3 +27,11 @@ type StartContainerEvent struct {
 func (c *StartContainerEvent) String() string {
 	return "create container"
 }
+
+type ContainerStartErrorEvent struct {
+	ID string
+}
+
+func (c *ContainerStartErrorEvent) String() string {
+	return "container start error"
+}
