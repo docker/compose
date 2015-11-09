@@ -349,6 +349,66 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_ulimits_invalid_keys_validation_error(self):
+        expected_error_msg = "Service 'web' configuration key 'ulimits' contains unsupported option: 'not_soft_or_hard'"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                build_config_details(
+                    {'web': {
+                        'image': 'busybox',
+                        'ulimits': {
+                            'nofile': {
+                                "not_soft_or_hard": 100,
+                                "soft": 10000,
+                                "hard": 20000,
+                            }
+                        }
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+    def test_config_ulimits_required_keys_validation_error(self):
+        expected_error_msg = "Service 'web' configuration key 'ulimits' u?'hard' is a required property"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                build_config_details(
+                    {'web': {
+                        'image': 'busybox',
+                        'ulimits': {
+                            'nofile': {
+                                "soft": 10000,
+                            }
+                        }
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+    def test_config_ulimits_soft_greater_than_hard_error(self):
+        expected_error_msg = "cannot contain a 'soft' value higher than 'hard' value"
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                build_config_details(
+                    {'web': {
+                        'image': 'busybox',
+                        'ulimits': {
+                            'nofile': {
+                                "soft": 10000,
+                                "hard": 1000
+                            }
+                        }
+                    }},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
     def test_valid_config_which_allows_two_type_definitions(self):
         expose_values = [["8000"], [8000]]
         for expose in expose_values:

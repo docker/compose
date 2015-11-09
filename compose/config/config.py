@@ -345,6 +345,16 @@ def validate_extended_service_dict(service_dict, filename, service):
                 "%s services with 'net: container' cannot be extended" % error_prefix)
 
 
+def validate_ulimits(ulimit_config):
+    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+        if isinstance(soft_hard_values, dict):
+            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
+                raise ConfigurationError(
+                    "ulimit_config \"%s\" cannot contain a 'soft' value higher than 'hard' value" %
+                    ulimit_config
+                )
+
+
 def process_container_options(service_dict, working_dir=None):
     service_dict = service_dict.copy()
 
@@ -356,6 +366,9 @@ def process_container_options(service_dict, working_dir=None):
 
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
+
+    if 'ulimits' in service_dict:
+        validate_ulimits(service_dict['ulimits'])
 
     return service_dict
 

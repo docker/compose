@@ -22,6 +22,7 @@ from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.service import build_extra_hosts
+from compose.service import build_ulimits
 from compose.service import ConfigError
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
@@ -163,6 +164,36 @@ class ServiceTest(DockerClientTestCase):
              'api.example.com': '192.168.0.18'}),
             {'www.example.com': '192.168.0.17',
              'api.example.com': '192.168.0.18'})
+
+    def sort_dicts_by_name(self, dictionary_list):
+        return sorted(dictionary_list, key=lambda k: k['name'])
+
+    def test_build_ulimits_with_invalid_options(self):
+        self.assertRaises(ConfigError, lambda: build_ulimits({'nofile': {'soft': 10000, 'hard': 10}}))
+
+    def test_build_ulimits_with_integers(self):
+        self.assertEqual(build_ulimits(
+            {'nofile': {'soft': 10000, 'hard': 20000}}),
+            [{'name': 'nofile', 'soft': 10000, 'hard': 20000}])
+        self.assertEqual(self.sort_dicts_by_name(build_ulimits(
+            {'nofile': {'soft': 10000, 'hard': 20000}, 'nproc': {'soft': 65535, 'hard': 65535}})),
+            self.sort_dicts_by_name([{'name': 'nofile', 'soft': 10000, 'hard': 20000},
+                                     {'name': 'nproc', 'soft': 65535, 'hard': 65535}]))
+
+    def test_build_ulimits_with_dicts(self):
+        self.assertEqual(build_ulimits(
+            {'nofile': 20000}),
+            [{'name': 'nofile', 'soft': 20000, 'hard': 20000}])
+        self.assertEqual(self.sort_dicts_by_name(build_ulimits(
+            {'nofile': 20000, 'nproc': 65535})),
+            self.sort_dicts_by_name([{'name': 'nofile', 'soft': 20000, 'hard': 20000},
+                                     {'name': 'nproc', 'soft': 65535, 'hard': 65535}]))
+
+    def test_build_ulimits_with_integers_and_dicts(self):
+        self.assertEqual(self.sort_dicts_by_name(build_ulimits(
+            {'nproc': 65535, 'nofile': {'soft': 10000, 'hard': 20000}})),
+            self.sort_dicts_by_name([{'name': 'nofile', 'soft': 10000, 'hard': 20000},
+                                     {'name': 'nproc', 'soft': 65535, 'hard': 65535}]))
 
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
