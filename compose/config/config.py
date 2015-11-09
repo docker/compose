@@ -247,11 +247,17 @@ class ServiceExtendsResolver(object):
         self.service_name = service_name
         self.service_dict['name'] = service_name
 
-    def detect_cycle(self, name):
-        if self.signature(name) in self.already_seen:
-            raise CircularReference(self.already_seen + [self.signature(name)])
+    @property
+    def signature(self):
+        return self.filename, self.service_name
+
+    def detect_cycle(self):
+        if self.signature in self.already_seen:
+            raise CircularReference(self.already_seen + [self.signature])
 
     def run(self):
+        self.detect_cycle()
+
         service_dict = dict(self.service_dict)
         env = resolve_environment(self.working_dir, self.service_dict)
         if env:
@@ -284,12 +290,11 @@ class ServiceExtendsResolver(object):
         resolver = ServiceExtendsResolver(
             os.path.dirname(extended_config_path),
             extended_config_path,
-            self.service_name,
+            service_name,
             service_config,
-            already_seen=self.already_seen + [self.signature(self.service_name)],
+            already_seen=self.already_seen + [self.signature],
         )
 
-        resolver.detect_cycle(service_name)
         other_service_dict = process_service(resolver.working_dir, resolver.run())
         validate_extended_service_dict(
             other_service_dict,
@@ -308,9 +313,6 @@ class ServiceExtendsResolver(object):
         if 'file' in extends_options:
             return expand_path(self.working_dir, extends_options['file'])
         return self.filename
-
-    def signature(self, name):
-        return self.filename, name
 
 
 def resolve_environment(working_dir, service_dict):

@@ -1080,18 +1080,19 @@ class ExtendsTest(unittest.TestCase):
         ]))
 
     def test_circular(self):
-        try:
+        with pytest.raises(config.CircularReference) as exc:
             load_from_filename('tests/fixtures/extends/circle-1.yml')
-            raise Exception("Expected config.CircularReference to be raised")
-        except config.CircularReference as e:
-            self.assertEqual(
-                [(os.path.basename(filename), service_name) for (filename, service_name) in e.trail],
-                [
-                    ('circle-1.yml', 'web'),
-                    ('circle-2.yml', 'web'),
-                    ('circle-1.yml', 'web'),
-                ],
-            )
+
+        path = [
+            (os.path.basename(filename), service_name)
+            for (filename, service_name) in exc.value.trail
+        ]
+        expected = [
+            ('circle-1.yml', 'web'),
+            ('circle-2.yml', 'other'),
+            ('circle-1.yml', 'web'),
+        ]
+        self.assertEqual(path, expected)
 
     def test_extends_validation_empty_dictionary(self):
         with self.assertRaisesRegexp(ConfigurationError, 'service'):

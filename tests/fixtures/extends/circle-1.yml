@@ -5,7 +5,7 @@ bar:
 web:
   extends:
     file: circle-2.yml
-    service: web
+    service: other
 baz:
   image: busybox
 quux:
