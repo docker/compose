@@ -410,7 +410,7 @@ class ServiceTest(unittest.TestCase):
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
-            'volumes_from': ['two'],
+            'volumes_from': [('two', 'rw')],
         }
         self.assertEqual(config_dict, expected)
 
