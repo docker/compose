@@ -913,14 +913,15 @@ def merge_volume_bindings(volumes_option, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
+    volumes = [parse_volume_spec(volume) for volume in volumes_option or []]
     volume_bindings = dict(
-        build_volume_binding(parse_volume_spec(volume))
-        for volume in volumes_option or []
-        if ':' in volume)
+        build_volume_binding(volume)
+        for volume in volumes
+        if volume.external)
 
     if previous_container:
         volume_bindings.update(
-            get_container_data_volumes(previous_container, volumes_option))
+            get_container_data_volumes(previous_container, volumes))
 
     return list(volume_bindings.values())
 
@@ -931,12 +932,14 @@ def get_container_data_volumes(container, volumes_option):
     """
     volumes = []
 
-    volumes_option = volumes_option or []
     container_volumes = container.get('Volumes') or {}
-    image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
+    image_volumes = [
+        parse_volume_spec(volume)
+        for volume in
+        container.image_config['ContainerConfig'].get('Volumes') or {}
+    ]
 
-    for volume in set(volumes_option + list(image_volumes)):
-        volume = parse_volume_spec(volume)
+    for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
         if volume.external:
             continue

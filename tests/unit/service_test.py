@@ -593,11 +593,11 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(binding, ('/inside', '/outside:/inside:rw'))
 
     def test_get_container_data_volumes(self):
-        options = [
+        options = [parse_volume_spec(v) for v in [
             '/host/volume:/host/volume:ro',
             '/new/volume',
             '/existing/volume',
-        ]
+        ]]
 
         self.mock_client.inspect_image.return_value = {
             'ContainerConfig': {
