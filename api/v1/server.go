@@ -49,12 +49,11 @@ func (s *server) signalPid(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	e := &containerd.SignalEvent{
-		ID:     id,
-		Pid:    pid,
-		Signal: syscall.Signal(signal.Signal),
-		Err:    make(chan error, 1),
-	}
+
+	e := containerd.NewEvent(containerd.SignalEventType)
+	e.ID = id
+	e.Pid = pid
+	e.Signal = syscall.Signal(signal.Signal)
 	s.supervisor.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		status := http.StatusInternalServerError
@@ -69,9 +68,7 @@ func (s *server) signalPid(w http.ResponseWriter, r *http.Request) {
 func (s *server) containers(w http.ResponseWriter, r *http.Request) {
 	var state State
 	state.Containers = []Container{}
-	e := &containerd.GetContainersEvent{
-		Err: make(chan error, 1),
-	}
+	e := containerd.NewEvent(containerd.GetContainerEventType)
 	s.supervisor.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -112,11 +109,9 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "empty bundle path", http.StatusBadRequest)
 		return
 	}
-	e := &containerd.StartContainerEvent{
-		ID:         id,
-		BundlePath: c.BundlePath,
-		Err:        make(chan error, 1),
-	}
+	e := containerd.NewEvent(containerd.StartContainerEventType)
+	e.ID = id
+	e.BundlePath = c.BundlePath
 	s.supervisor.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		code := http.StatusInternalServerError

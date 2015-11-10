@@ -54,7 +54,7 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 	if err != nil {
 		return err
 	}
-	events := make(chan containerd.Event, bufferSize)
+	events := make(chan *containerd.Event, bufferSize)
 	// start the signal handler in the background.
 	go startSignalHandler(supervisor, bufferSize)
 	if err := supervisor.Start(events); err != nil {
@@ -71,6 +71,7 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 	for s := range signals {
 		switch s {
 		case syscall.SIGTERM, syscall.SIGINT, syscall.SIGSTOP:
+			supervisor.Close()
 			os.Exit(0)
 		case syscall.SIGCHLD:
 			exits, err := reap()
@@ -84,7 +85,7 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 	}
 }
 
-func reap() (exits []*containerd.ExitEvent, err error) {
+func reap() (exits []*containerd.Event, err error) {
 	var (
 		ws  syscall.WaitStatus
 		rus syscall.Rusage
@@ -100,9 +101,9 @@ func reap() (exits []*containerd.ExitEvent, err error) {
 		if pid <= 0 {
 			return exits, nil
 		}
-		exits = append(exits, &containerd.ExitEvent{
-			Pid:    pid,
-			Status: utils.ExitStatus(ws),
-		})
+		e := containerd.NewEvent(containerd.ExitEventType)
+		e.Pid = pid
+		e.Status = utils.ExitStatus(ws)
+		exits = append(exits, e)
 	}
 }

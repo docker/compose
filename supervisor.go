@@ -2,6 +2,7 @@ package containerd
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -18,11 +19,16 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 	if err != nil {
 		return nil, err
 	}
+	j, err := newJournal(filepath.Join(stateDir, "journal.json"))
+	if err != nil {
+		return nil, err
+	}
 	s := &Supervisor{
 		stateDir:   stateDir,
 		containers: make(map[string]Container),
 		runtime:    runtime,
 		tasks:      make(chan *startTask, concurrency*100),
+		journal:    j,
 	}
 	for i := 0; i < concurrency; i++ {
 		s.workerGroup.Add(1)
@@ -39,24 +45,33 @@ type Supervisor struct {
 
 	runtime Runtime
 
-	events      chan Event
+	journal *journal
+
+	events      chan *Event
 	tasks       chan *startTask
 	workerGroup sync.WaitGroup
+}
+
+func (s *Supervisor) Close() error {
+	return s.journal.Close()
 }
 
 // Start is a non-blocking call that runs the supervisor for monitoring contianer processes and
 // executing new containers.
 //
 // This event loop is the only thing that is allowed to modify state of containers and processes.
-func (s *Supervisor) Start(events chan Event) error {
+func (s *Supervisor) Start(events chan *Event) error {
 	if events == nil {
 		return ErrEventChanNil
 	}
 	s.events = events
 	go func() {
-		for evt := range events {
-			switch e := evt.(type) {
-			case *ExitEvent:
+		for e := range events {
+			if err := s.journal.write(e); err != nil {
+				logrus.WithField("error", err).Error("write journal entry")
+			}
+			switch e.Type {
+			case ExitEventType:
 				logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
 					Debug("containerd: process exited")
 				container, err := s.getContainerForPid(e.Pid)
@@ -70,7 +85,7 @@ func (s *Supervisor) Start(events chan Event) error {
 				if err := s.deleteContainer(container); err != nil {
 					logrus.WithField("error", err).Error("containerd: deleting container")
 				}
-			case *StartContainerEvent:
+			case StartContainerEventType:
 				container, err := s.runtime.Create(e.ID, e.BundlePath)
 				if err != nil {
 					e.Err <- err
@@ -81,18 +96,18 @@ func (s *Supervisor) Start(events chan Event) error {
 					err:       e.Err,
 					container: container,
 				}
-			case *ContainerStartErrorEvent:
+			case ContainerStartErrorEventType:
 				if container, ok := s.containers[e.ID]; ok {
 					if err := s.deleteContainer(container); err != nil {
 						logrus.WithField("error", err).Error("containerd: deleting container")
 					}
 				}
-			case *GetContainersEvent:
+			case GetContainerEventType:
 				for _, c := range s.containers {
 					e.Containers = append(e.Containers, c)
 				}
 				e.Err <- nil
-			case *SignalEvent:
+			case SignalEventType:
 				container, ok := s.containers[e.ID]
 				if !ok {
 					e.Err <- ErrContainerNotFound
@@ -139,7 +154,7 @@ func (s *Supervisor) getContainerForPid(pid int) (Container, error) {
 	return nil, errNoContainerForPid
 }
 
-func (s *Supervisor) SendEvent(evt Event) {
+func (s *Supervisor) SendEvent(evt *Event) {
 	s.events <- evt
 }
 
@@ -152,9 +167,9 @@ func (s *Supervisor) startContainerWorker(tasks chan *startTask) {
 	defer s.workerGroup.Done()
 	for t := range tasks {
 		if err := t.container.Start(); err != nil {
-			s.SendEvent(&ContainerStartErrorEvent{
-				ID: t.container.ID(),
-			})
+			e := NewEvent(StartContainerEventType)
+			e.ID = t.container.ID()
+			s.SendEvent(e)
 			t.err <- err
 			continue
 		}
