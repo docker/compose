@@ -12,6 +12,7 @@ from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import ConfigError
 from compose.service import ContainerNet
@@ -433,6 +434,47 @@ class ServiceTest(unittest.TestCase):
             links=[(Service('one'), 'one')],
             use_networking=True)
         self.assertEqual(service._get_links(link_to_self=True), [])
+
+
+def sort_by_name(dictionary_list):
+    return sorted(dictionary_list, key=lambda k: k['name'])
+
+
+class BuildUlimitsTestCase(unittest.TestCase):
+
+    def test_build_ulimits_with_dict(self):
+        ulimits = build_ulimits(
+            {
+                'nofile': {'soft': 10000, 'hard': 20000},
+                'nproc': {'soft': 65535, 'hard': 65535}
+            }
+        )
+        expected = [
+            {'name': 'nofile', 'soft': 10000, 'hard': 20000},
+            {'name': 'nproc', 'soft': 65535, 'hard': 65535}
+        ]
+        assert sort_by_name(ulimits) == sort_by_name(expected)
+
+    def test_build_ulimits_with_ints(self):
+        ulimits = build_ulimits({'nofile': 20000, 'nproc': 65535})
+        expected = [
+            {'name': 'nofile', 'soft': 20000, 'hard': 20000},
+            {'name': 'nproc', 'soft': 65535, 'hard': 65535}
+        ]
+        assert sort_by_name(ulimits) == sort_by_name(expected)
+
+    def test_build_ulimits_with_integers_and_dicts(self):
+        ulimits = build_ulimits(
+            {
+                'nproc': 65535,
+                'nofile': {'soft': 10000, 'hard': 20000}
+            }
+        )
+        expected = [
+            {'name': 'nofile', 'soft': 10000, 'hard': 20000},
+            {'name': 'nproc', 'soft': 65535, 'hard': 65535}
+        ]
+        assert sort_by_name(ulimits) == sort_by_name(expected)
 
 
 class NetTestCase(unittest.TestCase):
