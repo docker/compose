@@ -242,19 +242,24 @@ class ProjectTest(DockerClientTestCase):
         db_container = db.create_container()
 
         project.start(service_names=['web'])
-        self.assertEqual(set(c.name for c in project.containers()), set([web_container_1.name, web_container_2.name]))
+        self.assertEqual(
+            set(c.name for c in project.containers()),
+            set([web_container_1.name, web_container_2.name]))
 
         project.start()
-        self.assertEqual(set(c.name for c in project.containers()),
-                         set([web_container_1.name, web_container_2.name, db_container.name]))
+        self.assertEqual(
+            set(c.name for c in project.containers()),
+            set([web_container_1.name, web_container_2.name, db_container.name]))
 
         project.pause(service_names=['web'])
-        self.assertEqual(set([c.name for c in project.containers() if c.is_paused]),
-                         set([web_container_1.name, web_container_2.name]))
+        self.assertEqual(
+            set([c.name for c in project.containers() if c.is_paused]),
+            set([web_container_1.name, web_container_2.name]))
 
         project.pause()
-        self.assertEqual(set([c.name for c in project.containers() if c.is_paused]),
-                         set([web_container_1.name, web_container_2.name, db_container.name]))
+        self.assertEqual(
+            set([c.name for c in project.containers() if c.is_paused]),
+            set([web_container_1.name, web_container_2.name, db_container.name]))
 
         project.unpause(service_names=['db'])
         self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 2)

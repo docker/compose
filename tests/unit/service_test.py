@@ -146,7 +146,13 @@ class ServiceTest(unittest.TestCase):
     def test_memory_swap_limit(self):
         self.mock_client.create_host_config.return_value = {}
 
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, mem_limit=1000000000, memswap_limit=2000000000)
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            mem_limit=1000000000,
+            memswap_limit=2000000000)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -162,7 +168,12 @@ class ServiceTest(unittest.TestCase):
     def test_cgroup_parent(self):
         self.mock_client.create_host_config.return_value = {}
 
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, cgroup_parent='test')
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            cgroup_parent='test')
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -176,7 +187,13 @@ class ServiceTest(unittest.TestCase):
 
         log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
         logging = {'driver': 'syslog', 'options': log_opt}
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, logging=logging)
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            log_driver='syslog',
+            logging=logging)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -348,11 +365,18 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(parse_repository_tag("user/repo"), ("user/repo", "", ":"))
         self.assertEqual(parse_repository_tag("user/repo:tag"), ("user/repo", "tag", ":"))
         self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", "", ":"))
-        self.assertEqual(parse_repository_tag("url:5000/repo:tag"), ("url:5000/repo", "tag", ":"))
-
-        self.assertEqual(parse_repository_tag("root@sha256:digest"), ("root", "sha256:digest", "@"))
-        self.assertEqual(parse_repository_tag("user/repo@sha256:digest"), ("user/repo", "sha256:digest", "@"))
-        self.assertEqual(parse_repository_tag("url:5000/repo@sha256:digest"), ("url:5000/repo", "sha256:digest", "@"))
+        self.assertEqual(
+            parse_repository_tag("url:5000/repo:tag"),
+            ("url:5000/repo", "tag", ":"))
+        self.assertEqual(
+            parse_repository_tag("root@sha256:digest"),
+            ("root", "sha256:digest", "@"))
+        self.assertEqual(
+            parse_repository_tag("user/repo@sha256:digest"),
+            ("user/repo", "sha256:digest", "@"))
+        self.assertEqual(
+            parse_repository_tag("url:5000/repo@sha256:digest"),
+            ("url:5000/repo", "sha256:digest", "@"))
 
     def test_create_container_with_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})

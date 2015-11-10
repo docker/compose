@@ -195,7 +195,9 @@ class Service(object):
 
             if num_running != len(all_containers):
                 # we have some stopped containers, let's start them up again
-                stopped_containers = sorted([c for c in all_containers if not c.is_running], key=attrgetter('number'))
+                stopped_containers = sorted(
+                    (c for c in all_containers if not c.is_running),
+                    key=attrgetter('number'))
 
                 num_stopped = len(stopped_containers)
 

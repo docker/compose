@@ -148,7 +148,9 @@ class GetContainerNameTestCase(unittest.TestCase):
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
         self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
-        self.assertEqual(get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}), 'myproject_db_1')
+        self.assertEqual(
+            get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}),
+            'myproject_db_1')
         self.assertEqual(
             get_container_name({
                 'Names': [

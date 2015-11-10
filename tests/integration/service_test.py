@@ -128,7 +128,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', read_only=read_only)
         container = service.create_container()
         service.start_container(container)
-        self.assertEqual(container.get('HostConfig.ReadonlyRootfs'), read_only, container.get('HostConfig'))
+        assert container.get('HostConfig.ReadonlyRootfs') == read_only
 
     def test_create_container_with_security_opt(self):
         security_opt = ['label:disable']
@@ -378,7 +378,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 0)
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
-        containers = service.execute_convergence_plan(ConvergencePlan('recreate', containers), start=False)
+        containers = service.execute_convergence_plan(
+            ConvergencePlan('recreate', containers),
+            start=False)
         self.assertEqual(len(service.containers()), 0)
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
@@ -769,7 +771,9 @@ class ServiceTest(DockerClientTestCase):
         containers = service.containers()
         self.assertEqual(len(containers), 2)
         for container in containers:
-            self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
+            self.assertEqual(
+                list(container.get('HostConfig.PortBindings')),
+                ['8000/tcp'])
 
     def test_scale_with_immediate_exit(self):
         service = self.create_service('web', image='busybox', command='true')
@@ -846,7 +850,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.get('Config.WorkingDir'), '/working/dir/sample')
 
     def test_split_env(self):
-        service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
+        service = self.create_service(
+            'web',
+            environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
         env = create_and_start_container(service).environment
         for k, v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.items():
             self.assertEqual(env[k], v)
