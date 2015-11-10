@@ -95,7 +95,7 @@ def stream_as_text(stream):
     """
     for data in stream:
         if not isinstance(data, six.text_type):
-            data = data.decode('utf-8')
+            data = data.decode('utf-8', 'replace')
         yield data
 
 
