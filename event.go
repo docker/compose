@@ -35,3 +35,12 @@ type ContainerStartErrorEvent struct {
 func (c *ContainerStartErrorEvent) String() string {
 	return "container start error"
 }
+
+type GetContainersEvent struct {
+	Containers []Container
+	Err        chan error
+}
+
+func (c *GetContainersEvent) String() string {
+	return "get containers"
+}

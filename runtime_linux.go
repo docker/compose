@@ -163,10 +163,15 @@ type libcontainerContainer struct {
 	initProcess *libcontainer.Process
 	exitStatus  int
 	exited      bool
+	path        string
 }
 
 func (c *libcontainerContainer) ID() string {
 	return c.c.ID()
+}
+
+func (c *libcontainerContainer) Path() string {
+	return c.path
 }
 
 func (c *libcontainerContainer) Pid() (int, error) {
@@ -185,6 +190,10 @@ func (c *libcontainerContainer) SetExited(status int) {
 
 func (c *libcontainerContainer) Delete() error {
 	return c.c.Destroy()
+}
+
+func (c *libcontainerContainer) Processes() ([]int, error) {
+	return c.c.Processes()
 }
 
 func NewRuntime(stateDir string) (Runtime, error) {
@@ -225,6 +234,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
 	c := &libcontainerContainer{
 		c:           container,
 		initProcess: process,
+		path:        bundlePath,
 	}
 	return c, nil
 }
@@ -380,16 +390,16 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 		AllowedDevices: append(devices, allowedDevices...),
 	}
 	r := spec.Linux.Resources
-	c.Memory = r.Memory.Limit
-	c.MemoryReservation = r.Memory.Reservation
-	c.MemorySwap = r.Memory.Swap
-	c.KernelMemory = r.Memory.Kernel
-	c.MemorySwappiness = r.Memory.Swappiness
-	c.CpuShares = r.CPU.Shares
-	c.CpuQuota = r.CPU.Quota
-	c.CpuPeriod = r.CPU.Period
-	c.CpuRtRuntime = r.CPU.RealtimeRuntime
-	c.CpuRtPeriod = r.CPU.RealtimePeriod
+	c.Memory = int64(r.Memory.Limit)
+	c.MemoryReservation = int64(r.Memory.Reservation)
+	c.MemorySwap = int64(r.Memory.Swap)
+	c.KernelMemory = int64(r.Memory.Kernel)
+	c.MemorySwappiness = int64(r.Memory.Swappiness)
+	c.CpuShares = int64(r.CPU.Shares)
+	c.CpuQuota = int64(r.CPU.Quota)
+	c.CpuPeriod = int64(r.CPU.Period)
+	c.CpuRtRuntime = int64(r.CPU.RealtimeRuntime)
+	c.CpuRtPeriod = int64(r.CPU.RealtimePeriod)
 	c.CpusetCpus = r.CPU.Cpus
 	c.CpusetMems = r.CPU.Mems
 	c.BlkioWeight = r.BlockIO.Weight
@@ -425,7 +435,7 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 	for _, m := range r.Network.Priorities {
 		c.NetPrioIfpriomap = append(c.NetPrioIfpriomap, &configs.IfPrioMap{
 			Interface: m.Name,
-			Priority:  m.Priority,
+			Priority:  int64(m.Priority),
 		})
 	}
 	return c, nil

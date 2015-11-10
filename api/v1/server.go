@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/containerd"
 	"github.com/gorilla/mux"
 )
@@ -30,7 +31,34 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) containers(w http.ResponseWriter, r *http.Request) {
-
+	var state State
+	state.Containers = []Container{}
+	e := &containerd.GetContainersEvent{
+		Err: make(chan error, 1),
+	}
+	s.supervisor.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for _, c := range e.Containers {
+		processes, err := c.Processes()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"error":     err,
+				"container": c.ID(),
+			}).Error("get processes for container")
+		}
+		state.Containers = append(state.Containers, Container{
+			ID:         c.ID(),
+			BundlePath: c.Path(),
+			Processes:  processes,
+		})
+	}
+	if err := json.NewEncoder(w).Encode(&state); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *server) events(w http.ResponseWriter, r *http.Request) {

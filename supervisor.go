@@ -87,6 +87,11 @@ func (s *Supervisor) Start(events chan Event) error {
 						logrus.WithField("error", err).Error("containerd: deleting container")
 					}
 				}
+			case *GetContainersEvent:
+				for _, c := range s.containers {
+					e.Containers = append(e.Containers, c)
+				}
+				e.Err <- nil
 			}
 		}
 	}()
