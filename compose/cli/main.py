@@ -185,10 +185,11 @@ class TopLevelCommand(DocoptCommand):
             --no-cache  Do not use cache when building the image.
             --pull      Always attempt to pull a newer version of the image.
         """
-        force_rm = bool(options.get('--force-rm', False))
-        no_cache = bool(options.get('--no-cache', False))
-        pull = bool(options.get('--pull', False))
-        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull, force_rm=force_rm)
+        project.build(
+            service_names=options['SERVICE'],
+            no_cache=bool(options.get('--no-cache', False)),
+            pull=bool(options.get('--pull', False)),
+            force_rm=bool(options.get('--force-rm', False)))
 
     def help(self, project, options):
         """
