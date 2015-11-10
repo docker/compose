@@ -176,6 +176,19 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         containers = self.run_up(next_cfg)
         self.assertEqual(len(containers), 2)
 
+    def test_service_recreated_when_dependency_created(self):
+        containers = self.run_up(self.cfg, service_names=['web'], start_deps=False)
+        self.assertEqual(len(containers), 1)
+
+        containers = self.run_up(self.cfg)
+        self.assertEqual(len(containers), 3)
+
+        web, = [c for c in containers if c.service == 'web']
+        nginx, = [c for c in containers if c.service == 'nginx']
+
+        self.assertEqual(web.links(), ['composetest_db_1', 'db', 'db_1'])
+        self.assertEqual(nginx.links(), ['composetest_web_1', 'web', 'web_1'])
+
 
 class ServiceStateTest(DockerClientTestCase):
     """Test cases for Service.convergence_plan."""
