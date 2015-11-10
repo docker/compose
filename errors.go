@@ -11,7 +11,8 @@ var (
 	ErrProcessNotFound   = errors.New("containerd: processs not found for container")
 
 	// Internal errors
-	errShutdown          = errors.New("containerd: supervisor is shutdown")
-	errRootNotAbs        = errors.New("containerd: rootfs path is not an absolute path")
-	errNoContainerForPid = errors.New("containerd: pid not registered for any container")
+	errShutdown             = errors.New("containerd: supervisor is shutdown")
+	errRootNotAbs           = errors.New("containerd: rootfs path is not an absolute path")
+	errNoContainerForPid    = errors.New("containerd: pid not registered for any container")
+	errInvalidContainerType = errors.New("containerd: invalid container type for runtime")
 )

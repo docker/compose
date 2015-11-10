@@ -5,9 +5,24 @@ type State struct {
 }
 
 type Container struct {
-	ID         string `json:"id,omitempty"`
-	BundlePath string `json:"bundlePath,omitempty"`
-	Processes  []int  `json:"processes,omitempty"`
+	ID         string    `json:"id,omitempty"`
+	BundlePath string    `json:"bundlePath,omitempty"`
+	Processes  []Process `json:"processes,omitempty"`
+}
+
+type User struct {
+	UID            uint32   `json:"uid"`
+	GID            uint32   `json:"gid"`
+	AdditionalGids []uint32 `json:"additionalGids,omitempty"`
+}
+
+type Process struct {
+	Terminal bool     `json:"terminal,omitempty"`
+	User     User     `json:"user,omitempty"`
+	Args     []string `json:"args,omitempty"`
+	Env      []string `json:"env,omitempty"`
+	Cwd      string   `json:"cwd,omitempty"`
+	Pid      int      `json:"pid,omitempty"`
 }
 
 type Signal struct {

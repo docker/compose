@@ -1,9 +1,14 @@
 package containerd
 
-import "os"
+import (
+	"os"
+
+	"github.com/opencontainers/specs"
+)
 
 type Process interface {
-	Pid() int
+	Pid() (int, error)
+	Spec() specs.Process
 	Signal(os.Signal) error
 }
 

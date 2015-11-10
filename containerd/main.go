@@ -25,6 +25,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		DaemonCommand,
+		JournalCommand,
 	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{Name: "debug", Usage: "enable debug output in the logs"},

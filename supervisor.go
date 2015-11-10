@@ -52,6 +52,8 @@ type Supervisor struct {
 	workerGroup sync.WaitGroup
 }
 
+// need proper close logic for jobs and stuff so that sending to the channels dont panic
+// but can complete jobs
 func (s *Supervisor) Close() error {
 	return s.journal.Close()
 }
@@ -82,9 +84,9 @@ func (s *Supervisor) Start(events chan *Event) error {
 					continue
 				}
 				container.SetExited(e.Status)
-				if err := s.deleteContainer(container); err != nil {
-					logrus.WithField("error", err).Error("containerd: deleting container")
-				}
+				ne := NewEvent(DeleteEventType)
+				ne.ID = container.ID()
+				s.SendEvent(ne)
 			case StartContainerEventType:
 				container, err := s.runtime.Create(e.ID, e.BundlePath)
 				if err != nil {
@@ -96,7 +98,8 @@ func (s *Supervisor) Start(events chan *Event) error {
 					err:       e.Err,
 					container: container,
 				}
-			case ContainerStartErrorEventType:
+				continue
+			case DeleteEventType:
 				if container, ok := s.containers[e.ID]; ok {
 					if err := s.deleteContainer(container); err != nil {
 						logrus.WithField("error", err).Error("containerd: deleting container")
@@ -106,7 +109,6 @@ func (s *Supervisor) Start(events chan *Event) error {
 				for _, c := range s.containers {
 					e.Containers = append(e.Containers, c)
 				}
-				e.Err <- nil
 			case SignalEventType:
 				container, ok := s.containers[e.ID]
 				if !ok {
@@ -119,13 +121,30 @@ func (s *Supervisor) Start(events chan *Event) error {
 					continue
 				}
 				for _, p := range processes {
-					if p.Pid() == e.Pid {
+					if pid, err := p.Pid(); err == nil && pid == e.Pid {
 						e.Err <- p.Signal(e.Signal)
 						continue
 					}
 				}
 				e.Err <- ErrProcessNotFound
+				continue
+			case AddProcessEventType:
+				container, ok := s.containers[e.ID]
+				if !ok {
+					e.Err <- ErrContainerNotFound
+					continue
+				}
+				p, err := s.runtime.StartProcess(container, *e.Process)
+				if err != nil {
+					e.Err <- err
+					continue
+				}
+				if e.Pid, err = p.Pid(); err != nil {
+					e.Err <- err
+					continue
+				}
 			}
+			close(e.Err)
 		}
 	}()
 	return nil

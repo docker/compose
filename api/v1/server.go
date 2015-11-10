@@ -9,6 +9,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/containerd"
 	"github.com/gorilla/mux"
+	"github.com/opencontainers/specs"
 )
 
 func NewServer(supervisor *containerd.Supervisor) http.Handler {
@@ -18,9 +19,10 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 		r:          r,
 	}
 	r.HandleFunc("/containers/{id:.*}/process/{pid:.*}", s.signalPid).Methods("POST")
+	r.HandleFunc("/containers/{id:.*}/process", s.addProcess).Methods("PUT")
 	r.HandleFunc("/containers/{id:.*}", s.createContainer).Methods("POST")
+	r.HandleFunc("/event", s.event).Methods("POST")
 	r.HandleFunc("/containers", s.containers).Methods("GET")
-	//	r.HandleFunc("/containers/{id:.*}", s.deleteContainer).Methods("DELETE")
 	return s
 }
 
@@ -31,6 +33,57 @@ type server struct {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.r.ServeHTTP(w, r)
+}
+
+func (s *server) event(w http.ResponseWriter, r *http.Request) {
+	var e containerd.Event
+	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	e.Err = make(chan error, 1)
+	s.supervisor.SendEvent(&e)
+	if err := <-e.Err; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if e.Containers != nil && len(e.Containers) > 0 {
+		if err := writeContainers(w, &e); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (s *server) addProcess(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var process specs.Process
+	if err := json.NewDecoder(r.Body).Decode(&process); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	e := containerd.NewEvent(containerd.AddProcessEventType)
+	e.ID = id
+	e.Process = &process
+	s.supervisor.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	p := Process{
+		Pid:      e.Pid,
+		Terminal: process.Terminal,
+		Args:     process.Args,
+		Env:      process.Env,
+		Cwd:      process.Cwd,
+	}
+	p.User.UID = process.User.UID
+	p.User.GID = process.User.GID
+	p.User.AdditionalGids = process.User.AdditionalGids
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *server) signalPid(w http.ResponseWriter, r *http.Request) {
@@ -66,14 +119,21 @@ func (s *server) signalPid(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) containers(w http.ResponseWriter, r *http.Request) {
-	var state State
-	state.Containers = []Container{}
 	e := containerd.NewEvent(containerd.GetContainerEventType)
 	s.supervisor.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := writeContainers(w, e); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func writeContainers(w http.ResponseWriter, e *containerd.Event) error {
+	var state State
+	state.Containers = []Container{}
 	for _, c := range e.Containers {
 		processes, err := c.Processes()
 		if err != nil {
@@ -82,9 +142,10 @@ func (s *server) containers(w http.ResponseWriter, r *http.Request) {
 				"container": c.ID(),
 			}).Error("get processes for container")
 		}
-		var pids []int
+		var pids []Process
 		for _, p := range processes {
-			pids = append(pids, p.Pid())
+			proc := createProcess(p)
+			pids = append(pids, proc)
 		}
 		state.Containers = append(state.Containers, Container{
 			ID:         c.ID(),
@@ -92,10 +153,26 @@ func (s *server) containers(w http.ResponseWriter, r *http.Request) {
 			Processes:  pids,
 		})
 	}
-	if err := json.NewEncoder(w).Encode(&state); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	return json.NewEncoder(w).Encode(&state)
+}
+
+func createProcess(in containerd.Process) Process {
+	pid, err := in.Pid()
+	if err != nil {
+		logrus.WithField("error", err).Error("get process pid")
 	}
+	process := in.Spec()
+	p := Process{
+		Pid:      pid,
+		Terminal: process.Terminal,
+		Args:     process.Args,
+		Env:      process.Env,
+		Cwd:      process.Cwd,
+	}
+	p.User.UID = process.User.UID
+	p.User.GID = process.User.GID
+	p.User.AdditionalGids = process.User.AdditionalGids
+	return p
 }
 
 func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {

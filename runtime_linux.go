@@ -14,6 +14,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	_ "github.com/opencontainers/runc/libcontainer/nsenter"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/specs"
 )
@@ -159,27 +160,34 @@ func init() {
 }
 
 type libcontainerProcess struct {
-	pid int
+	process *libcontainer.Process
+	spec    specs.Process
 }
 
-func (p *libcontainerProcess) Pid() int {
-	return p.pid
+// change interface to support an error
+func (p *libcontainerProcess) Pid() (int, error) {
+	pid, err := p.process.Pid()
+	if err != nil {
+		return -1, err
+	}
+	return pid, nil
+}
+
+func (p *libcontainerProcess) Spec() specs.Process {
+	return p.spec
 }
 
 func (p *libcontainerProcess) Signal(s os.Signal) error {
-	proc, err := os.FindProcess(p.pid)
-	if err != nil {
-		return err
-	}
-	return proc.Signal(s)
+	return p.process.Signal(s)
 }
 
 type libcontainerContainer struct {
-	c           libcontainer.Container
-	initProcess *libcontainer.Process
-	exitStatus  int
-	exited      bool
-	path        string
+	c                   libcontainer.Container
+	initProcess         *libcontainerProcess
+	additionalProcesses []*libcontainerProcess
+	exitStatus          int
+	exited              bool
+	path                string
 }
 
 func (c *libcontainerContainer) ID() string {
@@ -195,7 +203,7 @@ func (c *libcontainerContainer) Pid() (int, error) {
 }
 
 func (c *libcontainerContainer) Start() error {
-	return c.c.Start(c.initProcess)
+	return c.c.Start(c.initProcess.process)
 }
 
 func (c *libcontainerContainer) SetExited(status int) {
@@ -209,17 +217,13 @@ func (c *libcontainerContainer) Delete() error {
 }
 
 func (c *libcontainerContainer) Processes() ([]Process, error) {
-	pids, err := c.c.Processes()
-	if err != nil {
-		return nil, err
+	procs := []Process{
+		c.initProcess,
 	}
-	var proceses []Process
-	for _, pid := range pids {
-		proceses = append(proceses, &libcontainerProcess{
-			pid: pid,
-		})
+	for _, p := range c.additionalProcesses {
+		procs = append(procs, p)
 	}
-	return proceses, nil
+	return procs, nil
 }
 
 func NewRuntime(stateDir string) (Runtime, error) {
@@ -258,11 +262,31 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
 	}
 	process := r.newProcess(spec.Process)
 	c := &libcontainerContainer{
-		c:           container,
-		initProcess: process,
-		path:        bundlePath,
+		c: container,
+		initProcess: &libcontainerProcess{
+			process: process,
+			spec:    spec.Process,
+		},
+		path: bundlePath,
 	}
 	return c, nil
+}
+
+func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process) (Process, error) {
+	c, ok := ci.(*libcontainerContainer)
+	if !ok {
+		return nil, errInvalidContainerType
+	}
+	process := r.newProcess(p)
+	if err := c.c.Start(process); err != nil {
+		return nil, err
+	}
+	lp := &libcontainerProcess{
+		process: process,
+		spec:    p,
+	}
+	c.additionalProcesses = append(c.additionalProcesses, lp)
+	return lp, nil
 }
 
 // newProcess returns a new libcontainer Process with the arguments from the
