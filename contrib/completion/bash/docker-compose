@@ -93,7 +93,7 @@ __docker_compose_services_stopped() {
 _docker_compose_build() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --force-rm --no-cache --pull" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--force-rm --help --no-cache --pull" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_build
