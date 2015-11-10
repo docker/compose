@@ -335,8 +335,9 @@ Override the default labeling scheme for each container.
 
 ### ulimits
 
-Override the default ulimits for a container. You can either use a number
-to set the hard and soft limits, or specify them in a dictionary.
+Override the default ulimits for a container. You can either specify a single
+limit as an integer or soft/hard limits as a mapping.
+
 
       ulimits:
         nproc: 65535
