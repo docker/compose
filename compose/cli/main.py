@@ -80,6 +80,7 @@ def main():
             "If you encounter this issue regularly because of slow network conditions, consider setting "
             "COMPOSE_HTTP_TIMEOUT to a higher value (current value: %s)." % HTTP_TIMEOUT
         )
+        sys.exit(1)
 
 
 def setup_logging():
