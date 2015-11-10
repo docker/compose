@@ -9,3 +9,7 @@ type Container struct {
 	BundlePath string `json:"bundlePath,omitempty"`
 	Processes  []int  `json:"processes,omitempty"`
 }
+
+type Signal struct {
+	Signal int `json:"signal"`
+}

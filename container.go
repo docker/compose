@@ -1,5 +1,12 @@
 package containerd
 
+import "os"
+
+type Process interface {
+	Pid() int
+	Signal(os.Signal) error
+}
+
 type Container interface {
 	ID() string
 	Start() error
@@ -7,5 +14,5 @@ type Container interface {
 	Pid() (int, error)
 	SetExited(status int)
 	Delete() error
-	Processes() ([]int, error)
+	Processes() ([]Process, error)
 }

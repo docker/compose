@@ -8,6 +8,7 @@ var (
 	ErrBundleNotFound    = errors.New("containerd: bundle not found")
 	ErrContainerNotFound = errors.New("containerd: container not found")
 	ErrContainerExists   = errors.New("containerd: container already exists")
+	ErrProcessNotFound   = errors.New("containerd: processs not found for container")
 
 	// Internal errors
 	errShutdown          = errors.New("containerd: supervisor is shutdown")

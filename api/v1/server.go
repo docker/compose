@@ -3,6 +3,8 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/containerd"
@@ -15,9 +17,10 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 		supervisor: supervisor,
 		r:          r,
 	}
-	r.HandleFunc("/containers", s.containers).Methods("GET")
+	r.HandleFunc("/containers/{id:.*}/process/{pid:.*}", s.signalPid).Methods("POST")
 	r.HandleFunc("/containers/{id:.*}", s.createContainer).Methods("POST")
-	r.HandleFunc("/containers/{id:.*}", s.deleteContainer).Methods("DELETE")
+	r.HandleFunc("/containers", s.containers).Methods("GET")
+	//	r.HandleFunc("/containers/{id:.*}", s.deleteContainer).Methods("DELETE")
 	return s
 }
 
@@ -28,6 +31,39 @@ type server struct {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.r.ServeHTTP(w, r)
+}
+
+func (s *server) signalPid(w http.ResponseWriter, r *http.Request) {
+	var (
+		vars = mux.Vars(r)
+		id   = vars["id"]
+		spid = vars["pid"]
+	)
+	pid, err := strconv.Atoi(spid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var signal Signal
+	if err := json.NewDecoder(r.Body).Decode(&signal); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	e := &containerd.SignalEvent{
+		ID:     id,
+		Pid:    pid,
+		Signal: syscall.Signal(signal.Signal),
+		Err:    make(chan error, 1),
+	}
+	s.supervisor.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		status := http.StatusInternalServerError
+		if err == containerd.ErrContainerNotFound {
+			status = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
 }
 
 func (s *server) containers(w http.ResponseWriter, r *http.Request) {
@@ -49,10 +85,14 @@ func (s *server) containers(w http.ResponseWriter, r *http.Request) {
 				"container": c.ID(),
 			}).Error("get processes for container")
 		}
+		var pids []int
+		for _, p := range processes {
+			pids = append(pids, p.Pid())
+		}
 		state.Containers = append(state.Containers, Container{
 			ID:         c.ID(),
 			BundlePath: c.Path(),
-			Processes:  processes,
+			Processes:  pids,
 		})
 	}
 	if err := json.NewEncoder(w).Encode(&state); err != nil {
@@ -61,19 +101,15 @@ func (s *server) containers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *server) events(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (s *server) deleteContainer(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var c Container
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if c.BundlePath == "" {
+		http.Error(w, "empty bundle path", http.StatusBadRequest)
 		return
 	}
 	e := &containerd.StartContainerEvent{

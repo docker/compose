@@ -92,6 +92,24 @@ func (s *Supervisor) Start(events chan Event) error {
 					e.Containers = append(e.Containers, c)
 				}
 				e.Err <- nil
+			case *SignalEvent:
+				container, ok := s.containers[e.ID]
+				if !ok {
+					e.Err <- ErrContainerNotFound
+					continue
+				}
+				processes, err := container.Processes()
+				if err != nil {
+					e.Err <- err
+					continue
+				}
+				for _, p := range processes {
+					if p.Pid() == e.Pid {
+						e.Err <- p.Signal(e.Signal)
+						continue
+					}
+				}
+				e.Err <- ErrProcessNotFound
 			}
 		}
 	}()

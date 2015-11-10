@@ -158,6 +158,22 @@ func init() {
 	}
 }
 
+type libcontainerProcess struct {
+	pid int
+}
+
+func (p *libcontainerProcess) Pid() int {
+	return p.pid
+}
+
+func (p *libcontainerProcess) Signal(s os.Signal) error {
+	proc, err := os.FindProcess(p.pid)
+	if err != nil {
+		return err
+	}
+	return proc.Signal(s)
+}
+
 type libcontainerContainer struct {
 	c           libcontainer.Container
 	initProcess *libcontainer.Process
@@ -192,8 +208,18 @@ func (c *libcontainerContainer) Delete() error {
 	return c.c.Destroy()
 }
 
-func (c *libcontainerContainer) Processes() ([]int, error) {
-	return c.c.Processes()
+func (c *libcontainerContainer) Processes() ([]Process, error) {
+	pids, err := c.c.Processes()
+	if err != nil {
+		return nil, err
+	}
+	var proceses []Process
+	for _, pid := range pids {
+		proceses = append(proceses, &libcontainerProcess{
+			pid: pid,
+		})
+	}
+	return proceses, nil
 }
 
 func NewRuntime(stateDir string) (Runtime, error) {

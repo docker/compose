@@ -1,5 +1,7 @@
 package containerd
 
+import "os"
+
 type Event interface {
 	String() string
 }
@@ -43,4 +45,15 @@ type GetContainersEvent struct {
 
 func (c *GetContainersEvent) String() string {
 	return "get containers"
+}
+
+type SignalEvent struct {
+	ID     string
+	Pid    int
+	Signal os.Signal
+	Err    chan error
+}
+
+func (s *SignalEvent) String() string {
+	return "signal event"
 }
