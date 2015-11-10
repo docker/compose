@@ -66,21 +66,38 @@ def format_boolean_in_environment(instance):
     return True
 
 
-def validate_service_names(config):
-    for service_name in config.keys():
+def validate_top_level_service_objects(config_file):
+    """Perform some high level validation of the service name and value.
+
+    This validation must happen before interpolation, which must happen
+    before the rest of validation, which is why it's separate from the
+    rest of the service validation.
+    """
+    for service_name, service_dict in config_file.config.items():
         if not isinstance(service_name, six.string_types):
             raise ConfigurationError(
-                "Service name: {} needs to be a string, eg '{}'".format(
+                "In file '{}' service name: {} needs to be a string, eg '{}'".format(
+                    config_file.filename,
                     service_name,
                     service_name))
 
+        if not isinstance(service_dict, dict):
+            raise ConfigurationError(
+                "In file '{}' service '{}' doesn\'t have any configuration options. "
+                "All top level keys in your docker-compose.yml must map "
+                "to a dictionary of configuration options.".format(
+                    config_file.filename,
+                    service_name))
 
-def validate_top_level_object(config):
-    if not isinstance(config, dict):
+
+def validate_top_level_object(config_file):
+    if not isinstance(config_file.config, dict):
         raise ConfigurationError(
-            "Top level object needs to be a dictionary. Check your .yml file "
-            "that you have defined a service at the top level.")
-    validate_service_names(config)
+            "Top level object in '{}' needs to be an object not '{}'. Check "
+            "that you have defined a service at the top level.".format(
+                config_file.filename,
+                type(config_file.config)))
+    validate_top_level_service_objects(config_file)
 
 
 def validate_extends_file_path(service_name, extends_options, filename):
@@ -252,26 +269,28 @@ def process_errors(errors, service_name=None):
     return '\n'.join(format_error_message(error, service_name) for error in errors)
 
 
-def validate_against_fields_schema(config):
-    return _validate_against_schema(
+def validate_against_fields_schema(config, filename):
+    _validate_against_schema(
         config,
         "fields_schema.json",
-        ["ports", "environment"])
+        format_checker=["ports", "environment"],
+        filename=filename)
 
 
 def validate_against_service_schema(config, service_name):
-    return _validate_against_schema(
+    _validate_against_schema(
         config,
         "service_schema.json",
-        ["ports"],
-        service_name)
+        format_checker=["ports"],
+        service_name=service_name)
 
 
 def _validate_against_schema(
         config,
         schema_filename,
         format_checker=(),
-        service_name=None):
+        service_name=None,
+        filename=None):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
 
     if sys.platform == "win32":
@@ -293,6 +312,11 @@ def _validate_against_schema(
         format_checker=FormatChecker(format_checker))
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
-    if errors:
-        error_msg = process_errors(errors, service_name)
-        raise ConfigurationError("Validation failed, reason(s):\n{}".format(error_msg))
+    if not errors:
+        return
+
+    error_msg = process_errors(errors, service_name)
+    file_msg = " in file '{}'".format(filename) if filename else ''
+    raise ConfigurationError("Validation failed{}, reason(s):\n{}".format(
+        file_msg,
+        error_msg))
