@@ -658,16 +658,23 @@ def build_log_printer(containers, service_names, monochrome):
 
 def attach_to_logs(project, log_printer, service_names, timeout):
     print("Attaching to", list_containers(log_printer.containers))
-    try:
-        log_printer.run()
-    finally:
-        def handler(signal, frame):
-            project.kill(service_names=service_names)
-            sys.exit(0)
-        signal.signal(signal.SIGINT, handler)
 
+    def force_shutdown(signal, frame):
+        project.kill(service_names=service_names)
+        sys.exit(2)
+
+    def shutdown(signal, frame):
+        set_signal_handler(force_shutdown)
         print("Gracefully stopping... (press Ctrl+C again to force)")
         project.stop(service_names=service_names, timeout=timeout)
+
+    set_signal_handler(shutdown)
+    log_printer.run()
+
+
+def set_signal_handler(handler):
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
 
 
 def list_containers(containers):
