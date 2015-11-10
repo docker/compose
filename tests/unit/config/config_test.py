@@ -94,6 +94,7 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         error_msg = "Unsupported config option for 'web' service: 'name'"
         assert error_msg in exc.exconly()
+        assert "Validation failed in file 'filename.yml'" in exc.exconly()
 
     def test_load_invalid_service_definition(self):
         config_details = build_config_details(
@@ -102,11 +103,12 @@ class ConfigTest(unittest.TestCase):
             'filename.yml')
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        error_msg = "Service \"web\" doesn\'t have any configuration options"
+        error_msg = "service 'web' doesn't have any configuration options"
         assert error_msg in exc.exconly()
 
     def test_config_integer_service_name_raise_validation_error(self):
-        expected_error_msg = "Service name: 1 needs to be a string, eg '1'"
+        expected_error_msg = ("In file 'filename.yml' service name: 1 needs to "
+                              "be a string, eg '1'")
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(
@@ -156,25 +158,26 @@ class ConfigTest(unittest.TestCase):
 
     def test_load_with_multiple_files_and_empty_override(self):
         base_file = config.ConfigFile(
-            'base.yaml',
+            'base.yml',
             {'web': {'image': 'example/web'}})
-        override_file = config.ConfigFile('override.yaml', None)
+        override_file = config.ConfigFile('override.yml', None)
         details = config.ConfigDetails('.', [base_file, override_file])
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
-        assert 'Top level object needs to be a dictionary' in exc.exconly()
+        error_msg = "Top level object in 'override.yml' needs to be an object"
+        assert error_msg in exc.exconly()
 
     def test_load_with_multiple_files_and_empty_base(self):
-        base_file = config.ConfigFile('base.yaml', None)
+        base_file = config.ConfigFile('base.yml', None)
         override_file = config.ConfigFile(
-            'override.yaml',
+            'override.yml',
             {'web': {'image': 'example/web'}})
         details = config.ConfigDetails('.', [base_file, override_file])
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
-        assert 'Top level object needs to be a dictionary' in exc.exconly()
+        assert "Top level object in 'base.yml' needs to be an object" in exc.exconly()
 
     def test_load_with_multiple_files_and_extends_in_override_file(self):
         base_file = config.ConfigFile(
@@ -225,17 +228,17 @@ class ConfigTest(unittest.TestCase):
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
-        assert 'Service "bogus" doesn\'t have any configuration' in exc.exconly()
+        assert "service 'bogus' doesn't have any configuration" in exc.exconly()
+        assert "In file 'override.yaml'" in exc.exconly()
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
-            config.load(
+            services = config.load(
                 build_config_details(
                     {valid_name: {'image': 'busybox'}},
                     'tests/fixtures/extends',
-                    'common.yml'
-                )
-            )
+                    'common.yml'))
+            assert services[0]['name'] == valid_name
 
     def test_config_invalid_ports_format_validation(self):
         expected_error_msg = "Service 'web' configuration key 'ports' contains an invalid type"
@@ -300,7 +303,8 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_invalid_config_not_a_dictionary(self):
-        expected_error_msg = "Top level object needs to be a dictionary."
+        expected_error_msg = ("Top level object in 'filename.yml' needs to be "
+                              "an object.")
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
             config.load(
                 build_config_details(
@@ -382,12 +386,13 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_config_ulimits_invalid_keys_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'ulimits' contains unsupported option: 'not_soft_or_hard'"
+        expected = ("Service 'web' configuration key 'ulimits' 'nofile' contains "
+                    "unsupported option: 'not_soft_or_hard'")
 
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            config.load(
-                build_config_details(
-                    {'web': {
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(
+                {
+                    'web': {
                         'image': 'busybox',
                         'ulimits': {
                             'nofile': {
@@ -396,50 +401,43 @@ class ConfigTest(unittest.TestCase):
                                 "hard": 20000,
                             }
                         }
-                    }},
-                    'working_dir',
-                    'filename.yml'
-                )
-            )
+                    }
+                },
+                'working_dir',
+                'filename.yml'))
+        assert expected in exc.exconly()
 
     def test_config_ulimits_required_keys_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'ulimits' u?'hard' is a required property"
 
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            config.load(
-                build_config_details(
-                    {'web': {
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(
+                {
+                    'web': {
                         'image': 'busybox',
-                        'ulimits': {
-                            'nofile': {
-                                "soft": 10000,
-                            }
-                        }
-                    }},
-                    'working_dir',
-                    'filename.yml'
-                )
-            )
+                        'ulimits': {'nofile': {"soft": 10000}}
+                    }
+                },
+                'working_dir',
+                'filename.yml'))
+        assert "Service 'web' configuration key 'ulimits' 'nofile'" in exc.exconly()
+        assert "'hard' is a required property" in exc.exconly()
 
     def test_config_ulimits_soft_greater_than_hard_error(self):
-        expected_error_msg = "cannot contain a 'soft' value higher than 'hard' value"
+        expected = "cannot contain a 'soft' value higher than 'hard' value"
 
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            config.load(
-                build_config_details(
-                    {'web': {
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(
+                {
+                    'web': {
                         'image': 'busybox',
                         'ulimits': {
-                            'nofile': {
-                                "soft": 10000,
-                                "hard": 1000
-                            }
+                            'nofile': {"soft": 10000, "hard": 1000}
                         }
-                    }},
-                    'working_dir',
-                    'filename.yml'
-                )
-            )
+                    }
+                },
+                'working_dir',
+                'filename.yml'))
+        assert expected in exc.exconly()
 
     def test_valid_config_which_allows_two_type_definitions(self):
         expose_values = [["8000"], [8000]]

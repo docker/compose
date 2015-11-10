@@ -229,9 +229,9 @@ def load(config_details):
 
 
 def process_config_file(config_file, service_name=None):
-    validate_top_level_object(config_file.config)
+    validate_top_level_object(config_file)
     processed_config = interpolate_environment_variables(config_file.config)
-    validate_against_fields_schema(processed_config)
+    validate_against_fields_schema(processed_config, config_file.filename)
 
     if service_name and service_name not in processed_config:
         raise ConfigurationError(

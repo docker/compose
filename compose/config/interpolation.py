@@ -18,13 +18,6 @@ def interpolate_environment_variables(config):
 
 
 def process_service(service_name, service_dict, mapping):
-    if not isinstance(service_dict, dict):
-        raise ConfigurationError(
-            'Service "%s" doesn\'t have any configuration options. '
-            'All top level keys in your docker-compose.yml must map '
-            'to a dictionary of configuration options.' % service_name
-        )
-
     return dict(
         (key, interpolate_value(service_name, key, val, mapping))
         for (key, val) in service_dict.items()
