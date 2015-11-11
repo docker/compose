@@ -649,13 +649,13 @@ class ServiceVolumesTest(unittest.TestCase):
             },
         }, has_been_inspected=True)
 
-        expected = {
-            '/existing/volume': '/var/lib/docker/aaaaaaaa:/existing/volume:rw',
-            '/mnt/image/data': '/var/lib/docker/cccccccc:/mnt/image/data:rw',
-        }
+        expected = [
+            parse_volume_spec('/var/lib/docker/aaaaaaaa:/existing/volume:rw'),
+            parse_volume_spec('/var/lib/docker/cccccccc:/mnt/image/data:rw'),
+        ]
 
-        binds = get_container_data_volumes(container, options)
-        self.assertEqual(binds, expected)
+        volumes = get_container_data_volumes(container, options)
+        self.assertEqual(sorted(volumes), sorted(expected))
 
     def test_merge_volume_bindings(self):
         options = [

@@ -920,8 +920,10 @@ def merge_volume_bindings(volumes_option, previous_container):
         if volume.external)
 
     if previous_container:
+        data_volumes = get_container_data_volumes(previous_container, volumes)
+        warn_on_masked_volume(volumes, data_volumes, previous_container.service)
         volume_bindings.update(
-            get_container_data_volumes(previous_container, volumes))
+            build_volume_binding(volume) for volume in data_volumes)
 
     return list(volume_bindings.values())
 
@@ -931,7 +933,6 @@ def get_container_data_volumes(container, volumes_option):
     a mapping of volume bindings for those volumes.
     """
     volumes = []
-
     container_volumes = container.get('Volumes') or {}
     image_volumes = [
         parse_volume_spec(volume)
@@ -951,9 +952,27 @@ def get_container_data_volumes(container, volumes_option):
 
         # Copy existing volume from old container
         volume = volume._replace(external=volume_path)
-        volumes.append(build_volume_binding(volume))
+        volumes.append(volume)
 
-    return dict(volumes)
+    return volumes
+
+
+def warn_on_masked_volume(volumes_option, container_volumes, service):
+    container_volumes = dict(
+        (volume.internal, volume.external)
+        for volume in container_volumes)
+
+    for volume in volumes_option:
+        if container_volumes.get(volume.internal) != volume.external:
+            log.warn((
+                "Service \"{service}\" is using volume \"{volume}\" from the "
+                "previous container. Host mapping \"{host_path}\" has no effect. "
+                "Remove the existing containers (with `docker-compose rm {service}`) "
+                "to use the host volume mapping."
+            ).format(
+                service=service,
+                volume=volume.internal,
+                host_path=volume.external))
 
 
 def build_volume_binding(volume_spec):
