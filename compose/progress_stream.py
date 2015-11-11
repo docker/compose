@@ -19,30 +19,33 @@ def stream_output(output, stream):
         if not is_progress_event:
             print_output_event(event, stream, is_terminal)
             stream.flush()
+            continue
+
+        if not is_terminal:
+            continue
 
         # if it's a progress event and we have a terminal, then display the progress bars
-        elif is_terminal:
-            image_id = event.get('id')
-            if not image_id:
-                continue
+        image_id = event.get('id')
+        if not image_id:
+            continue
 
-            if image_id in lines:
-                diff = len(lines) - lines[image_id]
-            else:
-                lines[image_id] = len(lines)
-                stream.write("\n")
-                diff = 0
+        if image_id in lines:
+            diff = len(lines) - lines[image_id]
+        else:
+            lines[image_id] = len(lines)
+            stream.write("\n")
+            diff = 0
 
-            # move cursor up `diff` rows
-            stream.write("%c[%dA" % (27, diff))
+        # move cursor up `diff` rows
+        stream.write("%c[%dA" % (27, diff))
 
-            print_output_event(event, stream, is_terminal)
+        print_output_event(event, stream, is_terminal)
 
-            if 'id' in event:
-                # move cursor back down
-                stream.write("%c[%dB" % (27, diff))
+        if 'id' in event:
+            # move cursor back down
+            stream.write("%c[%dB" % (27, diff))
 
-            stream.flush()
+        stream.flush()
 
     return all_events
 
