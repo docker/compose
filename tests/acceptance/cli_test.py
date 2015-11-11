@@ -8,6 +8,8 @@ import time
 from collections import namedtuple
 from operator import attrgetter
 
+from docker import errors
+
 from .. import mock
 from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
@@ -59,6 +61,25 @@ class ContainerCountCondition(object):
 
     def __str__(self):
         return "waiting for counter count == %s" % self.expected
+
+
+class ContainerStateCondition(object):
+
+    def __init__(self, client, name, running):
+        self.client = client
+        self.name = name
+        self.running = running
+
+    # State.Running == true
+    def __call__(self):
+        try:
+            container = self.client.inspect_container(self.name)
+            return container['State']['Running'] == self.running
+        except errors.APIError:
+            return False
+
+    def __str__(self):
+        return "waiting for container to have state %s" % self.expected
 
 
 class CLITestCase(DockerClientTestCase):
@@ -553,6 +574,32 @@ class CLITestCase(DockerClientTestCase):
             self.addCleanup(client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(container.human_readable_command, u'true')
+
+    def test_run_handles_sigint(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=True))
+
+        os.kill(proc.pid, signal.SIGINT)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=False))
+
+    def test_run_handles_sigterm(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=True))
+
+        os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=False))
 
     def test_rm(self):
         service = self.project.get_service('simple')
