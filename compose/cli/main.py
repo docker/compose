@@ -368,7 +368,6 @@ class TopLevelCommand(DocoptCommand):
                                   allocates a TTY.
         """
         service = project.get_service(options['SERVICE'])
-
         detach = options['-d']
 
         if IS_WINDOWS_PLATFORM and not detach:
@@ -380,22 +379,6 @@ class TopLevelCommand(DocoptCommand):
         if options['--allow-insecure-ssl']:
             log.warn(INSECURE_SSL_WARNING)
 
-        if not options['--no-deps']:
-            deps = service.get_linked_service_names()
-
-            if len(deps) > 0:
-                project.up(
-                    service_names=deps,
-                    start_deps=True,
-                    strategy=ConvergenceStrategy.never,
-                )
-            elif project.use_networking:
-                project.ensure_network_exists()
-
-        tty = True
-        if detach or options['-T'] or not sys.stdin.isatty():
-            tty = False
-
         if options['COMMAND']:
             command = [options['COMMAND']] + options['ARGS']
         else:
@@ -403,7 +386,7 @@ class TopLevelCommand(DocoptCommand):
 
         container_options = {
             'command': command,
-            'tty': tty,
+            'tty': not (detach or options['-T'] or not sys.stdin.isatty()),
             'stdin_open': not detach,
             'detach': detach,
         }
@@ -435,31 +418,7 @@ class TopLevelCommand(DocoptCommand):
         if options['--name']:
             container_options['name'] = options['--name']
 
-        try:
-            container = service.create_container(
-                quiet=True,
-                one_off=True,
-                **container_options
-            )
-        except APIError as e:
-            legacy.check_for_legacy_containers(
-                project.client,
-                project.name,
-                [service.name],
-                allow_one_off=False,
-            )
-
-            raise e
-
-        if detach:
-            container.start()
-            print(container.name)
-        else:
-            dockerpty.start(project.client, container.id, interactive=not options['-T'])
-            exit_code = container.wait()
-            if options['--rm']:
-                project.client.remove_container(container.id)
-            sys.exit(exit_code)
+        run_one_off_container(container_options, project, service, options)
 
     def scale(self, project, options):
         """
@@ -647,6 +606,58 @@ def convergence_strategy_from_opts(options):
     return ConvergenceStrategy.changed
 
 
+def run_one_off_container(container_options, project, service, options):
+    if not options['--no-deps']:
+        deps = service.get_linked_service_names()
+        if deps:
+            project.up(
+                service_names=deps,
+                start_deps=True,
+                strategy=ConvergenceStrategy.never)
+
+    if project.use_networking:
+        project.ensure_network_exists()
+
+    try:
+        container = service.create_container(
+            quiet=True,
+            one_off=True,
+            **container_options)
+    except APIError:
+        legacy.check_for_legacy_containers(
+            project.client,
+            project.name,
+            [service.name],
+            allow_one_off=False)
+        raise
+
+    if options['-d']:
+        container.start()
+        print(container.name)
+        return
+
+    def remove_container(force=False):
+        if options['--rm']:
+            project.client.remove_container(container.id, force=True)
+
+    def force_shutdown(signal, frame):
+        project.client.kill(container.id)
+        remove_container(force=True)
+        sys.exit(2)
+
+    def shutdown(signal, frame):
+        set_signal_handler(force_shutdown)
+        project.client.stop(container.id)
+        remove_container()
+        sys.exit(1)
+
+    set_signal_handler(shutdown)
+    dockerpty.start(project.client, container.id, interactive=not options['-T'])
+    exit_code = container.wait()
+    remove_container()
+    sys.exit(exit_code)
+
+
 def build_log_printer(containers, service_names, monochrome):
     if service_names:
         containers = [
@@ -657,7 +668,6 @@ def build_log_printer(containers, service_names, monochrome):
 
 
 def attach_to_logs(project, log_printer, service_names, timeout):
-    print("Attaching to", list_containers(log_printer.containers))
 
     def force_shutdown(signal, frame):
         project.kill(service_names=service_names)
@@ -668,6 +678,7 @@ def attach_to_logs(project, log_printer, service_names, timeout):
         print("Gracefully stopping... (press Ctrl+C again to force)")
         project.stop(service_names=service_names, timeout=timeout)
 
+    print("Attaching to", list_containers(log_printer.containers))
     set_signal_handler(shutdown)
     log_printer.run()
 
