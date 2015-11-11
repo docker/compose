@@ -480,20 +480,18 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue(mock_logging.warn.called)
         self.assertTrue(expected_warning_msg in mock_logging.warn.call_args[0][0])
 
-    def test_config_invalid_environment_dict_key_raises_validation_error(self):
-        expected_error_msg = "Service 'web' configuration key 'environment' contains unsupported option: '---'"
-
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            config.load(
-                build_config_details(
-                    {'web': {
-                        'image': 'busybox',
-                        'environment': {'---': 'nope'}
-                    }},
-                    'working_dir',
-                    'filename.yml'
-                )
+    def test_config_valid_environment_dict_key_contains_dashes(self):
+        services = config.load(
+            build_config_details(
+                {'web': {
+                    'image': 'busybox',
+                    'environment': {'SPRING_JPA_HIBERNATE_DDL-AUTO': 'none'}
+                }},
+                'working_dir',
+                'filename.yml'
             )
+        )
+        self.assertEqual(services[0]['environment']['SPRING_JPA_HIBERNATE_DDL-AUTO'], 'none')
 
     def test_load_yaml_with_yaml_error(self):
         tmpdir = py.test.ensuretemp('invalid_yaml_test')
