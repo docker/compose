@@ -18,13 +18,14 @@ from tests import unittest
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
     """
-    Test helper function to construct a ServiceLoader
+    Test helper function to construct a ServiceExtendsResolver
     """
-    return config.ServiceLoader(
+    resolver = config.ServiceExtendsResolver(
         working_dir=working_dir,
         filename=filename,
         service_name=name,
-        service_dict=service_dict).make_service_dict()
+        service_dict=service_dict)
+    return config.process_service(working_dir, resolver.run())
 
 
 def service_sort(services):
@@ -194,6 +195,19 @@ class ConfigTest(unittest.TestCase):
             },
         ]
         self.assertEqual(service_sort(service_dicts), service_sort(expected))
+
+    def test_load_with_multiple_files_and_invalid_override(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {'web': {'image': 'example/web'}})
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {'bogus': 'thing'})
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        assert 'Service "bogus" doesn\'t have any configuration' in exc.exconly()
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
@@ -1066,18 +1080,19 @@ class ExtendsTest(unittest.TestCase):
         ]))
 
     def test_circular(self):
-        try:
+        with pytest.raises(config.CircularReference) as exc:
             load_from_filename('tests/fixtures/extends/circle-1.yml')
-            raise Exception("Expected config.CircularReference to be raised")
-        except config.CircularReference as e:
-            self.assertEqual(
-                [(os.path.basename(filename), service_name) for (filename, service_name) in e.trail],
-                [
-                    ('circle-1.yml', 'web'),
-                    ('circle-2.yml', 'web'),
-                    ('circle-1.yml', 'web'),
-                ],
-            )
+
+        path = [
+            (os.path.basename(filename), service_name)
+            for (filename, service_name) in exc.value.trail
+        ]
+        expected = [
+            ('circle-1.yml', 'web'),
+            ('circle-2.yml', 'other'),
+            ('circle-1.yml', 'web'),
+        ]
+        self.assertEqual(path, expected)
 
     def test_extends_validation_empty_dictionary(self):
         with self.assertRaisesRegexp(ConfigurationError, 'service'):

@@ -842,7 +842,13 @@ class ServiceTest(DockerClientTestCase):
             environment=['ONE=1', 'TWO=2', 'THREE=3'],
             env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
-        for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
+        for k, v in {
+            'ONE': '1',
+            'TWO': '2',
+            'THREE': '3',
+            'FOO': 'baz',
+            'DOO': 'dah'
+        }.items():
             self.assertEqual(env[k], v)
 
     @mock.patch.dict(os.environ)
@@ -850,9 +856,22 @@ class ServiceTest(DockerClientTestCase):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
-        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
+        service = self.create_service(
+            'web',
+            environment={
+                'FILE_DEF': 'F1',
+                'FILE_DEF_EMPTY': '',
+                'ENV_DEF': None,
+                'NO_DEF': None
+            }
+        )
         env = create_and_start_container(service).environment
-        for k, v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
+        for k, v in {
+            'FILE_DEF': 'F1',
+            'FILE_DEF_EMPTY': '',
+            'ENV_DEF': 'E3',
+            'NO_DEF': ''
+        }.items():
             self.assertEqual(env[k], v)
 
     def test_with_high_enough_api_version_we_get_default_network_mode(self):

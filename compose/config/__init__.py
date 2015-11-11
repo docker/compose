@@ -1,5 +1,4 @@
 # flake8: noqa
-from .config import ConfigDetails
 from .config import ConfigurationError
 from .config import DOCKER_CONFIG_KEYS
 from .config import find
