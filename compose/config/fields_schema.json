@@ -40,7 +40,7 @@
             {
               "type": "object",
               "patternProperties": {
-                "^[^-]+$": {
+                ".+": {
                   "type": ["string", "number", "boolean", "null"],
                   "format": "environment"
                 }
