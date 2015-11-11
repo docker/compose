@@ -20,12 +20,12 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
     """
     Test helper function to construct a ServiceExtendsResolver
     """
-    resolver = config.ServiceExtendsResolver(
+    resolver = config.ServiceExtendsResolver(config.ServiceConfig(
         working_dir=working_dir,
         filename=filename,
-        service_name=name,
-        service_dict=service_dict)
-    return config.process_service(working_dir, resolver.run())
+        name=name,
+        config=service_dict))
+    return config.process_service(resolver.run())
 
 
 def service_sort(services):
@@ -77,8 +77,8 @@ class ConfigTest(unittest.TestCase):
             )
 
     def test_config_invalid_service_names(self):
-        with self.assertRaises(ConfigurationError):
-            for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
+        for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
+            with pytest.raises(ConfigurationError):
                 config.load(
                     build_config_details(
                         {invalid_name: {'image': 'busybox'}},
@@ -86,6 +86,16 @@ class ConfigTest(unittest.TestCase):
                         'filename.yml'
                     )
                 )
+
+    def test_load_with_invalid_field_name(self):
+        config_details = build_config_details(
+            {'web': {'image': 'busybox', 'name': 'bogus'}},
+            'working_dir',
+            'filename.yml')
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        error_msg = "Unsupported config option for 'web' service: 'name'"
+        assert error_msg in exc.exconly()
 
     def test_config_integer_service_name_raise_validation_error(self):
         expected_error_msg = "Service name: 1 needs to be a string, eg '1'"
@@ -651,7 +661,7 @@ class VolumeConfigTest(unittest.TestCase):
 
     def test_volume_path_with_non_ascii_directory(self):
         volume = u'/Füü/data:/data'
-        container_path = config.resolve_volume_path(".", volume, "test")
+        container_path = config.resolve_volume_path(".", volume)
         self.assertEqual(container_path, volume)
 
 

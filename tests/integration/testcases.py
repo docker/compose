@@ -9,6 +9,7 @@ from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import process_service
 from compose.config.config import resolve_environment
+from compose.config.config import ServiceConfig
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
@@ -43,15 +44,13 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        # TODO: remove this once #2299 is fixed
-        kwargs['name'] = name
-
-        options = process_service('.', kwargs)
+        service_config = ServiceConfig('.', None, name, kwargs)
+        options = process_service(service_config)
         options['environment'] = resolve_environment('.', kwargs)
         labels = options.setdefault('labels', {})
         labels['com.docker.compose.test-name'] = self.id()
 
-        return Service(client=self.client, project='composetest', **options)
+        return Service(name, client=self.client, project='composetest', **options)
 
     def check_build(self, *args, **kwargs):
         kwargs.setdefault('rm', True)

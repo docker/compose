@@ -3,12 +3,6 @@
 
   "type": "object",
 
-  "properties": {
-      "name": {"type": "string"}
-  },
-
-  "required": ["name"],
-
   "allOf": [
     {"$ref": "fields_schema.json#/definitions/service"},
     {"$ref": "#/definitions/service_constraints"}
