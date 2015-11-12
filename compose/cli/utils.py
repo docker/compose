@@ -7,10 +7,10 @@ import platform
 import ssl
 import subprocess
 
-from docker import version as docker_py_version
+import docker
 from six.moves import input
 
-from .. import __version__
+import compose
 
 
 def yesno(prompt, default=None):
@@ -57,13 +57,32 @@ def is_ubuntu():
 
 
 def get_version_info(scope):
-    versioninfo = 'docker-compose version: %s' % __version__
+    versioninfo = 'docker-compose version {}, build {}'.format(
+        compose.__version__,
+        get_build_version())
+
     if scope == 'compose':
         return versioninfo
-    elif scope == 'full':
-        return versioninfo + '\n' \
-            + "docker-py version: %s\n" % docker_py_version \
-            + "%s version: %s\n" % (platform.python_implementation(), platform.python_version()) \
-            + "OpenSSL version: %s" % ssl.OPENSSL_VERSION
-    else:
-        raise RuntimeError('passed unallowed value to `cli.utils.get_version_info`')
+    if scope == 'full':
+        return (
+            "{}\n"
+            "docker-py version: {}\n"
+            "{} version: {}\n"
+            "OpenSSL version: {}"
+        ).format(
+            versioninfo,
+            docker.version,
+            platform.python_implementation(),
+            platform.python_version(),
+            ssl.OPENSSL_VERSION)
+
+    raise ValueError("{} is not a valid version scope".format(scope))
+
+
+def get_build_version():
+    filename = os.path.join(os.path.dirname(compose.__file__), 'GITSHA')
+    if not os.path.exists(filename):
+        return 'unknown'
+
+    with open(filename) as fh:
+        return fh.read().strip()

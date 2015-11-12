@@ -8,6 +8,6 @@ COPY    requirements.txt /code/requirements.txt
 RUN     pip install -r /code/requirements.txt
 
 ADD     dist/docker-compose-release.tar.gz /code/docker-compose
-RUN     pip install /code/docker-compose/docker-compose-*
+RUN     pip install --no-deps /code/docker-compose/docker-compose-*
 
 ENTRYPOINT ["/usr/bin/docker-compose"]
