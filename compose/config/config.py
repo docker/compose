@@ -65,7 +65,6 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'dockerfile',
     'expose',
     'external_links',
-    'name',
 ]
 
 
