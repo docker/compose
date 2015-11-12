@@ -1,6 +1,59 @@
 Change log
 ==========
 
+1.5.1 (2015-11-12)
+------------------
+
+-   Add the `--force-rm` option to `build`.
+
+-   Add the `ulimit` option for services in the Compose file.
+
+-   Fixed a bug where `up` would error with "service needs to be built" if
+    a service changed from using `image` to using `build`.
+
+-   Fixed a bug that would cause incorrect output of parallel operations
+    on some terminals.
+
+-   Fixed a bug that prevented a container from being recreated when the
+    mode of a `volumes_from` was changed.
+
+-   Fixed a regression in 1.5.0 where non-utf-8 unicode characters would cause
+    `up` or `logs` to crash.
+
+-   Fixed a regression in 1.5.0 where Compose would use a success exit status
+    code when a command fails due to an HTTP timeout communicating with the
+    docker daemon.
+
+-   Fixed a regression in 1.5.0 where `name` was being accepted as a valid
+    service option which would override the actual name of the service.
+
+-   When using `--x-networking` Compose no longer sets the hostname to the
+    container name.
+
+-   When using `--x-networking` Compose will only create the default network
+    if at least one container is using the network.
+
+-   When printings logs during `up` or `logs`, flush the output buffer after
+    each line to prevent buffering issues from hideing logs.
+
+-   Recreate a container if one of it's dependencies is being created.
+    Previously a container was only recreated if it's dependencies already
+    existed, but were being recreated as well.
+
+-   Add a warning when a `volume` in the Compose file is being ignored
+    and masked by a container volume from a previous container.
+
+-   Improve the output of `pull` when run without a tty.
+
+-   When using multiple Compose files, validate each before attempting to merge
+    them together. Previously invalid files would result in not helpful errors.
+
+-   Allow dashes in keys in the `environment` service option.
+
+-   Improve validation error messages by including the filename as part of the
+    error message.
+
+
 1.5.0 (2015-11-03)
 ------------------
 
