@@ -867,7 +867,7 @@ class MemoryOptionsTest(unittest.TestCase):
         a mem_limit
         """
         expected_error_msg = (
-            "Invalid 'memswap_limit' configuration for 'foo' service: when "
+            "Service 'foo' configuration key 'memswap_limit' is invalid: when "
             "defining 'memswap_limit' you must set 'mem_limit' as well"
         )
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):

@@ -109,189 +109,169 @@ def anglicize_validator(validator):
     return 'a ' + validator
 
 
-def process_errors(errors, service_name=None):
+def handle_error_for_schema_with_id(error, service_name):
+    schema_id = error.schema['id']
+
+    if schema_id == 'fields_schema.json' and error.validator == 'additionalProperties':
+        return "Invalid service name '{}' - only {} characters are allowed".format(
+            # The service_name is the key to the json object
+            list(error.instance)[0],
+            VALID_NAME_CHARS)
+
+    if schema_id == '#/definitions/constraints':
+        if 'image' in error.instance and 'build' in error.instance:
+            return (
+                "Service '{}' has both an image and build path specified. "
+                "A service can either be built to image or use an existing "
+                "image, not both.".format(service_name))
+        if 'image' not in error.instance and 'build' not in error.instance:
+            return (
+                "Service '{}' has neither an image nor a build path "
+                "specified. Exactly one must be provided.".format(service_name))
+        if 'image' in error.instance and 'dockerfile' in error.instance:
+            return (
+                "Service '{}' has both an image and alternate Dockerfile. "
+                "A service can either be built to image or use an existing "
+                "image, not both.".format(service_name))
+
+    if schema_id == '#/definitions/service':
+        if error.validator == 'additionalProperties':
+            invalid_config_key = parse_key_from_error_msg(error)
+            return get_unsupported_config_msg(service_name, invalid_config_key)
+
+
+def handle_generic_service_error(error, service_name):
+    config_key = " ".join("'%s'" % k for k in error.path)
+    msg_format = None
+    error_msg = error.message
+
+    if error.validator == 'oneOf':
+        msg_format = "Service '{}' configuration key {} {}"
+        error_msg = _parse_oneof_validator(error)
+
+    elif error.validator == 'type':
+        msg_format = ("Service '{}' configuration key {} contains an invalid "
+                      "type, it should be {}")
+        error_msg = _parse_valid_types_from_validator(error.validator_value)
+
+    # TODO: no test case for this branch, there are no config options
+    # which exercise this branch
+    elif error.validator == 'required':
+        msg_format = "Service '{}' configuration key '{}' is invalid, {}"
+
+    elif error.validator == 'dependencies':
+        msg_format = "Service '{}' configuration key '{}' is invalid: {}"
+        config_key = list(error.validator_value.keys())[0]
+        required_keys = ",".join(error.validator_value[config_key])
+        error_msg = "when defining '{}' you must set '{}' as well".format(
+            config_key,
+            required_keys)
+
+    elif error.path:
+        msg_format = "Service '{}' configuration key {} value {}"
+
+    if msg_format:
+        return msg_format.format(service_name, config_key, error_msg)
+
+    return error.message
+
+
+def parse_key_from_error_msg(error):
+    return error.message.split("'")[1]
+
+
+def _parse_valid_types_from_validator(validator):
+    """A validator value can be either an array of valid types or a string of
+    a valid type. Parse the valid types and prefix with the correct article.
     """
-    jsonschema gives us an error tree full of information to explain what has
+    if not isinstance(validator, list):
+        return anglicize_validator(validator)
+
+    if len(validator) == 1:
+        return anglicize_validator(validator[0])
+
+    return "{}, or {}".format(
+        ", ".join([anglicize_validator(validator[0])] + validator[1:-1]),
+        anglicize_validator(validator[-1]))
+
+
+def _parse_oneof_validator(error):
+    """oneOf has multiple schemas, so we need to reason about which schema, sub
+    schema or constraint the validation is failing on.
+    Inspecting the context value of a ValidationError gives us information about
+    which sub schema failed and which kind of error it is.
+    """
+    types = []
+    for context in error.context:
+
+        if context.validator == 'required':
+            return context.message
+
+        if context.validator == 'additionalProperties':
+            invalid_config_key = parse_key_from_error_msg(context)
+            return "contains unsupported option: '{}'".format(invalid_config_key)
+
+        if context.path:
+            invalid_config_key = " ".join(
+                "'{}' ".format(fragment) for fragment in context.path
+                if isinstance(fragment, six.string_types)
+            )
+            return "{}contains {}, which is an invalid type, it should be {}".format(
+                invalid_config_key,
+                context.instance,
+                _parse_valid_types_from_validator(context.validator_value))
+
+        if context.validator == 'uniqueItems':
+            return "contains non unique items, please remove duplicates from {}".format(
+                context.instance)
+
+        if context.validator == 'type':
+            types.append(context.validator_value)
+
+    valid_types = _parse_valid_types_from_validator(types)
+    return "contains an invalid type, it should be {}".format(valid_types)
+
+
+def process_errors(errors, service_name=None):
+    """jsonschema gives us an error tree full of information to explain what has
     gone wrong. Process each error and pull out relevant information and re-write
     helpful error messages that are relevant.
     """
-    def _parse_key_from_error_msg(error):
-        return error.message.split("'")[1]
+    def format_error_message(error, service_name):
+        if not service_name and error.path:
+            # field_schema errors will have service name on the path
+            service_name = error.path.popleft()
 
-    def _clean_error_message(message):
-        return message.replace("u'", "'")
+        if 'id' in error.schema:
+            error_msg = handle_error_for_schema_with_id(error, service_name)
+            if error_msg:
+                return error_msg
 
-    def _parse_valid_types_from_validator(validator):
-        """
-        A validator value can be either an array of valid types or a string of
-        a valid type. Parse the valid types and prefix with the correct article.
-        """
-        if isinstance(validator, list):
-            if len(validator) >= 2:
-                first_type = anglicize_validator(validator[0])
-                last_type = anglicize_validator(validator[-1])
-                types_from_validator = ", ".join([first_type] + validator[1:-1])
+        return handle_generic_service_error(error, service_name)
 
-                msg = "{} or {}".format(
-                    types_from_validator,
-                    last_type
-                )
-            else:
-                msg = "{}".format(anglicize_validator(validator[0]))
-        else:
-            msg = "{}".format(anglicize_validator(validator))
-
-        return msg
-
-    def _parse_oneof_validator(error):
-        """
-        oneOf has multiple schemas, so we need to reason about which schema, sub
-        schema or constraint the validation is failing on.
-        Inspecting the context value of a ValidationError gives us information about
-        which sub schema failed and which kind of error it is.
-        """
-        required = [context for context in error.context if context.validator == 'required']
-        if required:
-            return required[0].message
-
-        additionalProperties = [context for context in error.context if context.validator == 'additionalProperties']
-        if additionalProperties:
-            invalid_config_key = _parse_key_from_error_msg(additionalProperties[0])
-            return "contains unsupported option: '{}'".format(invalid_config_key)
-
-        constraint = [context for context in error.context if len(context.path) > 0]
-        if constraint:
-            valid_types = _parse_valid_types_from_validator(constraint[0].validator_value)
-            invalid_config_key = "".join(
-                "'{}' ".format(fragment) for fragment in constraint[0].path
-                if isinstance(fragment, six.string_types)
-            )
-            msg = "{}contains {}, which is an invalid type, it should be {}".format(
-                invalid_config_key,
-                constraint[0].instance,
-                valid_types
-            )
-            return msg
-
-        uniqueness = [context for context in error.context if context.validator == 'uniqueItems']
-        if uniqueness:
-            msg = "contains non unique items, please remove duplicates from {}".format(
-                uniqueness[0].instance
-            )
-            return msg
-
-        types = [context.validator_value for context in error.context if context.validator == 'type']
-        valid_types = _parse_valid_types_from_validator(types)
-
-        msg = "contains an invalid type, it should be {}".format(valid_types)
-
-        return msg
-
-    root_msgs = []
-    invalid_keys = []
-    required = []
-    type_errors = []
-    other_errors = []
-
-    for error in errors:
-        # handle root level errors
-        if len(error.path) == 0 and not service_name:
-            if error.validator == 'type':
-                msg = "Top level object needs to be a dictionary. Check your .yml file that you have defined a service at the top level."
-                root_msgs.append(msg)
-            elif error.validator == 'additionalProperties':
-                invalid_service_name = _parse_key_from_error_msg(error)
-                msg = "Invalid service name '{}' - only {} characters are allowed".format(invalid_service_name, VALID_NAME_CHARS)
-                root_msgs.append(msg)
-            else:
-                root_msgs.append(_clean_error_message(error.message))
-
-        else:
-            if not service_name:
-                # field_schema errors will have service name on the path
-                service_name = error.path[0]
-                error.path.popleft()
-            else:
-                # service_schema errors have the service name passed in, as that
-                # is not available on error.path or necessarily error.instance
-                service_name = service_name
-
-            if error.validator == 'additionalProperties':
-                invalid_config_key = _parse_key_from_error_msg(error)
-                invalid_keys.append(get_unsupported_config_msg(service_name, invalid_config_key))
-            elif error.validator == 'anyOf':
-                if 'image' in error.instance and 'build' in error.instance:
-                    required.append(
-                        "Service '{}' has both an image and build path specified. "
-                        "A service can either be built to image or use an existing "
-                        "image, not both.".format(service_name))
-                elif 'image' not in error.instance and 'build' not in error.instance:
-                    required.append(
-                        "Service '{}' has neither an image nor a build path "
-                        "specified. Exactly one must be provided.".format(service_name))
-                elif 'image' in error.instance and 'dockerfile' in error.instance:
-                    required.append(
-                        "Service '{}' has both an image and alternate Dockerfile. "
-                        "A service can either be built to image or use an existing "
-                        "image, not both.".format(service_name))
-                else:
-                    required.append(_clean_error_message(error.message))
-            elif error.validator == 'oneOf':
-                config_key = error.path[0]
-                msg = _parse_oneof_validator(error)
-
-                type_errors.append("Service '{}' configuration key '{}' {}".format(
-                    service_name, config_key, msg)
-                )
-            elif error.validator == 'type':
-                msg = _parse_valid_types_from_validator(error.validator_value)
-
-                if len(error.path) > 0:
-                    config_key = " ".join(["'%s'" % k for k in error.path])
-                    type_errors.append(
-                        "Service '{}' configuration key {} contains an invalid "
-                        "type, it should be {}".format(
-                            service_name,
-                            config_key,
-                            msg))
-                else:
-                    root_msgs.append(
-                        "Service \"{}\" doesn't have any configuration options. "
-                        "All top level keys in your docker-compose.yml must map "
-                        "to a dictionary of configuration options.'".format(service_name))
-            elif error.validator == 'required':
-                config_key = error.path[0]
-                required.append(
-                    "Service '{}' option '{}' is invalid, {}".format(
-                        service_name,
-                        config_key,
-                        _clean_error_message(error.message)))
-            elif error.validator == 'dependencies':
-                dependency_key = list(error.validator_value.keys())[0]
-                required_keys = ",".join(error.validator_value[dependency_key])
-                required.append("Invalid '{}' configuration for '{}' service: when defining '{}' you must set '{}' as well".format(
-                    dependency_key, service_name, dependency_key, required_keys))
-            else:
-                config_key = " ".join(["'%s'" % k for k in error.path])
-                err_msg = "Service '{}' configuration key {} value {}".format(service_name, config_key, error.message)
-                other_errors.append(err_msg)
-
-    return "\n".join(root_msgs + invalid_keys + required + type_errors + other_errors)
+    return '\n'.join(format_error_message(error, service_name) for error in errors)
 
 
 def validate_against_fields_schema(config):
-    schema_filename = "fields_schema.json"
-    format_checkers = ["ports", "environment"]
-    return _validate_against_schema(config, schema_filename, format_checkers)
+    return _validate_against_schema(
+        config,
+        "fields_schema.json",
+        ["ports", "environment"])
 
 
 def validate_against_service_schema(config, service_name):
-    schema_filename = "service_schema.json"
-    format_checkers = ["ports"]
-    return _validate_against_schema(config, schema_filename, format_checkers, service_name)
+    return _validate_against_schema(
+        config,
+        "service_schema.json",
+        ["ports"],
+        service_name)
 
 
-def _validate_against_schema(config, schema_filename, format_checker=[], service_name=None):
+def _validate_against_schema(
+        config,
+        schema_filename,
+        format_checker=(),
+        service_name=None):
     config_source_dir = os.path.dirname(os.path.abspath(__file__))
 
     if sys.platform == "win32":
