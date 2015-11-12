@@ -2,15 +2,18 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
 
   "type": "object",
+  "id": "fields_schema.json",
 
   "patternProperties": {
     "^[a-zA-Z0-9._-]+$": {
       "$ref": "#/definitions/service"
     }
   },
+  "additionalProperties": false,
 
   "definitions": {
     "service": {
+      "id": "#/definitions/service",
       "type": "object",
 
       "properties": {
@@ -167,6 +170,5 @@
       ]
     }
 
-  },
-  "additionalProperties": false
+  }
 }

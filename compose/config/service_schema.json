@@ -1,15 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "service_schema.json",
 
   "type": "object",
 
   "allOf": [
     {"$ref": "fields_schema.json#/definitions/service"},
-    {"$ref": "#/definitions/service_constraints"}
+    {"$ref": "#/definitions/constraints"}
   ],
 
   "definitions": {
-    "service_constraints": {
+    "constraints": {
+      "id": "#/definitions/constraints",
       "anyOf": [
         {
           "required": ["build"],
@@ -21,13 +23,8 @@
             {"required": ["build"]},
             {"required": ["dockerfile"]}
           ]}
-        },
-        {
-          "required": ["extends"],
-          "not": {"required": ["build", "image"]}
         }
       ]
     }
   }
-
 }
