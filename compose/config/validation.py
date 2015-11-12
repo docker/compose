@@ -307,7 +307,10 @@ def _validate_against_schema(config, schema_filename, format_checker=[], service
         schema = json.load(schema_fh)
 
     resolver = RefResolver(resolver_full_path, schema)
-    validation_output = Draft4Validator(schema, resolver=resolver, format_checker=FormatChecker(format_checker))
+    validation_output = Draft4Validator(
+        schema,
+        resolver=resolver,
+        format_checker=FormatChecker(format_checker))
 
     errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
     if errors:

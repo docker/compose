@@ -78,14 +78,12 @@ class ConfigTest(unittest.TestCase):
 
     def test_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
-            with pytest.raises(ConfigurationError):
-                config.load(
-                    build_config_details(
-                        {invalid_name: {'image': 'busybox'}},
-                        'working_dir',
-                        'filename.yml'
-                    )
-                )
+            with pytest.raises(ConfigurationError) as exc:
+                config.load(build_config_details(
+                    {invalid_name: {'image': 'busybox'}},
+                    'working_dir',
+                    'filename.yml'))
+            assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
     def test_load_with_invalid_field_name(self):
         config_details = build_config_details(
@@ -95,6 +93,16 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
         error_msg = "Unsupported config option for 'web' service: 'name'"
+        assert error_msg in exc.exconly()
+
+    def test_load_invalid_service_definition(self):
+        config_details = build_config_details(
+            {'web': 'wrong'},
+            'working_dir',
+            'filename.yml')
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        error_msg = "Service \"web\" doesn\'t have any configuration options"
         assert error_msg in exc.exconly()
 
     def test_config_integer_service_name_raise_validation_error(self):
