@@ -47,6 +47,8 @@ virtualenv .\venv
 .\venv\Scripts\pip install --no-deps .
 .\venv\Scripts\pip install --allow-external pyinstaller -r requirements-build.txt
 
+git rev-parse --short HEAD | out-file -encoding ASCII compose\GITSHA
+
 # Build binary
 # pyinstaller has lots of warnings, so we need to run with ErrorAction = Continue
 $ErrorActionPreference = "Continue"
