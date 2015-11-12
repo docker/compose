@@ -14,6 +14,7 @@ from .. import mock
 from .testcases import DockerClientTestCase
 from .testcases import pull_busybox
 from compose import __version__
+from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -23,6 +24,7 @@ from compose.container import Container
 from compose.service import build_extra_hosts
 from compose.service import ConfigError
 from compose.service import ConvergencePlan
+from compose.service import ConvergenceStrategy
 from compose.service import Net
 from compose.service import Service
 from compose.service import VolumeFromSpec
@@ -30,7 +32,8 @@ from compose.service import VolumeFromSpec
 
 def create_and_start_container(service, **override_options):
     container = service.create_container(**override_options)
-    return service.start_container(container)
+    container.start()
+    return container
 
 
 class ServiceTest(DockerClientTestCase):
@@ -115,19 +118,19 @@ class ServiceTest(DockerClientTestCase):
     def test_create_container_with_unspecified_volume(self):
         service = self.create_service('db', volumes=['/var/db'])
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertIn('/var/db', container.get('Volumes'))
 
     def test_create_container_with_volume_driver(self):
         service = self.create_service('db', volume_driver='foodriver')
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual('foodriver', container.get('Config.VolumeDriver'))
 
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(container.get('HostConfig.CpuShares'), 73)
 
     def test_build_extra_hosts(self):
@@ -165,7 +168,7 @@ class ServiceTest(DockerClientTestCase):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
         service = self.create_service('db', extra_hosts=extra_hosts)
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(set(container.get('HostConfig.ExtraHosts')), set(extra_hosts))
 
     def test_create_container_with_extra_hosts_dicts(self):
@@ -173,33 +176,33 @@ class ServiceTest(DockerClientTestCase):
         extra_hosts_list = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
         service = self.create_service('db', extra_hosts=extra_hosts)
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(set(container.get('HostConfig.ExtraHosts')), set(extra_hosts_list))
 
     def test_create_container_with_cpu_set(self):
         service = self.create_service('db', cpuset='0')
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(container.get('HostConfig.CpusetCpus'), '0')
 
     def test_create_container_with_read_only_root_fs(self):
         read_only = True
         service = self.create_service('db', read_only=read_only)
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(container.get('HostConfig.ReadonlyRootfs'), read_only, container.get('HostConfig'))
 
     def test_create_container_with_security_opt(self):
         security_opt = ['label:disable']
         service = self.create_service('db', security_opt=security_opt)
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(set(container.get('HostConfig.SecurityOpt')), set(security_opt))
 
     def test_create_container_with_mac_address(self):
         service = self.create_service('db', mac_address='02:42:ac:11:65:43')
         container = service.create_container()
-        service.start_container(container)
+        container.start()
         self.assertEqual(container.inspect()['Config']['MacAddress'], '02:42:ac:11:65:43')
 
     def test_create_container_with_specified_volume(self):
@@ -208,7 +211,7 @@ class ServiceTest(DockerClientTestCase):
 
         service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
         container = service.create_container()
-        service.start_container(container)
+        container.start()
 
         volumes = container.inspect()['Volumes']
         self.assertIn(container_path, volumes)
@@ -281,7 +284,7 @@ class ServiceTest(DockerClientTestCase):
             ]
         )
         host_container = host_service.create_container()
-        host_service.start_container(host_container)
+        host_container.start()
         self.assertIn(volume_container_1.id + ':rw',
                       host_container.get('HostConfig.VolumesFrom'))
         self.assertIn(volume_container_2.id + ':rw',
@@ -300,7 +303,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=1', old_container.get('Config.Env'))
         self.assertEqual(old_container.name, 'composetest_db_1')
-        service.start_container(old_container)
+        old_container.start()
         old_container.inspect()  # reload volume data
         volume_path = old_container.get('Volumes')['/etc']
 
@@ -362,6 +365,33 @@ class ServiceTest(DockerClientTestCase):
 
         new_container, = service.execute_convergence_plan(
             ConvergencePlan('recreate', [old_container]))
+
+        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
+        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+
+    def test_execute_convergence_plan_when_image_volume_masks_config(self):
+        service = Service(
+            project='composetest',
+            name='db',
+            client=self.client,
+            build='tests/fixtures/dockerfile-with-volume',
+        )
+
+        old_container = create_and_start_container(service)
+        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
+        volume_path = old_container.get('Volumes')['/data']
+
+        service.options['volumes'] = ['/tmp:/data']
+
+        with mock.patch('compose.service.log') as mock_log:
+            new_container, = service.execute_convergence_plan(
+                ConvergencePlan('recreate', [old_container]))
+
+        mock_log.warn.assert_called_once_with(mock.ANY)
+        _, args, kwargs = mock_log.warn.mock_calls[0]
+        self.assertIn(
+            "Service \"db\" is using volume \"/data\" from the previous container",
+            args[0])
 
         self.assertEqual(list(new_container.get('Volumes')), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
@@ -812,7 +842,13 @@ class ServiceTest(DockerClientTestCase):
             environment=['ONE=1', 'TWO=2', 'THREE=3'],
             env_file=['tests/fixtures/env/one.env', 'tests/fixtures/env/two.env'])
         env = create_and_start_container(service).environment
-        for k, v in {'ONE': '1', 'TWO': '2', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'}.items():
+        for k, v in {
+            'ONE': '1',
+            'TWO': '2',
+            'THREE': '3',
+            'FOO': 'baz',
+            'DOO': 'dah'
+        }.items():
             self.assertEqual(env[k], v)
 
     @mock.patch.dict(os.environ)
@@ -820,9 +856,22 @@ class ServiceTest(DockerClientTestCase):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
-        service = self.create_service('web', environment={'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': None, 'NO_DEF': None})
+        service = self.create_service(
+            'web',
+            environment={
+                'FILE_DEF': 'F1',
+                'FILE_DEF_EMPTY': '',
+                'ENV_DEF': None,
+                'NO_DEF': None
+            }
+        )
         env = create_and_start_container(service).environment
-        for k, v in {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''}.items():
+        for k, v in {
+            'FILE_DEF': 'F1',
+            'FILE_DEF_EMPTY': '',
+            'ENV_DEF': 'E3',
+            'NO_DEF': ''
+        }.items():
             self.assertEqual(env[k], v)
 
     def test_with_high_enough_api_version_we_get_default_network_mode(self):
@@ -929,3 +978,38 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(set(service.containers(stopped=True)), set([original, duplicate]))
         self.assertEqual(set(service.duplicate_containers()), set([duplicate]))
+
+
+def converge(service,
+             strategy=ConvergenceStrategy.changed,
+             do_build=True):
+    """Create a converge plan from a strategy and execute the plan."""
+    plan = service.convergence_plan(strategy)
+    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
+
+
+class ConfigHashTest(DockerClientTestCase):
+    def test_no_config_hash_when_one_off(self):
+        web = self.create_service('web')
+        container = web.create_container(one_off=True)
+        self.assertNotIn(LABEL_CONFIG_HASH, container.labels)
+
+    def test_no_config_hash_when_overriding_options(self):
+        web = self.create_service('web')
+        container = web.create_container(environment={'FOO': '1'})
+        self.assertNotIn(LABEL_CONFIG_HASH, container.labels)
+
+    def test_config_hash_with_custom_labels(self):
+        web = self.create_service('web', labels={'foo': '1'})
+        container = converge(web)[0]
+        self.assertIn(LABEL_CONFIG_HASH, container.labels)
+        self.assertIn('foo', container.labels)
+
+    def test_config_hash_sticks_around(self):
+        web = self.create_service('web', command=["top"])
+        container = converge(web)[0]
+        self.assertIn(LABEL_CONFIG_HASH, container.labels)
+
+        web = self.create_service('web', command=["top", "-d", "1"])
+        container = converge(web)[0]
+        self.assertIn(LABEL_CONFIG_HASH, container.labels)

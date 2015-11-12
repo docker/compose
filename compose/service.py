@@ -300,9 +300,7 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        self.ensure_image_exists(
-            do_build=do_build,
-        )
+        self.ensure_image_exists(do_build=do_build)
 
         container_options = self._get_container_create_options(
             override_options,
@@ -316,9 +314,7 @@ class Service(object):
 
         return Container.create(self.client, **container_options)
 
-    def ensure_image_exists(self,
-                            do_build=True):
-
+    def ensure_image_exists(self, do_build=True):
         try:
             self.image()
             return
@@ -410,7 +406,7 @@ class Service(object):
             if should_attach_logs:
                 container.attach_log_stream()
 
-            self.start_container(container)
+            container.start()
 
             return [container]
 
@@ -418,6 +414,7 @@ class Service(object):
             return [
                 self.recreate_container(
                     container,
+                    do_build=do_build,
                     timeout=timeout,
                     attach_logs=should_attach_logs
                 )
@@ -439,10 +436,12 @@ class Service(object):
         else:
             raise Exception("Invalid action: {}".format(action))
 
-    def recreate_container(self,
-                           container,
-                           timeout=DEFAULT_TIMEOUT,
-                           attach_logs=False):
+    def recreate_container(
+            self,
+            container,
+            do_build=False,
+            timeout=DEFAULT_TIMEOUT,
+            attach_logs=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -454,28 +453,23 @@ class Service(object):
         container.stop(timeout=timeout)
         container.rename_to_tmp_name()
         new_container = self.create_container(
-            do_build=False,
+            do_build=do_build,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
         )
         if attach_logs:
             new_container.attach_log_stream()
-        self.start_container(new_container)
+        new_container.start()
         container.remove()
         return new_container
 
     def start_container_if_stopped(self, container, attach_logs=False):
-        if container.is_running:
-            return container
-        else:
+        if not container.is_running:
             log.info("Starting %s" % container.name)
             if attach_logs:
                 container.attach_log_stream()
-            return self.start_container(container)
-
-    def start_container(self, container):
-        container.start()
+            container.start()
         return container
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
@@ -508,7 +502,9 @@ class Service(object):
             'image_id': self.image()['Id'],
             'links': self.get_link_names(),
             'net': self.net.id,
-            'volumes_from': self.get_volumes_from_names(),
+            'volumes_from': [
+                (v.source.name, v.mode) for v in self.volumes_from if isinstance(v.source, Service)
+            ],
         }
 
     def get_dependency_names(self):
@@ -605,9 +601,6 @@ class Service(object):
             container_options['hostname'] = parts[0]
             container_options['domainname'] = parts[2]
 
-        if 'hostname' not in container_options and self.use_networking:
-            container_options['hostname'] = self.name
-
         if 'ports' in container_options or 'expose' in self.options:
             ports = []
             all_ports = container_options.get('ports', []) + self.options.get('expose', [])
@@ -683,6 +676,7 @@ class Service(object):
 
         devices = options.get('devices', None)
         cgroup_parent = options.get('cgroup_parent', None)
+        ulimits = build_ulimits(options.get('ulimits', None))
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
@@ -699,6 +693,7 @@ class Service(object):
             cap_drop=cap_drop,
             mem_limit=options.get('mem_limit'),
             memswap_limit=options.get('memswap_limit'),
+            ulimits=ulimits,
             log_config=log_config,
             extra_hosts=extra_hosts,
             read_only=read_only,
@@ -708,7 +703,7 @@ class Service(object):
             cgroup_parent=cgroup_parent
         )
 
-    def build(self, no_cache=False, pull=False):
+    def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
 
         path = self.options['build']
@@ -722,6 +717,7 @@ class Service(object):
             tag=self.image_name,
             stream=True,
             rm=True,
+            forcerm=force_rm,
             pull=pull,
             nocache=no_cache,
             dockerfile=self.options.get('dockerfile', None),
@@ -899,14 +895,17 @@ def merge_volume_bindings(volumes_option, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
+    volumes = [parse_volume_spec(volume) for volume in volumes_option or []]
     volume_bindings = dict(
-        build_volume_binding(parse_volume_spec(volume))
-        for volume in volumes_option or []
-        if ':' in volume)
+        build_volume_binding(volume)
+        for volume in volumes
+        if volume.external)
 
     if previous_container:
+        data_volumes = get_container_data_volumes(previous_container, volumes)
+        warn_on_masked_volume(volumes, data_volumes, previous_container.service)
         volume_bindings.update(
-            get_container_data_volumes(previous_container, volumes_option))
+            build_volume_binding(volume) for volume in data_volumes)
 
     return list(volume_bindings.values())
 
@@ -916,13 +915,14 @@ def get_container_data_volumes(container, volumes_option):
     a mapping of volume bindings for those volumes.
     """
     volumes = []
-
-    volumes_option = volumes_option or []
     container_volumes = container.get('Volumes') or {}
-    image_volumes = container.image_config['ContainerConfig'].get('Volumes') or {}
+    image_volumes = [
+        parse_volume_spec(volume)
+        for volume in
+        container.image_config['ContainerConfig'].get('Volumes') or {}
+    ]
 
-    for volume in set(volumes_option + list(image_volumes)):
-        volume = parse_volume_spec(volume)
+    for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
         if volume.external:
             continue
@@ -934,9 +934,27 @@ def get_container_data_volumes(container, volumes_option):
 
         # Copy existing volume from old container
         volume = volume._replace(external=volume_path)
-        volumes.append(build_volume_binding(volume))
+        volumes.append(volume)
 
-    return dict(volumes)
+    return volumes
+
+
+def warn_on_masked_volume(volumes_option, container_volumes, service):
+    container_volumes = dict(
+        (volume.internal, volume.external)
+        for volume in container_volumes)
+
+    for volume in volumes_option:
+        if container_volumes.get(volume.internal) != volume.external:
+            log.warn((
+                "Service \"{service}\" is using volume \"{volume}\" from the "
+                "previous container. Host mapping \"{host_path}\" has no effect. "
+                "Remove the existing containers (with `docker-compose rm {service}`) "
+                "to use the host volume mapping."
+            ).format(
+                service=service,
+                volume=volume.internal,
+                host_path=volume.external))
 
 
 def build_volume_binding(volume_spec):
@@ -1057,6 +1075,23 @@ def parse_restart_spec(restart_config):
         max_retry_count = 0
 
     return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+# Ulimits
+
+
+def build_ulimits(ulimit_config):
+    if not ulimit_config:
+        return None
+    ulimits = []
+    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+        if isinstance(soft_hard_values, six.integer_types):
+            ulimits.append({'name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
+        elif isinstance(soft_hard_values, dict):
+            ulimit_dict = {'name': limit_name}
+            ulimit_dict.update(soft_hard_values)
+            ulimits.append(ulimit_dict)
+
+    return ulimits
 
 
 # Extra hosts

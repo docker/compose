@@ -278,10 +278,10 @@ class Project(object):
         for service in self.get_services(service_names):
             service.restart(**options)
 
-    def build(self, service_names=None, no_cache=False, pull=False):
+    def build(self, service_names=None, no_cache=False, pull=False, force_rm=False):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull)
+                service.build(no_cache, pull, force_rm)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
@@ -300,7 +300,7 @@ class Project(object):
 
         plans = self._get_convergence_plans(services, strategy)
 
-        if self.use_networking:
+        if self.use_networking and self.uses_default_network():
             self.ensure_network_exists()
 
         return [
@@ -322,7 +322,7 @@ class Project(object):
                 name
                 for name in service.get_dependency_names()
                 if name in plans
-                and plans[name].action == 'recreate'
+                and plans[name].action in ('recreate', 'create')
             ]
 
             if updated_dependencies and strategy.allows_recreate:
@@ -383,7 +383,10 @@ class Project(object):
     def remove_network(self):
         network = self.get_network()
         if network:
-            self.client.remove_network(network['id'])
+            self.client.remove_network(network['Id'])
+
+    def uses_default_network(self):
+        return any(service.net.mode == self.name for service in self.services)
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()

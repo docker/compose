@@ -13,12 +13,12 @@ from requests.exceptions import ReadTimeout
 
 from .. import __version__
 from .. import legacy
+from ..config import ConfigurationError
 from ..config import parse_environment
 from ..const import DEFAULT_TIMEOUT
 from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
-from ..project import ConfigurationError
 from ..project import NoSuchService
 from ..service import BuildError
 from ..service import ConvergenceStrategy
@@ -80,6 +80,7 @@ def main():
             "If you encounter this issue regularly because of slow network conditions, consider setting "
             "COMPOSE_HTTP_TIMEOUT to a higher value (current value: %s)." % HTTP_TIMEOUT
         )
+        sys.exit(1)
 
 
 def setup_logging():
@@ -180,12 +181,15 @@ class TopLevelCommand(DocoptCommand):
         Usage: build [options] [SERVICE...]
 
         Options:
+            --force-rm  Always remove intermediate containers.
             --no-cache  Do not use cache when building the image.
             --pull      Always attempt to pull a newer version of the image.
         """
-        no_cache = bool(options.get('--no-cache', False))
-        pull = bool(options.get('--pull', False))
-        project.build(service_names=options['SERVICE'], no_cache=no_cache, pull=pull)
+        project.build(
+            service_names=options['SERVICE'],
+            no_cache=bool(options.get('--no-cache', False)),
+            pull=bool(options.get('--pull', False)),
+            force_rm=bool(options.get('--force-rm', False)))
 
     def help(self, project, options):
         """
@@ -448,7 +452,7 @@ class TopLevelCommand(DocoptCommand):
             raise e
 
         if detach:
-            service.start_container(container)
+            container.start()
             print(container.name)
         else:
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
