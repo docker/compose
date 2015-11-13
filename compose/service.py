@@ -663,8 +663,6 @@ class Service(object):
         if isinstance(dns_search, six.string_types):
             dns_search = [dns_search]
 
-        restart = parse_restart_spec(options.get('restart', None))
-
         extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
         read_only = options.get('read_only', None)
 
@@ -682,7 +680,7 @@ class Service(object):
             devices=devices,
             dns=dns,
             dns_search=dns_search,
-            restart_policy=restart,
+            restart_policy=options.get('restart'),
             cap_add=cap_add,
             cap_drop=cap_drop,
             mem_limit=options.get('mem_limit'),
@@ -1057,24 +1055,6 @@ def build_container_labels(label_options, service_labels, number, config_hash):
 
     return labels
 
-
-# Restart policy
-
-
-def parse_restart_spec(restart_config):
-    if not restart_config:
-        return None
-    parts = restart_config.split(':')
-    if len(parts) > 2:
-        raise ConfigError("Restart %s has incorrect format, should be "
-                          "mode[:max_retry]" % restart_config)
-    if len(parts) == 2:
-        name, max_retry_count = parts
-    else:
-        name, = parts
-        max_retry_count = 0
-
-    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
 
 # Ulimits
 
