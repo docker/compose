@@ -18,7 +18,6 @@ from docker.utils.ports import split_port
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
-from .config.validation import VALID_NAME_CHARS
 from .const import DEFAULT_TIMEOUT
 from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
@@ -119,9 +118,6 @@ class Service(object):
         net=None,
         **options
     ):
-        if not re.match('^%s+$' % VALID_NAME_CHARS, project):
-            raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
-
         self.name = name
         self.client = client
         self.project = project

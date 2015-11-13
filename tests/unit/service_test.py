@@ -35,11 +35,6 @@ class ServiceTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.Client)
 
-    def test_project_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='>', image='foo'))
-
-        Service(name='foo', project='bar.bar__', image='foo')
-
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
         self.mock_client.containers.return_value = []
