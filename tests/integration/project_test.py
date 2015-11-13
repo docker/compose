@@ -3,12 +3,12 @@ from __future__ import unicode_literals
 from .testcases import DockerClientTestCase
 from compose.cli.docker_client import docker_client
 from compose.config import config
+from compose.config.types import VolumeFromSpec
 from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
 from compose.service import ConvergenceStrategy
 from compose.service import Net
-from compose.service import VolumeFromSpec
 
 
 def build_service_dicts(service_config):

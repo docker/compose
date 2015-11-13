@@ -14,6 +14,7 @@ from .. import mock
 from .testcases import DockerClientTestCase
 from .testcases import pull_busybox
 from compose import __version__
+from compose.config.types import VolumeFromSpec
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
@@ -27,7 +28,6 @@ from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import Net
 from compose.service import Service
-from compose.service import VolumeFromSpec
 
 
 def create_and_start_container(service, **override_options):
