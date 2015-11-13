@@ -43,3 +43,19 @@ def parse_restart_spec(restart_config):
         max_retry_count = 0
 
     return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+
+def parse_extra_hosts(extra_hosts_config):
+    if not extra_hosts_config:
+        return {}
+
+    if isinstance(extra_hosts_config, dict):
+        return dict(extra_hosts_config)
+
+    if isinstance(extra_hosts_config, list):
+        extra_hosts_dict = {}
+        for extra_hosts_line in extra_hosts_config:
+            # TODO: validate string contains ':' ?
+            host, ip = extra_hosts_line.split(':')
+            extra_hosts_dict[host.strip()] = ip.strip()
+        return extra_hosts_dict

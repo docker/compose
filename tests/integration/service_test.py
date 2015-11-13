@@ -22,8 +22,6 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
-from compose.service import build_extra_hosts
-from compose.service import ConfigError
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import Net
@@ -138,37 +136,6 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         container.start()
         self.assertEqual(container.get('HostConfig.CpuShares'), 73)
-
-    def test_build_extra_hosts(self):
-        # string
-        self.assertRaises(ConfigError, lambda: build_extra_hosts("www.example.com: 192.168.0.17"))
-
-        # list of strings
-        self.assertEqual(build_extra_hosts(
-            ["www.example.com:192.168.0.17"]),
-            {'www.example.com': '192.168.0.17'})
-        self.assertEqual(build_extra_hosts(
-            ["www.example.com: 192.168.0.17"]),
-            {'www.example.com': '192.168.0.17'})
-        self.assertEqual(build_extra_hosts(
-            ["www.example.com: 192.168.0.17",
-             "static.example.com:192.168.0.19",
-             "api.example.com: 192.168.0.18"]),
-            {'www.example.com': '192.168.0.17',
-             'static.example.com': '192.168.0.19',
-             'api.example.com': '192.168.0.18'})
-
-        # list of dictionaries
-        self.assertRaises(ConfigError, lambda: build_extra_hosts(
-            [{'www.example.com': '192.168.0.17'},
-             {'api.example.com': '192.168.0.18'}]))
-
-        # dictionaries
-        self.assertEqual(build_extra_hosts(
-            {'www.example.com': '192.168.0.17',
-             'api.example.com': '192.168.0.18'}),
-            {'www.example.com': '192.168.0.17',
-             'api.example.com': '192.168.0.18'})
 
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']

@@ -14,6 +14,7 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
+from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import VolumeFromSpec
 from .validation import validate_against_fields_schema
@@ -378,6 +379,9 @@ def process_service(service_config):
 
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
+
+    if 'extra_hosts' in service_dict:
+        service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
     # TODO: move to a validate_service()
     if 'ulimits' in service_dict:
