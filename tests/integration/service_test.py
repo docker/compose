@@ -786,23 +786,21 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertIsNone(container.get('HostConfig.Dns'))
 
-    def test_dns_single_value(self):
-        service = self.create_service('web', dns='8.8.8.8')
-        container = create_and_start_container(service)
-        self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8'])
-
     def test_dns_list(self):
         service = self.create_service('web', dns=['8.8.8.8', '9.9.9.9'])
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8', '9.9.9.9'])
 
     def test_restart_always_value(self):
-        service = self.create_service('web', restart='always')
+        service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'always')
 
     def test_restart_on_failure_value(self):
-        service = self.create_service('web', restart='on-failure:5')
+        service = self.create_service('web', restart={
+            'Name': 'on-failure',
+            'MaximumRetryCount': 5
+        })
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'on-failure')
         self.assertEqual(container.get('HostConfig.RestartPolicy.MaximumRetryCount'), 5)
@@ -817,17 +815,7 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.CapDrop'), ['SYS_ADMIN', 'NET_ADMIN'])
 
-    def test_dns_search_no_value(self):
-        service = self.create_service('web')
-        container = create_and_start_container(service)
-        self.assertIsNone(container.get('HostConfig.DnsSearch'))
-
-    def test_dns_search_single_value(self):
-        service = self.create_service('web', dns_search='example.com')
-        container = create_and_start_container(service)
-        self.assertEqual(container.get('HostConfig.DnsSearch'), ['example.com'])
-
-    def test_dns_search_list(self):
+    def test_dns_search(self):
         service = self.create_service('web', dns_search=['dc1.example.com', 'dc2.example.com'])
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])

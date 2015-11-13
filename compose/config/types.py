@@ -26,3 +26,20 @@ class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode')):
             source, mode = parts
 
         return cls(source, mode)
+
+
+def parse_restart_spec(restart_config):
+    if not restart_config:
+        return None
+    parts = restart_config.split(':')
+    if len(parts) > 2:
+        raise ConfigurationError(
+            "Restart %s has incorrect format, should be "
+            "mode[:max_retry]" % restart_config)
+    if len(parts) == 2:
+        name, max_retry_count = parts
+    else:
+        name, = parts
+        max_retry_count = 0
+
+    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
