@@ -72,9 +72,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 	s.events = events
 	go func() {
 		for e := range events {
-			if err := s.journal.write(e); err != nil {
-				logrus.WithField("error", err).Error("write journal entry")
-			}
+			s.journal.write(e)
 			switch e.Type {
 			case ExitEventType:
 				logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).

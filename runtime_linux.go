@@ -13,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
@@ -341,7 +340,6 @@ func (r *libcontainerRuntime) newProcess(p specs.Process, stdio *Stdio) (*libcon
 	)
 	if stdio != nil {
 		if stdio.Stdout != "" {
-			logrus.Debug("adding stdout")
 			f, err := os.OpenFile(stdio.Stdout, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
 				return nil, err

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/Sirupsen/logrus"
 )
 
 type entry struct {
@@ -18,24 +20,38 @@ func newJournal(path string) (*journal, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &journal{
+	j := &journal{
 		f:   f,
 		enc: json.NewEncoder(f),
-	}, nil
+		wc:  make(chan *Event, 2048),
+	}
+	go j.start()
+	return j, nil
 }
 
 type journal struct {
 	f   *os.File
 	enc *json.Encoder
+	wc  chan *Event
 }
 
-func (j *journal) write(e *Event) error {
-	et := &entry{
-		Event: e,
+func (j *journal) start() {
+	for e := range j.wc {
+		et := &entry{
+			Event: e,
+		}
+		if err := j.enc.Encode(et); err != nil {
+			logrus.WithField("error", err).Error("write event to journal")
+		}
 	}
-	return j.enc.Encode(et)
+}
+
+func (j *journal) write(e *Event) {
+	j.wc <- e
 }
 
 func (j *journal) Close() error {
+	// TODO: add waitgroup to make sure journal is flushed
+	close(j.wc)
 	return j.f.Close()
 }

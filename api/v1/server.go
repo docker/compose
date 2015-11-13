@@ -217,7 +217,6 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 	e := containerd.NewEvent(containerd.StartContainerEventType)
 	e.ID = id
 	e.BundlePath = c.BundlePath
-	logrus.Debug(c.Stderr, c.Stdout)
 	e.Stdio = &containerd.Stdio{
 		Stderr: c.Stderr,
 		Stdout: c.Stdout,
