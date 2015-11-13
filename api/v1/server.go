@@ -169,8 +169,9 @@ func writeContainers(w http.ResponseWriter, e *containerd.Event) error {
 		}
 		var pids []Process
 		for _, p := range processes {
-			proc := createProcess(p)
-			pids = append(pids, proc)
+			if proc := createProcess(p); proc != nil {
+				pids = append(pids, *proc)
+			}
 		}
 		state.Containers = append(state.Containers, Container{
 			ID:         c.ID(),
@@ -184,13 +185,14 @@ func writeContainers(w http.ResponseWriter, e *containerd.Event) error {
 	return json.NewEncoder(w).Encode(&state)
 }
 
-func createProcess(in containerd.Process) Process {
+func createProcess(in containerd.Process) *Process {
 	pid, err := in.Pid()
 	if err != nil {
 		logrus.WithField("error", err).Error("get process pid")
+		return nil
 	}
 	process := in.Spec()
-	p := Process{
+	p := &Process{
 		Pid:      pid,
 		Terminal: process.Terminal,
 		Args:     process.Args,
