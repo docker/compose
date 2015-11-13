@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import operator
 from functools import reduce
 
 import six
@@ -8,6 +9,7 @@ import six
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
+from compose.utils import parallel_execute
 
 
 class Container(object):
@@ -250,3 +252,40 @@ def get_container_name(container):
     # ps
     shortest_name = min(container['Names'], key=lambda n: len(n.split('/')))
     return shortest_name.split('/')[-1]
+
+
+def parallel_operation(containers, operation, options, message):
+    parallel_execute(
+        containers,
+        operator.methodcaller(operation, **options),
+        operator.attrgetter('name'),
+        message)
+
+
+def parallel_remove(containers, options):
+    stopped_containers = [c for c in containers if not c.is_running]
+    parallel_operation(stopped_containers, 'remove', options, 'Removing')
+
+
+def parallel_stop(containers, options):
+    parallel_operation(containers, 'stop', options, 'Stopping')
+
+
+def parallel_start(containers, options):
+    parallel_operation(containers, 'start', options, 'Starting')
+
+
+def parallel_pause(containers, options):
+    parallel_operation(containers, 'pause', options, 'Pausing')
+
+
+def parallel_unpause(containers, options):
+    parallel_operation(containers, 'unpause', options, 'Unpausing')
+
+
+def parallel_kill(containers, options):
+    parallel_operation(containers, 'kill', options, 'Killing')
+
+
+def parallel_restart(containers, options):
+    parallel_operation(containers, 'restart', options, 'Restarting')

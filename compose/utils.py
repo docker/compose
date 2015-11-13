@@ -17,58 +17,51 @@ log = logging.getLogger(__name__)
 json_decoder = json.JSONDecoder()
 
 
-def parallel_execute(objects, obj_callable, msg_index, msg):
-    """
-    For a given list of objects, call the callable passing in the first
+def perform_operation(func, arg, callback, index):
+    try:
+        callback((index, func(arg)))
+    except Exception as e:
+        callback((index, e))
+
+
+def parallel_execute(objects, func, index_func, msg):
+    """For a given list of objects, call the callable passing in the first
     object we give it.
     """
+    objects = list(objects)
     stream = get_output_stream(sys.stdout)
-    lines = []
+    writer = ParallelStreamWriter(stream, msg)
 
     for obj in objects:
-        write_out_msg(stream, lines, msg_index(obj), msg)
+        writer.initialize(index_func(obj))
 
     q = Queue()
 
-    def inner_execute_function(an_callable, parameter, msg_index):
-        error = None
-        try:
-            result = an_callable(parameter)
-        except APIError as e:
-            error = e.explanation
-            result = "error"
-        except Exception as e:
-            error = e
-            result = 'unexpected_exception'
-
-        q.put((msg_index, result, error))
-
-    for an_object in objects:
+    # TODO: limit the number of threads #1828
+    for obj in objects:
         t = Thread(
-            target=inner_execute_function,
-            args=(obj_callable, an_object, msg_index(an_object)),
-        )
+            target=perform_operation,
+            args=(func, obj, q.put, index_func(obj)))
         t.daemon = True
         t.start()
 
     done = 0
     errors = {}
-    total_to_execute = len(objects)
 
-    while done < total_to_execute:
+    while done < len(objects):
         try:
-            msg_index, result, error = q.get(timeout=1)
-
-            if result == 'unexpected_exception':
-                errors[msg_index] = result, error
-            if result == 'error':
-                errors[msg_index] = result, error
-                write_out_msg(stream, lines, msg_index, msg, status='error')
-            else:
-                write_out_msg(stream, lines, msg_index, msg)
-            done += 1
+            msg_index, result = q.get(timeout=1)
         except Empty:
-            pass
+            continue
+
+        if isinstance(result, APIError):
+            errors[msg_index] = "error", result.explanation
+            writer.write(msg_index, 'error')
+        elif isinstance(result, Exception):
+            errors[msg_index] = "unexpected_exception", result
+        else:
+            writer.write(msg_index, 'done')
+        done += 1
 
     if not errors:
         return
@@ -78,6 +71,36 @@ def parallel_execute(objects, obj_callable, msg_index, msg):
         stream.write("ERROR: for {}  {} \n".format(msg_index, error))
         if result == 'unexpected_exception':
             raise error
+
+
+class ParallelStreamWriter(object):
+    """Write out messages for operations happening in parallel.
+
+    Each operation has it's own line, and ANSI code characters are used
+    to jump to the correct line, and write over the line.
+    """
+
+    def __init__(self, stream, msg):
+        self.stream = stream
+        self.msg = msg
+        self.lines = []
+
+    def initialize(self, obj_index):
+        self.lines.append(obj_index)
+        self.stream.write("{} {} ... \r\n".format(self.msg, obj_index))
+        self.stream.flush()
+
+    def write(self, obj_index, status):
+        position = self.lines.index(obj_index)
+        diff = len(self.lines) - position
+        # move up
+        self.stream.write("%c[%dA" % (27, diff))
+        # erase
+        self.stream.write("%c[2K\r" % 27)
+        self.stream.write("{} {} ... {}\r".format(self.msg, obj_index, status))
+        # move back down
+        self.stream.write("%c[%dB" % (27, diff))
+        self.stream.flush()
 
 
 def get_output_stream(stream):
@@ -149,30 +172,6 @@ def json_stream(stream):
     be newline delimited, and others are not).
     """
     return split_buffer(stream, json_splitter, json_decoder.decode)
-
-
-def write_out_msg(stream, lines, msg_index, msg, status="done"):
-    """
-    Using special ANSI code characters we can write out the msg over the top of
-    a previous status message, if it exists.
-    """
-    obj_index = msg_index
-    if msg_index in lines:
-        position = lines.index(obj_index)
-        diff = len(lines) - position
-        # move up
-        stream.write("%c[%dA" % (27, diff))
-        # erase
-        stream.write("%c[2K\r" % 27)
-        stream.write("{} {} ... {}\r".format(msg, obj_index, status))
-        # move back down
-        stream.write("%c[%dB" % (27, diff))
-    else:
-        diff = 0
-        lines.append(obj_index)
-        stream.write("{} {} ... \r\n".format(msg, obj_index))
-
-    stream.flush()
 
 
 def json_hash(obj):
