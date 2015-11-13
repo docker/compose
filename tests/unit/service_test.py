@@ -6,6 +6,7 @@ import pytest
 
 from .. import mock
 from .. import unittest
+from compose.config.types import VolumeFromSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF

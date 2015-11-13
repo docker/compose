@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import codecs
 import logging
 import os
@@ -11,6 +13,7 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
+from .types import VolumeFromSpec
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_extends_file_path
@@ -197,8 +200,12 @@ def load(config_details):
             service_dict)
         resolver = ServiceExtendsResolver(service_config)
         service_dict = process_service(resolver.run())
+
+        # TODO: move to validate_service()
         validate_against_service_schema(service_dict, service_config.name)
         validate_paths(service_dict)
+
+        service_dict = finalize_service(service_config._replace(config=service_dict))
         service_dict['name'] = service_config.name
         return service_dict
 
@@ -352,6 +359,7 @@ def validate_ulimits(ulimit_config):
                     "than 'hard' value".format(ulimit_config))
 
 
+# TODO: rename to normalize_service
 def process_service(service_config):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
@@ -369,8 +377,19 @@ def process_service(service_config):
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
 
+    # TODO: move to a validate_service()
     if 'ulimits' in service_dict:
         validate_ulimits(service_dict['ulimits'])
+
+    return service_dict
+
+
+def finalize_service(service_config):
+    service_dict = dict(service_config.config)
+
+    if 'volumes_from' in service_dict:
+        service_dict['volumes_from'] = [
+            VolumeFromSpec.parse(vf) for vf in service_dict['volumes_from']]
 
     return service_dict
 

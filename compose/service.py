@@ -67,6 +67,7 @@ class BuildError(Exception):
         self.reason = reason
 
 
+# TODO: remove
 class ConfigError(ValueError):
     pass
 
@@ -81,9 +82,6 @@ class NoSuchImageError(Exception):
 
 
 VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
-
-
-VolumeFromSpec = namedtuple('VolumeFromSpec', 'source mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
@@ -1042,21 +1040,6 @@ def build_volume_from(volume_from_spec):
         return ["{}:{}".format(container.id, volume_from_spec.mode)]
     elif isinstance(volume_from_spec.source, Container):
         return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
-
-
-def parse_volume_from_spec(volume_from_config):
-    parts = volume_from_config.split(':')
-    if len(parts) > 2:
-        raise ConfigError("Volume %s has incorrect format, should be "
-                          "external:internal[:mode]" % volume_from_config)
-
-    if len(parts) == 1:
-        source = parts[0]
-        mode = 'rw'
-    else:
-        source, mode = parts
-
-    return VolumeFromSpec(source, mode)
 
 
 # Labels
