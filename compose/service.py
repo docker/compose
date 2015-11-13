@@ -655,6 +655,7 @@ class Service(object):
         pid = options.get('pid', None)
         security_opt = options.get('security_opt', None)
 
+        # TODO: these options are already normalized by config
         dns = options.get('dns', None)
         if isinstance(dns, six.string_types):
             dns = [dns]
@@ -662,9 +663,6 @@ class Service(object):
         dns_search = options.get('dns_search', None)
         if isinstance(dns_search, six.string_types):
             dns_search = [dns_search]
-
-        extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
-        read_only = options.get('read_only', None)
 
         devices = options.get('devices', None)
         cgroup_parent = options.get('cgroup_parent', None)
@@ -687,8 +685,8 @@ class Service(object):
             memswap_limit=options.get('memswap_limit'),
             ulimits=ulimits,
             log_config=log_config,
-            extra_hosts=extra_hosts,
-            read_only=read_only,
+            extra_hosts=options.get('extra_hosts'),
+            read_only=options.get('read_only'),
             pid_mode=pid,
             security_opt=security_opt,
             ipc_mode=options.get('ipc'),
@@ -1072,31 +1070,3 @@ def build_ulimits(ulimit_config):
             ulimits.append(ulimit_dict)
 
     return ulimits
-
-
-# Extra hosts
-
-
-def build_extra_hosts(extra_hosts_config):
-    if not extra_hosts_config:
-        return {}
-
-    if isinstance(extra_hosts_config, list):
-        extra_hosts_dict = {}
-        for extra_hosts_line in extra_hosts_config:
-            if not isinstance(extra_hosts_line, six.string_types):
-                raise ConfigError(
-                    "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
-                    extra_hosts_config
-                )
-            host, ip = extra_hosts_line.split(':')
-            extra_hosts_dict.update({host.strip(): ip.strip()})
-        extra_hosts_config = extra_hosts_dict
-
-    if isinstance(extra_hosts_config, dict):
-        return extra_hosts_config
-
-    raise ConfigError(
-        "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
-        extra_hosts_config
-    )

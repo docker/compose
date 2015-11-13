@@ -49,7 +49,7 @@ def format_ports(instance):
     return True
 
 
-@FormatChecker.cls_checks(format="environment")
+@FormatChecker.cls_checks(format="bool-value-in-mapping")
 def format_boolean_in_environment(instance):
     """
     Check if there is a boolean in the environment and display a warning.
@@ -273,7 +273,7 @@ def validate_against_fields_schema(config, filename):
     _validate_against_schema(
         config,
         "fields_schema.json",
-        format_checker=["ports", "environment"],
+        format_checker=["ports", "bool-value-in-mapping"],
         filename=filename)
 
 

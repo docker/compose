@@ -32,7 +32,7 @@ def service_sort(services):
     return sorted(services, key=itemgetter('name'))
 
 
-def build_config_details(contents, working_dir, filename):
+def build_config_details(contents, working_dir='working_dir', filename='filename.yml'):
     return config.ConfigDetails(
         working_dir,
         [config.ConfigFile(filename, contents)])
@@ -511,6 +511,29 @@ class ConfigTest(unittest.TestCase):
             config.load_yaml(str(invalid_yaml_file))
 
         assert 'line 3, column 32' in exc.exconly()
+
+    def test_validate_extra_hosts_invalid(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details({
+                'web': {
+                    'image': 'alpine',
+                    'extra_hosts': "www.example.com: 192.168.0.17",
+                }
+            }))
+        assert "'extra_hosts' contains an invalid type" in exc.exconly()
+
+    def test_validate_extra_hosts_invalid_list(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details({
+                'web': {
+                    'image': 'alpine',
+                    'extra_hosts': [
+                        {'www.example.com': '192.168.0.17'},
+                        {'api.example.com': '192.168.0.18'}
+                    ],
+                }
+            }))
+        assert "which is an invalid type" in exc.exconly()
 
 
 class InterpolationTest(unittest.TestCase):
