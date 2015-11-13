@@ -3,6 +3,7 @@ package containerd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -71,6 +72,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 	}
 	s.events = events
 	go func() {
+		runtime.LockOSThread()
 		for e := range events {
 			s.journal.write(e)
 			switch e.Type {
