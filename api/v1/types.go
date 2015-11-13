@@ -19,6 +19,8 @@ type Container struct {
 	ID         string          `json:"id,omitempty"`
 	BundlePath string          `json:"bundlePath,omitempty"`
 	Processes  []Process       `json:"processes,omitempty"`
+	Stdout     string          `json:"stdout,omitempty"`
+	Stderr     string          `json:"stderr,omitempty"`
 	State      *ContainerState `json:"state,omitempty"`
 }
 

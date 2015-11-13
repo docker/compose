@@ -5,6 +5,7 @@ package containerd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
@@ -275,7 +277,7 @@ type libcontainerRuntime struct {
 	factory libcontainer.Factory
 }
 
-func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
+func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *Stdio) (Container, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
 		filepath.Join(bundlePath, "runtime.json"),
@@ -291,7 +293,10 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	process := r.newProcess(spec.Process)
+	process, err := r.newProcess(spec.Process, stdio)
+	if err != nil {
+		return nil, err
+	}
 	c := &libcontainerContainer{
 		c:                   container,
 		additionalProcesses: make(map[int]*libcontainerProcess),
@@ -304,12 +309,15 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (Container, error) {
 	return c, nil
 }
 
-func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process) (Process, error) {
+func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process, stdio *Stdio) (Process, error) {
 	c, ok := ci.(*libcontainerContainer)
 	if !ok {
 		return nil, errInvalidContainerType
 	}
-	process := r.newProcess(p)
+	process, err := r.newProcess(p, stdio)
+	if err != nil {
+		return nil, err
+	}
 	if err := c.c.Start(process); err != nil {
 		return nil, err
 	}
@@ -327,14 +335,36 @@ func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process) (Proce
 
 // newProcess returns a new libcontainer Process with the arguments from the
 // spec and stdio from the current process.
-func (r *libcontainerRuntime) newProcess(p specs.Process) *libcontainer.Process {
+func (r *libcontainerRuntime) newProcess(p specs.Process, stdio *Stdio) (*libcontainer.Process, error) {
+	var (
+		stderr, stdout io.Writer
+	)
+	if stdio != nil {
+		if stdio.Stdout != "" {
+			logrus.Debug("adding stdout")
+			f, err := os.OpenFile(stdio.Stdout, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				return nil, err
+			}
+			stdout = f
+		}
+		if stdio.Stderr != "" {
+			f, err := os.OpenFile(stdio.Stderr, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				return nil, err
+			}
+			stderr = f
+		}
+	}
 	return &libcontainer.Process{
 		Args: p.Args,
 		Env:  p.Env,
 		// TODO: fix libcontainer's API to better support uid/gid in a typesafe way.
-		User: fmt.Sprintf("%d:%d", p.User.UID, p.User.GID),
-		Cwd:  p.Cwd,
-	}
+		User:   fmt.Sprintf("%d:%d", p.User.UID, p.User.GID),
+		Cwd:    p.Cwd,
+		Stderr: stderr,
+		Stdout: stdout,
+	}, nil
 }
 
 // loadSpec loads the specification from the provided path.

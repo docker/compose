@@ -1,6 +1,6 @@
 
 
 all:
-	godep go build -tags libcontainer
+	go build -tags libcontainer
 
 

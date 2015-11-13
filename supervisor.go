@@ -101,7 +101,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 				ne.ID = container.ID()
 				s.SendEvent(ne)
 			case StartContainerEventType:
-				container, err := s.runtime.Create(e.ID, e.BundlePath)
+				container, err := s.runtime.Create(e.ID, e.BundlePath, e.Stdio)
 				if err != nil {
 					e.Err <- err
 					continue
@@ -147,7 +147,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 					e.Err <- ErrContainerNotFound
 					continue
 				}
-				p, err := s.runtime.StartProcess(container, *e.Process)
+				p, err := s.runtime.StartProcess(container, *e.Process, e.Stdio)
 				if err != nil {
 					e.Err <- err
 					continue
