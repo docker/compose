@@ -185,7 +185,7 @@ class Service(object):
             c.kill(**options)
 
     def restart(self, **options):
-        for c in self.containers():
+        for c in self.containers(stopped=True):
             log.info("Restarting %s" % c.name)
             c.restart(**options)
 
