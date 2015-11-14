@@ -37,7 +37,7 @@ def start_process(base_dir, options):
 def wait_on_process(proc, returncode=0):
     stdout, stderr = proc.communicate()
     if proc.returncode != returncode:
-        print(stderr)
+        print(stderr.decode('utf-8'))
         assert proc.returncode == returncode
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 

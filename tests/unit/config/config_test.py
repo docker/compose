@@ -11,6 +11,7 @@ import pytest
 
 from compose.config import config
 from compose.config.errors import ConfigurationError
+from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
@@ -147,7 +148,7 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'build': '/',
                 'links': ['db'],
-                'volumes': ['/home/user/project:/code'],
+                'volumes': [VolumeSpec.parse('/home/user/project:/code')],
             },
             {
                 'name': 'db',
@@ -211,7 +212,7 @@ class ConfigTest(unittest.TestCase):
             {
                 'name': 'web',
                 'image': 'example/web',
-                'volumes': ['/home/user/project:/code'],
+                'volumes': [VolumeSpec.parse('/home/user/project:/code')],
                 'labels': {'label': 'one'},
             },
         ]
@@ -626,14 +627,11 @@ class VolumeConfigTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = config.load(
-            build_config_details(
-                {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
-                '.',
-                None,
-            )
-        )[0]
-        self.assertEqual(d['volumes'], ['/host/path:/container/path'])
+        d = config.load(build_config_details(
+            {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
+            '.',
+        ))[0]
+        self.assertEqual(d['volumes'], [VolumeSpec.parse('/host/path:/container/path')])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)
@@ -1031,19 +1029,21 @@ class EnvTest(unittest.TestCase):
             build_config_details(
                 {'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
                 "tests/fixtures/env",
-                None,
             )
         )[0]
-        self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
+        self.assertEqual(
+            set(service_dict['volumes']),
+            set([VolumeSpec.parse('/tmp:/host/tmp')]))
 
         service_dict = config.load(
             build_config_details(
                 {'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
                 "tests/fixtures/env",
-                None,
             )
         )[0]
-        self.assertEqual(set(service_dict['volumes']), set(['/opt/tmp:/opt/host/tmp']))
+        self.assertEqual(
+            set(service_dict['volumes']),
+            set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')]))
 
 
 def load_from_filename(filename):
@@ -1290,8 +1290,14 @@ class ExtendsTest(unittest.TestCase):
         dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')
 
         paths = [
-            '%s:/foo' % os.path.abspath('tests/fixtures/volume-path/common/foo'),
-            '%s:/bar' % os.path.abspath('tests/fixtures/volume-path/bar'),
+            VolumeSpec(
+                os.path.abspath('tests/fixtures/volume-path/common/foo'),
+                '/foo',
+                'rw'),
+            VolumeSpec(
+                os.path.abspath('tests/fixtures/volume-path/bar'),
+                '/bar',
+                'rw')
         ]
 
         self.assertEqual(set(dicts[0]['volumes']), set(paths))
