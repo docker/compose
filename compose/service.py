@@ -511,7 +511,7 @@ class Service(object):
         # TODO: Implement issue #652 here
         return build_container_name(self.project, self.name, number, one_off)
 
-    # TODO: this would benefit from github.com/docker/docker/pull/11943
+    # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
         containers = filter(None, [
@@ -633,54 +633,34 @@ class Service(object):
 
     def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
-        port_bindings = build_port_bindings(options.get('ports') or [])
 
-        privileged = options.get('privileged', False)
-        cap_add = options.get('cap_add', None)
-        cap_drop = options.get('cap_drop', None)
         log_config = LogConfig(
             type=options.get('log_driver', ""),
             config=options.get('log_opt', None)
         )
-        pid = options.get('pid', None)
-        security_opt = options.get('security_opt', None)
-
-        # TODO: these options are already normalized by config
-        dns = options.get('dns', None)
-        if isinstance(dns, six.string_types):
-            dns = [dns]
-
-        dns_search = options.get('dns_search', None)
-        if isinstance(dns_search, six.string_types):
-            dns_search = [dns_search]
-
-        devices = options.get('devices', None)
-        cgroup_parent = options.get('cgroup_parent', None)
-        ulimits = build_ulimits(options.get('ulimits', None))
-
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
-            port_bindings=port_bindings,
+            port_bindings=build_port_bindings(options.get('ports') or []),
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
-            privileged=privileged,
+            privileged=options.get('privileged', False),
             network_mode=self.net.mode,
-            devices=devices,
-            dns=dns,
-            dns_search=dns_search,
+            devices=options.get('devices'),
+            dns=options.get('dns'),
+            dns_search=options.get('dns_search'),
             restart_policy=options.get('restart'),
-            cap_add=cap_add,
-            cap_drop=cap_drop,
+            cap_add=options.get('cap_add'),
+            cap_drop=options.get('cap_drop'),
             mem_limit=options.get('mem_limit'),
             memswap_limit=options.get('memswap_limit'),
-            ulimits=ulimits,
+            ulimits=build_ulimits(options.get('ulimits')),
             log_config=log_config,
             extra_hosts=options.get('extra_hosts'),
             read_only=options.get('read_only'),
-            pid_mode=pid,
-            security_opt=security_opt,
+            pid_mode=options.get('pid'),
+            security_opt=options.get('security_opt'),
             ipc_mode=options.get('ipc'),
-            cgroup_parent=cgroup_parent
+            cgroup_parent=options.get('cgroup_parent'),
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
