@@ -16,6 +16,7 @@ from .interpolation import interpolate_environment_variables
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import VolumeFromSpec
+from .types import VolumeSpec
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_extends_file_path
@@ -395,6 +396,10 @@ def finalize_service(service_config):
     if 'volumes_from' in service_dict:
         service_dict['volumes_from'] = [
             VolumeFromSpec.parse(vf) for vf in service_dict['volumes_from']]
+
+    if 'volumes' in service_dict:
+        service_dict['volumes'] = [
+            VolumeSpec.parse(v) for v in service_dict['volumes']]
 
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])

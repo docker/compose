@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
-import os
 import re
 import sys
 from collections import namedtuple
@@ -18,8 +17,8 @@ from docker.utils.ports import split_port
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
+from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
-from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -67,11 +66,6 @@ class BuildError(Exception):
         self.reason = reason
 
 
-# TODO: remove
-class ConfigError(ValueError):
-    pass
-
-
 class NeedsBuildError(Exception):
     def __init__(self, service):
         self.service = service
@@ -79,9 +73,6 @@ class NeedsBuildError(Exception):
 
 class NoSuchImageError(Exception):
     pass
-
-
-VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
@@ -613,8 +604,7 @@ class Service(object):
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict(
-                (parse_volume_spec(v).internal, {})
-                for v in container_options['volumes'])
+                (v.internal, {}) for v in container_options['volumes'])
 
         container_options['environment'] = merge_environment(
             self.options.get('environment'),
@@ -899,11 +889,10 @@ def parse_repository_tag(repo_path):
 # Volumes
 
 
-def merge_volume_bindings(volumes_option, previous_container):
+def merge_volume_bindings(volumes, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
-    volumes = [parse_volume_spec(volume) for volume in volumes_option or []]
     volume_bindings = dict(
         build_volume_binding(volume)
         for volume in volumes
@@ -925,7 +914,7 @@ def get_container_data_volumes(container, volumes_option):
     volumes = []
     container_volumes = container.get('Volumes') or {}
     image_volumes = [
-        parse_volume_spec(volume)
+        VolumeSpec.parse(volume)
         for volume in
         container.image_config['ContainerConfig'].get('Volumes') or {}
     ]
@@ -970,56 +959,6 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
 
 def build_volume_binding(volume_spec):
     return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
-
-
-def normalize_paths_for_engine(external_path, internal_path):
-    """Windows paths, c:\my\path\shiny, need to be changed to be compatible with
-    the Engine. Volume paths are expected to be linux style /c/my/path/shiny/
-    """
-    if not IS_WINDOWS_PLATFORM:
-        return external_path, internal_path
-
-    if external_path:
-        drive, tail = os.path.splitdrive(external_path)
-
-        if drive:
-            external_path = '/' + drive.lower().rstrip(':') + tail
-
-        external_path = external_path.replace('\\', '/')
-
-    return external_path, internal_path.replace('\\', '/')
-
-
-def parse_volume_spec(volume_config):
-    """
-    Parse a volume_config path and split it into external:internal[:mode]
-    parts to be returned as a valid VolumeSpec.
-    """
-    if IS_WINDOWS_PLATFORM:
-        # relative paths in windows expand to include the drive, eg C:\
-        # so we join the first 2 parts back together to count as one
-        drive, tail = os.path.splitdrive(volume_config)
-        parts = tail.split(":")
-
-        if drive:
-            parts[0] = drive + parts[0]
-    else:
-        parts = volume_config.split(':')
-
-    if len(parts) > 3:
-        raise ConfigError("Volume %s has incorrect format, should be "
-                          "external:internal[:mode]" % volume_config)
-
-    if len(parts) == 1:
-        external, internal = normalize_paths_for_engine(None, os.path.normpath(parts[0]))
-    else:
-        external, internal = normalize_paths_for_engine(os.path.normpath(parts[0]), os.path.normpath(parts[1]))
-
-    mode = 'rw'
-    if len(parts) == 3:
-        mode = parts[2]
-
-    return VolumeSpec(external, internal, mode)
 
 
 def build_volume_from(volume_from_spec):

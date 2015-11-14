@@ -15,6 +15,7 @@ from .testcases import DockerClientTestCase
 from .testcases import pull_busybox
 from compose import __version__
 from compose.config.types import VolumeFromSpec
+from compose.config.types import VolumeSpec
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
@@ -114,7 +115,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.name, 'composetest_db_run_1')
 
     def test_create_container_with_unspecified_volume(self):
-        service = self.create_service('db', volumes=['/var/db'])
+        service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         container = service.create_container()
         container.start()
         self.assertIn('/var/db', container.get('Volumes'))
@@ -176,7 +177,9 @@ class ServiceTest(DockerClientTestCase):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
 
-        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
+        service = self.create_service(
+            'db',
+            volumes=[VolumeSpec(host_path, container_path, 'rw')])
         container = service.create_container()
         container.start()
 
@@ -189,11 +192,10 @@ class ServiceTest(DockerClientTestCase):
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
     def test_recreate_preserves_volume_with_trailing_slash(self):
-        """
-        When the Compose file specifies a trailing slash in the container path, make
+        """When the Compose file specifies a trailing slash in the container path, make
         sure we copy the volume over when recreating.
         """
-        service = self.create_service('data', volumes=['/data/'])
+        service = self.create_service('data', volumes=[VolumeSpec.parse('/data/')])
         old_container = create_and_start_container(service)
         volume_path = old_container.get('Volumes')['/data']
 
@@ -207,7 +209,7 @@ class ServiceTest(DockerClientTestCase):
         """
         host_path = '/tmp/data'
         container_path = '/data'
-        volumes = ['{}:{}/'.format(host_path, container_path)]
+        volumes = [VolumeSpec.parse('{}:{}/'.format(host_path, container_path))]
 
         tmp_container = self.client.create_container(
             'busybox', 'true',
@@ -261,7 +263,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=['/etc'],
+            volumes=[VolumeSpec.parse('/etc')],
             entrypoint=['top'],
             command=['-d', '1']
         )
@@ -299,7 +301,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=['/var/db'],
+            volumes=[VolumeSpec.parse('/var/db')],
             entrypoint=['top'],
             command=['-d', '1']
         )
@@ -337,10 +339,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
     def test_execute_convergence_plan_when_image_volume_masks_config(self):
-        service = Service(
-            project='composetest',
-            name='db',
-            client=self.client,
+        service = self.create_service(
+            'db',
             build='tests/fixtures/dockerfile-with-volume',
         )
 
@@ -348,7 +348,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
         volume_path = old_container.get('Volumes')['/data']
 
-        service.options['volumes'] = ['/tmp:/data']
+        service.options['volumes'] = [VolumeSpec.parse('/tmp:/data')]
 
         with mock.patch('compose.service.log') as mock_log:
             new_container, = service.execute_convergence_plan(
@@ -857,22 +857,11 @@ class ServiceTest(DockerClientTestCase):
         for pair in expected.items():
             self.assertIn(pair, labels)
 
-        service.kill()
-        service.remove_stopped()
-
-        labels_list = ["%s=%s" % pair for pair in labels_dict.items()]
-
-        service = self.create_service('web', labels=labels_list)
-        labels = create_and_start_container(service).labels.items()
-        for pair in expected.items():
-            self.assertIn(pair, labels)
-
     def test_empty_labels(self):
-        labels_list = ['foo', 'bar']
-
-        service = self.create_service('web', labels=labels_list)
+        labels_dict = {'foo': '', 'bar': ''}
+        service = self.create_service('web', labels=labels_dict)
         labels = create_and_start_container(service).labels.items()
-        for name in labels_list:
+        for name in labels_dict:
             self.assertIn((name, ''), labels)
 
     def test_custom_container_name(self):

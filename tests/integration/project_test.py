@@ -4,6 +4,7 @@ from .testcases import DockerClientTestCase
 from compose.cli.docker_client import docker_client
 from compose.config import config
 from compose.config.types import VolumeFromSpec
+from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
@@ -214,7 +215,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=['/var/db'])
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -238,7 +239,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_recreate_preserves_volumes(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=['/etc'])
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/etc')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -257,7 +258,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_with_no_recreate_running(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=['/var/db'])
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -277,7 +278,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=['/var/db'])
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -316,7 +317,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_starts_links(self):
         console = self.create_service('console')
-        db = self.create_service('db', volumes=['/var/db'])
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         web = self.create_service('web', links=[(db, 'db')])
 
         project = Project('composetest', [web, db, console], self.client)
