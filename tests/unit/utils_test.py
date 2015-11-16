@@ -1,25 +1,21 @@
 # encoding: utf-8
 from __future__ import unicode_literals
 
-from .. import unittest
 from compose import utils
 
 
-class JsonSplitterTestCase(unittest.TestCase):
+class TestJsonSplitter(object):
 
     def test_json_splitter_no_object(self):
         data = '{"foo": "bar'
-        self.assertEqual(utils.json_splitter(data), (None, None))
+        assert utils.json_splitter(data) is None
 
     def test_json_splitter_with_object(self):
         data = '{"foo": "bar"}\n  \n{"next": "obj"}'
-        self.assertEqual(
-            utils.json_splitter(data),
-            ({'foo': 'bar'}, '{"next": "obj"}')
-        )
+        assert utils.json_splitter(data) == ({'foo': 'bar'}, '{"next": "obj"}')
 
 
-class StreamAsTextTestCase(unittest.TestCase):
+class TestStreamAsText(object):
 
     def test_stream_with_non_utf_unicode_character(self):
         stream = [b'\xed\xf3\xf3']
@@ -30,3 +26,19 @@ class StreamAsTextTestCase(unittest.TestCase):
         stream = ['ěĝ'.encode('utf-8')]
         output, = utils.stream_as_text(stream)
         assert output == 'ěĝ'
+
+
+class TestJsonStream(object):
+
+    def test_with_falsy_entries(self):
+        stream = [
+            '{"one": "two"}\n{}\n',
+            "[1, 2, 3]\n[]\n",
+        ]
+        output = list(utils.json_stream(stream))
+        assert output == [
+            {'one': 'two'},
+            {},
+            [1, 2, 3],
+            [],
+        ]
