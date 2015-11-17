@@ -1,5 +1,6 @@
 import codecs
 import logging
+import operator
 import os
 import sys
 from collections import namedtuple
@@ -389,54 +390,44 @@ def merge_service_dicts_from_files(base, override):
 
 
 def merge_service_dicts(base, override):
-    d = base.copy()
+    d = {}
 
-    if 'environment' in base or 'environment' in override:
-        d['environment'] = merge_environment(
-            base.get('environment'),
-            override.get('environment'),
-        )
+    def merge_field(field, merge_func, default=None):
+        if field in base or field in override:
+            d[field] = merge_func(
+                base.get(field, default),
+                override.get(field, default))
 
-    path_mapping_keys = ['volumes', 'devices']
+    merge_field('environment', merge_environment)
+    merge_field('labels', merge_labels)
+    merge_image_or_build(base, override, d)
 
-    for key in path_mapping_keys:
-        if key in base or key in override:
-            d[key] = merge_path_mappings(
-                base.get(key),
-                override.get(key),
-            )
+    for field in ['volumes', 'devices']:
+        merge_field(field, merge_path_mappings)
 
-    if 'labels' in base or 'labels' in override:
-        d['labels'] = merge_labels(
-            base.get('labels'),
-            override.get('labels'),
-        )
+    for field in ['ports', 'expose', 'external_links']:
+        merge_field(field, operator.add, default=[])
 
-    if 'image' in override and 'build' in d:
-        del d['build']
+    for field in ['dns', 'dns_search']:
+        merge_field(field, merge_list_or_string)
 
-    if 'build' in override and 'image' in d:
-        del d['image']
-
-    list_keys = ['ports', 'expose', 'external_links']
-
-    for key in list_keys:
-        if key in base or key in override:
-            d[key] = base.get(key, []) + override.get(key, [])
-
-    list_or_string_keys = ['dns', 'dns_search']
-
-    for key in list_or_string_keys:
-        if key in base or key in override:
-            d[key] = to_list(base.get(key)) + to_list(override.get(key))
-
-    already_merged_keys = ['environment', 'labels'] + path_mapping_keys + list_keys + list_or_string_keys
-
-    for k in set(ALLOWED_KEYS) - set(already_merged_keys):
-        if k in override:
-            d[k] = override[k]
+    already_merged_keys = set(d) | {'image', 'build'}
+    for field in set(ALLOWED_KEYS) - already_merged_keys:
+        if field in base or field in override:
+            d[field] = override.get(field, base.get(field))
 
     return d
+
+
+def merge_image_or_build(base, override, output):
+    if 'image' in override:
+        output['image'] = override['image']
+    elif 'build' in override:
+        output['build'] = override['build']
+    elif 'image' in base:
+        output['image'] = base['image']
+    elif 'build' in base:
+        output['build'] = base['build']
 
 
 def merge_environment(base, override):
@@ -602,6 +593,10 @@ def split_label(label):
 
 def expand_path(working_dir, path):
     return os.path.abspath(os.path.join(working_dir, os.path.expanduser(path)))
+
+
+def merge_list_or_string(base, override):
+    return to_list(base) + to_list(override)
 
 
 def to_list(value):
