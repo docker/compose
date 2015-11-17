@@ -77,7 +77,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    def test_config_invalid_service_names(self):
+    def test_load_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
                 config.load(build_config_details(
@@ -231,6 +231,27 @@ class ConfigTest(unittest.TestCase):
             config.load(details)
         assert "service 'bogus' doesn't have any configuration" in exc.exconly()
         assert "In file 'override.yaml'" in exc.exconly()
+
+    def test_load_sorts_in_dependency_order(self):
+        config_details = build_config_details({
+            'web': {
+                'image': 'busybox:latest',
+                'links': ['db'],
+            },
+            'db': {
+                'image': 'busybox:latest',
+                'volumes_from': ['volume:ro']
+            },
+            'volume': {
+                'image': 'busybox:latest',
+                'volumes': ['/tmp'],
+            }
+        })
+        services = config.load(config_details)
+
+        assert services[0]['name'] == 'volume'
+        assert services[1]['name'] == 'db'
+        assert services[2]['name'] == 'web'
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:

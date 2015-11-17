@@ -34,29 +34,6 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_service('db').name, 'db')
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
-    def test_from_dict_sorts_in_dependency_order(self):
-        project = Project.from_dicts('composetest', [
-            {
-                'name': 'web',
-                'image': 'busybox:latest',
-                'links': ['db'],
-            },
-            {
-                'name': 'db',
-                'image': 'busybox:latest',
-                'volumes_from': [VolumeFromSpec('volume', 'ro')]
-            },
-            {
-                'name': 'volume',
-                'image': 'busybox:latest',
-                'volumes': ['/tmp'],
-            }
-        ], None)
-
-        self.assertEqual(project.services[0].name, 'volume')
-        self.assertEqual(project.services[1].name, 'db')
-        self.assertEqual(project.services[2].name, 'web')
-
     def test_from_config(self):
         dicts = [
             {

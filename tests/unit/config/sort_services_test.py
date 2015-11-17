@@ -1,7 +1,7 @@
-from .. import unittest
+from compose.config.errors import DependencyError
+from compose.config.sort_services import sort_service_dicts
 from compose.config.types import VolumeFromSpec
-from compose.project import DependencyError
-from compose.project import sort_service_dicts
+from tests import unittest
 
 
 class SortServiceTest(unittest.TestCase):

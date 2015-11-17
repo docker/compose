@@ -23,8 +23,6 @@ from compose.service import NoSuchImageError
 from compose.service import parse_repository_tag
 from compose.service import Service
 from compose.service import ServiceNet
-from compose.service import VolumeFromSpec
-from compose.service import VolumeSpec
 from compose.service import warn_on_masked_volume
 
 
