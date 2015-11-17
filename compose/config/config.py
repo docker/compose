@@ -117,6 +117,17 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return cls(filename, load_yaml(filename))
 
 
+class Config(namedtuple('_Config', 'version services volumes')):
+    """
+    :param version: configuration version
+    :type  version: int
+    :param services: List of service description dictionaries
+    :type  services: :class:`list`
+    :param volumes: List of volume description dictionaries
+    :type  volumes: :class:`list`
+    """
+
+
 class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name config')):
 
     @classmethod
@@ -146,6 +157,24 @@ def find(base_dir, filenames):
     return ConfigDetails(
         os.path.dirname(filenames[0]),
         [ConfigFile.from_filename(f) for f in filenames])
+
+
+def get_config_version(config_details):
+    def get_version(config):
+        validate_top_level_object(config)
+        return config.config.get('version')
+    main_file = config_details.config_files[0]
+    version = get_version(main_file)
+    for next_file in config_details.config_files[1:]:
+        next_file_version = get_version(next_file)
+        if version != next_file_version:
+            raise ConfigurationError(
+                "Version mismatch: main file {0} specifies version {1} but "
+                "extension file {2} uses version {3}".format(
+                    main_file.filename, version, next_file.filename, next_file_version
+                )
+            )
+    return version
 
 
 def get_default_config_files(base_dir):
@@ -194,10 +223,46 @@ def load(config_details):
 
     Return a fully interpolated, extended and validated configuration.
     """
+    version = get_config_version(config_details)
+    processed_files = []
+    for config_file in config_details.config_files:
+        processed_files.append(
+            process_config_file(config_file, version=version)
+        )
+    config_details = config_details._replace(config_files=processed_files)
 
+    if not version or isinstance(version, dict):
+        service_dicts = load_services(
+            config_details.working_dir, config_details.config_files
+        )
+        volumes = {}
+    elif version == 2:
+        config_files = [
+            ConfigFile(f.filename, f.config.get('services', {}))
+            for f in config_details.config_files
+        ]
+        service_dicts = load_services(
+            config_details.working_dir, config_files
+        )
+        volumes = load_volumes(config_details.config_files)
+    else:
+        raise ConfigurationError('Invalid config version provided: {0}'.format(version))
+
+    return Config(version, service_dicts, volumes)
+
+
+def load_volumes(config_files):
+    volumes = {}
+    for config_file in config_files:
+        for name, volume_config in config_file.config.get('volumes', {}).items():
+            volumes.update({name: volume_config})
+    return volumes
+
+
+def load_services(working_dir, config_files):
     def build_service(filename, service_name, service_dict):
         service_config = ServiceConfig.with_abs_paths(
-            config_details.working_dir,
+            working_dir,
             filename,
             service_name,
             service_dict)
@@ -227,20 +292,20 @@ def load(config_details):
             for name in all_service_names
         }
 
-    config_file = process_config_file(config_details.config_files[0])
-    for next_file in config_details.config_files[1:]:
-        next_file = process_config_file(next_file)
-
+    config_file = config_files[0]
+    for next_file in config_files[1:]:
         config = merge_services(config_file.config, next_file.config)
         config_file = config_file._replace(config=config)
 
     return build_services(config_file)
 
 
-def process_config_file(config_file, service_name=None):
+def process_config_file(config_file, service_name=None, version=None):
     validate_top_level_object(config_file)
     processed_config = interpolate_environment_variables(config_file.config)
-    validate_against_fields_schema(processed_config, config_file.filename)
+    validate_against_fields_schema(
+        processed_config, config_file.filename, version
+    )
 
     if service_name and service_name not in processed_config:
         raise ConfigurationError(

@@ -51,7 +51,7 @@ class ConfigTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
 
         self.assertEqual(
             service_sort(service_dicts),
@@ -143,7 +143,7 @@ class ConfigTest(unittest.TestCase):
             })
         details = config.ConfigDetails('.', [base_file, override_file])
 
-        service_dicts = config.load(details)
+        service_dicts = config.load(details).services
         expected = [
             {
                 'name': 'web',
@@ -207,7 +207,7 @@ class ConfigTest(unittest.TestCase):
               labels: ['label=one']
         """)
         with tmpdir.as_cwd():
-            service_dicts = config.load(details)
+            service_dicts = config.load(details).services
 
         expected = [
             {
@@ -260,7 +260,7 @@ class ConfigTest(unittest.TestCase):
                 build_config_details(
                     {valid_name: {'image': 'busybox'}},
                     'tests/fixtures/extends',
-                    'common.yml'))
+                    'common.yml')).services
             assert services[0]['name'] == valid_name
 
     def test_config_hint(self):
@@ -451,7 +451,7 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
-            )
+            ).services
             self.assertEqual(service[0]['expose'], expose)
 
     def test_valid_config_oneof_string_or_list(self):
@@ -466,7 +466,7 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
-            )
+            ).services
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
     @mock.patch('compose.config.validation.log')
@@ -496,7 +496,7 @@ class ConfigTest(unittest.TestCase):
                 'working_dir',
                 'filename.yml'
             )
-        )
+        ).services
         self.assertEqual(services[0]['environment']['SPRING_JPA_HIBERNATE_DDL-AUTO'], 'none')
 
     def test_load_yaml_with_yaml_error(self):
@@ -655,7 +655,7 @@ class InterpolationTest(unittest.TestCase):
 
         service_dicts = config.load(
             config.find('tests/fixtures/environment-interpolation', None),
-        )
+        ).services
 
         self.assertEqual(service_dicts, [
             {
@@ -722,7 +722,7 @@ class InterpolationTest(unittest.TestCase):
                 '.',
                 None,
             )
-        )[0]
+        ).services[0]
         self.assertEquals(service_dict['environment']['POSTGRES_PASSWORD'], '')
 
 
@@ -734,11 +734,15 @@ class VolumeConfigTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = config.load(build_config_details(
-            {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
-            '.',
-        ))[0]
-        self.assertEqual(d['volumes'], [VolumeSpec.parse('/host/path:/container/path')])
+
+        d = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
+                '.',
+                None,
+            )
+        ).services[0]
+        self.assertEqual(d['volumes'], ['/host/path:/container/path'])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)
@@ -1012,7 +1016,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
         self.assertEqual(service_dict[0]['memswap_limit'], 2000000)
 
     def test_memswap_can_be_a_string(self):
@@ -1022,7 +1026,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
         self.assertEqual(service_dict[0]['memswap_limit'], "512M")
 
 
@@ -1126,24 +1130,21 @@ class EnvTest(unittest.TestCase):
                 {'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
                 "tests/fixtures/env",
             )
-        )[0]
-        self.assertEqual(
-            set(service_dict['volumes']),
-            set([VolumeSpec.parse('/tmp:/host/tmp')]))
+
+        ).services[0]
+        self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
 
         service_dict = config.load(
             build_config_details(
                 {'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
                 "tests/fixtures/env",
             )
-        )[0]
-        self.assertEqual(
-            set(service_dict['volumes']),
-            set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')]))
+        ).services[0]
+        self.assertEqual(set(service_dict['volumes']), set(['/opt/tmp:/opt/host/tmp']))
 
 
 def load_from_filename(filename):
-    return config.load(config.find('.', [filename]))
+    return config.load(config.find('.', [filename])).services
 
 
 class ExtendsTest(unittest.TestCase):
@@ -1313,7 +1314,7 @@ class ExtendsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
 
         self.assertEquals(len(service), 1)
         self.assertIsInstance(service[0], dict)

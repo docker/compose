@@ -281,11 +281,14 @@ def process_errors(errors, service_name=None):
     return '\n'.join(format_error_message(error, service_name) for error in errors)
 
 
-def validate_against_fields_schema(config, filename):
+def validate_against_fields_schema(config, filename, version=None):
+    schema_filename = "fields_schema.json"
+    if version:
+        schema_filename = "fields_schema_v{0}.json".format(version)
     _validate_against_schema(
         config,
-        "fields_schema.json",
-        format_checker=["ports", "expose", "bool-value-in-mapping"],
+        schema_filename,
+        format_checker=["ports", "environment", "bool-value-in-mapping"],
         filename=filename)
 
 

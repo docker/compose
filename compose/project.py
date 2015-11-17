@@ -20,6 +20,7 @@ from .service import ConvergenceStrategy
 from .service import Net
 from .service import Service
 from .service import ServiceNet
+from .volume import Volume
 
 
 log = logging.getLogger(__name__)
@@ -29,12 +30,13 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, use_networking=False, network_driver=None):
+    def __init__(self, name, services, client, volumes=None, use_networking=False, network_driver=None):
         self.name = name
         self.services = services
         self.client = client
         self.use_networking = use_networking
         self.network_driver = network_driver
+        self.volumes = volumes or []
 
     def labels(self, one_off=False):
         return [
@@ -43,16 +45,16 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client, use_networking=False, network_driver=None):
+    def from_config(cls, name, config_data, client, use_networking=False, network_driver=None):
         """
-        Construct a ServiceCollection from a list of dicts representing services.
+        Construct a Project from a config.Config object.
         """
         project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
 
         if use_networking:
-            remove_links(service_dicts)
+            remove_links(config_data.services)
 
-        for service_dict in service_dicts:
+        for service_dict in config_data.services:
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)
@@ -66,6 +68,14 @@ class Project(object):
                     net=net,
                     volumes_from=volumes_from,
                     **service_dict))
+        if config_data.volumes:
+            for vol_name, data in config_data.volumes.items():
+                project.volumes.append(
+                    Volume(
+                        client=client, project=name, name=vol_name,
+                        driver=data.get('driver'), driver_opts=data.get('driver_opts')
+                    )
+                )
         return project
 
     @property
@@ -218,6 +228,15 @@ class Project(object):
     def remove_stopped(self, service_names=None, **options):
         parallel.parallel_remove(self.containers(service_names, stopped=True), options)
 
+    def initialize_volumes(self):
+        try:
+            for volume in self.volumes:
+                volume.create()
+        except NotFound:
+            raise ConfigurationError(
+                'Volume %s sepcifies nonexistent driver %s' % (volume.name, volume.driver)
+            )
+
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
         parallel.parallel_restart(containers, options)
@@ -252,6 +271,8 @@ class Project(object):
 
         if self.use_networking and self.uses_default_network():
             self.ensure_network_exists()
+
+        self.initialize_volumes()
 
         return [
             container

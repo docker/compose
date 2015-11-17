@@ -69,9 +69,9 @@ class ProjectTest(DockerClientTestCase):
                 'volumes_from': ['data'],
             },
         })
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=service_dicts,
+            config_data=service_dicts,
             client=self.client,
         )
         db = project.get_service('db')
@@ -86,9 +86,9 @@ class ProjectTest(DockerClientTestCase):
             name='composetest_data_container',
             labels={LABEL_PROJECT: 'composetest'},
         )
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
@@ -117,9 +117,9 @@ class ProjectTest(DockerClientTestCase):
         assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'net': {
                     'image': 'busybox:latest',
                     'command': ["top"]
@@ -149,9 +149,9 @@ class ProjectTest(DockerClientTestCase):
         )
         net_container.start()
 
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'web': {
                     'image': 'busybox:latest',
                     'net': 'container:composetest_net_container'
@@ -331,7 +331,6 @@ class ProjectTest(DockerClientTestCase):
         project.up(['db'])
         self.assertEqual(len(project.containers()), 1)
         old_db_id = project.containers()[0].id
-
         container, = project.containers()
         db_volume_path = container.get_mount('/var/db')['Source']
 
@@ -401,9 +400,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(console.containers()), 0)
 
     def test_project_up_starts_depends(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],
@@ -436,9 +435,9 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
     def test_project_up_with_no_deps(self):
-        project = Project.from_dicts(
+        project = Project.from_config(
             name='composetest',
-            service_dicts=build_service_dicts({
+            config_data=build_service_dicts({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],

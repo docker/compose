@@ -163,6 +163,7 @@ class ServiceTest(DockerClientTestCase):
 
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
         actual_host_path = container.get_mount(container_path)['Source']
+
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
