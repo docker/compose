@@ -13,6 +13,8 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
+from .sort_services import get_service_name_from_net
+from .sort_services import sort_service_dicts
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import VolumeFromSpec
@@ -213,10 +215,10 @@ def load(config_details):
         return service_dict
 
     def build_services(config_file):
-        return [
+        return sort_service_dicts([
             build_service(config_file.filename, name, service_dict)
             for name, service_dict in config_file.config.items()
-        ]
+        ])
 
     def merge_services(base, override):
         all_service_names = set(base) | set(override)
@@ -641,17 +643,6 @@ def to_list(value):
         return [value]
     else:
         return value
-
-
-def get_service_name_from_net(net_config):
-    if not net_config:
-        return
-
-    if not net_config.startswith('container:'):
-        return
-
-    _, net_name = net_config.split(':', 1)
-    return net_name
 
 
 def load_yaml(filename):

@@ -7,6 +7,7 @@ from pytest import skip
 from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
+from compose.config.config import ServiceConfig
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
