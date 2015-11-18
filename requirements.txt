@@ -6,5 +6,5 @@ enum34==1.0.4
 jsonschema==2.5.1
 requests==2.7.0
 six==1.7.3
-texttable==0.8.2
+texttable==0.8.4
 websocket-client==0.32.0
