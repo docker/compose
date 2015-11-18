@@ -365,7 +365,7 @@ In the case of `environment`, `labels`, `volumes` and `devices`, Compose
 
 ## Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)

@@ -126,7 +126,7 @@ To uninstall Docker Compose if you installed using `pip`:
 
 ## Where to go next
 
-- [User guide](/)
+- [User guide](index.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)
