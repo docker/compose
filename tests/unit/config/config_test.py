@@ -1317,6 +1317,54 @@ class ExtendsTest(unittest.TestCase):
             },
         ]))
 
+    def test_extends_with_environment_and_env_files(self):
+        tmpdir = py.test.ensuretemp('test_extends_with_environment')
+        self.addCleanup(tmpdir.remove)
+        commondir = tmpdir.mkdir('common')
+        commondir.join('base.yml').write("""
+            app:
+                image: 'example/app'
+                env_file:
+                    - 'envs'
+                environment:
+                    - SECRET
+        """)
+        tmpdir.join('docker-compose.yml').write("""
+            ext:
+                extends:
+                    file: common/base.yml
+                    service: app
+                env_file:
+                    - 'envs'
+                environment:
+                    - THING
+        """)
+        commondir.join('envs').write("""
+            COMMON_ENV_FILE=1
+        """)
+        tmpdir.join('envs').write("""
+            FROM_ENV_FILE=1
+        """)
+
+        expected = [
+            {
+                'name': 'ext',
+                'image': 'example/app',
+                'environment': {
+                    'SECRET': 'secret',
+                    'FROM_ENV_FILE': '1',
+                    'COMMON_ENV_FILE': '1',
+                    'THING': 'thing',
+                },
+            },
+        ]
+        with mock.patch.dict(os.environ):
+            os.environ['SECRET'] = 'secret'
+            os.environ['THING'] = 'thing'
+            config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+
+        assert config == expected
+
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ExpandPathTest(unittest.TestCase):

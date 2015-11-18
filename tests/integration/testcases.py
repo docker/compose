@@ -46,7 +46,8 @@ class DockerClientTestCase(unittest.TestCase):
 
         service_config = ServiceConfig('.', None, name, kwargs)
         options = process_service(service_config)
-        options['environment'] = resolve_environment('.', kwargs)
+        options['environment'] = resolve_environment(
+            service_config._replace(config=options))
         labels = options.setdefault('labels', {})
         labels['com.docker.compose.test-name'] = self.id()
 
