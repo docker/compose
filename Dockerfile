@@ -1,5 +1,7 @@
 FROM debian:wheezy
 
+# SVEN - do not merge
+
 RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
