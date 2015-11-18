@@ -257,16 +257,11 @@ class ServiceExtendsResolver(object):
     def run(self):
         self.detect_cycle()
 
-        service_dict = dict(self.service_config.config)
-        env = resolve_environment(self.working_dir, self.service_config.config)
-        if env:
-            service_dict['environment'] = env
-            service_dict.pop('env_file', None)
-
-        if 'extends' in service_dict:
+        if 'extends' in self.service_config.config:
             service_dict = self.resolve_extends(*self.validate_and_construct_extends())
+            return self.service_config._replace(config=service_dict)
 
-        return self.service_config._replace(config=service_dict)
+        return self.service_config
 
     def validate_and_construct_extends(self):
         extends = self.service_config.config['extends']
@@ -316,16 +311,15 @@ class ServiceExtendsResolver(object):
         return filename
 
 
-def resolve_environment(working_dir, service_dict):
+def resolve_environment(service_config):
     """Unpack any environment variables from an env_file, if set.
     Interpolate environment values if set.
     """
-    if 'environment' not in service_dict and 'env_file' not in service_dict:
-        return {}
+    service_dict = service_config.config
 
     env = {}
     if 'env_file' in service_dict:
-        for env_file in get_env_files(working_dir, service_dict):
+        for env_file in get_env_files(service_config.working_dir, service_dict):
             env.update(env_vars_from_file(env_file))
 
     env.update(parse_environment(service_dict.get('environment')))
@@ -361,6 +355,10 @@ def validate_ulimits(ulimit_config):
 def process_service(service_config):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
+
+    if 'environment' in service_dict or 'env_file' in service_dict:
+        service_dict['environment'] = resolve_environment(service_config)
+        service_dict.pop('env_file', None)
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
