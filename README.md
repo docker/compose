@@ -10,7 +10,7 @@ see [the list of features](docs/index.md#features).
 
 Compose is great for development, testing, and staging environments, as well as
 CI workflows. You can learn more about each case in
-[Common Use Cases](#common-use-cases).
+[Common Use Cases](docs/index.md#common-use-cases).
 
 Using Compose is basically a three-step process.
 
