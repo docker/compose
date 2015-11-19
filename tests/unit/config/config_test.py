@@ -1497,19 +1497,33 @@ class BuildPathTest(unittest.TestCase):
         service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
         self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
 
-    def test_valid_url_path(self):
+    def test_valid_url_in_build_path(self):
         valid_urls = [
             'git://github.com/docker/docker',
             'git@github.com:docker/docker.git',
             'git@bitbucket.org:atlassianlabs/atlassian-docker.git',
             'https://github.com/docker/docker.git',
             'http://github.com/docker/docker.git',
+            'github.com/docker/docker.git',
         ]
         for valid_url in valid_urls:
             service_dict = config.load(build_config_details({
                 'validurl': {'build': valid_url},
             }, '.', None))
             assert service_dict[0]['build'] == valid_url
+
+    def test_invalid_url_in_build_path(self):
+        invalid_urls = [
+            'example.com/bogus',
+            'ftp://example.com/',
+            '/path/does/not/exist',
+        ]
+        for invalid_url in invalid_urls:
+            with pytest.raises(ConfigurationError) as exc:
+                config.load(build_config_details({
+                    'invalidurl': {'build': invalid_url},
+                }, '.', None))
+            assert 'build path' in exc.exconly()
 
 
 class GetDefaultConfigFilesTestCase(unittest.TestCase):

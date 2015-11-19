@@ -501,6 +501,13 @@ class ServiceTest(DockerClientTestCase):
         self.create_service('web', build=text_type(base_dir)).build()
         self.assertEqual(len(self.client.images(name='composetest_web')), 1)
 
+    def test_build_with_git_url(self):
+        build_url = "https://github.com/dnephin/docker-build-from-url.git"
+        service = self.create_service('buildwithurl', build=build_url)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        service.build()
+        assert service.image()
+
     def test_start_container_stays_unpriviliged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()

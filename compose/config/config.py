@@ -573,7 +573,8 @@ def validate_paths(service_dict):
             (not os.path.exists(build_path) or not os.access(build_path, os.R_OK))
         ):
             raise ConfigurationError(
-                "build path %s either does not exist or is not accessible." % build_path)
+                "build path %s either does not exist, is not accessible, "
+                "or is not a valid URL." % build_path)
 
 
 def merge_path_mappings(base, override):
