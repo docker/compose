@@ -171,7 +171,7 @@ In this section, you set up the database connection for Django.
 
 ## More Compose documentation
 
-- [User guide](../index.md)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Rails](rails.md)

@@ -133,7 +133,7 @@ That's it. Your app should now be running on port 3000 on your Docker daemon. If
 
 ## More Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)

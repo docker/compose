@@ -93,7 +93,7 @@ database containers. If you're using [Docker Machine](https://docs.docker.com/ma
 
 ## More Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
