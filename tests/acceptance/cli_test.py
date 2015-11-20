@@ -2,9 +2,13 @@ from __future__ import absolute_import
 
 import os
 import shlex
+import signal
 import subprocess
+import time
 from collections import namedtuple
 from operator import attrgetter
+
+from docker import errors
 
 from .. import mock
 from compose.cli.command import get_project
@@ -18,6 +22,64 @@ ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
 BUILD_CACHE_TEXT = 'Using cache'
 BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:latest'
+
+
+def start_process(base_dir, options):
+    proc = subprocess.Popen(
+        ['docker-compose'] + options,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=base_dir)
+    print("Running process: %s" % proc.pid)
+    return proc
+
+
+def wait_on_process(proc, returncode=0):
+    stdout, stderr = proc.communicate()
+    if proc.returncode != returncode:
+        print(stderr)
+        assert proc.returncode == returncode
+    return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
+
+
+def wait_on_condition(condition, delay=0.1, timeout=5):
+    start_time = time.time()
+    while not condition():
+        if time.time() - start_time > timeout:
+            raise AssertionError("Timeout: %s" % condition)
+        time.sleep(delay)
+
+
+class ContainerCountCondition(object):
+
+    def __init__(self, project, expected):
+        self.project = project
+        self.expected = expected
+
+    def __call__(self):
+        return len(self.project.containers()) == self.expected
+
+    def __str__(self):
+        return "waiting for counter count == %s" % self.expected
+
+
+class ContainerStateCondition(object):
+
+    def __init__(self, client, name, running):
+        self.client = client
+        self.name = name
+        self.running = running
+
+    # State.Running == true
+    def __call__(self):
+        try:
+            container = self.client.inspect_container(self.name)
+            return container['State']['Running'] == self.running
+        except errors.APIError:
+            return False
+
+    def __str__(self):
+        return "waiting for container to have state %s" % self.expected
 
 
 class CLITestCase(DockerClientTestCase):
@@ -42,17 +104,8 @@ class CLITestCase(DockerClientTestCase):
 
     def dispatch(self, options, project_options=None, returncode=0):
         project_options = project_options or []
-        proc = subprocess.Popen(
-            ['docker-compose'] + project_options + options,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=self.base_dir)
-        print("Running process: %s" % proc.pid)
-        stdout, stderr = proc.communicate()
-        if proc.returncode != returncode:
-            print(stderr)
-            assert proc.returncode == returncode
-        return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
+        proc = start_process(self.base_dir, project_options + options)
+        return wait_on_process(proc, returncode=returncode)
 
     def test_help(self):
         old_base_dir = self.base_dir
@@ -291,7 +344,7 @@ class CLITestCase(DockerClientTestCase):
             returncode=1)
 
     def test_up_with_timeout(self):
-        self.dispatch(['up', '-d', '-t', '1'], None)
+        self.dispatch(['up', '-d', '-t', '1'])
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
         self.assertEqual(len(service.containers()), 1)
@@ -302,6 +355,20 @@ class CLITestCase(DockerClientTestCase):
         self.assertFalse(config['AttachStderr'])
         self.assertFalse(config['AttachStdout'])
         self.assertFalse(config['AttachStdin'])
+
+    def test_up_handles_sigint(self):
+        proc = start_process(self.base_dir, ['up', '-t', '2'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(proc.pid, signal.SIGINT)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+
+    def test_up_handles_sigterm(self):
+        proc = start_process(self.base_dir, ['up', '-t', '2'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
 
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
@@ -507,6 +574,32 @@ class CLITestCase(DockerClientTestCase):
             self.addCleanup(client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(container.human_readable_command, u'true')
+
+    def test_run_handles_sigint(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=True))
+
+        os.kill(proc.pid, signal.SIGINT)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=False))
+
+    def test_run_handles_sigterm(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=True))
+
+        os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            running=False))
 
     def test_rm(self):
         service = self.project.get_service('simple')
