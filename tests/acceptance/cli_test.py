@@ -597,6 +597,15 @@ class CLITestCase(DockerClientTestCase):
             started_at,
         )
 
+    def test_restart_stopped_container(self):
+        service = self.project.get_service('simple')
+        container = service.create_container()
+        container.start()
+        container.kill()
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.dispatch(['restart', '-t', '1'], None)
+        self.assertEqual(len(service.containers(stopped=False)), 1)
+
     def test_scale(self):
         project = self.project
 
