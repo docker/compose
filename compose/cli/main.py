@@ -364,6 +364,8 @@ class TopLevelCommand(DocoptCommand):
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
+            --not-one-off         Run the container as part of the composition,
+                                  not as a one-off container.
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
         """
@@ -438,7 +440,7 @@ class TopLevelCommand(DocoptCommand):
         try:
             container = service.create_container(
                 quiet=True,
-                one_off=True,
+                one_off=not options['--not-one-off'],
                 **container_options
             )
         except APIError as e:
