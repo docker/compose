@@ -963,7 +963,10 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
         for volume in container_volumes)
 
     for volume in volumes_option:
-        if container_volumes.get(volume.internal) != volume.external:
+        if (
+            volume.internal in container_volumes and
+            container_volumes.get(volume.internal) != volume.external
+        ):
             log.warn((
                 "Service \"{service}\" is using volume \"{volume}\" from the "
                 "previous container. Host mapping \"{host_path}\" has no effect. "

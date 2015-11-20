@@ -26,6 +26,8 @@ from compose.service import parse_volume_spec
 from compose.service import Service
 from compose.service import ServiceNet
 from compose.service import VolumeFromSpec
+from compose.service import VolumeSpec
+from compose.service import warn_on_masked_volume
 
 
 class ServiceTest(unittest.TestCase):
@@ -749,6 +751,39 @@ class ServiceVolumesTest(unittest.TestCase):
             self.mock_client.create_host_config.call_args[1]['binds'],
             ['/mnt/sda1/host/path:/data:rw'],
         )
+
+    def test_warn_on_masked_volume_no_warning_when_no_container_volumes(self):
+        volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
+        container_volumes = []
+        service = 'service_name'
+
+        with mock.patch('compose.service.log') as mock_log:
+            warn_on_masked_volume(volumes_option, container_volumes, service)
+
+        assert not mock_log.warn.called
+
+    def test_warn_on_masked_volume_when_masked(self):
+        volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
+        container_volumes = [
+            VolumeSpec('/var/lib/docker/path', '/path', 'rw'),
+            VolumeSpec('/var/lib/docker/path', '/other', 'rw'),
+        ]
+        service = 'service_name'
+
+        with mock.patch('compose.service.log') as mock_log:
+            warn_on_masked_volume(volumes_option, container_volumes, service)
+
+        mock_log.warn.called_once_with(mock.ANY)
+
+    def test_warn_on_masked_no_warning_with_same_path(self):
+        volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
+        container_volumes = [VolumeSpec('/home/user', '/path', 'rw')]
+        service = 'service_name'
+
+        with mock.patch('compose.service.log') as mock_log:
+            warn_on_masked_volume(volumes_option, container_volumes, service)
+
+        assert not mock_log.warn.called
 
     def test_create_with_special_volume_mode(self):
         self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
