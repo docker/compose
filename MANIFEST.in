@@ -7,6 +7,7 @@ include *.md
 exclude README.md
 include README.rst
 include compose/config/*.json
+include compose/GITSHA
 recursive-include contrib/completion *
 recursive-include tests *
 global-exclude *.pyc

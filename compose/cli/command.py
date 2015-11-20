@@ -12,12 +12,12 @@ from requests.exceptions import SSLError
 
 from . import errors
 from . import verbose_proxy
-from .. import __version__
 from .. import config
 from ..project import Project
 from ..service import ConfigError
 from .docker_client import docker_client
 from .utils import call_silently
+from .utils import get_version_info
 from .utils import is_mac
 from .utils import is_ubuntu
 
@@ -71,7 +71,7 @@ def get_client(verbose=False, version=None):
     client = docker_client(version=version)
     if verbose:
         version_info = six.iteritems(client.version())
-        log.info("Compose version %s", __version__)
+        log.info(get_version_info('full'))
         log.info("Docker base_url: %s", client.base_url)
         log.info("Docker version: %s",
                  ", ".join("%s=%s" % item for item in version_info))
