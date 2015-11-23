@@ -28,14 +28,14 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
-from .container import parallel_remove
-from .container import parallel_start
-from .container import parallel_stop
 from .legacy import check_for_legacy_containers
+from .parallel import parallel_execute
+from .parallel import parallel_remove
+from .parallel import parallel_start
+from .parallel import parallel_stop
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
-from .utils import parallel_execute
 
 
 log = logging.getLogger(__name__)

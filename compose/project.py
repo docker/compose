@@ -7,7 +7,7 @@ from functools import reduce
 from docker.errors import APIError
 from docker.errors import NotFound
 
-from . import container
+from . import parallel
 from .config import ConfigurationError
 from .config import get_service_name_from_net
 from .const import DEFAULT_TIMEOUT
@@ -241,22 +241,22 @@ class Project(object):
             service.start(**options)
 
     def stop(self, service_names=None, **options):
-        container.parallel_stop(self.containers(service_names), options)
+        parallel.parallel_stop(self.containers(service_names), options)
 
     def pause(self, service_names=None, **options):
-        container.parallel_pause(reversed(self.containers(service_names)), options)
+        parallel.parallel_pause(reversed(self.containers(service_names)), options)
 
     def unpause(self, service_names=None, **options):
-        container.parallel_unpause(self.containers(service_names), options)
+        parallel.parallel_unpause(self.containers(service_names), options)
 
     def kill(self, service_names=None, **options):
-        container.parallel_kill(self.containers(service_names), options)
+        parallel.parallel_kill(self.containers(service_names), options)
 
     def remove_stopped(self, service_names=None, **options):
-        container.parallel_remove(self.containers(service_names, stopped=True), options)
+        parallel.parallel_remove(self.containers(service_names, stopped=True), options)
 
     def restart(self, service_names=None, **options):
-        container.parallel_restart(self.containers(service_names, stopped=True), options)
+        parallel.parallel_restart(self.containers(service_names, stopped=True), options)
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False):
         for service in self.get_services(service_names):
