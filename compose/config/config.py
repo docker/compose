@@ -324,16 +324,13 @@ class ServiceExtendsResolver(object):
         return filename
 
 
-def resolve_environment(service_config):
+def resolve_environment(service_dict):
     """Unpack any environment variables from an env_file, if set.
     Interpolate environment values if set.
     """
-    service_dict = service_config.config
-
     env = {}
-    if 'env_file' in service_dict:
-        for env_file in get_env_files(service_config.working_dir, service_dict):
-            env.update(env_vars_from_file(env_file))
+    for env_file in service_dict.get('env_file', []):
+        env.update(env_vars_from_file(env_file))
 
     env.update(parse_environment(service_dict.get('environment')))
     return dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
@@ -370,9 +367,11 @@ def process_service(service_config):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
 
-    if 'environment' in service_dict or 'env_file' in service_dict:
-        service_dict['environment'] = resolve_environment(service_config)
-        service_dict.pop('env_file', None)
+    if 'env_file' in service_dict:
+        service_dict['env_file'] = [
+            expand_path(working_dir, path)
+            for path in to_list(service_dict['env_file'])
+        ]
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
@@ -395,6 +394,10 @@ def process_service(service_config):
 
 def finalize_service(service_config):
     service_dict = dict(service_config.config)
+
+    if 'environment' in service_dict or 'env_file' in service_dict:
+        service_dict['environment'] = resolve_environment(service_dict)
+        service_dict.pop('env_file', None)
 
     if 'volumes_from' in service_dict:
         service_dict['volumes_from'] = [
@@ -440,7 +443,7 @@ def merge_service_dicts(base, override):
     for field in ['ports', 'expose', 'external_links']:
         merge_field(field, operator.add, default=[])
 
-    for field in ['dns', 'dns_search']:
+    for field in ['dns', 'dns_search', 'env_file']:
         merge_field(field, merge_list_or_string)
 
     already_merged_keys = set(d) | {'image', 'build'}
@@ -466,17 +469,6 @@ def merge_environment(base, override):
     env = parse_environment(base)
     env.update(parse_environment(override))
     return env
-
-
-def get_env_files(working_dir, options):
-    if 'env_file' not in options:
-        return {}
-
-    env_files = options.get('env_file', [])
-    if not isinstance(env_files, list):
-        env_files = [env_files]
-
-    return [expand_path(working_dir, path) for path in env_files]
 
 
 def parse_environment(environment):

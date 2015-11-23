@@ -10,6 +10,7 @@ import py
 import pytest
 
 from compose.config import config
+from compose.config.config import resolve_environment
 from compose.config.errors import ConfigurationError
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
@@ -973,65 +974,54 @@ class EnvTest(unittest.TestCase):
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
 
-        service_dict = make_service_dict(
-            'foo', {
-                'build': '.',
-                'environment': {
-                    'FILE_DEF': 'F1',
-                    'FILE_DEF_EMPTY': '',
-                    'ENV_DEF': None,
-                    'NO_DEF': None
-                },
+        service_dict = {
+            'build': '.',
+            'environment': {
+                'FILE_DEF': 'F1',
+                'FILE_DEF_EMPTY': '',
+                'ENV_DEF': None,
+                'NO_DEF': None
             },
-            'tests/'
-        )
-
+        }
         self.assertEqual(
-            service_dict['environment'],
+            resolve_environment(service_dict),
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
         )
 
-    def test_env_from_file(self):
-        service_dict = make_service_dict(
-            'foo',
-            {'build': '.', 'env_file': 'one.env'},
-            'tests/fixtures/env',
-        )
+    def test_resolve_environment_from_env_file(self):
         self.assertEqual(
-            service_dict['environment'],
+            resolve_environment({'env_file': ['tests/fixtures/env/one.env']}),
             {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'},
         )
 
-    def test_env_from_multiple_files(self):
-        service_dict = make_service_dict(
-            'foo',
-            {'build': '.', 'env_file': ['one.env', 'two.env']},
-            'tests/fixtures/env',
-        )
+    def test_resolve_environment_with_multiple_env_files(self):
+        service_dict = {
+            'env_file': [
+                'tests/fixtures/env/one.env',
+                'tests/fixtures/env/two.env'
+            ]
+        }
         self.assertEqual(
-            service_dict['environment'],
+            resolve_environment(service_dict),
             {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'},
         )
 
-    def test_env_nonexistent_file(self):
-        options = {'env_file': 'nonexistent.env'}
-        self.assertRaises(
-            ConfigurationError,
-            lambda: make_service_dict('foo', options, 'tests/fixtures/env'),
-        )
+    def test_resolve_environment_nonexistent_file(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(
+                {'foo': {'image': 'example', 'env_file': 'nonexistent.env'}},
+                working_dir='tests/fixtures/env'))
+
+            assert 'Couldn\'t find env file' in exc.exconly()
+            assert 'nonexistent.env' in exc.exconly()
 
     @mock.patch.dict(os.environ)
-    def test_resolve_environment_from_file(self):
+    def test_resolve_environment_from_env_file_with_empty_values(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
-        service_dict = make_service_dict(
-            'foo',
-            {'build': '.', 'env_file': 'resolve.env'},
-            'tests/fixtures/env',
-        )
         self.assertEqual(
-            service_dict['environment'],
+            resolve_environment({'env_file': ['tests/fixtures/env/resolve.env']}),
             {
                 'FILE_DEF': u'bär',
                 'FILE_DEF_EMPTY': '',
@@ -1378,6 +1368,8 @@ class ExtendsTest(unittest.TestCase):
                     - 'envs'
                 environment:
                     - SECRET
+                    - TEST_ONE=common
+                    - TEST_TWO=common
         """)
         tmpdir.join('docker-compose.yml').write("""
             ext:
@@ -1388,12 +1380,20 @@ class ExtendsTest(unittest.TestCase):
                     - 'envs'
                 environment:
                     - THING
+                    - TEST_ONE=top
         """)
         commondir.join('envs').write("""
-            COMMON_ENV_FILE=1
+            COMMON_ENV_FILE
+            TEST_ONE=common-env-file
+            TEST_TWO=common-env-file
+            TEST_THREE=common-env-file
+            TEST_FOUR=common-env-file
         """)
         tmpdir.join('envs').write("""
-            FROM_ENV_FILE=1
+            TOP_ENV_FILE
+            TEST_ONE=top-env-file
+            TEST_TWO=top-env-file
+            TEST_THREE=top-env-file
         """)
 
         expected = [
@@ -1402,15 +1402,21 @@ class ExtendsTest(unittest.TestCase):
                 'image': 'example/app',
                 'environment': {
                     'SECRET': 'secret',
-                    'FROM_ENV_FILE': '1',
-                    'COMMON_ENV_FILE': '1',
+                    'TOP_ENV_FILE': 'secret',
+                    'COMMON_ENV_FILE': 'secret',
                     'THING': 'thing',
+                    'TEST_ONE': 'top',
+                    'TEST_TWO': 'common',
+                    'TEST_THREE': 'top-env-file',
+                    'TEST_FOUR': 'common-env-file',
                 },
             },
         ]
         with mock.patch.dict(os.environ):
             os.environ['SECRET'] = 'secret'
             os.environ['THING'] = 'thing'
+            os.environ['COMMON_ENV_FILE'] = 'secret'
+            os.environ['TOP_ENV_FILE'] = 'secret'
             config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
 
         assert config == expected
