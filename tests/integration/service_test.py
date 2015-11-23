@@ -36,6 +36,12 @@ def create_and_start_container(service, **override_options):
     return container
 
 
+def remove_stopped(service):
+    containers = [c for c in service.containers(stopped=True) if not c.is_running]
+    for container in containers:
+        container.remove()
+
+
 class ServiceTest(DockerClientTestCase):
     def test_containers(self):
         foo = self.create_service('foo')
@@ -94,14 +100,14 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(service)
         self.assertEqual(len(service.containers()), 1)
 
-        service.remove_stopped()
+        remove_stopped(service)
         self.assertEqual(len(service.containers()), 1)
 
         service.kill()
         self.assertEqual(len(service.containers()), 0)
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
-        service.remove_stopped()
+        remove_stopped(service)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
     def test_create_container_with_one_off(self):
@@ -659,9 +665,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
-    def test_scale_with_api_returns_errors(self):
-        """
-        Test that when scaling if the API returns an error, that error is handled
+    def test_scale_with_api_error(self):
+        """Test that when scaling if the API returns an error, that error is handled
         and the remaining threads continue.
         """
         service = self.create_service('web')
@@ -670,7 +675,10 @@ class ServiceTest(DockerClientTestCase):
 
         with mock.patch(
             'compose.container.Container.create',
-                side_effect=APIError(message="testing", response={}, explanation="Boom")):
+            side_effect=APIError(
+                message="testing",
+                response={},
+                explanation="Boom")):
 
             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                 service.scale(3)
@@ -679,9 +687,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(service.containers()[0].is_running)
         self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
 
-    def test_scale_with_api_returns_unexpected_exception(self):
-        """
-        Test that when scaling if the API returns an error, that is not of type
+    def test_scale_with_unexpected_exception(self):
+        """Test that when scaling if the API returns an error, that is not of type
         APIError, that error is re-raised.
         """
         service = self.create_service('web')
@@ -903,7 +910,7 @@ class ServiceTest(DockerClientTestCase):
             self.assertIn(pair, labels)
 
         service.kill()
-        service.remove_stopped()
+        remove_stopped(service)
 
         labels_list = ["%s=%s" % pair for pair in labels_dict.items()]
 

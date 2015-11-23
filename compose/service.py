@@ -29,10 +29,13 @@ from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
 from .legacy import check_for_legacy_containers
+from .parallel import parallel_execute
+from .parallel import parallel_remove
+from .parallel import parallel_start
+from .parallel import parallel_stop
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
-from .utils import parallel_execute
 
 
 log = logging.getLogger(__name__)
@@ -241,12 +244,7 @@ class Service(object):
                 else:
                     containers_to_start = stopped_containers
 
-                parallel_execute(
-                    objects=containers_to_start,
-                    obj_callable=lambda c: c.start(),
-                    msg_index=lambda c: c.name,
-                    msg="Starting"
-                )
+                parallel_start(containers_to_start, {})
 
                 num_running += len(containers_to_start)
 
@@ -259,35 +257,22 @@ class Service(object):
             ]
 
             parallel_execute(
-                objects=container_numbers,
-                obj_callable=lambda n: create_and_start(service=self, number=n),
-                msg_index=lambda n: n,
-                msg="Creating and starting"
+                container_numbers,
+                lambda n: create_and_start(service=self, number=n),
+                lambda n: n,
+                "Creating and starting"
             )
 
         if desired_num < num_running:
             num_to_stop = num_running - desired_num
-            sorted_running_containers = sorted(running_containers, key=attrgetter('number'))
-            containers_to_stop = sorted_running_containers[-num_to_stop:]
+            sorted_running_containers = sorted(
+                running_containers,
+                key=attrgetter('number'))
+            parallel_stop(
+                sorted_running_containers[-num_to_stop:],
+                dict(timeout=timeout))
 
-            parallel_execute(
-                objects=containers_to_stop,
-                obj_callable=lambda c: c.stop(timeout=timeout),
-                msg_index=lambda c: c.name,
-                msg="Stopping"
-            )
-
-        self.remove_stopped()
-
-    def remove_stopped(self, **options):
-        containers = [c for c in self.containers(stopped=True) if not c.is_running]
-
-        parallel_execute(
-            objects=containers,
-            obj_callable=lambda c: c.remove(**options),
-            msg_index=lambda c: c.name,
-            msg="Removing"
-        )
+        parallel_remove(self.containers(stopped=True), {})
 
     def create_container(self,
                          one_off=False,
