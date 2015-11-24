@@ -15,6 +15,7 @@ from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
 from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
+from tests.integration.testcases import pull_busybox
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -184,6 +185,8 @@ class CLITestCase(DockerClientTestCase):
         assert BUILD_PULL_TEXT not in result.stdout
 
     def test_build_pull(self):
+        # Make sure we have the latest busybox already
+        pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         self.dispatch(['build', 'simple'], None)
 
@@ -192,6 +195,8 @@ class CLITestCase(DockerClientTestCase):
         assert BUILD_PULL_TEXT in result.stdout
 
     def test_build_no_cache_pull(self):
+        # Make sure we have the latest busybox already
+        pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         self.dispatch(['build', 'simple'])
 
