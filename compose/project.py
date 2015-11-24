@@ -53,18 +53,19 @@ def sort_service_dicts(services):
         ]
 
     def visit(n):
-        if n['name'] in temporary_marked:
-            if n['name'] in get_service_names(n.get('links', [])):
-                raise DependencyError('A service can not link to itself: %s' % n['name'])
-            if n['name'] in n.get('volumes_from', []):
-                raise DependencyError('A service can not mount itself as volume: %s' % n['name'])
+        name = n['name']
+        if name in temporary_marked:
+            if name in get_service_names(n.get('links', [])):
+                raise DependencyError('A service can not link to itself: %s' % name)
+            if name in n.get('volumes_from', []):
+                raise DependencyError('A service can not mount itself as volume: %s' % name)
             else:
                 raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
         if n in unmarked:
-            temporary_marked.add(n['name'])
+            temporary_marked.add(name)
             for m in get_service_dependents(n, services):
                 visit(m)
-            temporary_marked.remove(n['name'])
+            temporary_marked.remove(name)
             unmarked.remove(n)
             sorted_services.insert(0, n)
 
@@ -156,7 +157,7 @@ class Project(object):
 
         Raises NoSuchService if any of the named services do not exist.
         """
-        if service_names is None or len(service_names) == 0:
+        if not service_names:
             return self.get_services(
                 service_names=self.service_names,
                 include_deps=include_deps
@@ -176,12 +177,9 @@ class Project(object):
         links = []
         if 'links' in service_dict:
             for link in service_dict.get('links', []):
-                if ':' in link:
-                    service_name, link_name = link.split(':', 1)
-                else:
-                    service_name, link_name = link, None
+                service_name, _, link_name = link.partition(':')
                 try:
-                    links.append((self.get_service(service_name), link_name))
+                    links.append((self.get_service(service_name), link_name or None))
                 except NoSuchService:
                     raise ConfigurationError(
                         'Service "%s" has a link to service "%s" which does not '
@@ -371,7 +369,7 @@ class Project(object):
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
 
-        if len(dep_names) > 0:
+        if dep_names:
             dep_services = self.get_services(
                 service_names=list(set(dep_names)),
                 include_deps=True
