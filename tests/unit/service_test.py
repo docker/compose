@@ -757,7 +757,7 @@ class ServiceVolumesTest(unittest.TestCase):
         container_volumes = []
         service = 'service_name'
 
-        with mock.patch('compose.service.log') as mock_log:
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
         assert not mock_log.warn.called
@@ -770,17 +770,17 @@ class ServiceVolumesTest(unittest.TestCase):
         ]
         service = 'service_name'
 
-        with mock.patch('compose.service.log') as mock_log:
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
-        mock_log.warn.called_once_with(mock.ANY)
+        mock_log.warn.assert_called_once_with(mock.ANY)
 
     def test_warn_on_masked_no_warning_with_same_path(self):
         volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
         container_volumes = [VolumeSpec('/home/user', '/path', 'rw')]
         service = 'service_name'
 
-        with mock.patch('compose.service.log') as mock_log:
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
         assert not mock_log.warn.called
