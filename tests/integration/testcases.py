@@ -7,7 +7,6 @@ from pytest import skip
 from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
-from compose.config.config import ServiceConfig
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
@@ -39,9 +38,7 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        service_config = ServiceConfig('.', None, name, kwargs)
-        kwargs['environment'] = resolve_environment(service_config)
-
+        kwargs['environment'] = resolve_environment(kwargs)
         labels = dict(kwargs.setdefault('labels', {}))
         labels['com.docker.compose.test-name'] = self.id()
 
