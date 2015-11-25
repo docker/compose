@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
-import os
 import re
 import sys
 from collections import namedtuple
@@ -18,9 +17,8 @@ from docker.utils.ports import split_port
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
-from .config.validation import VALID_NAME_CHARS
+from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
-from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -71,10 +69,6 @@ class BuildError(Exception):
         self.reason = reason
 
 
-class ConfigError(ValueError):
-    pass
-
-
 class NeedsBuildError(Exception):
     def __init__(self, service):
         self.service = service
@@ -82,12 +76,6 @@ class NeedsBuildError(Exception):
 
 class NoSuchImageError(Exception):
     pass
-
-
-VolumeSpec = namedtuple('VolumeSpec', 'external internal mode')
-
-
-VolumeFromSpec = namedtuple('VolumeFromSpec', 'source mode')
 
 
 ServiceName = namedtuple('ServiceName', 'project service number')
@@ -122,9 +110,6 @@ class Service(object):
         net=None,
         **options
     ):
-        if not re.match('^%s+$' % VALID_NAME_CHARS, project):
-            raise ConfigError('Invalid project name "%s" - only %s are allowed' % (project, VALID_NAME_CHARS))
-
         self.name = name
         self.client = client
         self.project = project
@@ -511,7 +496,7 @@ class Service(object):
         # TODO: Implement issue #652 here
         return build_container_name(self.project, self.name, number, one_off)
 
-    # TODO: this would benefit from github.com/docker/docker/pull/11943
+    # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
         containers = filter(None, [
@@ -604,8 +589,7 @@ class Service(object):
 
         if 'volumes' in container_options:
             container_options['volumes'] = dict(
-                (parse_volume_spec(v).internal, {})
-                for v in container_options['volumes'])
+                (v.internal, {}) for v in container_options['volumes'])
 
         container_options['environment'] = merge_environment(
             self.options.get('environment'),
@@ -634,58 +618,34 @@ class Service(object):
 
     def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
-        port_bindings = build_port_bindings(options.get('ports') or [])
 
-        privileged = options.get('privileged', False)
-        cap_add = options.get('cap_add', None)
-        cap_drop = options.get('cap_drop', None)
         log_config = LogConfig(
             type=options.get('log_driver', ""),
             config=options.get('log_opt', None)
         )
-        pid = options.get('pid', None)
-        security_opt = options.get('security_opt', None)
-
-        dns = options.get('dns', None)
-        if isinstance(dns, six.string_types):
-            dns = [dns]
-
-        dns_search = options.get('dns_search', None)
-        if isinstance(dns_search, six.string_types):
-            dns_search = [dns_search]
-
-        restart = parse_restart_spec(options.get('restart', None))
-
-        extra_hosts = build_extra_hosts(options.get('extra_hosts', None))
-        read_only = options.get('read_only', None)
-
-        devices = options.get('devices', None)
-        cgroup_parent = options.get('cgroup_parent', None)
-        ulimits = build_ulimits(options.get('ulimits', None))
-
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
-            port_bindings=port_bindings,
+            port_bindings=build_port_bindings(options.get('ports') or []),
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
-            privileged=privileged,
+            privileged=options.get('privileged', False),
             network_mode=self.net.mode,
-            devices=devices,
-            dns=dns,
-            dns_search=dns_search,
-            restart_policy=restart,
-            cap_add=cap_add,
-            cap_drop=cap_drop,
+            devices=options.get('devices'),
+            dns=options.get('dns'),
+            dns_search=options.get('dns_search'),
+            restart_policy=options.get('restart'),
+            cap_add=options.get('cap_add'),
+            cap_drop=options.get('cap_drop'),
             mem_limit=options.get('mem_limit'),
             memswap_limit=options.get('memswap_limit'),
-            ulimits=ulimits,
+            ulimits=build_ulimits(options.get('ulimits')),
             log_config=log_config,
-            extra_hosts=extra_hosts,
-            read_only=read_only,
-            pid_mode=pid,
-            security_opt=security_opt,
+            extra_hosts=options.get('extra_hosts'),
+            read_only=options.get('read_only'),
+            pid_mode=options.get('pid'),
+            security_opt=options.get('security_opt'),
             ipc_mode=options.get('ipc'),
-            cgroup_parent=cgroup_parent
+            cgroup_parent=options.get('cgroup_parent'),
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
@@ -894,11 +854,10 @@ def parse_repository_tag(repo_path):
 # Volumes
 
 
-def merge_volume_bindings(volumes_option, previous_container):
+def merge_volume_bindings(volumes, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
-    volumes = [parse_volume_spec(volume) for volume in volumes_option or []]
     volume_bindings = dict(
         build_volume_binding(volume)
         for volume in volumes
@@ -920,7 +879,7 @@ def get_container_data_volumes(container, volumes_option):
     volumes = []
     container_volumes = container.get('Volumes') or {}
     image_volumes = [
-        parse_volume_spec(volume)
+        VolumeSpec.parse(volume)
         for volume in
         container.image_config['ContainerConfig'].get('Volumes') or {}
     ]
@@ -967,56 +926,6 @@ def build_volume_binding(volume_spec):
     return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
 
 
-def normalize_paths_for_engine(external_path, internal_path):
-    """Windows paths, c:\my\path\shiny, need to be changed to be compatible with
-    the Engine. Volume paths are expected to be linux style /c/my/path/shiny/
-    """
-    if not IS_WINDOWS_PLATFORM:
-        return external_path, internal_path
-
-    if external_path:
-        drive, tail = os.path.splitdrive(external_path)
-
-        if drive:
-            external_path = '/' + drive.lower().rstrip(':') + tail
-
-        external_path = external_path.replace('\\', '/')
-
-    return external_path, internal_path.replace('\\', '/')
-
-
-def parse_volume_spec(volume_config):
-    """
-    Parse a volume_config path and split it into external:internal[:mode]
-    parts to be returned as a valid VolumeSpec.
-    """
-    if IS_WINDOWS_PLATFORM:
-        # relative paths in windows expand to include the drive, eg C:\
-        # so we join the first 2 parts back together to count as one
-        drive, tail = os.path.splitdrive(volume_config)
-        parts = tail.split(":")
-
-        if drive:
-            parts[0] = drive + parts[0]
-    else:
-        parts = volume_config.split(':')
-
-    if len(parts) > 3:
-        raise ConfigError("Volume %s has incorrect format, should be "
-                          "external:internal[:mode]" % volume_config)
-
-    if len(parts) == 1:
-        external, internal = normalize_paths_for_engine(None, os.path.normpath(parts[0]))
-    else:
-        external, internal = normalize_paths_for_engine(os.path.normpath(parts[0]), os.path.normpath(parts[1]))
-
-    mode = 'rw'
-    if len(parts) == 3:
-        mode = parts[2]
-
-    return VolumeSpec(external, internal, mode)
-
-
 def build_volume_from(volume_from_spec):
     """
     volume_from can be either a service or a container. We want to return the
@@ -1031,21 +940,6 @@ def build_volume_from(volume_from_spec):
         return ["{}:{}".format(container.id, volume_from_spec.mode)]
     elif isinstance(volume_from_spec.source, Container):
         return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
-
-
-def parse_volume_from_spec(volume_from_config):
-    parts = volume_from_config.split(':')
-    if len(parts) > 2:
-        raise ConfigError("Volume %s has incorrect format, should be "
-                          "external:internal[:mode]" % volume_from_config)
-
-    if len(parts) == 1:
-        source = parts[0]
-        mode = 'rw'
-    else:
-        source, mode = parts
-
-    return VolumeFromSpec(source, mode)
 
 
 # Labels
@@ -1064,24 +958,6 @@ def build_container_labels(label_options, service_labels, number, config_hash):
     return labels
 
 
-# Restart policy
-
-
-def parse_restart_spec(restart_config):
-    if not restart_config:
-        return None
-    parts = restart_config.split(':')
-    if len(parts) > 2:
-        raise ConfigError("Restart %s has incorrect format, should be "
-                          "mode[:max_retry]" % restart_config)
-    if len(parts) == 2:
-        name, max_retry_count = parts
-    else:
-        name, = parts
-        max_retry_count = 0
-
-    return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
-
 # Ulimits
 
 
@@ -1098,31 +974,3 @@ def build_ulimits(ulimit_config):
             ulimits.append(ulimit_dict)
 
     return ulimits
-
-
-# Extra hosts
-
-
-def build_extra_hosts(extra_hosts_config):
-    if not extra_hosts_config:
-        return {}
-
-    if isinstance(extra_hosts_config, list):
-        extra_hosts_dict = {}
-        for extra_hosts_line in extra_hosts_config:
-            if not isinstance(extra_hosts_line, six.string_types):
-                raise ConfigError(
-                    "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
-                    extra_hosts_config
-                )
-            host, ip = extra_hosts_line.split(':')
-            extra_hosts_dict.update({host.strip(): ip.strip()})
-        extra_hosts_config = extra_hosts_dict
-
-    if isinstance(extra_hosts_config, dict):
-        return extra_hosts_config
-
-    raise ConfigError(
-        "extra_hosts_config \"%s\" must be either a list of strings or a string->string mapping," %
-        extra_hosts_config
-    )

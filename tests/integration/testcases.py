@@ -6,7 +6,6 @@ from pytest import skip
 
 from .. import unittest
 from compose.cli.docker_client import docker_client
-from compose.config.config import process_service
 from compose.config.config import resolve_environment
 from compose.config.config import ServiceConfig
 from compose.const import LABEL_PROJECT
@@ -41,13 +40,12 @@ class DockerClientTestCase(unittest.TestCase):
             kwargs['command'] = ["top"]
 
         service_config = ServiceConfig('.', None, name, kwargs)
-        options = process_service(service_config)
-        options['environment'] = resolve_environment(
-            service_config._replace(config=options))
-        labels = options.setdefault('labels', {})
+        kwargs['environment'] = resolve_environment(service_config)
+
+        labels = dict(kwargs.setdefault('labels', {}))
         labels['com.docker.compose.test-name'] = self.id()
 
-        return Service(name, client=self.client, project='composetest', **options)
+        return Service(name, client=self.client, project='composetest', **kwargs)
 
     def check_build(self, *args, **kwargs):
         kwargs.setdefault('rm', True)

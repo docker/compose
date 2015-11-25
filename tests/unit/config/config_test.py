@@ -11,6 +11,7 @@ import pytest
 
 from compose.config import config
 from compose.config.errors import ConfigurationError
+from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
@@ -32,7 +33,7 @@ def service_sort(services):
     return sorted(services, key=itemgetter('name'))
 
 
-def build_config_details(contents, working_dir, filename):
+def build_config_details(contents, working_dir='working_dir', filename='filename.yml'):
     return config.ConfigDetails(
         working_dir,
         [config.ConfigFile(filename, contents)])
@@ -76,7 +77,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    def test_config_invalid_service_names(self):
+    def test_load_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
                 config.load(build_config_details(
@@ -147,7 +148,7 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'build': '/',
                 'links': ['db'],
-                'volumes': ['/home/user/project:/code'],
+                'volumes': [VolumeSpec.parse('/home/user/project:/code')],
             },
             {
                 'name': 'db',
@@ -211,7 +212,7 @@ class ConfigTest(unittest.TestCase):
             {
                 'name': 'web',
                 'image': 'example/web',
-                'volumes': ['/home/user/project:/code'],
+                'volumes': [VolumeSpec.parse('/home/user/project:/code')],
                 'labels': {'label': 'one'},
             },
         ]
@@ -230,6 +231,27 @@ class ConfigTest(unittest.TestCase):
             config.load(details)
         assert "service 'bogus' doesn't have any configuration" in exc.exconly()
         assert "In file 'override.yaml'" in exc.exconly()
+
+    def test_load_sorts_in_dependency_order(self):
+        config_details = build_config_details({
+            'web': {
+                'image': 'busybox:latest',
+                'links': ['db'],
+            },
+            'db': {
+                'image': 'busybox:latest',
+                'volumes_from': ['volume:ro']
+            },
+            'volume': {
+                'image': 'busybox:latest',
+                'volumes': ['/tmp'],
+            }
+        })
+        services = config.load(config_details)
+
+        assert services[0]['name'] == 'volume'
+        assert services[1]['name'] == 'db'
+        assert services[2]['name'] == 'web'
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
@@ -512,6 +534,29 @@ class ConfigTest(unittest.TestCase):
 
         assert 'line 3, column 32' in exc.exconly()
 
+    def test_validate_extra_hosts_invalid(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details({
+                'web': {
+                    'image': 'alpine',
+                    'extra_hosts': "www.example.com: 192.168.0.17",
+                }
+            }))
+        assert "'extra_hosts' contains an invalid type" in exc.exconly()
+
+    def test_validate_extra_hosts_invalid_list(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details({
+                'web': {
+                    'image': 'alpine',
+                    'extra_hosts': [
+                        {'www.example.com': '192.168.0.17'},
+                        {'api.example.com': '192.168.0.18'}
+                    ],
+                }
+            }))
+        assert "which is an invalid type" in exc.exconly()
+
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
@@ -603,14 +648,11 @@ class VolumeConfigTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = config.load(
-            build_config_details(
-                {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
-                '.',
-                None,
-            )
-        )[0]
-        self.assertEqual(d['volumes'], ['/host/path:/container/path'])
+        d = config.load(build_config_details(
+            {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
+            '.',
+        ))[0]
+        self.assertEqual(d['volumes'], [VolumeSpec.parse('/host/path:/container/path')])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)
@@ -1008,19 +1050,21 @@ class EnvTest(unittest.TestCase):
             build_config_details(
                 {'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
                 "tests/fixtures/env",
-                None,
             )
         )[0]
-        self.assertEqual(set(service_dict['volumes']), set(['/tmp:/host/tmp']))
+        self.assertEqual(
+            set(service_dict['volumes']),
+            set([VolumeSpec.parse('/tmp:/host/tmp')]))
 
         service_dict = config.load(
             build_config_details(
                 {'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
                 "tests/fixtures/env",
-                None,
             )
         )[0]
-        self.assertEqual(set(service_dict['volumes']), set(['/opt/tmp:/opt/host/tmp']))
+        self.assertEqual(
+            set(service_dict['volumes']),
+            set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')]))
 
 
 def load_from_filename(filename):
@@ -1267,8 +1311,14 @@ class ExtendsTest(unittest.TestCase):
         dicts = load_from_filename('tests/fixtures/volume-path/docker-compose.yml')
 
         paths = [
-            '%s:/foo' % os.path.abspath('tests/fixtures/volume-path/common/foo'),
-            '%s:/bar' % os.path.abspath('tests/fixtures/volume-path/bar'),
+            VolumeSpec(
+                os.path.abspath('tests/fixtures/volume-path/common/foo'),
+                '/foo',
+                'rw'),
+            VolumeSpec(
+                os.path.abspath('tests/fixtures/volume-path/bar'),
+                '/bar',
+                'rw')
         ]
 
         self.assertEqual(set(dicts[0]['volumes']), set(paths))

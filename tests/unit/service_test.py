@@ -2,11 +2,11 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
-import pytest
 
 from .. import mock
 from .. import unittest
-from compose.const import IS_WINDOWS_PLATFORM
+from compose.config.types import VolumeFromSpec
+from compose.config.types import VolumeSpec
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -14,7 +14,6 @@ from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
-from compose.service import ConfigError
 from compose.service import ContainerNet
 from compose.service import get_container_data_volumes
 from compose.service import merge_volume_bindings
@@ -22,11 +21,8 @@ from compose.service import NeedsBuildError
 from compose.service import Net
 from compose.service import NoSuchImageError
 from compose.service import parse_repository_tag
-from compose.service import parse_volume_spec
 from compose.service import Service
 from compose.service import ServiceNet
-from compose.service import VolumeFromSpec
-from compose.service import VolumeSpec
 from compose.service import warn_on_masked_volume
 
 
@@ -34,11 +30,6 @@ class ServiceTest(unittest.TestCase):
 
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.Client)
-
-    def test_project_validation(self):
-        self.assertRaises(ConfigError, lambda: Service(name='foo', project='>', image='foo'))
-
-        Service(name='foo', project='bar.bar__', image='foo')
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
@@ -589,46 +580,12 @@ class ServiceVolumesTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.Client)
 
-    def test_parse_volume_spec_only_one_path(self):
-        spec = parse_volume_spec('/the/volume')
-        self.assertEqual(spec, (None, '/the/volume', 'rw'))
-
-    def test_parse_volume_spec_internal_and_external(self):
-        spec = parse_volume_spec('external:interval')
-        self.assertEqual(spec, ('external', 'interval', 'rw'))
-
-    def test_parse_volume_spec_with_mode(self):
-        spec = parse_volume_spec('external:interval:ro')
-        self.assertEqual(spec, ('external', 'interval', 'ro'))
-
-        spec = parse_volume_spec('external:interval:z')
-        self.assertEqual(spec, ('external', 'interval', 'z'))
-
-    def test_parse_volume_spec_too_many_parts(self):
-        with self.assertRaises(ConfigError):
-            parse_volume_spec('one:two:three:four')
-
-    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
-    def test_parse_volume_windows_absolute_path(self):
-        windows_absolute_path = "c:\\Users\\me\\Documents\\shiny\\config:\\opt\\shiny\\config:ro"
-
-        spec = parse_volume_spec(windows_absolute_path)
-
-        self.assertEqual(
-            spec,
-            (
-                "/c/Users/me/Documents/shiny/config",
-                "/opt/shiny/config",
-                "ro"
-            )
-        )
-
     def test_build_volume_binding(self):
-        binding = build_volume_binding(parse_volume_spec('/outside:/inside'))
-        self.assertEqual(binding, ('/inside', '/outside:/inside:rw'))
+        binding = build_volume_binding(VolumeSpec.parse('/outside:/inside'))
+        assert binding == ('/inside', '/outside:/inside:rw')
 
     def test_get_container_data_volumes(self):
-        options = [parse_volume_spec(v) for v in [
+        options = [VolumeSpec.parse(v) for v in [
             '/host/volume:/host/volume:ro',
             '/new/volume',
             '/existing/volume',
@@ -652,19 +609,19 @@ class ServiceVolumesTest(unittest.TestCase):
         }, has_been_inspected=True)
 
         expected = [
-            parse_volume_spec('/var/lib/docker/aaaaaaaa:/existing/volume:rw'),
-            parse_volume_spec('/var/lib/docker/cccccccc:/mnt/image/data:rw'),
+            VolumeSpec.parse('/var/lib/docker/aaaaaaaa:/existing/volume:rw'),
+            VolumeSpec.parse('/var/lib/docker/cccccccc:/mnt/image/data:rw'),
         ]
 
         volumes = get_container_data_volumes(container, options)
-        self.assertEqual(sorted(volumes), sorted(expected))
+        assert sorted(volumes) == sorted(expected)
 
     def test_merge_volume_bindings(self):
         options = [
-            '/host/volume:/host/volume:ro',
-            '/host/rw/volume:/host/rw/volume',
-            '/new/volume',
-            '/existing/volume',
+            VolumeSpec.parse('/host/volume:/host/volume:ro'),
+            VolumeSpec.parse('/host/rw/volume:/host/rw/volume'),
+            VolumeSpec.parse('/new/volume'),
+            VolumeSpec.parse('/existing/volume'),
         ]
 
         self.mock_client.inspect_image.return_value = {
@@ -690,8 +647,8 @@ class ServiceVolumesTest(unittest.TestCase):
             'web',
             image='busybox',
             volumes=[
-                '/host/path:/data1',
-                '/host/path:/data2',
+                VolumeSpec.parse('/host/path:/data1'),
+                VolumeSpec.parse('/host/path:/data2'),
             ],
             client=self.mock_client,
         )
@@ -720,7 +677,7 @@ class ServiceVolumesTest(unittest.TestCase):
         service = Service(
             'web',
             image='busybox',
-            volumes=['/host/path:/data'],
+            volumes=[VolumeSpec.parse('/host/path:/data')],
             client=self.mock_client,
         )
 
@@ -788,22 +745,17 @@ class ServiceVolumesTest(unittest.TestCase):
     def test_create_with_special_volume_mode(self):
         self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
 
-        create_calls = []
+        self.mock_client.create_container.return_value = {'Id': 'containerid'}
 
-        def create_container(*args, **kwargs):
-            create_calls.append((args, kwargs))
-            return {'Id': 'containerid'}
-
-        self.mock_client.create_container = create_container
-
-        volumes = ['/tmp:/foo:z']
-
+        volume = '/tmp:/foo:z'
         Service(
             'web',
             client=self.mock_client,
             image='busybox',
-            volumes=volumes,
+            volumes=[VolumeSpec.parse(volume)],
         ).create_container()
 
-        self.assertEqual(len(create_calls), 1)
-        self.assertEqual(self.mock_client.create_host_config.call_args[1]['binds'], volumes)
+        assert self.mock_client.create_container.call_count == 1
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['binds'],
+            [volume])

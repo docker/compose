@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import codecs
 import logging
 import operator
@@ -12,6 +14,12 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
+from .sort_services import get_service_name_from_net
+from .sort_services import sort_service_dicts
+from .types import parse_extra_hosts
+from .types import parse_restart_spec
+from .types import VolumeFromSpec
+from .types import VolumeSpec
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_extends_file_path
@@ -198,16 +206,20 @@ def load(config_details):
             service_dict)
         resolver = ServiceExtendsResolver(service_config)
         service_dict = process_service(resolver.run())
+
+        # TODO: move to validate_service()
         validate_against_service_schema(service_dict, service_config.name)
         validate_paths(service_dict)
+
+        service_dict = finalize_service(service_config._replace(config=service_dict))
         service_dict['name'] = service_config.name
         return service_dict
 
     def build_services(config_file):
-        return [
+        return sort_service_dicts([
             build_service(config_file.filename, name, service_dict)
             for name, service_dict in config_file.config.items()
-        ]
+        ])
 
     def merge_services(base, override):
         all_service_names = set(base) | set(override)
@@ -353,6 +365,7 @@ def validate_ulimits(ulimit_config):
                     "than 'hard' value".format(ulimit_config))
 
 
+# TODO: rename to normalize_service
 def process_service(service_config):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
@@ -370,8 +383,29 @@ def process_service(service_config):
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
 
+    if 'extra_hosts' in service_dict:
+        service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
+
+    # TODO: move to a validate_service()
     if 'ulimits' in service_dict:
         validate_ulimits(service_dict['ulimits'])
+
+    return service_dict
+
+
+def finalize_service(service_config):
+    service_dict = dict(service_config.config)
+
+    if 'volumes_from' in service_dict:
+        service_dict['volumes_from'] = [
+            VolumeFromSpec.parse(vf) for vf in service_dict['volumes_from']]
+
+    if 'volumes' in service_dict:
+        service_dict['volumes'] = [
+            VolumeSpec.parse(v) for v in service_dict['volumes']]
+
+    if 'restart' in service_dict:
+        service_dict['restart'] = parse_restart_spec(service_dict['restart'])
 
     return service_dict
 
@@ -604,17 +638,6 @@ def to_list(value):
         return [value]
     else:
         return value
-
-
-def get_service_name_from_net(net_config):
-    if not net_config:
-        return
-
-    if not net_config.startswith('container:'):
-        return
-
-    _, net_name = net_config.split(':', 1)
-    return net_name
 
 
 def load_yaml(filename):

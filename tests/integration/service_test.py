@@ -14,6 +14,8 @@ from .. import mock
 from .testcases import DockerClientTestCase
 from .testcases import pull_busybox
 from compose import __version__
+from compose.config.types import VolumeFromSpec
+from compose.config.types import VolumeSpec
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
@@ -21,13 +23,10 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
-from compose.service import build_extra_hosts
-from compose.service import ConfigError
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import Net
 from compose.service import Service
-from compose.service import VolumeFromSpec
 
 
 def create_and_start_container(service, **override_options):
@@ -122,7 +121,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.name, 'composetest_db_run_1')
 
     def test_create_container_with_unspecified_volume(self):
-        service = self.create_service('db', volumes=['/var/db'])
+        service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         container = service.create_container()
         container.start()
         self.assertIn('/var/db', container.get('Volumes'))
@@ -138,37 +137,6 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         container.start()
         self.assertEqual(container.get('HostConfig.CpuShares'), 73)
-
-    def test_build_extra_hosts(self):
-        # string
-        self.assertRaises(ConfigError, lambda: build_extra_hosts("www.example.com: 192.168.0.17"))
-
-        # list of strings
-        self.assertEqual(build_extra_hosts(
-            ["www.example.com:192.168.0.17"]),
-            {'www.example.com': '192.168.0.17'})
-        self.assertEqual(build_extra_hosts(
-            ["www.example.com: 192.168.0.17"]),
-            {'www.example.com': '192.168.0.17'})
-        self.assertEqual(build_extra_hosts(
-            ["www.example.com: 192.168.0.17",
-             "static.example.com:192.168.0.19",
-             "api.example.com: 192.168.0.18"]),
-            {'www.example.com': '192.168.0.17',
-             'static.example.com': '192.168.0.19',
-             'api.example.com': '192.168.0.18'})
-
-        # list of dictionaries
-        self.assertRaises(ConfigError, lambda: build_extra_hosts(
-            [{'www.example.com': '192.168.0.17'},
-             {'api.example.com': '192.168.0.18'}]))
-
-        # dictionaries
-        self.assertEqual(build_extra_hosts(
-            {'www.example.com': '192.168.0.17',
-             'api.example.com': '192.168.0.18'}),
-            {'www.example.com': '192.168.0.17',
-             'api.example.com': '192.168.0.18'})
 
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
@@ -215,7 +183,9 @@ class ServiceTest(DockerClientTestCase):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
 
-        service = self.create_service('db', volumes=['%s:%s' % (host_path, container_path)])
+        service = self.create_service(
+            'db',
+            volumes=[VolumeSpec(host_path, container_path, 'rw')])
         container = service.create_container()
         container.start()
 
@@ -228,11 +198,10 @@ class ServiceTest(DockerClientTestCase):
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
     def test_recreate_preserves_volume_with_trailing_slash(self):
-        """
-        When the Compose file specifies a trailing slash in the container path, make
+        """When the Compose file specifies a trailing slash in the container path, make
         sure we copy the volume over when recreating.
         """
-        service = self.create_service('data', volumes=['/data/'])
+        service = self.create_service('data', volumes=[VolumeSpec.parse('/data/')])
         old_container = create_and_start_container(service)
         volume_path = old_container.get('Volumes')['/data']
 
@@ -246,7 +215,7 @@ class ServiceTest(DockerClientTestCase):
         """
         host_path = '/tmp/data'
         container_path = '/data'
-        volumes = ['{}:{}/'.format(host_path, container_path)]
+        volumes = [VolumeSpec.parse('{}:{}/'.format(host_path, container_path))]
 
         tmp_container = self.client.create_container(
             'busybox', 'true',
@@ -300,7 +269,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=['/etc'],
+            volumes=[VolumeSpec.parse('/etc')],
             entrypoint=['top'],
             command=['-d', '1']
         )
@@ -338,7 +307,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=['/var/db'],
+            volumes=[VolumeSpec.parse('/var/db')],
             entrypoint=['top'],
             command=['-d', '1']
         )
@@ -376,10 +345,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
     def test_execute_convergence_plan_when_image_volume_masks_config(self):
-        service = Service(
-            project='composetest',
-            name='db',
-            client=self.client,
+        service = self.create_service(
+            'db',
             build='tests/fixtures/dockerfile-with-volume',
         )
 
@@ -387,7 +354,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
         volume_path = old_container.get('Volumes')['/data']
 
-        service.options['volumes'] = ['/tmp:/data']
+        service.options['volumes'] = [VolumeSpec.parse('/tmp:/data')]
 
         with mock.patch('compose.service.log') as mock_log:
             new_container, = service.execute_convergence_plan(
@@ -786,23 +753,21 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertIsNone(container.get('HostConfig.Dns'))
 
-    def test_dns_single_value(self):
-        service = self.create_service('web', dns='8.8.8.8')
-        container = create_and_start_container(service)
-        self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8'])
-
     def test_dns_list(self):
         service = self.create_service('web', dns=['8.8.8.8', '9.9.9.9'])
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8', '9.9.9.9'])
 
     def test_restart_always_value(self):
-        service = self.create_service('web', restart='always')
+        service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'always')
 
     def test_restart_on_failure_value(self):
-        service = self.create_service('web', restart='on-failure:5')
+        service = self.create_service('web', restart={
+            'Name': 'on-failure',
+            'MaximumRetryCount': 5
+        })
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'on-failure')
         self.assertEqual(container.get('HostConfig.RestartPolicy.MaximumRetryCount'), 5)
@@ -817,17 +782,7 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.CapDrop'), ['SYS_ADMIN', 'NET_ADMIN'])
 
-    def test_dns_search_no_value(self):
-        service = self.create_service('web')
-        container = create_and_start_container(service)
-        self.assertIsNone(container.get('HostConfig.DnsSearch'))
-
-    def test_dns_search_single_value(self):
-        service = self.create_service('web', dns_search='example.com')
-        container = create_and_start_container(service)
-        self.assertEqual(container.get('HostConfig.DnsSearch'), ['example.com'])
-
-    def test_dns_search_list(self):
+    def test_dns_search(self):
         service = self.create_service('web', dns_search=['dc1.example.com', 'dc2.example.com'])
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])
@@ -909,22 +864,11 @@ class ServiceTest(DockerClientTestCase):
         for pair in expected.items():
             self.assertIn(pair, labels)
 
-        service.kill()
-        remove_stopped(service)
-
-        labels_list = ["%s=%s" % pair for pair in labels_dict.items()]
-
-        service = self.create_service('web', labels=labels_list)
-        labels = create_and_start_container(service).labels.items()
-        for pair in expected.items():
-            self.assertIn(pair, labels)
-
     def test_empty_labels(self):
-        labels_list = ['foo', 'bar']
-
-        service = self.create_service('web', labels=labels_list)
+        labels_dict = {'foo': '', 'bar': ''}
+        service = self.create_service('web', labels=labels_dict)
         labels = create_and_start_container(service).labels.items()
-        for name in labels_list:
+        for name in labels_dict:
             self.assertIn((name, ''), labels)
 
     def test_custom_container_name(self):

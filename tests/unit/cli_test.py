@@ -124,7 +124,7 @@ class CLITestCase(unittest.TestCase):
         mock_project.get_service.return_value = Service(
             'service',
             client=mock_client,
-            restart='always',
+            restart={'Name': 'always', 'MaximumRetryCount': 0},
             image='someimage')
         command.run(mock_project, {
             'SERVICE': 'service',
