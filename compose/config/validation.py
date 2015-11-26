@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sys
 
 import six
@@ -34,6 +35,7 @@ DOCKER_CONFIG_HINTS = {
 
 
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
+VALID_EXPOSE_FORMAT = r'^\d+(\/[a-zA-Z]+)?$'
 
 
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)
@@ -42,6 +44,16 @@ def format_ports(instance):
         split_port(instance)
     except ValueError as e:
         raise ValidationError(six.text_type(e))
+    return True
+
+
+@FormatChecker.cls_checks(format="expose", raises=ValidationError)
+def format_expose(instance):
+    if isinstance(instance, six.string_types):
+        if not re.match(VALID_EXPOSE_FORMAT, instance):
+            raise ValidationError(
+                "should be of the format 'PORT[/PROTOCOL]'")
+
     return True
 
 
@@ -273,7 +285,7 @@ def validate_against_fields_schema(config, filename):
     _validate_against_schema(
         config,
         "fields_schema.json",
-        format_checker=["ports", "bool-value-in-mapping"],
+        format_checker=["ports", "expose", "bool-value-in-mapping"],
         filename=filename)
 
 

@@ -590,6 +590,33 @@ class PortsTest(unittest.TestCase):
         for valid_ports in self.VALID_SINGLE_PORTS + self.VALID_PORT_MAPPINGS:
             self.check_config({'ports': valid_ports})
 
+    def test_config_invalid_expose_type_validation(self):
+        for invalid_expose in self.INVALID_PORTS_TYPES:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config({'expose': invalid_expose})
+
+            assert "contains an invalid type" in exc.value.msg
+
+    def test_config_non_unique_expose_validation(self):
+        for invalid_expose in self.NON_UNIQUE_SINGLE_PORTS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config({'expose': invalid_expose})
+
+            assert "non-unique" in exc.value.msg
+
+    def test_config_invalid_expose_format_validation(self):
+        # Valid port mappings ARE NOT valid 'expose' entries
+        for invalid_expose in self.INVALID_PORT_MAPPINGS + self.VALID_PORT_MAPPINGS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config({'expose': invalid_expose})
+
+            assert "should be of the format" in exc.value.msg
+
+    def test_config_valid_expose_format_validation(self):
+        # Valid single ports ARE valid 'expose' entries
+        for valid_expose in self.VALID_SINGLE_PORTS:
+            self.check_config({'expose': valid_expose})
+
     def check_config(self, cfg):
         config.load(
             build_config_details(
