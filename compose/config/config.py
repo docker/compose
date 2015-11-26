@@ -76,6 +76,13 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'external_links',
 ]
 
+DOCKER_VALID_URL_PREFIXES = (
+    'http://',
+    'https://',
+    'git://',
+    'github.com/',
+    'git@',
+)
 
 SUPPORTED_FILENAMES = [
     'docker-compose.yml',
@@ -377,7 +384,7 @@ def process_service(service_config):
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
 
     if 'build' in service_dict:
-        service_dict['build'] = expand_path(working_dir, service_dict['build'])
+        service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
 
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
@@ -539,11 +546,26 @@ def resolve_volume_path(working_dir, volume):
         return container_path
 
 
+def resolve_build_path(working_dir, build_path):
+    if is_url(build_path):
+        return build_path
+    return expand_path(working_dir, build_path)
+
+
+def is_url(build_path):
+    return build_path.startswith(DOCKER_VALID_URL_PREFIXES)
+
+
 def validate_paths(service_dict):
     if 'build' in service_dict:
         build_path = service_dict['build']
-        if not os.path.exists(build_path) or not os.access(build_path, os.R_OK):
-            raise ConfigurationError("build path %s either does not exist or is not accessible." % build_path)
+        if (
+            not is_url(build_path) and
+            (not os.path.exists(build_path) or not os.access(build_path, os.R_OK))
+        ):
+            raise ConfigurationError(
+                "build path %s either does not exist, is not accessible, "
+                "or is not a valid URL." % build_path)
 
 
 def merge_path_mappings(base, override):
