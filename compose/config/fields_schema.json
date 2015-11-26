@@ -41,7 +41,10 @@
 
         "expose": {
           "type": "array",
-          "items": {"type": ["string", "number"]},
+          "items": {
+            "type": ["string", "number"],
+            "format": "expose"
+          },
           "uniqueItems": true
         },
 
