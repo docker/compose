@@ -83,16 +83,8 @@
         "ports": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "type": "string",
-                "format": "ports"
-              },
-              {
-                "type": "number",
-                "format": "ports"
-              }
-            ]
+            "type": ["string", "number"],
+            "format": "ports"
           },
           "uniqueItems": true
         },
