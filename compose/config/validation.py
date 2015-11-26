@@ -36,16 +36,12 @@ DOCKER_CONFIG_HINTS = {
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 
 
-@FormatChecker.cls_checks(
-    format="ports",
-    raises=ValidationError(
-        "Invalid port formatting, it should be "
-        "'[[remote_ip:]remote_port:]port[/protocol]'"))
+@FormatChecker.cls_checks(format="ports", raises=ValidationError)
 def format_ports(instance):
     try:
         split_port(instance)
-    except ValueError:
-        return False
+    except ValueError as e:
+        raise ValidationError(six.text_type(e))
     return True
 
 
@@ -183,6 +179,10 @@ def handle_generic_service_error(error, service_name):
         error_msg = "when defining '{}' you must set '{}' as well".format(
             config_key,
             required_keys)
+
+    elif error.cause:
+        error_msg = six.text_type(error.cause)
+        msg_format = "Service '{}' configuration key {} is invalid: {}"
 
     elif error.path:
         msg_format = "Service '{}' configuration key {} value {}"
