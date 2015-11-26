@@ -263,28 +263,6 @@ class ConfigTest(unittest.TestCase):
                     'common.yml'))
             assert services[0]['name'] == valid_name
 
-    def test_config_invalid_ports_format_validation(self):
-        for invalid_ports in [{"1": "8000"}, False, 0, "8000", 8000, ["8000", "8000"]]:
-            with pytest.raises(ConfigurationError):
-                config.load(
-                    build_config_details(
-                        {'web': {'image': 'busybox', 'ports': invalid_ports}},
-                        'working_dir',
-                        'filename.yml'
-                    )
-                )
-
-    def test_config_valid_ports_format_validation(self):
-        valid_ports = [["8000", "9000"], ["8000/8050"], ["8000"], [8000], ["49153-49154:3002-3003"]]
-        for ports in valid_ports:
-            config.load(
-                build_config_details(
-                    {'web': {'image': 'busybox', 'ports': ports}},
-                    'working_dir',
-                    'filename.yml'
-                )
-            )
-
     def test_config_hint(self):
         expected_error_msg = "(did you mean 'privileged'?)"
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
@@ -556,6 +534,70 @@ class ConfigTest(unittest.TestCase):
                 }
             }))
         assert "which is an invalid type" in exc.exconly()
+
+
+class PortsTest(unittest.TestCase):
+    INVALID_PORTS_TYPES = [
+        {"1": "8000"},
+        False,
+        "8000",
+        8000,
+    ]
+
+    NON_UNIQUE_SINGLE_PORTS = [
+        ["8000", "8000"],
+    ]
+
+    INVALID_PORT_MAPPINGS = [
+        ["8000-8001:8000"],
+    ]
+
+    VALID_SINGLE_PORTS = [
+        ["8000"],
+        ["8000/tcp"],
+        ["8000", "9000"],
+        [8000],
+        [8000, 9000],
+    ]
+
+    VALID_PORT_MAPPINGS = [
+        ["8000:8050"],
+        ["49153-49154:3002-3003"],
+    ]
+
+    def test_config_invalid_ports_type_validation(self):
+        for invalid_ports in self.INVALID_PORTS_TYPES:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config({'ports': invalid_ports})
+
+            assert "contains an invalid type" in exc.value.msg
+
+    def test_config_non_unique_ports_validation(self):
+        for invalid_ports in self.NON_UNIQUE_SINGLE_PORTS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config({'ports': invalid_ports})
+
+            assert "non-unique" in exc.value.msg
+
+    def test_config_invalid_ports_format_validation(self):
+        for invalid_ports in self.INVALID_PORT_MAPPINGS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config({'ports': invalid_ports})
+
+            assert "Port ranges don't match in length" in exc.value.msg
+
+    def test_config_valid_ports_format_validation(self):
+        for valid_ports in self.VALID_SINGLE_PORTS + self.VALID_PORT_MAPPINGS:
+            self.check_config({'ports': valid_ports})
+
+    def check_config(self, cfg):
+        config.load(
+            build_config_details(
+                {'web': dict(image='busybox', **cfg)},
+                'working_dir',
+                'filename.yml'
+            )
+        )
 
 
 class InterpolationTest(unittest.TestCase):
