@@ -264,9 +264,8 @@ class ConfigTest(unittest.TestCase):
             assert services[0]['name'] == valid_name
 
     def test_config_invalid_ports_format_validation(self):
-        expected_error_msg = "Service 'web' configuration key 'ports' contains an invalid type"
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            for invalid_ports in [{"1": "8000"}, False, 0, "8000", 8000, ["8000", "8000"]]:
+        for invalid_ports in [{"1": "8000"}, False, 0, "8000", 8000, ["8000", "8000"]]:
+            with pytest.raises(ConfigurationError):
                 config.load(
                     build_config_details(
                         {'web': {'image': 'busybox', 'ports': invalid_ports}},
