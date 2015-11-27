@@ -41,7 +41,10 @@
 
         "expose": {
           "type": "array",
-          "items": {"type": ["string", "number"]},
+          "items": {
+            "type": ["string", "number"],
+            "format": "expose"
+          },
           "uniqueItems": true
         },
 
@@ -83,16 +86,8 @@
         "ports": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "type": "string",
-                "format": "ports"
-              },
-              {
-                "type": "number",
-                "format": "ports"
-              }
-            ]
+            "type": ["string", "number"],
+            "format": "ports"
           },
           "uniqueItems": true
         },

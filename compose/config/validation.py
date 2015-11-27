@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sys
 
 import six
@@ -34,18 +35,25 @@ DOCKER_CONFIG_HINTS = {
 
 
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
+VALID_EXPOSE_FORMAT = r'^\d+(\/[a-zA-Z]+)?$'
 
 
-@FormatChecker.cls_checks(
-    format="ports",
-    raises=ValidationError(
-        "Invalid port formatting, it should be "
-        "'[[remote_ip:]remote_port:]port[/protocol]'"))
+@FormatChecker.cls_checks(format="ports", raises=ValidationError)
 def format_ports(instance):
     try:
         split_port(instance)
-    except ValueError:
-        return False
+    except ValueError as e:
+        raise ValidationError(six.text_type(e))
+    return True
+
+
+@FormatChecker.cls_checks(format="expose", raises=ValidationError)
+def format_expose(instance):
+    if isinstance(instance, six.string_types):
+        if not re.match(VALID_EXPOSE_FORMAT, instance):
+            raise ValidationError(
+                "should be of the format 'PORT[/PROTOCOL]'")
+
     return True
 
 
@@ -184,6 +192,10 @@ def handle_generic_service_error(error, service_name):
             config_key,
             required_keys)
 
+    elif error.cause:
+        error_msg = six.text_type(error.cause)
+        msg_format = "Service '{}' configuration key {} is invalid: {}"
+
     elif error.path:
         msg_format = "Service '{}' configuration key {} value {}"
 
@@ -273,7 +285,7 @@ def validate_against_fields_schema(config, filename):
     _validate_against_schema(
         config,
         "fields_schema.json",
-        format_checker=["ports", "bool-value-in-mapping"],
+        format_checker=["ports", "expose", "bool-value-in-mapping"],
         filename=filename)
 
 
