@@ -1,0 +1,29 @@
+{
+    "package": {
+        "name": "${TRAVIS_OS_NAME}",
+        "repo": "master",
+        "subject": "docker-compose",
+        "desc": "Automated build of master branch from travis ci.",
+        "website_url": "https://github.com/docker/compose",
+        "issue_tracker_url": "https://github.com/docker/compose/issues",
+        "vcs_url": "https://github.com/docker/compose.git",
+        "licenses": ["Apache-2.0"]
+    },
+
+    "version": {
+        "name": "master",
+        "desc": "Automated build of the master branch.",
+        "released": "${DATE}",
+        "vcs_tag": "master"
+    },
+
+    "files": [
+        {
+            "includePattern": "dist/(.*)",
+            "excludePattern": ".*\.tar.gz",
+            "uploadPattern": "$1",
+            "matrixParams": { "override": 1 }
+        }
+    ],
+    "publish": true
+}

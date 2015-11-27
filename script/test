@@ -5,13 +5,11 @@ set -ex
 
 TAG="docker-compose:$(git rev-parse --short HEAD)"
 
+rm -rf coverage-html
+# Create the host directory so it's owned by $USER
+mkdir -p coverage-html
+
 docker build -t "$TAG" .
-docker run \
-  --rm \
-  --volume="/var/run/docker.sock:/var/run/docker.sock" \
-  --volume="$(pwd):/code" \
-  -e DOCKER_VERSIONS \
-  -e "TAG=$TAG" \
-  --entrypoint="script/test-versions" \
-  "$TAG" \
-  "$@"
+
+GIT_VOLUME="--volume=$(pwd)/.git:/code/.git"
+. script/test-versions

@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+
 from textwrap import dedent
 
 
@@ -39,10 +40,10 @@ class DockerNotFoundGeneric(UserError):
         """)
 
 
-class ConnectionErrorBoot2Docker(UserError):
+class ConnectionErrorDockerMachine(UserError):
     def __init__(self):
-        super(ConnectionErrorBoot2Docker, self).__init__("""
-        Couldn't connect to Docker daemon - you might need to run `boot2docker up`.
+        super(ConnectionErrorDockerMachine, self).__init__("""
+        Couldn't connect to Docker daemon - you might need to run `docker-machine start default`.
         """)
 
 
@@ -53,12 +54,3 @@ class ConnectionErrorGeneric(UserError):
 
         If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
         """ % url)
-
-
-class ComposeFileNotFound(UserError):
-    def __init__(self, supported_filenames):
-        super(ComposeFileNotFound, self).__init__("""
-        Can't find a suitable configuration file. Are you in the right directory?
-
-        Supported filenames: %s
-        """ % ", ".join(supported_filenames))

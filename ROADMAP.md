@@ -4,9 +4,12 @@
 
 Over time we will extend Compose's remit to cover test, staging and production environments. This is not a simple task, and will take many incremental improvements such as:
 
-- Compose’s brute-force “delete and recreate everything” approach is great for dev and testing, but it not sufficient for production environments. You should be able to define a "desired" state that Compose will intelligently converge to.
-- It should be possible to partially modify the config file for different environments (dev/test/staging/prod), passing in e.g. custom ports or volume mount paths. ([#426](https://github.com/docker/fig/issues/426))
+- Compose currently will attempt to get your application into the correct state when running `up`, but it has a number of shortcomings:
+  - It should roll back to a known good state if it fails.
+  - It should allow a user to check the actions it is about to perform before running them.
+- It should be possible to partially modify the config file for different environments (dev/test/staging/prod), passing in e.g. custom ports or volume mount paths. ([#1377](https://github.com/docker/compose/issues/1377))
 - Compose should recommend a technique for zero-downtime deploys.
+- It should be possible to continuously attempt to keep an application in the correct state, instead of just performing `up` a single time.
 
 ## Integration with Swarm
 

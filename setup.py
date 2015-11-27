@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from setuptools import setup, find_packages
+from __future__ import unicode_literals
+
 import codecs
 import os
 import re
 import sys
+
+from setuptools import find_packages
+from setuptools import setup
 
 
 def read(*parts):
@@ -27,24 +30,24 @@ def find_version(*file_paths):
 install_requires = [
     'docopt >= 0.6.1, < 0.7',
     'PyYAML >= 3.10, < 4',
-    'requests >= 2.5.0, < 2.6',
+    'requests >= 2.6.1, < 2.8',
     'texttable >= 0.8.1, < 0.9',
-    'websocket-client >= 0.11.0, < 1.0',
-    'docker-py >= 1.1.0, < 1.2',
-    'dockerpty >= 0.3.2, < 0.4',
+    'websocket-client >= 0.32.0, < 1.0',
+    'docker-py >= 1.5.0, < 2',
+    'dockerpty >= 0.3.4, < 0.4',
     'six >= 1.3.0, < 2',
+    'jsonschema >= 2.5.1, < 3',
 ]
+
 
 tests_require = [
-    'mock >= 1.0.1',
-    'nose',
-    'pyinstaller',
-    'flake8',
+    'pytest',
 ]
 
 
-if sys.version_info < (2, 7):
-    tests_require.append('unittest2')
+if sys.version_info[:2] < (3, 4):
+    tests_require.append('mock >= 1.0.1')
+    install_requires.append('enum34 >= 1.0.4, < 2')
 
 
 setup(
@@ -54,7 +57,7 @@ setup(
     url='https://www.docker.com/',
     author='Docker, Inc.',
     license='Apache License 2.0',
-    packages=find_packages(exclude=[ 'tests.*', 'tests' ]),
+    packages=find_packages(exclude=['tests.*', 'tests']),
     include_package_data=True,
     test_suite='nose.collector',
     install_requires=install_requires,
@@ -63,4 +66,14 @@ setup(
     [console_scripts]
     docker-compose=compose.cli.main:main
     """,
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
+    ],
 )

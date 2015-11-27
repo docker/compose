@@ -1,10 +1,16 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import division
-import datetime
+from __future__ import unicode_literals
+
 import os
-import subprocess
 import platform
+import ssl
+import subprocess
+
+import docker
+from six.moves import input
+
+import compose
 
 
 def yesno(prompt, default=None):
@@ -17,7 +23,7 @@ def yesno(prompt, default=None):
     Unrecognised input (anything other than "y", "n", "yes",
     "no" or "") will return None.
     """
-    answer = raw_input(prompt).strip().lower()
+    answer = input(prompt).strip().lower()
 
     if answer == "y" or answer == "yes":
         return True
@@ -29,70 +35,17 @@ def yesno(prompt, default=None):
         return None
 
 
-# http://stackoverflow.com/a/5164027
-def prettydate(d):
-    diff = datetime.datetime.utcnow() - d
-    s = diff.seconds
-    if diff.days > 7 or diff.days < 0:
-        return d.strftime('%d %b %y')
-    elif diff.days == 1:
-        return '1 day ago'
-    elif diff.days > 1:
-        return '{0} days ago'.format(diff.days)
-    elif s <= 1:
-        return 'just now'
-    elif s < 60:
-        return '{0} seconds ago'.format(s)
-    elif s < 120:
-        return '1 minute ago'
-    elif s < 3600:
-        return '{0} minutes ago'.format(s / 60)
-    elif s < 7200:
-        return '1 hour ago'
-    else:
-        return '{0} hours ago'.format(s / 3600)
-
-
-def mkdir(path, permissions=0o700):
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    os.chmod(path, permissions)
-
-    return path
-
-
-def split_buffer(reader, separator):
-    """
-    Given a generator which yields strings and a separator string,
-    joins all input, splits on the separator and yields each chunk.
-
-    Unlike string.split(), each chunk includes the trailing
-    separator, except for the last one if none was found on the end
-    of the input.
-    """
-    buffered = str('')
-    separator = str(separator)
-
-    for data in reader:
-        buffered += data
-        while True:
-            index = buffered.find(separator)
-            if index == -1:
-                break
-            yield buffered[:index + 1]
-            buffered = buffered[index + 1:]
-
-    if len(buffered) > 0:
-        yield buffered
-
-
 def call_silently(*args, **kwargs):
     """
     Like subprocess.call(), but redirects stdout and stderr to /dev/null.
     """
     with open(os.devnull, 'w') as shutup:
-        return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
+        try:
+            return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
+        except WindowsError:
+            # On Windows, subprocess.call() can still raise exceptions. Normalize
+            # to POSIXy behaviour by returning a nonzero exit code.
+            return 1
 
 
 def is_mac():
@@ -101,3 +54,35 @@ def is_mac():
 
 def is_ubuntu():
     return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
+
+
+def get_version_info(scope):
+    versioninfo = 'docker-compose version {}, build {}'.format(
+        compose.__version__,
+        get_build_version())
+
+    if scope == 'compose':
+        return versioninfo
+    if scope == 'full':
+        return (
+            "{}\n"
+            "docker-py version: {}\n"
+            "{} version: {}\n"
+            "OpenSSL version: {}"
+        ).format(
+            versioninfo,
+            docker.version,
+            platform.python_implementation(),
+            platform.python_version(),
+            ssl.OPENSSL_VERSION)
+
+    raise ValueError("{} is not a valid version scope".format(scope))
+
+
+def get_build_version():
+    filename = os.path.join(os.path.dirname(compose.__file__), 'GITSHA')
+    if not os.path.exists(filename):
+        return 'unknown'
+
+    with open(filename) as fh:
+        return fh.read().strip()

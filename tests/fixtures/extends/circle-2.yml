@@ -2,7 +2,7 @@ foo:
   image: busybox
 bar:
   image: busybox
-web:
+other:
   extends:
     file: circle-1.yml
     service: web

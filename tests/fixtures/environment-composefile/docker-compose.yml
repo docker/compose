@@ -1,6 +1,6 @@
 service:
   image: busybox:latest
-  command: sleep 5
+  command: top
 
   environment:
     foo: bar

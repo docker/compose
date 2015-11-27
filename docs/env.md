@@ -1,12 +1,17 @@
----
-layout: default
-title: Compose environment variables reference
----
+<!--[metadata]>
++++
+title = "Compose environment variables reference"
+description = "Compose CLI reference"
+keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
+[menu.main]
+parent="smn_compose_ref"
+weight=3
++++
+<![end-metadata]-->
 
-Environment variables reference
-===============================
+# Compose environment variables reference
 
-**Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, the name of the linked service) as the hostname to connect to. See the [docker-compose.yml documentation](yml.md#links) for details.
+**Note:** Environment variables are no longer the recommended method for connecting to linked services. Instead, you should use the link name (by default, the name of the linked service) as the hostname to connect to. See the [docker-compose.yml documentation](compose-file.md#links) for details.
 
 Compose uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
 
@@ -32,10 +37,9 @@ Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 
 [Docker links]: http://docs.docker.com/userguide/dockerlinks/
 
-## Compose documentation
+## Related Information
 
-- [Installing Compose](install.md)
 - [User guide](index.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose command line completion](completion.md)
+- [Installing Compose](install.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

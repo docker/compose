@@ -1,0 +1,53 @@
+#!/bin/bash
+
+set -ex
+
+python_version() {
+  python -V 2>&1
+}
+
+openssl_version() {
+  python -c "import ssl; print ssl.OPENSSL_VERSION"
+}
+
+desired_python_version="2.7.9"
+desired_python_brew_version="2.7.9"
+python_formula="https://raw.githubusercontent.com/Homebrew/homebrew/1681e193e4d91c9620c4901efd4458d9b6fcda8e/Library/Formula/python.rb"
+
+desired_openssl_version="1.0.1j"
+desired_openssl_brew_version="1.0.1j_1"
+openssl_formula="https://raw.githubusercontent.com/Homebrew/homebrew/62fc2a1a65e83ba9dbb30b2e0a2b7355831c714b/Library/Formula/openssl.rb"
+
+PATH="/usr/local/bin:$PATH"
+
+if !(which brew); then
+  ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+fi
+
+brew update > /dev/null
+
+if !(python_version | grep "$desired_python_version"); then
+  if brew list | grep python; then
+    brew unlink python
+  fi
+
+  brew install "$python_formula"
+  brew switch python "$desired_python_brew_version"
+fi
+
+if !(openssl_version | grep "$desired_openssl_version"); then
+  if brew list | grep openssl; then
+    brew unlink openssl
+  fi
+
+  brew install "$openssl_formula"
+  brew switch openssl "$desired_openssl_brew_version"
+fi
+
+echo "*** Using $(python_version)"
+echo "*** Using $(openssl_version)"
+
+if !(which virtualenv); then
+  pip install virtualenv
+fi
+

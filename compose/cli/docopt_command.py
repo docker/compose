@@ -1,9 +1,11 @@
-from __future__ import unicode_literals
 from __future__ import absolute_import
-import sys
+from __future__ import unicode_literals
 
+import sys
 from inspect import getdoc
-from docopt import docopt, DocoptExit
+
+from docopt import docopt
+from docopt import DocoptExit
 
 
 def docopt_full_help(docstring, *args, **kwargs):
@@ -23,9 +25,6 @@ class DocoptCommand(object):
     def dispatch(self, argv, global_options):
         self.perform_command(*self.parse(argv, global_options))
 
-    def perform_command(self, options, handler, command_options):
-        handler(command_options)
-
     def parse(self, argv, global_options):
         options = docopt_full_help(getdoc(self), argv, **self.docopt_options())
         command = options['COMMAND']
@@ -33,10 +32,7 @@ class DocoptCommand(object):
         if command is None:
             raise SystemExit(getdoc(self))
 
-        if not hasattr(self, command):
-            raise NoSuchCommand(command, self)
-
-        handler = getattr(self, command)
+        handler = self.get_handler(command)
         docstring = getdoc(handler)
 
         if docstring is None:
@@ -44,6 +40,14 @@ class DocoptCommand(object):
 
         command_options = docopt_full_help(docstring, options['ARGS'], options_first=True)
         return options, handler, command_options
+
+    def get_handler(self, command):
+        command = command.replace('-', '_')
+
+        if not hasattr(self, command):
+            raise NoSuchCommand(command, self)
+
+        return getattr(self, command)
 
 
 class NoSuchCommand(Exception):

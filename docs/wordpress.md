@@ -1,16 +1,23 @@
-page_title: Quickstart Guide: Compose and Wordpress
-page_description: Getting started with Docker Compose and Rails
-page_keywords: documentation, docs,  docker, compose, orchestration, containers,
-wordpress
+<!--[metadata]>
++++
+title = "Quickstart Guide: Compose and WordPress"
+description = "Getting started with Compose and WordPress"
+keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
+[menu.main]
+parent="smn_workw_compose"
+weight=6
++++
+<![end-metadata]-->
 
-## Getting started with Compose and Wordpress
 
-You can use Compose to easily run Wordpress in an isolated environment built
-with Docker containers. 
+# Quickstart Guide: Compose and WordPress
 
-### Define the project
+You can use Compose to easily run WordPress in an isolated environment built
+with Docker containers.
 
-First, [Install Compose](install.md) and then download Wordpress into the
+## Define the project
+
+First, [Install Compose](install.md) and then download WordPress into the
 current directory:
 
     $ curl https://wordpress.org/latest.tar.gz | tar -xvzf -
@@ -25,98 +32,71 @@ Dockerfiles, see the
 [Dockerfile reference](http://docs.docker.com/reference/builder/). In this case,
 your Dockerfile should be:
 
-```
-FROM orchardup/php5
-ADD . /code
-```
+    FROM orchardup/php5
+    ADD . /code
 
 This tells Docker how to build an image defining a container that contains PHP
-and Wordpress. 
+and WordPress.
 
 Next you'll create a `docker-compose.yml` file that will start your web service
 and a separate MySQL instance:
 
-```
-web:
-  build: .
-  command: php -S 0.0.0.0:8000 -t /code
-  ports:
-    - "8000:8000"
-  links:
-    - db
-  volumes:
-    - .:/code
-db:
-  image: orchardup/mysql
-  environment:
-    MYSQL_DATABASE: wordpress
-```
+    web:
+      build: .
+      command: php -S 0.0.0.0:8000 -t /code
+      ports:
+        - "8000:8000"
+      links:
+        - db
+      volumes:
+        - .:/code
+    db:
+      image: orchardup/mysql
+      environment:
+        MYSQL_DATABASE: wordpress
 
-Two supporting files are needed to get this working - first, `wp-config.php` is
-the standard Wordpress config file with a single change to point the database
+A supporting file is needed to get this working. `wp-config.php` is
+the standard WordPress config file with a single change to point the database
 configuration at the `db` container:
 
-```
-<?php
-define('DB_NAME', 'wordpress');
-define('DB_USER', 'root');
-define('DB_PASSWORD', '');
-define('DB_HOST', "db:3306");
-define('DB_CHARSET', 'utf8');
-define('DB_COLLATE', '');
+    <?php
+    define('DB_NAME', 'wordpress');
+    define('DB_USER', 'root');
+    define('DB_PASSWORD', '');
+    define('DB_HOST', "db:3306");
+    define('DB_CHARSET', 'utf8');
+    define('DB_COLLATE', '');
 
-define('AUTH_KEY',         'put your unique phrase here');
-define('SECURE_AUTH_KEY',  'put your unique phrase here');
-define('LOGGED_IN_KEY',    'put your unique phrase here');
-define('NONCE_KEY',        'put your unique phrase here');
-define('AUTH_SALT',        'put your unique phrase here');
-define('SECURE_AUTH_SALT', 'put your unique phrase here');
-define('LOGGED_IN_SALT',   'put your unique phrase here');
-define('NONCE_SALT',       'put your unique phrase here');
+    define('AUTH_KEY',         'put your unique phrase here');
+    define('SECURE_AUTH_KEY',  'put your unique phrase here');
+    define('LOGGED_IN_KEY',    'put your unique phrase here');
+    define('NONCE_KEY',        'put your unique phrase here');
+    define('AUTH_SALT',        'put your unique phrase here');
+    define('SECURE_AUTH_SALT', 'put your unique phrase here');
+    define('LOGGED_IN_SALT',   'put your unique phrase here');
+    define('NONCE_SALT',       'put your unique phrase here');
 
-$table_prefix  = 'wp_';
-define('WPLANG', '');
-define('WP_DEBUG', false);
+    $table_prefix  = 'wp_';
+    define('WPLANG', '');
+    define('WP_DEBUG', false);
 
-if ( !defined('ABSPATH') )
-    define('ABSPATH', dirname(__FILE__) . '/');
+    if ( !defined('ABSPATH') )
+        define('ABSPATH', dirname(__FILE__) . '/');
 
-require_once(ABSPATH . 'wp-settings.php');
-```
+    require_once(ABSPATH . 'wp-settings.php');
 
-Second, `router.php` tells PHP's built-in web server how to run Wordpress:
-
-```
-<?php
-
-$root = $_SERVER['DOCUMENT_ROOT'];
-chdir($root);
-$path = '/'.ltrim(parse_url($_SERVER['REQUEST_URI'])['path'],'/');
-set_include_path(get_include_path().':'.__DIR__);
-if(file_exists($root.$path))
-{
-    if(is_dir($root.$path) && substr($path,strlen($path) - 1, 1) !== '/')
-        $path = rtrim($path,'/').'/index.php';
-    if(strpos($path,'.php') === false) return false;
-    else {
-        chdir(dirname($root.$path));
-        require_once $root.$path;
-    }
-}else include_once 'index.php';
-```
 ### Build the project
 
-With those four files in place, run `docker-compose up` inside your Wordpress
+With those four files in place, run `docker-compose up` inside your WordPress
 directory and it'll pull and build the needed images, and then start the web and
-database containers. You'll then be able to visit Wordpress at port 8000 on your
-Docker daemon (if you're using Boot2docker, `boot2docker ip` will tell you its
-address).
+database containers. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` gives you the machine address and you can open `http://MACHINE_VM_IP:8000` in a browser.
 
 ## More Compose documentation
 
-- [Installing Compose](install.md)
 - [User guide](index.md)
-- [Command line reference](cli.md)
-- [Yaml file reference](yml.md)
-- [Compose environment variables](env.md)
-- [Compose command line completion](completion.md)
+- [Installing Compose](install.md)
+- [Getting Started](gettingstarted.md)
+- [Get started with Django](django.md)
+- [Get started with Rails](rails.md)
+- [Command line reference](./reference/index.md)
+- [Compose file reference](compose-file.md)

@@ -4,26 +4,55 @@
 
 set -e
 
->&2 echo "Validating DCO"
-script/validate-dco
-
 >&2 echo "Running lint checks"
-flake8 compose
+docker run --rm \
+  ${GIT_VOLUME} \
+  --entrypoint="tox" \
+  "$TAG" -e pre-commit
+
+get_versions="docker run --rm
+    --entrypoint=/code/.tox/py27/bin/python
+    $TAG
+    /code/script/versions.py docker/docker"
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="dev"
+  DOCKER_VERSIONS="$($get_versions default)"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
-  DOCKER_VERSIONS="$ALL_DOCKER_VERSIONS"
+  DOCKER_VERSIONS="$($get_versions recent -n 2)"
 fi
+
+
+BUILD_NUMBER=${BUILD_NUMBER-$USER}
 
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
-  docker-$version run \
-    --rm \
+
+  daemon_container="compose-dind-$version-$BUILD_NUMBER"
+
+  function on_exit() {
+    if [[ "$?" != "0" ]]; then
+        docker logs "$daemon_container" 2>&1 | tail -n 100
+    fi
+    docker rm -vf "$daemon_container"
+  }
+
+  trap "on_exit" EXIT
+
+  docker run \
+    -d \
+    --name "$daemon_container" \
     --privileged \
     --volume="/var/lib/docker" \
-    -e "DOCKER_VERSION=$version" \
-    --entrypoint="script/dind" \
+    dockerswarm/dind:$version \
+    docker daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
+    2>&1 | tail -n 10
+
+  docker run \
+    --rm \
+    --link="$daemon_container:docker" \
+    --env="DOCKER_HOST=tcp://docker:2375" \
+    --entrypoint="tox" \
     "$TAG" \
-    script/wrapdocker nosetests "$@"
+    -e py27,py34 -- "$@"
+
 done

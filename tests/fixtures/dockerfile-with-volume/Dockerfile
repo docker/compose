@@ -1,3 +1,4 @@
-FROM busybox
+FROM busybox:latest
+LABEL com.docker.compose.test_image=true
 VOLUME /data
-CMD sleep 3000
+CMD top

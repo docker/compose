@@ -1,0 +1,5 @@
+myweb:
+  extends:
+    service: web
+    file: valid-interpolation-2.yml
+  command: top

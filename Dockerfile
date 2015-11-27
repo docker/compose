@@ -3,43 +3,76 @@ FROM debian:wheezy
 RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
-        python \
-        python-pip \
-        python-dev \
+        locales \
+        gcc \
+        make \
+        zlib1g \
+        zlib1g-dev \
+        libssl-dev \
         git \
-        apt-transport-https \
         ca-certificates \
         curl \
-        lxc \
-        iptables \
+        libsqlite3-dev \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-# ENV ALL_DOCKER_VERSIONS 1.6.0
+RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.8.3 \
+        -o /usr/local/bin/docker && \
+    chmod +x /usr/local/bin/docker
 
-# RUN set -ex; \
-#     for v in ${ALL_DOCKER_VERSIONS}; do \
-#         curl https://get.docker.com/builds/Linux/x86_64/docker-$v -o /usr/local/bin/docker-$v; \
-#         chmod +x /usr/local/bin/docker-$v; \
-#     done
+# Build Python 2.7.9 from source
+RUN set -ex; \
+    curl -L https://www.python.org/ftp/python/2.7.9/Python-2.7.9.tgz | tar -xz; \
+    cd Python-2.7.9; \
+    ./configure --enable-shared; \
+    make; \
+    make install; \
+    cd ..; \
+    rm -rf /Python-2.7.9
 
-# Temporarily use dev version of Docker
-ENV ALL_DOCKER_VERSIONS dev
-RUN curl https://master.dockerproject.com/linux/amd64/docker-1.5.0-dev > /usr/local/bin/docker-dev
-RUN chmod +x /usr/local/bin/docker-dev
+# Build python 3.4 from source
+RUN set -ex; \
+    curl -L https://www.python.org/ftp/python/3.4.3/Python-3.4.3.tgz | tar -xz; \
+    cd Python-3.4.3; \
+    ./configure --enable-shared; \
+    make; \
+    make install; \
+    cd ..; \
+    rm -rf /Python-3.4.3
+
+# Make libpython findable
+ENV LD_LIBRARY_PATH /usr/local/lib
+
+# Install setuptools
+RUN set -ex; \
+    curl -L https://bootstrap.pypa.io/ez_setup.py | python
+
+# Install pip
+RUN set -ex; \
+    curl -L https://pypi.python.org/packages/source/p/pip/pip-7.0.1.tar.gz | tar -xz; \
+    cd pip-7.0.1; \
+    python setup.py install; \
+    cd ..; \
+    rm -rf pip-7.0.1
+
+# Python3 requires a valid locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
+ENV LANG en_US.UTF-8
 
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
 
-ADD requirements.txt /code/
-RUN pip install -r requirements.txt
+RUN pip install tox==2.1.1
 
+ADD requirements.txt /code/
 ADD requirements-dev.txt /code/
-RUN pip install -r requirements-dev.txt
+ADD .pre-commit-config.yaml /code/
+ADD setup.py /code/
+ADD tox.ini /code/
+ADD compose /code/compose/
+RUN tox --notest
 
 ADD . /code/
-RUN python setup.py install
-
 RUN chown -R user /code/
 
-ENTRYPOINT ["/usr/local/bin/docker-compose"]
+ENTRYPOINT ["/code/.tox/py27/bin/docker-compose"]

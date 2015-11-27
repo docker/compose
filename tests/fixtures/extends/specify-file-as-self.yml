@@ -1,0 +1,17 @@
+myweb:
+  extends:
+    file: specify-file-as-self.yml
+    service: web
+  environment:
+    - "BAR=1"
+web:
+  extends:
+    file: specify-file-as-self.yml
+    service: otherweb
+  image: busybox
+  environment:
+    - "BAZ=3"
+otherweb:
+  image: busybox
+  environment:
+    - "YEP=1"

@@ -1,2 +1,9 @@
+*.egg-info
+.coverage
 .git
+.tox
+build
+coverage-html
+docs/_site
 venv
+.tox
