@@ -41,11 +41,6 @@ if not IS_WINDOWS_PLATFORM:
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
 
-INSECURE_SSL_WARNING = """
---allow-insecure-ssl is deprecated and has no effect.
-It will be removed in a future version of Compose.
-"""
-
 
 def main():
     setup_logging()
@@ -303,11 +298,7 @@ class TopLevelCommand(DocoptCommand):
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
-            --allow-insecure-ssl    Deprecated - no effect.
         """
-        if options['--allow-insecure-ssl']:
-            log.warn(INSECURE_SSL_WARNING)
-
         project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures')
@@ -352,7 +343,6 @@ class TopLevelCommand(DocoptCommand):
         Usage: run [options] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
-            --allow-insecure-ssl  Deprecated - no effect.
             -d                    Detached mode: Run container in the background, print
                                   new container name.
             --name NAME           Assign a name to the container
@@ -375,9 +365,6 @@ class TopLevelCommand(DocoptCommand):
                 "Interactive mode is not yet supported on Windows.\n"
                 "Please pass the -d flag when using `docker-compose run`."
             )
-
-        if options['--allow-insecure-ssl']:
-            log.warn(INSECURE_SSL_WARNING)
 
         if options['COMMAND']:
             command = [options['COMMAND']] + options['ARGS']
@@ -514,7 +501,6 @@ class TopLevelCommand(DocoptCommand):
         Usage: up [options] [SERVICE...]
 
         Options:
-            --allow-insecure-ssl   Deprecated - no effect.
             -d                     Detached mode: Run containers in the background,
                                    print new container names.
             --no-color             Produce monochrome output.
@@ -528,9 +514,6 @@ class TopLevelCommand(DocoptCommand):
                                    when attached or when containers are already
                                    running. (default: 10)
         """
-        if options['--allow-insecure-ssl']:
-            log.warn(INSECURE_SSL_WARNING)
-
         monochrome = options['--no-color']
         start_deps = not options['--no-deps']
         service_names = options['SERVICE']
