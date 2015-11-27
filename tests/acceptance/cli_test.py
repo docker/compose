@@ -314,6 +314,14 @@ class CLITestCase(DockerClientTestCase):
             ['create', '--force-recreate', '--no-recreate'],
             returncode=1)
 
+    def test_down_invalid_rmi_flag(self):
+        result = self.dispatch(['down', '--rmi', 'bogus'], returncode=1)
+        assert '--rmi flag must be' in result.stderr
+
+    def test_down(self):
+        result = self.dispatch(['down'])
+        # TODO:
+
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
         service = self.project.get_service('simple')

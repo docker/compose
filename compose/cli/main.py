@@ -25,6 +25,7 @@ from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..service import BuildError
 from ..service import ConvergenceStrategy
+from ..service import ImageType
 from ..service import NeedsBuildError
 from .command import friendly_error_message
 from .command import get_config_path_from_options
@@ -129,6 +130,7 @@ class TopLevelCommand(DocoptCommand):
       build              Build or rebuild services
       config             Validate and view the compose file
       create             Create services
+      down               Stop and remove containers, networks, images, and volumes
       events             Receive real time events from containers
       help               Get help on a command
       kill               Kill containers
@@ -241,6 +243,22 @@ class TopLevelCommand(DocoptCommand):
             strategy=convergence_strategy_from_opts(options),
             do_build=not options['--no-build']
         )
+
+    def down(self, project, options):
+        """
+        Stop containers and remove containers, networks, volumes, and images
+        created by `up`.
+
+        Usage: down [options]
+
+        Options:
+            --rmi type      Remove images, type may be one of: 'all' to remove
+                            all images, or 'local' to remove only images that
+                            don't have an custom name set by the `image` field
+            -v, --volumes   Remove data volumes
+        """
+        image_type = image_type_from_opt('--rmi', options['--rmi'])
+        project.down(image_type, options['--volumes'])
 
     def events(self, project, options):
         """
@@ -658,6 +676,15 @@ def convergence_strategy_from_opts(options):
         return ConvergenceStrategy.never
 
     return ConvergenceStrategy.changed
+
+
+def image_type_from_opt(flag, value):
+    if not value:
+        return ImageType.none
+    try:
+        return ImageType[value]
+    except KeyError:
+        raise UserError("%s flag must be one of: all, local" % flag)
 
 
 def run_one_off_container(container_options, project, service, options):

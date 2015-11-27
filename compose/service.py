@@ -98,6 +98,14 @@ class ConvergenceStrategy(enum.Enum):
         return self is not type(self).never
 
 
+@enum.unique
+class ImageType(enum.Enum):
+    """Enumeration for the types of images known to compose."""
+    none = 0
+    local = 1
+    all = 2
+
+
 class Service(object):
     def __init__(
         self,
@@ -671,6 +679,19 @@ class Service(object):
 
     def custom_container_name(self):
         return self.options.get('container_name')
+
+    def remove_image(self, image_type):
+        if not image_type or image_type == ImageType.none:
+            return False
+        if image_type == ImageType.local and self.options.get('image'):
+            return False
+
+        try:
+            self.client.remove_image(self.image_name)
+            return True
+        except APIError as e:
+            log.error("Failed to remove image for service %s: %s", self.name, e)
+            return False
 
     def specifies_host_port(self):
         def has_host_port(binding):
