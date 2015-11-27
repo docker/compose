@@ -15,7 +15,6 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
-from .legacy import check_for_legacy_containers
 from .service import ContainerNet
 from .service import ConvergenceStrategy
 from .service import Net
@@ -286,13 +285,6 @@ class Project(object):
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names
-
-        if not containers:
-            check_for_legacy_containers(
-                self.client,
-                self.name,
-                self.service_names,
-            )
 
         return [c for c in containers if matches_service_names(c)]
 

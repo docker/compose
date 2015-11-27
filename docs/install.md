@@ -98,7 +98,7 @@ be recreated with labels added.
 If Compose detects containers that were created without labels, it will refuse
 to run so that you don't end up with two sets of them. If you want to keep using
 your existing containers (for example, because they have data volumes you want
-to preserve) you can migrate them with the following command:
+to preserve) you can use compose 1.5.x to migrate them with the following command:
 
     $ docker-compose migrate-to-labels
 

@@ -164,15 +164,6 @@ _docker_compose_logs() {
 }
 
 
-_docker_compose_migrate_to_labels() {
-	case "$cur" in
-		-*)
-			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
-			;;
-	esac
-}
-
-
 _docker_compose_pause() {
 	case "$cur" in
 		-*)
@@ -385,7 +376,6 @@ _docker_compose() {
 		help
 		kill
 		logs
-		migrate-to-labels
 		pause
 		port
 		ps
