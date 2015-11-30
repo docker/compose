@@ -63,6 +63,10 @@ func (s *Supervisor) Close() error {
 	return s.journal.Close()
 }
 
+func (s *Supervisor) Events() (<-chan *Event, error) {
+	return nil, nil
+}
+
 // Start is a non-blocking call that runs the supervisor for monitoring contianer processes and
 // executing new containers.
 //
@@ -73,6 +77,8 @@ func (s *Supervisor) Start(events chan *Event) error {
 	}
 	s.events = events
 	go func() {
+		// allocate an entire thread to this goroutine for the main event loop
+		// so that nothing else is scheduled over the top of it.
 		runtime.LockOSThread()
 		for e := range events {
 			s.journal.write(e)

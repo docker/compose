@@ -27,6 +27,7 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 	r.HandleFunc("/containers/{id:.*}", s.createContainer).Methods("POST")
 	r.HandleFunc("/containers/{id:.*}", s.updateContainer).Methods("PATCH")
 	r.HandleFunc("/event", s.event).Methods("POST")
+	r.HandleFunc("/events", s.events).Methods("GET")
 	r.HandleFunc("/containers", s.containers).Methods("GET")
 	return s
 }
@@ -57,6 +58,34 @@ func (s *server) updateContainer(w http.ResponseWriter, r *http.Request) {
 	if err := <-e.Err; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+}
+
+func (s *server) events(w http.ResponseWriter, r *http.Request) {
+	events, err := s.supervisor.Events()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	enc := json.NewEncoder(w)
+	for evt := range events {
+		var v interface{}
+		switch evt.Type {
+		case containerd.ExitEventType:
+			v = createExitEvent(evt)
+		}
+		if err := enc.Encode(v); err != nil {
+			// TODO: handled closed conn
+			logrus.WithField("error", err).Error("encode event")
+		}
+	}
+}
+
+func createExitEvent(e *containerd.Event) *Event {
+	return &Event{
+		Type:   "exit",
+		ID:     e.ID,
+		Status: e.Status,
 	}
 }
 

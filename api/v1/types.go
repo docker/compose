@@ -31,8 +31,8 @@ type User struct {
 }
 
 type Process struct {
-	Terminal bool     `json:"terminal,omitempty"`
-	User     User     `json:"user,omitempty"`
+	Terminal bool     `json:"terminal"`
+	User     User     `json:"user"`
 	Args     []string `json:"args,omitempty"`
 	Env      []string `json:"env,omitempty"`
 	Cwd      string   `json:"cwd,omitempty"`
@@ -41,4 +41,10 @@ type Process struct {
 
 type Signal struct {
 	Signal int `json:"signal"`
+}
+
+type Event struct {
+	Type   string `json:"type"`
+	ID     string `json:"id,omitempty"`
+	Status int    `json:"status,omitempty"`
 }
