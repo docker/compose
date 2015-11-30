@@ -36,6 +36,11 @@ var DaemonCommand = cli.Command{
 			l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
 			goRoutineCounter := metrics.NewGauge()
 			metrics.DefaultRegistry.Register("goroutines", goRoutineCounter)
+			for name, m := range containerd.Metrics() {
+				if err := metrics.DefaultRegistry.Register(name, m); err != nil {
+					logrus.Fatal(err)
+				}
+			}
 			go func() {
 				for range time.Tick(30 * time.Second) {
 					goRoutineCounter.Update(int64(runtime.NumGoroutine()))

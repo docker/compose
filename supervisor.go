@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer"
@@ -107,6 +108,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 					continue
 				}
 				s.containers[e.ID] = container
+				ContainersCounter.Inc(1)
 				s.tasks <- &startTask{
 					err:       e.Err,
 					container: container,
@@ -117,6 +119,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 					if err := s.deleteContainer(container); err != nil {
 						logrus.WithField("error", err).Error("containerd: deleting container")
 					}
+					ContainersCounter.Dec(1)
 				}
 			case GetContainerEventType:
 				for _, c := range s.containers {
@@ -222,6 +225,7 @@ type startTask struct {
 func (s *Supervisor) startContainerWorker(tasks chan *startTask) {
 	defer s.workerGroup.Done()
 	for t := range tasks {
+		started := time.Now()
 		if err := t.container.Start(); err != nil {
 			e := NewEvent(StartContainerEventType)
 			e.ID = t.container.ID()
@@ -229,6 +233,7 @@ func (s *Supervisor) startContainerWorker(tasks chan *startTask) {
 			t.err <- err
 			continue
 		}
+		ContainerStartTimer.UpdateSince(started)
 		t.err <- nil
 	}
 }
