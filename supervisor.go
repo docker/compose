@@ -33,6 +33,17 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 		tasks:      make(chan *startTask, concurrency*100),
 		journal:    j,
 	}
+	// register default event handlers
+	s.handlers = map[EventType]Handler{
+		ExitEventType:            &ExitEvent{s},
+		StartContainerEventType:  &StartEvent{s},
+		DeleteEventType:          &DeleteEvent{s},
+		GetContainerEventType:    &GetContainersEvent{s},
+		SignalEventType:          &SignalEvent{s},
+		AddProcessEventType:      &AddProcessEvent{s},
+		UpdateContainerEventType: &UpdateEvent{s},
+	}
+	// start the container workers for concurrent container starts
 	for i := 0; i < concurrency; i++ {
 		s.workerGroup.Add(1)
 		go s.startContainerWorker(s.tasks)
@@ -42,16 +53,12 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
-	stateDir string
-
-	containers map[string]Container
-
-	processes map[int]Container
-
-	runtime Runtime
-
-	journal *journal
-
+	stateDir    string
+	containers  map[string]Container
+	processes   map[int]Container
+	handlers    map[EventType]Handler
+	runtime     Runtime
+	journal     *journal
 	events      chan *Event
 	tasks       chan *startTask
 	workerGroup sync.WaitGroup
@@ -82,123 +89,22 @@ func (s *Supervisor) Start(events chan *Event) error {
 		runtime.LockOSThread()
 		for e := range events {
 			s.journal.write(e)
-			switch e.Type {
-			case ExitEventType:
-				logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
-					Debug("containerd: process exited")
-				// is it the child process of a container
-				if container, ok := s.processes[e.Pid]; ok {
-					if err := container.RemoveProcess(e.Pid); err != nil {
-						logrus.WithField("error", err).Error("containerd: find container for pid")
-					}
-					delete(s.processes, e.Pid)
+			h, ok := s.handlers[e.Type]
+			if !ok {
+				e.Err <- ErrUnknownEvent
+				continue
+			}
+			if err := h.Handle(e); err != nil {
+				if err != errDeferedResponse {
+					e.Err <- err
 					close(e.Err)
-					continue
-				}
-				// is it the main container's process
-				container, err := s.getContainerForPid(e.Pid)
-				if err != nil {
-					if err != errNoContainerForPid {
-						logrus.WithField("error", err).Error("containerd: find container for pid")
-					}
-					continue
-				}
-				container.SetExited(e.Status)
-				ne := NewEvent(DeleteEventType)
-				ne.ID = container.ID()
-				s.SendEvent(ne)
-			case StartContainerEventType:
-				container, err := s.runtime.Create(e.ID, e.BundlePath, e.Stdio)
-				if err != nil {
-					e.Err <- err
-					continue
-				}
-				s.containers[e.ID] = container
-				ContainersCounter.Inc(1)
-				s.tasks <- &startTask{
-					err:       e.Err,
-					container: container,
 				}
 				continue
-			case DeleteEventType:
-				if container, ok := s.containers[e.ID]; ok {
-					if err := s.deleteContainer(container); err != nil {
-						logrus.WithField("error", err).Error("containerd: deleting container")
-					}
-					ContainersCounter.Dec(1)
-				}
-			case GetContainerEventType:
-				for _, c := range s.containers {
-					e.Containers = append(e.Containers, c)
-				}
-			case SignalEventType:
-				container, ok := s.containers[e.ID]
-				if !ok {
-					e.Err <- ErrContainerNotFound
-					continue
-				}
-				processes, err := container.Processes()
-				if err != nil {
-					e.Err <- err
-					continue
-				}
-				for _, p := range processes {
-					if pid, err := p.Pid(); err == nil && pid == e.Pid {
-						e.Err <- p.Signal(e.Signal)
-						continue
-					}
-				}
-				e.Err <- ErrProcessNotFound
-				continue
-			case AddProcessEventType:
-				container, ok := s.containers[e.ID]
-				if !ok {
-					e.Err <- ErrContainerNotFound
-					continue
-				}
-				p, err := s.runtime.StartProcess(container, *e.Process, e.Stdio)
-				if err != nil {
-					e.Err <- err
-					continue
-				}
-				if e.Pid, err = p.Pid(); err != nil {
-					e.Err <- err
-					continue
-				}
-				s.processes[e.Pid] = container
-			case UpdateContainerEventType:
-				container, ok := s.containers[e.ID]
-				if !ok {
-					e.Err <- ErrContainerNotFound
-					continue
-				}
-				if e.State.Status != "" {
-					switch e.State.Status {
-					case Running:
-						if err := container.Resume(); err != nil {
-							e.Err <- ErrUnknownContainerStatus
-							continue
-						}
-					case Paused:
-						if err := container.Pause(); err != nil {
-							e.Err <- ErrUnknownContainerStatus
-							continue
-						}
-					default:
-						e.Err <- ErrUnknownContainerStatus
-						continue
-					}
-				}
 			}
 			close(e.Err)
 		}
 	}()
 	return nil
-}
-
-func (s *Supervisor) deleteContainer(container Container) error {
-	delete(s.containers, container.ID())
-	return container.Delete()
 }
 
 func (s *Supervisor) getContainerForPid(pid int) (Container, error) {
@@ -220,6 +126,7 @@ func (s *Supervisor) getContainerForPid(pid int) (Container, error) {
 }
 
 func (s *Supervisor) SendEvent(evt *Event) {
+	EventsCounter.Inc(1)
 	s.events <- evt
 }
 

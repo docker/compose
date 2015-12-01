@@ -46,3 +46,7 @@ type Event struct {
 	Containers []Container    `json:"-"`
 	Err        chan error     `json:"-"`
 }
+
+type Handler interface {
+	Handle(*Event) error
+}
