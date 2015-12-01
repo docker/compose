@@ -63,11 +63,7 @@ func (s *server) updateContainer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) events(w http.ResponseWriter, r *http.Request) {
-	events, err := s.supervisor.Events()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	events := s.supervisor.Events()
 	enc := json.NewEncoder(w)
 	for evt := range events {
 		var v interface{}

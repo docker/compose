@@ -11,6 +11,7 @@ import (
 type EventType string
 
 const (
+	ExecExitEventType        EventType = "execExit"
 	ExitEventType            EventType = "exit"
 	StartContainerEventType  EventType = "startContainer"
 	DeleteEventType          EventType = "deleteContainerEvent"

@@ -36,6 +36,7 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
+		ExecExitEventType:        &ExecExitEvent{s},
 		ExitEventType:            &ExitEvent{s},
 		StartContainerEventType:  &StartEvent{s},
 		DeleteEventType:          &DeleteEvent{s},
@@ -63,16 +64,30 @@ type Supervisor struct {
 	events      chan *Event
 	tasks       chan *startTask
 	workerGroup sync.WaitGroup
+	subscribers map[subscriber]bool
 }
+
+type subscriber chan *Event
 
 // need proper close logic for jobs and stuff so that sending to the channels dont panic
 // but can complete jobs
 func (s *Supervisor) Close() error {
+	//TODO: unsubscribe all channels
 	return s.journal.Close()
 }
 
-func (s *Supervisor) Events() (<-chan *Event, error) {
-	return nil, nil
+func (s *Supervisor) Events() subscriber {
+	return subscriber(make(chan *Event))
+}
+
+func (s *Supervisor) Unsubscribe(sub subscriber) {
+	delete(s.subscribers, sub)
+}
+
+func (s *Supervisor) NotifySubscribers(e *Event) {
+	for sub := range s.subscribers {
+		sub <- e
+	}
 }
 
 // Start is a non-blocking call that runs the supervisor for monitoring contianer processes and
