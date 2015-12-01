@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/runtime"
 	"github.com/gorilla/mux"
 	"github.com/opencontainers/specs"
 )
@@ -51,8 +52,8 @@ func (s *server) updateContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	e := containerd.NewEvent(containerd.UpdateContainerEventType)
 	e.ID = id
-	e.State = &containerd.State{
-		Status: containerd.Status(string(state.Status)),
+	e.State = &runtime.State{
+		Status: runtime.Status(string(state.Status)),
 	}
 	s.supervisor.SendEvent(e)
 	if err := <-e.Err; err != nil {
@@ -214,7 +215,7 @@ func writeContainers(w http.ResponseWriter, e *containerd.Event) error {
 	return json.NewEncoder(w).Encode(&state)
 }
 
-func createProcess(in containerd.Process) *Process {
+func createProcess(in runtime.Process) *Process {
 	pid, err := in.Pid()
 	if err != nil {
 		logrus.WithField("error", err).Error("get process pid")
@@ -248,7 +249,7 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 	e := containerd.NewEvent(containerd.StartContainerEventType)
 	e.ID = id
 	e.BundlePath = c.BundlePath
-	e.Stdio = &containerd.Stdio{
+	e.Stdio = &runtime.Stdio{
 		Stderr: c.Stderr,
 		Stdout: c.Stdout,
 	}

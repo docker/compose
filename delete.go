@@ -1,6 +1,9 @@
 package containerd
 
-import "github.com/Sirupsen/logrus"
+import (
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/runtime"
+)
 
 type DeleteEvent struct {
 	s *Supervisor
@@ -16,7 +19,7 @@ func (h *DeleteEvent) Handle(e *Event) error {
 	return nil
 }
 
-func (h *DeleteEvent) deleteContainer(container Container) error {
+func (h *DeleteEvent) deleteContainer(container runtime.Container) error {
 	delete(h.s.containers, container.ID())
 	return container.Delete()
 }

@@ -1,5 +1,7 @@
 package containerd
 
+import "github.com/docker/containerd/runtime"
+
 type UpdateEvent struct {
 	s *Supervisor
 }
@@ -11,11 +13,11 @@ func (h *UpdateEvent) Handle(e *Event) error {
 	}
 	if e.State.Status != "" {
 		switch e.State.Status {
-		case Running:
+		case runtime.Running:
 			if err := container.Resume(); err != nil {
 				return ErrUnknownContainerStatus
 			}
-		case Paused:
+		case runtime.Paused:
 			if err := container.Pause(); err != nil {
 				return ErrUnknownContainerStatus
 			}

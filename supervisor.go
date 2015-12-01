@@ -3,11 +3,12 @@ package containerd
 import (
 	"os"
 	"path/filepath"
-	"runtime"
+	goruntime "runtime"
 	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 )
 
@@ -17,7 +18,7 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 		return nil, err
 	}
 	// register counters
-	runtime, err := NewRuntime(stateDir)
+	r, err := NewRuntime(stateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -27,9 +28,9 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 	}
 	s := &Supervisor{
 		stateDir:   stateDir,
-		containers: make(map[string]Container),
-		processes:  make(map[int]Container),
-		runtime:    runtime,
+		containers: make(map[string]runtime.Container),
+		processes:  make(map[int]runtime.Container),
+		runtime:    r,
 		tasks:      make(chan *startTask, concurrency*100),
 		journal:    j,
 	}
@@ -54,10 +55,10 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir    string
-	containers  map[string]Container
-	processes   map[int]Container
+	containers  map[string]runtime.Container
+	processes   map[int]runtime.Container
 	handlers    map[EventType]Handler
-	runtime     Runtime
+	runtime     runtime.Runtime
 	journal     *journal
 	events      chan *Event
 	tasks       chan *startTask
@@ -86,7 +87,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 	go func() {
 		// allocate an entire thread to this goroutine for the main event loop
 		// so that nothing else is scheduled over the top of it.
-		runtime.LockOSThread()
+		goruntime.LockOSThread()
 		for e := range events {
 			s.journal.write(e)
 			h, ok := s.handlers[e.Type]
@@ -107,7 +108,7 @@ func (s *Supervisor) Start(events chan *Event) error {
 	return nil
 }
 
-func (s *Supervisor) getContainerForPid(pid int) (Container, error) {
+func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
 	for _, container := range s.containers {
 		cpid, err := container.Pid()
 		if err != nil {
@@ -131,7 +132,7 @@ func (s *Supervisor) SendEvent(evt *Event) {
 }
 
 type startTask struct {
-	container Container
+	container runtime.Container
 	err       chan error
 }
 

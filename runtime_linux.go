@@ -8,11 +8,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
@@ -149,8 +150,8 @@ var mountPropagationMapping = map[string]int{
 
 func init() {
 	if len(os.Args) > 1 && os.Args[1] == "init" {
-		runtime.GOMAXPROCS(1)
-		runtime.LockOSThread()
+		goruntime.GOMAXPROCS(1)
+		goruntime.LockOSThread()
 		factory, _ := libcontainer.New("")
 		if err := factory.StartInitialization(); err != nil {
 			fmt.Fprint(os.Stderr, err)
@@ -199,8 +200,8 @@ func (c *libcontainerContainer) Pause() error {
 	return c.c.Pause()
 }
 
-func (c *libcontainerContainer) State() State {
-	s := State{}
+func (c *libcontainerContainer) State() runtime.State {
+	s := runtime.State{}
 	// TODO: what to do with error
 	state, err := c.c.Status()
 	if err != nil {
@@ -208,9 +209,9 @@ func (c *libcontainerContainer) State() State {
 	}
 	switch state {
 	case libcontainer.Paused, libcontainer.Pausing:
-		s.Status = Paused
+		s.Status = runtime.Paused
 	default:
-		s.Status = Running
+		s.Status = runtime.Running
 	}
 	return s
 }
@@ -241,8 +242,8 @@ func (c *libcontainerContainer) Delete() error {
 	return c.c.Destroy()
 }
 
-func (c *libcontainerContainer) Processes() ([]Process, error) {
-	procs := []Process{
+func (c *libcontainerContainer) Processes() ([]runtime.Process, error) {
+	procs := []runtime.Process{
 		c.initProcess,
 	}
 	for _, p := range c.additionalProcesses {
@@ -259,7 +260,7 @@ func (c *libcontainerContainer) RemoveProcess(pid int) error {
 	return nil
 }
 
-func NewRuntime(stateDir string) (Runtime, error) {
+func NewRuntime(stateDir string) (runtime.Runtime, error) {
 	f, err := libcontainer.New(stateDir, libcontainer.Cgroupfs, func(l *libcontainer.LinuxFactory) error {
 		//l.CriuPath = context.GlobalString("criu")
 		return nil
@@ -276,7 +277,7 @@ type libcontainerRuntime struct {
 	factory libcontainer.Factory
 }
 
-func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *Stdio) (Container, error) {
+func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runtime.Container, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
 		filepath.Join(bundlePath, "runtime.json"),
@@ -308,7 +309,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *Stdio) (Conta
 	return c, nil
 }
 
-func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process, stdio *Stdio) (Process, error) {
+func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process, stdio *runtime.Stdio) (runtime.Process, error) {
 	c, ok := ci.(*libcontainerContainer)
 	if !ok {
 		return nil, errInvalidContainerType
@@ -334,7 +335,7 @@ func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process, stdio 
 
 // newProcess returns a new libcontainer Process with the arguments from the
 // spec and stdio from the current process.
-func (r *libcontainerRuntime) newProcess(p specs.Process, stdio *Stdio) (*libcontainer.Process, error) {
+func (r *libcontainerRuntime) newProcess(p specs.Process, stdio *runtime.Stdio) (*libcontainer.Process, error) {
 	var (
 		stderr, stdout io.Writer
 	)

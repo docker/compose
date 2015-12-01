@@ -1,4 +1,4 @@
-package containerd
+package runtime
 
 import (
 	"os"
@@ -20,6 +20,11 @@ const (
 
 type State struct {
 	Status Status `json:"status,omitempty"`
+}
+
+type Stdio struct {
+	Stderr string `json:"stderr,omitempty"`
+	Stdout string `json:"stdout,omitempty"`
 }
 
 type Container interface {
