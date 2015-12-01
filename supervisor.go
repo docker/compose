@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/linux"
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 )
@@ -18,7 +19,7 @@ func NewSupervisor(stateDir string, concurrency int) (*Supervisor, error) {
 		return nil, err
 	}
 	// register counters
-	r, err := NewRuntime(stateDir)
+	r, err := linux.NewRuntime(stateDir)
 	if err != nil {
 		return nil, err
 	}

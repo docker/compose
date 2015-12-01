@@ -1,6 +1,6 @@
 // +build libcontainer
 
-package containerd
+package linux
 
 import (
 	"encoding/json"
@@ -254,7 +254,7 @@ func (c *libcontainerContainer) Processes() ([]runtime.Process, error) {
 
 func (c *libcontainerContainer) RemoveProcess(pid int) error {
 	if _, ok := c.additionalProcesses[pid]; !ok {
-		return errNotChildProcess
+		return runtime.ErrNotChildProcess
 	}
 	delete(c.additionalProcesses, pid)
 	return nil
@@ -312,7 +312,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio
 func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process, stdio *runtime.Stdio) (runtime.Process, error) {
 	c, ok := ci.(*libcontainerContainer)
 	if !ok {
-		return nil, errInvalidContainerType
+		return nil, runtime.ErrInvalidContainerType
 	}
 	process, err := r.newProcess(p, stdio)
 	if err != nil {

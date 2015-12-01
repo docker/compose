@@ -1,6 +1,15 @@
 package runtime
 
-import "github.com/opencontainers/specs"
+import (
+	"errors"
+
+	"github.com/opencontainers/specs"
+)
+
+var (
+	ErrNotChildProcess      = errors.New("containerd: not a child process for container")
+	ErrInvalidContainerType = errors.New("containerd: invalid container type for runtime")
+)
 
 // runtime handles containers, containers handle their own actions.
 type Runtime interface {
