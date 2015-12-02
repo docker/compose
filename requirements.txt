@@ -1,6 +1,5 @@
--e git://github.com/docker/docker-py.git@881e24c231ab9921eb0cbd475e85706137983f89#egg=docker-py
 PyYAML==3.11
-# docker-py==1.5.1
+docker-py==1.6.0
 dockerpty==0.3.4
 docopt==0.6.1
 enum34==1.0.4
