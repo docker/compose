@@ -868,6 +868,7 @@ def get_container_data_volumes(container, volumes_option):
             continue
 
         mount = container_mounts.get(volume.internal)
+
         # New volume, doesn't exist in the old container
         if not mount:
             continue

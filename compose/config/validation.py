@@ -290,7 +290,7 @@ def validate_against_fields_schema(config, filename, version):
     _validate_against_schema(
         config,
         schema_filename,
-        format_checker=["ports", "environment", "bool-value-in-mapping"],
+        format_checker=["ports", "expose", "bool-value-in-mapping"],
         filename=filename)
 
 
