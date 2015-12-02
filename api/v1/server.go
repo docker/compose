@@ -27,6 +27,7 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 	r.HandleFunc("/containers/{id:.*}/process", s.addProcess).Methods("PUT")
 	r.HandleFunc("/containers/{id:.*}", s.createContainer).Methods("POST")
 	r.HandleFunc("/containers/{id:.*}", s.updateContainer).Methods("PATCH")
+	// internal method for replaying the journal
 	r.HandleFunc("/event", s.event).Methods("POST")
 	r.HandleFunc("/events", s.events).Methods("GET")
 	r.HandleFunc("/containers", s.containers).Methods("GET")

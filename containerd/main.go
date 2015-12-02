@@ -17,15 +17,12 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-const (
-	Version = "0.0.1"
-	Usage   = `High performance conatiner daemon`
-)
+const Usage = `High performance conatiner daemon`
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "containerd"
-	app.Version = Version
+	app.Version = containerd.Version
 	app.Usage = Usage
 	app.Authors = []cli.Author{
 		{
