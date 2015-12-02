@@ -10,6 +10,7 @@ from collections import namedtuple
 import six
 import yaml
 
+from ..const import COMPOSEFILE_VERSIONS
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
@@ -24,6 +25,7 @@ from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_extends_file_path
 from .validation import validate_top_level_object
+from .validation import validate_top_level_service_objects
 
 
 DOCKER_CONFIG_KEYS = [
@@ -161,13 +163,24 @@ def find(base_dir, filenames):
 
 def get_config_version(config_details):
     def get_version(config):
-        validate_top_level_object(config)
-        return config.config.get('version')
+        if config.config is None:
+            return None
+        version = config.config.get('version', 1)
+        if isinstance(version, dict):
+            version = 1
+        return version
+
     main_file = config_details.config_files[0]
+    validate_top_level_object(main_file)
     version = get_version(main_file)
     for next_file in config_details.config_files[1:]:
+        validate_top_level_object(next_file)
         next_file_version = get_version(next_file)
-        if version != next_file_version:
+        if version is None:
+            version = next_file_version
+            continue
+
+        if version != next_file_version and next_file_version is not None:
             raise ConfigurationError(
                 "Version mismatch: main file {0} specifies version {1} but "
                 "extension file {2} uses version {3}".format(
@@ -224,6 +237,9 @@ def load(config_details):
     Return a fully interpolated, extended and validated configuration.
     """
     version = get_config_version(config_details)
+    if version not in COMPOSEFILE_VERSIONS:
+        raise ConfigurationError('Invalid config version provided: {0}'.format(version))
+
     processed_files = []
     for config_file in config_details.config_files:
         processed_files.append(
@@ -231,9 +247,10 @@ def load(config_details):
         )
     config_details = config_details._replace(config_files=processed_files)
 
-    if not version or isinstance(version, dict):
+    if version == 1:
         service_dicts = load_services(
-            config_details.working_dir, config_details.config_files
+            config_details.working_dir, config_details.config_files,
+            version
         )
         volumes = {}
     elif version == 2:
@@ -242,11 +259,9 @@ def load(config_details):
             for f in config_details.config_files
         ]
         service_dicts = load_services(
-            config_details.working_dir, config_files
+            config_details.working_dir, config_files, version
         )
         volumes = load_volumes(config_details.config_files)
-    else:
-        raise ConfigurationError('Invalid config version provided: {0}'.format(version))
 
     return Config(version, service_dicts, volumes)
 
@@ -259,14 +274,14 @@ def load_volumes(config_files):
     return volumes
 
 
-def load_services(working_dir, config_files):
+def load_services(working_dir, config_files, version):
     def build_service(filename, service_name, service_dict):
         service_config = ServiceConfig.with_abs_paths(
             working_dir,
             filename,
             service_name,
             service_dict)
-        resolver = ServiceExtendsResolver(service_config)
+        resolver = ServiceExtendsResolver(service_config, version)
         service_dict = process_service(resolver.run())
 
         # TODO: move to validate_service()
@@ -301,8 +316,8 @@ def load_services(working_dir, config_files):
 
 
 def process_config_file(config_file, service_name=None, version=None):
-    validate_top_level_object(config_file)
-    processed_config = interpolate_environment_variables(config_file.config)
+    validate_top_level_service_objects(config_file, version)
+    processed_config = interpolate_environment_variables(config_file.config, version)
     validate_against_fields_schema(
         processed_config, config_file.filename, version
     )
@@ -316,10 +331,11 @@ def process_config_file(config_file, service_name=None, version=None):
 
 
 class ServiceExtendsResolver(object):
-    def __init__(self, service_config, already_seen=None):
+    def __init__(self, service_config, version, already_seen=None):
         self.service_config = service_config
         self.working_dir = service_config.working_dir
         self.already_seen = already_seen or []
+        self.version = version
 
     @property
     def signature(self):
@@ -348,7 +364,8 @@ class ServiceExtendsResolver(object):
 
         extended_file = process_config_file(
             ConfigFile.from_filename(config_path),
-            service_name=service_name)
+            service_name=service_name, version=self.version
+        )
         service_config = extended_file.config[service_name]
         return config_path, service_config, service_name
 
@@ -359,6 +376,7 @@ class ServiceExtendsResolver(object):
                 extended_config_path,
                 service_name,
                 service_dict),
+            self.version,
             already_seen=self.already_seen + [self.signature])
 
         service_config = resolver.run()

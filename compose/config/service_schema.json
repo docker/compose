@@ -5,7 +5,7 @@
   "type": "object",
 
   "allOf": [
-    {"$ref": "fields_schema.json#/definitions/service"},
+    {"$ref": "fields_schema_v1.json#/definitions/service"},
     {"$ref": "#/definitions/constraints"}
   ],
 

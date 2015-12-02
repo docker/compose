@@ -74,14 +74,15 @@ def format_boolean_in_environment(instance):
     return True
 
 
-def validate_top_level_service_objects(config_file):
+def validate_top_level_service_objects(config_file, version):
     """Perform some high level validation of the service name and value.
 
     This validation must happen before interpolation, which must happen
     before the rest of validation, which is why it's separate from the
     rest of the service validation.
     """
-    for service_name, service_dict in config_file.config.items():
+    service_dicts = config_file.config if version == 1 else config_file.config.get('services', {})
+    for service_name, service_dict in service_dicts.items():
         if not isinstance(service_name, six.string_types):
             raise ConfigurationError(
                 "In file '{}' service name: {} needs to be a string, eg '{}'".format(
@@ -105,7 +106,6 @@ def validate_top_level_object(config_file):
             "that you have defined a service at the top level.".format(
                 config_file.filename,
                 type(config_file.config)))
-    validate_top_level_service_objects(config_file)
 
 
 def validate_extends_file_path(service_name, extends_options, filename):
@@ -134,10 +134,14 @@ def anglicize_validator(validator):
     return 'a ' + validator
 
 
+def is_service_dict_schema(schema_id):
+    return schema_id == 'fields_schema_v1.json' or schema_id == '#/properties/services'
+
+
 def handle_error_for_schema_with_id(error, service_name):
     schema_id = error.schema['id']
 
-    if schema_id == 'fields_schema.json' and error.validator == 'additionalProperties':
+    if is_service_dict_schema(schema_id) and error.validator == 'additionalProperties':
         return "Invalid service name '{}' - only {} characters are allowed".format(
             # The service_name is the key to the json object
             list(error.instance)[0],
@@ -281,10 +285,8 @@ def process_errors(errors, service_name=None):
     return '\n'.join(format_error_message(error, service_name) for error in errors)
 
 
-def validate_against_fields_schema(config, filename, version=None):
-    schema_filename = "fields_schema.json"
-    if version:
-        schema_filename = "fields_schema_v{0}.json".format(version)
+def validate_against_fields_schema(config, filename, version):
+    schema_filename = "fields_schema_v{0}.json".format(version)
     _validate_against_schema(
         config,
         schema_filename,
