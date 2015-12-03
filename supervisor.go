@@ -24,6 +24,10 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 	if err != nil {
 		return nil, err
 	}
+	machine, err := CollectMachineInformation()
+	if err != nil {
+		return nil, err
+	}
 	s := &Supervisor{
 		stateDir:   stateDir,
 		containers: make(map[string]runtime.Container),
@@ -32,6 +36,7 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 		journal:    j,
 		tasks:      tasks,
 		events:     make(chan *Event, 2048),
+		machine:    machine,
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
@@ -59,6 +64,7 @@ type Supervisor struct {
 	events      chan *Event
 	tasks       chan *StartTask
 	subscribers map[subscriber]bool
+	machine     Machine
 }
 
 type subscriber chan *Event
@@ -112,6 +118,12 @@ func (s *Supervisor) Start() error {
 		}
 	}()
 	return nil
+}
+
+// Machine returns the machine information for which the
+// supervisor is executing on.
+func (s *Supervisor) Machine() Machine {
+	return s.machine
 }
 
 func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {

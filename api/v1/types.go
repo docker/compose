@@ -2,6 +2,7 @@ package v1
 
 type State struct {
 	Containers []Container `json:"containers"`
+	Machine    Machine     `json:"machine"`
 }
 
 type Status string
@@ -10,6 +11,11 @@ const (
 	Paused  Status = "paused"
 	Running Status = "running"
 )
+
+type Machine struct {
+	Cpus   int   `json:"cpus"`
+	Memory int64 `json:"memory"`
+}
 
 type ContainerState struct {
 	Status Status `json:"status,omitempty"`

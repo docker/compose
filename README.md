@@ -13,7 +13,6 @@ Add a process:
 ```bash
 curl -s -XPUT localhost:8888/containers/redis/process -d@process.json | json_pp                   
 {
-   "pid" : 25671,
    "user" : {
       "gid" : 0,
       "uid" : 0
@@ -31,10 +30,10 @@ curl -s -XPUT localhost:8888/containers/redis/process -d@process.json | json_pp
 ```
 
 
-Get containers: 
+Get containers and state: 
 
 ```bash
-curl -s localhost:8888/containers | json_pp
+curl -s localhost:8888/state | json_pp
 {
    "containers" : [
       {

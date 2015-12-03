@@ -30,7 +30,7 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 	// internal method for replaying the journal
 	r.HandleFunc("/event", s.event).Methods("POST")
 	r.HandleFunc("/events", s.events).Methods("GET")
-	r.HandleFunc("/containers", s.containers).Methods("GET")
+	r.HandleFunc("/state", s.state).Methods("GET")
 	return s
 }
 
@@ -100,7 +100,7 @@ func (s *server) event(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if e.Containers != nil && len(e.Containers) > 0 {
-		if err := writeContainers(w, &e); err != nil {
+		if err := s.writeState(w, &e); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -170,22 +170,28 @@ func (s *server) signalPid(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *server) containers(w http.ResponseWriter, r *http.Request) {
+func (s *server) state(w http.ResponseWriter, r *http.Request) {
 	e := containerd.NewEvent(containerd.GetContainerEventType)
 	s.supervisor.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := writeContainers(w, e); err != nil {
+	if err := s.writeState(w, e); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func writeContainers(w http.ResponseWriter, e *containerd.Event) error {
-	var state State
-	state.Containers = []Container{}
+func (s *server) writeState(w http.ResponseWriter, e *containerd.Event) error {
+	m := s.supervisor.Machine()
+	state := State{
+		Containers: []Container{},
+		Machine: Machine{
+			Cpus:   m.Cpus,
+			Memory: m.Memory,
+		},
+	}
 	for _, c := range e.Containers {
 		processes, err := c.Processes()
 		if err != nil {
