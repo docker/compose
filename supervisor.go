@@ -31,6 +31,7 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 		runtime:    r,
 		journal:    j,
 		tasks:      tasks,
+		events:     make(chan *Event, 2048),
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
@@ -87,16 +88,12 @@ func (s *Supervisor) NotifySubscribers(e *Event) {
 // executing new containers.
 //
 // This event loop is the only thing that is allowed to modify state of containers and processes.
-func (s *Supervisor) Start(events chan *Event) error {
-	if events == nil {
-		return ErrEventChanNil
-	}
-	s.events = events
+func (s *Supervisor) Start() error {
 	go func() {
 		// allocate an entire thread to this goroutine for the main event loop
 		// so that nothing else is scheduled over the top of it.
 		goruntime.LockOSThread()
-		for e := range events {
+		for e := range s.events {
 			EventsCounter.Inc(1)
 			s.journal.write(e)
 			h, ok := s.handlers[e.Type]

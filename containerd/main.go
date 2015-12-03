@@ -89,10 +89,9 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 		w := containerd.NewWorker(supervisor, wg)
 		go w.Start()
 	}
-	events := make(chan *containerd.Event, bufferSize)
 	// start the signal handler in the background.
 	go startSignalHandler(supervisor, bufferSize)
-	if err := supervisor.Start(events); err != nil {
+	if err := supervisor.Start(); err != nil {
 		return err
 	}
 	server := v1.NewServer(supervisor)
