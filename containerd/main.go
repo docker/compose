@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -77,9 +78,16 @@ func main() {
 }
 
 func daemon(stateDir string, concurrency, bufferSize int) error {
-	supervisor, err := containerd.NewSupervisor(stateDir, concurrency)
+	tasks := make(chan *containerd.StartTask, concurrency*100)
+	supervisor, err := containerd.NewSupervisor(stateDir, tasks)
 	if err != nil {
 		return err
+	}
+	wg := &sync.WaitGroup{}
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		w := containerd.NewWorker(supervisor, wg)
+		go w.Start()
 	}
 	events := make(chan *containerd.Event, bufferSize)
 	// start the signal handler in the background.

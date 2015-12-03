@@ -11,9 +11,9 @@ func (h *StartEvent) Handle(e *Event) error {
 	}
 	h.s.containers[e.ID] = container
 	ContainersCounter.Inc(1)
-	h.s.tasks <- &startTask{
-		err:       e.Err,
-		container: container,
+	h.s.tasks <- &StartTask{
+		Err:       e.Err,
+		Container: container,
 	}
 	return errDeferedResponse
 }
