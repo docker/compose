@@ -19,10 +19,10 @@ class Multiplexer(object):
     parallel and yielding results as they come in.
     """
 
-    def __init__(self, iterators):
+    def __init__(self, iterators, max_queue_size=-1):
         self.iterators = iterators
         self._num_running = len(iterators)
-        self.queue = Queue()
+        self.queue = Queue(maxsize=max_queue_size)
 
     def loop(self):
         self._init_readers()
