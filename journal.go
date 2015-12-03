@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -25,6 +26,7 @@ func newJournal(path string) (*journal, error) {
 		enc: json.NewEncoder(f),
 		wc:  make(chan *Event, 2048),
 	}
+	j.wg.Add(1)
 	go j.start()
 	return j, nil
 }
@@ -33,9 +35,11 @@ type journal struct {
 	f   *os.File
 	enc *json.Encoder
 	wc  chan *Event
+	wg  sync.WaitGroup
 }
 
 func (j *journal) start() {
+	defer j.wg.Done()
 	for e := range j.wc {
 		et := &entry{
 			Event: e,
@@ -51,7 +55,7 @@ func (j *journal) write(e *Event) {
 }
 
 func (j *journal) Close() error {
-	// TODO: add waitgroup to make sure journal is flushed
 	close(j.wc)
+	j.wg.Wait()
 	return j.f.Close()
 }
