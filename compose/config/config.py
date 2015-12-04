@@ -161,11 +161,6 @@ def get_default_config_files(base_dir):
         log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
         log.warn("Using %s\n", winner)
 
-    if winner == 'docker-compose.yaml':
-        log.warn("Please be aware that .yml is the expected extension "
-                 "in most cases, and using .yaml can cause compatibility "
-                 "issues in future.\n")
-
     if winner.startswith("fig."):
         log.warn("%s is deprecated and will not be supported in future. "
                  "Please rename your config file to docker-compose.yml\n" % winner)
