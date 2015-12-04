@@ -217,7 +217,7 @@ func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
 
 func (c *libcontainerContainer) createCheckpointOpts(cp *runtime.Checkpoint) *libcontainer.CriuOpts {
 	opts := libcontainer.CriuOpts{}
-	opts.LeaveRunning = cp.Running
+	opts.LeaveRunning = !cp.Exit
 	opts.ShellJob = cp.Shell
 	opts.TcpEstablished = cp.Tcp
 	opts.ExternalUnixConnections = cp.UnixSockets

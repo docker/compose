@@ -30,13 +30,20 @@ type Stdio struct {
 }
 
 type Checkpoint struct {
-	Timestamp   time.Time `json:"timestamp,omitempty"`
-	Path        string    `json:"path,omitempty"`
-	Name        string    `json:"name,omitempty"`
-	Tcp         bool      `json:"tcp"`
-	UnixSockets bool      `json:"unixSockets"`
-	Shell       bool      `json:"shell"`
-	Running     bool      `json:"running,omitempty"`
+	// Timestamp is the time that checkpoint happened
+	Timestamp time.Time `json:"timestamp,omitempty"`
+	// Path is the custom path to the checkpoint, this is optional
+	Path string `json:"path,omitempty"`
+	// Name is the name of the checkpoint
+	Name string `json:"name,omitempty"`
+	// Tcp checkpoints open tcp connections
+	Tcp bool `json:"tcp"`
+	// UnixSockets persists unix sockets in the checkpoint
+	UnixSockets bool `json:"unixSockets"`
+	// Shell persists tty sessions in the checkpoint
+	Shell bool `json:"shell"`
+	// Exit exits the container after the checkpoint is finished
+	Exit bool `json:"exit,omitempty"`
 }
 
 type Container interface {

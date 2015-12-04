@@ -338,7 +338,7 @@ func (s *server) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        name,
 		Path:        cp.Path,
-		Running:     cp.Running,
+		Exit:        cp.Exit,
 		Tcp:         cp.Tcp,
 		UnixSockets: cp.UnixSockets,
 		Shell:       cp.Shell,
