@@ -2,15 +2,13 @@ sudo: required
 
 language: python
 
-services:
-  - docker
-
 matrix:
   include:
     - os: linux
+      services:
+      - docker
     - os: osx
       language: generic
-
 
 install: ./script/travis/install
 

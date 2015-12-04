@@ -102,7 +102,7 @@ def stream_as_text(stream):
 def line_splitter(buffer, separator=u'\n'):
     index = buffer.find(six.text_type(separator))
     if index == -1:
-        return None, None
+        return None
     return buffer[:index + 1], buffer[index + 1:]
 
 
@@ -120,11 +120,11 @@ def split_buffer(stream, splitter=None, decoder=lambda a: a):
     for data in stream_as_text(stream):
         buffered += data
         while True:
-            item, rest = splitter(buffered)
-            if not item:
+            buffer_split = splitter(buffered)
+            if buffer_split is None:
                 break
 
-            buffered = rest
+            item, buffered = buffer_split
             yield item
 
     if buffered:
@@ -140,7 +140,7 @@ def json_splitter(buffer):
         rest = buffer[json.decoder.WHITESPACE.match(buffer, index).end():]
         return obj, rest
     except ValueError:
-        return None, None
+        return None
 
 
 def json_stream(stream):
@@ -148,7 +148,7 @@ def json_stream(stream):
     This handles streams which are inconsistently buffered (some entries may
     be newline delimited, and others are not).
     """
-    return split_buffer(stream_as_text(stream), json_splitter, json_decoder.decode)
+    return split_buffer(stream, json_splitter, json_decoder.decode)
 
 
 def write_out_msg(stream, lines, msg_index, msg, status="done"):

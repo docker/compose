@@ -87,15 +87,18 @@ relative to the current working directory.
 
 The `-f` flag is optional. If you don't provide this flag on the command line,
 Compose traverses the working directory and its subdirectories looking for a
-`docker-compose.yml` and a `docker-compose.override.yml` file. You must supply
-at least the `docker-compose.yml` file. If both files are present, Compose
-combines the two files into a single configuration. The configuration in the
-`docker-compose.override.yml` file is applied over and in addition to the values
-in the `docker-compose.yml` file.
+`docker-compose.yml` and a `docker-compose.override.yml` file. You must
+supply at least the `docker-compose.yml` file. If both files are present,
+Compose combines the two files into a single configuration. The configuration
+in the `docker-compose.override.yml` file is applied over and in addition to
+the values in the `docker-compose.yml` file.
+
+See also the `COMPOSE_FILE` [environment variable](overview.md#compose-file).
 
 Each configuration has a project name. If you supply a `-p` flag, you can
 specify a project name. If you don't specify the flag, Compose uses the current
-directory name.
+directory name. See also the `COMPOSE_PROJECT_NAME` [environment variable](
+overview.md#compose-project-name)
 
 
 ## Where to go next

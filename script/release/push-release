@@ -57,6 +57,7 @@ docker push docker/compose:$VERSION
 echo "Uploading sdist to pypi"
 pandoc -f markdown -t rst README.md -o README.rst
 sed -i -e 's/logo.png?raw=true/https:\/\/github.com\/docker\/compose\/raw\/master\/logo.png?raw=true/' README.rst
+./script/write-git-sha
 python setup.py sdist
 if [ "$(command -v twine 2> /dev/null)" ]; then
     twine upload ./dist/docker-compose-${VERSION}.tar.gz

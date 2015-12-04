@@ -6,6 +6,10 @@ class ConfigurationError(Exception):
         return self.msg
 
 
+class DependencyError(ConfigurationError):
+    pass
+
+
 class CircularReference(ConfigurationError):
     def __init__(self, trail):
         self.trail = trail

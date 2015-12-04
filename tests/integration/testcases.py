@@ -1,25 +1,19 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from docker import errors
 from docker.utils import version_lt
 from pytest import skip
 
 from .. import unittest
 from compose.cli.docker_client import docker_client
-from compose.config.config import process_service
 from compose.config.config import resolve_environment
-from compose.config.config import ServiceConfig
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
 
 
 def pull_busybox(client):
-    try:
-        client.inspect_image('busybox:latest')
-    except errors.APIError:
-        client.pull('busybox:latest', stream=False)
+    client.pull('busybox:latest', stream=False)
 
 
 class DockerClientTestCase(unittest.TestCase):
@@ -44,13 +38,11 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        service_config = ServiceConfig('.', None, name, kwargs)
-        options = process_service(service_config)
-        options['environment'] = resolve_environment('.', kwargs)
-        labels = options.setdefault('labels', {})
+        kwargs['environment'] = resolve_environment(kwargs)
+        labels = dict(kwargs.setdefault('labels', {}))
         labels['com.docker.compose.test-name'] = self.id()
 
-        return Service(name, client=self.client, project='composetest', **options)
+        return Service(name, client=self.client, project='composetest', **kwargs)
 
     def check_build(self, *args, **kwargs):
         kwargs.setdefault('rm', True)

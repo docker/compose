@@ -57,11 +57,11 @@ class CLIMainTestCase(unittest.TestCase):
         with mock.patch('compose.cli.main.signal', autospec=True) as mock_signal:
             attach_to_logs(project, log_printer, service_names, timeout)
 
-        mock_signal.signal.assert_called_once_with(mock_signal.SIGINT, mock.ANY)
+        assert mock_signal.signal.mock_calls == [
+            mock.call(mock_signal.SIGINT, mock.ANY),
+            mock.call(mock_signal.SIGTERM, mock.ANY),
+        ]
         log_printer.run.assert_called_once_with()
-        project.stop.assert_called_once_with(
-            service_names=service_names,
-            timeout=timeout)
 
 
 class SetupConsoleHandlerTestCase(unittest.TestCase):

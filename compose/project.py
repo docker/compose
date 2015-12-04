@@ -8,7 +8,7 @@ from docker.errors import APIError
 from docker.errors import NotFound
 
 from .config import ConfigurationError
-from .config import get_service_name_from_net
+from .config.sort_services import get_service_name_from_net
 from .const import DEFAULT_TIMEOUT
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
@@ -18,60 +18,12 @@ from .legacy import check_for_legacy_containers
 from .service import ContainerNet
 from .service import ConvergenceStrategy
 from .service import Net
-from .service import parse_volume_from_spec
 from .service import Service
 from .service import ServiceNet
-from .service import VolumeFromSpec
 from .utils import parallel_execute
 
 
 log = logging.getLogger(__name__)
-
-
-def sort_service_dicts(services):
-    # Topological sort (Cormen/Tarjan algorithm).
-    unmarked = services[:]
-    temporary_marked = set()
-    sorted_services = []
-
-    def get_service_names(links):
-        return [link.split(':')[0] for link in links]
-
-    def get_service_names_from_volumes_from(volumes_from):
-        return [
-            parse_volume_from_spec(volume_from).source
-            for volume_from in volumes_from
-        ]
-
-    def get_service_dependents(service_dict, services):
-        name = service_dict['name']
-        return [
-            service for service in services
-            if (name in get_service_names(service.get('links', [])) or
-                name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
-                name == get_service_name_from_net(service.get('net')))
-        ]
-
-    def visit(n):
-        if n['name'] in temporary_marked:
-            if n['name'] in get_service_names(n.get('links', [])):
-                raise DependencyError('A service can not link to itself: %s' % n['name'])
-            if n['name'] in n.get('volumes_from', []):
-                raise DependencyError('A service can not mount itself as volume: %s' % n['name'])
-            else:
-                raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
-        if n in unmarked:
-            temporary_marked.add(n['name'])
-            for m in get_service_dependents(n, services):
-                visit(m)
-            temporary_marked.remove(n['name'])
-            unmarked.remove(n)
-            sorted_services.insert(0, n)
-
-    while unmarked:
-        visit(unmarked[-1])
-
-    return sorted_services
 
 
 class Project(object):
@@ -101,7 +53,7 @@ class Project(object):
         if use_networking:
             remove_links(service_dicts)
 
-        for service_dict in sort_service_dicts(service_dicts):
+        for service_dict in service_dicts:
             links = project.get_links(service_dict)
             volumes_from = project.get_volumes_from(service_dict)
             net = project.get_net(service_dict)
@@ -192,16 +144,15 @@ class Project(object):
     def get_volumes_from(self, service_dict):
         volumes_from = []
         if 'volumes_from' in service_dict:
-            for volume_from_config in service_dict.get('volumes_from', []):
-                volume_from_spec = parse_volume_from_spec(volume_from_config)
+            for volume_from_spec in service_dict.get('volumes_from', []):
                 # Get service
                 try:
-                    service_name = self.get_service(volume_from_spec.source)
-                    volume_from_spec = VolumeFromSpec(service_name, volume_from_spec.mode)
+                    service = self.get_service(volume_from_spec.source)
+                    volume_from_spec = volume_from_spec._replace(source=service)
                 except NoSuchService:
                     try:
-                        container_name = Container.from_id(self.client, volume_from_spec.source)
-                        volume_from_spec = VolumeFromSpec(container_name, volume_from_spec.mode)
+                        container = Container.from_id(self.client, volume_from_spec.source)
+                        volume_from_spec = volume_from_spec._replace(source=container)
                     except APIError:
                         raise ConfigurationError(
                             'Service "%s" mounts volumes from "%s", which is '
@@ -430,7 +381,3 @@ class NoSuchService(Exception):
 
     def __str__(self):
         return self.msg
-
-
-class DependencyError(ConfigurationError):
-    pass

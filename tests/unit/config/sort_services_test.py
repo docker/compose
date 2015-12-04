@@ -1,6 +1,7 @@
-from .. import unittest
-from compose.project import DependencyError
-from compose.project import sort_service_dicts
+from compose.config.errors import DependencyError
+from compose.config.sort_services import sort_service_dicts
+from compose.config.types import VolumeFromSpec
+from tests import unittest
 
 
 class SortServiceTest(unittest.TestCase):
@@ -73,7 +74,7 @@ class SortServiceTest(unittest.TestCase):
             },
             {
                 'name': 'parent',
-                'volumes_from': ['child']
+                'volumes_from': [VolumeFromSpec('child', 'rw')]
             },
             {
                 'links': ['parent'],
@@ -116,7 +117,7 @@ class SortServiceTest(unittest.TestCase):
             },
             {
                 'name': 'parent',
-                'volumes_from': ['child']
+                'volumes_from': [VolumeFromSpec('child', 'ro')]
             },
             {
                 'name': 'child'
@@ -141,7 +142,7 @@ class SortServiceTest(unittest.TestCase):
             },
             {
                 'name': 'two',
-                'volumes_from': ['one']
+                'volumes_from': [VolumeFromSpec('one', 'rw')]
             },
             {
                 'name': 'one'

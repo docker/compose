@@ -37,26 +37,14 @@
         "domainname": {"type": "string"},
         "entrypoint": {"$ref": "#/definitions/string_or_list"},
         "env_file": {"$ref": "#/definitions/string_or_list"},
-
-        "environment": {
-          "oneOf": [
-            {
-              "type": "object",
-              "patternProperties": {
-                ".+": {
-                  "type": ["string", "number", "boolean", "null"],
-                  "format": "environment"
-                }
-              },
-              "additionalProperties": false
-            },
-            {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
-          ]
-        },
+        "environment": {"$ref": "#/definitions/list_or_dict"},
 
         "expose": {
           "type": "array",
-          "items": {"type": ["string", "number"]},
+          "items": {
+            "type": ["string", "number"],
+            "format": "expose"
+          },
           "uniqueItems": true
         },
 
@@ -98,16 +86,8 @@
         "ports": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "type": "string",
-                "format": "ports"
-              },
-              {
-                "type": "number",
-                "format": "ports"
-              }
-            ]
+            "type": ["string", "number"],
+            "format": "ports"
           },
           "uniqueItems": true
         },
@@ -165,10 +145,18 @@
 
     "list_or_dict": {
       "oneOf": [
-        {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-        {"type": "object"}
+        {
+          "type": "object",
+          "patternProperties": {
+            ".+": {
+              "type": ["string", "number", "boolean", "null"],
+              "format": "bool-value-in-mapping"
+            }
+          },
+          "additionalProperties": false
+        },
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
       ]
     }
-
   }
 }
