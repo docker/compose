@@ -39,7 +39,7 @@ which the release page specifies, in your terminal.
 
      The following is an example command illustrating the format:
 
-        curl -L https://github.com/docker/compose/releases/download/1.5.1/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        curl -L https://github.com/docker/compose/releases/download/1.5.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 
      If you have problems installing with `curl`, see
      [Alternative Install Options](#alternative-install-options).
