@@ -11,9 +11,15 @@ type Worker interface {
 	Start()
 }
 
+type Checkpoint struct {
+	Path string
+	Name string
+}
+
 type StartTask struct {
-	Container runtime.Container
-	Err       chan error
+	Container  runtime.Container
+	Checkpoint *Checkpoint
+	Err        chan error
 }
 
 func NewWorker(s *Supervisor, wg *sync.WaitGroup) Worker {
@@ -32,12 +38,22 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
-		if err := t.Container.Start(); err != nil {
-			evt := NewEvent(DeleteEventType)
-			evt.ID = t.Container.ID()
-			w.s.SendEvent(evt)
-			t.Err <- err
-			continue
+		if t.Checkpoint != nil {
+			if err := t.Container.Restore(t.Checkpoint.Path, t.Checkpoint.Name); err != nil {
+				evt := NewEvent(DeleteEventType)
+				evt.ID = t.Container.ID()
+				w.s.SendEvent(evt)
+				t.Err <- err
+				continue
+			}
+		} else {
+			if err := t.Container.Start(); err != nil {
+				evt := NewEvent(DeleteEventType)
+				evt.ID = t.Container.ID()
+				w.s.SendEvent(evt)
+				t.Err <- err
+				continue
+			}
 		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil

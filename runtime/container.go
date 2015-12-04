@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"os"
+	"time"
 
 	"github.com/opencontainers/specs"
 )
@@ -11,6 +12,7 @@ type Process interface {
 	Spec() specs.Process
 	Signal(os.Signal) error
 }
+
 type Status string
 
 const (
@@ -25,6 +27,16 @@ type State struct {
 type Stdio struct {
 	Stderr string `json:"stderr,omitempty"`
 	Stdout string `json:"stdout,omitempty"`
+}
+
+type Checkpoint struct {
+	Timestamp   time.Time `json:"timestamp,omitempty"`
+	Path        string    `json:"path,omitempty"`
+	Name        string    `json:"name,omitempty"`
+	Tcp         bool      `json:"tcp"`
+	UnixSockets bool      `json:"unixSockets"`
+	Shell       bool      `json:"shell"`
+	Running     bool      `json:"running,omitempty"`
 }
 
 type Container interface {
@@ -50,4 +62,10 @@ type Container interface {
 	Resume() error
 	// Pause pauses a running container
 	Pause() error
+
+	Checkpoints() ([]Checkpoint, error)
+
+	Checkpoint(Checkpoint) error
+
+	Restore(path, name string) error
 }

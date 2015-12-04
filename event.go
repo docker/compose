@@ -11,14 +11,15 @@ import (
 type EventType string
 
 const (
-	ExecExitEventType        EventType = "execExit"
-	ExitEventType            EventType = "exit"
-	StartContainerEventType  EventType = "startContainer"
-	DeleteEventType          EventType = "deleteContainerEvent"
-	GetContainerEventType    EventType = "getContainer"
-	SignalEventType          EventType = "signal"
-	AddProcessEventType      EventType = "addProcess"
-	UpdateContainerEventType EventType = "updateContainer"
+	ExecExitEventType         EventType = "execExit"
+	ExitEventType             EventType = "exit"
+	StartContainerEventType   EventType = "startContainer"
+	DeleteEventType           EventType = "deleteContainerEvent"
+	GetContainerEventType     EventType = "getContainer"
+	SignalEventType           EventType = "signal"
+	AddProcessEventType       EventType = "addProcess"
+	UpdateContainerEventType  EventType = "updateContainer"
+	CreateCheckpointEventType EventType = "createCheckpoint"
 )
 
 func NewEvent(t EventType) *Event {
@@ -41,6 +42,7 @@ type Event struct {
 	Process    *specs.Process      `json:"process,omitempty"`
 	State      *runtime.State      `json:"state,omitempty"`
 	Containers []runtime.Container `json:"-"`
+	Checkpoint *runtime.Checkpoint `json:"checkpoint,omitempty"`
 	Err        chan error          `json:"-"`
 }
 

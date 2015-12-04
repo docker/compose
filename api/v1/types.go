@@ -28,6 +28,7 @@ type Container struct {
 	Stdout     string          `json:"stdout,omitempty"`
 	Stderr     string          `json:"stderr,omitempty"`
 	State      *ContainerState `json:"state,omitempty"`
+	Checkpoint *Checkpoint     `json:"checkpoint,omitempty"`
 }
 
 type User struct {
@@ -53,4 +54,13 @@ type Event struct {
 	Type   string `json:"type"`
 	ID     string `json:"id,omitempty"`
 	Status int    `json:"status,omitempty"`
+}
+
+type Checkpoint struct {
+	Name        string `json:"name,omitempty"`
+	Path        string `json:"path"`
+	Running     bool   `json:"running,omitempty"`
+	Tcp         bool   `json:"tcp"`
+	UnixSockets bool   `json:"unixSockets"`
+	Shell       bool   `json:"shell"`
 }

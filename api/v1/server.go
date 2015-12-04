@@ -19,17 +19,25 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 		supervisor: supervisor,
 		r:          r,
 	}
-	// TODO: add container stats
-	// TODO: add container checkpoint
-	// TODO: add container restore
-	// TODO: set prctl child subreaper
+	// process handlers
 	r.HandleFunc("/containers/{id:.*}/process/{pid:.*}", s.signalPid).Methods("POST")
 	r.HandleFunc("/containers/{id:.*}/process", s.addProcess).Methods("PUT")
+
+	// checkpoint and restore handlers
+	// TODO: PUT handler for adding a checkpoint to containerd??
+	r.HandleFunc("/containers/{id:.*}/checkpoint/{name:.*}", s.createCheckpoint).Methods("POST")
+	// r.HandleFunc("/containers/{id:.*}/checkpoint/{cid:.*}", s.deleteCheckpoint).Methods("DELETE")
+	r.HandleFunc("/containers/{id:.*}/checkpoint", s.listCheckpoints).Methods("GET")
+
+	// container handlers
 	r.HandleFunc("/containers/{id:.*}", s.createContainer).Methods("POST")
 	r.HandleFunc("/containers/{id:.*}", s.updateContainer).Methods("PATCH")
+
 	// internal method for replaying the journal
 	r.HandleFunc("/event", s.event).Methods("POST")
 	r.HandleFunc("/events", s.events).Methods("GET")
+
+	// containerd handlers
 	r.HandleFunc("/state", s.state).Methods("GET")
 	return s
 }
@@ -252,6 +260,12 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 	e := containerd.NewEvent(containerd.StartContainerEventType)
 	e.ID = id
 	e.BundlePath = c.BundlePath
+	if c.Checkpoint != nil {
+		e.Checkpoint = &runtime.Checkpoint{
+			Name: c.Checkpoint.Name,
+			Path: c.Checkpoint.Path,
+		}
+	}
 	e.Stdio = &runtime.Stdio{
 		Stderr: c.Stderr,
 		Stdout: c.Stdout,
@@ -266,4 +280,72 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *server) listCheckpoints(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	e := containerd.NewEvent(containerd.GetContainerEventType)
+	s.supervisor.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var container runtime.Container
+	for _, c := range e.Containers {
+		if c.ID() == id {
+			container = c
+			break
+		}
+	}
+	if container == nil {
+		http.Error(w, "container not found", http.StatusNotFound)
+		return
+	}
+	checkpoints, err := container.Checkpoints()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	out := []Checkpoint{}
+	for _, c := range checkpoints {
+		out = append(out, Checkpoint{
+			Path:        c.Path,
+			Name:        c.Name,
+			Tcp:         c.Tcp,
+			Shell:       c.Shell,
+			UnixSockets: c.UnixSockets,
+		})
+	}
+}
+
+func (s *server) createCheckpoint(w http.ResponseWriter, r *http.Request) {
+	var (
+		vars = mux.Vars(r)
+		id   = vars["id"]
+		name = vars["name"]
+	)
+	var cp Checkpoint
+	if err := json.NewDecoder(r.Body).Decode(&cp); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	e := containerd.NewEvent(containerd.CreateCheckpointEventType)
+	e.ID = id
+	e.Checkpoint = &runtime.Checkpoint{
+		Name:        name,
+		Path:        cp.Path,
+		Running:     cp.Running,
+		Tcp:         cp.Tcp,
+		UnixSockets: cp.UnixSockets,
+		Shell:       cp.Shell,
+	}
+	s.supervisor.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *server) deleteCheckpoint(w http.ResponseWriter, r *http.Request) {
 }

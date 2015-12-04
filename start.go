@@ -11,9 +11,16 @@ func (h *StartEvent) Handle(e *Event) error {
 	}
 	h.s.containers[e.ID] = container
 	ContainersCounter.Inc(1)
-	h.s.tasks <- &StartTask{
+	task := &StartTask{
 		Err:       e.Err,
 		Container: container,
 	}
+	if e.Checkpoint != nil {
+		task.Checkpoint = &Checkpoint{
+			Name: e.Checkpoint.Name,
+			Path: e.Checkpoint.Path,
+		}
+	}
+	h.s.tasks <- task
 	return errDeferedResponse
 }

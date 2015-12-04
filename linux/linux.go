@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
@@ -190,6 +191,57 @@ type libcontainerContainer struct {
 	exitStatus          int
 	exited              bool
 	path                string
+	checkpoints         map[string]runtime.Checkpoint
+}
+
+func (c *libcontainerContainer) Checkpoints() ([]runtime.Checkpoint, error) {
+	out := []runtime.Checkpoint{}
+	for _, cp := range c.checkpoints {
+		out = append(out, cp)
+	}
+	return out, nil
+}
+
+func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
+	opts := c.createCheckpointOpts(&cp)
+	if err := os.MkdirAll(opts.ImagesDirectory, 0755); err != nil {
+		return err
+	}
+	if err := c.c.Checkpoint(opts); err != nil {
+		return err
+	}
+	cp.Timestamp = time.Now()
+	c.checkpoints[cp.Name] = cp
+	return nil
+}
+
+func (c *libcontainerContainer) createCheckpointOpts(cp *runtime.Checkpoint) *libcontainer.CriuOpts {
+	opts := libcontainer.CriuOpts{}
+	opts.LeaveRunning = cp.Running
+	opts.ShellJob = cp.Shell
+	opts.TcpEstablished = cp.Tcp
+	opts.ExternalUnixConnections = cp.UnixSockets
+	if cp.Path == "" {
+		cp.Path = filepath.Join(c.path, "checkpoints", cp.Name)
+	}
+	opts.ImagesDirectory = cp.Path
+	return &opts
+}
+
+func (c *libcontainerContainer) Restore(path, name string) error {
+	if path == "" {
+		path = filepath.Join(c.path, "checkpoints", name)
+	}
+	var opts libcontainer.CriuOpts
+	if cp, ok := c.checkpoints[name]; ok {
+		opts = *c.createCheckpointOpts(&cp)
+	} else {
+		opts.ImagesDirectory = path
+	}
+	if err := c.c.Restore(c.initProcess.process, &opts); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *libcontainerContainer) Resume() error {
@@ -300,6 +352,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio
 	c := &libcontainerContainer{
 		c:                   container,
 		additionalProcesses: make(map[int]*libcontainerProcess),
+		checkpoints:         make(map[string]runtime.Checkpoint),
 		initProcess: &libcontainerProcess{
 			process: process,
 			spec:    spec.Process,

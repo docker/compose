@@ -40,14 +40,15 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
-		ExecExitEventType:        &ExecExitEvent{s},
-		ExitEventType:            &ExitEvent{s},
-		StartContainerEventType:  &StartEvent{s},
-		DeleteEventType:          &DeleteEvent{s},
-		GetContainerEventType:    &GetContainersEvent{s},
-		SignalEventType:          &SignalEvent{s},
-		AddProcessEventType:      &AddProcessEvent{s},
-		UpdateContainerEventType: &UpdateEvent{s},
+		ExecExitEventType:         &ExecExitEvent{s},
+		ExitEventType:             &ExitEvent{s},
+		StartContainerEventType:   &StartEvent{s},
+		DeleteEventType:           &DeleteEvent{s},
+		GetContainerEventType:     &GetContainersEvent{s},
+		SignalEventType:           &SignalEvent{s},
+		AddProcessEventType:       &AddProcessEvent{s},
+		UpdateContainerEventType:  &UpdateEvent{s},
+		CreateCheckpointEventType: &CreateCheckpointEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil
