@@ -19,6 +19,7 @@ type Machine struct {
 
 type ContainerState struct {
 	Status Status `json:"status,omitempty"`
+	Signal int    `json:"signal,omitempty"`
 }
 
 type Container struct {

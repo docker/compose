@@ -225,7 +225,14 @@ func (c *libcontainerContainer) getCheckpointPath(name string) string {
 
 func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
 	opts := c.createCheckpointOpts(cp)
-	if err := os.MkdirAll(opts.ImagesDirectory, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(opts.ImagesDirectory), 0755); err != nil {
+		return err
+	}
+	// mkdir is atomic so if it already exists we can fail
+	if err := os.Mkdir(opts.ImagesDirectory, 0755); err != nil {
+		if os.IsExist(err) {
+			return runtime.ErrCheckpointExists
+		}
 		return err
 	}
 	if err := c.c.Checkpoint(opts); err != nil {

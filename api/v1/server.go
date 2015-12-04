@@ -61,6 +61,9 @@ func (s *server) updateContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	e := containerd.NewEvent(containerd.UpdateContainerEventType)
 	e.ID = id
+	if state.Signal != 0 {
+		e.Signal = syscall.Signal(state.Signal)
+	}
 	e.State = &runtime.State{
 		Status: runtime.Status(string(state.Status)),
 	}
