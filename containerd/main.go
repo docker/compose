@@ -4,17 +4,14 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/v1"
-	"github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -89,6 +86,9 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 		w := containerd.NewWorker(supervisor, wg)
 		go w.Start()
 	}
+	if err := setSubReaper(); err != nil {
+		return err
+	}
 	// start the signal handler in the background.
 	go startSignalHandler(supervisor, bufferSize)
 	if err := supervisor.Start(); err != nil {
@@ -96,48 +96,4 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 	}
 	server := v1.NewServer(supervisor)
 	return http.ListenAndServe("localhost:8888", server)
-}
-
-func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
-	logrus.Debug("containerd: starting signal handler")
-	signals := make(chan os.Signal, bufferSize)
-	signal.Notify(signals)
-	for s := range signals {
-		switch s {
-		case syscall.SIGTERM, syscall.SIGINT, syscall.SIGSTOP:
-			supervisor.Close()
-			os.Exit(0)
-		case syscall.SIGCHLD:
-			exits, err := reap()
-			if err != nil {
-				logrus.WithField("error", err).Error("containerd: reaping child processes")
-			}
-			for _, e := range exits {
-				supervisor.SendEvent(e)
-			}
-		}
-	}
-}
-
-func reap() (exits []*containerd.Event, err error) {
-	var (
-		ws  syscall.WaitStatus
-		rus syscall.Rusage
-	)
-	for {
-		pid, err := syscall.Wait4(-1, &ws, syscall.WNOHANG, &rus)
-		if err != nil {
-			if err == syscall.ECHILD {
-				return exits, nil
-			}
-			return exits, err
-		}
-		if pid <= 0 {
-			return exits, nil
-		}
-		e := containerd.NewEvent(containerd.ExitEventType)
-		e.Pid = pid
-		e.Status = utils.ExitStatus(ws)
-		exits = append(exits, e)
-	}
 }
