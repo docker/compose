@@ -20,9 +20,10 @@ type Client struct {
 
 // Start starts a container with the specified id and path to the container's
 // bundle on the system.
-func (c *Client) Start(id, path string) error {
+func (c *Client) Start(id, path, checkpoint string) error {
 	container := Container{
 		BundlePath: path,
+		Checkpoint: checkpoint,
 	}
 	buf := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(buf).Encode(container); err != nil {
@@ -53,7 +54,7 @@ func (c *Client) Containers() ([]Container, error) {
 	return s.Containers, nil
 }
 
-func (c *Client) Signal(id string, pid, signal int) error {
+func (c *Client) SignalProcess(id string, pid, signal int) error {
 	sig := Signal{
 		Signal: signal,
 	}

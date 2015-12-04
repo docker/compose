@@ -34,7 +34,7 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 	r.HandleFunc("/containers/{id:.*}", s.updateContainer).Methods("PATCH")
 
 	// internal method for replaying the journal
-	r.HandleFunc("/event", s.event).Methods("POST")
+	// r.HandleFunc("/event", s.event).Methods("POST")
 	r.HandleFunc("/events", s.events).Methods("GET")
 
 	// containerd handlers
@@ -263,9 +263,9 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 	e := containerd.NewEvent(containerd.StartContainerEventType)
 	e.ID = id
 	e.BundlePath = c.BundlePath
-	if c.Checkpoint != nil {
+	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
-			Name: c.Checkpoint.Name,
+			Name: c.Checkpoint,
 		}
 	}
 	e.Stdio = &runtime.Stdio{

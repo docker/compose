@@ -29,7 +29,7 @@ type Container struct {
 	Stdout     string          `json:"stdout,omitempty"`
 	Stderr     string          `json:"stderr,omitempty"`
 	State      *ContainerState `json:"state,omitempty"`
-	Checkpoint *Checkpoint     `json:"checkpoint,omitempty"`
+	Checkpoint string          `json:"checkpoint,omitempty"`
 }
 
 type User struct {
