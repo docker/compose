@@ -26,7 +26,7 @@ func NewServer(supervisor *containerd.Supervisor) http.Handler {
 	// checkpoint and restore handlers
 	// TODO: PUT handler for adding a checkpoint to containerd??
 	r.HandleFunc("/containers/{id:.*}/checkpoint/{name:.*}", s.createCheckpoint).Methods("POST")
-	// r.HandleFunc("/containers/{id:.*}/checkpoint/{cid:.*}", s.deleteCheckpoint).Methods("DELETE")
+	r.HandleFunc("/containers/{id:.*}/checkpoint/{name:.*}", s.deleteCheckpoint).Methods("DELETE")
 	r.HandleFunc("/containers/{id:.*}/checkpoint", s.listCheckpoints).Methods("GET")
 
 	// container handlers
@@ -263,7 +263,6 @@ func (s *server) createContainer(w http.ResponseWriter, r *http.Request) {
 	if c.Checkpoint != nil {
 		e.Checkpoint = &runtime.Checkpoint{
 			Name: c.Checkpoint.Name,
-			Path: c.Checkpoint.Path,
 		}
 	}
 	e.Stdio = &runtime.Stdio{
@@ -309,12 +308,16 @@ func (s *server) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 	out := []Checkpoint{}
 	for _, c := range checkpoints {
 		out = append(out, Checkpoint{
-			Path:        c.Path,
 			Name:        c.Name,
 			Tcp:         c.Tcp,
 			Shell:       c.Shell,
 			UnixSockets: c.UnixSockets,
 		})
+	}
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		logrus.WithField("error", err).Error("encode checkpoints")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -337,7 +340,6 @@ func (s *server) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	e.ID = id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        name,
-		Path:        cp.Path,
 		Exit:        cp.Exit,
 		Tcp:         cp.Tcp,
 		UnixSockets: cp.UnixSockets,
@@ -352,4 +354,30 @@ func (s *server) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) deleteCheckpoint(w http.ResponseWriter, r *http.Request) {
+	var (
+		vars = mux.Vars(r)
+		id   = vars["id"]
+		name = vars["name"]
+	)
+	if name == "" {
+		http.Error(w, "checkpoint name cannot be empty", http.StatusBadRequest)
+		return
+	}
+	var cp Checkpoint
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&cp); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	e := containerd.NewEvent(containerd.DeleteCheckpointEventType)
+	e.ID = id
+	e.Checkpoint = &runtime.Checkpoint{
+		Name: name,
+	}
+	s.supervisor.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

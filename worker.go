@@ -11,14 +11,9 @@ type Worker interface {
 	Start()
 }
 
-type Checkpoint struct {
-	Path string
-	Name string
-}
-
 type StartTask struct {
 	Container  runtime.Container
-	Checkpoint *Checkpoint
+	Checkpoint string
 	Err        chan error
 }
 
@@ -38,8 +33,8 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
-		if t.Checkpoint != nil {
-			if err := t.Container.Restore(t.Checkpoint.Path, t.Checkpoint.Name); err != nil {
+		if t.Checkpoint != "" {
+			if err := t.Container.Restore(t.Checkpoint); err != nil {
 				evt := NewEvent(DeleteEventType)
 				evt.ID = t.Container.ID()
 				w.s.SendEvent(evt)

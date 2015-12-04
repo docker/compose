@@ -32,8 +32,6 @@ type Stdio struct {
 type Checkpoint struct {
 	// Timestamp is the time that checkpoint happened
 	Timestamp time.Time `json:"timestamp,omitempty"`
-	// Path is the custom path to the checkpoint, this is optional
-	Path string `json:"path,omitempty"`
 	// Name is the name of the checkpoint
 	Name string `json:"name,omitempty"`
 	// Tcp checkpoints open tcp connections
@@ -74,5 +72,7 @@ type Container interface {
 
 	Checkpoint(Checkpoint) error
 
-	Restore(path, name string) error
+	DeleteCheckpoint(name string) error
+
+	Restore(name string) error
 }

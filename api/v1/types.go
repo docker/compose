@@ -58,7 +58,6 @@ type Event struct {
 
 type Checkpoint struct {
 	Name        string `json:"name,omitempty"`
-	Path        string `json:"path"`
 	Exit        bool   `json:"exit,omitempty"`
 	Tcp         bool   `json:"tcp"`
 	UnixSockets bool   `json:"unixSockets"`

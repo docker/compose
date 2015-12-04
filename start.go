@@ -16,10 +16,7 @@ func (h *StartEvent) Handle(e *Event) error {
 		Container: container,
 	}
 	if e.Checkpoint != nil {
-		task.Checkpoint = &Checkpoint{
-			Name: e.Checkpoint.Name,
-			Path: e.Checkpoint.Path,
-		}
+		task.Checkpoint = e.Checkpoint.Name
 	}
 	h.s.tasks <- task
 	return errDeferedResponse

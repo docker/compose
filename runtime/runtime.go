@@ -9,6 +9,7 @@ import (
 var (
 	ErrNotChildProcess      = errors.New("containerd: not a child process for container")
 	ErrInvalidContainerType = errors.New("containerd: invalid container type for runtime")
+	ErrCheckpointNotExists  = errors.New("containerd: checkpoint does not exist for container")
 )
 
 // runtime handles containers, containers handle their own actions.

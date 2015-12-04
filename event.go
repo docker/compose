@@ -20,6 +20,7 @@ const (
 	AddProcessEventType       EventType = "addProcess"
 	UpdateContainerEventType  EventType = "updateContainer"
 	CreateCheckpointEventType EventType = "createCheckpoint"
+	DeleteCheckpointEventType EventType = "deleteCheckpoint"
 )
 
 func NewEvent(t EventType) *Event {

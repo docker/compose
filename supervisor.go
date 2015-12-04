@@ -52,6 +52,7 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 		AddProcessEventType:       &AddProcessEvent{s},
 		UpdateContainerEventType:  &UpdateEvent{s},
 		CreateCheckpointEventType: &CreateCheckpointEvent{s},
+		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil

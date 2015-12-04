@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -191,19 +192,39 @@ type libcontainerContainer struct {
 	exitStatus          int
 	exited              bool
 	path                string
-	checkpoints         map[string]runtime.Checkpoint
 }
 
 func (c *libcontainerContainer) Checkpoints() ([]runtime.Checkpoint, error) {
 	out := []runtime.Checkpoint{}
-	for _, cp := range c.checkpoints {
-		out = append(out, cp)
+	files, err := ioutil.ReadDir(c.getCheckpointPath(""))
+	if err != nil {
+		return nil, err
+	}
+	for _, fi := range files {
+		out = append(out, runtime.Checkpoint{
+			Name: fi.Name(),
+		})
 	}
 	return out, nil
 }
 
+func (c *libcontainerContainer) DeleteCheckpoint(name string) error {
+	path := c.getCheckpointPath(name)
+	if err := os.RemoveAll(path); err != nil {
+		if os.IsNotExist(err) {
+			return runtime.ErrCheckpointNotExists
+		}
+		return err
+	}
+	return nil
+}
+
+func (c *libcontainerContainer) getCheckpointPath(name string) string {
+	return filepath.Join(c.path, "checkpoints", name)
+}
+
 func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
-	opts := c.createCheckpointOpts(&cp)
+	opts := c.createCheckpointOpts(cp)
 	if err := os.MkdirAll(opts.ImagesDirectory, 0755); err != nil {
 		return err
 	}
@@ -211,37 +232,24 @@ func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
 		return err
 	}
 	cp.Timestamp = time.Now()
-	c.checkpoints[cp.Name] = cp
 	return nil
 }
 
-func (c *libcontainerContainer) createCheckpointOpts(cp *runtime.Checkpoint) *libcontainer.CriuOpts {
+func (c *libcontainerContainer) createCheckpointOpts(cp runtime.Checkpoint) *libcontainer.CriuOpts {
 	opts := libcontainer.CriuOpts{}
 	opts.LeaveRunning = !cp.Exit
 	opts.ShellJob = cp.Shell
 	opts.TcpEstablished = cp.Tcp
 	opts.ExternalUnixConnections = cp.UnixSockets
-	if cp.Path == "" {
-		cp.Path = filepath.Join(c.path, "checkpoints", cp.Name)
-	}
-	opts.ImagesDirectory = cp.Path
+	opts.ImagesDirectory = c.getCheckpointPath(cp.Name)
 	return &opts
 }
 
-func (c *libcontainerContainer) Restore(path, name string) error {
-	if path == "" {
-		path = filepath.Join(c.path, "checkpoints", name)
-	}
+func (c *libcontainerContainer) Restore(name string) error {
+	path := c.getCheckpointPath(name)
 	var opts libcontainer.CriuOpts
-	if cp, ok := c.checkpoints[name]; ok {
-		opts = *c.createCheckpointOpts(&cp)
-	} else {
-		opts.ImagesDirectory = path
-	}
-	if err := c.c.Restore(c.initProcess.process, &opts); err != nil {
-		return err
-	}
-	return nil
+	opts.ImagesDirectory = path
+	return c.c.Restore(c.initProcess.process, &opts)
 }
 
 func (c *libcontainerContainer) Resume() error {
@@ -352,7 +360,6 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio
 	c := &libcontainerContainer{
 		c:                   container,
 		additionalProcesses: make(map[int]*libcontainerProcess),
-		checkpoints:         make(map[string]runtime.Checkpoint),
 		initProcess: &libcontainerProcess{
 			process: process,
 			spec:    spec.Process,
