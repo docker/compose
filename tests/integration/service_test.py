@@ -887,6 +887,12 @@ class ServiceTest(DockerClientTestCase):
         for name in labels_dict:
             self.assertIn((name, ''), labels)
 
+    def test_stop_signal(self):
+        stop_signal = 'SIGINT'
+        service = self.create_service('web', stop_signal=stop_signal)
+        container = create_and_start_container(service)
+        self.assertEqual(container.stop_signal, stop_signal)
+
     def test_custom_container_name(self):
         service = self.create_service('web', container_name='my-web-container')
         self.assertEqual(service.custom_container_name(), 'my-web-container')

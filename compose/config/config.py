@@ -62,6 +62,7 @@ DOCKER_CONFIG_KEYS = [
     'restart',
     'security_opt',
     'stdin_open',
+    'stop_signal',
     'tty',
     'user',
     'volume_driver',

@@ -94,6 +94,7 @@
         "restart": {"type": "string"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "stdin_open": {"type": "boolean"},
+        "stop_signal": {"type": "string"},
         "tty": {"type": "boolean"},
         "ulimits": {
           "type": "object",
