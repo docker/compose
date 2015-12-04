@@ -1,6 +1,28 @@
 Change log
 ==========
 
+1.5.2 (2015-12-03)
+------------------
+
+-   Fixed a bug which broke the use of `environment` and `env_file` with
+    `extends`, and caused environment keys without values to have a `None`
+    value, instead of a value from the host environment.
+
+-   Fixed a regression in 1.5.1 that caused a warning about volumes to be
+    raised incorrectly when containers were recreated.
+
+-   Fixed a bug which prevented building a `Dockerfile` that used `ADD <url>`
+
+-   Fixed a bug with `docker-compose restart` which prevented it from
+    starting stopped containers.
+
+-   Fixed handling of SIGTERM and SIGINT to properly stop containers
+
+-   Add support for using a url as the value of `build`
+
+-   Improved the validation of the `expose` option
+
+
 1.5.1 (2015-11-12)
 ------------------
 
