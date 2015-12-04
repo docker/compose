@@ -173,13 +173,15 @@ Response:
       "name" : "test1",
       "unixSockets" : false,
       "tcp" : false,
-      "shell" : false
+      "shell" : false,
+      "timestamp" : "2015-12-04T15:09:14.915868934-08:00"
    },
    {
       "name" : "test2",
       "tcp" : false,
       "unixSockets" : false,
-      "shell" : false
+      "shell" : false,
+      "timestamp" : "2015-12-04T15:09:14.915868934-08:00"
    }
 ]
 ```

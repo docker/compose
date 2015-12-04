@@ -1,5 +1,7 @@
 package v1
 
+import "time"
+
 type State struct {
 	Containers []Container `json:"containers"`
 	Machine    Machine     `json:"machine"`
@@ -58,9 +60,10 @@ type Event struct {
 }
 
 type Checkpoint struct {
-	Name        string `json:"name,omitempty"`
-	Exit        bool   `json:"exit,omitempty"`
-	Tcp         bool   `json:"tcp"`
-	UnixSockets bool   `json:"unixSockets"`
-	Shell       bool   `json:"shell"`
+	Name        string    `json:"name,omitempty"`
+	Timestamp   time.Time `json:"timestamp,omitempty"`
+	Exit        bool      `json:"exit,omitempty"`
+	Tcp         bool      `json:"tcp"`
+	UnixSockets bool      `json:"unixSockets"`
+	Shell       bool      `json:"shell"`
 }

@@ -314,6 +314,7 @@ func (s *server) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 			Tcp:         c.Tcp,
 			Shell:       c.Shell,
 			UnixSockets: c.UnixSockets,
+			Timestamp:   c.Timestamp,
 		})
 	}
 	if err := json.NewEncoder(w).Encode(out); err != nil {

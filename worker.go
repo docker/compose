@@ -50,7 +50,6 @@ func (w *worker) Start() {
 				continue
 			}
 		}
-		w.s.containerGroup.Add(1)
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
 	}

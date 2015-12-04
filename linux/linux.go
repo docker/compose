@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
@@ -202,7 +201,8 @@ func (c *libcontainerContainer) Checkpoints() ([]runtime.Checkpoint, error) {
 	}
 	for _, fi := range files {
 		out = append(out, runtime.Checkpoint{
-			Name: fi.Name(),
+			Name:      fi.Name(),
+			Timestamp: fi.ModTime(),
 		})
 	}
 	return out, nil
@@ -238,7 +238,6 @@ func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
 	if err := c.c.Checkpoint(opts); err != nil {
 		return err
 	}
-	cp.Timestamp = time.Now()
 	return nil
 }
 
