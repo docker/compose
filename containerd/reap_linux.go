@@ -34,8 +34,7 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 	for s := range signals {
 		switch s {
 		case syscall.SIGTERM, syscall.SIGINT:
-			supervisor.Close()
-			os.Exit(0)
+			supervisor.Stop(signals)
 		case syscall.SIGCHLD:
 			exits, err := reap()
 			if err != nil {
@@ -46,6 +45,8 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 			}
 		}
 	}
+	supervisor.Close()
+	os.Exit(0)
 }
 
 func reap() (exits []*containerd.Event, err error) {

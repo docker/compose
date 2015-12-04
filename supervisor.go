@@ -2,8 +2,11 @@ package containerd
 
 import (
 	"os"
+	"os/signal"
 	"path/filepath"
 	goruntime "runtime"
+	"sync"
+	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
@@ -56,24 +59,58 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
-	stateDir    string
-	containers  map[string]runtime.Container
-	processes   map[int]runtime.Container
-	handlers    map[EventType]Handler
-	runtime     runtime.Runtime
-	journal     *journal
-	events      chan *Event
-	tasks       chan *StartTask
-	subscribers map[subscriber]bool
-	machine     Machine
+	stateDir       string
+	containers     map[string]runtime.Container
+	processes      map[int]runtime.Container
+	handlers       map[EventType]Handler
+	runtime        runtime.Runtime
+	journal        *journal
+	events         chan *Event
+	tasks          chan *StartTask
+	subscribers    map[subscriber]bool
+	machine        Machine
+	containerGroup sync.WaitGroup
 }
 
 type subscriber chan *Event
 
-// need proper close logic for jobs and stuff so that sending to the channels dont panic
-// but can complete jobs
+func (s *Supervisor) Stop(sig chan os.Signal) {
+	// Close the tasks channel so that no new containers get started
+	close(s.tasks)
+	// send a SIGTERM to all containers
+	for id, c := range s.containers {
+		logrus.WithField("id", id).Debug("sending TERM to container processes")
+		procs, err := c.Processes()
+		if err != nil {
+			logrus.WithField("id", id).Warn("get container processes")
+			continue
+		}
+		if len(procs) == 0 {
+			continue
+		}
+		mainProc := procs[0]
+		if err := mainProc.Signal(syscall.SIGTERM); err != nil {
+			pid, _ := mainProc.Pid()
+			logrus.WithFields(logrus.Fields{
+				"id":    id,
+				"pid":   pid,
+				"error": err,
+			}).Error("send SIGTERM to process")
+		}
+	}
+	go func() {
+		logrus.Debug("waiting for containers to exit")
+		s.containerGroup.Wait()
+		logrus.Debug("all containers exited")
+		// stop receiving signals and close the channel
+		signal.Stop(sig)
+		close(sig)
+	}()
+}
+
+// Close closes any open files in the supervisor but expects that Stop has been
+// callsed so that no more containers are started.
 func (s *Supervisor) Close() error {
-	//TODO: unsubscribe all channels
 	return s.journal.Close()
 }
 

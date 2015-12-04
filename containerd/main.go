@@ -86,8 +86,11 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 		w := containerd.NewWorker(supervisor, wg)
 		go w.Start()
 	}
-	if err := setSubReaper(); err != nil {
-		return err
+	// only set containerd as the subreaper if it is not an init process
+	if pid := os.Getpid(); pid != 1 {
+		if err := setSubReaper(); err != nil {
+			return err
+		}
 	}
 	// start the signal handler in the background.
 	go startSignalHandler(supervisor, bufferSize)

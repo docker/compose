@@ -15,6 +15,7 @@ func (h *DeleteEvent) Handle(e *Event) error {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
 		ContainersCounter.Dec(1)
+		h.s.containerGroup.Done()
 	}
 	return nil
 }

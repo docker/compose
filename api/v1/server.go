@@ -325,9 +325,13 @@ func (s *server) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 		name = vars["name"]
 	)
 	var cp Checkpoint
-	if err := json.NewDecoder(r.Body).Decode(&cp); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	// most options to the checkpoint action can be left out so don't
+	// decode unless the client passed anything in the body.
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&cp); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	e := containerd.NewEvent(containerd.CreateCheckpointEventType)
 	e.ID = id
