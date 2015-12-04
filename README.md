@@ -1,6 +1,8 @@
 # containerd
 
-another container runtime
+Another container runtime built for performance and density. 
+containerd has advanced features such as seccomp and user namespace support as well
+as checkpoint and restore for cloning and live migration of containers.
 
 #### Status 
 
@@ -10,6 +12,26 @@ What does alpha, beta, etc mean?
 * alpha - not feature complete
 * beta - feature complete but needs testing
 * prod ready - read for production
+
+
+# Performance
+
+Starting 1000 containers concurrently runs at 126-140 containers per second.
+
+Overall start times:
+
+```
+[containerd] 2015/12/04 15:00:54   count:        1000
+[containerd] 2015/12/04 14:59:54   min:          23ms
+[containerd] 2015/12/04 14:59:54   max:         355ms
+[containerd] 2015/12/04 14:59:54   mean:         78ms
+[containerd] 2015/12/04 14:59:54   stddev:       34ms
+[containerd] 2015/12/04 14:59:54   median:       73ms
+[containerd] 2015/12/04 14:59:54   75%:          91ms
+[containerd] 2015/12/04 14:59:54   95%:         123ms
+[containerd] 2015/12/04 14:59:54   99%:         287ms
+[containerd] 2015/12/04 14:59:54   99.9%:       355ms
+```
 
 
 # REST API v1

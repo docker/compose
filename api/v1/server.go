@@ -47,7 +47,6 @@ type server struct {
 	supervisor *containerd.Supervisor
 }
 
-// TODO: implement correct shutdown
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.r.ServeHTTP(w, r)
 }
