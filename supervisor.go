@@ -3,7 +3,6 @@ package containerd
 import (
 	"os"
 	"os/signal"
-	"path/filepath"
 	goruntime "runtime"
 	"sync"
 	"syscall"
@@ -23,10 +22,6 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 	if err != nil {
 		return nil, err
 	}
-	j, err := newJournal(filepath.Join(stateDir, "journal.json"))
-	if err != nil {
-		return nil, err
-	}
 	machine, err := CollectMachineInformation()
 	if err != nil {
 		return nil, err
@@ -36,7 +31,6 @@ func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) 
 		containers: make(map[string]runtime.Container),
 		processes:  make(map[int]runtime.Container),
 		runtime:    r,
-		journal:    j,
 		tasks:      tasks,
 		events:     make(chan *Event, 2048),
 		machine:    machine,
@@ -65,7 +59,6 @@ type Supervisor struct {
 	processes      map[int]runtime.Container
 	handlers       map[EventType]Handler
 	runtime        runtime.Runtime
-	journal        *journal
 	events         chan *Event
 	tasks          chan *StartTask
 	subscribers    map[subscriber]bool
@@ -112,7 +105,7 @@ func (s *Supervisor) Stop(sig chan os.Signal) {
 // Close closes any open files in the supervisor but expects that Stop has been
 // callsed so that no more containers are started.
 func (s *Supervisor) Close() error {
-	return s.journal.Close()
+	return nil
 }
 
 func (s *Supervisor) Events() subscriber {
@@ -140,7 +133,6 @@ func (s *Supervisor) Start() error {
 		goruntime.LockOSThread()
 		for e := range s.events {
 			EventsCounter.Inc(1)
-			s.journal.write(e)
 			h, ok := s.handlers[e.Type]
 			if !ok {
 				e.Err <- ErrUnknownEvent
