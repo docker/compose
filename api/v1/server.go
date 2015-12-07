@@ -198,6 +198,7 @@ func (s *server) writeState(w http.ResponseWriter, e *containerd.Event) error {
 	state := State{
 		Containers: []Container{},
 		Machine: Machine{
+			ID:     m.ID,
 			Cpus:   m.Cpus,
 			Memory: m.Memory,
 		},

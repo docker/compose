@@ -3,6 +3,7 @@ package containerd
 import (
 	"os"
 	"os/signal"
+	"path/filepath"
 	goruntime "runtime"
 	"sync"
 	"syscall"
@@ -13,16 +14,16 @@ import (
 )
 
 // NewSupervisor returns an initialized Process supervisor.
-func NewSupervisor(stateDir string, tasks chan *StartTask) (*Supervisor, error) {
+func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
 	// register counters
-	r, err := newRuntime(stateDir)
+	r, err := newRuntime(filepath.Join(stateDir, id))
 	if err != nil {
 		return nil, err
 	}
-	machine, err := CollectMachineInformation()
+	machine, err := CollectMachineInformation(id)
 	if err != nil {
 		return nil, err
 	}

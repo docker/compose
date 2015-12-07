@@ -15,8 +15,9 @@ const (
 )
 
 type Machine struct {
-	Cpus   int   `json:"cpus"`
-	Memory int64 `json:"memory"`
+	ID     string `json:"id"`
+	Cpus   int    `json:"cpus"`
+	Memory int64  `json:"memory"`
 }
 
 type ContainerState struct {

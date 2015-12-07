@@ -29,6 +29,11 @@ func main() {
 		},
 	}
 	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "id",
+			Value: getDefaultID(),
+			Usage: "unique containerd id to identify the instance",
+		},
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output in the logs",
@@ -42,6 +47,11 @@ func main() {
 			Name:  "buffer-size",
 			Value: 2048,
 			Usage: "set the channel buffer size for events and signals",
+		},
+		cli.IntFlag{
+			Name:  "c,concurrency",
+			Value: 10,
+			Usage: "set the concurrency level for tasks",
 		},
 	}
 	app.Before = func(context *cli.Context) error {
@@ -65,7 +75,12 @@ func main() {
 		return nil
 	}
 	app.Action = func(context *cli.Context) {
-		if err := daemon(context.String("state-dir"), 10, context.Int("buffer-size")); err != nil {
+		if err := daemon(
+			context.String("id"),
+			context.String("state-dir"),
+			context.Int("concurrency"),
+			context.Int("buffer-size"),
+		); err != nil {
 			logrus.Fatal(err)
 		}
 	}
@@ -74,9 +89,9 @@ func main() {
 	}
 }
 
-func daemon(stateDir string, concurrency, bufferSize int) error {
+func daemon(id, stateDir string, concurrency, bufferSize int) error {
 	tasks := make(chan *containerd.StartTask, concurrency*100)
-	supervisor, err := containerd.NewSupervisor(stateDir, tasks)
+	supervisor, err := containerd.NewSupervisor(id, stateDir, tasks)
 	if err != nil {
 		return err
 	}
@@ -99,4 +114,13 @@ func daemon(stateDir string, concurrency, bufferSize int) error {
 	}
 	server := v1.NewServer(supervisor)
 	return http.ListenAndServe("localhost:8888", server)
+}
+
+// getDefaultID returns the hostname for the instance host
+func getDefaultID() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+	return hostname
 }
