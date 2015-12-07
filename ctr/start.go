@@ -63,7 +63,7 @@ var StartCommand = cli.Command{
 			fatal("container id cannot be empty", 1)
 		}
 		c := v1.NewClient(context.GlobalString("addr"))
-		if err := c.Start(id, path); err != nil {
+		if err := c.Start(id, path, ""); err != nil {
 			fatal(err.Error(), 1)
 		}
 	},
@@ -89,7 +89,7 @@ var KillCommand = cli.Command{
 			fatal("container id cannot be empty", 1)
 		}
 		c := v1.NewClient(context.GlobalString("addr"))
-		if err := c.Signal(id, context.Int("pid"), context.Int("signal")); err != nil {
+		if err := c.SignalProcess(id, context.Int("pid"), context.Int("signal")); err != nil {
 			fatal(err.Error(), 1)
 		}
 	},

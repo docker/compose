@@ -4,6 +4,7 @@ package runc
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -84,6 +85,26 @@ func (c *runcContainer) Resume() error {
 
 func (c *runcContainer) Pause() error {
 	return c.newCommand("pause").Run()
+}
+
+// TODO: pass arguments
+func (c *runcContainer) Checkpoint(runtime.Checkpoint) error {
+	return c.newCommand("checkpoint").Run()
+}
+
+// TODO: pass arguments
+func (c *runcContainer) Restore(cp string) error {
+	return c.newCommand("restore").Run()
+}
+
+// TODO: pass arguments
+func (c *runcContainer) DeleteCheckpoint(cp string) error {
+	return errors.New("not implemented")
+}
+
+// TODO: implement in runc
+func (c *runcContainer) Checkpoints() ([]runtime.Checkpoint, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (c *runcContainer) newCommand(args ...string) *exec.Cmd {
