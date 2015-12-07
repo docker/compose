@@ -12,7 +12,6 @@ from docker.errors import APIError
 from requests.exceptions import ReadTimeout
 
 from .. import __version__
-from .. import legacy
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..const import DEFAULT_TIMEOUT
@@ -50,7 +49,7 @@ def main():
     except KeyboardInterrupt:
         log.error("\nAborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError, legacy.LegacyError) as e:
+    except (UserError, NoSuchService, ConfigurationError) as e:
         log.error(e.msg)
         sys.exit(1)
     except NoSuchCommand as e:
@@ -142,9 +141,7 @@ class TopLevelCommand(DocoptCommand):
       stop               Stop services
       unpause            Unpause services
       up                 Create and start containers
-      migrate-to-labels  Recreate containers to add labels
       version            Show the Docker-Compose version information
-
     """
     base_dir = '.'
 
@@ -533,32 +530,6 @@ class TopLevelCommand(DocoptCommand):
             log_printer = build_log_printer(to_attach, service_names, monochrome)
             attach_to_logs(project, log_printer, service_names, timeout)
 
-    def migrate_to_labels(self, project, _options):
-        """
-        Recreate containers to add labels
-
-        If you're coming from Compose 1.2 or earlier, you'll need to remove or
-        migrate your existing containers after upgrading Compose. This is
-        because, as of version 1.3, Compose uses Docker labels to keep track
-        of containers, and so they need to be recreated with labels added.
-
-        If Compose detects containers that were created without labels, it
-        will refuse to run so that you don't end up with two sets of them. If
-        you want to keep using your existing containers (for example, because
-        they have data volumes you want to preserve) you can migrate them with
-        the following command:
-
-            docker-compose migrate-to-labels
-
-        Alternatively, if you're not worried about keeping them, you can
-        remove them - Compose will just create new ones.
-
-            docker rm -f myapp_web_1 myapp_db_1 ...
-
-        Usage: migrate-to-labels
-        """
-        legacy.migrate_project_to_labels(project)
-
     def version(self, project, options):
         """
         Show version informations
@@ -601,18 +572,10 @@ def run_one_off_container(container_options, project, service, options):
     if project.use_networking:
         project.ensure_network_exists()
 
-    try:
-        container = service.create_container(
-            quiet=True,
-            one_off=True,
-            **container_options)
-    except APIError:
-        legacy.check_for_legacy_containers(
-            project.client,
-            project.name,
-            [service.name],
-            allow_one_off=False)
-        raise
+    container = service.create_container(
+        quiet=True,
+        one_off=True,
+        **container_options)
 
     if options['-d']:
         container.start()

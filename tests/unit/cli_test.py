@@ -74,12 +74,6 @@ class CLITestCase(unittest.TestCase):
 
         self.assertIn('Usage: up', str(ctx.exception))
 
-    def test_command_help_dashes(self):
-        with self.assertRaises(SystemExit) as ctx:
-            TopLevelCommand().dispatch(['help', 'migrate-to-labels'], None)
-
-        self.assertIn('Usage: migrate-to-labels', str(ctx.exception))
-
     def test_command_help_nonexistent(self):
         with self.assertRaises(NoSuchCommand):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)

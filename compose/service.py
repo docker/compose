@@ -26,7 +26,6 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
-from .legacy import check_for_legacy_containers
 from .parallel import parallel_execute
 from .parallel import parallel_remove
 from .parallel import parallel_start
@@ -122,20 +121,11 @@ class Service(object):
     def containers(self, stopped=False, one_off=False, filters={}):
         filters.update({'label': self.labels(one_off=one_off)})
 
-        containers = list(filter(None, [
+        return list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
                 filters=filters)]))
-
-        if not containers:
-            check_for_legacy_containers(
-                self.client,
-                self.project,
-                [self.name],
-            )
-
-        return containers
 
     def get_container(self, number=1):
         """Return a :class:`compose.container.Container` for this service. The

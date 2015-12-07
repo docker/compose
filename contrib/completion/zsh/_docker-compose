@@ -212,11 +212,6 @@ __docker-compose_subcommand() {
                 '--no-color[Produce monochrome output.]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
-        (migrate-to-labels)
-            _arguments -A '-*' \
-                $opts_help \
-                '(-):Recreate containers to add labels' && ret=0
-            ;;
         (pause)
             _arguments \
                 $opts_help \
