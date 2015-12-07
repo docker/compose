@@ -13,8 +13,17 @@ What does alpha, beta, etc mean?
 * beta - feature complete but needs testing
 * prod ready - read for production
 
+## Docs
 
-# Performance
+For more documentation on various subjects refer to the `/docs` directory in this repository.
+
+## Building
+
+To build the daemon you will need to cd into the `containerd` directory in the respository and type `make`.
+You will need to make sure that you have Go installed on your system and the containerd repository is cloned
+in your `$GOPATH`.  You will also need to make sure that you have all the depedencies cloned as well.
+
+## Performance
 
 Starting 1000 containers concurrently runs at 126-140 containers per second.
 
