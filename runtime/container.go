@@ -21,27 +21,27 @@ const (
 )
 
 type State struct {
-	Status Status `json:"status,omitempty"`
+	Status Status
 }
 
 type Stdio struct {
-	Stderr string `json:"stderr,omitempty"`
-	Stdout string `json:"stdout,omitempty"`
+	Stderr string
+	Stdout string
 }
 
 type Checkpoint struct {
 	// Timestamp is the time that checkpoint happened
-	Timestamp time.Time `json:"timestamp,omitempty"`
+	Timestamp time.Time
 	// Name is the name of the checkpoint
-	Name string `json:"name,omitempty"`
+	Name string
 	// Tcp checkpoints open tcp connections
-	Tcp bool `json:"tcp"`
+	Tcp bool
 	// UnixSockets persists unix sockets in the checkpoint
-	UnixSockets bool `json:"unixSockets"`
+	UnixSockets bool
 	// Shell persists tty sessions in the checkpoint
-	Shell bool `json:"shell"`
+	Shell bool
 	// Exit exits the container after the checkpoint is finished
-	Exit bool `json:"exit,omitempty"`
+	Exit bool
 }
 
 type Container interface {
@@ -67,12 +67,12 @@ type Container interface {
 	Resume() error
 	// Pause pauses a running container
 	Pause() error
-
+	// Checkpoints returns all the checkpoints for a container
 	Checkpoints() ([]Checkpoint, error)
-
+	// Checkpoint creates a new checkpoint
 	Checkpoint(Checkpoint) error
-
+	// DeleteCheckpoint deletes the checkpoint for the provided name
 	DeleteCheckpoint(name string) error
-
+	// Restore restores the container to that of the checkpoint provided by name
 	Restore(name string) error
 }

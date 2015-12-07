@@ -32,19 +32,19 @@ func NewEvent(t EventType) *Event {
 }
 
 type Event struct {
-	Type       EventType           `json:"type"`
-	Timestamp  time.Time           `json:"timestamp"`
-	ID         string              `json:"id,omitempty"`
-	BundlePath string              `json:"bundlePath,omitempty"`
-	Stdio      *runtime.Stdio      `json:"stdio,omitempty"`
-	Pid        int                 `json:"pid,omitempty"`
-	Status     int                 `json:"status,omitempty"`
-	Signal     os.Signal           `json:"signal,omitempty"`
-	Process    *specs.Process      `json:"process,omitempty"`
-	State      *runtime.State      `json:"state,omitempty"`
-	Containers []runtime.Container `json:"-"`
-	Checkpoint *runtime.Checkpoint `json:"checkpoint,omitempty"`
-	Err        chan error          `json:"-"`
+	Type       EventType
+	Timestamp  time.Time
+	ID         string
+	BundlePath string
+	Stdio      *runtime.Stdio
+	Pid        int
+	Status     int
+	Signal     os.Signal
+	Process    *specs.Process
+	State      *runtime.State
+	Containers []runtime.Container
+	Checkpoint *runtime.Checkpoint
+	Err        chan error
 }
 
 type Handler interface {
