@@ -9,23 +9,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/util"
 	"github.com/opencontainers/runc/libcontainer/utils"
 )
-
-// http://man7.org/linux/man-pages/man2/prctl.2.html
-//
-// If arg2 is nonzero, set the "child subreaper" attribute of the
-// calling process; if arg2 is zero, unset the attribute.  When a
-// process is marked as a child subreaper, all of the children
-// that it creates, and their descendants, will be marked as
-// having a subreaper.  In effect, a subreaper fulfills the role
-// of init(1) for its descendant processes.  Upon termination of
-// a process that is orphaned (i.e., its immediate parent has
-// already terminated) and marked as having a subreaper, the
-// nearest still living ancestor subreaper will receive a SIGCHLD
-// signal and be able to wait(2) on the process to discover its
-// termination status.
-const PR_SET_CHILD_SUBREAPER = 36
 
 func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 	logrus.Debug("containerd: starting signal handler")
@@ -73,8 +59,5 @@ func reap() (exits []*containerd.Event, err error) {
 }
 
 func setSubReaper() error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, PR_SET_CHILD_SUBREAPER, 1, 0); err != 0 {
-		return err
-	}
-	return nil
+	return util.SetSubreaper(1)
 }
