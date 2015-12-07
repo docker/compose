@@ -15,7 +15,8 @@ parent = "smn_compose_cli"
 Usage: ps [options] [SERVICE...]
 
 Options:
--q    Only display IDs
+-q          Only display IDs
+-a, --all   Display orphan containers
 ```
 
 Lists containers.

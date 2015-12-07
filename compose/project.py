@@ -216,13 +216,32 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
+    def clean(self, keep=False):
+        all_containers = (self.containers(orphan=True, stopped=True) +
+                          self.containers(orphan=True, one_off=True))
+        running_containers = [c for c in all_containers if c.is_running]
+        parallel_execute(
+            objects=running_containers,
+            obj_callable=lambda c: c.kill(),
+            msg_index=lambda c: c.name,
+            msg="Killing"
+        )
+        if not keep:
+            parallel_execute(
+                objects=all_containers,
+                obj_callable=lambda c: c.remove(),
+                msg_index=lambda c: c.name,
+                msg="Removing"
+            )
+
     def up(self,
            service_names=None,
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
            do_build=True,
            timeout=DEFAULT_TIMEOUT,
-           detached=False):
+           detached=False,
+           clean=False):
 
         services = self.get_services(service_names, include_deps=start_deps)
 
@@ -233,6 +252,9 @@ class Project(object):
 
         if self.use_networking and self.uses_default_network():
             self.ensure_network_exists()
+
+        if clean:
+            self.clean(keep=True)
 
         return [
             container
@@ -272,10 +294,16 @@ class Project(object):
         for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
-    def containers(self, service_names=None, stopped=False, one_off=False):
-        if service_names:
+    def containers(self,
+                   service_names=None,
+                   stopped=False,
+                   one_off=False,
+                   orphan=False):
+
+        if service_names and not orphan:
             self.validate_service_names(service_names)
         else:
+            orphan_name = service_names
             service_names = self.service_names
 
         containers = list(filter(None, [
@@ -285,7 +313,11 @@ class Project(object):
                 filters={'label': self.labels(one_off=one_off)})]))
 
         def matches_service_names(container):
-            return container.labels.get(LABEL_SERVICE) in service_names
+            label = container.labels.get(LABEL_SERVICE)
+            if orphan:
+                return (label not in service_names and
+                        (not orphan_name or label in orphan_name))
+            return label in service_names
 
         if not containers:
             check_for_legacy_containers(
