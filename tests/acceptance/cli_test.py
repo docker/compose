@@ -43,7 +43,7 @@ def wait_on_process(proc, returncode=0):
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
-def wait_on_condition(condition, delay=0.1, timeout=5):
+def wait_on_condition(condition, delay=0.1, timeout=20):
     start_time = time.time()
     while not condition():
         if time.time() - start_time > timeout:
