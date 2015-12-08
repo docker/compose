@@ -29,6 +29,16 @@ type Stdio struct {
 	Stdout string
 }
 
+type Stat struct {
+	// Timestamp is the time that the statistics where collected
+	Timestamp time.Time
+	// Data is the raw stats
+	// TODO: it is currently an interface because we don't know what type of exec drivers
+	// we will have or what the structure should look like at the moment os the containers
+	// can return what they want and we could marshal to json or whatever.
+	Data interface{}
+}
+
 type Checkpoint struct {
 	// Timestamp is the time that checkpoint happened
 	Timestamp time.Time
@@ -75,4 +85,6 @@ type Container interface {
 	DeleteCheckpoint(name string) error
 	// Restore restores the container to that of the checkpoint provided by name
 	Restore(name string) error
+	// Stats returns realtime container stats and resource information
+	Stats() (*Stat, error)
 }

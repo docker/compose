@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
@@ -302,6 +303,18 @@ func (c *libcontainerContainer) SetExited(status int) {
 	c.exitStatus = status
 	// meh
 	c.exited = true
+}
+
+func (c *libcontainerContainer) Stats() (*runtime.Stat, error) {
+	now := time.Now()
+	stats, err := c.c.Stats()
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.Stat{
+		Timestamp: now,
+		Data:      stats,
+	}, nil
 }
 
 func (c *libcontainerContainer) Delete() error {
