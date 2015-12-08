@@ -46,7 +46,7 @@ def friendly_error_message():
 def project_from_options(base_dir, options):
     return get_project(
         base_dir,
-        get_config_path(options.get('--file')),
+        get_config_path_from_options(options),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         use_networking=options.get('--x-networking'),
@@ -54,7 +54,8 @@ def project_from_options(base_dir, options):
     )
 
 
-def get_config_path(file_option):
+def get_config_path_from_options(options):
+    file_option = options.get('--file')
     if file_option:
         return file_option
 

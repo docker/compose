@@ -8,10 +8,12 @@ import sys
 from inspect import getdoc
 from operator import attrgetter
 
+import yaml
 from docker.errors import APIError
 from requests.exceptions import ReadTimeout
 
 from .. import __version__
+from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..const import DEFAULT_TIMEOUT
@@ -23,6 +25,7 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import NeedsBuildError
 from .command import friendly_error_message
+from .command import get_config_path_from_options
 from .command import project_from_options
 from .docopt_command import DocoptCommand
 from .docopt_command import NoSuchCommand
@@ -126,6 +129,7 @@ class TopLevelCommand(DocoptCommand):
 
     Commands:
       build              Build or rebuild services
+      config             Validate and view the compose file
       help               Get help on a command
       kill               Kill containers
       logs               View output from containers
@@ -158,6 +162,10 @@ class TopLevelCommand(DocoptCommand):
             handler(None, command_options)
             return
 
+        if options['COMMAND'] == 'config':
+            handler(options, command_options)
+            return
+
         project = project_from_options(self.base_dir, options)
         with friendly_error_message():
             handler(project, command_options)
@@ -182,6 +190,36 @@ class TopLevelCommand(DocoptCommand):
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)))
+
+    def config(self, config_options, options):
+        """
+        Validate and view the compose file.
+
+        Usage: config [options]
+
+        Options:
+            -q, --quiet     Only validate the configuration, don't print
+                            anything.
+            --services      Print the service names, one per line.
+
+        """
+        config_path = get_config_path_from_options(config_options)
+        compose_config = config.load(config.find(self.base_dir, config_path))
+
+        if options['--quiet']:
+            return
+
+        if options['--services']:
+            print('\n'.join(service['name'] for service in compose_config))
+            return
+
+        compose_config = dict(
+            (service.pop('name'), service) for service in compose_config)
+        print(yaml.dump(
+            compose_config,
+            default_flow_style=False,
+            indent=2,
+            width=80))
 
     def help(self, project, options):
         """
