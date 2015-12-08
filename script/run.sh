@@ -43,5 +43,11 @@ if [ -n "$HOME" ]; then
     VOLUMES="$VOLUMES -v $HOME:$HOME"
 fi
 
+# Only allocate tty if we detect one
+if [ -t 1 ]; then
+    DOCKER_RUN_OPTIONS="-ti"
+else
+    DOCKER_RUN_OPTIONS="-i"
+fi
 
-exec docker run --rm -ti $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w $(pwd) $IMAGE $@
+exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w $(pwd) $IMAGE $@
