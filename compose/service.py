@@ -141,34 +141,6 @@ class Service(object):
         for c in self.containers(stopped=True):
             self.start_container_if_stopped(c, **options)
 
-    # TODO: remove these functions, project takes care of starting/stopping,
-    def stop(self, **options):
-        for c in self.containers():
-            log.info("Stopping %s" % c.name)
-            c.stop(**options)
-
-    def pause(self, **options):
-        for c in self.containers(filters={'status': 'running'}):
-            log.info("Pausing %s" % c.name)
-            c.pause(**options)
-
-    def unpause(self, **options):
-        for c in self.containers(filters={'status': 'paused'}):
-            log.info("Unpausing %s" % c.name)
-            c.unpause()
-
-    def kill(self, **options):
-        for c in self.containers():
-            log.info("Killing %s" % c.name)
-            c.kill(**options)
-
-    def restart(self, **options):
-        for c in self.containers(stopped=True):
-            log.info("Restarting %s" % c.name)
-            c.restart(**options)
-
-    # end TODO
-
     def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
         """
         Adjusts the number of containers to the specified number and ensures

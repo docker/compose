@@ -73,42 +73,6 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(service)
         self.assertEqual(service.containers()[0].name, 'composetest_web_1')
 
-    def test_start_stop(self):
-        service = self.create_service('scalingtest')
-        self.assertEqual(len(service.containers(stopped=True)), 0)
-
-        service.create_container()
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
-
-        service.start()
-        self.assertEqual(len(service.containers()), 1)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
-
-        service.stop(timeout=1)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
-
-        service.stop(timeout=1)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
-
-    def test_kill_remove(self):
-        service = self.create_service('scalingtest')
-
-        create_and_start_container(service)
-        self.assertEqual(len(service.containers()), 1)
-
-        remove_stopped(service)
-        self.assertEqual(len(service.containers()), 1)
-
-        service.kill()
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
-
-        remove_stopped(service)
-        self.assertEqual(len(service.containers(stopped=True)), 0)
-
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
