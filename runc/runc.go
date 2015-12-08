@@ -37,6 +37,10 @@ func (c *runcContainer) Start() error {
 	return c.initProcess.cmd.Start()
 }
 
+func (c *runcContainer) Stats() (*runtime.Stat, error) {
+	return nil, errors.New("containerd: runc does not support stats in containerd")
+}
+
 func (c *runcContainer) Path() string {
 	return c.path
 }
