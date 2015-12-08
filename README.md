@@ -19,9 +19,10 @@ For more documentation on various subjects refer to the `/docs` directory in thi
 
 ## Building
 
-To build the daemon you will need to cd into the `containerd` directory in the respository and type `make`.
 You will need to make sure that you have Go installed on your system and the containerd repository is cloned
-in your `$GOPATH`.  You will also need to make sure that you have all the depedencies cloned as well.
+in your `$GOPATH`.  You will also need to make sure that you have all the dependencies cloned as well.
+
+After that just run `make` and the binaries for the daemon and client will be localed in the `bin/` directory.
 
 ## Performance
 
