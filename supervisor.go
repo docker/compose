@@ -149,6 +149,10 @@ func (s *Supervisor) Start() error {
 			close(e.Err)
 		}
 	}()
+	logrus.WithFields(logrus.Fields{
+		"runtime":  s.runtime.Type(),
+		"stateDir": s.stateDir,
+	}).Debug("Supervisor started")
 	return nil
 }
 

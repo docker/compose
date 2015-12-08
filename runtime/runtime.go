@@ -17,4 +17,5 @@ var (
 type Runtime interface {
 	Create(id, bundlePath string, stdio *Stdio) (Container, error)
 	StartProcess(Container, specs.Process, *Stdio) (Process, error)
+	Type() string
 }

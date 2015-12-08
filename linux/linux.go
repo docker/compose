@@ -343,6 +343,10 @@ type libcontainerRuntime struct {
 	factory libcontainer.Factory
 }
 
+func (r *libcontainerRuntime) Type() string {
+	return "libcontainer"
+}
+
 func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runtime.Container, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
