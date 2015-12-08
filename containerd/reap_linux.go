@@ -14,7 +14,9 @@ import (
 )
 
 func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
-	logrus.Debug("containerd: starting signal handler")
+	logrus.WithFields(logrus.Fields{
+		"bufferSize": bufferSize,
+	}).Debug("containerd: starting signal handler")
 	signals := make(chan os.Signal, bufferSize)
 	signal.Notify(signals)
 	for s := range signals {

@@ -139,6 +139,10 @@ type runcRuntime struct {
 	stateDir string
 }
 
+func (r *runcRuntime) Type() string {
+	return "runc"
+}
+
 func (r *runcRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runtime.Container, error) {
 	cmd := exec.Command("runc", "--root", r.stateDir, "--id", id, "start")
 	cmd.Dir = bundlePath

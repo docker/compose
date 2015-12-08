@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -356,6 +357,10 @@ type libcontainerRuntime struct {
 	factory libcontainer.Factory
 }
 
+func (r *libcontainerRuntime) Type() string {
+	return "libcontainer"
+}
+
 func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runtime.Container, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
@@ -364,13 +369,17 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio
 	if err != nil {
 		return nil, err
 	}
+	logrus.WithFields(logrus.Fields{
+		"id":         id,
+		"bundlePath": bundlePath,
+	}).Debugf("create container")
 	config, err := r.createLibcontainerConfig(id, bundlePath, spec, rspec)
 	if err != nil {
 		return nil, err
 	}
 	container, err := r.factory.Create(id, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create container: %v", err)
 	}
 	process, err := r.newProcess(spec.Process, stdio)
 	if err != nil {
@@ -422,14 +431,14 @@ func (r *libcontainerRuntime) newProcess(p specs.Process, stdio *runtime.Stdio) 
 		if stdio.Stdout != "" {
 			f, err := os.OpenFile(stdio.Stdout, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("open stdout: %v", err)
 			}
 			stdout = f
 		}
 		if stdio.Stderr != "" {
 			f, err := os.OpenFile(stdio.Stderr, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("open stderr: %v", err)
 			}
 			stderr = f
 		}
@@ -467,10 +476,10 @@ func (r *libcontainerRuntime) loadSpec(cPath, rPath string) (spec *specs.LinuxSp
 	defer rf.Close()
 
 	if err = json.NewDecoder(cf).Decode(&spec); err != nil {
-		return spec, rspec, err
+		return spec, rspec, fmt.Errorf("unmarshal %s: %v", cPath, err)
 	}
 	if err = json.NewDecoder(rf).Decode(&rspec); err != nil {
-		return spec, rspec, err
+		return spec, rspec, fmt.Errorf("unmarshal %s: %v", rPath, err)
 	}
 	return spec, rspec, r.checkSpecVersion(spec)
 }

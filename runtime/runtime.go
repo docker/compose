@@ -20,4 +20,5 @@ type Runtime interface {
 	Create(id, bundlePath string, stdio *Stdio) (Container, error)
 	// StartProcess adds a new process to the container
 	StartProcess(Container, specs.Process, *Stdio) (Process, error)
+	Type() string
 }
