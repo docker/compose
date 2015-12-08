@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
 )
 
@@ -33,6 +34,11 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
+		logrus.WithFields(logrus.Fields{
+			"containerID": t.Container.ID(),
+			"checkpoint":  t.Checkpoint,
+			"started":     started,
+		}).Debug("worker received task")
 		if t.Checkpoint != "" {
 			if err := t.Container.Restore(t.Checkpoint); err != nil {
 				evt := NewEvent(DeleteEventType)
