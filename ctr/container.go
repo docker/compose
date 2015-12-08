@@ -29,7 +29,7 @@ var ListCommand = cli.Command{
 
 func listContainers(context *cli.Context) {
 	c := v1.NewClient(context.GlobalString("addr"))
-	containers, err := c.Containers()
+	containers, err := c.State()
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
@@ -52,6 +52,11 @@ var StartCommand = cli.Command{
 			Value: "",
 			Usage: "id of the container",
 		},
+		cli.StringFlag{
+			Name:  "checkpoint,c",
+			Value: "",
+			Usage: "checkpoint to start the container from",
+		},
 	},
 	Action: func(context *cli.Context) {
 		path := context.Args().First()
@@ -63,7 +68,10 @@ var StartCommand = cli.Command{
 			fatal("container id cannot be empty", 1)
 		}
 		c := v1.NewClient(context.GlobalString("addr"))
-		if err := c.Start(id, path, ""); err != nil {
+		if err := c.Start(id, v1.StartOpts{
+			Path:       path,
+			Checkpoint: context.String("checkpoint"),
+		}); err != nil {
 			fatal(err.Error(), 1)
 		}
 	},
