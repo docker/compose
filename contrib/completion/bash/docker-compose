@@ -102,6 +102,11 @@ _docker_compose_build() {
 }
 
 
+_docker_compose_config() {
+	COMPREPLY=( $( compgen -W "--help --quiet -q --services" -- "$cur" ) )
+}
+
+
 _docker_compose_docker_compose() {
 	case "$prev" in
 		--file|-f)
@@ -373,6 +378,7 @@ _docker_compose() {
 
 	local commands=(
 		build
+		config
 		help
 		kill
 		logs
