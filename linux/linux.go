@@ -199,6 +199,9 @@ func (c *libcontainerContainer) Checkpoints() ([]runtime.Checkpoint, error) {
 	out := []runtime.Checkpoint{}
 	files, err := ioutil.ReadDir(c.getCheckpointPath(""))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return out, nil
+		}
 		return nil, err
 	}
 	for _, fi := range files {
