@@ -18,7 +18,7 @@ get_versions="docker run --rm
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="$($get_versions default)"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
-  DOCKER_VERSIONS="$($get_versions recent -n 2)"
+  DOCKER_VERSIONS="$($get_versions recent -n 1)"
 fi
 
 
