@@ -197,6 +197,12 @@ __docker-compose_subcommand() {
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
+        (config)
+            _arguments \
+                $opts_help \
+                '(--quiet -q)'{--quiet,-q}"[Only validate the configuration, don't print anything.]" \
+                '--services[Print the service names, one per line.]' && ret=0
+            ;;
         (help)
             _arguments ':subcommand:__docker-compose_commands' && ret=0
             ;;
