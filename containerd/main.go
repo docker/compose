@@ -3,21 +3,18 @@ package main
 import (
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"runtime"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
-	"github.com/docker/containerd/api/v1"
 	"github.com/docker/containerd/util"
 	"github.com/rcrowley/go-metrics"
 )
@@ -150,18 +147,13 @@ func daemon(id, stateDir string, concurrency, bufferSize int) error {
 	if err := supervisor.Start(); err != nil {
 		return err
 	}
-	if os.Getenv("GRPC") != "" {
-		lis, err := net.Listen("tcp", ":8888")
-		if err != nil {
-			grpclog.Fatalf("failed to listen: %v", err)
-		}
-		grpcServer := grpc.NewServer()
-		types.RegisterAPIServer(grpcServer, server.NewServer(supervisor))
-		return grpcServer.Serve(lis)
-
+	l, err := net.Listen("tcp", ":8888")
+	if err != nil {
+		return err
 	}
-	server := v1.NewServer(supervisor)
-	return http.ListenAndServe("localhost:8888", server)
+	s := grpc.NewServer()
+	types.RegisterAPIServer(s, server.NewServer(supervisor))
+	return s.Serve(l)
 }
 
 // getDefaultID returns the hostname for the instance host
