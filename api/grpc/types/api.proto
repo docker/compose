@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package types;
+
+service API {
+	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
+	rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse) {}
+	rpc Signal(SignalRequest) returns (SignalResponse) {}
+	rpc AddProcess(AddProcessRequest) returns (AddProcessResponse) {}
+	rpc CreateCheckpoint(CreateCheckpointRequest) returns (CreateCheckpointResponse) {}
+	rpc DeleteCheckpoint(DeleteCheckpointRequest) returns (DeleteCheckpointResponse) {}
+	rpc ListCheckpoint(ListCheckpointRequest) returns (ListCheckpointResponse) {}
+	rpc State(StateRequest) returns (StateResponse) {}
+	rpc Events(EventsRequest) returns (stream Event) {}
+}
+
+message CreateContainerRequest {
+	string id = 1;
+	string bundlePath = 2;
+	string stdout = 4;
+	string stderr = 5;
+	string checkpoint = 7;
+}
+
+message CreateContainerResponse {
+}
+
+message SignalRequest {
+	string id = 1;
+	uint32 pid = 2;
+	uint32 signal = 3;
+}
+
+message SignalResponse {
+}
+
+message AddProcessRequest {
+	string id = 1;
+	bool terminal = 2;
+	User user = 3;
+	repeated string args = 4;
+	repeated string env = 5;
+	string cwd = 6;
+};
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additionalGids = 3;
+}
+
+message AddProcessResponse {
+	uint32 pid = 1;
+}
+
+message CreateCheckpointRequest {
+	string id = 1;
+	Checkpoint checkpoint = 2;
+}
+
+message CreateCheckpointResponse {
+}
+
+message DeleteCheckpointRequest {
+	string id = 1;
+	string name = 2;
+}
+
+message DeleteCheckpointResponse {
+}
+
+message ListCheckpointRequest {
+	string id = 1;
+}
+
+message Checkpoint {
+	string name = 1;
+	bool exit = 2;
+	bool tcp = 3;
+	bool unixSockets = 4;
+	bool shell = 5;
+}
+
+message ListCheckpointResponse {
+	repeated Checkpoint checkpoints = 1;
+}
+
+message StateRequest {
+}
+
+message ContainerState {
+	string status = 1;
+}
+
+message Process {
+	uint32 pid = 1;
+	bool terminal = 2;
+	User user = 3;
+	repeated string args = 4;
+	repeated string env = 5;
+	string cwd = 6;
+}
+
+message Container {
+	string id = 1;
+	string name = 2;
+	string bundlePath = 3;
+	repeated Process processes = 4;
+	string status = 5;
+}
+
+message Machine {
+	string id = 1;
+	uint32 cpus = 2;
+	uint64 memory = 3;
+}
+
+message StateResponse {
+	repeated Container containers = 1;
+	Machine machine = 2;
+}
+
+message UpdateContainerRequest {
+	string id = 1;
+	uint32 signal = 2;
+	string status = 3;
+}
+
+message UpdateContainerResponse {
+}
+
+message EventsRequest {
+}
+
+message Event {
+	string type = 1;
+	string id = 2;
+	uint32 status = 3;
+	string bundlePath = 4;
+	uint32 pid = 5;
+	uint32 signal = 7;
+	Process process = 8;
+	repeated Container containers = 9;
+	Checkpoint checkpoint = 10;
+}
