@@ -52,6 +52,11 @@ def wait_on_condition(condition, delay=0.1, timeout=20):
         time.sleep(delay)
 
 
+def kill_service(service):
+    for container in service.containers():
+        container.kill()
+
+
 class ContainerCountCondition(object):
 
     def __init__(self, project, expected):
@@ -637,13 +642,13 @@ class CLITestCase(DockerClientTestCase):
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
-        service.kill()
+        kill_service(service)
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
         service = self.project.get_service('simple')
         service.create_container()
-        service.kill()
+        kill_service(service)
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
