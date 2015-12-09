@@ -513,6 +513,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_volumes(self):
         vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
             2, [{
                 'name': 'web',
@@ -528,12 +529,13 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         self.assertEqual(len(project.containers()), 1)
 
-        volume_data = self.client.inspect_volume(vol_name)
-        self.assertEqual(volume_data['Name'], vol_name)
+        volume_data = self.client.inspect_volume(full_vol_name)
+        self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
     def test_initialize_volumes(self):
         vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
             2, [{
                 'name': 'web',
@@ -548,12 +550,13 @@ class ProjectTest(DockerClientTestCase):
         )
         project.initialize_volumes()
 
-        volume_data = self.client.inspect_volume(vol_name)
-        self.assertEqual(volume_data['Name'], vol_name)
+        volume_data = self.client.inspect_volume(full_vol_name)
+        self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
     def test_project_up_implicit_volume_driver(self):
         vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
             2, [{
                 'name': 'web',
@@ -568,12 +571,13 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up()
 
-        volume_data = self.client.inspect_volume(vol_name)
-        self.assertEqual(volume_data['Name'], vol_name)
+        volume_data = self.client.inspect_volume(full_vol_name)
+        self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
     def test_project_up_invalid_volume_driver(self):
         vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+
         config_data = config.Config(
             2, [{
                 'name': 'web',

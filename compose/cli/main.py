@@ -211,11 +211,11 @@ class TopLevelCommand(DocoptCommand):
             return
 
         if options['--services']:
-            print('\n'.join(service['name'] for service in compose_config))
+            print('\n'.join(service['name'] for service in compose_config.services))
             return
 
         compose_config = dict(
-            (service.pop('name'), service) for service in compose_config)
+            (service.pop('name'), service) for service in compose_config.services)
         print(yaml.dump(
             compose_config,
             default_flow_style=False,

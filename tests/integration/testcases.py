@@ -41,7 +41,7 @@ class DockerClientTestCase(unittest.TestCase):
             self.client.remove_image(i)
         volumes = self.client.volumes().get('Volumes') or []
         for v in volumes:
-            if 'composetests_' in v['Name']:
+            if 'composetest_' in v['Name']:
                 self.client.remove_volume(v['Name'])
 
     def create_service(self, name, **kwargs):
