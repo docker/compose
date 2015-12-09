@@ -45,9 +45,9 @@ func listContainers(context *cli.Context) {
 		fatal(err.Error(), 1)
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
-	fmt.Fprint(w, "ID\tPATH\tSTATUS\n")
+	fmt.Fprint(w, "ID\tPATH\tSTATUS\tPID1\n")
 	for _, c := range resp.Containers {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", c.Id, c.BundlePath, c.Status)
+		fmt.Fprintf(w, "%s\t%s\t%s\n", c.Id, c.BundlePath, c.Status, c.Processes[0].Pid)
 	}
 	if err := w.Flush(); err != nil {
 		logrus.Fatal(err)

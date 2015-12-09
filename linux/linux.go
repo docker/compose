@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -372,10 +371,6 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio
 	if err != nil {
 		return nil, err
 	}
-	logrus.WithFields(logrus.Fields{
-		"id":         id,
-		"bundlePath": bundlePath,
-	}).Debugf("create container")
 	config, err := r.createLibcontainerConfig(id, bundlePath, spec, rspec)
 	if err != nil {
 		return nil, err

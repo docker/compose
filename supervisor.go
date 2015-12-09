@@ -133,12 +133,6 @@ func (s *Supervisor) Start() error {
 		// so that nothing else is scheduled over the top of it.
 		goruntime.LockOSThread()
 		for e := range s.events {
-			logrus.WithFields(logrus.Fields{
-				"type":       e.Type,
-				"timestamp":  e.Timestamp,
-				"id":         e.ID,
-				"bundlePath": e.BundlePath,
-			}).Debug("event received")
 			EventsCounter.Inc(1)
 			h, ok := s.handlers[e.Type]
 			if !ok {
