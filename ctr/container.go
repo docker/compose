@@ -7,8 +7,19 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/docker/containerd/api/v1"
+	"github.com/docker/containerd/api/grpc/types"
+	netcontext "golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
+
+// TODO: parse flags and pass opts
+func getClient() types.APIClient {
+	conn, err := grpc.Dial("localhost:8888", grpc.WithInsecure())
+	if err != nil {
+		fatal(err.Error(), 1)
+	}
+	return types.NewAPIClient(conn)
+}
 
 var ContainersCommand = cli.Command{
 	Name:  "containers",
@@ -28,15 +39,15 @@ var ListCommand = cli.Command{
 }
 
 func listContainers(context *cli.Context) {
-	c := v1.NewClient(context.GlobalString("addr"))
-	containers, err := c.State()
+	cli := getClient()
+	resp, err := cli.State(netcontext.Background(), &types.StateRequest{})
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprint(w, "ID\tPATH\tSTATUS\n")
-	for _, c := range containers {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", c.ID, c.BundlePath, c.State.Status)
+	for _, c := range resp.Containers {
+		fmt.Fprintf(w, "%s\t%s\t%s\n", c.Id, c.BundlePath, c.Status)
 	}
 	if err := w.Flush(); err != nil {
 		logrus.Fatal(err)
@@ -67,9 +78,10 @@ var StartCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
-		c := v1.NewClient(context.GlobalString("addr"))
-		if err := c.Start(id, v1.StartOpts{
-			Path:       path,
+		c := getClient()
+		if _, err := c.CreateContainer(netcontext.Background(), &types.CreateContainerRequest{
+			Id:         id,
+			BundlePath: path,
 			Checkpoint: context.String("checkpoint"),
 		}); err != nil {
 			fatal(err.Error(), 1)
@@ -96,8 +108,12 @@ var KillCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
-		c := v1.NewClient(context.GlobalString("addr"))
-		if err := c.SignalProcess(id, context.Int("pid"), context.Int("signal")); err != nil {
+		c := getClient()
+		if _, err := c.Signal(netcontext.Background(), &types.SignalRequest{
+			Id:     id,
+			Pid:    uint32(context.Int("pid")),
+			Signal: uint32(context.Int("signal")),
+		}); err != nil {
 			fatal(err.Error(), 1)
 		}
 	},
