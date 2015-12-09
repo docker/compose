@@ -12,65 +12,62 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/v1"
+	"github.com/docker/containerd/util"
 	"github.com/rcrowley/go-metrics"
 )
 
 const Usage = `High performance conatiner daemon`
+
+var authors = []cli.Author{
+	{
+		Name:  "@crosbymichael",
+		Email: "crosbymichael@gmail.com",
+	},
+}
+
+var daemonFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "id",
+		Value: getDefaultID(),
+		Usage: "unique containerd id to identify the instance",
+	},
+	cli.BoolFlag{
+		Name:  "debug",
+		Usage: "enable debug output in the logs",
+	},
+	cli.StringFlag{
+		Name:  "state-dir",
+		Value: "/run/containerd",
+		Usage: "runtime state directory",
+	},
+	cli.IntFlag{
+		Name:  "buffer-size",
+		Value: 2048,
+		Usage: "set the channel buffer size for events and signals",
+	},
+	cli.IntFlag{
+		Name:  "c,concurrency",
+		Value: 10,
+		Usage: "set the concurrency level for tasks",
+	},
+	cli.DurationFlag{
+		Name:  "metrics-interval",
+		Value: 60 * time.Second,
+		Usage: "interval for flushing metrics to the store",
+	},
+}
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "containerd"
 	app.Version = containerd.Version
 	app.Usage = Usage
-	app.Authors = []cli.Author{
-		{
-			Name:  "@crosbymichael",
-			Email: "crosbymichael@gmail.com",
-		},
-	}
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "id",
-			Value: getDefaultID(),
-			Usage: "unique containerd id to identify the instance",
-		},
-		cli.BoolFlag{
-			Name:  "debug",
-			Usage: "enable debug output in the logs",
-		},
-		cli.StringFlag{
-			Name:  "state-dir",
-			Value: "/run/containerd",
-			Usage: "runtime state directory",
-		},
-		cli.IntFlag{
-			Name:  "buffer-size",
-			Value: 2048,
-			Usage: "set the channel buffer size for events and signals",
-		},
-		cli.IntFlag{
-			Name:  "c,concurrency",
-			Value: 10,
-			Usage: "set the concurrency level for tasks",
-		},
-	}
+	app.Authors = authors
+	app.Flags = daemonFlags
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
-			l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
-			goRoutineCounter := metrics.NewGauge()
-			metrics.DefaultRegistry.Register("goroutines", goRoutineCounter)
-			for name, m := range containerd.Metrics() {
-				if err := metrics.DefaultRegistry.Register(name, m); err != nil {
-					return err
-				}
-			}
-			go func() {
-				for range time.Tick(30 * time.Second) {
-					goRoutineCounter.Update(int64(runtime.NumGoroutine()))
-				}
-			}()
-			go metrics.Log(metrics.DefaultRegistry, 60*time.Second, l)
+			return debugMetrics(context.GlobalDuration("metrics-interval"))
 		}
 		return nil
 	}
@@ -87,6 +84,38 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+func debugMetrics(interval time.Duration) error {
+	for name, m := range containerd.Metrics() {
+		if err := metrics.DefaultRegistry.Register(name, m); err != nil {
+			return err
+		}
+	}
+	processMetrics()
+	l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
+	go metrics.Log(metrics.DefaultRegistry, interval, l)
+	return nil
+}
+
+func processMetrics() {
+	var (
+		g  = metrics.NewGauge()
+		fg = metrics.NewGauge()
+	)
+	metrics.DefaultRegistry.Register("goroutines", g)
+	metrics.DefaultRegistry.Register("fds", fg)
+	go func() {
+		for range time.Tick(30 * time.Second) {
+			g.Update(int64(runtime.NumGoroutine()))
+			fds, err := util.GetOpenFds(os.Getpid())
+			if err != nil {
+				logrus.WithField("error", err).Error("get open fd count")
+				continue
+			}
+			fg.Update(int64(fds))
+		}
+	}()
 }
 
 func daemon(id, stateDir string, concurrency, bufferSize int) error {
