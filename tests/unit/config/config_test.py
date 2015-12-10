@@ -702,7 +702,7 @@ class ConfigTest(unittest.TestCase):
                 'dns_search': 'domain.local',
             }
         }))
-        assert actual == [
+        assert actual.services == [
             {
                 'name': 'web',
                 'image': 'alpine',

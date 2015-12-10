@@ -234,7 +234,7 @@ class Project(object):
                 volume.create()
         except NotFound:
             raise ConfigurationError(
-                'Volume %s sepcifies nonexistent driver %s' % (volume.name, volume.driver)
+                'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
             )
 
     def restart(self, service_names=None, **options):

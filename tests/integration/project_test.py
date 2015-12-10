@@ -512,14 +512,14 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
 
     def test_project_up_volumes(self):
-        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
-            2, [{
+            version=2, services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], {vol_name: {'driver': 'local'}}
+            }], volumes={vol_name: {'driver': 'local'}}
         )
 
         project = Project.from_config(
@@ -534,14 +534,14 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Driver'], 'local')
 
     def test_initialize_volumes(self):
-        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
-            2, [{
+            version=2, services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], {vol_name: {}}
+            }], volumes={vol_name: {}}
         )
 
         project = Project.from_config(
@@ -555,14 +555,14 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Driver'], 'local')
 
     def test_project_up_implicit_volume_driver(self):
-        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
-            2, [{
+            version=2, services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], {vol_name: {}}
+            }], volumes={vol_name: {}}
         )
 
         project = Project.from_config(
@@ -576,7 +576,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Driver'], 'local')
 
     def test_project_up_invalid_volume_driver(self):
-        vol_name = 'composetests_{0:x}'.format(random.getrandbits(32))
+        vol_name = '{0:x}'.format(random.getrandbits(32))
 
         config_data = config.Config(
             2, [{

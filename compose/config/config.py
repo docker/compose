@@ -315,7 +315,7 @@ def load_services(working_dir, config_files, version):
     return build_services(config_file)
 
 
-def process_config_file(config_file, service_name=None, version=None):
+def process_config_file(config_file, version, service_name=None):
     validate_top_level_service_objects(config_file, version)
     processed_config = interpolate_environment_variables(config_file.config, version)
     validate_against_fields_schema(
@@ -364,7 +364,7 @@ class ServiceExtendsResolver(object):
 
         extended_file = process_config_file(
             ConfigFile.from_filename(config_path),
-            service_name=service_name, version=self.version
+            version=self.version, service_name=service_name
         )
         service_config = extended_file.config[service_name]
         return config_path, service_config, service_name
