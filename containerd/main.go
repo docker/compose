@@ -44,11 +44,6 @@ var daemonFlags = []cli.Flag{
 		Usage: "runtime state directory",
 	},
 	cli.IntFlag{
-		Name:  "buffer-size",
-		Value: 2048,
-		Usage: "set the channel buffer size for events and signals",
-	},
-	cli.IntFlag{
 		Name:  "c,concurrency",
 		Value: 10,
 		Usage: "set the concurrency level for tasks",
@@ -79,7 +74,6 @@ func main() {
 			context.String("id"),
 			context.String("state-dir"),
 			context.Int("concurrency"),
-			context.Int("buffer-size"),
 		); err != nil {
 			logrus.Fatal(err)
 		}
@@ -121,7 +115,7 @@ func processMetrics() {
 	}()
 }
 
-func daemon(id, stateDir string, concurrency, bufferSize int) error {
+func daemon(id, stateDir string, concurrency int) error {
 	tasks := make(chan *containerd.StartTask, concurrency*100)
 	supervisor, err := containerd.NewSupervisor(id, stateDir, tasks)
 	if err != nil {
@@ -143,7 +137,7 @@ func daemon(id, stateDir string, concurrency, bufferSize int) error {
 		}
 	}
 	// start the signal handler in the background.
-	go startSignalHandler(supervisor, bufferSize)
+	go startSignalHandler(supervisor, containerd.DefaultBufferSize)
 	if err := supervisor.Start(); err != nil {
 		return err
 	}

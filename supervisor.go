@@ -56,19 +56,24 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
-	stateDir       string
-	containers     map[string]runtime.Container
-	processes      map[int]runtime.Container
-	handlers       map[EventType]Handler
-	runtime        runtime.Runtime
-	events         chan *Event
-	tasks          chan *StartTask
+	stateDir   string
+	containers map[string]runtime.Container
+	processes  map[int]runtime.Container
+	handlers   map[EventType]Handler
+	runtime    runtime.Runtime
+	events     chan *Event
+	tasks      chan *StartTask
+	// we need a lock around the subscribers map only because additions and deletions from
+	// the map are via the API so we cannot really control the concurrency
 	subscriberLock sync.RWMutex
 	subscribers    map[chan *Event]struct{}
 	machine        Machine
 	containerGroup sync.WaitGroup
 }
 
+// Stop closes all tasks and sends a SIGTERM to each container's pid1 then waits for they to
+// terminate.  After it has handled all the SIGCHILD events it will close the signals chan
+// and exit.  Stop is a non-blocking call and will return after the containers have been signaled
 func (s *Supervisor) Stop(sig chan os.Signal) {
 	// Close the tasks channel so that no new containers get started
 	close(s.tasks)
@@ -109,6 +114,8 @@ func (s *Supervisor) Close() error {
 	return nil
 }
 
+// Events returns an event channel that external consumers can use to receive updates
+// on container events
 func (s *Supervisor) Events() chan *Event {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
@@ -118,6 +125,7 @@ func (s *Supervisor) Events() chan *Event {
 	return c
 }
 
+// Unsubscribe removes the provided channel from receiving any more events
 func (s *Supervisor) Unsubscribe(sub chan *Event) {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
@@ -126,7 +134,9 @@ func (s *Supervisor) Unsubscribe(sub chan *Event) {
 	EventSubscriberCounter.Dec(1)
 }
 
-func (s *Supervisor) NotifySubscribers(e *Event) {
+// notifySubscribers will send the provided event to the external subscribers
+// of the events channel
+func (s *Supervisor) notifySubscribers(e *Event) {
 	s.subscriberLock.RLock()
 	defer s.subscriberLock.RUnlock()
 	for sub := range s.subscribers {
@@ -142,7 +152,9 @@ func (s *Supervisor) NotifySubscribers(e *Event) {
 // Start is a non-blocking call that runs the supervisor for monitoring contianer processes and
 // executing new containers.
 //
-// This event loop is the only thing that is allowed to modify state of containers and processes.
+// This event loop is the only thing that is allowed to modify state of containers and processes
+// therefore it is save to do operations in the handlers that modify state of the system or
+// state of the Supervisor
 func (s *Supervisor) Start() error {
 	go func() {
 		// allocate an entire thread to this goroutine for the main event loop
@@ -178,6 +190,8 @@ func (s *Supervisor) Machine() Machine {
 	return s.machine
 }
 
+// getContainerForPid returns the container where the provided pid is the pid1 or main
+// process in the container
 func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
 	for _, container := range s.containers {
 		cpid, err := container.Pid()
@@ -196,6 +210,7 @@ func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
 	return nil, errNoContainerForPid
 }
 
+// SendEvent sends the provided event the the supervisors main event loop
 func (s *Supervisor) SendEvent(evt *Event) {
 	s.events <- evt
 }

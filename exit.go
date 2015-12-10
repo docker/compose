@@ -47,6 +47,6 @@ func (h *ExecExitEvent) Handle(e *Event) error {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
 	delete(h.s.processes, e.Pid)
-	h.s.NotifySubscribers(e)
+	h.s.notifySubscribers(e)
 	return nil
 }

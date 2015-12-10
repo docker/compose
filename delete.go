@@ -14,7 +14,7 @@ func (h *DeleteEvent) Handle(e *Event) error {
 		if err := h.deleteContainer(container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
-		h.s.NotifySubscribers(&Event{
+		h.s.notifySubscribers(&Event{
 			Type:   ExitEventType,
 			ID:     e.ID,
 			Status: e.Status,
