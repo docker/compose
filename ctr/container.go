@@ -27,6 +27,7 @@ var ContainersCommand = cli.Command{
 		StartCommand,
 		ListCommand,
 		KillCommand,
+		ExecCommand,
 	},
 	Action: listContainers,
 }
@@ -38,8 +39,8 @@ var ListCommand = cli.Command{
 }
 
 func listContainers(context *cli.Context) {
-	cli := getClient()
-	resp, err := cli.State(netcontext.Background(), &types.StateRequest{})
+	c := getClient()
+	resp, err := c.State(netcontext.Background(), &types.StateRequest{})
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
@@ -110,6 +111,55 @@ var KillCommand = cli.Command{
 			Pid:    uint32(context.Int("pid")),
 			Signal: uint32(context.Int("signal")),
 		}); err != nil {
+			fatal(err.Error(), 1)
+		}
+	},
+}
+
+var ExecCommand = cli.Command{
+	Name:  "exec",
+	Usage: "exec another process in an existing container",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "id",
+			Usage: "container id to add the process to",
+		},
+		cli.StringFlag{
+			Name:  "cwd",
+			Usage: "current working directory for the process",
+		},
+		cli.BoolFlag{
+			Name:  "tty,t",
+			Usage: "create a terminal for the process",
+		},
+		cli.StringSliceFlag{
+			Name:  "env,e",
+			Value: &cli.StringSlice{},
+			Usage: "environment variables for the process",
+		},
+		cli.IntFlag{
+			Name:  "uid,u",
+			Usage: "user id of the user for the process",
+		},
+		cli.IntFlag{
+			Name:  "gid,g",
+			Usage: "group id of the user for the process",
+		},
+	},
+	Action: func(context *cli.Context) {
+		p := &types.AddProcessRequest{
+			Args:     context.Args(),
+			Cwd:      context.String("cwd"),
+			Terminal: context.Bool("tty"),
+			Id:       context.String("id"),
+			Env:      context.StringSlice("env"),
+			User: &types.User{
+				Uid: uint32(context.Int("uid")),
+				Gid: uint32(context.Int("gid")),
+			},
+		}
+		c := getClient()
+		if _, err := c.AddProcess(netcontext.Background(), p); err != nil {
 			fatal(err.Error(), 1)
 		}
 	},
