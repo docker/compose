@@ -35,6 +35,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		ContainersCommand,
+		CheckpointCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -48,6 +49,6 @@ func main() {
 }
 
 func fatal(err string, code int) {
-	fmt.Fprintf(os.Stderr, "[ctr] %s", err)
+	fmt.Fprintf(os.Stderr, "[ctr] %s\n", err)
 	os.Exit(code)
 }

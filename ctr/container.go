@@ -5,7 +5,6 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd/api/grpc/types"
 	netcontext "golang.org/x/net/context"
@@ -47,10 +46,10 @@ func listContainers(context *cli.Context) {
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprint(w, "ID\tPATH\tSTATUS\tPID1\n")
 	for _, c := range resp.Containers {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", c.Id, c.BundlePath, c.Status, c.Processes[0].Pid)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", c.Id, c.BundlePath, c.Status, c.Processes[0].Pid)
 	}
 	if err := w.Flush(); err != nil {
-		logrus.Fatal(err)
+		fatal(err.Error(), 1)
 	}
 }
 
@@ -59,22 +58,19 @@ var StartCommand = cli.Command{
 	Usage: "start a container",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "id",
-			Value: "",
-			Usage: "id of the container",
-		},
-		cli.StringFlag{
 			Name:  "checkpoint,c",
 			Value: "",
 			Usage: "checkpoint to start the container from",
 		},
 	},
 	Action: func(context *cli.Context) {
-		path := context.Args().First()
+		var (
+			id   = context.Args().Get(0)
+			path = context.Args().Get(1)
+		)
 		if path == "" {
 			fatal("bundle path cannot be empty", 1)
 		}
-		id := context.String("id")
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
