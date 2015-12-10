@@ -6,10 +6,6 @@ type ExitEvent struct {
 	s *Supervisor
 }
 
-type ExecExitEvent struct {
-	s *Supervisor
-}
-
 func (h *ExitEvent) Handle(e *Event) error {
 	logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
 		Debug("containerd: process exited")
@@ -34,8 +30,14 @@ func (h *ExitEvent) Handle(e *Event) error {
 	container.SetExited(e.Status)
 	ne := NewEvent(DeleteEventType)
 	ne.ID = container.ID()
+	ne.Pid = e.Pid
+	ne.Status = e.Status
 	h.s.SendEvent(ne)
 	return nil
+}
+
+type ExecExitEvent struct {
+	s *Supervisor
 }
 
 func (h *ExecExitEvent) Handle(e *Event) error {

@@ -28,13 +28,14 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 		return nil, err
 	}
 	s := &Supervisor{
-		stateDir:   stateDir,
-		containers: make(map[string]runtime.Container),
-		processes:  make(map[int]runtime.Container),
-		runtime:    r,
-		tasks:      tasks,
-		events:     make(chan *Event, 2048),
-		machine:    machine,
+		stateDir:    stateDir,
+		containers:  make(map[string]runtime.Container),
+		processes:   make(map[int]runtime.Container),
+		runtime:     r,
+		tasks:       tasks,
+		events:      make(chan *Event, 2048),
+		machine:     machine,
+		subscribers: make(map[chan *Event]struct{}),
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
@@ -62,12 +63,10 @@ type Supervisor struct {
 	runtime        runtime.Runtime
 	events         chan *Event
 	tasks          chan *StartTask
-	subscribers    map[subscriber]bool
+	subscribers    map[chan *Event]struct{}
 	machine        Machine
 	containerGroup sync.WaitGroup
 }
-
-type subscriber chan *Event
 
 func (s *Supervisor) Stop(sig chan os.Signal) {
 	// Close the tasks channel so that no new containers get started
@@ -109,12 +108,16 @@ func (s *Supervisor) Close() error {
 	return nil
 }
 
-func (s *Supervisor) Events() subscriber {
-	return subscriber(make(chan *Event))
+func (s *Supervisor) Events() chan *Event {
+	c := make(chan *Event, 2048)
+	EventSubscriberCounter.Inc(1)
+	s.subscribers[c] = struct{}{}
+	return c
 }
 
-func (s *Supervisor) Unsubscribe(sub subscriber) {
+func (s *Supervisor) Unsubscribe(sub chan *Event) {
 	delete(s.subscribers, sub)
+	EventSubscriberCounter.Dec(1)
 }
 
 func (s *Supervisor) NotifySubscribers(e *Event) {

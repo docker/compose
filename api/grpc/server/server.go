@@ -217,12 +217,14 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 
 func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
 	events := s.sv.Events()
+	defer s.sv.Unsubscribe(events)
 	for evt := range events {
 		switch evt.Type {
 		case containerd.ExitEventType:
 			ev := &types.Event{
 				Type:   "exit",
 				Id:     evt.ID,
+				Pid:    uint32(evt.Pid),
 				Status: uint32(evt.Status),
 			}
 			if err := stream.Send(ev); err != nil {
