@@ -535,6 +535,23 @@ class ConfigTest(unittest.TestCase):
             }))
         assert "which is an invalid type" in exc.exconly()
 
+    def test_normalize_dns_options(self):
+        actual = config.load(build_config_details({
+            'web': {
+                'image': 'alpine',
+                'dns': '8.8.8.8',
+                'dns_search': 'domain.local',
+            }
+        }))
+        assert actual == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'dns': ['8.8.8.8'],
+                'dns_search': ['domain.local'],
+            }
+        ]
+
 
 class PortsTest(unittest.TestCase):
     INVALID_PORTS_TYPES = [
@@ -1080,8 +1097,8 @@ class EnvTest(unittest.TestCase):
                 {'foo': {'image': 'example', 'env_file': 'nonexistent.env'}},
                 working_dir='tests/fixtures/env'))
 
-            assert 'Couldn\'t find env file' in exc.exconly()
-            assert 'nonexistent.env' in exc.exconly()
+        assert 'Couldn\'t find env file' in exc.exconly()
+        assert 'nonexistent.env' in exc.exconly()
 
     @mock.patch.dict(os.environ)
     def test_resolve_environment_from_env_file_with_empty_values(self):
