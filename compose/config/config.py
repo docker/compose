@@ -387,6 +387,10 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
+    for field in ['dns', 'dns_search']:
+        if field in service_dict:
+            service_dict[field] = to_list(service_dict[field])
+
     # TODO: move to a validate_service()
     if 'ulimits' in service_dict:
         validate_ulimits(service_dict['ulimits'])
