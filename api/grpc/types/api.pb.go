@@ -270,6 +270,7 @@ func (m *Container) GetProcesses() []*Process {
 	return nil
 }
 
+// Machine is information about machine on which containerd is run
 type Machine struct {
 	Id     string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Cpus   uint32 `protobuf:"varint,2,opt,name=cpus" json:"cpus,omitempty"`
@@ -281,6 +282,7 @@ func (m *Machine) String() string            { return proto.CompactTextString(m)
 func (*Machine) ProtoMessage()               {}
 func (*Machine) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{18} }
 
+// StateResponse is information about containerd daemon
 type StateResponse struct {
 	Containers []*Container `protobuf:"bytes,1,rep,name=containers" json:"containers,omitempty"`
 	Machine    *Machine     `protobuf:"bytes,2,opt,name=machine" json:"machine,omitempty"`

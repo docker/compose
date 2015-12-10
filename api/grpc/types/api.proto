@@ -15,74 +15,74 @@ service API {
 }
 
 message CreateContainerRequest {
-	string id = 1;
-	string bundlePath = 2;
-	string stdout = 4;
-	string stderr = 5;
-	string checkpoint = 7;
+	string id = 1; // ID of container
+	string bundlePath = 2; // path to OCI bundle
+	string stdout = 4; // path to file where stdout will be written (optional)
+	string stderr = 5; // path to file where stderr will be written (optional)
+	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
 }
 
 message CreateContainerResponse {
 }
 
 message SignalRequest {
-	string id = 1;
-	uint32 pid = 2;
-	uint32 signal = 3;
+	string id = 1; // ID of container
+	uint32 pid = 2; // PID of process inside container
+	uint32 signal = 3; // Signal which will be sent, you can find value in "man 7 signal"
 }
 
 message SignalResponse {
 }
 
 message AddProcessRequest {
-	string id = 1;
-	bool terminal = 2;
-	User user = 3;
-	repeated string args = 4;
-	repeated string env = 5;
-	string cwd = 6;
+	string id = 1; // ID of container
+	bool terminal = 2; // Use tty for container stdio
+	User user = 3; // User under which process will be run
+	repeated string args = 4; // Arguments for process, first is binary path itself
+	repeated string env = 5; // List of environment variables for process
+	string cwd = 6; // Workind directory of process
 };
 
 message User {
-	uint32 uid = 1;
-	uint32 gid = 2;
-	repeated uint32 additionalGids = 3;
+	uint32 uid = 1; // UID of user
+	uint32 gid = 2; // GID of user
+	repeated uint32 additionalGids = 3; // Additional groups to which user will be added
 }
 
 message AddProcessResponse {
-	uint32 pid = 1;
+	uint32 pid = 1; // PID of process is returned in case of success
 }
 
 message CreateCheckpointRequest {
-	string id = 1;
-	Checkpoint checkpoint = 2;
+	string id = 1; // ID of container
+	Checkpoint checkpoint = 2; // Checkpoint configuration
 }
 
 message CreateCheckpointResponse {
 }
 
 message DeleteCheckpointRequest {
-	string id = 1;
-	string name = 2;
+	string id = 1; // ID of container
+	string name = 2; // Name of checkpoint
 }
 
 message DeleteCheckpointResponse {
 }
 
 message ListCheckpointRequest {
-	string id = 1;
+	string id = 1; // ID of container
 }
 
 message Checkpoint {
-	string name = 1;
-	bool exit = 2;
-	bool tcp = 3;
-	bool unixSockets = 4;
-	bool shell = 5;
+	string name = 1; // Name of checkpoint
+	bool exit = 2; // checkpoint configuration: should container exit on checkpoint or not
+	bool tcp = 3; // allow open tcp connections
+	bool unixSockets = 4; // allow external unix sockets
+	bool shell = 5; // allow shell-jobs
 }
 
 message ListCheckpointResponse {
-	repeated Checkpoint checkpoints = 1;
+	repeated Checkpoint checkpoints = 1; // List of checkpoints
 }
 
 message StateRequest {
@@ -94,36 +94,38 @@ message ContainerState {
 
 message Process {
 	uint32 pid = 1;
-	bool terminal = 2;
-	User user = 3;
-	repeated string args = 4;
-	repeated string env = 5;
-	string cwd = 6;
+	bool terminal = 2; // Use tty for container stdio
+	User user = 3; // User under which process will be run
+	repeated string args = 4; // Arguments for process, first is binary path itself
+	repeated string env = 5; // List of environment variables for process
+	string cwd = 6; // Workind directory of process
 }
 
 message Container {
-	string id = 1;
-	string name = 2;
-	string bundlePath = 3;
-	repeated Process processes = 4;
-	string status = 5;
+	string id = 1; // ID of container
+	string name = 2; // Name of container (???)
+	string bundlePath = 3; // Path to OCI bundle
+	repeated Process processes = 4; // List of processes which run in container
+	string status = 5; // Container status ("running", "paused", etc.)
 }
 
+// Machine is information about machine on which containerd is run
 message Machine {
-	string id = 1;
-	uint32 cpus = 2;
-	uint64 memory = 3;
+	string id = 1; // ID of machine
+	uint32 cpus = 2; // number of cpus
+	uint64 memory = 3; // amount of memory
 }
 
+// StateResponse is information about containerd daemon
 message StateResponse {
 	repeated Container containers = 1;
 	Machine machine = 2;
 }
 
 message UpdateContainerRequest {
-	string id = 1;
-	uint32 signal = 2;
-	string status = 3;
+	string id = 1; // ID of container
+	uint32 signal = 2; // Signal
+	string status = 3; // Status to whcih containerd will try to change
 }
 
 message UpdateContainerResponse {
