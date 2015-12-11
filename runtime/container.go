@@ -9,6 +9,7 @@ import (
 )
 
 type Process interface {
+	io.Closer
 	Pid() (int, error)
 	Spec() specs.Process
 	Signal(os.Signal) error

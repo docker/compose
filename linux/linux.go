@@ -5,6 +5,7 @@ package linux
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -184,6 +185,15 @@ func (p *libcontainerProcess) Signal(s os.Signal) error {
 	return p.process.Signal(s)
 }
 
+func (p *libcontainerProcess) Close() error {
+	// in close we always need to call wait to close/flush any pipes
+	_, err := p.process.Wait()
+	p.process.Stdin.(io.Closer).Close()
+	p.process.Stdout.(io.Closer).Close()
+	p.process.Stderr.(io.Closer).Close()
+	return err
+}
+
 type libcontainerContainer struct {
 	c                   libcontainer.Container
 	initProcess         *libcontainerProcess
@@ -305,6 +315,7 @@ func (c *libcontainerContainer) SetExited(status int) {
 	c.exitStatus = status
 	// meh
 	c.exited = true
+	c.initProcess.Close()
 }
 
 func (c *libcontainerContainer) Stats() (*runtime.Stat, error) {
@@ -334,11 +345,13 @@ func (c *libcontainerContainer) Processes() ([]runtime.Process, error) {
 }
 
 func (c *libcontainerContainer) RemoveProcess(pid int) error {
-	if _, ok := c.additionalProcesses[pid]; !ok {
+	proc, ok := c.additionalProcesses[pid]
+	if !ok {
 		return runtime.ErrNotChildProcess
 	}
+	err := proc.Close()
 	delete(c.additionalProcesses, pid)
-	return nil
+	return err
 }
 
 func NewRuntime(stateDir string) (runtime.Runtime, error) {
