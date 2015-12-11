@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import codecs
+import functools
 import logging
 import operator
 import os
@@ -455,6 +456,12 @@ def resolve_environment(service_dict):
     return dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
 
 
+def resolve_build_args(build):
+    args = {}
+    args.update(parse_build_arguments(build.get('args')))
+    return dict(resolve_env_var(k, v) for k, v in six.iteritems(args))
+
+
 def validate_extended_service_dict(service_dict, filename, service):
     error_prefix = "Cannot extend service '%s' in %s:" % (service, filename)
 
@@ -492,11 +499,15 @@ def process_service(service_config):
             for path in to_list(service_dict['env_file'])
         ]
 
+    if 'build' in service_dict:
+        if isinstance(service_dict['build'], six.string_types):
+            service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
+        elif isinstance(service_dict['build'], dict) and 'context' in service_dict['build']:
+            path = service_dict['build']['context']
+            service_dict['build']['context'] = resolve_build_path(working_dir, path)
+
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
-
-    if 'build' in service_dict:
-        service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
 
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
@@ -534,6 +545,8 @@ def finalize_service(service_config, service_names, version):
 
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
+
+    normalize_build(service_dict, service_config.working_dir)
 
     return normalize_v1_service_format(service_dict)
 
@@ -599,8 +612,29 @@ def merge_service_dicts(base, override, version):
 
     if version == 1:
         legacy_v1_merge_image_or_build(d, base, override)
+    else:
+        merge_build(d, base, override)
 
     return d
+
+
+def merge_build(output, base, override):
+    build = {}
+
+    if 'build' in base:
+        if isinstance(base['build'], six.string_types):
+            build['context'] = base['build']
+        else:
+            build.update(base['build'])
+
+    if 'build' in override:
+        if isinstance(override['build'], six.string_types):
+            build['context'] = override['build']
+        else:
+            build.update(override['build'])
+
+    if build:
+        output['build'] = build
 
 
 def legacy_v1_merge_image_or_build(output, base, override):
@@ -622,22 +656,6 @@ def merge_environment(base, override):
     return env
 
 
-def parse_environment(environment):
-    if not environment:
-        return {}
-
-    if isinstance(environment, list):
-        return dict(split_env(e) for e in environment)
-
-    if isinstance(environment, dict):
-        return dict(environment)
-
-    raise ConfigurationError(
-        "environment \"%s\" must be a list or mapping," %
-        environment
-    )
-
-
 def split_env(env):
     if isinstance(env, six.binary_type):
         env = env.decode('utf-8', 'replace')
@@ -645,6 +663,34 @@ def split_env(env):
         return env.split('=', 1)
     else:
         return env, None
+
+
+def split_label(label):
+    if '=' in label:
+        return label.split('=', 1)
+    else:
+        return label, ''
+
+
+def parse_dict_or_list(split_func, type_name, arguments):
+    if not arguments:
+        return {}
+
+    if isinstance(arguments, list):
+        return dict(split_func(e) for e in arguments)
+
+    if isinstance(arguments, dict):
+        return dict(arguments)
+
+    raise ConfigurationError(
+        "%s \"%s\" must be a list or mapping," %
+        (type_name, arguments)
+    )
+
+
+parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
+parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
+parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
 
 
 def resolve_env_var(key, val):
@@ -690,6 +736,26 @@ def resolve_volume_path(working_dir, volume):
         return container_path
 
 
+def normalize_build(service_dict, working_dir):
+    build = {}
+
+    # supported in V1 only
+    if 'dockerfile' in service_dict:
+        build['dockerfile'] = service_dict.pop('dockerfile')
+
+    if 'build' in service_dict:
+        # Shortcut where specifying a string is treated as the build context
+        if isinstance(service_dict['build'], six.string_types):
+            build['context'] = service_dict.pop('build')
+        else:
+            build.update(service_dict['build'])
+            if 'args' in build:
+                build['args'] = resolve_build_args(build)
+
+    if build:
+        service_dict['build'] = build
+
+
 def resolve_build_path(working_dir, build_path):
     if is_url(build_path):
         return build_path
@@ -702,7 +768,13 @@ def is_url(build_path):
 
 def validate_paths(service_dict):
     if 'build' in service_dict:
-        build_path = service_dict['build']
+        build = service_dict.get('build', {})
+
+        if isinstance(build, six.string_types):
+            build_path = build
+        elif isinstance(build, dict) and 'context' in build:
+            build_path = build['context']
+
         if (
             not is_url(build_path) and
             (not os.path.exists(build_path) or not os.access(build_path, os.R_OK))
