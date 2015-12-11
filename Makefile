@@ -14,3 +14,6 @@ daemon:
 
 install:
 	cp bin/* /usr/local/bin/
+
+protoc:
+	protoc -I ./api/grpc/types ./api/grpc/types/api.proto --go_out=plugins=grpc:api/grpc/types
