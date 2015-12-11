@@ -146,3 +146,83 @@ message Event {
 	repeated Container containers = 9;
 	Checkpoint checkpoint = 10;
 }
+
+message NetworkStats {
+	string name = 1; // name of network interface
+	uint64 rx_bytes  = 2;
+	uint64 rx_Packets = 3;
+	uint64 Rx_errors  = 4;
+	uint64 Rx_dropped = 5;
+	uint64 Tx_bytes   = 6;
+	uint64 Tx_packets = 7;
+	uint64 Tx_errors  = 8;
+	uint64 Tx_dropped = 9;
+}
+
+message CpuUsage {
+	uint64 total_usage = 1;
+	repeated uint64 percpu_usage = 2;
+	uint64 usage_in_kernelmode = 3;
+	uint64 usage_in_usermode = 4;
+}
+
+message ThrottlingData {
+	uint64 periods = 1;
+	uint64 throttled_periods = 2;
+	uint64 throttled_time = 3;
+}
+
+message CpuStats {
+	CpuUsage cpu_usage = 1;
+	ThrottlingData throttling_data = 2;
+}
+
+message MemoryData {
+	uint64 usage = 1;
+	uint64 max_usage = 2;
+	uint64 failcnt = 3;
+}
+
+message MemoryStats {
+	uint64 cache = 1;
+	MemoryData usage = 2;
+	MemoryData swap_usage = 3;
+	MemoryData kernel_usage = 4;
+	map<string, uint64> stats = 5;
+}
+
+message BlkioStatsEntry {
+	uint64 major = 1;
+	uint64 minor = 2;
+	string op = 3;
+	uint64 value = 4;
+}
+
+message BlkioStats {
+	repeated BlkioStatsEntry io_service_bytes_recursive = 1; // number of bytes tranferred to and from the block device
+	repeated BlkioStatsEntry io_serviced_recursive = 2;
+	repeated BlkioStatsEntry io_queued_recursive = 3;
+	repeated BlkioStatsEntry io_service_time_recursive = 4;
+	repeated BlkioStatsEntry io_wait_time_recursive = 5;
+	repeated BlkioStatsEntry io_merged_recursive = 6;
+	repeated BlkioStatsEntry io_time_recursive = 7;
+	repeated BlkioStatsEntry sectors_recursive = 8;
+}
+
+message HugetlbStats {
+	uint64 usage = 1;
+	uint64 max_usage = 2;
+	uint64 failcnt = 3;
+}
+
+message CgroupStats {
+	CpuStats cpu_stats = 1;
+	MemoryStats memory_stats  = 2;
+	BlkioStats blkio_stats = 3;
+	map<string, HugetlbStats> hugetlb_stats = 4; // the map is in the format "size of hugepage: stats of the hugepage"
+}
+
+message Stats {
+	repeated NetworkStats network_stats = 1;
+	CgroupStats cgroup_stats = 2;
+};
