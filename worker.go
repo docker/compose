@@ -35,13 +35,15 @@ func (w *worker) Start() {
 	for t := range w.s.tasks {
 		started := time.Now()
 		// start logging the container's stdio
-		if err := w.s.log(t.Container.Path(), t.IO); err != nil {
+		l, err := w.s.log(t.Container.Path(), t.IO)
+		if err != nil {
 			evt := NewEvent(DeleteEventType)
 			evt.ID = t.Container.ID()
 			w.s.SendEvent(evt)
 			t.Err <- err
 			continue
 		}
+		w.s.containers[t.Container.ID()].logger = l
 		if t.Checkpoint != "" {
 			if err := t.Container.Restore(t.Checkpoint); err != nil {
 				evt := NewEvent(DeleteEventType)

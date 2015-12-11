@@ -9,15 +9,16 @@ type AddProcessEvent struct {
 // TODO: add this to worker for concurrent starts???  maybe not because of races where the container
 // could be stopped and removed...
 func (h *AddProcessEvent) Handle(e *Event) error {
-	container, ok := h.s.containers[e.ID]
+	ci, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	p, io, err := h.s.runtime.StartProcess(container, *e.Process)
+	p, io, err := h.s.runtime.StartProcess(ci.container, *e.Process)
 	if err != nil {
 		return err
 	}
-	if err := h.s.log(container.Path(), io); err != nil {
+	l, err := h.s.log(ci.container.Path(), io)
+	if err != nil {
 		// log the error but continue with the other commands
 		logrus.WithFields(logrus.Fields{
 			"error": err,
@@ -27,6 +28,9 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 	if e.Pid, err = p.Pid(); err != nil {
 		return err
 	}
-	h.s.processes[e.Pid] = container
+	h.s.processes[e.Pid] = &containerInfo{
+		container: ci.container,
+		logger:    l,
+	}
 	return nil
 }

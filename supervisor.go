@@ -29,8 +29,8 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 	}
 	s := &Supervisor{
 		stateDir:    stateDir,
-		containers:  make(map[string]runtime.Container),
-		processes:   make(map[int]runtime.Container),
+		containers:  make(map[string]*containerInfo),
+		processes:   make(map[int]*containerInfo),
 		runtime:     r,
 		tasks:       tasks,
 		events:      make(chan *Event, DefaultBufferSize),
@@ -54,11 +54,16 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 	return s, nil
 }
 
+type containerInfo struct {
+	container runtime.Container
+	logger    *logger
+}
+
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir   string
-	containers map[string]runtime.Container
-	processes  map[int]runtime.Container
+	containers map[string]*containerInfo
+	processes  map[int]*containerInfo
 	handlers   map[EventType]Handler
 	runtime    runtime.Runtime
 	events     chan *Event
@@ -78,7 +83,8 @@ func (s *Supervisor) Stop(sig chan os.Signal) {
 	// Close the tasks channel so that no new containers get started
 	close(s.tasks)
 	// send a SIGTERM to all containers
-	for id, c := range s.containers {
+	for id, i := range s.containers {
+		c := i.container
 		logrus.WithField("id", id).Debug("sending TERM to container processes")
 		procs, err := c.Processes()
 		if err != nil {
@@ -193,7 +199,8 @@ func (s *Supervisor) Machine() Machine {
 // getContainerForPid returns the container where the provided pid is the pid1 or main
 // process in the container
 func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
-	for _, container := range s.containers {
+	for _, i := range s.containers {
+		container := i.container
 		cpid, err := container.Pid()
 		if err != nil {
 			if lerr, ok := err.(libcontainer.Error); ok {
@@ -215,16 +222,16 @@ func (s *Supervisor) SendEvent(evt *Event) {
 	s.events <- evt
 }
 
-func (s *Supervisor) log(path string, i *runtime.IO) error {
+func (s *Supervisor) log(path string, i *runtime.IO) (*logger, error) {
 	config := &logConfig{
 		BundlePath: path,
 		Stdin:      i.Stdin,
 		Stdout:     i.Stdout,
 		Stderr:     i.Stderr,
 	}
-	// TODO: save logger to call close after its all done
-	if _, err := newLogger(config); err != nil {
-		return err
+	l, err := newLogger(config)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return l, nil
 }

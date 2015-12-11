@@ -10,9 +10,9 @@ func (h *ExitEvent) Handle(e *Event) error {
 	logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
 		Debug("containerd: process exited")
 	// is it the child process of a container
-	if container, ok := h.s.processes[e.Pid]; ok {
+	if info, ok := h.s.processes[e.Pid]; ok {
 		ne := NewEvent(ExecExitEventType)
-		ne.ID = container.ID()
+		ne.ID = info.container.ID()
 		ne.Pid = e.Pid
 		ne.Status = e.Status
 		h.s.SendEvent(ne)
@@ -42,9 +42,12 @@ type ExecExitEvent struct {
 
 func (h *ExecExitEvent) Handle(e *Event) error {
 	// exec process: we remove this process without notifying the main event loop
-	container := h.s.processes[e.Pid]
-	if err := container.RemoveProcess(e.Pid); err != nil {
+	info := h.s.processes[e.Pid]
+	if err := info.container.RemoveProcess(e.Pid); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
+	}
+	if err := info.logger.Close(); err != nil {
+		logrus.WithField("error", err).Error("containerd: close process IO")
 	}
 	delete(h.s.processes, e.Pid)
 	h.s.notifySubscribers(e)

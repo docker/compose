@@ -10,7 +10,9 @@ func (h *StartEvent) Handle(e *Event) error {
 		return err
 	}
 	h.s.containerGroup.Add(1)
-	h.s.containers[e.ID] = container
+	h.s.containers[e.ID] = &containerInfo{
+		container: container,
+	}
 	ContainersCounter.Inc(1)
 	task := &StartTask{
 		Err:       e.Err,

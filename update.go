@@ -7,10 +7,11 @@ type UpdateEvent struct {
 }
 
 func (h *UpdateEvent) Handle(e *Event) error {
-	container, ok := h.s.containers[e.ID]
+	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
+	container := i.container
 	if e.State.Status != "" {
 		switch e.State.Status {
 		case runtime.Running:

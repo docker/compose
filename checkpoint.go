@@ -5,11 +5,11 @@ type CreateCheckpointEvent struct {
 }
 
 func (h *CreateCheckpointEvent) Handle(e *Event) error {
-	container, ok := h.s.containers[e.ID]
+	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	return container.Checkpoint(*e.Checkpoint)
+	return i.container.Checkpoint(*e.Checkpoint)
 }
 
 type DeleteCheckpointEvent struct {
@@ -17,9 +17,9 @@ type DeleteCheckpointEvent struct {
 }
 
 func (h *DeleteCheckpointEvent) Handle(e *Event) error {
-	container, ok := h.s.containers[e.ID]
+	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	return container.DeleteCheckpoint(e.Checkpoint.Name)
+	return i.container.DeleteCheckpoint(e.Checkpoint.Name)
 }

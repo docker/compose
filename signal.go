@@ -5,11 +5,11 @@ type SignalEvent struct {
 }
 
 func (h *SignalEvent) Handle(e *Event) error {
-	container, ok := h.s.containers[e.ID]
+	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	processes, err := container.Processes()
+	processes, err := i.container.Processes()
 	if err != nil {
 		return err
 	}

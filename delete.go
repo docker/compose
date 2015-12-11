@@ -10,9 +10,12 @@ type DeleteEvent struct {
 }
 
 func (h *DeleteEvent) Handle(e *Event) error {
-	if container, ok := h.s.containers[e.ID]; ok {
-		if err := h.deleteContainer(container); err != nil {
+	if i, ok := h.s.containers[e.ID]; ok {
+		if err := h.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
+		}
+		if err := i.logger.Close(); err != nil {
+			logrus.WithField("error", err).Error("containerd: close container logger")
 		}
 		h.s.notifySubscribers(&Event{
 			Type:   ExitEventType,

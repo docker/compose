@@ -24,6 +24,15 @@ func newLogger(i *logConfig) (*logger, error) {
 		config:   i,
 		messages: make(chan *Message, DefaultBufferSize),
 	}
+	f, err := os.OpenFile(
+		filepath.Join(l.config.BundlePath, "logs.json"),
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0655,
+	)
+	if err != nil {
+		return nil, err
+	}
+	l.f = f
 	hout := &logHandler{
 		stream:   "stdout",
 		messages: l.messages,
@@ -32,16 +41,14 @@ func newLogger(i *logConfig) (*logger, error) {
 		stream:   "stderr",
 		messages: l.messages,
 	}
-	l.wg.Add(2)
 	go func() {
-		defer l.wg.Done()
 		io.Copy(hout, i.Stdout)
 	}()
 	go func() {
-		defer l.wg.Done()
 		io.Copy(herr, i.Stderr)
 	}()
-	return l, l.start()
+	l.start()
+	return l, nil
 }
 
 type Message struct {
@@ -71,27 +78,17 @@ func (h *logHandler) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (l *logger) start() error {
-	f, err := os.OpenFile(
-		filepath.Join(l.config.BundlePath, "logs.json"),
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
-		0655,
-	)
-	if err != nil {
-		return err
-	}
-	l.f = f
+func (l *logger) start() {
 	l.wg.Add(1)
 	go func() {
 		l.wg.Done()
-		enc := json.NewEncoder(f)
+		enc := json.NewEncoder(l.f)
 		for m := range l.messages {
 			if err := enc.Encode(m); err != nil {
 				logrus.WithField("error", err).Error("write log message")
 			}
 		}
 	}()
-	return nil
 }
 
 func (l *logger) Close() (err error) {
