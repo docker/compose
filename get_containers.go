@@ -5,8 +5,8 @@ type GetContainersEvent struct {
 }
 
 func (h *GetContainersEvent) Handle(e *Event) error {
-	for _, c := range h.s.containers {
-		e.Containers = append(e.Containers, c)
+	for _, i := range h.s.containers {
+		e.Containers = append(e.Containers, i.container)
 	}
 	return nil
 }

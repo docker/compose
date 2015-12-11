@@ -185,6 +185,15 @@ func (p *libcontainerProcess) Signal(s os.Signal) error {
 	return p.process.Signal(s)
 }
 
+func (p *libcontainerProcess) Close() error {
+	// in close we always need to call wait to close/flush any pipes
+	_, err := p.process.Wait()
+	p.process.Stdin.(io.Closer).Close()
+	p.process.Stdout.(io.Closer).Close()
+	p.process.Stderr.(io.Closer).Close()
+	return err
+}
+
 type libcontainerContainer struct {
 	c                   libcontainer.Container
 	initProcess         *libcontainerProcess
@@ -306,6 +315,7 @@ func (c *libcontainerContainer) SetExited(status int) {
 	c.exitStatus = status
 	// meh
 	c.exited = true
+	c.initProcess.Close()
 }
 
 func (c *libcontainerContainer) Stats() (*runtime.Stat, error) {
@@ -335,11 +345,13 @@ func (c *libcontainerContainer) Processes() ([]runtime.Process, error) {
 }
 
 func (c *libcontainerContainer) RemoveProcess(pid int) error {
-	if _, ok := c.additionalProcesses[pid]; !ok {
+	proc, ok := c.additionalProcesses[pid]
+	if !ok {
 		return runtime.ErrNotChildProcess
 	}
+	err := proc.Close()
 	delete(c.additionalProcesses, pid)
-	return nil
+	return err
 }
 
 func NewRuntime(stateDir string) (runtime.Runtime, error) {
@@ -363,25 +375,29 @@ func (r *libcontainerRuntime) Type() string {
 	return "libcontainer"
 }
 
-func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runtime.Container, error) {
+func (r *libcontainerRuntime) Create(id, bundlePath string) (runtime.Container, *runtime.IO, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
 		filepath.Join(bundlePath, "runtime.json"),
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	config, err := r.createLibcontainerConfig(id, bundlePath, spec, rspec)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	container, err := r.factory.Create(id, config)
 	if err != nil {
-		return nil, fmt.Errorf("create container: %v", err)
+		return nil, nil, fmt.Errorf("create container: %v", err)
 	}
-	process, err := r.newProcess(spec.Process, stdio)
+	process, err := r.newProcess(spec.Process)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	i, err := process.InitializeIO(int(spec.Process.User.UID))
+	if err != nil {
+		return nil, nil, err
 	}
 	c := &libcontainerContainer{
 		c:                   container,
@@ -392,20 +408,28 @@ func (r *libcontainerRuntime) Create(id, bundlePath string, stdio *runtime.Stdio
 		},
 		path: bundlePath,
 	}
-	return c, nil
+	return c, &runtime.IO{
+		Stdin:  i.Stdin,
+		Stdout: i.Stdout,
+		Stderr: i.Stderr,
+	}, nil
 }
 
-func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process, stdio *runtime.Stdio) (runtime.Process, error) {
+func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process) (runtime.Process, *runtime.IO, error) {
 	c, ok := ci.(*libcontainerContainer)
 	if !ok {
-		return nil, runtime.ErrInvalidContainerType
+		return nil, nil, runtime.ErrInvalidContainerType
 	}
-	process, err := r.newProcess(p, stdio)
+	process, err := r.newProcess(p)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	i, err := process.InitializeIO(int(p.User.UID))
+	if err != nil {
+		return nil, nil, err
 	}
 	if err := c.c.Start(process); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	lp := &libcontainerProcess{
 		process: process,
@@ -413,42 +437,29 @@ func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process
 	}
 	pid, err := process.Pid()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c.additionalProcesses[pid] = lp
-	return lp, nil
+	return lp, &runtime.IO{
+		Stdin:  i.Stdin,
+		Stdout: i.Stdout,
+		Stderr: i.Stderr,
+	}, nil
 }
 
 // newProcess returns a new libcontainer Process with the arguments from the
 // spec and stdio from the current process.
-func (r *libcontainerRuntime) newProcess(p specs.Process, stdio *runtime.Stdio) (*libcontainer.Process, error) {
-	var (
-		stderr, stdout io.Writer
-	)
-	if stdio != nil {
-		if stdio.Stdout != "" {
-			f, err := os.OpenFile(stdio.Stdout, os.O_CREATE|os.O_WRONLY, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("open stdout: %v", err)
-			}
-			stdout = f
-		}
-		if stdio.Stderr != "" {
-			f, err := os.OpenFile(stdio.Stderr, os.O_CREATE|os.O_WRONLY, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("open stderr: %v", err)
-			}
-			stderr = f
-		}
+func (r *libcontainerRuntime) newProcess(p specs.Process) (*libcontainer.Process, error) {
+	// TODO: support terminals
+	if p.Terminal {
+		return nil, runtime.ErrTerminalsNotSupported
 	}
 	return &libcontainer.Process{
 		Args: p.Args,
 		Env:  p.Env,
 		// TODO: fix libcontainer's API to better support uid/gid in a typesafe way.
-		User:   fmt.Sprintf("%d:%d", p.User.UID, p.User.GID),
-		Cwd:    p.Cwd,
-		Stderr: stderr,
-		Stdout: stdout,
+		User: fmt.Sprintf("%d:%d", p.User.UID, p.User.GID),
+		Cwd:  p.Cwd,
 	}, nil
 }
 

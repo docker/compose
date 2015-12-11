@@ -38,10 +38,6 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 			Name: c.Checkpoint,
 		}
 	}
-	e.Stdio = &runtime.Stdio{
-		Stderr: c.Stderr,
-		Stdout: c.Stdout,
-	}
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
