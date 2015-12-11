@@ -214,3 +214,17 @@ func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
 func (s *Supervisor) SendEvent(evt *Event) {
 	s.events <- evt
 }
+
+func (s *Supervisor) log(path string, i *runtime.IO) error {
+	config := &logConfig{
+		BundlePath: path,
+		Stdin:      i.Stdin,
+		Stdout:     i.Stdout,
+		Stderr:     i.Stderr,
+	}
+	// TODO: save logger to call close after its all done
+	if _, err := newLogger(config); err != nil {
+		return err
+	}
+	return nil
+}

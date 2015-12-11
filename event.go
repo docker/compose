@@ -36,7 +36,6 @@ type Event struct {
 	Timestamp  time.Time
 	ID         string
 	BundlePath string
-	Stdio      *runtime.Stdio
 	Pid        int
 	Status     int
 	Signal     os.Signal

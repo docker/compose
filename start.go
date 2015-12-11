@@ -5,7 +5,7 @@ type StartEvent struct {
 }
 
 func (h *StartEvent) Handle(e *Event) error {
-	container, err := h.s.runtime.Create(e.ID, e.BundlePath, e.Stdio)
+	container, io, err := h.s.runtime.Create(e.ID, e.BundlePath)
 	if err != nil {
 		return err
 	}
@@ -14,6 +14,7 @@ func (h *StartEvent) Handle(e *Event) error {
 	ContainersCounter.Inc(1)
 	task := &StartTask{
 		Err:       e.Err,
+		IO:        io,
 		Container: container,
 	}
 	if e.Checkpoint != nil {

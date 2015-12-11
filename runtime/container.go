@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -24,9 +25,24 @@ type State struct {
 	Status Status
 }
 
-type Stdio struct {
-	Stderr string
-	Stdout string
+type IO struct {
+	Stdin  io.WriteCloser
+	Stdout io.ReadCloser
+	Stderr io.ReadCloser
+}
+
+func (i *IO) Close() error {
+	var oerr error
+	for _, c := range []io.Closer{
+		i.Stdin,
+		i.Stdout,
+		i.Stderr,
+	} {
+		if err := c.Close(); oerr == nil {
+			oerr = err
+		}
+	}
+	return oerr
 }
 
 type Stat struct {
