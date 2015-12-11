@@ -297,9 +297,13 @@ class Project(object):
     def ensure_network_exists(self):
         # TODO: recreate network if driver has changed?
         if self.get_network() is None:
+            driver_name = 'the default driver'
+            if self.network_driver:
+                driver_name = 'driver "{}"'.format(self.network_driver)
+
             log.info(
-                'Creating network "{}" with driver "{}"'
-                .format(self.name, self.network_driver)
+                'Creating network "{}" with {}'
+                .format(self.name, driver_name)
             )
             self.client.create_network(self.name, driver=self.network_driver)
 
