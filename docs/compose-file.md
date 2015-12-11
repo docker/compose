@@ -37,7 +37,8 @@ those files, all the [services](#service-configuration-reference) are declared
 at the root of the document.
 
 Version 1 files do not support the declaration of
-named [volumes](#volume-configuration-reference)
+named [volumes](#volume-configuration-reference) or
+[build arguments](#args).
 
 Example:
 
@@ -89,6 +90,30 @@ definition.
 
 ### build
 
+Configuration options that are applied at build time.
+
+In version 1 this must be given as a string representing the context.
+
+  build: .
+
+In version 2 this can alternatively be given as an object with extra options.
+
+  version: 2
+  services:
+    web:
+      build: .
+
+    version: 2
+    services:
+      web:
+        build:
+          context: .
+          dockerfile: Dockerfile-alternate
+          args:
+            buildno: 1
+
+#### context
+
 Either a path to a directory containing a Dockerfile, or a url to a git repository.
 
 When the value supplied is a relative path, it is interpreted as relative to the
@@ -99,8 +124,45 @@ Compose will build and tag it with a generated name, and use that image thereaft
 
     build: /path/to/build/dir
 
-Using `build` together with `image` is not allowed. Attempting to do so results in
+    build:
+      context: /path/to/build/dir
+
+Using `context` together with `image` is not allowed. Attempting to do so results in
 an error.
+
+#### dockerfile
+
+Alternate Dockerfile.
+
+Compose will use an alternate file to build with. A build path must also be
+specified using the `build` key.
+
+    build:
+      context: /path/to/build/dir
+      dockerfile: Dockerfile-alternate
+
+Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
+
+#### args
+
+Add build arguments. You can use either an array or a dictionary. Any
+boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
+they are not converted to True or False by the YML parser.
+
+Build arguments with only a key are resolved to their environment value on the
+machine Compose is running on.
+
+> **Note:** Introduced in version 2 of the compose file format.
+
+    build:
+      args:
+        buildno: 1
+        user: someuser
+
+    build:
+      args:
+        - buildno=1
+        - user=someuser
 
 ### cap_add, cap_drop
 
@@ -161,18 +223,6 @@ Custom DNS search domains. Can be a single value or a list.
     dns_search:
       - dc1.example.com
       - dc2.example.com
-
-### dockerfile
-
-Alternate Dockerfile.
-
-Compose will use an alternate file to build with. A build path must also be
-specified using the `build` key.
-
-    build: /path/to/build/dir
-    dockerfile: Dockerfile-alternate
-
-Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
 ### env_file
 

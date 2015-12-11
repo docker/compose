@@ -301,7 +301,7 @@ class ServiceTest(DockerClientTestCase):
             project='composetest',
             name='db',
             client=self.client,
-            build='tests/fixtures/dockerfile-with-volume',
+            build={'context': 'tests/fixtures/dockerfile-with-volume'},
         )
 
         old_container = create_and_start_container(service)
@@ -322,7 +322,7 @@ class ServiceTest(DockerClientTestCase):
     def test_execute_convergence_plan_when_image_volume_masks_config(self):
         service = self.create_service(
             'db',
-            build='tests/fixtures/dockerfile-with-volume',
+            build={'context': 'tests/fixtures/dockerfile-with-volume'},
         )
 
         old_container = create_and_start_container(service)
@@ -353,7 +353,7 @@ class ServiceTest(DockerClientTestCase):
     def test_execute_convergence_plan_without_start(self):
         service = self.create_service(
             'db',
-            build='tests/fixtures/dockerfile-with-volume'
+            build={'context': 'tests/fixtures/dockerfile-with-volume'}
         )
 
         containers = service.execute_convergence_plan(ConvergencePlan('create', []), start=False)
@@ -457,7 +457,7 @@ class ServiceTest(DockerClientTestCase):
         service = Service(
             name='test',
             client=self.client,
-            build='tests/fixtures/simple-dockerfile',
+            build={'context': 'tests/fixtures/simple-dockerfile'},
             project='composetest',
         )
         container = create_and_start_container(service)
@@ -470,7 +470,7 @@ class ServiceTest(DockerClientTestCase):
         service = Service(
             name='test',
             client=self.client,
-            build='this/does/not/exist/and/will/throw/error',
+            build={'context': 'this/does/not/exist/and/will/throw/error'},
             project='composetest',
         )
         container = create_and_start_container(service)
@@ -490,7 +490,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        self.create_service('web', build=base_dir).build()
+        self.create_service('web', build={'context': base_dir}).build()
         assert self.client.inspect_image('composetest_web')
 
     def test_build_non_ascii_filename(self):
@@ -503,7 +503,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir.encode('utf8'), b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
-        self.create_service('web', build=text_type(base_dir)).build()
+        self.create_service('web', build={'context': text_type(base_dir)}).build()
         assert self.client.inspect_image('composetest_web')
 
     def test_build_with_image_name(self):
@@ -515,13 +515,27 @@ class ServiceTest(DockerClientTestCase):
 
         image_name = 'examples/composetest:latest'
         self.addCleanup(self.client.remove_image, image_name)
-        self.create_service('web', build=base_dir, image=image_name).build()
+        self.create_service('web', build={'context': base_dir}, image=image_name).build()
         assert self.client.inspect_image(image_name)
 
     def test_build_with_git_url(self):
         build_url = "https://github.com/dnephin/docker-build-from-url.git"
-        service = self.create_service('buildwithurl', build=build_url)
+        service = self.create_service('buildwithurl', build={'context': build_url})
         self.addCleanup(self.client.remove_image, service.image_name)
+        service.build()
+        assert service.image()
+
+    def test_build_with_build_args(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+            f.write("ARG build_version\n")
+
+        service = self.create_service('buildwithargs',
+                                      build={'context': text_type(base_dir),
+                                             'args': {"build_version": "1"}})
         service.build()
         assert service.image()
 

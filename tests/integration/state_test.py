@@ -266,13 +266,13 @@ class ServiceStateTest(DockerClientTestCase):
         dockerfile = context.join('Dockerfile')
         dockerfile.write(base_image)
 
-        web = self.create_service('web', build=str(context))
+        web = self.create_service('web', build={'context': str(context)})
         container = web.create_container()
 
         dockerfile.write(base_image + 'CMD echo hello world\n')
         web.build()
 
-        web = self.create_service('web', build=str(context))
+        web = self.create_service('web', build={'context': str(context)})
         self.assertEqual(('recreate', [container]), web.convergence_plan())
 
     def test_image_changed_to_build(self):
@@ -286,7 +286,7 @@ class ServiceStateTest(DockerClientTestCase):
         web = self.create_service('web', image='busybox')
         container = web.create_container()
 
-        web = self.create_service('web', build=str(context))
+        web = self.create_service('web', build={'context': str(context)})
         plan = web.convergence_plan()
         self.assertEqual(('recreate', [container]), plan)
         containers = web.execute_convergence_plan(plan)

@@ -151,18 +151,29 @@ def handle_error_for_schema_with_id(error, service_name):
             VALID_NAME_CHARS)
 
     if schema_id == '#/definitions/constraints':
+        # Build context could in 'build' or 'build.context' and dockerfile could be
+        # in 'dockerfile' or 'build.dockerfile'
+        context = False
+        dockerfile = 'dockerfile' in error.instance
+        if 'build' in error.instance:
+            if isinstance(error.instance['build'], six.string_types):
+                context = True
+            else:
+                context = 'context' in error.instance['build']
+                dockerfile = dockerfile or 'dockerfile' in error.instance['build']
+
         # TODO: only applies to v1
-        if 'image' in error.instance and 'build' in error.instance:
+        if 'image' in error.instance and context:
             return (
                 "Service '{}' has both an image and build path specified. "
                 "A service can either be built to image or use an existing "
                 "image, not both.".format(service_name))
-        if 'image' not in error.instance and 'build' not in error.instance:
+        if 'image' not in error.instance and not context:
             return (
                 "Service '{}' has neither an image nor a build path "
                 "specified. At least one must be provided.".format(service_name))
         # TODO: only applies to v1
-        if 'image' in error.instance and 'dockerfile' in error.instance:
+        if 'image' in error.instance and dockerfile:
             return (
                 "Service '{}' has both an image and alternate Dockerfile. "
                 "A service can either be built to image or use an existing "
