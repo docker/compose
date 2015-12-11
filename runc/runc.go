@@ -135,6 +135,10 @@ func (p *runcProcess) Signal(s os.Signal) error {
 	return p.cmd.Process.Signal(s)
 }
 
+func (p *runcProcess) Close() error {
+	return nil
+}
+
 type runcRuntime struct {
 	stateDir string
 }
@@ -143,19 +147,22 @@ func (r *runcRuntime) Type() string {
 	return "runc"
 }
 
-func (r *runcRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runtime.Container, error) {
-	cmd := exec.Command("runc", "--root", r.stateDir, "--id", id, "start")
-	cmd.Dir = bundlePath
-	//	cmd.Stderr = stdio.Stderr
-	//	cmd.Stdout = stdio.Stdout
+func (r *runcRuntime) Create(id, bundlePath string) (runtime.Container, *runtime.IO, error) {
 	var s specs.Spec
 	f, err := os.Open(filepath.Join(bundlePath, "config.json"))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer f.Close()
+
 	if err := json.NewDecoder(f).Decode(&s); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	cmd := exec.Command("runc", "--root", r.stateDir, "--id", id, "start")
+	cmd.Dir = bundlePath
+	i, err := r.createIO(cmd)
+	if err != nil {
+		return nil, nil, err
 	}
 	return &runcContainer{
 		id:       id,
@@ -166,35 +173,59 @@ func (r *runcRuntime) Create(id, bundlePath string, stdio *runtime.Stdio) (runti
 			spec: s.Process,
 		},
 		processes: make(map[int]*runcProcess),
-	}, nil
+	}, i, nil
 }
 
-func (r *runcRuntime) StartProcess(ci runtime.Container, p specs.Process, stdio *runtime.Stdio) (runtime.Process, error) {
-	c, ok := ci.(*runcContainer)
-	if !ok {
-		return nil, runtime.ErrInvalidContainerType
-	}
-	f, err := ioutil.TempFile("", "containerd")
+func (r *runcRuntime) createIO(cmd *exec.Cmd) (*runtime.IO, error) {
+	w, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
-	if err := json.NewEncoder(f).Encode(p); err != nil {
-		f.Close()
+	ro, err := cmd.StdoutPipe()
+	if err != nil {
 		return nil, err
 	}
-	cmd := c.newCommand("exec", f.Name())
+	re, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.IO{
+		Stdin:  w,
+		Stdout: ro,
+		Stderr: re,
+	}, nil
+}
+
+func (r *runcRuntime) StartProcess(ci runtime.Container, p specs.Process) (runtime.Process, *runtime.IO, error) {
+	c, ok := ci.(*runcContainer)
+	if !ok {
+		return nil, nil, runtime.ErrInvalidContainerType
+	}
+	f, err := ioutil.TempFile("", "containerd")
+	if err != nil {
+		return nil, nil, err
+	}
+	err = json.NewEncoder(f).Encode(p)
 	f.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+	cmd := c.newCommand("exec", f.Name())
+	i, err := r.createIO(cmd)
+	if err != nil {
+		return nil, nil, err
+	}
 	process := &runcProcess{
 		cmd:  cmd,
 		spec: p,
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pid, err := process.Pid()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c.processes[pid] = process
-	return process, nil
+	return process, i, nil
 }
