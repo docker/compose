@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
@@ -19,7 +20,10 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-const Usage = `High performance conatiner daemon`
+const (
+	Usage     = `High performance conatiner daemon`
+	minRlimit = 1024
+)
 
 var authors = []cli.Author{
 	{
@@ -65,7 +69,12 @@ func main() {
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
-			return debugMetrics(context.GlobalDuration("metrics-interval"))
+			if err := debugMetrics(context.GlobalDuration("metrics-interval")); err != nil {
+				return err
+			}
+		}
+		if err := checkLimits(); err != nil {
+			return err
 		}
 		return nil
 	}
@@ -81,6 +90,22 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+func checkLimits() error {
+	var l syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &l); err != nil {
+		return err
+	}
+	if l.Cur <= minRlimit {
+		logrus.WithFields(logrus.Fields{
+			"current": l.Cur,
+			"max":     l.Max,
+		}).Warn("low RLIMIT_NOFILE changing to max")
+		l.Cur = l.Max
+		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
+	}
+	return nil
 }
 
 func debugMetrics(interval time.Duration) error {
