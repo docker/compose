@@ -579,11 +579,11 @@ class ProjectTest(DockerClientTestCase):
         vol_name = '{0:x}'.format(random.getrandbits(32))
 
         config_data = config.Config(
-            2, [{
+            version=2, services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], {vol_name: {'driver': 'foobar'}}
+            }], volumes={vol_name: {'driver': 'foobar'}}
         )
 
         project = Project.from_config(
@@ -592,3 +592,37 @@ class ProjectTest(DockerClientTestCase):
         )
         with self.assertRaises(config.ConfigurationError):
             project.initialize_volumes()
+
+    def test_project_up_updated_driver(self):
+        vol_name = '{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
+
+        config_data = config.Config(
+            version=2, services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], volumes={vol_name: {'driver': 'local'}}
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.initialize_volumes()
+
+        volume_data = self.client.inspect_volume(full_vol_name)
+        self.assertEqual(volume_data['Name'], full_vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+        config_data = config_data._replace(
+            volumes={vol_name: {'driver': 'smb'}}
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        with self.assertRaises(config.ConfigurationError) as e:
+            project.initialize_volumes()
+        assert 'Configuration for volume {0} specifies driver smb'.format(
+            vol_name
+        ) in str(e.exception)

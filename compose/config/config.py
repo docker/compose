@@ -118,6 +118,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def from_filename(cls, filename):
         return cls(filename, load_yaml(filename))
 
+    def get_service_dicts(self, version):
+        return self.config if version == 1 else self.config.get('services', {})
+
 
 class Config(namedtuple('_Config', 'version services volumes')):
     """
@@ -164,9 +167,11 @@ def find(base_dir, filenames):
 def get_config_version(config_details):
     def get_version(config):
         if config.config is None:
-            return None
+            return 1
         version = config.config.get('version', 1)
         if isinstance(version, dict):
+            # in that case 'version' is probably a service name, so assume
+            # this is a legacy (version=1) file
             version = 1
         return version
 
@@ -176,9 +181,6 @@ def get_config_version(config_details):
     for next_file in config_details.config_files[1:]:
         validate_top_level_object(next_file)
         next_file_version = get_version(next_file)
-        if version is None:
-            version = next_file_version
-            continue
 
         if version != next_file_version and next_file_version is not None:
             raise ConfigurationError(
@@ -316,8 +318,16 @@ def load_services(working_dir, config_files, version):
 
 
 def process_config_file(config_file, version, service_name=None):
-    validate_top_level_service_objects(config_file, version)
-    processed_config = interpolate_environment_variables(config_file.config, version)
+    service_dicts = config_file.get_service_dicts(version)
+    validate_top_level_service_objects(
+        config_file.filename, service_dicts
+    )
+    interpolated_config = interpolate_environment_variables(service_dicts)
+    if version == 2:
+        processed_config = dict(config_file.config)
+        processed_config.update({'services': interpolated_config})
+    if version == 1:
+        processed_config = interpolated_config
     validate_against_fields_schema(
         processed_config, config_file.filename, version
     )

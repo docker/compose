@@ -236,6 +236,18 @@ class Project(object):
             raise ConfigurationError(
                 'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
             )
+        except APIError as e:
+            if 'Choose a different volume name' in str(e):
+                raise ConfigurationError(
+                    'Configuration for volume {0} specifies driver {1}, but '
+                    'a volume with the same name uses a different driver '
+                    '({3}). If you wish to use the new configuration, please '
+                    'remove the existing volume "{2}" first:\n'
+                    '$ docker volume rm {2}'.format(
+                        volume.name, volume.driver, volume.full_name,
+                        volume.inspect()['Driver']
+                    )
+                )
 
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)

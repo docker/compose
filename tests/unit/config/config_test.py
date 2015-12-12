@@ -286,6 +286,18 @@ class ConfigTest(unittest.TestCase):
         error_msg = "Top level object in 'override.yml' needs to be an object"
         assert error_msg in exc.exconly()
 
+    def test_load_with_multiple_files_and_empty_override_v2(self):
+        base_file = config.ConfigFile(
+            'base.yml',
+            {'version': 2, 'services': {'web': {'image': 'example/web'}}})
+        override_file = config.ConfigFile('override.yml', None)
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        error_msg = "Top level object in 'override.yml' needs to be an object"
+        assert error_msg in exc.exconly()
+
     def test_load_with_multiple_files_and_empty_base(self):
         base_file = config.ConfigFile('base.yml', None)
         override_file = config.ConfigFile(
@@ -293,6 +305,17 @@ class ConfigTest(unittest.TestCase):
             {'web': {'image': 'example/web'}})
         details = config.ConfigDetails('.', [base_file, override_file])
 
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        assert "Top level object in 'base.yml' needs to be an object" in exc.exconly()
+
+    def test_load_with_multiple_files_and_empty_base_v2(self):
+        base_file = config.ConfigFile('base.yml', None)
+        override_file = config.ConfigFile(
+            'override.tml',
+            {'version': 2, 'services': {'web': {'image': 'example/web'}}}
+        )
+        details = config.ConfigDetails('.', [base_file, override_file])
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
         assert "Top level object in 'base.yml' needs to be an object" in exc.exconly()

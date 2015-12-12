@@ -74,19 +74,18 @@ def format_boolean_in_environment(instance):
     return True
 
 
-def validate_top_level_service_objects(config_file, version):
+def validate_top_level_service_objects(filename, service_dicts):
     """Perform some high level validation of the service name and value.
 
     This validation must happen before interpolation, which must happen
     before the rest of validation, which is why it's separate from the
     rest of the service validation.
     """
-    service_dicts = config_file.config if version == 1 else config_file.config.get('services', {})
     for service_name, service_dict in service_dicts.items():
         if not isinstance(service_name, six.string_types):
             raise ConfigurationError(
                 "In file '{}' service name: {} needs to be a string, eg '{}'".format(
-                    config_file.filename,
+                    filename,
                     service_name,
                     service_name))
 
@@ -95,8 +94,9 @@ def validate_top_level_service_objects(config_file, version):
                 "In file '{}' service '{}' doesn\'t have any configuration options. "
                 "All top level keys in your docker-compose.yml must map "
                 "to a dictionary of configuration options.".format(
-                    config_file.filename,
-                    service_name))
+                    filename, service_name
+                )
+            )
 
 
 def validate_top_level_object(config_file):
