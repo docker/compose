@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"syscall"
 	"text/tabwriter"
 
 	"github.com/codegangsta/cli"
@@ -63,6 +67,10 @@ var StartCommand = cli.Command{
 			Value: "",
 			Usage: "checkpoint to start the container from",
 		},
+		cli.BoolFlag{
+			Name:  "interactive,i",
+			Usage: "connect to the stdio of the container",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -75,15 +83,73 @@ var StartCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
-		c := getClient()
-		if _, err := c.CreateContainer(netcontext.Background(), &types.CreateContainerRequest{
+		r := &types.CreateContainerRequest{
 			Id:         id,
 			BundlePath: path,
 			Checkpoint: context.String("checkpoint"),
-		}); err != nil {
+		}
+		if context.Bool("interactive") {
+			if err := attachStdio(r); err != nil {
+				fatal(err.Error(), 1)
+			}
+		}
+		c := getClient()
+		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
+		if stdin != nil {
+			io.Copy(stdin, os.Stdin)
+		}
 	},
+}
+
+var stdin io.WriteCloser
+
+func attachStdio(r *types.CreateContainerRequest) error {
+	dir, err := ioutil.TempDir("", "ctr-")
+	if err != nil {
+		return err
+	}
+	for _, p := range []struct {
+		path string
+		flag int
+		done func(f *os.File)
+	}{
+		{
+			path: filepath.Join(dir, "stdin"),
+			flag: syscall.O_RDWR,
+			done: func(f *os.File) {
+				r.Stdin = filepath.Join(dir, "stdin")
+				stdin = f
+			},
+		},
+		{
+			path: filepath.Join(dir, "stdout"),
+			flag: syscall.O_RDWR,
+			done: func(f *os.File) {
+				r.Stdout = filepath.Join(dir, "stdout")
+				go io.Copy(os.Stdout, f)
+			},
+		},
+		{
+			path: filepath.Join(dir, "stderr"),
+			flag: syscall.O_RDWR,
+			done: func(f *os.File) {
+				r.Stderr = filepath.Join(dir, "stderr")
+				go io.Copy(os.Stderr, f)
+			},
+		},
+	} {
+		if err := syscall.Mkfifo(p.path, 0755); err != nil {
+			return fmt.Errorf("mkfifo: %s %v", p.path, err)
+		}
+		f, err := os.OpenFile(p.path, p.flag, 0)
+		if err != nil {
+			return fmt.Errorf("open: %s %v", p.path, err)
+		}
+		p.done(f)
+	}
+	return nil
 }
 
 var KillCommand = cli.Command{

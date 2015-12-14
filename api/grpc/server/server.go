@@ -33,6 +33,9 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e := containerd.NewEvent(containerd.StartContainerEventType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
+	e.Stdout = c.Stdout
+	e.Stderr = c.Stderr
+	e.Stdin = c.Stdin
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
 			Name: c.Checkpoint,

@@ -56,7 +56,7 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 
 type containerInfo struct {
 	container runtime.Container
-	logger    *logger
+	copier    *copier
 }
 
 type Supervisor struct {
@@ -222,14 +222,16 @@ func (s *Supervisor) SendEvent(evt *Event) {
 	s.events <- evt
 }
 
-func (s *Supervisor) log(path string, i *runtime.IO) (*logger, error) {
-	config := &logConfig{
-		BundlePath: path,
+func (s *Supervisor) copyIO(stdin, stdout, stderr string, i *runtime.IO) (*copier, error) {
+	config := &ioConfig{
 		Stdin:      i.Stdin,
 		Stdout:     i.Stdout,
 		Stderr:     i.Stderr,
+		StdoutPath: stdout,
+		StderrPath: stderr,
+		StdinPath:  stdin,
 	}
-	l, err := newLogger(config)
+	l, err := newCopier(config)
 	if err != nil {
 		return nil, err
 	}

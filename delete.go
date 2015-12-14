@@ -14,9 +14,9 @@ func (h *DeleteEvent) Handle(e *Event) error {
 		if err := h.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
-		if i.logger != nil {
-			if err := i.logger.Close(); err != nil {
-				logrus.WithField("error", err).Error("containerd: close container logger")
+		if i.copier != nil {
+			if err := i.copier.Close(); err != nil {
+				logrus.WithField("error", err).Error("containerd: close container copier")
 			}
 		}
 		h.s.notifySubscribers(&Event{

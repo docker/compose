@@ -44,15 +44,13 @@ func (i *IO) Close() error {
 		i.Stdin,
 		i.Stdout,
 		i.Stderr,
+		i.Console,
 	} {
 		if c != nil {
 			if err := c.Close(); oerr == nil {
 				oerr = err
 			}
 		}
-	}
-	if i.Console != nil {
-		oerr = i.Console.Close()
 	}
 	return oerr
 }
