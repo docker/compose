@@ -395,9 +395,21 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (runtime.Container, 
 	if err != nil {
 		return nil, nil, err
 	}
-	i, err := process.InitializeIO(int(spec.Process.User.UID))
-	if err != nil {
-		return nil, nil, err
+	var rio runtime.IO
+	if spec.Process.Terminal {
+		console, err := process.NewConsole(int(spec.Process.User.UID))
+		if err != nil {
+			return nil, nil, err
+		}
+		rio.Console = console
+	} else {
+		i, err := process.InitializeIO(int(spec.Process.User.UID))
+		if err != nil {
+			return nil, nil, err
+		}
+		rio.Stdin = i.Stdin
+		rio.Stderr = i.Stderr
+		rio.Stdout = i.Stdout
 	}
 	c := &libcontainerContainer{
 		c:                   container,
@@ -408,11 +420,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (runtime.Container, 
 		},
 		path: bundlePath,
 	}
-	return c, &runtime.IO{
-		Stdin:  i.Stdin,
-		Stdout: i.Stdout,
-		Stderr: i.Stderr,
-	}, nil
+	return c, &rio, nil
 }
 
 func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process) (runtime.Process, *runtime.IO, error) {
@@ -450,10 +458,6 @@ func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process
 // newProcess returns a new libcontainer Process with the arguments from the
 // spec and stdio from the current process.
 func (r *libcontainerRuntime) newProcess(p specs.Process) (*libcontainer.Process, error) {
-	// TODO: support terminals
-	if p.Terminal {
-		return nil, runtime.ErrTerminalsNotSupported
-	}
 	return &libcontainer.Process{
 		Args: p.Args,
 		Env:  p.Env,

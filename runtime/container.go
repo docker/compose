@@ -26,10 +26,16 @@ type State struct {
 	Status Status
 }
 
+type Console interface {
+	io.ReadWriter
+	io.Closer
+}
+
 type IO struct {
-	Stdin  io.WriteCloser
-	Stdout io.ReadCloser
-	Stderr io.ReadCloser
+	Stdin   io.WriteCloser
+	Stdout  io.ReadCloser
+	Stderr  io.ReadCloser
+	Console Console
 }
 
 func (i *IO) Close() error {
@@ -39,9 +45,14 @@ func (i *IO) Close() error {
 		i.Stdout,
 		i.Stderr,
 	} {
-		if err := c.Close(); oerr == nil {
-			oerr = err
+		if c != nil {
+			if err := c.Close(); oerr == nil {
+				oerr = err
+			}
 		}
+	}
+	if i.Console != nil {
+		oerr = i.Console.Close()
 	}
 	return oerr
 }
