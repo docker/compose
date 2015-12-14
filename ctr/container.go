@@ -2,7 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"sync"
+	"syscall"
 	"text/tabwriter"
 
 	"github.com/codegangsta/cli"
@@ -63,6 +68,10 @@ var StartCommand = cli.Command{
 			Value: "",
 			Usage: "checkpoint to start the container from",
 		},
+		cli.BoolFlag{
+			Name:  "interactive,i",
+			Usage: "connect to the stdio of the container",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -75,15 +84,69 @@ var StartCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
-		c := getClient()
-		if _, err := c.CreateContainer(netcontext.Background(), &types.CreateContainerRequest{
+		r := &types.CreateContainerRequest{
 			Id:         id,
 			BundlePath: path,
 			Checkpoint: context.String("checkpoint"),
-		}); err != nil {
+		}
+		wg := &sync.WaitGroup{}
+		if context.Bool("interactive") {
+			if err := attachStdio(r, wg); err != nil {
+				fatal(err.Error(), 1)
+			}
+		}
+		c := getClient()
+		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
+		wg.Wait()
 	},
+}
+
+func attachStdio(r *types.CreateContainerRequest, wg *sync.WaitGroup) error {
+	dir, err := ioutil.TempDir("", "ctr-")
+	if err != nil {
+		return err
+	}
+	wg.Add(2)
+	for _, p := range []struct {
+		path string
+		flag int
+		done func(f *os.File)
+	}{
+		{
+			path: filepath.Join(dir, "stdout"),
+			flag: syscall.O_RDWR,
+			done: func(f *os.File) {
+				r.Stdout = filepath.Join(dir, "stdout")
+				go func() {
+					io.Copy(os.Stdout, f)
+					wg.Done()
+				}()
+			},
+		},
+		{
+			path: filepath.Join(dir, "stderr"),
+			flag: syscall.O_RDWR,
+			done: func(f *os.File) {
+				r.Stderr = filepath.Join(dir, "stderr")
+				go func() {
+					io.Copy(os.Stderr, f)
+					wg.Done()
+				}()
+			},
+		},
+	} {
+		if err := syscall.Mkfifo(p.path, 0755); err != nil {
+			return fmt.Errorf("mkfifo: %s %v", p.path, err)
+		}
+		f, err := os.OpenFile(p.path, p.flag, 0)
+		if err != nil {
+			return fmt.Errorf("open: %s %v", p.path, err)
+		}
+		p.done(f)
+	}
+	return nil
 }
 
 var KillCommand = cli.Command{

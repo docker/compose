@@ -18,6 +18,8 @@ func (h *StartEvent) Handle(e *Event) error {
 		Err:       e.Err,
 		IO:        io,
 		Container: container,
+		Stdout:    e.Stdout,
+		Stderr:    e.Stderr,
 	}
 	if e.Checkpoint != nil {
 		task.Checkpoint = e.Checkpoint.Name

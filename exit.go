@@ -46,7 +46,7 @@ func (h *ExecExitEvent) Handle(e *Event) error {
 	if err := info.container.RemoveProcess(e.Pid); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
-	if err := info.logger.Close(); err != nil {
+	if err := info.copier.Close(); err != nil {
 		logrus.WithField("error", err).Error("containerd: close process IO")
 	}
 	delete(h.s.processes, e.Pid)
