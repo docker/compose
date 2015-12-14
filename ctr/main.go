@@ -37,6 +37,7 @@ func main() {
 		CheckpointCommand,
 		ContainersCommand,
 		EventsCommand,
+		StatsCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

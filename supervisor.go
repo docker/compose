@@ -7,11 +7,14 @@ import (
 	goruntime "runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 )
+
+const statsInterval = 1 * time.Second
 
 // NewSupervisor returns an initialized Process supervisor.
 func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, error) {
@@ -28,14 +31,15 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 		return nil, err
 	}
 	s := &Supervisor{
-		stateDir:    stateDir,
-		containers:  make(map[string]*containerInfo),
-		processes:   make(map[int]*containerInfo),
-		runtime:     r,
-		tasks:       tasks,
-		events:      make(chan *Event, DefaultBufferSize),
-		machine:     machine,
-		subscribers: make(map[chan *Event]struct{}),
+		stateDir:       stateDir,
+		containers:     make(map[string]*containerInfo),
+		processes:      make(map[int]*containerInfo),
+		runtime:        r,
+		tasks:          tasks,
+		events:         make(chan *Event, DefaultBufferSize),
+		machine:        machine,
+		subscribers:    make(map[chan *Event]struct{}),
+		statsCollector: newStatsCollector(statsInterval),
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
@@ -49,6 +53,8 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 		UpdateContainerEventType:  &UpdateEvent{s},
 		CreateCheckpointEventType: &CreateCheckpointEvent{s},
 		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
+		StatsEventType:            &StatsEvent{s},
+		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil
@@ -74,6 +80,7 @@ type Supervisor struct {
 	subscribers    map[chan *Event]struct{}
 	machine        Machine
 	containerGroup sync.WaitGroup
+	statsCollector *statsCollector
 }
 
 // Stop closes all tasks and sends a SIGTERM to each container's pid1 then waits for they to

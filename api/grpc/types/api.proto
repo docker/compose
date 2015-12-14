@@ -12,6 +12,7 @@ service API {
 	rpc ListCheckpoint(ListCheckpointRequest) returns (ListCheckpointResponse) {}
 	rpc State(StateRequest) returns (StateResponse) {}
 	rpc Events(EventsRequest) returns (stream Event) {}
+	rpc GetStats(StatsRequest) returns (stream Stats) {}
 }
 
 message CreateContainerRequest {
@@ -225,4 +226,9 @@ message CgroupStats {
 message Stats {
 	repeated NetworkStats network_stats = 1;
 	CgroupStats cgroup_stats = 2;
+	uint64 timestamp = 3;
 };
+
+message StatsRequest {
+	string id = 1;
+}

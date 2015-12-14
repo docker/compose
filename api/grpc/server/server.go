@@ -233,3 +233,39 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	}
 	return nil
 }
+
+func (s *apiServer) GetStats(r *types.StatsRequest, stream types.API_GetStatsServer) error {
+	e := containerd.NewEvent(containerd.StatsEventType)
+	e.ID = r.Id
+	s.sv.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		if err == containerd.ErrContainerNotFound {
+			return grpc.Errorf(codes.NotFound, err.Error())
+		}
+		return err
+	}
+	defer func() {
+		ue := containerd.NewEvent(containerd.UnsubscribeStatsEventType)
+		ue.ID = e.ID
+		ue.Stats = e.Stats
+		s.sv.SendEvent(ue)
+		if err := <-ue.Err; err != nil {
+			logrus.Errorf("Error unsubscribing %s: %v", r.Id, err)
+		}
+	}()
+	for {
+		select {
+		case st := <-e.Stats:
+			pbSt, ok := st.(*types.Stats)
+			if !ok {
+				panic("invalid stats type from collector")
+			}
+			if err := stream.Send(pbSt); err != nil {
+				return err
+			}
+		case <-stream.Context().Done():
+			return nil
+		}
+	}
+	return nil
+}
