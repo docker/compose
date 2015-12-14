@@ -328,7 +328,8 @@ class Service(object):
                                  plan,
                                  do_build=True,
                                  timeout=DEFAULT_TIMEOUT,
-                                 detached=False):
+                                 detached=False,
+                                 start=True):
         (action, containers) = plan
         should_attach_logs = not detached
 
@@ -338,7 +339,8 @@ class Service(object):
             if should_attach_logs:
                 container.attach_log_stream()
 
-            container.start()
+            if start:
+                container.start()
 
             return [container]
 
@@ -348,14 +350,16 @@ class Service(object):
                     container,
                     do_build=do_build,
                     timeout=timeout,
-                    attach_logs=should_attach_logs
+                    attach_logs=should_attach_logs,
+                    start_new_container=start
                 )
                 for container in containers
             ]
 
         elif action == 'start':
-            for container in containers:
-                self.start_container_if_stopped(container, attach_logs=should_attach_logs)
+            if start:
+                for container in containers:
+                    self.start_container_if_stopped(container, attach_logs=should_attach_logs)
 
             return containers
 
@@ -373,7 +377,8 @@ class Service(object):
             container,
             do_build=False,
             timeout=DEFAULT_TIMEOUT,
-            attach_logs=False):
+            attach_logs=False,
+            start_new_container=True):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -392,7 +397,8 @@ class Service(object):
         )
         if attach_logs:
             new_container.attach_log_stream()
-        new_container.start()
+        if start_new_container:
+            new_container.start()
         container.remove()
         return new_container
 

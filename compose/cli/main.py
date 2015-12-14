@@ -130,6 +130,7 @@ class TopLevelCommand(DocoptCommand):
     Commands:
       build              Build or rebuild services
       config             Validate and view the compose file
+      create             Create services
       help               Get help on a command
       kill               Kill containers
       logs               View output from containers
@@ -220,6 +221,27 @@ class TopLevelCommand(DocoptCommand):
             default_flow_style=False,
             indent=2,
             width=80))
+
+    def create(self, project, options):
+        """
+        Creates containers for a service.
+
+        Usage: create [options] [SERVICE...]
+
+        Options:
+            --force-recreate       Recreate containers even if their configuration and
+                                   image haven't changed. Incompatible with --no-recreate.
+            --no-recreate          If containers already exist, don't recreate them.
+                                   Incompatible with --force-recreate.
+            --no-build             Don't build an image, even if it's missing
+        """
+        service_names = options['SERVICE']
+
+        project.create(
+            service_names=service_names,
+            strategy=convergence_strategy_from_opts(options),
+            do_build=not options['--no-build']
+        )
 
     def help(self, project, options):
         """

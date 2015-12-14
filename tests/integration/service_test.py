@@ -333,6 +333,24 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(list(new_container.get('Volumes')), ['/data'])
         self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
 
+    def test_execute_convergence_plan_without_start(self):
+        service = self.create_service(
+            'db',
+            build='tests/fixtures/dockerfile-with-volume'
+        )
+
+        containers = service.execute_convergence_plan(ConvergencePlan('create', []), start=False)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        containers = service.execute_convergence_plan(ConvergencePlan('recreate', containers), start=False)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        service.execute_convergence_plan(ConvergencePlan('start', containers), start=False)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
         create_and_start_container(db, environment={'FOO': 'BAR'})
