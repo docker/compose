@@ -38,6 +38,7 @@ type Event struct {
 	BundlePath string
 	Stdout     string
 	Stderr     string
+	Stdin      string
 	Pid        int
 	Status     int
 	Signal     os.Signal

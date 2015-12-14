@@ -15,6 +15,7 @@ type StartTask struct {
 	Container  runtime.Container
 	Checkpoint string
 	IO         *runtime.IO
+	Stdin      string
 	Stdout     string
 	Stderr     string
 	Err        chan error
@@ -36,7 +37,7 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
-		l, err := w.s.copyIO(t.Stdout, t.Stderr, t.IO)
+		l, err := w.s.copyIO(t.Stdin, t.Stdout, t.Stderr, t.IO)
 		if err != nil {
 			evt := NewEvent(DeleteEventType)
 			evt.ID = t.Container.ID()

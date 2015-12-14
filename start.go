@@ -18,6 +18,7 @@ func (h *StartEvent) Handle(e *Event) error {
 		Err:       e.Err,
 		IO:        io,
 		Container: container,
+		Stdin:     e.Stdin,
 		Stdout:    e.Stdout,
 		Stderr:    e.Stderr,
 	}

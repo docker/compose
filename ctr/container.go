@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync"
 	"syscall"
 	"text/tabwriter"
 
@@ -89,9 +88,8 @@ var StartCommand = cli.Command{
 			BundlePath: path,
 			Checkpoint: context.String("checkpoint"),
 		}
-		wg := &sync.WaitGroup{}
 		if context.Bool("interactive") {
-			if err := attachStdio(r, wg); err != nil {
+			if err := attachStdio(r); err != nil {
 				fatal(err.Error(), 1)
 			}
 		}
@@ -99,30 +97,38 @@ var StartCommand = cli.Command{
 		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
-		wg.Wait()
+		if stdin != nil {
+			io.Copy(stdin, os.Stdin)
+		}
 	},
 }
 
-func attachStdio(r *types.CreateContainerRequest, wg *sync.WaitGroup) error {
+var stdin io.WriteCloser
+
+func attachStdio(r *types.CreateContainerRequest) error {
 	dir, err := ioutil.TempDir("", "ctr-")
 	if err != nil {
 		return err
 	}
-	wg.Add(2)
 	for _, p := range []struct {
 		path string
 		flag int
 		done func(f *os.File)
 	}{
 		{
+			path: filepath.Join(dir, "stdin"),
+			flag: syscall.O_RDWR,
+			done: func(f *os.File) {
+				r.Stdin = filepath.Join(dir, "stdin")
+				stdin = f
+			},
+		},
+		{
 			path: filepath.Join(dir, "stdout"),
 			flag: syscall.O_RDWR,
 			done: func(f *os.File) {
 				r.Stdout = filepath.Join(dir, "stdout")
-				go func() {
-					io.Copy(os.Stdout, f)
-					wg.Done()
-				}()
+				go io.Copy(os.Stdout, f)
 			},
 		},
 		{
@@ -130,10 +136,7 @@ func attachStdio(r *types.CreateContainerRequest, wg *sync.WaitGroup) error {
 			flag: syscall.O_RDWR,
 			done: func(f *os.File) {
 				r.Stderr = filepath.Join(dir, "stderr")
-				go func() {
-					io.Copy(os.Stderr, f)
-					wg.Done()
-				}()
+				go io.Copy(os.Stderr, f)
 			},
 		},
 	} {

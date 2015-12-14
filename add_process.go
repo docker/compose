@@ -17,7 +17,7 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 	if err != nil {
 		return err
 	}
-	l, err := h.s.copyIO(e.Stdout, e.Stderr, io)
+	l, err := h.s.copyIO(e.Stdin, e.Stdout, e.Stderr, io)
 	if err != nil {
 		// log the error but continue with the other commands
 		logrus.WithFields(logrus.Fields{

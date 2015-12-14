@@ -222,13 +222,14 @@ func (s *Supervisor) SendEvent(evt *Event) {
 	s.events <- evt
 }
 
-func (s *Supervisor) copyIO(stdout, stderr string, i *runtime.IO) (*copier, error) {
+func (s *Supervisor) copyIO(stdin, stdout, stderr string, i *runtime.IO) (*copier, error) {
 	config := &ioConfig{
 		Stdin:      i.Stdin,
 		Stdout:     i.Stdout,
 		Stderr:     i.Stderr,
 		StdoutPath: stdout,
 		StderrPath: stderr,
+		StdinPath:  stdin,
 	}
 	l, err := newCopier(config)
 	if err != nil {
