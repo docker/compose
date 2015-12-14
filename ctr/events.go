@@ -14,7 +14,7 @@ var EventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "receive events from the containerd daemon",
 	Action: func(context *cli.Context) {
-		c := getClient()
+		c := getClient(context)
 		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
 		if err != nil {
 			fatal(err.Error(), 1)

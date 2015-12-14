@@ -28,7 +28,7 @@ var ListCheckpointCommand = cli.Command{
 
 func listCheckpoints(context *cli.Context) {
 	var (
-		c  = getClient()
+		c  = getClient(context)
 		id = context.Args().First()
 	)
 	if id == "" {
@@ -82,7 +82,7 @@ var CreateCheckpointCommand = cli.Command{
 		if name == "" {
 			fatal("checkpoint name cannot be empty", 1)
 		}
-		c := getClient()
+		c := getClient(context)
 		if _, err := c.CreateCheckpoint(netcontext.Background(), &types.CreateCheckpointRequest{
 			Id: containerID,
 			Checkpoint: &types.Checkpoint{
@@ -108,7 +108,7 @@ var DeleteCheckpointCommand = cli.Command{
 		if name == "" {
 			fatal("checkpoint name cannot be empty", 1)
 		}
-		c := getClient()
+		c := getClient(context)
 		if _, err := c.DeleteCheckpoint(netcontext.Background(), &types.DeleteCheckpointRequest{
 			Id:   containerID,
 			Name: name,
