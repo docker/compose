@@ -115,6 +115,8 @@ class Container(object):
     def human_readable_state(self):
         if self.is_paused:
             return 'Paused'
+        if self.is_restarting:
+            return 'Restarting'
         if self.is_running:
             return 'Ghost' if self.get('State.Ghost') else 'Up'
         else:
@@ -133,6 +135,10 @@ class Container(object):
     @property
     def is_running(self):
         return self.get('State.Running')
+
+    @property
+    def is_restarting(self):
+        return self.get('State.Restarting')
 
     @property
     def is_paused(self):
