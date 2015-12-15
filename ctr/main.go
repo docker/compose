@@ -28,9 +28,9 @@ func main() {
 			Usage: "enable debug output in the logs",
 		},
 		cli.StringFlag{
-			Name:  "addr",
-			Value: "http://localhost:8888",
-			Usage: "address to the containerd api",
+			Name:  "address",
+			Value: "/run/containerd/containerd.sock",
+			Usage: "address of GRPC API",
 		},
 	}
 	app.Commands = []cli.Command{

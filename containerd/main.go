@@ -57,6 +57,11 @@ var daemonFlags = []cli.Flag{
 		Value: 60 * time.Second,
 		Usage: "interval for flushing metrics to the store",
 	},
+	cli.StringFlag{
+		Name:  "listen,l",
+		Value: "/run/containerd/containerd.sock",
+		Usage: "Address on which GRPC API will listen",
+	},
 }
 
 func main() {
@@ -81,6 +86,7 @@ func main() {
 	app.Action = func(context *cli.Context) {
 		if err := daemon(
 			context.String("id"),
+			context.String("listen"),
 			context.String("state-dir"),
 			context.Int("concurrency"),
 		); err != nil {
@@ -140,7 +146,7 @@ func processMetrics() {
 	}()
 }
 
-func daemon(id, stateDir string, concurrency int) error {
+func daemon(id, address, stateDir string, concurrency int) error {
 	tasks := make(chan *containerd.StartTask, concurrency*100)
 	supervisor, err := containerd.NewSupervisor(id, stateDir, tasks)
 	if err != nil {
@@ -166,12 +172,16 @@ func daemon(id, stateDir string, concurrency int) error {
 	if err := supervisor.Start(); err != nil {
 		return err
 	}
-	l, err := net.Listen("tcp", ":8888")
+	if err := os.RemoveAll(address); err != nil {
+		return err
+	}
+	l, err := net.Listen("unix", address)
 	if err != nil {
 		return err
 	}
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(supervisor))
+	logrus.Debugf("GRPC API listen on %s", address)
 	return s.Serve(l)
 }
 

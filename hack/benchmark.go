@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -17,19 +18,26 @@ import (
 
 func init() {
 	flag.StringVar(&bundle, "bundle", "/containers/redis", "the bundle path")
+	flag.StringVar(&addr, "addr", "/run/containerd/containerd.sock", "address to the container d instance")
 	flag.IntVar(&count, "count", 1000, "number of containers to run")
 	flag.Parse()
 }
 
 var (
-	count  int
-	bundle string
-	group  = sync.WaitGroup{}
-	jobs   = make(chan string, 20)
+	count        int
+	bundle, addr string
+	group        = sync.WaitGroup{}
+	jobs         = make(chan string, 20)
 )
 
 func getClient() types.APIClient {
-	conn, err := grpc.Dial("localhost:8888", grpc.WithInsecure())
+	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
+	dialOpts = append(dialOpts,
+		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+			return net.DialTimeout("unix", addr, timeout)
+		},
+		))
+	conn, err := grpc.Dial(addr, dialOpts...)
 	if err != nil {
 		logrus.Fatal(err)
 	}
