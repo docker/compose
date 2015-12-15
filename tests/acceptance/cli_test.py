@@ -664,6 +664,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
+    def test_start_no_containers(self):
+        result = self.dispatch(['start'], returncode=1)
+        assert 'No containers to start' in result.stderr
+
     def test_pause_unpause(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -674,6 +678,14 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['unpause'], None)
         self.assertFalse(service.containers()[0].is_paused)
+
+    def test_pause_no_containers(self):
+        result = self.dispatch(['pause'], returncode=1)
+        assert 'No containers to pause' in result.stderr
+
+    def test_unpause_no_containers(self):
+        result = self.dispatch(['unpause'], returncode=1)
+        assert 'No containers to unpause' in result.stderr
 
     def test_logs_invalid_service_name(self):
         self.dispatch(['logs', 'madeupname'], returncode=1)
@@ -736,6 +748,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['restart', '-t', '1'], None)
         self.assertEqual(len(service.containers(stopped=False)), 1)
+
+    def test_restart_no_containers(self):
+        result = self.dispatch(['restart'], returncode=1)
+        assert 'No containers to restart' in result.stderr
 
     def test_scale(self):
         project = self.project

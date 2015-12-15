@@ -138,8 +138,10 @@ class Service(object):
         raise ValueError("No container found for %s_%s" % (self.name, number))
 
     def start(self, **options):
-        for c in self.containers(stopped=True):
+        containers = self.containers(stopped=True)
+        for c in containers:
             self.start_container_if_stopped(c, **options)
+        return containers
 
     def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
         """
