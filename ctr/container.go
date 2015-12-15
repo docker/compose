@@ -28,10 +28,11 @@ var ContainersCommand = cli.Command{
 	Name:  "containers",
 	Usage: "interact with running containers",
 	Subcommands: []cli.Command{
-		StartCommand,
-		ListCommand,
-		KillCommand,
 		ExecCommand,
+		KillCommand,
+		ListCommand,
+		StartCommand,
+		StatsCommand,
 	},
 	Action: listContainers,
 }
@@ -234,15 +235,9 @@ var ExecCommand = cli.Command{
 var StatsCommand = cli.Command{
 	Name:  "stats",
 	Usage: "get stats for running container",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "id",
-			Usage: "container id",
-		},
-	},
 	Action: func(context *cli.Context) {
 		req := &types.StatsRequest{
-			Id: context.String("id"),
+			Id: context.Args().First(),
 		}
 		c := getClient()
 		stream, err := c.GetStats(netcontext.Background(), req)
