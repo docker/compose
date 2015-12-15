@@ -44,6 +44,10 @@ message AddProcessRequest {
 	repeated string args = 4; // Arguments for process, first is binary path itself
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
+    string stdin = 7; // path to the file where stdin will be read (optional)
+	string stdout = 8; // path to file where stdout will be written (optional)
+	string stderr = 9; // path to file where stderr will be written (optional)
+    string console = 10; // path to the console for a container (optional)
 };
 
 message User {

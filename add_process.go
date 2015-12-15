@@ -13,9 +13,15 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 	if !ok {
 		return ErrContainerNotFound
 	}
-	p, io, err := h.s.runtime.StartProcess(ci.container, *e.Process)
+	p, io, err := h.s.runtime.StartProcess(ci.container, *e.Process, e.Console)
 	if err != nil {
 		return err
+	}
+	if e.Pid, err = p.Pid(); err != nil {
+		return err
+	}
+	h.s.processes[e.Pid] = &containerInfo{
+		container: ci.container,
 	}
 	l, err := h.s.copyIO(e.Stdin, e.Stdout, e.Stderr, io)
 	if err != nil {
@@ -25,12 +31,6 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 			"id":    e.ID,
 		}).Error("log stdio")
 	}
-	if e.Pid, err = p.Pid(); err != nil {
-		return err
-	}
-	h.s.processes[e.Pid] = &containerInfo{
-		container: ci.container,
-		copier:    l,
-	}
+	h.s.processes[e.Pid].copier = l
 	return nil
 }

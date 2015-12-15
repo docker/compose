@@ -196,7 +196,7 @@ func (r *runcRuntime) createIO(cmd *exec.Cmd) (*runtime.IO, error) {
 	}, nil
 }
 
-func (r *runcRuntime) StartProcess(ci runtime.Container, p specs.Process) (runtime.Process, *runtime.IO, error) {
+func (r *runcRuntime) StartProcess(ci runtime.Container, p specs.Process, consolePath string) (runtime.Process, *runtime.IO, error) {
 	c, ok := ci.(*runcContainer)
 	if !ok {
 		return nil, nil, runtime.ErrInvalidContainerType

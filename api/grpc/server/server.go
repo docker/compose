@@ -76,6 +76,10 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	e := containerd.NewEvent(containerd.AddProcessEventType)
 	e.ID = r.Id
 	e.Process = process
+	e.Console = r.Console
+	e.Stdin = r.Stdin
+	e.Stdout = r.Stdout
+	e.Stderr = r.Stderr
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
@@ -220,7 +224,7 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	defer s.sv.Unsubscribe(events)
 	for evt := range events {
 		switch evt.Type {
-		case containerd.ExitEventType:
+		case containerd.ExitEventType, containerd.ExecExitEventType:
 			ev := &types.Event{
 				Type:   "exit",
 				Id:     evt.ID,

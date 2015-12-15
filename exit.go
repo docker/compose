@@ -18,12 +18,11 @@ func (h *ExitEvent) Handle(e *Event) error {
 		h.s.SendEvent(ne)
 		return nil
 	}
-
 	// is it the main container's process
 	container, err := h.s.getContainerForPid(e.Pid)
 	if err != nil {
 		if err != errNoContainerForPid {
-			logrus.WithField("error", err).Error("containerd: find container for pid")
+			logrus.WithField("error", err).Error("containerd: find containers main pid")
 		}
 		return nil
 	}

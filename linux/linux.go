@@ -187,7 +187,7 @@ func (p *libcontainerProcess) Signal(s os.Signal) error {
 
 func (p *libcontainerProcess) Close() error {
 	// in close we always need to call wait to close/flush any pipes
-	_, err := p.process.Wait()
+	p.process.Wait()
 	// explicitly close any open fd on the process
 	for _, cl := range []interface{}{
 		p.process.Stderr,
@@ -200,7 +200,7 @@ func (p *libcontainerProcess) Close() error {
 			}
 		}
 	}
-	return err
+	return nil
 }
 
 type libcontainerContainer struct {
@@ -430,7 +430,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtim
 	return c, &rio, nil
 }
 
-func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process) (runtime.Process, *runtime.IO, error) {
+func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process, consolePath string) (runtime.Process, *runtime.IO, error) {
 	c, ok := ci.(*libcontainerContainer)
 	if !ok {
 		return nil, nil, runtime.ErrInvalidContainerType
@@ -439,9 +439,19 @@ func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process
 	if err != nil {
 		return nil, nil, err
 	}
-	i, err := process.InitializeIO(int(p.User.UID))
-	if err != nil {
-		return nil, nil, err
+	var rio runtime.IO
+	if p.Terminal {
+		if err := process.ConsoleFromPath(consolePath); err != nil {
+			return nil, nil, err
+		}
+	} else {
+		i, err := process.InitializeIO(int(p.User.UID))
+		if err != nil {
+			return nil, nil, err
+		}
+		rio.Stdin = i.Stdin
+		rio.Stderr = i.Stderr
+		rio.Stdout = i.Stdout
 	}
 	if err := c.c.Start(process); err != nil {
 		return nil, nil, err
@@ -455,11 +465,7 @@ func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process
 		return nil, nil, err
 	}
 	c.additionalProcesses[pid] = lp
-	return lp, &runtime.IO{
-		Stdin:  i.Stdin,
-		Stdout: i.Stdout,
-		Stderr: i.Stderr,
-	}, nil
+	return lp, &rio, nil
 }
 
 // newProcess returns a new libcontainer Process with the arguments from the

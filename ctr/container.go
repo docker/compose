@@ -112,11 +112,11 @@ var StartCommand = cli.Command{
 				fatal(err.Error(), 1)
 			}
 			if mkterm {
-				if err := attachTty(r); err != nil {
+				if err := attachTty(&r.Console); err != nil {
 					fatal(err.Error(), 1)
 				}
 			} else {
-				if err := attachStdio(r); err != nil {
+				if err := attachStdio(&r.Stdin, &r.Stdout, &r.Stderr); err != nil {
 					fatal(err.Error(), 1)
 				}
 			}
@@ -149,6 +149,8 @@ var (
 	state *term.State
 )
 
+// readTermSetting reads the Terminal option out of the specs configuration
+// to know if ctr should allocate a pty
 func readTermSetting(path string) (bool, error) {
 	f, err := os.Open(filepath.Join(path, "config.json"))
 	if err != nil {
@@ -162,12 +164,12 @@ func readTermSetting(path string) (bool, error) {
 	return spec.Process.Terminal, nil
 }
 
-func attachTty(r *types.CreateContainerRequest) error {
+func attachTty(consolePath *string) error {
 	console, err := libcontainer.NewConsole(os.Getuid(), os.Getgid())
 	if err != nil {
 		return err
 	}
-	r.Console = console.Path()
+	*consolePath = console.Path()
 	stdin = console
 	go func() {
 		io.Copy(os.Stdout, console)
@@ -181,7 +183,7 @@ func attachTty(r *types.CreateContainerRequest) error {
 	return nil
 }
 
-func attachStdio(r *types.CreateContainerRequest) error {
+func attachStdio(stdins, stdout, stderr *string) error {
 	dir, err := ioutil.TempDir("", "ctr-")
 	if err != nil {
 		return err
@@ -195,7 +197,7 @@ func attachStdio(r *types.CreateContainerRequest) error {
 			path: filepath.Join(dir, "stdin"),
 			flag: syscall.O_RDWR,
 			done: func(f *os.File) {
-				r.Stdin = filepath.Join(dir, "stdin")
+				*stdins = filepath.Join(dir, "stdin")
 				stdin = f
 			},
 		},
@@ -203,7 +205,7 @@ func attachStdio(r *types.CreateContainerRequest) error {
 			path: filepath.Join(dir, "stdout"),
 			flag: syscall.O_RDWR,
 			done: func(f *os.File) {
-				r.Stdout = filepath.Join(dir, "stdout")
+				*stdout = filepath.Join(dir, "stdout")
 				go io.Copy(os.Stdout, f)
 			},
 		},
@@ -211,7 +213,7 @@ func attachStdio(r *types.CreateContainerRequest) error {
 			path: filepath.Join(dir, "stderr"),
 			flag: syscall.O_RDWR,
 			done: func(f *os.File) {
-				r.Stderr = filepath.Join(dir, "stderr")
+				*stderr = filepath.Join(dir, "stderr")
 				go io.Copy(os.Stderr, f)
 			},
 		},
@@ -266,6 +268,10 @@ var ExecCommand = cli.Command{
 			Name:  "id",
 			Usage: "container id to add the process to",
 		},
+		cli.BoolFlag{
+			Name:  "attach,a",
+			Usage: "connect to the stdio of the container",
+		},
 		cli.StringFlag{
 			Name:  "cwd",
 			Usage: "current working directory for the process",
@@ -301,8 +307,41 @@ var ExecCommand = cli.Command{
 			},
 		}
 		c := getClient(context)
-		if _, err := c.AddProcess(netcontext.Background(), p); err != nil {
+		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
+		if err != nil {
 			fatal(err.Error(), 1)
+		}
+		if context.Bool("attach") {
+			if p.Terminal {
+				if err := attachTty(&p.Console); err != nil {
+					fatal(err.Error(), 1)
+				}
+			} else {
+				if err := attachStdio(&p.Stdin, &p.Stdout, &p.Stderr); err != nil {
+					fatal(err.Error(), 1)
+				}
+			}
+		}
+		r, err := c.AddProcess(netcontext.Background(), p)
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		if context.Bool("attach") {
+			go func() {
+				io.Copy(stdin, os.Stdin)
+				if state != nil {
+					term.RestoreTerminal(os.Stdin.Fd(), state)
+				}
+			}()
+			for {
+				e, err := events.Recv()
+				if err != nil {
+					fatal(err.Error(), 1)
+				}
+				if e.Pid == r.Pid && e.Type == "exit" {
+					os.Exit(int(e.Status))
+				}
+			}
 		}
 	},
 }
