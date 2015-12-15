@@ -147,7 +147,7 @@ func (r *runcRuntime) Type() string {
 	return "runc"
 }
 
-func (r *runcRuntime) Create(id, bundlePath string) (runtime.Container, *runtime.IO, error) {
+func (r *runcRuntime) Create(id, bundlePath, consolePath string) (runtime.Container, *runtime.IO, error) {
 	var s specs.Spec
 	f, err := os.Open(filepath.Join(bundlePath, "config.json"))
 	if err != nil {

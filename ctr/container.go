@@ -11,6 +11,8 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/docker/docker/pkg/term"
+	"github.com/opencontainers/runc/libcontainer"
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -72,6 +74,10 @@ var StartCommand = cli.Command{
 			Name:  "interactive,i",
 			Usage: "connect to the stdio of the container",
 		},
+		cli.BoolFlag{
+			Name:  "tty,t",
+			Usage: "allocate a tty for use with the container",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -84,6 +90,11 @@ var StartCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
+		c := getClient()
+		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
 		r := &types.CreateContainerRequest{
 			Id:         id,
 			BundlePath: path,
@@ -94,17 +105,57 @@ var StartCommand = cli.Command{
 				fatal(err.Error(), 1)
 			}
 		}
-		c := getClient()
+		if context.Bool("tty") {
+			if err := attachTty(r); err != nil {
+				fatal(err.Error(), 1)
+			}
+		}
 		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
 		if stdin != nil {
-			io.Copy(stdin, os.Stdin)
+			go func() {
+				io.Copy(stdin, os.Stdin)
+				if state != nil {
+					term.RestoreTerminal(os.Stdin.Fd(), state)
+				}
+			}()
+			for {
+				e, err := events.Recv()
+				if err != nil {
+					fatal(err.Error(), 1)
+				}
+				if e.Id == id && e.Type == "exit" {
+					os.Exit(int(e.Status))
+				}
+			}
 		}
 	},
 }
 
-var stdin io.WriteCloser
+var (
+	stdin io.WriteCloser
+	state *term.State
+)
+
+func attachTty(r *types.CreateContainerRequest) error {
+	console, err := libcontainer.NewConsole(os.Getuid(), os.Getgid())
+	if err != nil {
+		return err
+	}
+	r.Console = console.Path()
+	stdin = console
+	go func() {
+		io.Copy(os.Stdout, console)
+		console.Close()
+	}()
+	s, err := term.SetRawTerminal(os.Stdin.Fd())
+	if err != nil {
+		return err
+	}
+	state = s
+	return nil
+}
 
 func attachStdio(r *types.CreateContainerRequest) error {
 	dir, err := ioutil.TempDir("", "ctr-")
