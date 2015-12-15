@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/term"
 	"github.com/opencontainers/runc/libcontainer"
+	"github.com/opencontainers/specs"
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -79,12 +81,8 @@ var StartCommand = cli.Command{
 			Usage: "checkpoint to start the container from",
 		},
 		cli.BoolFlag{
-			Name:  "interactive,i",
+			Name:  "attach,a",
 			Usage: "connect to the stdio of the container",
-		},
-		cli.BoolFlag{
-			Name:  "tty,t",
-			Usage: "allocate a tty for use with the container",
 		},
 	},
 	Action: func(context *cli.Context) {
@@ -108,20 +106,25 @@ var StartCommand = cli.Command{
 			BundlePath: path,
 			Checkpoint: context.String("checkpoint"),
 		}
-		if context.Bool("interactive") {
-			if err := attachStdio(r); err != nil {
+		if context.Bool("attach") {
+			mkterm, err := readTermSetting(path)
+			if err != nil {
 				fatal(err.Error(), 1)
 			}
-		}
-		if context.Bool("tty") {
-			if err := attachTty(r); err != nil {
-				fatal(err.Error(), 1)
+			if mkterm {
+				if err := attachTty(r); err != nil {
+					fatal(err.Error(), 1)
+				}
+			} else {
+				if err := attachStdio(r); err != nil {
+					fatal(err.Error(), 1)
+				}
 			}
 		}
 		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
-		if stdin != nil {
+		if context.Bool("attach") {
 			go func() {
 				io.Copy(stdin, os.Stdin)
 				if state != nil {
@@ -145,6 +148,19 @@ var (
 	stdin io.WriteCloser
 	state *term.State
 )
+
+func readTermSetting(path string) (bool, error) {
+	f, err := os.Open(filepath.Join(path, "config.json"))
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	var spec specs.Spec
+	if err := json.NewDecoder(f).Decode(&spec); err != nil {
+		return false, err
+	}
+	return spec.Process.Terminal, nil
+}
 
 func attachTty(r *types.CreateContainerRequest) error {
 	console, err := libcontainer.NewConsole(os.Getuid(), os.Getgid())
