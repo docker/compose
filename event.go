@@ -21,6 +21,8 @@ const (
 	UpdateContainerEventType  EventType = "updateContainer"
 	CreateCheckpointEventType EventType = "createCheckpoint"
 	DeleteCheckpointEventType EventType = "deleteCheckpoint"
+	StatsEventType            EventType = "events"
+	UnsubscribeStatsEventType EventType = "unsubscribeEvents"
 )
 
 func NewEvent(t EventType) *Event {
@@ -47,6 +49,7 @@ type Event struct {
 	Containers []runtime.Container
 	Checkpoint *runtime.Checkpoint
 	Err        chan error
+	Stats      chan interface{}
 }
 
 type Handler interface {

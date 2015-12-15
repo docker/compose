@@ -230,3 +230,31 @@ var ExecCommand = cli.Command{
 		}
 	},
 }
+
+var StatsCommand = cli.Command{
+	Name:  "stats",
+	Usage: "get stats for running container",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "id",
+			Usage: "container id",
+		},
+	},
+	Action: func(context *cli.Context) {
+		req := &types.StatsRequest{
+			Id: context.String("id"),
+		}
+		c := getClient()
+		stream, err := c.GetStats(netcontext.Background(), req)
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		for {
+			stats, err := stream.Recv()
+			if err != nil {
+				fatal(err.Error(), 1)
+			}
+			fmt.Println(stats)
+		}
+	},
+}
