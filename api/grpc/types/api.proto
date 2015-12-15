@@ -21,6 +21,7 @@ message CreateContainerRequest {
 	string stdin = 3; // path to the file where stdin will be read (optional)
 	string stdout = 4; // path to file where stdout will be written (optional)
 	string stderr = 5; // path to file where stderr will be written (optional)
+    string console = 6; // path to the console for a container (optional)
 	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
 }
 
