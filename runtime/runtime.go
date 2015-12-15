@@ -20,7 +20,7 @@ type Runtime interface {
 	// Type of the runtime
 	Type() string
 	// Create creates a new container initialized but without it starting it
-	Create(id, bundlePath string) (Container, *IO, error)
+	Create(id, bundlePath, consolePath string) (Container, *IO, error)
 	// StartProcess adds a new process to the container
 	StartProcess(Container, specs.Process) (Process, *IO, error)
 }

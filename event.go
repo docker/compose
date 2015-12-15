@@ -41,6 +41,7 @@ type Event struct {
 	Stdout     string
 	Stderr     string
 	Stdin      string
+	Console    string
 	Pid        int
 	Status     int
 	Signal     os.Signal

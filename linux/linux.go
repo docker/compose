@@ -188,9 +188,18 @@ func (p *libcontainerProcess) Signal(s os.Signal) error {
 func (p *libcontainerProcess) Close() error {
 	// in close we always need to call wait to close/flush any pipes
 	_, err := p.process.Wait()
-	p.process.Stdin.(io.Closer).Close()
-	p.process.Stdout.(io.Closer).Close()
-	p.process.Stderr.(io.Closer).Close()
+	// explicitly close any open fd on the process
+	for _, cl := range []interface{}{
+		p.process.Stderr,
+		p.process.Stdout,
+		p.process.Stdin,
+	} {
+		if cl != nil {
+			if c, ok := cl.(io.Closer); ok {
+				c.Close()
+			}
+		}
+	}
 	return err
 }
 
@@ -375,7 +384,7 @@ func (r *libcontainerRuntime) Type() string {
 	return "libcontainer"
 }
 
-func (r *libcontainerRuntime) Create(id, bundlePath string) (runtime.Container, *runtime.IO, error) {
+func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtime.Container, *runtime.IO, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
 		filepath.Join(bundlePath, "runtime.json"),
@@ -397,11 +406,9 @@ func (r *libcontainerRuntime) Create(id, bundlePath string) (runtime.Container, 
 	}
 	var rio runtime.IO
 	if spec.Process.Terminal {
-		console, err := process.NewConsole(int(spec.Process.User.UID))
-		if err != nil {
+		if err := process.ConsoleFromPath(consolePath); err != nil {
 			return nil, nil, err
 		}
-		rio.Console = console
 	} else {
 		i, err := process.InitializeIO(int(spec.Process.User.UID))
 		if err != nil {

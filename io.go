@@ -53,8 +53,10 @@ type copier struct {
 
 func (l *copier) Close() (err error) {
 	for _, c := range append(l.closers, l.config.Stdin, l.config.Stdout, l.config.Stderr) {
-		if cerr := c.Close(); err == nil {
-			err = cerr
+		if c != nil {
+			if cerr := c.Close(); err == nil {
+				err = cerr
+			}
 		}
 	}
 	return err

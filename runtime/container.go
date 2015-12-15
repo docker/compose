@@ -32,10 +32,9 @@ type Console interface {
 }
 
 type IO struct {
-	Stdin   io.WriteCloser
-	Stdout  io.ReadCloser
-	Stderr  io.ReadCloser
-	Console Console
+	Stdin  io.WriteCloser
+	Stdout io.ReadCloser
+	Stderr io.ReadCloser
 }
 
 func (i *IO) Close() error {
@@ -44,7 +43,6 @@ func (i *IO) Close() error {
 		i.Stdin,
 		i.Stdout,
 		i.Stderr,
-		i.Console,
 	} {
 		if c != nil {
 			if err := c.Close(); oerr == nil {

@@ -5,7 +5,7 @@ type StartEvent struct {
 }
 
 func (h *StartEvent) Handle(e *Event) error {
-	container, io, err := h.s.runtime.Create(e.ID, e.BundlePath)
+	container, io, err := h.s.runtime.Create(e.ID, e.BundlePath, e.Console)
 	if err != nil {
 		return err
 	}
