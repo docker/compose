@@ -63,3 +63,22 @@ type Event struct {
 type Handler interface {
 	Handle(*Event) error
 }
+
+type commonEvent struct {
+	data *Event
+	sv   *Supervisor
+}
+
+func (e *commonEvent) Handle() {
+	h, ok := e.sv.handlers[e.data.Type]
+	if !ok {
+		e.data.Err <- ErrUnknownEvent
+		return
+	}
+	err := h.Handle(e.data)
+	if err != errDeferedResponse {
+		e.data.Err <- err
+		close(e.data.Err)
+		return
+	}
+}
