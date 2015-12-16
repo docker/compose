@@ -2,5 +2,6 @@
 set -e
 
 find . -type f -name '*.pyc' -delete
+find . -name .coverage.* -delete
 find -name __pycache__ -delete
 rm -rf docs/_site build dist docker-compose.egg-info
