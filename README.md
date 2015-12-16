@@ -21,8 +21,15 @@ For more documentation on various subjects refer to the `/docs` directory in thi
 
 You will need to make sure that you have Go installed on your system and the containerd repository is cloned
 in your `$GOPATH`.  You will also need to make sure that you have all the dependencies cloned as well.
+Currently, contributing to containerd is not for the first time devs as many dependencies are not vendored and 
+work is being completed at a high rate.  
 
 After that just run `make` and the binaries for the daemon and client will be localed in the `bin/` directory.
+
+## Downloads
+
+The easy way to test and use containerd is to view the [releases page](https://github.com/docker/containerd/releases) for binary downloads.
+We encourage everyone to use containerd this way until it is out of alpha status.
 
 ## Performance
 
@@ -43,196 +50,303 @@ Overall start times:
 [containerd] 2015/12/04 14:59:54   99.9%:       355ms
 ```
 
+## Telemetry 
 
-# REST API v1
+Currently containerd only outputs metrics to stdout but will support dumping to various backends in the future.
 
-## Starting a container
-
-To start a container hit the `/containers/{name}` endpoint with a `POST` request.
-The checkpoint field is option but allows you to start the container with the specified
-checkpoint name instead of a new instance of the container.
-
-Example:
-```bash
-curl -XPOST localhost:8888/containers/redis -d '{
-    "bundlePath": "/containers/redis",
-    "checkpoint: "checkpoint-name"
-    }' 
+```
+[containerd] 2015/12/16 11:48:28 timer container-start-time
+[containerd] 2015/12/16 11:48:28   count:              22
+[containerd] 2015/12/16 11:48:28   min:          25425883
+[containerd] 2015/12/16 11:48:28   max:         113077691
+[containerd] 2015/12/16 11:48:28   mean:         68386923.27
+[containerd] 2015/12/16 11:48:28   stddev:       20928453.26
+[containerd] 2015/12/16 11:48:28   median:       65489003.50
+[containerd] 2015/12/16 11:48:28   75%:          82393210.50
+[containerd] 2015/12/16 11:48:28   95%:         112267814.75
+[containerd] 2015/12/16 11:48:28   99%:         113077691.00
+[containerd] 2015/12/16 11:48:28   99.9%:       113077691.00
+[containerd] 2015/12/16 11:48:28   1-min rate:          0.00
+[containerd] 2015/12/16 11:48:28   5-min rate:          0.01
+[containerd] 2015/12/16 11:48:28   15-min rate:         0.01
+[containerd] 2015/12/16 11:48:28   mean rate:           0.03
+[containerd] 2015/12/16 11:48:28 counter containers
+[containerd] 2015/12/16 11:48:28   count:               1
+[containerd] 2015/12/16 11:48:28 counter events
+[containerd] 2015/12/16 11:48:28   count:              87
+[containerd] 2015/12/16 11:48:28 counter events-subscribers
+[containerd] 2015/12/16 11:48:28   count:               2
+[containerd] 2015/12/16 11:48:28 gauge goroutines
+[containerd] 2015/12/16 11:48:28   value:              38
+[containerd] 2015/12/16 11:48:28 gauge fds
+[containerd] 2015/12/16 11:48:28   value:              18
 ```
 
-## Add a process to an existing container
+## Daemon options
 
-To add an additional process to a running container send a `PUT` request to the
-`/containers/{name}/processes` endpoint.
 
-Example:
-```bash
-curl -s -XPUT localhost:8888/containers/redis/process -d '{
-       "user" : {
-          "gid" : 0,
-          "uid" : 0
-       },
-       "args" : [
-          "sh",
-          "-c",
-          "sleep 10"
-       ],
-       "env" : [
-          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-          "TERM=xterm"
-       ]
-    }'
+```
+$ containerd -h
+
+NAME:
+   containerd - High performance container daemon
+
+USAGE:
+   containerd [global options] command [command options] [arguments...]
+
+VERSION:
+   0.0.4
+
+AUTHOR(S): 
+   @crosbymichael <crosbymichael@gmail.com> 
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+   
+GLOBAL OPTIONS:
+   --id "deathstar"                 unique containerd id to identify the instance
+   --debug                      enable debug output in the logs
+   --state-dir "/run/containerd"            runtime state directory
+   -c, --concurrency "10"               set the concurrency level for tasks
+   --metrics-interval "1m0s"                interval for flushing metrics to the store
+   --listen, -l "/run/containerd/containerd.sock"   Address on which GRPC API will listen
+   --oom-notify                     enable oom notifications for containers
+   --help, -h                       show help
+   --version, -v                    print the version
+   
 ```
 
+# Roadmap 
 
-## Signal a specific process in a container
+The current roadmap and milestones for alpha and beta completion are in the github issues on this repository.  Please refer to these issues for what is being worked on and completed for the various stages of development.
 
-To send a signal to any of the containers processes send a  `POST` request to
-the `/containers/{name}/process/{pid}` endpoint.
+# API
 
-Example
+## GRPC API
 
-```bash
-curl -s -XPOST  localhost:8888/containers/redis/process/1234 -d '{"signal": 15}'
+The API for containerd is with GRPC over a unix socket located at the default location of `/run/containerd/containerd.sock`.  
+
+At this time please refer to the [proto at](https://github.com/docker/containerd/blob/master/api/grpc/types/api.proto) for the API methods and types.  
+There is a Go implementation and types checked into this repository but alternate language implementations can be created using the grpc and protoc toolchain.
+
+
+## containerd CLI
+
+There is a default cli named `ctr` based on the GRPC api.
+This cli will allow you to create and manage containers run with containerd.
+
+```
+NAME:
+   ctr - High performance conatiner daemon controller
+
+USAGE:
+   ctr [global options] command [command options] [arguments...]
+
+VERSION:
+   0.0.4
+
+AUTHOR(S): 
+   @crosbymichael <crosbymichael@gmail.com> 
+
+COMMANDS:
+   checkpoints  list all checkpoints
+   containers   interact with running containers
+   events   receive events from the containerd daemon
+   help, h  Shows a list of commands or help for one command
+   
+GLOBAL OPTIONS:
+   --debug                  enable debug output in the logs
+   --address "/run/containerd/containerd.sock"  address of GRPC API
+   --help, -h                   show help
+   --version, -v                print the version
+   
 ```
 
-## Get the state of containerd and all of its containers
-
-To the the entire state of the containerd instance send a `GET` request
-to the `/state` endpoint.
-
-Example:
-```bash
-curl -s localhost:8888/state
-```
-
-Response:
-```json
-{
-   "containers" : [
-      {
-         "state" : {
-            "status" : "running"
-         },
-         "bundlePath" : "/containers/redis",
-         "id" : "redis",
-         "processes" : [
-            {
-               "args" : [
-                  "redis-server",
-                  "--bind",
-                  "0.0.0.0"
-               ],
-               "user" : {
-                  "gid" : 1000,
-                  "uid" : 1000
-               },
-               "terminal" : false,
-               "pid" : 11497,
-               "env" : [
-                  "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                  "TERM=xterm"
-               ]
-            }
-         ]
-      }
-   ],
-   "machine" : {
-      "cpus" : 4,
-      "memory" : 7872909312
-   }
-}
-```
-
-## Create a checkpoint for a container
-
-To create a checkpoint for a container send a `POST` request to the 
-`/containers/{name}/checkpoint/{checkpointname}` endpoint.  All of the options
-to this endpoint are optional.
-
-If you send `"exit": true` the container will be stopped after the checkpoint is complete,
-the default is to keep the container running.
-
-Example:
-
-```bash
-curl -s -XPOST localhost:8888/containers/redis/checkpoint/test1 -d '{
-        "exit": false,
-        "tcp": false,
-        "unixSockets": false,
-        "shell": false
-    }'
-```
-
-## List all checkpoints for a container
-
-To list all checkpoints for a container send a `GET` request to the 
-`/containers/{name}/checkpoint` endpoint.
-
-Example:
+### Listing containers
 
 ```bash
-curl -s localhost:8888/containers/redis/checkpoint
+$ sudo ctr containers
+ID                  PATH                STATUS              PID1
+1                   /containers/redis   running             14063
+19                  /containers/redis   running             14100
+14                  /containers/redis   running             14117
+4                   /containers/redis   running             14030
+16                  /containers/redis   running             14061
+3                   /containers/redis   running             14024
+12                  /containers/redis   running             14097
+10                  /containers/redis   running             14131
+18                  /containers/redis   running             13977
+13                  /containers/redis   running             13979
+15                  /containers/redis   running             13998
+5                   /containers/redis   running             14021
+9                   /containers/redis   running             14075
+6                   /containers/redis   running             14107
+2                   /containers/redis   running             14135
+11                  /containers/redis   running             13978
+17                  /containers/redis   running             13989
+8                   /containers/redis   running             14053
+7                   /containers/redis   running             14022
+0                   /containers/redis   running             14006
 ```
 
-Response:
+### Starting a container
 
-```json
-[
-   {
-      "name" : "test1",
-      "unixSockets" : false,
-      "tcp" : false,
-      "shell" : false,
-      "timestamp" : "2015-12-04T15:09:14.915868934-08:00"
-   },
-   {
-      "name" : "test2",
-      "tcp" : false,
-      "unixSockets" : false,
-      "shell" : false,
-      "timestamp" : "2015-12-04T15:09:14.915868934-08:00"
-   }
-]
 ```
+$ ctr containers start -h
+NAME:
+   start - start a container
 
-## Delete a container's checkpoint
+USAGE:
+   command start [command options] [arguments...]
 
-To delete a container's checkpoint send a `DELETE` request to the 
-`/containers/redis/checkpoint/{checkpointname}` endpoint.
+OPTIONS:
+   --checkpoint, -c     checkpoint to start the container from
+   --attach, -a         connect to the stdio of the container
 
-Example:
+```
 
 ```bash
-curl -XDELETE -s localhost:8888/containers/redis/checkpoint/test1
+$ sudo ctr containers start redis /containers/redis
 ```
 
-## Update a container
+### Kill a container's process
 
-The update endpoint for a container accepts a JSON object with various fields 
-for the actions you with to perform.  To update a container send a `PATCH` request
-to the `/containers/{name}` endpoint.
+```
+$ ctr containers kill -h 
+NAME:
+   kill - send a signal to a container or it's processes
 
-### Pause and resume a container
+USAGE:
+   command kill [command options] [arguments...]
 
-To pause or resume a continer you want to send a `PATCH` request updating the container's state.
-
-Example:
-
-```bash
-# pause a container
-curl -XPATCH localhost:8888/containers/redis -d '{"status": "paused"}'
-
-# resume the container
-curl -XPATCH localhost:8888/containers/redis -d '{"status": "running"}'
+OPTIONS:
+   --pid, -p "0"        pid of the process to signal within the container
+   --signal, -s "15"    signal to send to the container
 ```
 
-### Signal the main process of a container
+### Exec another process into a container
 
-To signal the main process of the container hit the same update endpoint with a different state.
-
-Example:
-
-```bash
-curl -s -XPATCH localhost:8888/containers/redis -d '{"signal": 9}'
 ```
+$ ctr containers exec -h 
+NAME:
+   exec - exec another process in an existing container
+
+USAGE:
+   command exec [command options] [arguments...]
+
+OPTIONS:
+   --id                                         container id to add the process to
+   --attach, -a                                 connect to the stdio of the container
+   --cwd                                        current working directory for the process
+   --tty, -t                                    create a terminal for the process
+   --env, -e [--env option --env option]        environment variables for the process
+   --uid, -u "0"                                user id of the user for the process
+   --gid, -g "0"                                group id of the user for the process
+   
+```
+
+### Stats for a container
+
+```
+$ ctr containers stats -h 
+NAME:
+   stats - get stats for running container
+
+USAGE:
+  command stats [arguments...]
+```
+
+### List checkpoints
+
+```
+$ sudo ctr checkpoints redis
+NAME                TCP                 UNIX SOCKETS        SHELL
+test                false               false               false
+test2               false               false               false
+```
+
+### Create a new checkpoint
+
+```
+$ ctr checkpoints create -h
+NAME:
+   create - create a new checkpoint for the container
+
+USAGE:
+   command create [command options] [arguments...]
+
+OPTIONS:
+   --tcp                persist open tcp connections
+   --unix-sockets       perist unix sockets
+   --exit               exit the container after the checkpoint completes successfully
+   --shell              checkpoint shell jobs
+   
+```
+
+### Get events
+
+```
+$ sudo ctr events
+TYPE                ID                  PID                 STATUS
+exit                redis               24761               0
+```
+
+
+# License
+
+Apache 2.0 found in the LICENSE file.
+
+### Sign your work
+
+The sign-off is a simple line at the end of the explanation for the patch. Your
+signature certifies that you wrote the patch or otherwise have the right to pass
+it on as an open-source patch. The rules are pretty simple: if you can certify
+the below (from [developercertificate.org](http://developercertificate.org/)):
+
+```
+Developer Certificate of Origin
+Version 1.1
+
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+660 York Street, Suite 102,
+San Francisco, CA 94110 USA
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+```
+
+Then you just add a line to every git commit message:
+
+    Signed-off-by: Joe Smith <joe.smith@email.com>
+
+Use your real name (sorry, no pseudonyms or anonymous contributions.)
+
+If you set your `user.name` and `user.email` git configs, you can sign your
+commit automatically with `git commit -s`.
+

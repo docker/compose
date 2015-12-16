@@ -9,7 +9,7 @@ import (
 	"github.com/docker/containerd"
 )
 
-const Usage = `High performance conatiner daemon controller`
+const Usage = `High performance container daemon cli`
 
 func main() {
 	app := cli.NewApp()
