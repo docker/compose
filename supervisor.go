@@ -17,7 +17,7 @@ import (
 const statsInterval = 1 * time.Second
 
 // NewSupervisor returns an initialized Process supervisor.
-func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, error) {
+func NewSupervisor(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
@@ -40,6 +40,9 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 		machine:        machine,
 		subscribers:    make(map[chan *Event]struct{}),
 		statsCollector: newStatsCollector(statsInterval),
+	}
+	if oom {
+		s.notifier = newNotifier(s)
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
@@ -81,6 +84,7 @@ type Supervisor struct {
 	machine        Machine
 	containerGroup sync.WaitGroup
 	statsCollector *statsCollector
+	notifier       *notifier
 }
 
 // Stop closes all tasks and sends a SIGTERM to each container's pid1 then waits for they to

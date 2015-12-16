@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
 )
 
@@ -12,13 +13,14 @@ type Worker interface {
 }
 
 type StartTask struct {
-	Container  runtime.Container
-	Checkpoint string
-	IO         *runtime.IO
-	Stdin      string
-	Stdout     string
-	Stderr     string
-	Err        chan error
+	Container     runtime.Container
+	Checkpoint    string
+	IO            *runtime.IO
+	Stdin         string
+	Stdout        string
+	Stderr        string
+	Err           chan error
+	StartResponse chan StartResponse
 }
 
 func NewWorker(s *Supervisor, wg *sync.WaitGroup) Worker {
@@ -63,7 +65,22 @@ func (w *worker) Start() {
 				continue
 			}
 		}
+		pid, err := t.Container.Pid()
+		if err != nil {
+			logrus.WithField("error", err).Error("containerd: get container main pid")
+		}
+		if w.s.notifier != nil {
+			n, err := t.Container.OOM()
+			if err != nil {
+				logrus.WithField("error", err).Error("containerd: notify OOM events")
+			} else {
+				w.s.notifier.Add(n, t.Container.ID())
+			}
+		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
+		t.StartResponse <- StartResponse{
+			Pid: pid,
+		}
 	}
 }

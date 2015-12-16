@@ -23,6 +23,7 @@ const (
 	DeleteCheckpointEventType EventType = "deleteCheckpoint"
 	StatsEventType            EventType = "events"
 	UnsubscribeStatsEventType EventType = "unsubscribeEvents"
+	OOMEventType              EventType = "oom"
 )
 
 func NewEvent(t EventType) *Event {
@@ -33,24 +34,29 @@ func NewEvent(t EventType) *Event {
 	}
 }
 
+type StartResponse struct {
+	Pid int
+}
+
 type Event struct {
-	Type       EventType
-	Timestamp  time.Time
-	ID         string
-	BundlePath string
-	Stdout     string
-	Stderr     string
-	Stdin      string
-	Console    string
-	Pid        int
-	Status     int
-	Signal     os.Signal
-	Process    *specs.Process
-	State      *runtime.State
-	Containers []runtime.Container
-	Checkpoint *runtime.Checkpoint
-	Err        chan error
-	Stats      chan interface{}
+	Type          EventType
+	Timestamp     time.Time
+	ID            string
+	BundlePath    string
+	Stdout        string
+	Stderr        string
+	Stdin         string
+	Console       string
+	Pid           int
+	Status        int
+	Signal        os.Signal
+	Process       *specs.Process
+	State         *runtime.State
+	Containers    []runtime.Container
+	Checkpoint    *runtime.Checkpoint
+	Err           chan error
+	StartResponse chan StartResponse
+	Stats         chan interface{}
 }
 
 type Handler interface {

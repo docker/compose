@@ -111,6 +111,10 @@ func (c *runcContainer) Checkpoints() ([]runtime.Checkpoint, error) {
 	return nil, errors.New("not implemented")
 }
 
+func (c *runcContainer) OOM() (<-chan struct{}, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (c *runcContainer) newCommand(args ...string) *exec.Cmd {
 	cmd := exec.Command("runc", append([]string{"--root", c.stateDir, "--id", c.id}, args...)...)
 	cmd.Dir = c.path

@@ -121,7 +121,8 @@ var StartCommand = cli.Command{
 				}
 			}
 		}
-		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
+		resp, err := c.CreateContainer(netcontext.Background(), r)
+		if err != nil {
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
@@ -140,6 +141,8 @@ var StartCommand = cli.Command{
 					os.Exit(int(e.Status))
 				}
 			}
+		} else {
+			fmt.Println(resp.Pid)
 		}
 	},
 }

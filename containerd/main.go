@@ -62,6 +62,10 @@ var daemonFlags = []cli.Flag{
 		Value: "/run/containerd/containerd.sock",
 		Usage: "Address on which GRPC API will listen",
 	},
+	cli.BoolFlag{
+		Name:  "oom-notify",
+		Usage: "enable oom notifications for containers",
+	},
 }
 
 func main() {
@@ -89,6 +93,7 @@ func main() {
 			context.String("listen"),
 			context.String("state-dir"),
 			context.Int("concurrency"),
+			context.Bool("oom-notify"),
 		); err != nil {
 			logrus.Fatal(err)
 		}
@@ -146,9 +151,9 @@ func processMetrics() {
 	}()
 }
 
-func daemon(id, address, stateDir string, concurrency int) error {
+func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 	tasks := make(chan *containerd.StartTask, concurrency*100)
-	supervisor, err := containerd.NewSupervisor(id, stateDir, tasks)
+	supervisor, err := containerd.NewSupervisor(id, stateDir, tasks, oom)
 	if err != nil {
 		return err
 	}

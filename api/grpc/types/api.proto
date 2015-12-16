@@ -26,6 +26,7 @@ message CreateContainerRequest {
 }
 
 message CreateContainerResponse {
+    uint32 pid = 1; // PID of the containers main process
 }
 
 message SignalRequest {

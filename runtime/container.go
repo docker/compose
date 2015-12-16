@@ -111,4 +111,6 @@ type Container interface {
 	Restore(name string) error
 	// Stats returns realtime container stats and resource information
 	Stats() (*Stat, error)
+	// OOM signals the channel if the container received an OOM notification
+	OOM() (<-chan struct{}, error)
 }

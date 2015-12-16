@@ -363,6 +363,10 @@ func (c *libcontainerContainer) RemoveProcess(pid int) error {
 	return err
 }
 
+func (c *libcontainerContainer) OOM() (<-chan struct{}, error) {
+	return c.c.NotifyOOM()
+}
+
 func NewRuntime(stateDir string) (runtime.Runtime, error) {
 	f, err := libcontainer.New(stateDir, libcontainer.Cgroupfs, func(l *libcontainer.LinuxFactory) error {
 		//l.CriuPath = context.GlobalString("criu")

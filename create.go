@@ -15,12 +15,13 @@ func (h *StartEvent) Handle(e *Event) error {
 	}
 	ContainersCounter.Inc(1)
 	task := &StartTask{
-		Err:       e.Err,
-		IO:        io,
-		Container: container,
-		Stdin:     e.Stdin,
-		Stdout:    e.Stdout,
-		Stderr:    e.Stderr,
+		Err:           e.Err,
+		IO:            io,
+		Container:     container,
+		Stdin:         e.Stdin,
+		Stdout:        e.Stdout,
+		Stderr:        e.Stderr,
+		StartResponse: e.StartResponse,
 	}
 	if e.Checkpoint != nil {
 		task.Checkpoint = e.Checkpoint.Name

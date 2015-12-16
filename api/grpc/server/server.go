@@ -37,6 +37,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.Stderr = c.Stderr
 	e.Stdin = c.Stdin
 	e.Console = c.Console
+	e.StartResponse = make(chan containerd.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
 			Name: c.Checkpoint,
@@ -46,7 +47,10 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	return &types.CreateContainerResponse{}, nil
+	sr := <-e.StartResponse
+	return &types.CreateContainerResponse{
+		Pid: uint32(sr.Pid),
+	}, nil
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
@@ -223,18 +227,27 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	events := s.sv.Events()
 	defer s.sv.Unsubscribe(events)
 	for evt := range events {
+		var ev *types.Event
 		switch evt.Type {
 		case containerd.ExitEventType, containerd.ExecExitEventType:
-			ev := &types.Event{
+			ev = &types.Event{
 				Type:   "exit",
 				Id:     evt.ID,
 				Pid:    uint32(evt.Pid),
 				Status: uint32(evt.Status),
 			}
+		case containerd.OOMEventType:
+			ev = &types.Event{
+				Type: "oom",
+				Id:   evt.ID,
+			}
+		}
+		if ev != nil {
 			if err := stream.Send(ev); err != nil {
 				return err
 			}
 		}
+
 	}
 	return nil
 }
