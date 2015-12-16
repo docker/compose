@@ -29,6 +29,7 @@
         },
         "container_name": {"type": "string"},
         "cpu_shares": {"type": ["number", "string"]},
+        "cpu_quota": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
