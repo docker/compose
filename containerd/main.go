@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	Usage     = `High performance conatiner daemon`
+	Usage     = `High performance container daemon`
 	minRlimit = 1024
 )
 
