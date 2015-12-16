@@ -22,7 +22,8 @@ const (
 	CreateCheckpointEventType EventType = "createCheckpoint"
 	DeleteCheckpointEventType EventType = "deleteCheckpoint"
 	StatsEventType            EventType = "events"
-	UnsubscribeStatsEventType EventType = "unsubscribeEvents"
+	UnsubscribeStatsEventType EventType = "unsubscribeStats"
+	StopStatsEventType        EventType = "stopStats"
 	OOMEventType              EventType = "oom"
 )
 
