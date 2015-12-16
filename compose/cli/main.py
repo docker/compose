@@ -265,7 +265,8 @@ class TopLevelCommand(DocoptCommand):
 
         Usage: pause [SERVICE...]
         """
-        project.pause(service_names=options['SERVICE'])
+        containers = project.pause(service_names=options['SERVICE'])
+        exit_if(not containers, 'No containers to pause', 1)
 
     def port(self, project, options):
         """
@@ -476,7 +477,8 @@ class TopLevelCommand(DocoptCommand):
 
         Usage: start [SERVICE...]
         """
-        project.start(service_names=options['SERVICE'])
+        containers = project.start(service_names=options['SERVICE'])
+        exit_if(not containers, 'No containers to start', 1)
 
     def stop(self, project, options):
         """
@@ -504,7 +506,8 @@ class TopLevelCommand(DocoptCommand):
                                      (default: 10)
         """
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
-        project.restart(service_names=options['SERVICE'], timeout=timeout)
+        containers = project.restart(service_names=options['SERVICE'], timeout=timeout)
+        exit_if(not containers, 'No containers to restart', 1)
 
     def unpause(self, project, options):
         """
@@ -512,7 +515,8 @@ class TopLevelCommand(DocoptCommand):
 
         Usage: unpause [SERVICE...]
         """
-        project.unpause(service_names=options['SERVICE'])
+        containers = project.unpause(service_names=options['SERVICE'])
+        exit_if(not containers, 'No containers to unpause', 1)
 
     def up(self, project, options):
         """
@@ -674,3 +678,9 @@ def set_signal_handler(handler):
 
 def list_containers(containers):
     return ", ".join(c.name for c in containers)
+
+
+def exit_if(condition, message, exit_code):
+    if condition:
+        log.error(message)
+        raise SystemExit(exit_code)
