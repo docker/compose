@@ -32,6 +32,10 @@ func (h *ExitEvent) Handle(e *Event) error {
 	ne.Pid = e.Pid
 	ne.Status = e.Status
 	h.s.SendEvent(ne)
+
+	stopCollect := NewEvent(StopStatsEventType)
+	stopCollect.ID = container.ID()
+	h.s.SendEvent(stopCollect)
 	return nil
 }
 
