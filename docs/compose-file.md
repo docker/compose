@@ -324,29 +324,37 @@ for this service, e.g:
 Environment variables will also be created - see the [environment variable
 reference](env.md) for details.
 
-### log_driver
+### logging
 
-Specify a logging driver for the service's containers, as with the ``--log-driver``
-option for docker run ([documented here](https://docs.docker.com/engine/reference/logging/overview/)).
+Logging configuration for the service. This configuration replaces the previous
+`log_driver` and `log_opt` keys.
+
+    logging:
+        driver: log_driver
+        options:
+            syslog-address: "tcp://192.168.0.42:123"
+
+The `driver`  name specifies a logging driver for the service's
+containers, as with the ``--log-driver`` option for docker run
+([documented here](https://docs.docker.com/engine/reference/logging/overview/)).
 
 The default value is json-file.
 
-    log_driver: "json-file"
-    log_driver: "syslog"
-    log_driver: "none"
+    driver: "json-file"
+    driver: "syslog"
+    driver: "none"
 
 > **Note:** Only the `json-file` driver makes the logs available directly from
 > `docker-compose up` and `docker-compose logs`. Using any other driver will not
 > print any logs.
 
-### log_opt
+Specify logging options for the logging driver with the ``options`` key, as with the ``--log-opt`` option for `docker run`.
 
-Specify logging options with `log_opt` for the logging driver, as with the ``--log-opt`` option for `docker run`.
 
 Logging options are key value pairs. An example of `syslog` options:
 
-    log_driver: "syslog"
-    log_opt:
+    driver: "syslog"
+    options:
       syslog-address: "tcp://192.168.0.42:123"
 
 ### net

@@ -51,8 +51,6 @@ DOCKER_CONFIG_KEYS = [
     'ipc',
     'labels',
     'links',
-    'log_driver',
-    'log_opt',
     'mac_address',
     'mem_limit',
     'memswap_limit',
@@ -78,6 +76,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'dockerfile',
     'expose',
     'external_links',
+    'logging',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (

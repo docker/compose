@@ -1,0 +1,3 @@
+another:
+  logging:
+    driver: "none"

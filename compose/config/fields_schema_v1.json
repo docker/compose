@@ -75,8 +75,15 @@
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
-        "log_driver": {"type": "string"},
-        "log_opt": {"type": "object"},
+        "logging": {
+            "type": "object",
+
+            "properties": {
+                "driver": {"type": "string"},
+                "options": {"type": "object"}
+            },
+            "additionalProperties": false
+        },
 
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
