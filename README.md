@@ -292,10 +292,6 @@ exit                redis               24761               0
 ```
 
 
-# License
-
-Apache 2.0 found in the LICENSE file.
-
 ### Sign your work
 
 The sign-off is a simple line at the end of the explanation for the patch. Your
@@ -350,3 +346,11 @@ Use your real name (sorry, no pseudonyms or anonymous contributions.)
 If you set your `user.name` and `user.email` git configs, you can sign your
 commit automatically with `git commit -s`.
 
+## Copyright and license
+
+Copyright © 2015 Docker, Inc. All rights reserved, except as follows. Code
+is released under the Apache 2.0 license. The README.md file, and files in the
+"docs" folder are licensed under the Creative Commons Attribution 4.0
+International License under the terms and conditions set forth in the file
+"LICENSE.docs". You may obtain a duplicate copy of the same license, titled
+CC-BY-SA-4.0, at http://creativecommons.org/licenses/by/4.0/.
