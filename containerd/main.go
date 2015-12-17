@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
@@ -66,6 +67,10 @@ var daemonFlags = []cli.Flag{
 		Name:  "oom-notify",
 		Usage: "enable oom notifications for containers",
 	},
+	cli.StringFlag{
+		Name:  "graphite-address",
+		Usage: "Address of graphite server",
+	},
 }
 
 func main() {
@@ -78,7 +83,7 @@ func main() {
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
-			if err := debugMetrics(context.GlobalDuration("metrics-interval")); err != nil {
+			if err := debugMetrics(context.GlobalDuration("metrics-interval"), context.GlobalString("graphite-address")); err != nil {
 				return err
 			}
 		}
@@ -119,15 +124,24 @@ func checkLimits() error {
 	return nil
 }
 
-func debugMetrics(interval time.Duration) error {
+func debugMetrics(interval time.Duration, graphiteAddr string) error {
 	for name, m := range containerd.Metrics() {
 		if err := metrics.DefaultRegistry.Register(name, m); err != nil {
 			return err
 		}
 	}
 	processMetrics()
-	l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
-	go metrics.Log(metrics.DefaultRegistry, interval, l)
+	if graphiteAddr != "" {
+		addr, err := net.ResolveTCPAddr("tcp", graphiteAddr)
+		if err != nil {
+			return err
+		}
+		logrus.Debugf("Sending metrics to Graphite server on %s", graphiteAddr)
+		go graphite.Graphite(metrics.DefaultRegistry, 10e9, "metrics", addr)
+	} else {
+		l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
+		go metrics.Log(metrics.DefaultRegistry, interval, l)
+	}
 	return nil
 }
 
