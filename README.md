@@ -137,7 +137,7 @@ This cli will allow you to create and manage containers run with containerd.
 
 ```
 NAME:
-   ctr - High performance conatiner daemon controller
+   ctr - High performance container daemon controller
 
 USAGE:
    ctr [global options] command [command options] [arguments...]
