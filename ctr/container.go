@@ -131,6 +131,7 @@ var StartCommand = cli.Command{
 				if state != nil {
 					term.RestoreTerminal(os.Stdin.Fd(), state)
 				}
+				stdin.Close()
 			}()
 			for {
 				e, err := events.Recv()
@@ -335,6 +336,7 @@ var ExecCommand = cli.Command{
 				if state != nil {
 					term.RestoreTerminal(os.Stdin.Fd(), state)
 				}
+				stdin.Close()
 			}()
 			for {
 				e, err := events.Recv()
