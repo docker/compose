@@ -1,7 +1,7 @@
 # containerd
 
-Another container runtime built for performance and density. 
-containerd has advanced features such as seccomp and user namespace support as well
+Containerd is a daemon to control runC, built for performance and density. 
+Containerd leverages runC advanced features such as seccomp and user namespace support as well
 as checkpoint and restore for cloning and live migration of containers.
 
 #### Status 
