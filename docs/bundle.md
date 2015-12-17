@@ -61,7 +61,7 @@ look like this:
 
 ## Edits
 
-We need to exit the config to add `redis-server` as the application to launch inside the container along with 
+We need to edit the config to add `redis-server` as the application to launch inside the container along with 
 a few other settings.  The resulting `config.json` should look like this:
 
 ```json
