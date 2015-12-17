@@ -31,6 +31,7 @@ DOCKER_CONFIG_KEYS = [
     'cap_drop',
     'cgroup_parent',
     'command',
+    'cpu_quota',
     'cpu_shares',
     'cpuset',
     'detach',

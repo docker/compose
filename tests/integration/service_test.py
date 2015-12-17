@@ -102,6 +102,12 @@ class ServiceTest(DockerClientTestCase):
         container.start()
         self.assertEqual(container.get('HostConfig.CpuShares'), 73)
 
+    def test_create_container_with_cpu_quota(self):
+        service = self.create_service('db', cpu_quota=40000)
+        container = service.create_container()
+        container.start()
+        self.assertEqual(container.get('HostConfig.CpuQuota'), 40000)
+
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
         service = self.create_service('db', extra_hosts=extra_hosts)
