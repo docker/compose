@@ -17,6 +17,7 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
+from .network import Network
 from .service import ContainerNet
 from .service import ConvergenceStrategy
 from .service import Net
@@ -33,12 +34,14 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, volumes=None, use_networking=False, network_driver=None):
+    def __init__(self, name, services, client, networks=None, volumes=None,
+                 use_networking=False, network_driver=None):
         self.name = name
         self.services = services
         self.client = client
         self.use_networking = use_networking
         self.network_driver = network_driver
+        self.networks = networks or []
         self.volumes = volumes or []
 
     def labels(self, one_off=False):
@@ -55,9 +58,6 @@ class Project(object):
         use_networking = (config_data.version and config_data.version >= 2)
         project = cls(name, [], client, use_networking=use_networking)
 
-        if use_networking:
-            remove_links(config_data.services)
-
         for service_dict in config_data.services:
             links = project.get_links(service_dict)
             volumes_from = get_volumes_from(project, service_dict)
@@ -72,6 +72,16 @@ class Project(object):
                     net=net,
                     volumes_from=volumes_from,
                     **service_dict))
+
+        if config_data.networks:
+            for network_name, data in config_data.networks.items():
+                project.networks.append(
+                    Network(
+                        client=client, project=name, name=network_name,
+                        driver=data.get('driver'), driver_opts=data.get('driver_opts')
+                    )
+                )
+
         if config_data.volumes:
             for vol_name, data in config_data.volumes.items():
                 project.volumes.append(
@@ -82,6 +92,7 @@ class Project(object):
                         external_name=data.get('external_name')
                     )
                 )
+
         return project
 
     @property
@@ -124,20 +135,18 @@ class Project(object):
         Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            return self.get_services(
-                service_names=self.service_names,
-                include_deps=include_deps
-            )
-        else:
-            unsorted = [self.get_service(name) for name in service_names]
-            services = [s for s in self.services if s in unsorted]
+            service_names = self.service_names
 
-            if include_deps:
-                services = reduce(self._inject_deps, services, [])
+        unsorted = [self.get_service(name) for name in service_names]
+        services = [s for s in self.services if s in unsorted]
 
-            uniques = []
-            [uniques.append(s) for s in services if s not in uniques]
-            return uniques
+        if include_deps:
+            services = reduce(self._inject_deps, services, [])
+
+        uniques = []
+        [uniques.append(s) for s in services if s not in uniques]
+
+        return uniques
 
     def get_services_without_duplicate(self, service_names=None, include_deps=False):
         services = self.get_services(service_names, include_deps)
@@ -166,7 +175,7 @@ class Project(object):
         net = service_dict.pop('net', None)
         if not net:
             if self.use_networking:
-                return Net(self.default_network_name)
+                return Net(self.default_network.full_name)
             return Net(None)
 
         net_name = get_service_name_from_net(net)
@@ -251,7 +260,7 @@ class Project(object):
     def down(self, remove_image_type, include_volumes):
         self.stop()
         self.remove_stopped(v=include_volumes)
-        self.remove_network()
+        self.remove_default_network()
 
         if include_volumes:
             self.remove_volumes()
@@ -262,9 +271,33 @@ class Project(object):
         for service in self.get_services():
             service.remove_image(remove_image_type)
 
+    def remove_default_network(self):
+        if not self.use_networking:
+            return
+        if self.uses_default_network():
+            self.default_network.remove()
+
     def remove_volumes(self):
         for volume in self.volumes:
             volume.remove()
+
+    def initialize_networks(self):
+        networks = self.networks
+        if self.uses_default_network():
+            networks.append(self.default_network)
+
+        for network in networks:
+            network.ensure()
+
+    def uses_default_network(self):
+        return any(
+            service.net.mode == self.default_network.full_name
+            for service in self.services
+        )
+
+    @property
+    def default_network(self):
+        return Network(client=self.client, project=self.name, name='default')
 
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
@@ -335,9 +368,7 @@ class Project(object):
 
         plans = self._get_convergence_plans(services, strategy)
 
-        if self.use_networking and self.uses_default_network():
-            self.ensure_network_exists()
-
+        self.initialize_networks()
         self.initialize_volumes()
 
         return [
@@ -395,40 +426,6 @@ class Project(object):
 
         return [c for c in containers if matches_service_names(c)]
 
-    def get_network(self):
-        try:
-            return self.client.inspect_network(self.default_network_name)
-        except NotFound:
-            return None
-
-    def ensure_network_exists(self):
-        # TODO: recreate network if driver has changed?
-        if self.get_network() is None:
-            driver_name = 'the default driver'
-            if self.network_driver:
-                driver_name = 'driver "{}"'.format(self.network_driver)
-
-            log.info(
-                'Creating network "{}" with {}'
-                .format(self.default_network_name, driver_name)
-            )
-            self.client.create_network(self.default_network_name, driver=self.network_driver)
-
-    def remove_network(self):
-        if not self.use_networking:
-            return
-        network = self.get_network()
-        if network:
-            log.info("Removing network %s", self.default_network_name)
-            self.client.remove_network(network['Id'])
-
-    def uses_default_network(self):
-        return any(service.net.mode == self.default_network_name for service in self.services)
-
-    @property
-    def default_network_name(self):
-        return '{}_default'.format(self.name)
-
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
 
@@ -442,26 +439,6 @@ class Project(object):
 
         dep_services.append(service)
         return acc + dep_services
-
-
-def remove_links(service_dicts):
-    services_with_links = [s for s in service_dicts if 'links' in s]
-    if not services_with_links:
-        return
-
-    if len(services_with_links) == 1:
-        prefix = '"{}" defines'.format(services_with_links[0]['name'])
-    else:
-        prefix = 'Some services ({}) define'.format(
-            ", ".join('"{}"'.format(s['name']) for s in services_with_links))
-
-    log.warn(
-        '\n{} links, which are not compatible with Docker networking and will be ignored.\n'
-        'Future versions of Docker will not support links - you should remove them for '
-        'forwards-compatibility.\n'.format(prefix))
-
-    for s in services_with_links:
-        del s['links']
 
 
 def get_volumes_from(project, service_dict):

@@ -354,7 +354,7 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d'], None)
 
-        networks = self.client.networks(names=[self.project.default_network_name])
+        networks = self.client.networks(names=[self.project.default_network.full_name])
         self.assertEqual(len(networks), 0)
 
         for service in self.project.get_services():
@@ -371,7 +371,7 @@ class CLITestCase(DockerClientTestCase):
 
         services = self.project.get_services()
 
-        networks = self.client.networks(names=[self.project.default_network_name])
+        networks = self.client.networks(names=[self.project.default_network.full_name])
         for n in networks:
             self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
@@ -387,6 +387,19 @@ class CLITestCase(DockerClientTestCase):
 
         web_container = self.project.get_service('simple').containers()[0]
         self.assertFalse(web_container.get('HostConfig.Links'))
+
+    def test_up_with_networks(self):
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['up', '-d'], None)
+
+        networks = self.client.networks(names=[
+            '{}_{}'.format(self.project.name, n)
+            for n in ['foo', 'bar']])
+
+        self.assertEqual(len(networks), 2)
+
+        for net in networks:
+            self.assertEqual(net['Driver'], 'bridge')
 
     def test_up_with_links_is_invalid(self):
         self.base_dir = 'tests/fixtures/v2-simple'
@@ -698,7 +711,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['run', 'simple', 'true'], None)
         service = self.project.get_service('simple')
         container, = service.containers(stopped=True, one_off=True)
-        networks = self.client.networks(names=[self.project.default_network_name])
+        networks = self.client.networks(names=[self.project.default_network.full_name])
         for n in networks:
             self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)

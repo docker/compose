@@ -1,0 +1,7 @@
+version: 2
+
+networks:
+  foo:
+    driver:
+
+  bar: {}
