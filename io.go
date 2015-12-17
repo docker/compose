@@ -25,7 +25,10 @@ func newCopier(i *ioConfig) (*copier, error) {
 			return nil, err
 		}
 		l.closers = append(l.closers, f)
-		go io.Copy(i.Stdin, f)
+		go func() {
+			io.Copy(i.Stdin, f)
+			i.Stdin.Close()
+		}()
 	}
 	if i.StdoutPath != "" {
 		f, err := os.OpenFile(i.StdoutPath, os.O_RDWR, 0)
