@@ -617,11 +617,14 @@ func (r *libcontainerRuntime) createLibcontainerMount(cwd, dest string, m specs.
 }
 
 func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.LinuxRuntimeSpec, devices []*configs.Device) (*configs.Cgroup, error) {
-	c := &configs.Cgroup{
-		Name:           name,
-		Parent:         "/containerd",
+	cr := &configs.Cgroup{
+		Name:   name,
+		Parent: "/containerd",
+	}
+	c := &configs.Resources{
 		AllowedDevices: append(devices, allowedDevices...),
 	}
+	cr.Resources = c
 	r := spec.Linux.Resources
 	c.Memory = int64(r.Memory.Limit)
 	c.MemoryReservation = int64(r.Memory.Reservation)
@@ -671,7 +674,7 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 			Priority:  int64(m.Priority),
 		})
 	}
-	return c, nil
+	return cr, nil
 }
 
 func (r *libcontainerRuntime) createDevices(spec *specs.LinuxRuntimeSpec, config *configs.Config) error {
