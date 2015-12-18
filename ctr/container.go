@@ -23,6 +23,10 @@ import (
 
 // TODO: parse flags and pass opts
 func getClient(ctx *cli.Context) types.APIClient {
+	return types.NewAPIClient(getClientConn(ctx))
+}
+
+func getClientConn(ctx *cli.Context) *grpc.ClientConn {
 	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
@@ -33,7 +37,7 @@ func getClient(ctx *cli.Context) types.APIClient {
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
-	return types.NewAPIClient(conn)
+	return conn
 }
 
 var ContainersCommand = cli.Command{

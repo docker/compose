@@ -14,7 +14,7 @@ const Usage = `High performance container daemon cli`
 func main() {
 	app := cli.NewApp()
 	app.Name = "ctr"
-	app.Version = containerd.Version
+	app.Version = containerd.Version.VersionString()
 	app.Usage = Usage
 	app.Authors = []cli.Author{
 		{
@@ -37,6 +37,7 @@ func main() {
 		CheckpointCommand,
 		ContainersCommand,
 		EventsCommand,
+		VersionCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

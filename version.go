@@ -1,3 +1,9 @@
 package containerd
 
-const Version = "0.0.4"
+import "go.pedge.io/proto/version"
+
+var Version = &protoversion.Version{
+	Major: 0,
+	Minor: 0,
+	Micro: 4,
+}
