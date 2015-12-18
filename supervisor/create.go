@@ -1,4 +1,4 @@
-package containerd
+package supervisor
 
 type StartEvent struct {
 	s *Supervisor

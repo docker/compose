@@ -8,19 +8,19 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
+	"github.com/docker/containerd/supervisor"
 	"github.com/opencontainers/specs"
 	"golang.org/x/net/context"
 )
 
 type apiServer struct {
-	sv *containerd.Supervisor
+	sv *supervisor.Supervisor
 }
 
 // NewServer returns grpc server instance
-func NewServer(sv *containerd.Supervisor) types.APIServer {
+func NewServer(sv *supervisor.Supervisor) types.APIServer {
 	return &apiServer{
 		sv: sv,
 	}
@@ -30,14 +30,14 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if c.BundlePath == "" {
 		return nil, errors.New("empty bundle path")
 	}
-	e := containerd.NewEvent(containerd.StartContainerEventType)
+	e := supervisor.NewEvent(supervisor.StartContainerEventType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
 	e.Stdout = c.Stdout
 	e.Stderr = c.Stderr
 	e.Stdin = c.Stdin
 	e.Console = c.Console
-	e.StartResponse = make(chan containerd.StartResponse, 1)
+	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
 			Name: c.Checkpoint,
@@ -54,7 +54,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
-	e := containerd.NewEvent(containerd.SignalEventType)
+	e := supervisor.NewEvent(supervisor.SignalEventType)
 	e.ID = r.Id
 	e.Pid = int(r.Pid)
 	e.Signal = syscall.Signal(int(r.Signal))
@@ -77,7 +77,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 			AdditionalGids: r.User.AdditionalGids,
 		},
 	}
-	e := containerd.NewEvent(containerd.AddProcessEventType)
+	e := supervisor.NewEvent(supervisor.AddProcessEventType)
 	e.ID = r.Id
 	e.Process = process
 	e.Console = r.Console
@@ -92,7 +92,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
-	e := containerd.NewEvent(containerd.CreateCheckpointEventType)
+	e := supervisor.NewEvent(supervisor.CreateCheckpointEventType)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        r.Checkpoint.Name,
@@ -112,7 +112,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 	if r.Name == "" {
 		return nil, errors.New("checkpoint name cannot be empty")
 	}
-	e := containerd.NewEvent(containerd.DeleteCheckpointEventType)
+	e := supervisor.NewEvent(supervisor.DeleteCheckpointEventType)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name: r.Name,
@@ -125,7 +125,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 }
 
 func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointRequest) (*types.ListCheckpointResponse, error) {
-	e := containerd.NewEvent(containerd.GetContainerEventType)
+	e := supervisor.NewEvent(supervisor.GetContainerEventType)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 }
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
-	e := containerd.NewEvent(containerd.GetContainerEventType)
+	e := supervisor.NewEvent(supervisor.GetContainerEventType)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 }
 
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
-	e := containerd.NewEvent(containerd.UpdateContainerEventType)
+	e := supervisor.NewEvent(supervisor.UpdateContainerEventType)
 	e.ID = r.Id
 	if r.Signal != 0 {
 		e.Signal = syscall.Signal(r.Signal)
@@ -229,14 +229,14 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	for evt := range events {
 		var ev *types.Event
 		switch evt.Type {
-		case containerd.ExitEventType, containerd.ExecExitEventType:
+		case supervisor.ExitEventType, supervisor.ExecExitEventType:
 			ev = &types.Event{
 				Type:   "exit",
 				Id:     evt.ID,
 				Pid:    uint32(evt.Pid),
 				Status: uint32(evt.Status),
 			}
-		case containerd.OOMEventType:
+		case supervisor.OOMEventType:
 			ev = &types.Event{
 				Type: "oom",
 				Id:   evt.ID,
@@ -253,17 +253,17 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 }
 
 func (s *apiServer) GetStats(r *types.StatsRequest, stream types.API_GetStatsServer) error {
-	e := containerd.NewEvent(containerd.StatsEventType)
+	e := supervisor.NewEvent(supervisor.StatsEventType)
 	e.ID = r.Id
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
-		if err == containerd.ErrContainerNotFound {
+		if err == supervisor.ErrContainerNotFound {
 			return grpc.Errorf(codes.NotFound, err.Error())
 		}
 		return err
 	}
 	defer func() {
-		ue := containerd.NewEvent(containerd.UnsubscribeStatsEventType)
+		ue := supervisor.NewEvent(supervisor.UnsubscribeStatsEventType)
 		ue.ID = e.ID
 		ue.Stats = e.Stats
 		s.sv.SendEvent(ue)

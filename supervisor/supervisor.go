@@ -1,4 +1,4 @@
-package containerd
+package supervisor
 
 import (
 	"os"
@@ -14,10 +14,13 @@ import (
 	"github.com/opencontainers/runc/libcontainer"
 )
 
-const statsInterval = 1 * time.Second
+const (
+	statsInterval     = 1 * time.Second
+	defaultBufferSize = 2048 // size of queue in eventloop
+)
 
-// NewSupervisor returns an initialized Process supervisor.
-func NewSupervisor(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
+// New returns an initialized Process supervisor.
+func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
@@ -39,7 +42,7 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask, oom bool) (*Super
 		machine:        machine,
 		subscribers:    make(map[chan *Event]struct{}),
 		statsCollector: newStatsCollector(statsInterval),
-		el:             eventloop.NewChanLoop(DefaultBufferSize),
+		el:             eventloop.NewChanLoop(defaultBufferSize),
 	}
 	if oom {
 		s.notifier = newNotifier(s)
@@ -138,7 +141,7 @@ func (s *Supervisor) Close() error {
 func (s *Supervisor) Events() chan *Event {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
-	c := make(chan *Event, DefaultBufferSize)
+	c := make(chan *Event, defaultBufferSize)
 	EventSubscriberCounter.Inc(1)
 	s.subscribers[c] = struct{}{}
 	return c

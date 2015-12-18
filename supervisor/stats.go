@@ -1,4 +1,4 @@
-package containerd
+package supervisor
 
 import "github.com/rcrowley/go-metrics"
 

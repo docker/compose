@@ -1,13 +1,12 @@
-// +build !libcontainer,!runc
+// +build runc
 
-package containerd
+package supervisor
 
 import (
-	"errors"
-
+	"github.com/docker/containerd/runc"
 	"github.com/docker/containerd/runtime"
 )
 
 func newRuntime(stateDir string) (runtime.Runtime, error) {
-	return nil, errors.New("unsupported platform")
+	return runc.NewRuntime(stateDir)
 }
