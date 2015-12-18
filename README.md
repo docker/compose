@@ -11,7 +11,7 @@ as checkpoint and restore for cloning and live migration of containers.
 What does alpha, beta, etc mean?
 * alpha - not feature complete
 * beta - feature complete but needs testing
-* prod ready - read for production
+* prod ready - ready for production
 
 ## Docs
 
