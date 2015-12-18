@@ -1,4 +1,4 @@
-package containerd
+package supervisor
 
 type SignalEvent struct {
 	s *Supervisor

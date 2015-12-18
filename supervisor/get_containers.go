@@ -1,4 +1,4 @@
-package containerd
+package supervisor
 
 type GetContainersEvent struct {
 	s *Supervisor

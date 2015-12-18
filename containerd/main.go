@@ -17,6 +17,7 @@ import (
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/docker/containerd/supervisor"
 	"github.com/docker/containerd/util"
 	"github.com/rcrowley/go-metrics"
 )
@@ -125,7 +126,7 @@ func checkLimits() error {
 }
 
 func debugMetrics(interval time.Duration, graphiteAddr string) error {
-	for name, m := range containerd.Metrics() {
+	for name, m := range supervisor.Metrics() {
 		if err := metrics.DefaultRegistry.Register(name, m); err != nil {
 			return err
 		}
@@ -166,15 +167,15 @@ func processMetrics() {
 }
 
 func daemon(id, address, stateDir string, concurrency int, oom bool) error {
-	tasks := make(chan *containerd.StartTask, concurrency*100)
-	supervisor, err := containerd.NewSupervisor(id, stateDir, tasks, oom)
+	tasks := make(chan *supervisor.StartTask, concurrency*100)
+	sv, err := supervisor.New(id, stateDir, tasks, oom)
 	if err != nil {
 		return err
 	}
 	wg := &sync.WaitGroup{}
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
-		w := containerd.NewWorker(supervisor, wg)
+		w := supervisor.NewWorker(sv, wg)
 		go w.Start()
 	}
 	// only set containerd as the subreaper if it is not an init process
@@ -187,8 +188,8 @@ func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 		}
 	}
 	// start the signal handler in the background.
-	go startSignalHandler(supervisor, containerd.DefaultBufferSize)
-	if err := supervisor.Start(); err != nil {
+	go startSignalHandler(sv)
+	if err := sv.Start(); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(address); err != nil {
@@ -199,7 +200,7 @@ func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 		return err
 	}
 	s := grpc.NewServer()
-	types.RegisterAPIServer(s, server.NewServer(supervisor))
+	types.RegisterAPIServer(s, server.NewServer(sv))
 	logrus.Debugf("GRPC API listen on %s", address)
 	return s.Serve(l)
 }

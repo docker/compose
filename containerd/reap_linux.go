@@ -8,16 +8,18 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd"
+	"github.com/docker/containerd/supervisor"
 	"github.com/docker/containerd/util"
 	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
-func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
+const signalBufferSize = 2048
+
+func startSignalHandler(supervisor *supervisor.Supervisor) {
 	logrus.WithFields(logrus.Fields{
-		"bufferSize": bufferSize,
+		"bufferSize": signalBufferSize,
 	}).Debug("containerd: starting signal handler")
-	signals := make(chan os.Signal, bufferSize)
+	signals := make(chan os.Signal, signalBufferSize)
 	signal.Notify(signals)
 	for s := range signals {
 		switch s {
@@ -37,7 +39,7 @@ func startSignalHandler(supervisor *containerd.Supervisor, bufferSize int) {
 	os.Exit(0)
 }
 
-func reap() (exits []*containerd.Event, err error) {
+func reap() (exits []*supervisor.Event, err error) {
 	var (
 		ws  syscall.WaitStatus
 		rus syscall.Rusage
@@ -53,7 +55,7 @@ func reap() (exits []*containerd.Event, err error) {
 		if pid <= 0 {
 			return exits, nil
 		}
-		e := containerd.NewEvent(containerd.ExitEventType)
+		e := supervisor.NewEvent(supervisor.ExitEventType)
 		e.Pid = pid
 		e.Status = utils.ExitStatus(ws)
 		exits = append(exits, e)

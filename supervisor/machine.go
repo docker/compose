@@ -1,4 +1,4 @@
-package containerd
+package supervisor
 
 import "github.com/cloudfoundry/gosigar"
 
