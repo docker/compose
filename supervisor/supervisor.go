@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/chanotify"
 	"github.com/docker/containerd/eventloop"
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
@@ -45,7 +46,14 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		el:             eventloop.NewChanLoop(defaultBufferSize),
 	}
 	if oom {
-		s.notifier = newNotifier(s)
+		s.notifier = chanotify.New()
+		go func() {
+			for id := range s.notifier.Chan() {
+				e := NewEvent(OOMEventType)
+				e.ID = id
+				s.SendEvent(e)
+			}
+		}()
 	}
 	// register default event handlers
 	s.handlers = map[EventType]Handler{
@@ -88,7 +96,7 @@ type Supervisor struct {
 	machine        Machine
 	containerGroup sync.WaitGroup
 	statsCollector *statsCollector
-	notifier       *notifier
+	notifier       *chanotify.Notifier
 	el             eventloop.EventLoop
 }
 
@@ -124,6 +132,9 @@ func (s *Supervisor) Stop(sig chan os.Signal) {
 		logrus.Debug("waiting for containers to exit")
 		s.containerGroup.Wait()
 		logrus.Debug("all containers exited")
+		if s.notifier != nil {
+			s.notifier.Close()
+		}
 		// stop receiving signals and close the channel
 		signal.Stop(sig)
 		close(sig)
