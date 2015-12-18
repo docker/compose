@@ -344,6 +344,11 @@ class TopLevelCommand(DocoptCommand):
         """
         Remove stopped service containers.
 
+        By default, volumes attached to containers will not be removed. You can see all
+        volumes with `docker volume ls`.
+
+        Any data which is not in a volume will be lost.
+
         Usage: rm [options] [SERVICE...]
 
         Options:
