@@ -1,6 +1,8 @@
 package supervisor
 
 import (
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
 )
@@ -11,6 +13,7 @@ type DeleteEvent struct {
 
 func (h *DeleteEvent) Handle(e *Event) error {
 	if i, ok := h.s.containers[e.ID]; ok {
+		start := time.Now()
 		if err := h.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
@@ -27,6 +30,7 @@ func (h *DeleteEvent) Handle(e *Event) error {
 		})
 		ContainersCounter.Dec(1)
 		h.s.containerGroup.Done()
+		ContainerDeleteTimer.UpdateSince(start)
 	}
 	return nil
 }

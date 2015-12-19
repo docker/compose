@@ -1,10 +1,13 @@
 package supervisor
 
+import "time"
+
 type StartEvent struct {
 	s *Supervisor
 }
 
 func (h *StartEvent) Handle(e *Event) error {
+	start := time.Now()
 	container, io, err := h.s.runtime.Create(e.ID, e.BundlePath, e.Console)
 	if err != nil {
 		return err
@@ -27,5 +30,6 @@ func (h *StartEvent) Handle(e *Event) error {
 		task.Checkpoint = e.Checkpoint.Name
 	}
 	h.s.tasks <- task
+	ContainerCreateTimer.UpdateSince(start)
 	return errDeferedResponse
 }

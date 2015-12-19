@@ -1,12 +1,17 @@
 package supervisor
 
-import "github.com/Sirupsen/logrus"
+import (
+	"time"
+
+	"github.com/Sirupsen/logrus"
+)
 
 type ExitEvent struct {
 	s *Supervisor
 }
 
 func (h *ExitEvent) Handle(e *Event) error {
+	start := time.Now()
 	logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
 		Debug("containerd: process exited")
 	// is it the child process of a container
@@ -36,6 +41,7 @@ func (h *ExitEvent) Handle(e *Event) error {
 	stopCollect := NewEvent(StopStatsEventType)
 	stopCollect.ID = container.ID()
 	h.s.SendEvent(stopCollect)
+	ExitProcessTimer.UpdateSince(start)
 	return nil
 }
 

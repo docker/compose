@@ -1,6 +1,10 @@
 package supervisor
 
-import "github.com/Sirupsen/logrus"
+import (
+	"time"
+
+	"github.com/Sirupsen/logrus"
+)
 
 type AddProcessEvent struct {
 	s *Supervisor
@@ -9,6 +13,7 @@ type AddProcessEvent struct {
 // TODO: add this to worker for concurrent starts???  maybe not because of races where the container
 // could be stopped and removed...
 func (h *AddProcessEvent) Handle(e *Event) error {
+	start := time.Now()
 	ci, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -32,5 +37,6 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 		}).Error("log stdio")
 	}
 	h.s.processes[e.Pid].copier = l
+	ExecProcessTimer.UpdateSince(start)
 	return nil
 }

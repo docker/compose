@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/cloudfoundry/gosigar"
 	"github.com/codegangsta/cli"
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
@@ -150,20 +151,33 @@ func debugMetrics(interval time.Duration, graphiteAddr string) error {
 
 func processMetrics() {
 	var (
-		g  = metrics.NewGauge()
-		fg = metrics.NewGauge()
+		g    = metrics.NewGauge()
+		fg   = metrics.NewGauge()
+		memg = metrics.NewGauge()
 	)
 	metrics.DefaultRegistry.Register("goroutines", g)
 	metrics.DefaultRegistry.Register("fds", fg)
+	metrics.DefaultRegistry.Register("memory-used", memg)
+	collect := func() {
+		// update number of goroutines
+		g.Update(int64(runtime.NumGoroutine()))
+		// collect the number of open fds
+		fds, err := util.GetOpenFds(os.Getpid())
+		if err != nil {
+			logrus.WithField("error", err).Error("get open fd count")
+		}
+		fg.Update(int64(fds))
+		// get the memory used
+		m := sigar.ProcMem{}
+		if err := m.Get(os.Getpid()); err != nil {
+			logrus.WithField("error", err).Error("get pid memory information")
+		}
+		memg.Update(int64(m.Size))
+	}
 	go func() {
+		collect()
 		for range time.Tick(30 * time.Second) {
-			g.Update(int64(runtime.NumGoroutine()))
-			fds, err := util.GetOpenFds(os.Getpid())
-			if err != nil {
-				logrus.WithField("error", err).Error("get open fd count")
-				continue
-			}
-			fg.Update(int64(fds))
+			collect()
 		}
 	}()
 }
