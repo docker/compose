@@ -183,4 +183,4 @@ individuals, we have a number of open channels for communication.
 
 * To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
 
-For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/project/get-help/).
+For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/opensource/get-help/).

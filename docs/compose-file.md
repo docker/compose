@@ -231,7 +231,7 @@ pull if it doesn't exist locally.
 
 ### labels
 
-Add metadata to containers using [Docker labels](http://docs.docker.com/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
+Add metadata to containers using [Docker labels](https://docs.docker.com/engine/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
 
@@ -269,7 +269,7 @@ reference](env.md) for details.
 ### log_driver
 
 Specify a logging driver for the service's containers, as with the ``--log-driver``
-option for docker run ([documented here](https://docs.docker.com/reference/logging/overview/)).
+option for docker run ([documented here](https://docs.docker.com/engine/reference/logging/overview/)).
 
 The default value is json-file.
 
@@ -371,8 +371,8 @@ a `volume_driver`.
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
 
-See [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/) and
-[Volume Plugins](https://docs.docker.com/extend/plugins_volume/) for more
+See [Docker Volumes](https://docs.docker.com/engine/userguide/dockervolumes/) and
+[Volume Plugins](https://docs.docker.com/engine/extend/plugins_volume/) for more
 information.
 
 ### volumes_from
@@ -388,7 +388,7 @@ specifying read-only access(``ro``) or read-write(``rw``).
 ### cpu\_shares, cpu\_quota, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
-[docker run](https://docs.docker.com/reference/run/) counterpart.
+[docker run](https://docs.docker.com/engine/reference/run/) counterpart.
 
     cpu_shares: 73
     cpu_quota: 50000

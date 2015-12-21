@@ -35,7 +35,7 @@ Protocol (tcp or udp), e.g. `DB_PORT_5432_TCP_PROTO=tcp`
 <b><i>name</i>\_NAME</b><br>
 Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
 
-[Docker links]: http://docs.docker.com/userguide/dockerlinks/
+[Docker links]: https://docs.docker.com/engine/userguide/networking/default_network/dockerlinks/
 
 ## Related Information
 
