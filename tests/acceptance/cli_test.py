@@ -264,6 +264,52 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert not containers
 
+    def test_create(self):
+        self.dispatch(['create'])
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(another.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertEqual(len(another.containers(stopped=True)), 1)
+
+    def test_create_with_force_recreate(self):
+        self.dispatch(['create'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        old_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.dispatch(['create', '--force-recreate'], None)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        new_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.assertNotEqual(old_ids, new_ids)
+
+    def test_create_with_no_recreate(self):
+        self.dispatch(['create'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        old_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.dispatch(['create', '--no-recreate'], None)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        new_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.assertEqual(old_ids, new_ids)
+
+    def test_create_with_force_recreate_and_no_recreate(self):
+        self.dispatch(
+            ['create', '--force-recreate', '--no-recreate'],
+            returncode=1)
+
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
         service = self.project.get_service('simple')

@@ -123,6 +123,12 @@ class Project(object):
             [uniques.append(s) for s in services if s not in uniques]
             return uniques
 
+    def get_services_without_duplicate(self, service_names=None, include_deps=False):
+        services = self.get_services(service_names, include_deps)
+        for service in services:
+            service.remove_duplicate_containers()
+        return services
+
     def get_links(self, service_dict):
         links = []
         if 'links' in service_dict:
@@ -224,6 +230,14 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
+    def create(self, service_names=None, strategy=ConvergenceStrategy.changed, do_build=True):
+        services = self.get_services_without_duplicate(service_names, include_deps=True)
+
+        plans = self._get_convergence_plans(services, strategy)
+
+        for service in services:
+            service.execute_convergence_plan(plans[service.name], do_build, detached=True, start=False)
+
     def up(self,
            service_names=None,
            start_deps=True,
@@ -232,10 +246,7 @@ class Project(object):
            timeout=DEFAULT_TIMEOUT,
            detached=False):
 
-        services = self.get_services(service_names, include_deps=start_deps)
-
-        for service in services:
-            service.remove_duplicate_containers()
+        services = self.get_services_without_duplicate(service_names, include_deps=start_deps)
 
         plans = self._get_convergence_plans(services, strategy)
 

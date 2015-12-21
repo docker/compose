@@ -213,6 +213,71 @@ class ProjectTest(DockerClientTestCase):
         project.remove_stopped()
         self.assertEqual(len(project.containers(stopped=True)), 0)
 
+    def test_create(self):
+        web = self.create_service('web')
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        project = Project('composetest', [web, db], self.client)
+
+        project.create(['db'])
+        self.assertEqual(len(project.containers()), 0)
+        self.assertEqual(len(project.containers(stopped=True)), 1)
+        self.assertEqual(len(db.containers()), 0)
+        self.assertEqual(len(db.containers(stopped=True)), 1)
+        self.assertEqual(len(web.containers(stopped=True)), 0)
+
+    def test_create_twice(self):
+        web = self.create_service('web')
+        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        project = Project('composetest', [web, db], self.client)
+
+        project.create(['db', 'web'])
+        project.create(['db', 'web'])
+        self.assertEqual(len(project.containers()), 0)
+        self.assertEqual(len(project.containers(stopped=True)), 2)
+        self.assertEqual(len(db.containers()), 0)
+        self.assertEqual(len(db.containers(stopped=True)), 1)
+        self.assertEqual(len(web.containers()), 0)
+        self.assertEqual(len(web.containers(stopped=True)), 1)
+
+    def test_create_with_links(self):
+        db = self.create_service('db')
+        web = self.create_service('web', links=[(db, 'db')])
+        project = Project('composetest', [db, web], self.client)
+
+        project.create(['web'])
+        self.assertEqual(len(project.containers()), 0)
+        self.assertEqual(len(project.containers(stopped=True)), 2)
+        self.assertEqual(len(db.containers()), 0)
+        self.assertEqual(len(db.containers(stopped=True)), 1)
+        self.assertEqual(len(web.containers()), 0)
+        self.assertEqual(len(web.containers(stopped=True)), 1)
+
+    def test_create_strategy_always(self):
+        db = self.create_service('db')
+        project = Project('composetest', [db], self.client)
+        project.create(['db'])
+        old_id = project.containers(stopped=True)[0].id
+
+        project.create(['db'], strategy=ConvergenceStrategy.always)
+        self.assertEqual(len(project.containers()), 0)
+        self.assertEqual(len(project.containers(stopped=True)), 1)
+
+        db_container = project.containers(stopped=True)[0]
+        self.assertNotEqual(db_container.id, old_id)
+
+    def test_create_strategy_never(self):
+        db = self.create_service('db')
+        project = Project('composetest', [db], self.client)
+        project.create(['db'])
+        old_id = project.containers(stopped=True)[0].id
+
+        project.create(['db'], strategy=ConvergenceStrategy.never)
+        self.assertEqual(len(project.containers()), 0)
+        self.assertEqual(len(project.containers(stopped=True)), 1)
+
+        db_container = project.containers(stopped=True)[0]
+        self.assertEqual(db_container.id, old_id)
+
     def test_project_up(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
