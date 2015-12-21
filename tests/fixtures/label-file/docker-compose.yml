@@ -1,0 +1,4 @@
+web:
+  image: busybox
+  command: /bin/true
+  label_file: ./labels-one.lbls

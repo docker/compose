@@ -1336,6 +1336,15 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(db.human_readable_command, 'top')
         self.assertEqual(other.human_readable_command, 'top')
 
+    def test_labels_file_relative_to_compose_file(self):
+        config_path = os.path.abspath('tests/fixtures/label-file/docker-compose-one.yml')
+        self.dispatch(['-f', config_path, 'up', '-d'], None)
+        self._project = get_project(config_path)
+
+        containers = self.project.containers(stopped=True)
+        self.assertEqual(len(containers), 1)
+        self.assertIn("com.example.label-with-empty-value", containers[0].get('Config.Labels'))
+
     def test_up_with_extends(self):
         self.base_dir = 'tests/fixtures/extends'
         self.dispatch(['up', '-d'], None)

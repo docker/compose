@@ -970,6 +970,19 @@ class ServiceTest(DockerClientTestCase):
         one_off_container = service.create_container(one_off=True)
         self.assertNotEqual(one_off_container.name, 'my-web-container')
 
+    def test_labels_from_file_combined_with_labels(self):
+        service = self.create_service('web',
+                                      labels=['com.example.description=Accounting web',
+                                              'com.example.department=Finance'],
+                                      label_file=['tests/fixtures/label-file/labels-one.lbls',
+                                                  'tests/fixtures/label-file/labels-two.lbls'])
+        labels = create_and_start_container(service).labels
+        for k, v in {'com.example.description': 'Accounting web',
+                     'com.example.department': 'Finance',
+                     'com.example.label-with-empty-value': '',
+                     'com.example.priority': 'high'}.items():
+            self.assertEqual(labels[k], v)
+
     def test_log_drive_invalid(self):
         service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
