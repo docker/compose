@@ -20,11 +20,11 @@ To install Compose, do the following:
 
 1. Install Docker Engine version 1.7.1 or greater:
 
-     * <a href="https://docs.docker.com/installation/mac/" target="_blank">Mac OS X installation</a> (Toolbox installation includes both Engine and Compose)
+     * <a href="https://docs.docker.com/engine/installation/mac/" target="_blank">Mac OS X installation</a> (Toolbox installation includes both Engine and Compose)
 
-     * <a href="https://docs.docker.com/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
+     * <a href="https://docs.docker.com/engine/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
 
-     * <a href="https://docs.docker.com/installation/" target="_blank">other system installations</a>
+     * <a href="https://docs.docker.com/engine/installation/" target="_blank">other system installations</a>
 
 2. Mac OS X users are done installing. Others should continue to the next step.
 

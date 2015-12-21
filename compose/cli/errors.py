@@ -27,7 +27,7 @@ class DockerNotFoundUbuntu(UserError):
         super(DockerNotFoundUbuntu, self).__init__("""
         Couldn't connect to Docker daemon. You might need to install Docker:
 
-        http://docs.docker.io/en/latest/installation/ubuntulinux/
+        https://docs.docker.com/engine/installation/ubuntulinux/
         """)
 
 
@@ -36,7 +36,7 @@ class DockerNotFoundGeneric(UserError):
         super(DockerNotFoundGeneric, self).__init__("""
         Couldn't connect to Docker daemon. You might need to install Docker:
 
-        http://docs.docker.io/en/latest/installation/
+        https://docs.docker.com/engine/installation/
         """)
 
 
