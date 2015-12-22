@@ -19,7 +19,7 @@ type dataPair struct {
 type Notifier struct {
 	c     chan string
 	chMap map[<-chan struct{}]*dataPair
-	exit  chan struct{}
+	ctrl  chan struct{}
 	m     sync.Mutex
 }
 
@@ -28,7 +28,7 @@ func New() *Notifier {
 	s := &Notifier{
 		c:     make(chan string),
 		chMap: make(map[<-chan struct{}]*dataPair),
-		exit:  make(chan struct{}),
+		ctrl:  make(chan struct{}),
 	}
 	go s.start()
 	return s
@@ -51,12 +51,13 @@ func (s *Notifier) Add(ch <-chan struct{}, id string) {
 		},
 	}
 	s.m.Unlock()
+	s.ctrl <- struct{}{}
 }
 
 // Close stops Notifier to listen for any notifications and closes its
 // "client-side" channel.
 func (s *Notifier) Close() {
-	close(s.exit)
+	close(s.ctrl)
 }
 
 func (s *Notifier) start() {
@@ -64,7 +65,10 @@ func (s *Notifier) start() {
 		c := s.createCase()
 		i, _, ok := reflect.Select(c)
 		if i == 0 {
-			// exit was closed, we can safely close output
+			if ok {
+				continue
+			}
+			// ctrl was closed, we can safely close output
 			close(s.c)
 			return
 		}
@@ -81,11 +85,11 @@ func (s *Notifier) start() {
 }
 
 func (s *Notifier) createCase() []reflect.SelectCase {
-	// put exit channel as 0 element of select
+	// put ctrl channel as 0 element of select
 	out := []reflect.SelectCase{
 		reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(s.exit),
+			Chan: reflect.ValueOf(s.ctrl),
 		},
 	}
 	s.m.Lock()

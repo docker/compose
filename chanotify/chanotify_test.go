@@ -78,3 +78,18 @@ func TestConcurrentNotifier(t *testing.T) {
 		}
 	}
 }
+
+func TestAddToBlocked(t *testing.T) {
+	s := New()
+	ch := make(chan struct{}, 1)
+	go func() {
+		// give some time to start first select
+		time.Sleep(1 * time.Second)
+		s.Add(ch, "1")
+		ch <- struct{}{}
+	}()
+	val := <-s.Chan()
+	if val != "1" {
+		t.Fatalf("Expected 1, got %s", val)
+	}
+}
