@@ -709,7 +709,12 @@ def run_one_off_container(container_options, project, service, options):
     signals.set_signal_handler_to_shutdown()
     try:
         try:
-            pty = PseudoTerminal(project.client, container.id, interactive=not options['-T'])
+            pty = PseudoTerminal(
+                project.client,
+                container.id,
+                interactive=not options['-T'],
+                logs=False,
+            )
             sockets = pty.sockets()
             service.start_container(container)
             pty.start(sockets)
