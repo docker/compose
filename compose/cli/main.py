@@ -667,7 +667,7 @@ def run_one_off_container(container_options, project, service, options):
         sys.exit(1)
 
     set_signal_handler(shutdown)
-    dockerpty.start(project.client, container.id, interactive=not options['-T'])
+    dockerpty.start(project.client, container.id, interactive=not options['-T'], logs=False)
     exit_code = container.wait()
     remove_container()
     sys.exit(exit_code)
