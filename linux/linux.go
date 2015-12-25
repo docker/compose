@@ -626,22 +626,22 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 	}
 	cr.Resources = c
 	r := spec.Linux.Resources
-	c.Memory = int64(r.Memory.Limit)
-	c.MemoryReservation = int64(r.Memory.Reservation)
-	c.MemorySwap = int64(r.Memory.Swap)
-	c.KernelMemory = int64(r.Memory.Kernel)
-	c.MemorySwappiness = int64(r.Memory.Swappiness)
-	c.CpuShares = int64(r.CPU.Shares)
-	c.CpuQuota = int64(r.CPU.Quota)
-	c.CpuPeriod = int64(r.CPU.Period)
-	c.CpuRtRuntime = int64(r.CPU.RealtimeRuntime)
-	c.CpuRtPeriod = int64(r.CPU.RealtimePeriod)
-	c.CpusetCpus = r.CPU.Cpus
-	c.CpusetMems = r.CPU.Mems
-	c.BlkioWeight = r.BlockIO.Weight
-	c.BlkioLeafWeight = r.BlockIO.LeafWeight
+	c.Memory = int64(*r.Memory.Limit)
+	c.MemoryReservation = int64(*r.Memory.Reservation)
+	c.MemorySwap = int64(*r.Memory.Swap)
+	c.KernelMemory = int64(*r.Memory.Kernel)
+	c.MemorySwappiness = int64(*r.Memory.Swappiness)
+	c.CpuShares = int64(*r.CPU.Shares)
+	c.CpuQuota = int64(*r.CPU.Quota)
+	c.CpuPeriod = int64(*r.CPU.Period)
+	c.CpuRtRuntime = int64(*r.CPU.RealtimeRuntime)
+	c.CpuRtPeriod = int64(*r.CPU.RealtimePeriod)
+	c.CpusetCpus = *r.CPU.Cpus
+	c.CpusetMems = *r.CPU.Mems
+	c.BlkioWeight = *r.BlockIO.Weight
+	c.BlkioLeafWeight = *r.BlockIO.LeafWeight
 	for _, wd := range r.BlockIO.WeightDevice {
-		weightDevice := configs.NewWeightDevice(wd.Major, wd.Minor, wd.Weight, wd.LeafWeight)
+		weightDevice := configs.NewWeightDevice(wd.Major, wd.Minor, *wd.Weight, *wd.LeafWeight)
 		c.BlkioWeightDevice = append(c.BlkioWeightDevice, weightDevice)
 	}
 	for _, td := range r.BlockIO.ThrottleReadBpsDevice {
@@ -662,11 +662,11 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 	}
 	for _, l := range r.HugepageLimits {
 		c.HugetlbLimit = append(c.HugetlbLimit, &configs.HugepageLimit{
-			Pagesize: l.Pagesize,
-			Limit:    l.Limit,
+			Pagesize: *l.Pagesize,
+			Limit:    *l.Limit,
 		})
 	}
-	c.OomKillDisable = r.DisableOOMKiller
+	c.OomKillDisable = *r.DisableOOMKiller
 	c.NetClsClassid = r.Network.ClassID
 	for _, m := range r.Network.Priorities {
 		c.NetPrioIfpriomap = append(c.NetPrioIfpriomap, &configs.IfPrioMap{
