@@ -378,7 +378,8 @@ information.
 ### volumes_from
 
 Mount all of the volumes from another service or container, optionally
-specifying read-only access(``ro``) or read-write(``rw``).
+specifying read-only access (``ro``) or read-write (``rw``). If no access level is specified,
+then read-write will be used.
 
     volumes_from:
      - service_name
