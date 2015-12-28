@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import logging
 import re
-import signal
 import sys
 from inspect import getdoc
 from operator import attrgetter
@@ -12,6 +11,7 @@ import yaml
 from docker.errors import APIError
 from requests.exceptions import ReadTimeout
 
+from . import signals
 from .. import __version__
 from ..config import config
 from ..config import ConfigurationError
@@ -655,20 +655,19 @@ def run_one_off_container(container_options, project, service, options):
         if options['--rm']:
             project.client.remove_container(container.id, force=True)
 
-    def force_shutdown(signal, frame):
+    signals.set_signal_handler_to_shutdown()
+    try:
+        try:
+            dockerpty.start(project.client, container.id, interactive=not options['-T'])
+            exit_code = container.wait()
+        except signals.ShutdownException:
+            project.client.stop(container.id)
+            exit_code = 1
+    except signals.ShutdownException:
         project.client.kill(container.id)
         remove_container(force=True)
         sys.exit(2)
 
-    def shutdown(signal, frame):
-        set_signal_handler(force_shutdown)
-        project.client.stop(container.id)
-        remove_container()
-        sys.exit(1)
-
-    set_signal_handler(shutdown)
-    dockerpty.start(project.client, container.id, interactive=not options['-T'])
-    exit_code = container.wait()
     remove_container()
     sys.exit(exit_code)
 
@@ -683,24 +682,18 @@ def build_log_printer(containers, service_names, monochrome):
 
 
 def attach_to_logs(project, log_printer, service_names, timeout):
+    print("Attaching to", list_containers(log_printer.containers))
+    signals.set_signal_handler_to_shutdown()
 
-    def force_shutdown(signal, frame):
+    try:
+        try:
+            log_printer.run()
+        except signals.ShutdownException:
+            print("Gracefully stopping... (press Ctrl+C again to force)")
+            project.stop(service_names=service_names, timeout=timeout)
+    except signals.ShutdownException:
         project.kill(service_names=service_names)
         sys.exit(2)
-
-    def shutdown(signal, frame):
-        set_signal_handler(force_shutdown)
-        print("Gracefully stopping... (press Ctrl+C again to force)")
-        project.stop(service_names=service_names, timeout=timeout)
-
-    print("Attaching to", list_containers(log_printer.containers))
-    set_signal_handler(shutdown)
-    log_printer.run()
-
-
-def set_signal_handler(handler):
-    signal.signal(signal.SIGINT, handler)
-    signal.signal(signal.SIGTERM, handler)
 
 
 def list_containers(containers):
