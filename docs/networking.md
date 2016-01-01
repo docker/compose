@@ -79,9 +79,11 @@ You can specify which one to use with the `--x-network-driver` flag:
 
     $ docker-compose --x-networking --x-network-driver=overlay up
 
+<!--[metadata]>
 ## Multi-host networking
 
 (TODO: talk about Swarm and the overlay driver)
+<![end-metadata]-->
 
 ## Custom container network modes
 
