@@ -1,0 +1,6 @@
+
+web:
+    image: alpine:edge
+    command: echo ${COMPOSE_PROJECT_NAME}
+    environment:
+        COMPOSE_PROJECT_NAME:

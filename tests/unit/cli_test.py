@@ -10,8 +10,11 @@ import pytest
 
 from .. import mock
 from .. import unittest
+from compose.cli.command import get_name_and_config
 from compose.cli.command import get_project
 from compose.cli.command import get_project_name
+from compose.cli.command import PROJECT_NAME_VAR
+from compose.cli.command import set_project_name_from_options
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
@@ -50,11 +53,31 @@ class CLITestCase(unittest.TestCase):
         self.assertEquals(project_name, name)
 
     def test_get_project(self):
+        project_name, options = 'projectname', {}
+        compose_config = [
+            {'image': 'alpine:edge', 'name': 'web'},
+        ]
+        project = get_project(project_name, compose_config, options)
+        assert project.name == project_name
+        assert project.client
+        assert project.services
+
+    def test_set_project_name_from_options(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'
-        project = get_project(base_dir)
-        self.assertEqual(project.name, 'longerfilenamecomposefile')
-        self.assertTrue(project.client)
-        self.assertTrue(project.services)
+        project_name = 'theprojectname'
+        options = {'--project-name': project_name}
+        with mock.patch.dict(os.environ):
+            actual = set_project_name_from_options(base_dir, options)
+            assert os.environ[PROJECT_NAME_VAR] == project_name
+        assert actual == project_name
+
+    def test_get_name_and_config(self):
+        base_dir = 'tests/fixtures/longer-filename-composefile'
+        options = {}
+        with mock.patch.dict(os.environ):
+            project_name, config = get_name_and_config(base_dir, options)
+        assert project_name == 'longerfilenamecomposefile'
+        assert config
 
     def test_help(self):
         command = TopLevelCommand()

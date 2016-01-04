@@ -24,6 +24,9 @@ from .utils import is_ubuntu
 log = logging.getLogger(__name__)
 
 
+PROJECT_NAME_VAR = 'COMPOSE_PROJECT_NAME'
+
+
 @contextlib.contextmanager
 def friendly_error_message():
     try:
@@ -44,13 +47,12 @@ def friendly_error_message():
             raise errors.ConnectionErrorGeneric(get_client().base_url)
 
 
-def project_from_options(base_dir, options):
-    return get_project(
-        base_dir,
-        get_config_path_from_options(options),
-        project_name=options.get('--project-name'),
-        verbose=options.get('--verbose'),
-    )
+def get_name_and_config(base_dir, options):
+    config_path = get_config_path_from_options(options)
+    config_details = config.find(base_dir, config_path)
+    project_name = set_project_name_from_options(config_details.working_dir, options)
+
+    return project_name, config.load(config_details)
 
 
 def get_config_path_from_options(options):
@@ -60,6 +62,14 @@ def get_config_path_from_options(options):
 
     config_file = os.environ.get('COMPOSE_FILE')
     return [config_file] if config_file else None
+
+
+def set_project_name_from_options(working_dir, options):
+    project_name = get_project_name(
+        working_dir,
+        project_name=options.get('--project-name'))
+    os.environ[PROJECT_NAME_VAR] = project_name
+    return project_name
 
 
 def get_client(verbose=False, version=None):
@@ -74,17 +84,15 @@ def get_client(verbose=False, version=None):
     return client
 
 
-def get_project(base_dir, config_path=None, project_name=None, verbose=False):
-    config_details = config.find(base_dir, config_path)
-    project_name = get_project_name(config_details.working_dir, project_name)
-    config_data = config.load(config_details)
-
+def get_project(project_name, config_data, options):
     api_version = os.environ.get(
         'COMPOSE_API_VERSION',
         API_VERSIONS[config_data.version])
-    client = get_client(verbose=verbose, version=api_version)
 
-    return Project.from_config(project_name, config_data, client)
+    return Project.from_config(
+        project_name,
+        config_data,
+        get_client(verbose=options.get('--verbose'), version=api_version))
 
 
 def get_project_name(working_dir, project_name=None):

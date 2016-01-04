@@ -15,7 +15,7 @@ from textwrap import dedent
 from docker import errors
 
 from .. import mock
-from compose.cli.command import get_project
+from compose.cli import command
 from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
@@ -71,6 +71,15 @@ class ContainerCountCondition(object):
 
     def __str__(self):
         return "waiting for counter count == %s" % self.expected
+
+
+def get_project(base_dir, config_paths=None):
+    options = {'--file': config_paths}
+    project_name, config = command.get_name_and_config(base_dir, options)
+    # Unset the project name being set above because we're only using the
+    # project here to inspect state, not to actually run anything
+    os.environ.pop('COMPOSE_PROJECT_NAME')
+    return command.get_project(project_name, config, {})
 
 
 class ContainerStateCondition(object):
@@ -153,6 +162,13 @@ class CLITestCase(DockerClientTestCase):
               command: top
               image: busybox:latest
         """).lstrip() in result.stdout
+
+    def test_config_with_injected_project_name(self):
+        self.base_dir = 'tests/fixtures/inject-project-name/'
+        result = self.dispatch(['config'])
+        assert """
+            command: echo injectprojectname
+        """.strip() in result.stdout
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
