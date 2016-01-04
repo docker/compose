@@ -1616,8 +1616,6 @@ class GetDefaultConfigFilesTestCase(unittest.TestCase):
     files = [
         'docker-compose.yml',
         'docker-compose.yaml',
-        'fig.yml',
-        'fig.yaml',
     ]
 
     def test_get_config_path_default_file_in_basedir(self):
