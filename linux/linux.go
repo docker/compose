@@ -626,38 +626,66 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 	}
 	cr.Resources = c
 	r := spec.Linux.Resources
-	c.Memory = int64(*r.Memory.Limit)
-	c.MemoryReservation = int64(*r.Memory.Reservation)
-	c.MemorySwap = int64(*r.Memory.Swap)
-	c.KernelMemory = int64(*r.Memory.Kernel)
-	c.MemorySwappiness = int64(*r.Memory.Swappiness)
-	c.CpuShares = int64(*r.CPU.Shares)
-	c.CpuQuota = int64(*r.CPU.Quota)
-	c.CpuPeriod = int64(*r.CPU.Period)
-	c.CpuRtRuntime = int64(*r.CPU.RealtimeRuntime)
-	c.CpuRtPeriod = int64(*r.CPU.RealtimePeriod)
-	c.CpusetCpus = *r.CPU.Cpus
-	c.CpusetMems = *r.CPU.Mems
-	c.BlkioWeight = *r.BlockIO.Weight
-	c.BlkioLeafWeight = *r.BlockIO.LeafWeight
+	if r.Memory.Limit != nil {
+		c.Memory = int64(*r.Memory.Limit)
+	}
+	if r.Memory.Reservation != nil {
+		c.MemoryReservation = int64(*r.Memory.Reservation)
+	}
+	if r.Memory.Swap != nil {
+		c.MemorySwap = int64(*r.Memory.Swap)
+	}
+	if r.Memory.Kernel != nil {
+		c.KernelMemory = int64(*r.Memory.Kernel)
+	}
+	if r.Memory.Swappiness != nil {
+		c.MemorySwappiness = int64(*r.Memory.Swappiness)
+	}
+	if r.CPU.Shares != nil {
+		c.CpuShares = int64(*r.CPU.Shares)
+	}
+	if r.CPU.Quota != nil {
+		c.CpuQuota = int64(*r.CPU.Quota)
+	}
+	if r.CPU.Period != nil {
+		c.CpuPeriod = int64(*r.CPU.Period)
+	}
+	if r.CPU.RealtimeRuntime != nil {
+		c.CpuRtRuntime = int64(*r.CPU.RealtimeRuntime)
+	}
+	if r.CPU.RealtimePeriod != nil {
+		c.CpuRtPeriod = int64(*r.CPU.RealtimePeriod)
+	}
+	if r.CPU.Cpus != nil {
+		c.CpusetCpus = *r.CPU.Cpus
+	}
+	if r.CPU.Mems != nil {
+		c.CpusetMems = *r.CPU.Mems
+	}
+	if r.BlockIO.Weight != nil {
+		c.BlkioWeight = *r.BlockIO.Weight
+	}
+	if r.BlockIO.LeafWeight != nil {
+		c.BlkioLeafWeight = *r.BlockIO.LeafWeight
+	}
 	for _, wd := range r.BlockIO.WeightDevice {
 		weightDevice := configs.NewWeightDevice(wd.Major, wd.Minor, *wd.Weight, *wd.LeafWeight)
 		c.BlkioWeightDevice = append(c.BlkioWeightDevice, weightDevice)
 	}
 	for _, td := range r.BlockIO.ThrottleReadBpsDevice {
-		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, td.Rate)
+		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, *td.Rate)
 		c.BlkioThrottleReadBpsDevice = append(c.BlkioThrottleReadBpsDevice, throttleDevice)
 	}
 	for _, td := range r.BlockIO.ThrottleWriteBpsDevice {
-		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, td.Rate)
+		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, *td.Rate)
 		c.BlkioThrottleWriteBpsDevice = append(c.BlkioThrottleWriteBpsDevice, throttleDevice)
 	}
 	for _, td := range r.BlockIO.ThrottleReadIOPSDevice {
-		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, td.Rate)
+		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, *td.Rate)
 		c.BlkioThrottleReadIOPSDevice = append(c.BlkioThrottleReadIOPSDevice, throttleDevice)
 	}
 	for _, td := range r.BlockIO.ThrottleWriteIOPSDevice {
-		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, td.Rate)
+		throttleDevice := configs.NewThrottleDevice(td.Major, td.Minor, *td.Rate)
 		c.BlkioThrottleWriteIOPSDevice = append(c.BlkioThrottleWriteIOPSDevice, throttleDevice)
 	}
 	for _, l := range r.HugepageLimits {
@@ -666,7 +694,7 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 			Limit:    *l.Limit,
 		})
 	}
-	c.OomKillDisable = *r.DisableOOMKiller
+	c.OomKillDisable = r.DisableOOMKiller != nil && *r.DisableOOMKiller
 	c.NetClsClassid = r.Network.ClassID
 	for _, m := range r.Network.Priorities {
 		c.NetPrioIfpriomap = append(c.NetPrioIfpriomap, &configs.IfPrioMap{
