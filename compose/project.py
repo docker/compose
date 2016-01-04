@@ -235,6 +235,12 @@ class Project(object):
     def initialize_volumes(self):
         try:
             for volume in self.volumes:
+                if volume.is_user_created:
+                    log.info(
+                        'Found user-created volume "{0}". No new namespaced '
+                        'volume will be created.'.format(volume.name)
+                    )
+                    continue
                 volume.create()
         except NotFound:
             raise ConfigurationError(
