@@ -68,7 +68,10 @@ def set_project_name_from_options(working_dir, options):
     project_name = get_project_name(
         working_dir,
         project_name=options.get('--project-name'))
-    os.environ[PROJECT_NAME_VAR] = project_name
+    if six.PY2:
+        os.environ[PROJECT_NAME_VAR] = six.binary_type(project_name)
+    else:
+        os.environ[PROJECT_NAME_VAR] = project_name
     return project_name
 
 

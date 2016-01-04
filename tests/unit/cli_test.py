@@ -18,6 +18,7 @@ from compose.cli.command import set_project_name_from_options
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
+from compose.config import config
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.service import Service
 
@@ -54,9 +55,10 @@ class CLITestCase(unittest.TestCase):
 
     def test_get_project(self):
         project_name, options = 'projectname', {}
-        compose_config = [
-            {'image': 'alpine:edge', 'name': 'web'},
-        ]
+        compose_config = config.Config(
+            services=[{'image': 'alpine:edge', 'name': 'web'}],
+            version=2,
+            volumes=[])
         project = get_project(project_name, compose_config, options)
         assert project.name == project_name
         assert project.client
