@@ -54,3 +54,13 @@ class VolumeTest(DockerClientTestCase):
         vol.remove()
         volumes = self.client.volumes()['Volumes']
         assert len([v for v in volumes if v['Name'] == vol.full_name]) == 0
+
+    def test_is_user_created(self):
+        vol = Volume(self.client, 'composetest', 'uservolume01')
+        try:
+            self.client.create_volume('uservolume01')
+            assert vol.is_user_created is True
+        finally:
+            self.client.remove_volume('uservolume01')
+        vol2 = Volume(self.client, 'composetest', 'volume01')
+        assert vol2.is_user_created is False
