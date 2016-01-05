@@ -1,6 +1,6 @@
 PyYAML==3.11
 docker-py==1.5.0
-dockerpty==0.3.4
+dockerpty==0.3.5
 docopt==0.6.1
 enum34==1.0.4
 jsonschema==2.5.1
