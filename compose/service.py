@@ -880,6 +880,7 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
 
     for volume in volumes_option:
         if (
+            volume.external and
             volume.internal in container_volumes and
             container_volumes.get(volume.internal) != volume.external
         ):
