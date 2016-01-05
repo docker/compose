@@ -18,6 +18,7 @@ get_versions="docker run --rm
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="$($get_versions default)"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
+  # TODO: `-n 2` when engine 1.10 releases
   DOCKER_VERSIONS="$($get_versions recent -n 1)"
 fi
 
