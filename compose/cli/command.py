@@ -59,11 +59,7 @@ def get_config_path_from_options(options):
     if file_option:
         return file_option
 
-    if 'FIG_FILE' in os.environ:
-        log.warn('The FIG_FILE environment variable is deprecated.')
-        log.warn('Please use COMPOSE_FILE instead.')
-
-    config_file = os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')
+    config_file = os.environ.get('COMPOSE_FILE')
     return [config_file] if config_file else None
 
 
@@ -96,14 +92,7 @@ def get_project_name(working_dir, project_name=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    if 'FIG_PROJECT_NAME' in os.environ:
-        log.warn('The FIG_PROJECT_NAME environment variable is deprecated.')
-        log.warn('Please use COMPOSE_PROJECT_NAME instead.')
-
-    project_name = (
-        project_name or
-        os.environ.get('COMPOSE_PROJECT_NAME') or
-        os.environ.get('FIG_PROJECT_NAME'))
+    project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME')
     if project_name is not None:
         return normalize_name(project_name)
 

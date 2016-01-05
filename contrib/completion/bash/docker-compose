@@ -28,7 +28,7 @@ __docker_compose_nospace() {
 # Support for these filenames might be dropped in some future version.
 __docker_compose_compose_file() {
 	local file
-	for file in docker-compose.y{,a}ml fig.y{,a}ml ; do
+	for file in docker-compose.y{,a}ml ; do
 		[ -e $file ] && {
 			echo $file
 			return

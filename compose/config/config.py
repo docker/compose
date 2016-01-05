@@ -88,8 +88,6 @@ DOCKER_VALID_URL_PREFIXES = (
 SUPPORTED_FILENAMES = [
     'docker-compose.yml',
     'docker-compose.yaml',
-    'fig.yml',
-    'fig.yaml',
 ]
 
 DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
@@ -161,10 +159,6 @@ def get_default_config_files(base_dir):
     if len(candidates) > 1:
         log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
         log.warn("Using %s\n", winner)
-
-    if winner.startswith("fig."):
-        log.warn("%s is deprecated and will not be supported in future. "
-                 "Please rename your config file to docker-compose.yml\n" % winner)
 
     return [os.path.join(path, winner)] + get_default_override_file(path)
 

@@ -42,13 +42,6 @@ class CLITestCase(unittest.TestCase):
         project_name = get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
-    def test_project_name_from_environment_old_var(self):
-        name = 'namefromenv'
-        with mock.patch.dict(os.environ):
-            os.environ['FIG_PROJECT_NAME'] = name
-            project_name = get_project_name(None)
-        self.assertEquals(project_name, name)
-
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         with mock.patch.dict(os.environ):
