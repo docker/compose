@@ -46,8 +46,6 @@ and a separate MySQL instance:
       command: php -S 0.0.0.0:8000 -t /code
       ports:
         - "8000:8000"
-      links:
-        - db
       volumes:
         - .:/code
     db:
@@ -57,13 +55,13 @@ and a separate MySQL instance:
 
 A supporting file is needed to get this working. `wp-config.php` is
 the standard WordPress config file with a single change to point the database
-configuration at the `db` container:
+configuration at the `wordpress_db_1` container:
 
     <?php
     define('DB_NAME', 'wordpress');
     define('DB_USER', 'root');
     define('DB_PASSWORD', '');
-    define('DB_HOST', "db:3306");
+    define('DB_HOST', "wordpress_db_1:3306");
     define('DB_CHARSET', 'utf8');
     define('DB_COLLATE', '');
 
@@ -87,9 +85,18 @@ configuration at the `db` container:
 
 ### Build the project
 
-With those four files in place, run `docker-compose up` inside your WordPress
-directory and it'll pull and build the needed images, and then start the web and
-database containers. If you're using [Docker Machine](https://docs.docker.com/machine/), then `docker-machine ip MACHINE_VM` gives you the machine address and you can open `http://MACHINE_VM_IP:8000` in a browser.
+With those four files in place, run
+
+    docker-compose --x-networking -p wordpress up
+
+inside your WordPress directory and it'll pull and build the needed images,
+and then start the web and database containers. If you're using
+[Docker Machine](https://docs.docker.com/machine/), then
+
+    $ docker-machine ip default
+    192.168.99.100
+
+gives you the machine address and you can open `http://IP:8000` in a browser.
 
 ## More Compose documentation
 
