@@ -16,6 +16,7 @@ from compose.cli.command import get_project
 from compose.cli.docker_client import docker_client
 from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
+from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
 
 
@@ -871,7 +872,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'], None)
 
         container = self.project.containers(stopped=True)[0]
-        actual_host_path = container.get('Volumes')['/container-path']
+        actual_host_path = container.get_mount('/container-path')['Source']
         components = actual_host_path.split('/')
         assert components[-2:] == ['home-dir', 'my-volume']
 
@@ -909,7 +910,7 @@ class CLITestCase(DockerClientTestCase):
 
         web, other, db = containers
         self.assertEqual(web.human_readable_command, 'top')
-        self.assertTrue({'db', 'other'} <= set(web.links()))
+        self.assertTrue({'db', 'other'} <= set(get_links(web)))
         self.assertEqual(db.human_readable_command, 'top')
         self.assertEqual(other.human_readable_command, 'top')
 
@@ -931,7 +932,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 2)
         web = containers[1]
 
-        self.assertEqual(set(web.links()), set(['db', 'mydb_1', 'extends_mydb_1']))
+        self.assertEqual(
+            set(get_links(web)),
+            set(['db', 'mydb_1', 'extends_mydb_1']))
 
         expected_env = set([
             "FOO=1",

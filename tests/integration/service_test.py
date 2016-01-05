@@ -12,6 +12,7 @@ from six import text_type
 
 from .. import mock
 from .testcases import DockerClientTestCase
+from .testcases import get_links
 from .testcases import pull_busybox
 from compose import __version__
 from compose.config.types import VolumeFromSpec
@@ -88,13 +89,13 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         container = service.create_container()
         container.start()
-        self.assertIn('/var/db', container.get('Volumes'))
+        assert container.get_mount('/var/db')
 
     def test_create_container_with_volume_driver(self):
         service = self.create_service('db', volume_driver='foodriver')
         container = service.create_container()
         container.start()
-        self.assertEqual('foodriver', container.get('Config.VolumeDriver'))
+        self.assertEqual('foodriver', container.get('HostConfig.VolumeDriver'))
 
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
@@ -158,12 +159,10 @@ class ServiceTest(DockerClientTestCase):
             volumes=[VolumeSpec(host_path, container_path, 'rw')])
         container = service.create_container()
         container.start()
-
-        volumes = container.inspect()['Volumes']
-        self.assertIn(container_path, volumes)
+        assert container.get_mount(container_path)
 
         # Match the last component ("host-path"), because boot2docker symlinks /tmp
-        actual_host_path = volumes[container_path]
+        actual_host_path = container.get_mount(container_path)['Source']
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
@@ -173,10 +172,10 @@ class ServiceTest(DockerClientTestCase):
         """
         service = self.create_service('data', volumes=[VolumeSpec.parse('/data/')])
         old_container = create_and_start_container(service)
-        volume_path = old_container.get('Volumes')['/data']
+        volume_path = old_container.get_mount('/data')['Source']
 
         new_container = service.recreate_container(old_container)
-        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+        self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
     def test_duplicate_volume_trailing_slash(self):
         """
@@ -250,7 +249,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.name, 'composetest_db_1')
         old_container.start()
         old_container.inspect()  # reload volume data
-        volume_path = old_container.get('Volumes')['/etc']
+        volume_path = old_container.get_mount('/etc')['Source']
 
         num_containers_before = len(self.client.containers(all=True))
 
@@ -262,7 +261,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=2', new_container.get('Config.Env'))
         self.assertEqual(new_container.name, 'composetest_db_1')
-        self.assertEqual(new_container.get('Volumes')['/etc'], volume_path)
+        self.assertEqual(new_container.get_mount('/etc')['Source'], volume_path)
         self.assertIn(
             'affinity:container==%s' % old_container.id,
             new_container.get('Config.Env'))
@@ -305,14 +304,19 @@ class ServiceTest(DockerClientTestCase):
         )
 
         old_container = create_and_start_container(service)
-        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
-        volume_path = old_container.get('Volumes')['/data']
+        self.assertEqual(
+            [mount['Destination'] for mount in old_container.get('Mounts')], ['/data']
+        )
+        volume_path = old_container.get_mount('/data')['Source']
 
         new_container, = service.execute_convergence_plan(
             ConvergencePlan('recreate', [old_container]))
 
-        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
-        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+        self.assertEqual(
+            [mount['Destination'] for mount in new_container.get('Mounts')],
+            ['/data']
+        )
+        self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
     def test_execute_convergence_plan_when_image_volume_masks_config(self):
         service = self.create_service(
@@ -321,8 +325,11 @@ class ServiceTest(DockerClientTestCase):
         )
 
         old_container = create_and_start_container(service)
-        self.assertEqual(list(old_container.get('Volumes').keys()), ['/data'])
-        volume_path = old_container.get('Volumes')['/data']
+        self.assertEqual(
+            [mount['Destination'] for mount in old_container.get('Mounts')],
+            ['/data']
+        )
+        volume_path = old_container.get_mount('/data')['Source']
 
         service.options['volumes'] = [VolumeSpec.parse('/tmp:/data')]
 
@@ -336,8 +343,11 @@ class ServiceTest(DockerClientTestCase):
             "Service \"db\" is using volume \"/data\" from the previous container",
             args[0])
 
-        self.assertEqual(list(new_container.get('Volumes')), ['/data'])
-        self.assertEqual(new_container.get('Volumes')['/data'], volume_path)
+        self.assertEqual(
+            [mount['Destination'] for mount in new_container.get('Mounts')],
+            ['/data']
+        )
+        self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
     def test_execute_convergence_plan_without_start(self):
         service = self.create_service(
@@ -376,7 +386,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(web)
 
         self.assertEqual(
-            set(web.containers()[0].links()),
+            set(get_links(web.containers()[0])),
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
@@ -392,7 +402,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(web)
 
         self.assertEqual(
-            set(web.containers()[0].links()),
+            set(get_links(web.containers()[0])),
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
@@ -410,7 +420,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(web)
 
         self.assertEqual(
-            set(web.containers()[0].links()),
+            set(get_links(web.containers()[0])),
             set([
                 'composetest_db_1',
                 'composetest_db_2',
@@ -424,7 +434,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
 
         c = create_and_start_container(db)
-        self.assertEqual(set(c.links()), set([]))
+        self.assertEqual(set(get_links(c)), set([]))
 
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
@@ -435,7 +445,7 @@ class ServiceTest(DockerClientTestCase):
         c = create_and_start_container(db, one_off=True)
 
         self.assertEqual(
-            set(c.links()),
+            set(get_links(c)),
             set([
                 'composetest_db_1', 'db_1',
                 'composetest_db_2', 'db_2',
