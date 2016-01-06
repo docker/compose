@@ -422,6 +422,8 @@ def merge_service_dicts_from_files(base, override):
     new_service = merge_service_dicts(base, override)
     if 'extends' in override:
         new_service['extends'] = override['extends']
+    elif 'extends' in base:
+        new_service['extends'] = base['extends']
     return new_service
 
 
