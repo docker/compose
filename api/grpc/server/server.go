@@ -33,10 +33,6 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e := supervisor.NewEvent(supervisor.StartContainerEventType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
-	e.Stdout = c.Stdout
-	e.Stderr = c.Stderr
-	e.Stdin = c.Stdin
-	e.Console = c.Console
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
@@ -49,14 +45,16 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	}
 	sr := <-e.StartResponse
 	return &types.CreateContainerResponse{
-		Pid: uint32(sr.Pid),
+		Stdin:  sr.Stdin,
+		Stdout: sr.Stdout,
+		Stderr: sr.Stderr,
 	}, nil
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
 	e := supervisor.NewEvent(supervisor.SignalEventType)
 	e.ID = r.Id
-	e.Pid = int(r.Pid)
+	e.Pid = r.Pid
 	e.Signal = syscall.Signal(int(r.Signal))
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
@@ -79,7 +77,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	}
 	e := supervisor.NewEvent(supervisor.AddProcessEventType)
 	e.ID = r.Id
-	e.Process = process
+	e.ProcessSpec = process
 	e.Console = r.Console
 	e.Stdin = r.Stdin
 	e.Stdout = r.Stdout
@@ -88,7 +86,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	return &types.AddProcessResponse{Pid: uint32(e.Pid)}, nil
+	return &types.AddProcessResponse{}, nil
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
@@ -140,21 +138,23 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 	if container == nil {
 		return nil, grpc.Errorf(codes.NotFound, "no such containers")
 	}
-	checkpoints, err := container.Checkpoints()
-	if err != nil {
-		return nil, err
-	}
 	var out []*types.Checkpoint
-	for _, c := range checkpoints {
-		out = append(out, &types.Checkpoint{
-			Name:        c.Name,
-			Tcp:         c.Tcp,
-			Shell:       c.Shell,
-			UnixSockets: c.UnixSockets,
-			// TODO: figure out timestamp
-			//Timestamp:   c.Timestamp,
-		})
-	}
+	/*
+		checkpoints, err := container.Checkpoints()
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range checkpoints {
+			out = append(out, &types.Checkpoint{
+				Name:        c.Name,
+				Tcp:         c.Tcp,
+				Shell:       c.Shell,
+				UnixSockets: c.UnixSockets,
+				// TODO: figure out timestamp
+				//Timestamp:   c.Timestamp,
+			})
+		}
+	*/
 	return &types.ListCheckpointResponse{Checkpoints: out}, nil
 }
 
@@ -167,7 +167,6 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 	m := s.sv.Machine()
 	state := &types.StateResponse{
 		Machine: &types.Machine{
-			Id:     m.ID,
 			Cpus:   uint32(m.Cpus),
 			Memory: uint64(m.Cpus),
 		},
@@ -179,13 +178,9 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 		}
 		var procs []*types.Process
 		for _, p := range processes {
-			pid, err := p.Pid()
-			if err != nil {
-				logrus.WithField("error", err).Error("get process pid")
-			}
 			oldProc := p.Spec()
 			procs = append(procs, &types.Process{
-				Pid:      uint32(pid),
+				Pid:      p.ID(),
 				Terminal: oldProc.Terminal,
 				Args:     oldProc.Args,
 				Env:      oldProc.Env,
@@ -231,7 +226,7 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 			ev = &types.Event{
 				Type:   "exit",
 				Id:     evt.ID,
-				Pid:    uint32(evt.Pid),
+				Pid:    evt.Pid,
 				Status: uint32(evt.Status),
 			}
 		case supervisor.OOMEventType:

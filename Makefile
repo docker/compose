@@ -1,4 +1,4 @@
-BUILDTAGS=libcontainer
+BUILDTAGS=
 
 # if this session isn't interactive, then we don't want to allocate a
 # TTY, which would fail, but if it is interactive, we do want to attach
@@ -13,7 +13,7 @@ DOCKER_RUN := docker run --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
 export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
 
-all: client daemon
+all: client daemon shim
 
 bin:
 	mkdir -p bin/
@@ -26,6 +26,9 @@ client: bin
 
 daemon: bin
 	cd containerd && go build -tags "$(BUILDTAGS)" -o ../bin/containerd
+
+shim: bin
+	cd containerd-shim && go build -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
 
 dbuild:
 	@docker build --rm --force-rm -t "$(DOCKER_IMAGE)" .

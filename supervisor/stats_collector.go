@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/docker/pkg/pubsub"
@@ -179,15 +178,17 @@ func (s *statsCollector) run() {
 			continue
 		}
 
-		for _, pair := range pairs {
-			stats, err := pair.ct.Stats()
-			if err != nil {
-				logrus.Errorf("Error getting stats for container ID %s", pair.ct.ID())
-				continue
-			}
+		/*
+			for _, pair := range pairs {
+					stats, err := pair.ct.Stats()
+					if err != nil {
+						logrus.Errorf("Error getting stats for container ID %s", pair.ct.ID())
+						continue
+					}
 
-			pair.pub.Publish(convertToPb(stats))
-		}
+					pair.pub.Publish(convertToPb(stats))
+			}
+		*/
 	}
 }
 

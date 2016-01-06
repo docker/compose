@@ -29,7 +29,6 @@ func (h *DeleteEvent) Handle(e *Event) error {
 			Pid:    e.Pid,
 		})
 		ContainersCounter.Dec(1)
-		h.s.containerGroup.Done()
 		ContainerDeleteTimer.UpdateSince(start)
 	}
 	return nil

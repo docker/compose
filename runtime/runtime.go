@@ -1,10 +1,6 @@
 package runtime
 
-import (
-	"errors"
-
-	"github.com/opencontainers/specs"
-)
+import "errors"
 
 var (
 	ErrNotChildProcess       = errors.New("containerd: not a child process for container")
@@ -13,14 +9,8 @@ var (
 	ErrCheckpointExists      = errors.New("containerd: checkpoint already exists")
 	ErrContainerExited       = errors.New("containerd: container has exited")
 	ErrTerminalsNotSupported = errors.New("containerd: terminals are not supported for runtime")
-)
+	ErrProcessNotExited      = errors.New("containerd: process has not exited")
+	ErrProcessExited         = errors.New("containerd: process has exited")
 
-// Runtime handles containers, containers handle their own actions
-type Runtime interface {
-	// Type of the runtime
-	Type() string
-	// Create creates a new container initialized but without it starting it
-	Create(id, bundlePath, consolePath string) (Container, *IO, error)
-	// StartProcess adds a new process to the container
-	StartProcess(c Container, p specs.Process, consolePath string) (Process, *IO, error)
-}
+	errNotImplemented = errors.New("containerd: not implemented")
+)

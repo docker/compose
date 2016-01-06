@@ -18,20 +18,19 @@ service API {
 message CreateContainerRequest {
 	string id = 1; // ID of container
 	string bundlePath = 2; // path to OCI bundle
-	string stdin = 3; // path to the file where stdin will be read (optional)
-	string stdout = 4; // path to file where stdout will be written (optional)
-	string stderr = 5; // path to file where stderr will be written (optional)
-	string console = 6; // path to the console for a container (optional)
 	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
 }
 
 message CreateContainerResponse {
 	uint32 pid = 1; // PID of the containers main process
+	string stdin = 1; // path to the file where stdin will be read (optional)
+	string stdout = 2; // path to file where stdout will be written (optional)
+	string stderr = 3; // path to file where stderr will be written (optional)
 }
 
 message SignalRequest {
 	string id = 1; // ID of container
-	uint32 pid = 2; // PID of process inside container
+	string pid = 2; // PID of process inside container
 	uint32 signal = 3; // Signal which will be sent, you can find value in "man 7 signal"
 }
 
@@ -58,7 +57,6 @@ message User {
 }
 
 message AddProcessResponse {
-	uint32 pid = 1; // PID of process is returned in case of success
 }
 
 message CreateCheckpointRequest {
@@ -101,7 +99,7 @@ message ContainerState {
 }
 
 message Process {
-	uint32 pid = 1;
+	string pid = 1;
 	bool terminal = 2; // Use tty for container stdio
 	User user = 3; // User under which process will be run
 	repeated string args = 4; // Arguments for process, first is binary path itself
@@ -119,9 +117,8 @@ message Container {
 
 // Machine is information about machine on which containerd is run
 message Machine {
-	string id = 1; // ID of machine
-	uint32 cpus = 2; // number of cpus
-	uint64 memory = 3; // amount of memory
+	uint32 cpus = 1; // number of cpus
+	uint64 memory = 2; // amount of memory
 }
 
 // StateResponse is information about containerd daemon
@@ -147,7 +144,7 @@ message Event {
 	string id = 2;
 	uint32 status = 3;
 	string bundlePath = 4;
-	uint32 pid = 5;
+	string pid = 5;
 	uint32 signal = 7;
 	Process process = 8;
 	repeated Container containers = 9;

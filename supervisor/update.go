@@ -27,15 +27,17 @@ func (h *UpdateEvent) Handle(e *Event) error {
 		}
 	}
 	if e.Signal != nil {
-		// signal the pid1/main process of the container
-		processes, err := container.Processes()
-		if err != nil {
-			return err
-		}
-		if len(processes) == 0 {
-			return ErrProcessNotFound
-		}
-		return processes[0].Signal(e.Signal)
+		/*
+			// signal the pid1/main process of the container
+			processes, err := container.Processes()
+			if err != nil {
+				return err
+			}
+			if len(processes) == 0 {
+				return ErrProcessNotFound
+			}
+			return processes[0].Signal(e.Signal)
+		*/
 	}
 	return nil
 }

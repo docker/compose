@@ -36,7 +36,9 @@ func NewEvent(t EventType) *Event {
 }
 
 type StartResponse struct {
-	Pid int
+	Stdin  string
+	Stdout string
+	Stderr string
 }
 
 type Event struct {
@@ -48,11 +50,12 @@ type Event struct {
 	Stderr        string
 	Stdin         string
 	Console       string
-	Pid           int
+	Pid           string
 	Status        int
 	Signal        os.Signal
-	Process       *specs.Process
+	Process       runtime.Process
 	State         runtime.State
+	ProcessSpec   *specs.Process
 	Containers    []runtime.Container
 	Checkpoint    *runtime.Checkpoint
 	Err           chan error

@@ -27,7 +27,7 @@ var eventsCommand = cli.Command{
 			if err != nil {
 				fatal(err.Error(), 1)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%d\t%d\n", e.Type, e.Id, e.Pid, e.Status)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", e.Type, e.Id, e.Pid, e.Status)
 			w.Flush()
 		}
 	},

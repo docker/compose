@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
 	"syscall"
@@ -29,11 +30,6 @@ const (
 )
 
 var daemonFlags = []cli.Flag{
-	cli.StringFlag{
-		Name:  "id",
-		Value: getDefaultID(),
-		Usage: "unique containerd id to identify the instance",
-	},
 	cli.BoolFlag{
 		Name:  "debug",
 		Usage: "enable debug output in the logs",
@@ -88,7 +84,6 @@ func main() {
 	}
 	app.Action = func(context *cli.Context) {
 		if err := daemon(
-			context.String("id"),
 			context.String("listen"),
 			context.String("state-dir"),
 			context.Int("concurrency"),
@@ -172,9 +167,12 @@ func processMetrics() {
 	}()
 }
 
-func daemon(id, address, stateDir string, concurrency int, oom bool) error {
+func daemon(address, stateDir string, concurrency int, oom bool) error {
+	// setup a standard reaper so that we don't leave any zombies if we are still alive
+	// this is just good practice because we are spawning new processes
+	go reapProcesses()
 	tasks := make(chan *supervisor.StartTask, concurrency*100)
-	sv, err := supervisor.New(id, stateDir, tasks, oom)
+	sv, err := supervisor.New(stateDir, tasks, oom)
 	if err != nil {
 		return err
 	}
@@ -184,17 +182,6 @@ func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 		w := supervisor.NewWorker(sv, wg)
 		go w.Start()
 	}
-	// only set containerd as the subreaper if it is not an init process
-	if pid := os.Getpid(); pid != 1 {
-		logrus.WithFields(logrus.Fields{
-			"pid": pid,
-		}).Debug("containerd is not init, set as subreaper")
-		if err := setSubReaper(); err != nil {
-			return err
-		}
-	}
-	// start the signal handler in the background.
-	go startSignalHandler(sv)
 	if err := sv.Start(); err != nil {
 		return err
 	}
@@ -209,6 +196,19 @@ func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 	types.RegisterAPIServer(s, server.NewServer(sv))
 	logrus.Debugf("GRPC API listen on %s", address)
 	return s.Serve(l)
+}
+
+func reapProcesses() {
+	s := make(chan os.Signal, 2048)
+	signal.Notify(s, syscall.SIGCHLD)
+	if err := util.SetSubreaper(1); err != nil {
+		logrus.WithField("error", err).Error("containerd: set subpreaper")
+	}
+	for range s {
+		if _, err := util.Reap(); err != nil {
+			logrus.WithField("error", err).Error("containerd: reap child processes")
+		}
+	}
 }
 
 // getDefaultID returns the hostname for the instance host

@@ -1,18 +1,16 @@
 package supervisor
 
 import (
+	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/chanotify"
 	"github.com/docker/containerd/eventloop"
 	"github.com/docker/containerd/runtime"
-	"github.com/opencontainers/runc/libcontainer"
 )
 
 const (
@@ -21,29 +19,27 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
+func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
-	// register counters
-	r, err := newRuntime(filepath.Join(stateDir, id))
+	machine, err := CollectMachineInformation()
 	if err != nil {
 		return nil, err
 	}
-	machine, err := CollectMachineInformation(id)
+	monitor, err := NewMonitor()
 	if err != nil {
 		return nil, err
 	}
 	s := &Supervisor{
 		stateDir:       stateDir,
 		containers:     make(map[string]*containerInfo),
-		processes:      make(map[int]*containerInfo),
-		runtime:        r,
 		tasks:          tasks,
 		machine:        machine,
 		subscribers:    make(map[chan *Event]struct{}),
 		statsCollector: newStatsCollector(statsInterval),
 		el:             eventloop.NewChanLoop(defaultBufferSize),
+		monitor:        monitor,
 	}
 	if oom {
 		s.notifier = chanotify.New()
@@ -71,7 +67,10 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
 		StopStatsEventType:        &StopStatsEvent{s},
 	}
-	// start the container workers for concurrent container starts
+	go s.exitHandler()
+	if err := s.restore(); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -84,9 +83,7 @@ type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir   string
 	containers map[string]*containerInfo
-	processes  map[int]*containerInfo
 	handlers   map[EventType]Handler
-	runtime    runtime.Runtime
 	events     chan *Event
 	tasks      chan *StartTask
 	// we need a lock around the subscribers map only because additions and deletions from
@@ -94,51 +91,18 @@ type Supervisor struct {
 	subscriberLock sync.RWMutex
 	subscribers    map[chan *Event]struct{}
 	machine        Machine
-	containerGroup sync.WaitGroup
 	statsCollector *statsCollector
 	notifier       *chanotify.Notifier
 	el             eventloop.EventLoop
+	monitor        *Monitor
 }
 
 // Stop closes all tasks and sends a SIGTERM to each container's pid1 then waits for they to
 // terminate.  After it has handled all the SIGCHILD events it will close the signals chan
 // and exit.  Stop is a non-blocking call and will return after the containers have been signaled
-func (s *Supervisor) Stop(sig chan os.Signal) {
+func (s *Supervisor) Stop() {
 	// Close the tasks channel so that no new containers get started
 	close(s.tasks)
-	// send a SIGTERM to all containers
-	for id, i := range s.containers {
-		c := i.container
-		logrus.WithField("id", id).Debug("sending TERM to container processes")
-		procs, err := c.Processes()
-		if err != nil {
-			logrus.WithField("id", id).Warn("get container processes")
-			continue
-		}
-		if len(procs) == 0 {
-			continue
-		}
-		mainProc := procs[0]
-		if err := mainProc.Signal(syscall.SIGTERM); err != nil {
-			pid, _ := mainProc.Pid()
-			logrus.WithFields(logrus.Fields{
-				"id":    id,
-				"pid":   pid,
-				"error": err,
-			}).Error("send SIGTERM to process")
-		}
-	}
-	go func() {
-		logrus.Debug("waiting for containers to exit")
-		s.containerGroup.Wait()
-		logrus.Debug("all containers exited")
-		if s.notifier != nil {
-			s.notifier.Close()
-		}
-		// stop receiving signals and close the channel
-		signal.Stop(sig)
-		close(sig)
-	}()
 }
 
 // Close closes any open files in the supervisor but expects that Stop has been
@@ -190,7 +154,6 @@ func (s *Supervisor) notifySubscribers(e *Event) {
 // state of the Supervisor
 func (s *Supervisor) Start() error {
 	logrus.WithFields(logrus.Fields{
-		"runtime":  s.runtime.Type(),
 		"stateDir": s.stateDir,
 	}).Debug("Supervisor started")
 	return s.el.Start()
@@ -202,45 +165,60 @@ func (s *Supervisor) Machine() Machine {
 	return s.machine
 }
 
-// getContainerForPid returns the container where the provided pid is the pid1 or main
-// process in the container
-func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
-	for _, i := range s.containers {
-		container := i.container
-		cpid, err := container.Pid()
-		if err != nil {
-			if lerr, ok := err.(libcontainer.Error); ok {
-				if lerr.Code() == libcontainer.ProcessNotExecuted {
-					continue
-				}
-			}
-			logrus.WithField("error", err).Error("containerd: get container pid")
-		}
-		if pid == cpid {
-			return container, nil
-		}
-	}
-	return nil, errNoContainerForPid
-}
-
 // SendEvent sends the provided event the the supervisors main event loop
 func (s *Supervisor) SendEvent(evt *Event) {
 	EventsCounter.Inc(1)
 	s.el.Send(&commonEvent{data: evt, sv: s})
 }
 
-func (s *Supervisor) copyIO(stdin, stdout, stderr string, i *runtime.IO) (*copier, error) {
-	config := &ioConfig{
-		Stdin:      i.Stdin,
-		Stdout:     i.Stdout,
-		Stderr:     i.Stderr,
-		StdoutPath: stdout,
-		StderrPath: stderr,
-		StdinPath:  stdin,
+func (s *Supervisor) exitHandler() {
+	for p := range s.monitor.Exits() {
+		e := NewEvent(ExitEventType)
+		e.Process = p
+		s.SendEvent(e)
 	}
-	l, err := newCopier(config)
+}
+
+func (s *Supervisor) monitorProcess(p runtime.Process) error {
+	return s.monitor.Monitor(p)
+}
+
+func (s *Supervisor) restore() error {
+	dirs, err := ioutil.ReadDir(s.stateDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return l, nil
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		id := d.Name()
+		container, err := runtime.Load(s.stateDir, id)
+		if err != nil {
+			if err == runtime.ErrContainerExited {
+				logrus.WithField("id", id).Debug("containerd: container exited while away")
+				// TODO: fire events to do the removal
+				if err := os.RemoveAll(filepath.Join(s.stateDir, id)); err != nil {
+					logrus.WithField("error", err).Warn("containerd: remove container state")
+				}
+				continue
+			}
+			return err
+		}
+		processes, err := container.Processes()
+		if err != nil {
+			return err
+		}
+		ContainersCounter.Inc(1)
+		s.containers[id] = &containerInfo{
+			container: container,
+		}
+		logrus.WithField("id", id).Debug("containerd: container restored")
+		for _, p := range processes {
+			if err := s.monitorProcess(p); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

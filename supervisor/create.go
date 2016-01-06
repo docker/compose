@@ -1,6 +1,10 @@
 package supervisor
 
-import "time"
+import (
+	"time"
+
+	"github.com/docker/containerd/runtime"
+)
 
 type StartEvent struct {
 	s *Supervisor
@@ -8,22 +12,17 @@ type StartEvent struct {
 
 func (h *StartEvent) Handle(e *Event) error {
 	start := time.Now()
-	container, io, err := h.s.runtime.Create(e.ID, e.BundlePath, e.Console)
+	container, err := runtime.New(h.s.stateDir, e.ID, e.BundlePath)
 	if err != nil {
 		return err
 	}
-	h.s.containerGroup.Add(1)
 	h.s.containers[e.ID] = &containerInfo{
 		container: container,
 	}
 	ContainersCounter.Inc(1)
 	task := &StartTask{
 		Err:           e.Err,
-		IO:            io,
 		Container:     container,
-		Stdin:         e.Stdin,
-		Stdout:        e.Stdout,
-		Stderr:        e.Stderr,
 		StartResponse: e.StartResponse,
 	}
 	if e.Checkpoint != nil {

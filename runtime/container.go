@@ -10,9 +10,27 @@ import (
 
 type Process interface {
 	io.Closer
-	Pid() (int, error)
+
+	// ID of the process.
+	// This is either "init" when it is the container's init process or
+	// it is a user provided id for the process similar to the container id
+	ID() string
+	// Stdin returns the path the the processes stdin fifo
+	Stdin() string
+	// Stdout returns the path the the processes stdout fifo
+	Stdout() string
+	// Stderr returns the path the the processes stderr fifo
+	Stderr() string
+	// ExitFD returns the fd the provides an event when the process exits
+	ExitFD() int
+	// ExitStatus returns the exit status of the process or an error if it
+	// has not exited
+	ExitStatus() (int, error)
 	Spec() specs.Process
+	// Signal sends the provided signal to the process
 	Signal(os.Signal) error
+	// Container returns the container that the process belongs to
+	Container() Container
 }
 
 type State string
@@ -77,20 +95,16 @@ type Checkpoint struct {
 type Container interface {
 	// ID returns the container ID
 	ID() string
-	// Start starts the init process of the container
-	Start() error
 	// Path returns the path to the bundle
 	Path() string
-	// Pid returns the container's init process id
-	Pid() (int, error)
-	// SetExited sets the exit status of the container after its init dies
-	SetExited(status int)
-	// Delete deletes the container
+	// Start starts the init process of the container
+	Start() (Process, error)
+	// Delete removes the container's state and any resources
 	Delete() error
+	// Pid returns the container's init process id
+	// Pid() (int, error)
 	// Processes returns all the containers processes that have been added
 	Processes() ([]Process, error)
-	// RemoveProcess removes a specific process for the container because it exited
-	RemoveProcess(pid int) error
 	// State returns the containers runtime state
 	State() State
 	// Resume resumes a paused container
@@ -98,15 +112,15 @@ type Container interface {
 	// Pause pauses a running container
 	Pause() error
 	// Checkpoints returns all the checkpoints for a container
-	Checkpoints() ([]Checkpoint, error)
+	// Checkpoints() ([]Checkpoint, error)
 	// Checkpoint creates a new checkpoint
-	Checkpoint(Checkpoint) error
+	// Checkpoint(Checkpoint) error
 	// DeleteCheckpoint deletes the checkpoint for the provided name
-	DeleteCheckpoint(name string) error
+	// DeleteCheckpoint(name string) error
 	// Restore restores the container to that of the checkpoint provided by name
-	Restore(name string) error
+	// Restore(name string) error
 	// Stats returns realtime container stats and resource information
-	Stats() (*Stat, error)
+	// Stats() (*Stat, error)
 	// OOM signals the channel if the container received an OOM notification
-	OOM() (<-chan struct{}, error)
+	// OOM() (<-chan struct{}, error)
 }

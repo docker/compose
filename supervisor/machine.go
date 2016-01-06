@@ -3,15 +3,12 @@ package supervisor
 import "github.com/cloudfoundry/gosigar"
 
 type Machine struct {
-	ID     string
 	Cpus   int
 	Memory int64
 }
 
-func CollectMachineInformation(id string) (Machine, error) {
-	m := Machine{
-		ID: id,
-	}
+func CollectMachineInformation() (Machine, error) {
+	m := Machine{}
 	cpu := sigar.CpuList{}
 	if err := cpu.Get(); err != nil {
 		return m, err
