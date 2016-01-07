@@ -26,7 +26,7 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
         working_dir=working_dir,
         filename=filename,
         name=name,
-        config=service_dict))
+        config=service_dict), version=1)
     return config.process_service(resolver.run())
 
 
@@ -51,7 +51,7 @@ class ConfigTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
 
         self.assertEqual(
             service_sort(service_dicts),
@@ -68,11 +68,100 @@ class ConfigTest(unittest.TestCase):
             ])
         )
 
+    def test_load_v2(self):
+        config_data = config.load(
+            build_config_details({
+                'version': 2,
+                'services': {
+                    'foo': {'image': 'busybox'},
+                    'bar': {'image': 'busybox', 'environment': ['FOO=1']},
+                },
+                'volumes': {
+                    'hello': {
+                        'driver': 'default',
+                        'driver_opts': {'beep': 'boop'}
+                    }
+                }
+            }, 'working_dir', 'filename.yml')
+        )
+        service_dicts = config_data.services
+        volume_dict = config_data.volumes
+        self.assertEqual(
+            service_sort(service_dicts),
+            service_sort([
+                {
+                    'name': 'bar',
+                    'image': 'busybox',
+                    'environment': {'FOO': '1'},
+                },
+                {
+                    'name': 'foo',
+                    'image': 'busybox',
+                }
+            ])
+        )
+        self.assertEqual(volume_dict, {
+            'hello': {
+                'driver': 'default',
+                'driver_opts': {'beep': 'boop'}
+            }
+        })
+
+    def test_load_service_with_name_version(self):
+        config_data = config.load(
+            build_config_details({
+                'version': {
+                    'image': 'busybox'
+                }
+            }, 'working_dir', 'filename.yml')
+        )
+        service_dicts = config_data.services
+        self.assertEqual(
+            service_sort(service_dicts),
+            service_sort([
+                {
+                    'name': 'version',
+                    'image': 'busybox',
+                }
+            ])
+        )
+
+    def test_load_invalid_version(self):
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': 18,
+                    'services': {
+                        'foo': {'image': 'busybox'}
+                    }
+                }, 'working_dir', 'filename.yml')
+            )
+
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': 'two point oh',
+                    'services': {
+                        'foo': {'image': 'busybox'}
+                    }
+                }, 'working_dir', 'filename.yml')
+            )
+
     def test_load_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
             config.load(
                 build_config_details(
                     {'web': 'busybox:latest'},
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
+    def test_load_throws_error_when_not_dict_v2(self):
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details(
+                    {'version': 2, 'services': {'web': 'busybox:latest'}},
                     'working_dir',
                     'filename.yml'
                 )
@@ -85,6 +174,17 @@ class ConfigTest(unittest.TestCase):
                     {invalid_name: {'image': 'busybox'}},
                     'working_dir',
                     'filename.yml'))
+            assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
+
+    def test_config_invalid_service_names_v2(self):
+        for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
+            with pytest.raises(ConfigurationError) as exc:
+                config.load(
+                    build_config_details({
+                        'version': 2,
+                        'services': {invalid_name: {'image': 'busybox'}}
+                    }, 'working_dir', 'filename.yml')
+                )
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
     def test_load_with_invalid_field_name(self):
@@ -120,6 +220,22 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_config_integer_service_name_raise_validation_error_v2(self):
+        expected_error_msg = ("In file 'filename.yml' service name: 1 needs to "
+                              "be a string, eg '1'")
+
+        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+            config.load(
+                build_config_details(
+                    {
+                        'version': 2,
+                        'services': {1: {'image': 'busybox'}}
+                    },
+                    'working_dir',
+                    'filename.yml'
+                )
+            )
+
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     def test_load_with_multiple_files(self):
         base_file = config.ConfigFile(
@@ -143,7 +259,7 @@ class ConfigTest(unittest.TestCase):
             })
         details = config.ConfigDetails('.', [base_file, override_file])
 
-        service_dicts = config.load(details)
+        service_dicts = config.load(details).services
         expected = [
             {
                 'name': 'web',
@@ -170,6 +286,18 @@ class ConfigTest(unittest.TestCase):
         error_msg = "Top level object in 'override.yml' needs to be an object"
         assert error_msg in exc.exconly()
 
+    def test_load_with_multiple_files_and_empty_override_v2(self):
+        base_file = config.ConfigFile(
+            'base.yml',
+            {'version': 2, 'services': {'web': {'image': 'example/web'}}})
+        override_file = config.ConfigFile('override.yml', None)
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        error_msg = "Top level object in 'override.yml' needs to be an object"
+        assert error_msg in exc.exconly()
+
     def test_load_with_multiple_files_and_empty_base(self):
         base_file = config.ConfigFile('base.yml', None)
         override_file = config.ConfigFile(
@@ -177,6 +305,17 @@ class ConfigTest(unittest.TestCase):
             {'web': {'image': 'example/web'}})
         details = config.ConfigDetails('.', [base_file, override_file])
 
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(details)
+        assert "Top level object in 'base.yml' needs to be an object" in exc.exconly()
+
+    def test_load_with_multiple_files_and_empty_base_v2(self):
+        base_file = config.ConfigFile('base.yml', None)
+        override_file = config.ConfigFile(
+            'override.tml',
+            {'version': 2, 'services': {'web': {'image': 'example/web'}}}
+        )
+        details = config.ConfigDetails('.', [base_file, override_file])
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
         assert "Top level object in 'base.yml' needs to be an object" in exc.exconly()
@@ -207,7 +346,7 @@ class ConfigTest(unittest.TestCase):
               labels: ['label=one']
         """)
         with tmpdir.as_cwd():
-            service_dicts = config.load(details)
+            service_dicts = config.load(details).services
 
         expected = [
             {
@@ -248,11 +387,54 @@ class ConfigTest(unittest.TestCase):
                 'volumes': ['/tmp'],
             }
         })
-        services = config.load(config_details)
+        services = config.load(config_details).services
 
         assert services[0]['name'] == 'volume'
         assert services[1]['name'] == 'db'
         assert services[2]['name'] == 'web'
+
+    def test_load_with_multiple_files_v2(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': 2,
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'links': ['db'],
+                    },
+                    'db': {
+                        'image': 'example/db',
+                    }
+                },
+            })
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': 2,
+                'services': {
+                    'web': {
+                        'build': '/',
+                        'volumes': ['/home/user/project:/code'],
+                    },
+                }
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'build': os.path.abspath('/'),
+                'links': ['db'],
+                'volumes': [VolumeSpec.parse('/home/user/project:/code')],
+            },
+            {
+                'name': 'db',
+                'image': 'example/db',
+            },
+        ]
+        self.assertEqual(service_sort(service_dicts), service_sort(expected))
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
@@ -260,7 +442,7 @@ class ConfigTest(unittest.TestCase):
                 build_config_details(
                     {valid_name: {'image': 'busybox'}},
                     'tests/fixtures/extends',
-                    'common.yml'))
+                    'common.yml')).services
             assert services[0]['name'] == valid_name
 
     def test_config_hint(self):
@@ -451,7 +633,7 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
-            )
+            ).services
             self.assertEqual(service[0]['expose'], expose)
 
     def test_valid_config_oneof_string_or_list(self):
@@ -466,7 +648,7 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
-            )
+            ).services
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
     @mock.patch('compose.config.validation.log')
@@ -496,7 +678,7 @@ class ConfigTest(unittest.TestCase):
                 'working_dir',
                 'filename.yml'
             )
-        )
+        ).services
         self.assertEqual(services[0]['environment']['SPRING_JPA_HIBERNATE_DDL-AUTO'], 'none')
 
     def test_load_yaml_with_yaml_error(self):
@@ -543,7 +725,7 @@ class ConfigTest(unittest.TestCase):
                 'dns_search': 'domain.local',
             }
         }))
-        assert actual == [
+        assert actual.services == [
             {
                 'name': 'web',
                 'image': 'alpine',
@@ -655,7 +837,7 @@ class InterpolationTest(unittest.TestCase):
 
         service_dicts = config.load(
             config.find('tests/fixtures/environment-interpolation', None),
-        )
+        ).services
 
         self.assertEqual(service_dicts, [
             {
@@ -722,7 +904,7 @@ class InterpolationTest(unittest.TestCase):
                 '.',
                 None,
             )
-        )[0]
+        ).services[0]
         self.assertEquals(service_dict['environment']['POSTGRES_PASSWORD'], '')
 
 
@@ -734,10 +916,14 @@ class VolumeConfigTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
-        d = config.load(build_config_details(
-            {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
-            '.',
-        ))[0]
+
+        d = config.load(
+            build_config_details(
+                {'foo': {'build': '.', 'volumes': ['${VOLUME_PATH}:/container/path']}},
+                '.',
+                None,
+            )
+        ).services[0]
         self.assertEqual(d['volumes'], [VolumeSpec.parse('/host/path:/container/path')])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
@@ -1012,7 +1198,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
         self.assertEqual(service_dict[0]['memswap_limit'], 2000000)
 
     def test_memswap_can_be_a_string(self):
@@ -1022,7 +1208,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
         self.assertEqual(service_dict[0]['memswap_limit'], "512M")
 
 
@@ -1126,7 +1312,7 @@ class EnvTest(unittest.TestCase):
                 {'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
                 "tests/fixtures/env",
             )
-        )[0]
+        ).services[0]
         self.assertEqual(
             set(service_dict['volumes']),
             set([VolumeSpec.parse('/tmp:/host/tmp')]))
@@ -1136,14 +1322,14 @@ class EnvTest(unittest.TestCase):
                 {'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
                 "tests/fixtures/env",
             )
-        )[0]
+        ).services[0]
         self.assertEqual(
             set(service_dict['volumes']),
             set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')]))
 
 
 def load_from_filename(filename):
-    return config.load(config.find('.', [filename]))
+    return config.load(config.find('.', [filename])).services
 
 
 class ExtendsTest(unittest.TestCase):
@@ -1313,7 +1499,7 @@ class ExtendsTest(unittest.TestCase):
                 'tests/fixtures/extends',
                 'common.yml'
             )
-        )
+        ).services
 
         self.assertEquals(len(service), 1)
         self.assertIsInstance(service[0], dict)
@@ -1594,7 +1780,7 @@ class BuildPathTest(unittest.TestCase):
         for valid_url in valid_urls:
             service_dict = config.load(build_config_details({
                 'validurl': {'build': valid_url},
-            }, '.', None))
+            }, '.', None)).services
             assert service_dict[0]['build'] == valid_url
 
     def test_invalid_url_in_build_path(self):

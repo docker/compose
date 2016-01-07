@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "id": "fields_schema_v2.json",
+
+  "properties": {
+    "version": {
+      "enum": [2]
+    },
+    "services": {
+      "id": "#/properties/services",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "fields_schema_v1.json#/definitions/service"
+        }
+      },
+      "additionalProperties": false
+    },
+    "volumes": {
+      "id": "#/properties/volumes",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/volume"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "definitions": {
+    "volume": {
+      "id": "#/definitions/volume",
+      "type": "object",
+      "properties": {
+        "driver": {"type": "string"},
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": ["string", "number"]}
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

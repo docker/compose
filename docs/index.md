@@ -31,16 +31,22 @@ they can be run together in an isolated environment.
 
 A `docker-compose.yml` looks like this:
 
-    web:
-      build: .
-      ports:
-       - "5000:5000"
-      volumes:
-       - .:/code
-      links:
-       - redis
-    redis:
-      image: redis
+    version: 2
+    services:
+      web:
+        build: .
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+         - logvolume01:/var/log
+        links:
+         - redis
+      redis:
+        image: redis
+    volumes:
+      logvolume01:
+        driver: default
 
 For more information about the Compose file, see the
 [Compose file reference](compose-file.md)

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
 
   "type": "object",
-  "id": "fields_schema.json",
+  "id": "fields_schema_v1.json",
 
   "patternProperties": {
     "^[a-zA-Z0-9._-]+$": {

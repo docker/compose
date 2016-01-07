@@ -80,12 +80,13 @@ def get_project(base_dir, config_path=None, project_name=None, verbose=False,
     config_details = config.find(base_dir, config_path)
 
     api_version = '1.21' if use_networking else None
-    return Project.from_dicts(
+    return Project.from_config(
         get_project_name(config_details.working_dir, project_name),
         config.load(config_details),
         get_client(verbose=verbose, version=api_version),
         use_networking=use_networking,
-        network_driver=network_driver)
+        network_driver=network_driver
+    )
 
 
 def get_project_name(working_dir, project_name=None):

@@ -849,7 +849,13 @@ def get_container_data_volumes(container, volumes_option):
     a mapping of volume bindings for those volumes.
     """
     volumes = []
-    container_volumes = container.get('Volumes') or {}
+    volumes_option = volumes_option or []
+
+    container_mounts = dict(
+        (mount['Destination'], mount)
+        for mount in container.get('Mounts') or {}
+    )
+
     image_volumes = [
         VolumeSpec.parse(volume)
         for volume in
@@ -861,13 +867,14 @@ def get_container_data_volumes(container, volumes_option):
         if volume.external:
             continue
 
-        volume_path = container_volumes.get(volume.internal)
+        mount = container_mounts.get(volume.internal)
+
         # New volume, doesn't exist in the old container
-        if not volume_path:
+        if not mount:
             continue
 
         # Copy existing volume from old container
-        volume = volume._replace(external=volume_path)
+        volume = volume._replace(external=mount['Source'])
         volumes.append(volume)
 
     return volumes

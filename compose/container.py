@@ -177,6 +177,12 @@ class Container(object):
         port = self.ports.get("%s/%s" % (port, protocol))
         return "{HostIp}:{HostPort}".format(**port[0]) if port else None
 
+    def get_mount(self, mount_dest):
+        for mount in self.get('Mounts'):
+            if mount['Destination'] == mount_dest:
+                return mount
+        return None
+
     def start(self, **options):
         return self.client.start(self.id, **options)
 
@@ -221,16 +227,6 @@ class Container(object):
         self.dictionary = self.client.inspect_container(self.id)
         self.has_been_inspected = True
         return self.dictionary
-
-    # TODO: only used by tests, move to test module
-    def links(self):
-        links = []
-        for container in self.client.containers():
-            for name in container['Names']:
-                bits = name.split('/')
-                if len(bits) > 2 and bits[1] == self.name:
-                    links.append(bits[2])
-        return links
 
     def attach(self, *args, **kwargs):
         return self.client.attach(self.id, *args, **kwargs)

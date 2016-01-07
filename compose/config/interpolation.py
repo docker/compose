@@ -8,12 +8,12 @@ from .errors import ConfigurationError
 log = logging.getLogger(__name__)
 
 
-def interpolate_environment_variables(config):
+def interpolate_environment_variables(service_dicts):
     mapping = BlankDefaultDict(os.environ)
 
     return dict(
         (service_name, process_service(service_name, service_dict, mapping))
-        for (service_name, service_dict) in config.items()
+        for (service_name, service_dict) in service_dicts.items()
     )
 
 

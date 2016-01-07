@@ -234,6 +234,7 @@ class ServiceTest(unittest.TestCase):
         prev_container = mock.Mock(
             id='ababab',
             image_config={'ContainerConfig': {}})
+        prev_container.get.return_value = None
 
         opts = service._get_container_create_options(
             {},
@@ -575,6 +576,10 @@ class NetTestCase(unittest.TestCase):
         self.assertEqual(net.service_name, service_name)
 
 
+def build_mount(destination, source, mode='rw'):
+    return {'Source': source, 'Destination': destination, 'Mode': mode}
+
+
 class ServiceVolumesTest(unittest.TestCase):
 
     def setUp(self):
@@ -600,12 +605,33 @@ class ServiceVolumesTest(unittest.TestCase):
         }
         container = Container(self.mock_client, {
             'Image': 'ababab',
-            'Volumes': {
-                '/host/volume': '/host/volume',
-                '/existing/volume': '/var/lib/docker/aaaaaaaa',
-                '/removed/volume': '/var/lib/docker/bbbbbbbb',
-                '/mnt/image/data': '/var/lib/docker/cccccccc',
-            },
+            'Mounts': [
+                {
+                    'Source': '/host/volume',
+                    'Destination': '/host/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'hostvolume',
+                }, {
+                    'Source': '/var/lib/docker/aaaaaaaa',
+                    'Destination': '/existing/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'existingvolume',
+                }, {
+                    'Source': '/var/lib/docker/bbbbbbbb',
+                    'Destination': '/removed/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'removedvolume',
+                }, {
+                    'Source': '/var/lib/docker/cccccccc',
+                    'Destination': '/mnt/image/data',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'imagedata',
+                },
+            ]
         }, has_been_inspected=True)
 
         expected = [
@@ -630,7 +656,13 @@ class ServiceVolumesTest(unittest.TestCase):
 
         intermediate_container = Container(self.mock_client, {
             'Image': 'ababab',
-            'Volumes': {'/existing/volume': '/var/lib/docker/aaaaaaaa'},
+            'Mounts': [{
+                'Source': '/var/lib/docker/aaaaaaaa',
+                'Destination': '/existing/volume',
+                'Mode': '',
+                'RW': True,
+                'Name': 'existingvolume',
+            }],
         }, has_been_inspected=True)
 
         expected = [
@@ -693,9 +725,16 @@ class ServiceVolumesTest(unittest.TestCase):
         self.mock_client.inspect_container.return_value = {
             'Id': '123123123',
             'Image': 'ababab',
-            'Volumes': {
-                '/data': '/mnt/sda1/host/path',
-            },
+            'Mounts': [
+                {
+                    'Destination': '/data',
+                    'Source': '/mnt/sda1/host/path',
+                    'Mode': '',
+                    'RW': True,
+                    'Driver': 'local',
+                    'Name': 'abcdefff1234'
+                },
+            ]
         }
 
         service._get_container_create_options(
