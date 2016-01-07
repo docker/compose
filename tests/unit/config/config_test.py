@@ -1396,6 +1396,24 @@ class ExtendsTest(unittest.TestCase):
             }
         ]))
 
+    def test_merging_env_labels_ulimits(self):
+        service_dicts = load_from_filename('tests/fixtures/extends/common-env-labels-ulimits.yml')
+
+        self.assertEqual(service_sort(service_dicts), service_sort([
+            {
+                'name': 'web',
+                'image': 'busybox',
+                'command': '/bin/true',
+                'environment': {
+                    "FOO": "2",
+                    "BAR": "1",
+                    "BAZ": "3",
+                },
+                'labels': {'label': 'one'},
+                'ulimits': {'nproc': 65535, 'memlock': {'soft': 1024, 'hard': 2048}}
+            }
+        ]))
+
     def test_nested(self):
         service_dicts = load_from_filename('tests/fixtures/extends/nested.yml')
 
