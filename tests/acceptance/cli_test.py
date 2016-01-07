@@ -100,6 +100,7 @@ class CLITestCase(DockerClientTestCase):
     def setUp(self):
         super(CLITestCase, self).setUp()
         self.base_dir = 'tests/fixtures/simple-composefile'
+        self.override_dir = None
 
     def tearDown(self):
         if self.base_dir:
@@ -120,7 +121,7 @@ class CLITestCase(DockerClientTestCase):
     def project(self):
         # Hack: allow project to be overridden
         if not hasattr(self, '_project'):
-            self._project = get_project(self.base_dir)
+            self._project = get_project(self.base_dir, override_dir=self.override_dir)
         return self._project
 
     def dispatch(self, options, project_options=None, returncode=0):
@@ -312,6 +313,23 @@ class CLITestCase(DockerClientTestCase):
                 filters={"label": labels})
         ]
         assert not containers
+
+    def test_build_override_dir(self):
+        self.base_dir = 'tests/fixtures/build-path-override-dir'
+        self.override_dir = os.path.abspath('tests/fixtures')
+        result = self.dispatch([
+            '--project-directory', self.override_dir,
+            'build'])
+
+        assert 'Successfully built' in result.stdout
+
+    def test_build_override_dir_invalid_path(self):
+        config_path = os.path.abspath('tests/fixtures/build-path-override-dir/docker-compose.yml')
+        result = self.dispatch([
+            '-f', config_path,
+            'build'], returncode=1)
+
+        assert 'does not exist, is not accessible, or is not a valid URL' in result.stderr
 
     def test_create(self):
         self.dispatch(['create'])

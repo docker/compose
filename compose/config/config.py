@@ -218,10 +218,10 @@ class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name conf
             config)
 
 
-def find(base_dir, filenames, environment):
+def find(base_dir, filenames, environment, override_dir='.'):
     if filenames == ['-']:
         return ConfigDetails(
-            os.getcwd(),
+            os.path.abspath(override_dir),
             [ConfigFile(None, yaml.safe_load(sys.stdin))],
             environment
         )
@@ -233,7 +233,7 @@ def find(base_dir, filenames, environment):
 
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
-        os.path.dirname(filenames[0]),
+        override_dir or os.path.dirname(filenames[0]),
         [ConfigFile.from_filename(f) for f in filenames],
         environment
     )

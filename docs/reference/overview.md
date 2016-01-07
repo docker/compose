@@ -39,6 +39,8 @@ Options:
   --skip-hostname-check       Don't check the daemon's hostname against the name specified
                               in the client certificate (for example if your docker host
                               is an IP address)
+  --project-directory PATH  Specify an alternate working directory
+                            (default: the path of the compose file)
 
 Commands:
   build              Build or rebuild services

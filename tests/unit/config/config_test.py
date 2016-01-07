@@ -2170,9 +2170,9 @@ class EnvTest(unittest.TestCase):
             set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')]))
 
 
-def load_from_filename(filename):
+def load_from_filename(filename, override_dir=None):
     return config.load(
-        config.find('.', [filename], Environment.from_env_file('.'))
+        config.find('.', [filename], Environment.from_env_file('.'), override_dir=override_dir)
     ).services
 
 
@@ -2705,6 +2705,12 @@ class BuildPathTest(unittest.TestCase):
 
     def test_from_file(self):
         service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
+        self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
+
+    def test_from_file_override_dir(self):
+        override_dir = os.path.join(os.getcwd(), 'tests/fixtures/')
+        service_dict = load_from_filename(
+            'tests/fixtures/build-path-override-dir/docker-compose.yml', override_dir=override_dir)
         self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
 
     def test_valid_url_in_build_path(self):
