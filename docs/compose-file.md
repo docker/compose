@@ -120,6 +120,10 @@ Override the default command.
 
     command: bundle exec thin -p 3000
 
+The command can also be a list, in a manner similar to [dockerfile](https://docs.docker.com/engine/reference/builder/#cmd):
+
+    command: [bundle, exec, thin, -p, 3000]
+
 ### cgroup_parent
 
 Specify an optional parent cgroup for the container.
@@ -173,6 +177,22 @@ specified using the `build` key.
     dockerfile: Dockerfile-alternate
 
 Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
+
+### entrypoint
+
+Override the default entrypoint.
+
+    entrypoint: /code/entrypoint.sh
+
+The entrypoint can also be a list, in a manner similar to [dockerfile](https://docs.docker.com/engine/reference/builder/#entrypoint):
+
+    entrypoint:
+        - php
+        - -d
+        - zend_extension=/usr/local/lib/php/extensions/no-debug-non-zts-20100525/xdebug.so
+        - -d
+        - memory_limit=-1
+        - vendor/bin/phpunit
 
 ### env_file
 
@@ -451,7 +471,7 @@ specifying read-only access(``ro``) or read-write(``rw``).
      - container_name
      - service_name:rw
 
-### cpu\_shares, cpu\_quota, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
+### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/engine/reference/run/) counterpart.
@@ -460,7 +480,6 @@ Each of these is a single value, analogous to its
     cpu_quota: 50000
     cpuset: 0,1
 
-    entrypoint: /code/entrypoint.sh
     user: postgresql
     working_dir: /code
 
