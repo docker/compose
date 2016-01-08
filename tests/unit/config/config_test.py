@@ -738,6 +738,37 @@ class ConfigTest(unittest.TestCase):
             }
         ]
 
+    def test_merge_service_dicts_from_files_with_extends_in_base(self):
+        base = {
+            'volumes': ['.:/app'],
+            'extends': {'service': 'app'}
+        }
+        override = {
+            'image': 'alpine:edge',
+        }
+        actual = config.merge_service_dicts_from_files(base, override)
+        assert actual == {
+            'image': 'alpine:edge',
+            'volumes': ['.:/app'],
+            'extends': {'service': 'app'}
+        }
+
+    def test_merge_service_dicts_from_files_with_extends_in_override(self):
+        base = {
+            'volumes': ['.:/app'],
+            'extends': {'service': 'app'}
+        }
+        override = {
+            'image': 'alpine:edge',
+            'extends': {'service': 'foo'}
+        }
+        actual = config.merge_service_dicts_from_files(base, override)
+        assert actual == {
+            'image': 'alpine:edge',
+            'volumes': ['.:/app'],
+            'extends': {'service': 'foo'}
+        }
+
 
 class PortsTest(unittest.TestCase):
     INVALID_PORTS_TYPES = [
