@@ -781,6 +781,18 @@ class ServiceVolumesTest(unittest.TestCase):
 
         assert not mock_log.warn.called
 
+    def test_warn_on_masked_no_warning_with_container_only_option(self):
+        volumes_option = [VolumeSpec(None, '/path', 'rw')]
+        container_volumes = [
+            VolumeSpec('/var/lib/docker/volume/path', '/path', 'rw')
+        ]
+        service = 'service_name'
+
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            warn_on_masked_volume(volumes_option, container_volumes, service)
+
+        assert not mock_log.warn.called
+
     def test_create_with_special_volume_mode(self):
         self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
 
