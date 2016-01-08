@@ -287,7 +287,7 @@ def load_services(working_dir, config_files, version):
         service_dict = process_service(resolver.run())
 
         # TODO: move to validate_service()
-        validate_against_service_schema(service_dict, service_config.name)
+        validate_against_service_schema(service_dict, service_config.name, version)
         validate_paths(service_dict)
 
         service_dict = finalize_service(service_config._replace(config=service_dict))

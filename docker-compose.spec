@@ -28,8 +28,13 @@ exe = EXE(pyz,
                 'DATA'
             ),
             (
-                'compose/config/service_schema.json',
-                'compose/config/service_schema.json',
+                'compose/config/service_schema_v1.json',
+                'compose/config/service_schema_v1.json',
+                'DATA'
+            ),
+            (
+                'compose/config/service_schema_v2.json',
+                'compose/config/service_schema_v2.json',
                 'DATA'
             ),
             (

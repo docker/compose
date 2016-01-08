@@ -1,3 +1,5 @@
-another:
-  logging:
-    driver: "none"
+version: 2
+services:
+  another:
+    logging:
+      driver: "none"
