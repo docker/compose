@@ -238,12 +238,19 @@ class ProjectTest(unittest.TestCase):
 
         def get_container(cid):
             if cid == 'abcde':
-                labels = {LABEL_SERVICE: 'web'}
+                name = 'web'
+                labels = {LABEL_SERVICE: name}
             elif cid == 'ababa':
-                labels = {LABEL_SERVICE: 'db'}
+                name = 'db'
+                labels = {LABEL_SERVICE: name}
             else:
                 labels = {}
-            return {'Id': cid, 'Config': {'Labels': labels}}
+                name = ''
+            return {
+                'Id': cid,
+                'Config': {'Labels': labels},
+                'Name': '/project_%s_1' % name,
+            }
 
         self.mock_client.inspect_container.side_effect = get_container
 
@@ -254,24 +261,36 @@ class ProjectTest(unittest.TestCase):
         assert not list(events)
         assert events_list == [
             {
+                'type': 'container',
                 'service': 'web',
-                'event': 'create',
-                'container': 'abcde',
-                'image': 'example/image',
+                'action': 'create',
+                'id': 'abcde',
+                'attributes': {
+                    'name': 'project_web_1',
+                    'image': 'example/image',
+                },
                 'time': dt_with_microseconds(1420092061, 2),
             },
             {
+                'type': 'container',
                 'service': 'web',
-                'event': 'attach',
-                'container': 'abcde',
-                'image': 'example/image',
+                'action': 'attach',
+                'id': 'abcde',
+                'attributes': {
+                    'name': 'project_web_1',
+                    'image': 'example/image',
+                },
                 'time': dt_with_microseconds(1420092061, 3),
             },
             {
+                'type': 'container',
                 'service': 'db',
-                'event': 'create',
-                'container': 'ababa',
-                'image': 'example/db',
+                'action': 'create',
+                'id': 'ababa',
+                'attributes': {
+                    'name': 'project_db_1',
+                    'image': 'example/db',
+                },
                 'time': dt_with_microseconds(1420092061, 4),
             },
         ]

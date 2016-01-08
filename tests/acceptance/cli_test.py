@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import datetime
 import json
 import os
 import shlex
@@ -864,7 +865,26 @@ class CLITestCase(DockerClientTestCase):
         os.kill(events_proc.pid, signal.SIGINT)
         result = wait_on_process(events_proc, returncode=1)
         lines = [json.loads(line) for line in result.stdout.rstrip().split('\n')]
-        assert [e['event'] for e in lines] == ['create', 'start', 'create', 'start']
+        assert [e['action'] for e in lines] == ['create', 'start', 'create', 'start']
+
+    def test_events_human_readable(self):
+        events_proc = start_process(self.base_dir, ['events'])
+        self.dispatch(['up', '-d', 'simple'])
+        wait_on_condition(ContainerCountCondition(self.project, 1))
+
+        os.kill(events_proc.pid, signal.SIGINT)
+        result = wait_on_process(events_proc, returncode=1)
+        lines = result.stdout.rstrip().split('\n')
+        assert len(lines) == 2
+
+        container, = self.project.containers()
+        expected_template = (
+            ' container {} {} (image=busybox:latest, '
+            'name=simplecomposefile_simple_1)')
+
+        assert expected_template.format('create', container.id) in lines[0]
+        assert expected_template.format('start', container.id) in lines[1]
+        assert lines[0].startswith(datetime.date.today().isoformat())
 
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')

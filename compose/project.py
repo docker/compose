@@ -282,11 +282,15 @@ class Project(object):
             time = time.replace(
                 microsecond=microseconds_from_time_nano(event['timeNano']))
             return {
-                'service': container.service,
-                'event': event['status'],
-                'container': container.id,
-                'image': event['from'],
                 'time': time,
+                'type': 'container',
+                'action': event['status'],
+                'id': container.id,
+                'service': container.service,
+                'attributes': {
+                    'name': container.name,
+                    'image': event['from'],
+                }
             }
 
         service_names = set(self.service_names)

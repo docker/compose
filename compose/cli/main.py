@@ -256,8 +256,10 @@ class TopLevelCommand(DocoptCommand):
             --json      Output events as a stream of json objects
         """
         def format_event(event):
-            return ("{time}: service={service} event={event} "
-                    "container={container} image={image}").format(**event)
+            attributes = ["%s=%s" % item for item in event['attributes'].items()]
+            return ("{time} {type} {action} {id} ({attrs})").format(
+                attrs=", ".join(sorted(attributes)),
+                **event)
 
         def json_format_event(event):
             event['time'] = event['time'].isoformat()
@@ -266,6 +268,7 @@ class TopLevelCommand(DocoptCommand):
         for event in project.events():
             formatter = json_format_event if options['--json'] else format_event
             print(formatter(event))
+            sys.stdout.flush()
 
     def help(self, project, options):
         """
