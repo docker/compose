@@ -38,7 +38,7 @@ DOCKER_CONFIG_HINTS = {
 
 
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
-VALID_EXPOSE_FORMAT = r'^\d+(\/[a-zA-Z]+)?$'
+VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
 
 
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)

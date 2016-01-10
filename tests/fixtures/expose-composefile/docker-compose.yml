@@ -1,0 +1,11 @@
+
+simple:
+  image: busybox:latest
+  command: top
+  expose:
+    - '3000'
+    - '3001/tcp'
+    - '3001/udp'
+    - '3002-3003'
+    - '3004-3005/tcp'
+    - '3006-3007/udp'
