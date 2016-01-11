@@ -504,6 +504,10 @@ def finalize_service(service_config):
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
 
+    return normalize_v1_service_format(service_dict)
+
+
+def normalize_v1_service_format(service_dict):
     if 'log_driver' in service_dict or 'log_opt' in service_dict:
         if 'logging' not in service_dict:
             service_dict['logging'] = {}
