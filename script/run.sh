@@ -40,7 +40,7 @@ if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
 fi
 if [ -n "$HOME" ]; then
-    VOLUMES="$VOLUMES -v $HOME:$HOME"
+    VOLUMES="$VOLUMES -v $HOME:$HOME -v $HOME:/root" # mount $HOME in /root to share docker.config
 fi
 
 # Only allocate tty if we detect one
