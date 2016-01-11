@@ -510,13 +510,6 @@ class Service(object):
 
         return volumes_from
 
-    def get_logging_options(self):
-        logging_dict = self.options.get('logging', {})
-        return {
-            'log_driver': logging_dict.get('driver', ""),
-            'log_opt': logging_dict.get('options', None)
-        }
-
     def _get_container_create_options(
             self,
             override_options,
@@ -529,8 +522,6 @@ class Service(object):
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
-
-        container_options.update(self.get_logging_options())
 
         if self.custom_container_name() and not one_off:
             container_options['name'] = self.custom_container_name()
