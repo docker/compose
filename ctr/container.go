@@ -126,19 +126,24 @@ var StartCommand = cli.Command{
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
-			go func() {
-				io.Copy(stdin, os.Stdin)
+			restoreAndCloseStdin := func() {
 				if state != nil {
 					term.RestoreTerminal(os.Stdin.Fd(), state)
 				}
 				stdin.Close()
+			}
+			go func() {
+				io.Copy(stdin, os.Stdin)
+				restoreAndCloseStdin()
 			}()
 			for {
 				e, err := events.Recv()
 				if err != nil {
+					restoreAndCloseStdin()
 					fatal(err.Error(), 1)
 				}
 				if e.Id == id && e.Type == "exit" {
+					restoreAndCloseStdin()
 					os.Exit(int(e.Status))
 				}
 			}
