@@ -344,8 +344,8 @@ class Project(object):
             updated_dependencies = [
                 name
                 for name in service.get_dependency_names()
-                if name in plans
-                and plans[name].action in ('recreate', 'create')
+                if name in plans and
+                plans[name].action in ('recreate', 'create')
             ]
 
             if updated_dependencies and strategy.allows_recreate:

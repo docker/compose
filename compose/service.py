@@ -535,9 +535,9 @@ class Service(object):
         # unqualified hostname and a domainname unless domainname
         # was also given explicitly. This matches the behavior of
         # the official Docker CLI in that scenario.
-        if ('hostname' in container_options
-                and 'domainname' not in container_options
-                and '.' in container_options['hostname']):
+        if ('hostname' in container_options and
+                'domainname' not in container_options and
+                '.' in container_options['hostname']):
             parts = container_options['hostname'].partition('.')
             container_options['hostname'] = parts[0]
             container_options['domainname'] = parts[2]
