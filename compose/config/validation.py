@@ -151,6 +151,7 @@ def handle_error_for_schema_with_id(error, service_name):
             VALID_NAME_CHARS)
 
     if schema_id == '#/definitions/constraints':
+        # TODO: only applies to v1
         if 'image' in error.instance and 'build' in error.instance:
             return (
                 "Service '{}' has both an image and build path specified. "
@@ -159,7 +160,8 @@ def handle_error_for_schema_with_id(error, service_name):
         if 'image' not in error.instance and 'build' not in error.instance:
             return (
                 "Service '{}' has neither an image nor a build path "
-                "specified. Exactly one must be provided.".format(service_name))
+                "specified. At least one must be provided.".format(service_name))
+        # TODO: only applies to v1
         if 'image' in error.instance and 'dockerfile' in error.instance:
             return (
                 "Service '{}' has both an image and alternate Dockerfile. "
