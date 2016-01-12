@@ -48,11 +48,12 @@ class Project(object):
         ]
 
     @classmethod
-    def from_config(cls, name, config_data, client, use_networking=False, network_driver=None):
+    def from_config(cls, name, config_data, client):
         """
         Construct a Project from a config.Config object.
         """
-        project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
+        use_networking = (config_data.version and config_data.version >= 2)
+        project = cls(name, [], client, use_networking=use_networking)
 
         if use_networking:
             remove_links(config_data.services)

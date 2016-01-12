@@ -122,10 +122,6 @@ class TopLevelCommand(DocoptCommand):
     Options:
       -f, --file FILE           Specify an alternate compose file (default: docker-compose.yml)
       -p, --project-name NAME   Specify an alternate project name (default: directory name)
-      --x-networking            (EXPERIMENTAL) Use new Docker networking functionality.
-                                Requires Docker 1.9 or later.
-      --x-network-driver DRIVER (EXPERIMENTAL) Specify a network driver (default: "bridge").
-                                Requires Docker 1.9 or later.
       --verbose                 Show more output
       -v, --version             Print version and exit
 
