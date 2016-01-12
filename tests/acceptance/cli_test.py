@@ -372,7 +372,18 @@ class CLITestCase(DockerClientTestCase):
         web_container = self.project.get_service('simple').containers()[0]
         self.assertFalse(web_container.get('HostConfig.Links'))
 
-    def test_up_with_links(self):
+    def test_up_with_links_is_invalid(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
+
+        result = self.dispatch(
+            ['-f', 'links-invalid.yml', 'up', '-d'],
+            returncode=1)
+
+        # TODO: fix validation error messages for v2 files
+        # assert "Unsupported config option for service 'simple': 'links'" in result.stderr
+        assert "Unsupported config option" in result.stderr
+
+    def test_up_with_links_v1(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'web'], None)
         web = self.project.get_service('web')

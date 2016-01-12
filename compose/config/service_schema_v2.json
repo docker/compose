@@ -66,12 +66,10 @@
         },
 
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
-        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
-        "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
         "logging": {
             "type": "object",
