@@ -133,6 +133,24 @@ _docker_compose_docker_compose() {
 }
 
 
+_docker_compose_events() {
+	case "$prev" in
+		--json)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help --json" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_all
+			;;
+	esac
+}
+
+
 _docker_compose_help() {
 	COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
 }
@@ -379,6 +397,7 @@ _docker_compose() {
 	local commands=(
 		build
 		config
+		events
 		help
 		kill
 		logs
