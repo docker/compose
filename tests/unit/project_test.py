@@ -346,7 +346,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(service.net.mode, 'container:' + container_name)
 
     def test_uses_default_network_true(self):
-        web = Service('web', project='test', image="alpine", net=Net('test'))
+        web = Service('web', project='test', image="alpine", net=Net('test_default'))
         db = Service('web', project='test', image="alpine", net=Net('other'))
         project = Project('test', [web, db], None)
         assert project.uses_default_network()

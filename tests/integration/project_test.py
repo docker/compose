@@ -108,10 +108,14 @@ class ProjectTest(DockerClientTestCase):
         assert project.get_network() is None
 
     def test_get_network(self):
-        network_name = 'network_does_exist'
-        project = Project(network_name, [], self.client)
+        project_name = 'network_does_exist'
+        network_name = '{}_default'.format(project_name)
+
+        project = Project(project_name, [], self.client)
         self.client.create_network(network_name)
         self.addCleanup(self.client.remove_network, network_name)
+
+        assert isinstance(project.get_network(), dict)
         assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):

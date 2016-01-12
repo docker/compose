@@ -185,7 +185,7 @@ class Project(object):
         net = service_dict.pop('net', None)
         if not net:
             if self.use_networking:
-                return Net(self.name)
+                return Net(self.default_network_name)
             return Net(None)
 
         net_name = get_service_name_from_net(net)
@@ -383,7 +383,7 @@ class Project(object):
 
     def get_network(self):
         try:
-            return self.client.inspect_network(self.name)
+            return self.client.inspect_network(self.default_network_name)
         except NotFound:
             return None
 
@@ -396,9 +396,9 @@ class Project(object):
 
             log.info(
                 'Creating network "{}" with {}'
-                .format(self.name, driver_name)
+                .format(self.default_network_name, driver_name)
             )
-            self.client.create_network(self.name, driver=self.network_driver)
+            self.client.create_network(self.default_network_name, driver=self.network_driver)
 
     def remove_network(self):
         network = self.get_network()
@@ -406,7 +406,11 @@ class Project(object):
             self.client.remove_network(network['Id'])
 
     def uses_default_network(self):
-        return any(service.net.mode == self.name for service in self.services)
+        return any(service.net.mode == self.default_network_name for service in self.services)
+
+    @property
+    def default_network_name(self):
+        return '{}_default'.format(self.name)
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()

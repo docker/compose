@@ -355,7 +355,7 @@ class CLITestCase(DockerClientTestCase):
 
         services = self.project.get_services()
 
-        networks = self.client.networks(names=[self.project.name])
+        networks = self.client.networks(names=[self.project.default_network_name])
         for n in networks:
             self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
@@ -649,7 +649,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['--x-networking', 'run', 'simple', 'true'], None)
         service = self.project.get_service('simple')
         container, = service.containers(stopped=True, one_off=True)
-        networks = self.client.networks(names=[self.project.name])
+        networks = self.client.networks(names=[self.project.default_network_name])
         for n in networks:
             self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
