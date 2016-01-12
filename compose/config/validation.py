@@ -298,10 +298,10 @@ def validate_against_fields_schema(config, filename, version):
         filename=filename)
 
 
-def validate_against_service_schema(config, service_name):
+def validate_against_service_schema(config, service_name, version):
     _validate_against_schema(
         config,
-        "service_schema.json",
+        "service_schema_v{0}.json".format(version),
         format_checker=["ports"],
         service_name=service_name)
 

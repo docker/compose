@@ -51,8 +51,6 @@ DOCKER_CONFIG_KEYS = [
     'ipc',
     'labels',
     'links',
-    'log_driver',
-    'log_opt',
     'mac_address',
     'mem_limit',
     'memswap_limit',
@@ -78,6 +76,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'dockerfile',
     'expose',
     'external_links',
+    'logging',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -288,7 +287,7 @@ def load_services(working_dir, config_files, version):
         service_dict = process_service(resolver.run())
 
         # TODO: move to validate_service()
-        validate_against_service_schema(service_dict, service_config.name)
+        validate_against_service_schema(service_dict, service_config.name, version)
         validate_paths(service_dict)
 
         service_dict = finalize_service(service_config._replace(config=service_dict))
@@ -504,6 +503,20 @@ def finalize_service(service_config):
 
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
+
+    return normalize_v1_service_format(service_dict)
+
+
+def normalize_v1_service_format(service_dict):
+    if 'log_driver' in service_dict or 'log_opt' in service_dict:
+        if 'logging' not in service_dict:
+            service_dict['logging'] = {}
+        if 'log_driver' in service_dict:
+            service_dict['logging']['driver'] = service_dict['log_driver']
+            del service_dict['log_driver']
+        if 'log_opt' in service_dict:
+            service_dict['logging']['options'] = service_dict['log_opt']
+            del service_dict['log_opt']
 
     return service_dict
 

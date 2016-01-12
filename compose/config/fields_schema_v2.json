@@ -12,7 +12,7 @@
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9._-]+$": {
-          "$ref": "fields_schema_v1.json#/definitions/service"
+          "$ref": "service_schema_v2.json#/definitions/service"
         }
       },
       "additionalProperties": false

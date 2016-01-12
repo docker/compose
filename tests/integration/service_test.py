@@ -888,7 +888,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertNotEqual(one_off_container.name, 'my-web-container')
 
     def test_log_drive_invalid(self):
-        service = self.create_service('web', log_driver='xxx')
+        service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
 
         with self.assertRaisesRegexp(APIError, expected_error_msg):
@@ -902,7 +902,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertFalse(log_config['Config'])
 
     def test_log_drive_none(self):
-        service = self.create_service('web', log_driver='none')
+        service = self.create_service('web', logging={'driver': 'none'})
         log_config = create_and_start_container(service).log_config
 
         self.assertEqual('none', log_config['Type'])

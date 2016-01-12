@@ -718,6 +718,34 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['start'], returncode=1)
         assert 'No containers to start' in result.stderr
 
+    def test_up_logging(self):
+        self.base_dir = 'tests/fixtures/logging-composefile'
+        self.dispatch(['up', '-d'])
+        simple = self.project.get_service('simple').containers()[0]
+        log_config = simple.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'none')
+
+        another = self.project.get_service('another').containers()[0]
+        log_config = another.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'json-file')
+        self.assertEqual(log_config.get('Config')['max-size'], '10m')
+
+    def test_up_logging_legacy(self):
+        self.base_dir = 'tests/fixtures/logging-composefile-legacy'
+        self.dispatch(['up', '-d'])
+        simple = self.project.get_service('simple').containers()[0]
+        log_config = simple.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'none')
+
+        another = self.project.get_service('another').containers()[0]
+        log_config = another.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'json-file')
+        self.assertEqual(log_config.get('Config')['max-size'], '10m')
+
     def test_pause_unpause(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')

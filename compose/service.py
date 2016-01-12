@@ -590,10 +590,9 @@ class Service(object):
     def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
 
-        log_config = LogConfig(
-            type=options.get('log_driver', ""),
-            config=options.get('log_opt', None)
-        )
+        logging_dict = options.get('logging', None)
+        log_config = get_log_config(logging_dict)
+
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=build_port_bindings(options.get('ports') or []),
@@ -954,3 +953,12 @@ def build_ulimits(ulimit_config):
             ulimits.append(ulimit_dict)
 
     return ulimits
+
+
+def get_log_config(logging_dict):
+    log_driver = logging_dict.get('driver', "") if logging_dict else ""
+    log_options = logging_dict.get('options', None) if logging_dict else None
+    return LogConfig(
+        type=log_driver,
+        config=log_options
+    )

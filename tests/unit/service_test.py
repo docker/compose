@@ -156,7 +156,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.create_host_config.return_value = {}
 
         log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
+        logging = {'driver': 'syslog', 'options': log_opt}
+        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, logging=logging)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
