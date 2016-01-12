@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import random
 
+import py
+
 from .testcases import DockerClientTestCase
 from compose.cli.docker_client import docker_client
 from compose.config import config
@@ -533,6 +535,57 @@ class ProjectTest(DockerClientTestCase):
         volume_data = self.client.inspect_volume(full_vol_name)
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
+
+    def test_project_up_logging_with_multiple_files(self):
+        base_file = config.ConfigFile(
+            'base.yml',
+            {
+                'version': 2,
+                'services': {
+                    'simple': {'image': 'busybox:latest', 'command': 'top'},
+                    'another': {
+                        'image': 'busybox:latest',
+                        'command': 'top',
+                        'logging': {
+                            'driver': "json-file",
+                            'options': {
+                                'max-size': "10m"
+                            }
+                        }
+                    }
+                }
+
+            })
+        override_file = config.ConfigFile(
+            'override.yml',
+            {
+                'version': 2,
+                'services': {
+                    'another': {
+                        'logging': {
+                            'driver': "none"
+                        }
+                    }
+                }
+
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        tmpdir = py.test.ensuretemp('logging_test')
+        self.addCleanup(tmpdir.remove)
+        with tmpdir.as_cwd():
+            config_data = config.load(details)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        containers = project.containers()
+        self.assertEqual(len(containers), 2)
+
+        another = project.get_service('another').containers()[0]
+        log_config = another.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'none')
 
     def test_initialize_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
