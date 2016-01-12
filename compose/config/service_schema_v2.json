@@ -167,17 +167,8 @@
     "constraints": {
       "id": "#/definitions/constraints",
       "anyOf": [
-        {
-          "required": ["build"],
-          "not": {"required": ["image"]}
-        },
-        {
-          "required": ["image"],
-          "not": {"anyOf": [
-            {"required": ["build"]},
-            {"required": ["dockerfile"]}
-          ]}
-        }
+          {"required": ["build"]},
+          {"required": ["image"]}
       ]
     }
   }

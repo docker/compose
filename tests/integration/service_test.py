@@ -491,7 +491,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("FROM busybox\n")
 
         self.create_service('web', build=base_dir).build()
-        self.assertEqual(len(self.client.images(name='composetest_web')), 1)
+        assert self.client.inspect_image('composetest_web')
 
     def test_build_non_ascii_filename(self):
         base_dir = tempfile.mkdtemp()
@@ -504,7 +504,19 @@ class ServiceTest(DockerClientTestCase):
             f.write("hello world\n")
 
         self.create_service('web', build=text_type(base_dir)).build()
-        self.assertEqual(len(self.client.images(name='composetest_web')), 1)
+        assert self.client.inspect_image('composetest_web')
+
+    def test_build_with_image_name(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        image_name = 'examples/composetest:latest'
+        self.addCleanup(self.client.remove_image, image_name)
+        self.create_service('web', build=base_dir, image=image_name).build()
+        assert self.client.inspect_image(image_name)
 
     def test_build_with_git_url(self):
         build_url = "https://github.com/dnephin/docker-build-from-url.git"

@@ -305,7 +305,8 @@ def load_services(working_dir, config_files, version):
         return {
             name: merge_service_dicts_from_files(
                 base.get(name, {}),
-                override.get(name, {}))
+                override.get(name, {}),
+                version)
             for name in all_service_names
         }
 
@@ -397,7 +398,10 @@ class ServiceExtendsResolver(object):
             service_name,
         )
 
-        return merge_service_dicts(other_service_dict, self.service_config.config)
+        return merge_service_dicts(
+            other_service_dict,
+            self.service_config.config,
+            self.version)
 
     def get_extended_config_path(self, extends_options):
         """Service we are extending either has a value for 'file' set, which we
@@ -521,12 +525,12 @@ def normalize_v1_service_format(service_dict):
     return service_dict
 
 
-def merge_service_dicts_from_files(base, override):
+def merge_service_dicts_from_files(base, override, version):
     """When merging services from multiple files we need to merge the `extends`
     field. This is not handled by `merge_service_dicts()` which is used to
     perform the `extends`.
     """
-    new_service = merge_service_dicts(base, override)
+    new_service = merge_service_dicts(base, override, version)
     if 'extends' in override:
         new_service['extends'] = override['extends']
     elif 'extends' in base:
@@ -534,7 +538,7 @@ def merge_service_dicts_from_files(base, override):
     return new_service
 
 
-def merge_service_dicts(base, override):
+def merge_service_dicts(base, override, version):
     d = {}
 
     def merge_field(field, merge_func, default=None):
@@ -545,7 +549,6 @@ def merge_service_dicts(base, override):
 
     merge_field('environment', merge_environment)
     merge_field('labels', merge_labels)
-    merge_image_or_build(base, override, d)
 
     for field in ['volumes', 'devices']:
         merge_field(field, merge_path_mappings)
@@ -556,15 +559,19 @@ def merge_service_dicts(base, override):
     for field in ['dns', 'dns_search', 'env_file']:
         merge_field(field, merge_list_or_string)
 
-    already_merged_keys = set(d) | {'image', 'build'}
-    for field in set(ALLOWED_KEYS) - already_merged_keys:
+    for field in set(ALLOWED_KEYS) - set(d):
         if field in base or field in override:
             d[field] = override.get(field, base.get(field))
+
+    if version == 1:
+        legacy_v1_merge_image_or_build(d, base, override)
 
     return d
 
 
-def merge_image_or_build(base, override, output):
+def legacy_v1_merge_image_or_build(output, base, override):
+    output.pop('image', None)
+    output.pop('build', None)
     if 'image' in override:
         output['image'] = override['image']
     elif 'build' in override:

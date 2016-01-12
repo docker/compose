@@ -19,6 +19,9 @@ from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
 
+DEFAULT_VERSION = 2
+V1 = 1
+
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
     """
@@ -238,8 +241,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
-    def test_load_with_multiple_files(self):
+    def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
             'base.yaml',
             {
@@ -265,7 +267,7 @@ class ConfigTest(unittest.TestCase):
         expected = [
             {
                 'name': 'web',
-                'build': '/',
+                'build': os.path.abspath('/'),
                 'links': ['db'],
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
             },
@@ -274,7 +276,7 @@ class ConfigTest(unittest.TestCase):
                 'image': 'example/db',
             },
         ]
-        self.assertEqual(service_sort(service_dicts), service_sort(expected))
+        assert service_sort(service_dicts) == service_sort(expected)
 
     def test_load_with_multiple_files_and_empty_override(self):
         base_file = config.ConfigFile(
@@ -428,6 +430,7 @@ class ConfigTest(unittest.TestCase):
             {
                 'name': 'web',
                 'build': os.path.abspath('/'),
+                'image': 'example/web',
                 'links': ['db'],
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
             },
@@ -436,7 +439,7 @@ class ConfigTest(unittest.TestCase):
                 'image': 'example/db',
             },
         ]
-        self.assertEqual(service_sort(service_dicts), service_sort(expected))
+        assert service_sort(service_dicts) == service_sort(expected)
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
@@ -525,16 +528,15 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    def test_config_image_and_dockerfile_raise_validation_error(self):
-        expected_error_msg = "Service 'web' has both an image and alternate Dockerfile."
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
-            config.load(
-                build_config_details(
-                    {'web': {'image': 'busybox', 'dockerfile': 'Dockerfile.alt'}},
-                    'working_dir',
-                    'filename.yml'
-                )
-            )
+    def test_load_config_dockerfile_without_build_raises_error(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details({
+                'web': {
+                    'image': 'busybox',
+                    'dockerfile': 'Dockerfile.alt'
+                }
+            }))
+        assert "Service 'web' has both an image and alternate Dockerfile." in exc.exconly()
 
     def test_config_extra_hosts_string_raises_validation_error(self):
         expected_error_msg = "Service 'web' configuration key 'extra_hosts' contains an invalid type"
@@ -746,7 +748,10 @@ class ConfigTest(unittest.TestCase):
         override = {
             'image': 'alpine:edge',
         }
-        actual = config.merge_service_dicts_from_files(base, override)
+        actual = config.merge_service_dicts_from_files(
+            base,
+            override,
+            DEFAULT_VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'volumes': ['.:/app'],
@@ -762,7 +767,10 @@ class ConfigTest(unittest.TestCase):
             'image': 'alpine:edge',
             'extends': {'service': 'foo'}
         }
-        actual = config.merge_service_dicts_from_files(base, override)
+        actual = config.merge_service_dicts_from_files(
+            base,
+            override,
+            DEFAULT_VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'volumes': ['.:/app'],
@@ -1023,43 +1031,43 @@ class MergePathMappingTest(object):
         return ""
 
     def test_empty(self):
-        service_dict = config.merge_service_dicts({}, {})
-        self.assertNotIn(self.config_name(), service_dict)
+        service_dict = config.merge_service_dicts({}, {}, DEFAULT_VERSION)
+        assert self.config_name() not in service_dict
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
             {self.config_name(): ['/foo:/code', '/data']},
             {},
-        )
-        self.assertEqual(set(service_dict[self.config_name()]), set(['/foo:/code', '/data']))
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name()]) == set(['/foo:/code', '/data'])
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {self.config_name(): ['/bar:/code']},
-        )
-        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code']))
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name()]) == set(['/bar:/code'])
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name(): ['/foo:/code', '/data']},
             {self.config_name(): ['/bar:/code']},
-        )
-        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/data']))
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/data'])
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name(): ['/foo:/code', '/data']},
             {self.config_name(): ['/bar:/code', '/quux:/data']},
-        )
-        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/quux:/data']))
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/quux:/data'])
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name(): ['/foo:/code', '/quux:/data']},
             {self.config_name(): ['/bar:/code', '/data']},
-        )
-        self.assertEqual(set(service_dict[self.config_name()]), set(['/bar:/code', '/data']))
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/data'])
 
 
 class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
@@ -1075,63 +1083,62 @@ class MergeDevicesTest(unittest.TestCase, MergePathMappingTest):
 class BuildOrImageMergeTest(unittest.TestCase):
     def test_merge_build_or_image_no_override(self):
         self.assertEqual(
-            config.merge_service_dicts({'build': '.'}, {}),
+            config.merge_service_dicts({'build': '.'}, {}, V1),
             {'build': '.'},
         )
 
         self.assertEqual(
-            config.merge_service_dicts({'image': 'redis'}, {}),
+            config.merge_service_dicts({'image': 'redis'}, {}, V1),
             {'image': 'redis'},
         )
 
     def test_merge_build_or_image_override_with_same(self):
         self.assertEqual(
-            config.merge_service_dicts({'build': '.'}, {'build': './web'}),
+            config.merge_service_dicts({'build': '.'}, {'build': './web'}, V1),
             {'build': './web'},
         )
 
         self.assertEqual(
-            config.merge_service_dicts({'image': 'redis'}, {'image': 'postgres'}),
+            config.merge_service_dicts({'image': 'redis'}, {'image': 'postgres'}, V1),
             {'image': 'postgres'},
         )
 
     def test_merge_build_or_image_override_with_other(self):
         self.assertEqual(
-            config.merge_service_dicts({'build': '.'}, {'image': 'redis'}),
-            {'image': 'redis'}
+            config.merge_service_dicts({'build': '.'}, {'image': 'redis'}, V1),
+            {'image': 'redis'},
         )
 
         self.assertEqual(
-            config.merge_service_dicts({'image': 'redis'}, {'build': '.'}),
-            {'build': '.'}
+            config.merge_service_dicts({'image': 'redis'}, {'build': '.'}, V1),
+            {'build': '.'},
         )
 
 
 class MergeListsTest(unittest.TestCase):
     def test_empty(self):
-        service_dict = config.merge_service_dicts({}, {})
-        self.assertNotIn('ports', service_dict)
+        assert 'ports' not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
             {'ports': ['10:8000', '9000']},
             {},
-        )
-        self.assertEqual(set(service_dict['ports']), set(['10:8000', '9000']))
+            DEFAULT_VERSION)
+        assert set(service_dict['ports']) == set(['10:8000', '9000'])
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {'ports': ['10:8000', '9000']},
-        )
-        self.assertEqual(set(service_dict['ports']), set(['10:8000', '9000']))
+            DEFAULT_VERSION)
+        assert set(service_dict['ports']) == set(['10:8000', '9000'])
 
     def test_add_item(self):
         service_dict = config.merge_service_dicts(
             {'ports': ['10:8000', '9000']},
             {'ports': ['20:8000']},
-        )
-        self.assertEqual(set(service_dict['ports']), set(['10:8000', '9000', '20:8000']))
+            DEFAULT_VERSION)
+        assert set(service_dict['ports']) == set(['10:8000', '9000', '20:8000'])
 
 
 class MergeStringsOrListsTest(unittest.TestCase):
@@ -1139,70 +1146,69 @@ class MergeStringsOrListsTest(unittest.TestCase):
         service_dict = config.merge_service_dicts(
             {'dns': '8.8.8.8'},
             {},
-        )
-        self.assertEqual(set(service_dict['dns']), set(['8.8.8.8']))
+            DEFAULT_VERSION)
+        assert set(service_dict['dns']) == set(['8.8.8.8'])
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {'dns': '8.8.8.8'},
-        )
-        self.assertEqual(set(service_dict['dns']), set(['8.8.8.8']))
+            DEFAULT_VERSION)
+        assert set(service_dict['dns']) == set(['8.8.8.8'])
 
     def test_add_string(self):
         service_dict = config.merge_service_dicts(
             {'dns': ['8.8.8.8']},
             {'dns': '9.9.9.9'},
-        )
-        self.assertEqual(set(service_dict['dns']), set(['8.8.8.8', '9.9.9.9']))
+            DEFAULT_VERSION)
+        assert set(service_dict['dns']) == set(['8.8.8.8', '9.9.9.9'])
 
     def test_add_list(self):
         service_dict = config.merge_service_dicts(
             {'dns': '8.8.8.8'},
             {'dns': ['9.9.9.9']},
-        )
-        self.assertEqual(set(service_dict['dns']), set(['8.8.8.8', '9.9.9.9']))
+            DEFAULT_VERSION)
+        assert set(service_dict['dns']) == set(['8.8.8.8', '9.9.9.9'])
 
 
 class MergeLabelsTest(unittest.TestCase):
     def test_empty(self):
-        service_dict = config.merge_service_dicts({}, {})
-        self.assertNotIn('labels', service_dict)
+        assert 'labels' not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
             make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar']}, 'tests/'),
             make_service_dict('foo', {'build': '.'}, 'tests/'),
-        )
-        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
+            DEFAULT_VERSION)
+        assert service_dict['labels'] == {'foo': '1', 'bar': ''}
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             make_service_dict('foo', {'build': '.'}, 'tests/'),
             make_service_dict('foo', {'build': '.', 'labels': ['foo=2']}, 'tests/'),
-        )
-        self.assertEqual(service_dict['labels'], {'foo': '2'})
+            DEFAULT_VERSION)
+        assert service_dict['labels'] == {'foo': '2'}
 
     def test_override_explicit_value(self):
         service_dict = config.merge_service_dicts(
             make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar']}, 'tests/'),
             make_service_dict('foo', {'build': '.', 'labels': ['foo=2']}, 'tests/'),
-        )
-        self.assertEqual(service_dict['labels'], {'foo': '2', 'bar': ''})
+            DEFAULT_VERSION)
+        assert service_dict['labels'] == {'foo': '2', 'bar': ''}
 
     def test_add_explicit_value(self):
         service_dict = config.merge_service_dicts(
             make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar']}, 'tests/'),
             make_service_dict('foo', {'build': '.', 'labels': ['bar=2']}, 'tests/'),
-        )
-        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': '2'})
+            DEFAULT_VERSION)
+        assert service_dict['labels'] == {'foo': '1', 'bar': '2'}
 
     def test_remove_explicit_value(self):
         service_dict = config.merge_service_dicts(
             make_service_dict('foo', {'build': '.', 'labels': ['foo=1', 'bar=2']}, 'tests/'),
             make_service_dict('foo', {'build': '.', 'labels': ['bar']}, 'tests/'),
-        )
-        self.assertEqual(service_dict['labels'], {'foo': '1', 'bar': ''})
+            DEFAULT_VERSION)
+        assert service_dict['labels'] == {'foo': '1', 'bar': ''}
 
 
 class MemoryOptionsTest(unittest.TestCase):
@@ -1541,10 +1547,12 @@ class ExtendsTest(unittest.TestCase):
         self.assertEquals(service[0]['command'], "/bin/true")
 
     def test_extended_service_with_invalid_config(self):
-        expected_error_msg = "Service 'myweb' has neither an image nor a build path specified"
-
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+        with pytest.raises(ConfigurationError) as exc:
             load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
+        assert (
+            "Service 'myweb' has neither an image nor a build path specified" in
+            exc.exconly()
+        )
 
     def test_extended_service_with_valid_config(self):
         service = load_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')

@@ -492,6 +492,15 @@ class ServiceTest(unittest.TestCase):
             use_networking=True)
         self.assertEqual(service._get_links(link_to_self=True), [])
 
+    def test_image_name_from_config(self):
+        image_name = 'example/web:latest'
+        service = Service('foo', image=image_name)
+        assert service.image_name == image_name
+
+    def test_image_name_default(self):
+        service = Service('foo', project='testing')
+        assert service.image_name == 'testing_foo'
+
 
 def sort_by_name(dictionary_list):
     return sorted(dictionary_list, key=lambda k: k['name'])

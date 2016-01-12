@@ -275,10 +275,7 @@ class Service(object):
 
     @property
     def image_name(self):
-        if self.can_be_built():
-            return self.full_name
-        else:
-            return self.options['image']
+        return self.options.get('image', '{s.project}_{s.name}'.format(s=self))
 
     def convergence_plan(self, strategy=ConvergenceStrategy.changed):
         containers = self.containers(stopped=True)
@@ -664,13 +661,6 @@ class Service(object):
 
     def can_be_built(self):
         return 'build' in self.options
-
-    @property
-    def full_name(self):
-        """
-        The tag to give to images built for this service.
-        """
-        return '%s_%s' % (self.project, self.name)
 
     def labels(self, one_off=False):
         return [
