@@ -55,7 +55,7 @@ class CLIMainTestCase(unittest.TestCase):
         service_names = ['web', 'db']
         timeout = 12
 
-        with mock.patch('compose.cli.main.signal', autospec=True) as mock_signal:
+        with mock.patch('compose.cli.main.signals.signal', autospec=True) as mock_signal:
             attach_to_logs(project, log_printer, service_names, timeout)
 
         assert mock_signal.signal.mock_calls == [

@@ -90,7 +90,8 @@ class ContainerStateCondition(object):
             return False
 
     def __str__(self):
-        return "waiting for container to have state %s" % self.expected
+        state = 'running' if self.running else 'stopped'
+        return "waiting for container to be %s" % state
 
 
 class CLITestCase(DockerClientTestCase):
