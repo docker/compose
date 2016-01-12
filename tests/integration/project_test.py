@@ -6,7 +6,6 @@ import random
 import py
 
 from .testcases import DockerClientTestCase
-from compose.cli.docker_client import docker_client
 from compose.config import config
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
@@ -105,20 +104,14 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(db._get_volumes_from(), [data_container.id + ':rw'])
 
     def test_get_network_does_not_exist(self):
-        self.require_api_version('1.21')
-        client = docker_client(version='1.21')
-
-        project = Project('composetest', [], client)
+        project = Project('composetest', [], self.client)
         assert project.get_network() is None
 
     def test_get_network(self):
-        self.require_api_version('1.21')
-        client = docker_client(version='1.21')
-
         network_name = 'network_does_exist'
-        project = Project(network_name, [], client)
-        client.create_network(network_name)
-        self.addCleanup(client.remove_network, network_name)
+        project = Project(network_name, [], self.client)
+        self.client.create_network(network_name)
+        self.addCleanup(self.client.remove_network, network_name)
         assert project.get_network()['Name'] == network_name
 
     def test_net_from_service(self):
@@ -476,15 +469,13 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
     def test_project_up_with_custom_network(self):
-        self.require_api_version('1.21')
-        client = docker_client(version='1.21')
         network_name = 'composetest-custom'
 
-        client.create_network(network_name)
-        self.addCleanup(client.remove_network, network_name)
+        self.client.create_network(network_name)
+        self.addCleanup(self.client.remove_network, network_name)
 
         web = self.create_service('web', net=Net(network_name))
-        project = Project('composetest', [web], client, use_networking=True)
+        project = Project('composetest', [web], self.client, use_networking=True)
         project.up()
 
         assert project.get_network() is None
