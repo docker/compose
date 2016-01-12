@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import json
 import logging
 import re
 import signal
@@ -132,6 +133,7 @@ class TopLevelCommand(DocoptCommand):
       build              Build or rebuild services
       config             Validate and view the compose file
       create             Create services
+      events             Receive real time events from containers
       help               Get help on a command
       kill               Kill containers
       logs               View output from containers
@@ -243,6 +245,30 @@ class TopLevelCommand(DocoptCommand):
             strategy=convergence_strategy_from_opts(options),
             do_build=not options['--no-build']
         )
+
+    def events(self, project, options):
+        """
+        Receive real time events from containers.
+
+        Usage: events [options] [SERVICE...]
+
+        Options:
+            --json      Output events as a stream of json objects
+        """
+        def format_event(event):
+            attributes = ["%s=%s" % item for item in event['attributes'].items()]
+            return ("{time} {type} {action} {id} ({attrs})").format(
+                attrs=", ".join(sorted(attributes)),
+                **event)
+
+        def json_format_event(event):
+            event['time'] = event['time'].isoformat()
+            return json.dumps(event)
+
+        for event in project.events():
+            formatter = json_format_event if options['--json'] else format_event
+            print(formatter(event))
+            sys.stdout.flush()
 
     def help(self, project, options):
         """

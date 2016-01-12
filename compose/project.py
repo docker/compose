@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import datetime
 import logging
 from functools import reduce
 
@@ -11,6 +12,7 @@ from . import parallel
 from .config import ConfigurationError
 from .config.sort_services import get_service_name_from_net
 from .const import DEFAULT_TIMEOUT
+from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
@@ -20,6 +22,7 @@ from .service import ConvergenceStrategy
 from .service import Net
 from .service import Service
 from .service import ServiceNet
+from .utils import microseconds_from_time_nano
 from .volume import Volume
 
 
@@ -267,7 +270,44 @@ class Project(object):
         plans = self._get_convergence_plans(services, strategy)
 
         for service in services:
-            service.execute_convergence_plan(plans[service.name], do_build, detached=True, start=False)
+            service.execute_convergence_plan(
+                plans[service.name],
+                do_build,
+                detached=True,
+                start=False)
+
+    def events(self):
+        def build_container_event(event, container):
+            time = datetime.datetime.fromtimestamp(event['time'])
+            time = time.replace(
+                microsecond=microseconds_from_time_nano(event['timeNano']))
+            return {
+                'time': time,
+                'type': 'container',
+                'action': event['status'],
+                'id': container.id,
+                'service': container.service,
+                'attributes': {
+                    'name': container.name,
+                    'image': event['from'],
+                }
+            }
+
+        service_names = set(self.service_names)
+        for event in self.client.events(
+            filters={'label': self.labels()},
+            decode=True
+        ):
+            if event['status'] in IMAGE_EVENTS:
+                # We don't receive any image events because labels aren't applied
+                # to images
+                continue
+
+            # TODO: get labels from the API v1.22 , see github issue 2618
+            container = Container.from_id(self.client, event['id'])
+            if container.service not in service_names:
+                continue
+            yield build_container_event(event, container)
 
     def up(self,
            service_names=None,
