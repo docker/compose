@@ -39,7 +39,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
 
     def test_from_config(self):
-        dicts = Config(None, [
+        config = Config(None, [
             {
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -49,12 +49,28 @@ class ProjectTest(unittest.TestCase):
                 'image': 'busybox:latest',
             },
         ], None)
-        project = Project.from_config('composetest', dicts, None)
+        project = Project.from_config('composetest', config, None)
         self.assertEqual(len(project.services), 2)
         self.assertEqual(project.get_service('web').name, 'web')
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
         self.assertEqual(project.get_service('db').name, 'db')
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
+        self.assertFalse(project.use_networking)
+
+    def test_from_config_v2(self):
+        config = Config(2, [
+            {
+                'name': 'web',
+                'image': 'busybox:latest',
+            },
+            {
+                'name': 'db',
+                'image': 'busybox:latest',
+            },
+        ], None)
+        project = Project.from_config('composetest', config, None)
+        self.assertEqual(len(project.services), 2)
+        self.assertTrue(project.use_networking)
 
     def test_get_service(self):
         web = Service(
@@ -346,7 +362,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(service.net.mode, 'container:' + container_name)
 
     def test_uses_default_network_true(self):
-        web = Service('web', project='test', image="alpine", net=Net('test'))
+        web = Service('web', project='test', image="alpine", net=Net('test_default'))
         db = Service('web', project='test', image="alpine", net=Net('other'))
         project = Project('test', [web, db], None)
         assert project.uses_default_network()

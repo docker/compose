@@ -116,15 +116,11 @@ _docker_compose_docker_compose() {
 		--project-name|-p)
 			return
 			;;
-		--x-network-driver)
-			COMPREPLY=( $( compgen -W "bridge host none overlay" -- "$cur" ) )
-			return
-			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v --x-networking --x-network-driver" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -415,9 +411,6 @@ _docker_compose() {
 			--project-name|p)
 				(( counter++ ))
 				compose_project="${words[$counter]}"
-				;;
-			--x-network-driver)
-				(( counter++ ))
 				;;
 			-*)
 				;;

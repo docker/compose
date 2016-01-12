@@ -36,13 +36,20 @@ class DockerClientTestCase(unittest.TestCase):
                 all=True,
                 filters={'label': '%s=composetest' % LABEL_PROJECT}):
             self.client.remove_container(c['Id'], force=True)
+
         for i in self.client.images(
                 filters={'label': 'com.docker.compose.test_image'}):
             self.client.remove_image(i)
+
         volumes = self.client.volumes().get('Volumes') or []
         for v in volumes:
             if 'composetest_' in v['Name']:
                 self.client.remove_volume(v['Name'])
+
+        networks = self.client.networks()
+        for n in networks:
+            if 'composetest_' in n['Name']:
+                self.client.remove_network(n['Name'])
 
     def create_service(self, name, **kwargs):
         if 'image' not in kwargs and 'build' not in kwargs:

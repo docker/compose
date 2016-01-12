@@ -16,7 +16,6 @@ from docker import errors
 
 from .. import mock
 from compose.cli.command import get_project
-from compose.cli.docker_client import docker_client
 from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
@@ -336,13 +335,10 @@ class CLITestCase(DockerClientTestCase):
         assert 'another_1 | another' in result.stdout
 
     def test_up_without_networking(self):
-        self.require_api_version('1.21')
-
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d'], None)
-        client = docker_client(version='1.21')
 
-        networks = client.networks(names=[self.project.name])
+        networks = self.client.networks(names=[self.project.default_network_name])
         self.assertEqual(len(networks), 0)
 
         for service in self.project.get_services():
@@ -354,21 +350,18 @@ class CLITestCase(DockerClientTestCase):
         self.assertTrue(web_container.get('HostConfig.Links'))
 
     def test_up_with_networking(self):
-        self.require_api_version('1.21')
-
-        self.base_dir = 'tests/fixtures/links-composefile'
-        self.dispatch(['--x-networking', 'up', '-d'], None)
-        client = docker_client(version='1.21')
+        self.base_dir = 'tests/fixtures/v2-simple'
+        self.dispatch(['up', '-d'], None)
 
         services = self.project.get_services()
 
-        networks = client.networks(names=[self.project.name])
+        networks = self.client.networks(names=[self.project.default_network_name])
         for n in networks:
-            self.addCleanup(client.remove_network, n['Id'])
+            self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['Driver'], 'bridge')
 
-        network = client.inspect_network(networks[0]['Id'])
+        network = self.client.inspect_network(networks[0]['Id'])
         self.assertEqual(len(network['Containers']), len(services))
 
         for service in services:
@@ -376,10 +369,21 @@ class CLITestCase(DockerClientTestCase):
             self.assertEqual(len(containers), 1)
             self.assertIn(containers[0].id, network['Containers'])
 
-        web_container = self.project.get_service('web').containers()[0]
+        web_container = self.project.get_service('simple').containers()[0]
         self.assertFalse(web_container.get('HostConfig.Links'))
 
-    def test_up_with_links(self):
+    def test_up_with_links_is_invalid(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
+
+        result = self.dispatch(
+            ['-f', 'links-invalid.yml', 'up', '-d'],
+            returncode=1)
+
+        # TODO: fix validation error messages for v2 files
+        # assert "Unsupported config option for service 'simple': 'links'" in result.stderr
+        assert "Unsupported config option" in result.stderr
+
+    def test_up_with_links_v1(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'web'], None)
         web = self.project.get_service('web')
@@ -652,15 +656,13 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(container.name, name)
 
     def test_run_with_networking(self):
-        self.require_api_version('1.21')
-        client = docker_client(version='1.21')
-        self.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.dispatch(['--x-networking', 'run', 'simple', 'true'], None)
+        self.base_dir = 'tests/fixtures/v2-simple'
+        self.dispatch(['run', 'simple', 'true'], None)
         service = self.project.get_service('simple')
         container, = service.containers(stopped=True, one_off=True)
-        networks = client.networks(names=[self.project.name])
+        networks = self.client.networks(names=[self.project.default_network_name])
         for n in networks:
-            self.addCleanup(client.remove_network, n['Id'])
+            self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(container.human_readable_command, u'true')
 

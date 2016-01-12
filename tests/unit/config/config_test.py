@@ -268,8 +268,8 @@ class ConfigTest(unittest.TestCase):
             {
                 'name': 'web',
                 'build': os.path.abspath('/'),
-                'links': ['db'],
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
+                'links': ['db'],
             },
             {
                 'name': 'db',
@@ -405,7 +405,6 @@ class ConfigTest(unittest.TestCase):
                 'services': {
                     'web': {
                         'image': 'example/web',
-                        'links': ['db'],
                     },
                     'db': {
                         'image': 'example/db',
@@ -431,7 +430,6 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'build': os.path.abspath('/'),
                 'image': 'example/web',
-                'links': ['db'],
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
             },
             {
