@@ -154,8 +154,7 @@ environments in just a few commands:
 
     $ docker-compose up -d
     $ ./run_tests
-    $ docker-compose stop
-    $ docker-compose rm -f
+    $ docker-compose down
 
 ### Single host deployments
 

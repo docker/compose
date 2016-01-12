@@ -1,0 +1,10 @@
+
+version: 2
+
+volumes:
+  data:
+    driver: local
+
+services:
+  web:
+    build: .

@@ -616,13 +616,13 @@ class ServiceTest(DockerClientTestCase):
         service.create_container(number=next_number)
         service.create_container(number=next_number + 1)
 
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             service.scale(2)
         for container in service.containers():
             self.assertTrue(container.is_running)
             self.assertTrue(container.number in valid_numbers)
 
-        captured_output = mock_stdout.getvalue()
+        captured_output = mock_stderr.getvalue()
         self.assertNotIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
@@ -639,14 +639,14 @@ class ServiceTest(DockerClientTestCase):
         for container in service.containers():
             self.assertFalse(container.is_running)
 
-        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             service.scale(2)
 
         self.assertEqual(len(service.containers()), 2)
         for container in service.containers():
             self.assertTrue(container.is_running)
 
-        captured_output = mock_stdout.getvalue()
+        captured_output = mock_stderr.getvalue()
         self.assertIn('Creating', captured_output)
         self.assertIn('Starting', captured_output)
 
@@ -665,12 +665,12 @@ class ServiceTest(DockerClientTestCase):
                 response={},
                 explanation="Boom")):
 
-            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
                 service.scale(3)
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
-        self.assertIn("ERROR: for 2  Boom", mock_stdout.getvalue())
+        self.assertIn("ERROR: for 2  Boom", mock_stderr.getvalue())
 
     def test_scale_with_unexpected_exception(self):
         """Test that when scaling if the API returns an error, that is not of type

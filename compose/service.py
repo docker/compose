@@ -686,6 +686,7 @@ class Service(object):
         if image_type == ImageType.local and self.options.get('image'):
             return False
 
+        log.info("Removing image %s", self.image_name)
         try:
             self.client.remove_image(self.image_name)
             return True

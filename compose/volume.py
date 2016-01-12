@@ -1,7 +1,12 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import logging
+
 from docker.errors import NotFound
+
+
+log = logging.getLogger(__name__)
 
 
 class Volume(object):
@@ -20,6 +25,10 @@ class Volume(object):
         )
 
     def remove(self):
+        if self.external:
+            log.info("Volume %s is external, skipping", self.full_name)
+            return
+        log.info("Removing volume %s", self.full_name)
         return self.client.remove_volume(self.full_name)
 
     def inspect(self):

@@ -319,8 +319,16 @@ class CLITestCase(DockerClientTestCase):
         assert '--rmi flag must be' in result.stderr
 
     def test_down(self):
-        result = self.dispatch(['down'])
-        # TODO:
+        self.base_dir = 'tests/fixtures/shutdown'
+        self.dispatch(['up', '-d'])
+        wait_on_condition(ContainerCountCondition(self.project, 1))
+
+        result = self.dispatch(['down', '--rmi=local', '--volumes'])
+        assert 'Stopping shutdown_web_1' in result.stderr
+        assert 'Removing shutdown_web_1' in result.stderr
+        assert 'Removing volume shutdown_data' in result.stderr
+        assert 'Removing image shutdown_web' in result.stderr
+        assert 'Removing network shutdown_default' in result.stderr
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])

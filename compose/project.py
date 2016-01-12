@@ -272,7 +272,7 @@ class Project(object):
 
     def down(self, remove_image_type, include_volumes):
         self.stop()
-        self.remove_stopped()
+        self.remove_stopped(v=include_volumes)
         self.remove_network()
 
         if include_volumes:
@@ -441,6 +441,7 @@ class Project(object):
             return
         network = self.get_network()
         if network:
+            log.info("Removing network %s", self.default_network_name)
             self.client.remove_network(network['Id'])
 
     def uses_default_network(self):

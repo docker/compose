@@ -247,7 +247,7 @@ class TopLevelCommand(DocoptCommand):
     def down(self, project, options):
         """
         Stop containers and remove containers, networks, volumes, and images
-        created by `up`.
+        created by `up`. Only containers and networks are removed by default.
 
         Usage: down [options]
 
