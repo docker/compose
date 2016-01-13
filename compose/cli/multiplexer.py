@@ -20,8 +20,9 @@ class Multiplexer(object):
     parallel and yielding results as they come in.
     """
 
-    def __init__(self, iterators):
+    def __init__(self, iterators, cascade_stop=False):
         self.iterators = iterators
+        self.cascade_stop = cascade_stop
         self._num_running = len(iterators)
         self.queue = Queue()
 
@@ -36,7 +37,10 @@ class Multiplexer(object):
                     raise exception
 
                 if item is STOP:
-                    self._num_running -= 1
+                    if self.cascade_stop is True:
+                        break
+                    else:
+                        self._num_running -= 1
                 else:
                     yield item
             except Empty:

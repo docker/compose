@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import unittest
+from time import sleep
 
 from compose.cli.multiplexer import Multiplexer
 
@@ -46,3 +47,20 @@ class MultiplexerTest(unittest.TestCase):
 
         with self.assertRaises(Problem):
             list(mux.loop())
+
+    def test_cascade_stop(self):
+        mux = Multiplexer([
+            ((lambda x: sleep(0.01) or x)(x) for x in ['after 0.01 sec T1',
+                                                       'after 0.02 sec T1',
+                                                       'after 0.03 sec T1']),
+            ((lambda x: sleep(0.02) or x)(x) for x in ['after 0.02 sec T2',
+                                                       'after 0.04 sec T2',
+                                                       'after 0.06 sec T2']),
+        ], cascade_stop=True)
+
+        self.assertEqual(
+            ['after 0.01 sec T1',
+             'after 0.02 sec T1',
+             'after 0.02 sec T2',
+             'after 0.03 sec T1'],
+            sorted(list(mux.loop())))

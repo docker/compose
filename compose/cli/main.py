@@ -590,24 +590,32 @@ class TopLevelCommand(DocoptCommand):
         Usage: up [options] [SERVICE...]
 
         Options:
-            -d                     Detached mode: Run containers in the background,
-                                   print new container names.
-            --no-color             Produce monochrome output.
-            --no-deps              Don't start linked services.
-            --force-recreate       Recreate containers even if their configuration and
-                                   image haven't changed. Incompatible with --no-recreate.
-            --no-recreate          If containers already exist, don't recreate them.
-                                   Incompatible with --force-recreate.
-            --no-build             Don't build an image, even if it's missing
-            -t, --timeout TIMEOUT  Use this timeout in seconds for container shutdown
-                                   when attached or when containers are already
-                                   running. (default: 10)
+            -d                         Detached mode: Run containers in the background,
+                                       print new container names.
+                                       Incompatible with --abort-on-container-exit.
+            --no-color                 Produce monochrome output.
+            --no-deps                  Don't start linked services.
+            --force-recreate           Recreate containers even if their configuration
+                                       and image haven't changed.
+                                       Incompatible with --no-recreate.
+            --no-recreate              If containers already exist, don't recreate them.
+                                       Incompatible with --force-recreate.
+            --no-build                 Don't build an image, even if it's missing
+            --abort-on-container-exit  Stops all containers if any container was stopped.
+                                       Incompatible with -d.
+            -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
+                                       when attached or when containers are already
+                                       running. (default: 10)
         """
         monochrome = options['--no-color']
         start_deps = not options['--no-deps']
+        cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
         detached = options.get('-d')
+
+        if detached and cascade_stop:
+            raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
         to_attach = project.up(
             service_names=service_names,
@@ -619,7 +627,7 @@ class TopLevelCommand(DocoptCommand):
         )
 
         if not detached:
-            log_printer = build_log_printer(to_attach, service_names, monochrome)
+            log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop)
             attach_to_logs(project, log_printer, service_names, timeout)
 
     def version(self, project, options):
@@ -695,13 +703,13 @@ def run_one_off_container(container_options, project, service, options):
     sys.exit(exit_code)
 
 
-def build_log_printer(containers, service_names, monochrome):
+def build_log_printer(containers, service_names, monochrome, cascade_stop):
     if service_names:
         containers = [
             container
             for container in containers if container.service in service_names
         ]
-    return LogPrinter(containers, monochrome=monochrome)
+    return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop)
 
 
 def attach_to_logs(project, log_printer, service_names, timeout):

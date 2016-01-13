@@ -36,7 +36,7 @@ class CLIMainTestCase(unittest.TestCase):
             mock_container('another', 1),
         ]
         service_names = ['web', 'db']
-        log_printer = build_log_printer(containers, service_names, True)
+        log_printer = build_log_printer(containers, service_names, True, False)
         self.assertEqual(log_printer.containers, containers[:3])
 
     def test_build_log_printer_all_services(self):
@@ -46,7 +46,7 @@ class CLIMainTestCase(unittest.TestCase):
             mock_container('other', 1),
         ]
         service_names = []
-        log_printer = build_log_printer(containers, service_names, True)
+        log_printer = build_log_printer(containers, service_names, True, False)
         self.assertEqual(log_printer.containers, containers)
 
     def test_attach_to_logs(self):
