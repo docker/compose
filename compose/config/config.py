@@ -138,6 +138,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_volumes(self):
         return {} if self.version == 1 else self.config.get('volumes', {})
 
+    def get_networks(self):
+        return {} if self.version == 1 else self.config.get('networks', {})
+
 
 class Config(namedtuple('_Config', 'version services volumes networks')):
     """
@@ -258,8 +261,8 @@ def load(config_details):
     config_details = config_details._replace(config_files=processed_files)
 
     main_file = config_details.config_files[0]
-    volumes = load_mapping(config_details.config_files, 'volumes', 'Volume')
-    networks = load_mapping(config_details.config_files, 'networks', 'Network')
+    volumes = load_mapping(config_details.config_files, 'get_volumes', 'Volume')
+    networks = load_mapping(config_details.config_files, 'get_networks', 'Network')
     service_dicts = load_services(
         config_details.working_dir,
         main_file.filename,
@@ -268,11 +271,11 @@ def load(config_details):
     return Config(main_file.version, service_dicts, volumes, networks)
 
 
-def load_mapping(config_files, key, entity_type):
+def load_mapping(config_files, get_func, entity_type):
     mapping = {}
 
     for config_file in config_files:
-        for name, config in config_file.config.get(key, {}).items():
+        for name, config in getattr(config_file, get_func)().items():
             mapping[name] = config or {}
             if not config:
                 continue
@@ -347,12 +350,16 @@ def process_config_file(config_file, service_name=None):
     service_dicts = config_file.get_service_dicts()
     validate_top_level_service_objects(config_file.filename, service_dicts)
 
-    # TODO: interpolate config in volumes/network sections as well
-    interpolated_config = interpolate_environment_variables(service_dicts)
+    interpolated_config = interpolate_environment_variables(service_dicts, 'service')
 
     if config_file.version == 2:
         processed_config = dict(config_file.config)
-        processed_config.update({'services': interpolated_config})
+        processed_config['services'] = interpolated_config
+        processed_config['volumes'] = interpolate_environment_variables(
+            config_file.get_volumes(), 'volume')
+        processed_config['networks'] = interpolate_environment_variables(
+            config_file.get_networks(), 'network')
+
     if config_file.version == 1:
         processed_config = interpolated_config
 
