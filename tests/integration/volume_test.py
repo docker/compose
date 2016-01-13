@@ -57,7 +57,7 @@ class VolumeTest(DockerClientTestCase):
         assert len([v for v in volumes if v['Name'] == vol.full_name]) == 0
 
     def test_external_volume(self):
-        vol = self.create_volume('volume01', external=True)
+        vol = self.create_volume('composetest_volume_ext', external=True)
         assert vol.external is True
         assert vol.full_name == vol.name
         vol.create()
@@ -65,10 +65,28 @@ class VolumeTest(DockerClientTestCase):
         assert info['Name'] == vol.name
 
     def test_external_aliased_volume(self):
-        alias_name = 'alias01'
+        alias_name = 'composetest_alias01'
         vol = self.create_volume('volume01', external={'name': alias_name})
         assert vol.external is True
         assert vol.full_name == alias_name
         vol.create()
         info = vol.inspect()
         assert info['Name'] == alias_name
+
+    def test_exists(self):
+        vol = self.create_volume('volume01')
+        assert vol.exists() is False
+        vol.create()
+        assert vol.exists() is True
+
+    def test_exists_external(self):
+        vol = self.create_volume('volume01', external=True)
+        assert vol.exists() is False
+        vol.create()
+        assert vol.exists() is True
+
+    def test_exists_external_aliased(self):
+        vol = self.create_volume('volume01', external={'name': 'composetest_alias01'})
+        assert vol.exists() is False
+        vol.create()
+        assert vol.exists() is True
