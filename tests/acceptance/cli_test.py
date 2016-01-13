@@ -646,6 +646,28 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "127.0.0.1:30000")
         self.assertEqual(port_full, "127.0.0.1:30001")
 
+    def test_run_with_expose_ports(self):
+        # create one off container
+        self.base_dir = 'tests/fixtures/expose-composefile'
+        self.dispatch(['run', '-d', '--service-ports', 'simple'])
+        container = self.project.get_service('simple').containers(one_off=True)[0]
+
+        ports = container.ports
+        self.assertEqual(len(ports), 9)
+        # exposed ports are not mapped to host ports
+        assert ports['3000/tcp'] is None
+        assert ports['3001/tcp'] is None
+        assert ports['3001/udp'] is None
+        assert ports['3002/tcp'] is None
+        assert ports['3003/tcp'] is None
+        assert ports['3004/tcp'] is None
+        assert ports['3005/tcp'] is None
+        assert ports['3006/udp'] is None
+        assert ports['3007/udp'] is None
+
+        # close all one off containers we just created
+        container.stop()
+
     def test_run_with_custom_name(self):
         self.base_dir = 'tests/fixtures/environment-composefile'
         name = 'the-container-name'
