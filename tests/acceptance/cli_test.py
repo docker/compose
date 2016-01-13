@@ -103,8 +103,15 @@ class CLITestCase(DockerClientTestCase):
         if self.base_dir:
             self.project.kill()
             self.project.remove_stopped()
+
             for container in self.project.containers(stopped=True, one_off=True):
                 container.remove(force=True)
+
+            networks = self.client.networks()
+            for n in networks:
+                if n['Name'].startswith('{}_'.format(self.project.name)):
+                    self.client.remove_network(n['Name'])
+
         super(CLITestCase, self).tearDown()
 
     @property
@@ -357,12 +364,11 @@ class CLITestCase(DockerClientTestCase):
         services = self.project.get_services()
 
         networks = self.client.networks(names=[self.project.default_network.full_name])
-        for n in networks:
-            self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['Driver'], 'bridge')
 
         network = self.client.inspect_network(networks[0]['Id'])
+        # print self.project.services[0].containers()[0].get('NetworkSettings')
         self.assertEqual(len(network['Containers']), len(services))
 
         for service in services:
@@ -374,14 +380,52 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/networks'
         self.dispatch(['up', '-d'], None)
 
-        networks = self.client.networks(names=[
-            '{}_{}'.format(self.project.name, n)
-            for n in ['foo', 'bar']])
+        back_name = '{}_back'.format(self.project.name)
+        front_name = '{}_front'.format(self.project.name)
 
-        self.assertEqual(len(networks), 2)
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
 
-        for net in networks:
-            self.assertEqual(net['Driver'], 'bridge')
+        # Two networks were created: back and front
+        assert sorted(n['Name'] for n in networks) == [back_name, front_name]
+
+        back_network = [n for n in networks if n['Name'] == back_name][0]
+        front_network = [n for n in networks if n['Name'] == front_name][0]
+
+        web_container = self.project.get_service('web').containers()[0]
+        app_container = self.project.get_service('app').containers()[0]
+        db_container = self.project.get_service('db').containers()[0]
+
+        # db and app joined the back network
+        assert sorted(back_network['Containers']) == sorted([db_container.id, app_container.id])
+
+        # web and app joined the front network
+        assert sorted(front_network['Containers']) == sorted([web_container.id, app_container.id])
+
+    def test_up_missing_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+
+        result = self.dispatch(
+            ['-f', 'missing-network.yml', 'up', '-d'],
+            returncode=1)
+
+        assert 'Service "web" uses an undefined network "foo"' in result.stderr
+
+    def test_up_no_services(self):
+        self.base_dir = 'tests/fixtures/no-services'
+        self.dispatch(['up', '-d'], None)
+
+        network_names = [
+            n['Name'] for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        assert sorted(network_names) == [
+            '{}_{}'.format(self.project.name, name)
+            for name in ['bar', 'foo']
+        ]
 
     def test_up_with_links_is_invalid(self):
         self.base_dir = 'tests/fixtures/v2-simple'
@@ -400,9 +444,7 @@ class CLITestCase(DockerClientTestCase):
 
         # No network was created
         networks = self.client.networks(names=[self.project.default_network.full_name])
-        for n in networks:
-            self.addCleanup(self.client.remove_network, n['Id'])
-        self.assertEqual(len(networks), 0)
+        assert networks == []
 
         web = self.project.get_service('web')
         db = self.project.get_service('db')
@@ -731,8 +773,6 @@ class CLITestCase(DockerClientTestCase):
         service = self.project.get_service('simple')
         container, = service.containers(stopped=True, one_off=True)
         networks = self.client.networks(names=[self.project.default_network.full_name])
-        for n in networks:
-            self.addCleanup(self.client.remove_network, n['Id'])
         self.assertEqual(len(networks), 1)
         self.assertEqual(container.human_readable_command, u'true')
 
@@ -890,7 +930,7 @@ class CLITestCase(DockerClientTestCase):
     def test_restart(self):
         service = self.project.get_service('simple')
         container = service.create_container()
-        container.start()
+        service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
         self.dispatch(['restart', '-t', '1'], None)
         container.inspect()

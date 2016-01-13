@@ -11,6 +11,7 @@ from .config import ConfigurationError
 log = logging.getLogger(__name__)
 
 
+# TODO: support external networks
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None):
         self.client = client

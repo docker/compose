@@ -704,7 +704,7 @@ def run_one_off_container(container_options, project, service, options):
         **container_options)
 
     if options['-d']:
-        container.start()
+        service.start_container(container)
         print(container.name)
         return
 
@@ -716,6 +716,7 @@ def run_one_off_container(container_options, project, service, options):
     try:
         try:
             dockerpty.start(project.client, container.id, interactive=not options['-T'])
+            service.connect_container_to_networks(container)
             exit_code = container.wait()
         except signals.ShutdownException:
             project.client.stop(container.id)

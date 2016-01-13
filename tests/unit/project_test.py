@@ -12,8 +12,6 @@ from compose.config.types import VolumeFromSpec
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
-from compose.service import ContainerNet
-from compose.service import Net
 from compose.service import Service
 
 
@@ -412,29 +410,42 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(service.net.mode, 'container:' + container_name)
 
     def test_uses_default_network_true(self):
-        web = Service('web', project='test', image="alpine", net=Net('test_default'))
-        db = Service('web', project='test', image="alpine", net=Net('other'))
-        project = Project('test', [web, db], None)
+        project = Project.from_config(
+            name='test',
+            client=self.mock_client,
+            config_data=Config(
+                version=2,
+                services=[
+                    {
+                        'name': 'foo',
+                        'image': 'busybox:latest'
+                    },
+                ],
+                networks=None,
+                volumes=None,
+            ),
+        )
+
         assert project.uses_default_network()
 
-    def test_uses_default_network_custom_name(self):
-        web = Service('web', project='test', image="alpine", net=Net('other'))
-        project = Project('test', [web], None)
-        assert not project.uses_default_network()
+    def test_uses_default_network_false(self):
+        project = Project.from_config(
+            name='test',
+            client=self.mock_client,
+            config_data=Config(
+                version=2,
+                services=[
+                    {
+                        'name': 'foo',
+                        'image': 'busybox:latest',
+                        'networks': ['custom']
+                    },
+                ],
+                networks={'custom': {}},
+                volumes=None,
+            ),
+        )
 
-    def test_uses_default_network_host(self):
-        web = Service('web', project='test', image="alpine", net=Net('host'))
-        project = Project('test', [web], None)
-        assert not project.uses_default_network()
-
-    def test_uses_default_network_container(self):
-        container = mock.Mock(id='test')
-        web = Service(
-            'web',
-            project='test',
-            image="alpine",
-            net=ContainerNet(container))
-        project = Project('test', [web], None)
         assert not project.uses_default_network()
 
     def test_container_without_name(self):

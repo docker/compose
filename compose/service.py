@@ -116,6 +116,7 @@ class Service(object):
         links=None,
         volumes_from=None,
         net=None,
+        networks=None,
         **options
     ):
         self.name = name
@@ -125,6 +126,7 @@ class Service(object):
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.net = net or Net(None)
+        self.networks = networks or []
         self.options = options
 
     def containers(self, stopped=False, one_off=False, filters={}):
@@ -175,7 +177,7 @@ class Service(object):
 
         def create_and_start(service, number):
             container = service.create_container(number=number, quiet=True)
-            container.start()
+            service.start_container(container)
             return container
 
         running_containers = self.containers(stopped=False)
@@ -348,7 +350,7 @@ class Service(object):
                 container.attach_log_stream()
 
             if start:
-                container.start()
+                self.start_container(container)
 
             return [container]
 
@@ -406,7 +408,7 @@ class Service(object):
         if attach_logs:
             new_container.attach_log_stream()
         if start_new_container:
-            new_container.start()
+            self.start_container(new_container)
         container.remove()
         return new_container
 
@@ -415,8 +417,17 @@ class Service(object):
             log.info("Starting %s" % container.name)
             if attach_logs:
                 container.attach_log_stream()
-            container.start()
+            return self.start_container(container)
+
+    def start_container(self, container):
+        container.start()
+        self.connect_container_to_networks(container)
         return container
+
+    def connect_container_to_networks(self, container):
+        for network in self.networks:
+            log.debug('Connecting "{}" to "{}"'.format(container.name, network))
+            self.client.connect_container_to_network(container.id, network)
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():

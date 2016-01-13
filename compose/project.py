@@ -58,7 +58,21 @@ class Project(object):
         use_networking = (config_data.version and config_data.version >= 2)
         project = cls(name, [], client, use_networking=use_networking)
 
+        custom_networks = []
+        if config_data.networks:
+            for network_name, data in config_data.networks.items():
+                custom_networks.append(
+                    Network(
+                        client=client, project=name, name=network_name,
+                        driver=data.get('driver'), driver_opts=data.get('driver_opts')
+                    )
+                )
+
         for service_dict in config_data.services:
+            networks = project.get_networks(
+                service_dict,
+                custom_networks + [project.default_network])
+
             links = project.get_links(service_dict)
             volumes_from = get_volumes_from(project, service_dict)
             net = project.get_net(service_dict)
@@ -68,19 +82,15 @@ class Project(object):
                     client=client,
                     project=name,
                     use_networking=use_networking,
+                    networks=networks,
                     links=links,
                     net=net,
                     volumes_from=volumes_from,
                     **service_dict))
 
-        if config_data.networks:
-            for network_name, data in config_data.networks.items():
-                project.networks.append(
-                    Network(
-                        client=client, project=name, name=network_name,
-                        driver=data.get('driver'), driver_opts=data.get('driver_opts')
-                    )
-                )
+        project.networks += custom_networks
+        if project.uses_default_network():
+            project.networks.append(project.default_network)
 
         if config_data.volumes:
             for vol_name, data in config_data.volumes.items():
@@ -154,6 +164,18 @@ class Project(object):
             service.remove_duplicate_containers()
         return services
 
+    def get_networks(self, service_dict, network_definitions):
+        networks = []
+        for name in service_dict.pop('networks', ['default']):
+            matches = [n for n in network_definitions if n.name == name]
+            if matches:
+                networks.append(matches[0].full_name)
+            else:
+                raise ConfigurationError(
+                    'Service "{}" uses an undefined network "{}"'
+                    .format(service_dict['name'], name))
+        return networks
+
     def get_links(self, service_dict):
         links = []
         if 'links' in service_dict:
@@ -172,10 +194,11 @@ class Project(object):
         return links
 
     def get_net(self, service_dict):
+        if self.use_networking:
+            return Net(None)
+
         net = service_dict.pop('net', None)
         if not net:
-            if self.use_networking:
-                return Net(self.default_network.full_name)
             return Net(None)
 
         net_name = get_service_name_from_net(net)
@@ -282,6 +305,9 @@ class Project(object):
             volume.remove()
 
     def initialize_networks(self):
+        if not self.use_networking:
+            return
+
         networks = self.networks
         if self.uses_default_network():
             networks.append(self.default_network)
@@ -291,7 +317,7 @@ class Project(object):
 
     def uses_default_network(self):
         return any(
-            service.net.mode == self.default_network.full_name
+            self.default_network.full_name in service.networks
             for service in self.services
         )
 
