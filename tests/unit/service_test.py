@@ -70,7 +70,11 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'test',
             image='foo',
-            volumes_from=[VolumeFromSpec(mock.Mock(id=container_id, spec=Container), 'rw')])
+            volumes_from=[
+                VolumeFromSpec(
+                    mock.Mock(id=container_id, spec=Container),
+                    'rw',
+                    'container')])
 
         self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
 
@@ -79,7 +83,11 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'test',
             image='foo',
-            volumes_from=[VolumeFromSpec(mock.Mock(id=container_id, spec=Container), 'ro')])
+            volumes_from=[
+                VolumeFromSpec(
+                    mock.Mock(id=container_id, spec=Container),
+                    'ro',
+                    'container')])
 
         self.assertEqual(service._get_volumes_from(), [container_id + ':ro'])
 
@@ -90,7 +98,10 @@ class ServiceTest(unittest.TestCase):
             mock.Mock(id=container_id, spec=Container)
             for container_id in container_ids
         ]
-        service = Service('test', volumes_from=[VolumeFromSpec(from_service, 'rw')], image='foo')
+        service = Service(
+            'test',
+            volumes_from=[VolumeFromSpec(from_service, 'rw', 'service')],
+            image='foo')
 
         self.assertEqual(service._get_volumes_from(), [container_ids[0] + ":rw"])
 
@@ -102,7 +113,10 @@ class ServiceTest(unittest.TestCase):
                 mock.Mock(id=container_id.split(':')[0], spec=Container)
                 for container_id in container_ids
             ]
-            service = Service('test', volumes_from=[VolumeFromSpec(from_service, mode)], image='foo')
+            service = Service(
+                'test',
+                volumes_from=[VolumeFromSpec(from_service, mode, 'service')],
+                image='foo')
 
             self.assertEqual(service._get_volumes_from(), [container_ids[0]])
 
@@ -113,7 +127,10 @@ class ServiceTest(unittest.TestCase):
         from_service.create_container.return_value = mock.Mock(
             id=container_id,
             spec=Container)
-        service = Service('test', image='foo', volumes_from=[VolumeFromSpec(from_service, 'rw')])
+        service = Service(
+            'test',
+            image='foo',
+            volumes_from=[VolumeFromSpec(from_service, 'rw', 'service')])
 
         self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
         from_service.create_container.assert_called_once_with()
@@ -389,7 +406,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             net=ServiceNet(Service('other')),
             links=[(Service('one'), 'one')],
-            volumes_from=[VolumeFromSpec(Service('two'), 'rw')])
+            volumes_from=[VolumeFromSpec(Service('two'), 'rw', 'service')])
 
         config_dict = service.config_dict()
         expected = {

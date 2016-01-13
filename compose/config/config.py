@@ -292,7 +292,7 @@ def load_volumes(config_files):
 
 
 def load_services(working_dir, filename, service_configs, version):
-    def build_service(service_name, service_dict):
+    def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
             working_dir,
             filename,
@@ -305,13 +305,17 @@ def load_services(working_dir, filename, service_configs, version):
         validate_against_service_schema(service_dict, service_config.name, version)
         validate_paths(service_dict)
 
-        service_dict = finalize_service(service_config._replace(config=service_dict))
+        service_dict = finalize_service(
+            service_config._replace(config=service_dict),
+            service_names,
+            version)
         service_dict['name'] = service_config.name
         return service_dict
 
     def build_services(service_config):
+        service_names = service_config.keys()
         return sort_service_dicts([
-            build_service(name, service_dict)
+            build_service(name, service_dict, service_names)
             for name, service_dict in service_config.items()
         ])
 
@@ -504,7 +508,7 @@ def process_service(service_config):
     return service_dict
 
 
-def finalize_service(service_config):
+def finalize_service(service_config, service_names, version):
     service_dict = dict(service_config.config)
 
     if 'environment' in service_dict or 'env_file' in service_dict:
@@ -513,7 +517,9 @@ def finalize_service(service_config):
 
     if 'volumes_from' in service_dict:
         service_dict['volumes_from'] = [
-            VolumeFromSpec.parse(vf) for vf in service_dict['volumes_from']]
+            VolumeFromSpec.parse(vf, service_names, version)
+            for vf in service_dict['volumes_from']
+        ]
 
     if 'volumes' in service_dict:
         service_dict['volumes'] = [

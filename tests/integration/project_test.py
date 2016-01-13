@@ -81,7 +81,7 @@ class ProjectTest(DockerClientTestCase):
         )
         db = project.get_service('db')
         data = project.get_service('data')
-        self.assertEqual(db.volumes_from, [VolumeFromSpec(data, 'rw')])
+        self.assertEqual(db.volumes_from, [VolumeFromSpec(data, 'rw', 'service')])
 
     def test_volumes_from_container(self):
         data_container = Container.create(

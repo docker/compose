@@ -77,7 +77,7 @@ class SortServiceTest(unittest.TestCase):
             },
             {
                 'name': 'parent',
-                'volumes_from': [VolumeFromSpec('child', 'rw')]
+                'volumes_from': [VolumeFromSpec('child', 'rw', 'service')]
             },
             {
                 'links': ['parent'],
@@ -120,7 +120,7 @@ class SortServiceTest(unittest.TestCase):
             },
             {
                 'name': 'parent',
-                'volumes_from': [VolumeFromSpec('child', 'ro')]
+                'volumes_from': [VolumeFromSpec('child', 'ro', 'service')]
             },
             {
                 'name': 'child'
@@ -145,7 +145,7 @@ class SortServiceTest(unittest.TestCase):
             },
             {
                 'name': 'two',
-                'volumes_from': [VolumeFromSpec('one', 'rw')]
+                'volumes_from': [VolumeFromSpec('one', 'rw', 'service')]
             },
             {
                 'name': 'one'
