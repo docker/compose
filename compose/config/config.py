@@ -547,8 +547,15 @@ def merge_service_dicts(base, override, version):
                 base.get(field, default),
                 override.get(field, default))
 
-    merge_field('environment', merge_environment)
-    merge_field('labels', merge_labels)
+    def merge_mapping(mapping, parse_func):
+        if mapping in base or mapping in override:
+            merged = parse_func(base.get(mapping, None))
+            merged.update(parse_func(override.get(mapping, None)))
+            d[mapping] = merged
+
+    merge_mapping('environment', parse_environment)
+    merge_mapping('labels', parse_labels)
+    merge_mapping('ulimits', parse_ulimits)
 
     for field in ['volumes', 'devices']:
         merge_field(field, merge_path_mappings)
@@ -723,12 +730,6 @@ def join_path_mapping(pair):
         return ":".join((host, container))
 
 
-def merge_labels(base, override):
-    labels = parse_labels(base)
-    labels.update(parse_labels(override))
-    return labels
-
-
 def parse_labels(labels):
     if not labels:
         return {}
@@ -745,6 +746,14 @@ def split_label(label):
         return label.split('=', 1)
     else:
         return label, ''
+
+
+def parse_ulimits(ulimits):
+    if not ulimits:
+        return {}
+
+    if isinstance(ulimits, dict):
+        return dict(ulimits)
 
 
 def expand_path(working_dir, path):
