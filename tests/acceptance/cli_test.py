@@ -422,6 +422,30 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
+    def test_up_with_net_is_invalid(self):
+        self.base_dir = 'tests/fixtures/net-container'
+
+        result = self.dispatch(
+            ['-f', 'v2-invalid.yml', 'up', '-d'],
+            returncode=1)
+
+        # TODO: fix validation error messages for v2 files
+        # assert "Unsupported config option for service 'web': 'net'" in exc.exconly()
+        assert "Unsupported config option" in result.stderr
+
+    def test_up_with_net_v1(self):
+        self.base_dir = 'tests/fixtures/net-container'
+        self.dispatch(['up', '-d'], None)
+
+        bar = self.project.get_service('bar')
+        bar_container = bar.containers()[0]
+
+        foo = self.project.get_service('foo')
+        foo_container = foo.containers()[0]
+
+        assert foo_container.get('HostConfig.NetworkMode') == \
+            'container:{}'.format(bar_container.id)
+
     def test_up_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', '--no-deps', 'web'], None)
