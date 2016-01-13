@@ -41,6 +41,13 @@
             "^.+$": {"type": ["string", "number"]}
           },
           "additionalProperties": false
+        },
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "additionalProperties": false
         }
       }
     }

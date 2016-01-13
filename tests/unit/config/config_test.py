@@ -775,6 +775,24 @@ class ConfigTest(unittest.TestCase):
             'extends': {'service': 'foo'}
         }
 
+    def test_external_volume_config(self):
+        config_details = build_config_details({
+            'version': 2,
+            'services': {
+                'bogus': {'image': 'busybox'}
+            },
+            'volumes': {
+                'ext': {'external': True},
+                'ext2': {'external': {'name': 'aliased'}}
+            }
+        })
+        config_result = config.load(config_details)
+        volumes = config_result.volumes
+        assert 'ext' in volumes
+        assert volumes['ext']['external'] is True
+        assert 'ext2' in volumes
+        assert volumes['ext2']['external']['name'] == 'aliased'
+
 
 class PortsTest(unittest.TestCase):
     INVALID_PORTS_TYPES = [

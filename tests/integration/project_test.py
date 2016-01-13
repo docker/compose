@@ -677,7 +677,7 @@ class ProjectTest(DockerClientTestCase):
             vol_name
         ) in str(e.exception)
 
-    def test_initialize_volumes_user_created_volumes(self):
+    def test_initialize_volumes_external_volumes(self):
         # Use composetest_ prefix so it gets garbage-collected in tearDown()
         vol_name = 'composetest_{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
@@ -687,7 +687,7 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], volumes={vol_name: {'driver': 'local'}}
+            }], volumes={vol_name: {'external': True}}
         )
         project = Project.from_config(
             name='composetest',
@@ -697,3 +697,23 @@ class ProjectTest(DockerClientTestCase):
 
         with self.assertRaises(NotFound):
             self.client.inspect_volume(full_vol_name)
+
+    def test_initialize_volumes_inexistent_external_volume(self):
+        vol_name = '{0:x}'.format(random.getrandbits(32))
+
+        config_data = config.Config(
+            version=2, services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], volumes={vol_name: {'external': True}}
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        with self.assertRaises(config.ConfigurationError) as e:
+            project.initialize_volumes()
+        assert 'Volume {0} declared as external'.format(
+            vol_name
+        ) in str(e.exception)
