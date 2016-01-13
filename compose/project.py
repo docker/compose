@@ -238,15 +238,18 @@ class Project(object):
         try:
             for volume in self.volumes:
                 if volume.external:
-                    log.info(
+                    log.debug(
                         'Volume {0} declared as external. No new '
                         'volume will be created.'.format(volume.name)
                     )
                     if not volume.exists():
                         raise ConfigurationError(
-                            'Volume {0} declared as external, but could not be'
-                            ' found. Please create the volume manually and try'
-                            ' again.'.format(volume.full_name)
+                            'Volume {name} declared as external, but could'
+                            ' not be found. Please create the volume manually'
+                            ' using `{command}{name}` and try again.'.format(
+                                name=volume.full_name,
+                                command='docker volume create --name='
+                            )
                         )
                     continue
                 volume.create()
