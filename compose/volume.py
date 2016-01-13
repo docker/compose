@@ -6,18 +6,13 @@ from docker.errors import NotFound
 
 class Volume(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 external=False):
+                 external_name=None):
         self.client = client
         self.project = project
         self.name = name
         self.driver = driver
         self.driver_opts = driver_opts
-        self.external_name = None
-        if external:
-            if isinstance(external, dict):
-                self.external_name = external.get('name')
-            else:
-                self.external_name = self.name
+        self.external_name = external_name
 
     def create(self):
         return self.client.create_volume(

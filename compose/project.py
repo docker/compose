@@ -79,7 +79,7 @@ class Project(object):
                         client=client, project=name, name=vol_name,
                         driver=data.get('driver'),
                         driver_opts=data.get('driver_opts'),
-                        external=data.get('external', False)
+                        external_name=data.get('external_name')
                     )
                 )
         return project

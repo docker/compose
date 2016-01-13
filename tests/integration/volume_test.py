@@ -18,10 +18,12 @@ class VolumeTest(DockerClientTestCase):
             except DockerException:
                 pass
 
-    def create_volume(self, name, driver=None, opts=None, external=False):
+    def create_volume(self, name, driver=None, opts=None, external=None):
+        if external and isinstance(external, bool):
+            external = name
         vol = Volume(
             self.client, 'composetest', name, driver=driver, driver_opts=opts,
-            external=external
+            external_name=external
         )
         self.tmp_volumes.append(vol)
         return vol
@@ -66,7 +68,7 @@ class VolumeTest(DockerClientTestCase):
 
     def test_external_aliased_volume(self):
         alias_name = 'composetest_alias01'
-        vol = self.create_volume('volume01', external={'name': alias_name})
+        vol = self.create_volume('volume01', external=alias_name)
         assert vol.external is True
         assert vol.full_name == alias_name
         vol.create()
@@ -86,7 +88,7 @@ class VolumeTest(DockerClientTestCase):
         assert vol.exists() is True
 
     def test_exists_external_aliased(self):
-        vol = self.create_volume('volume01', external={'name': 'composetest_alias01'})
+        vol = self.create_volume('volume01', external='composetest_alias01')
         assert vol.exists() is False
         vol.create()
         assert vol.exists() is True

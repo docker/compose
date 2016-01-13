@@ -273,6 +273,13 @@ def load_volumes(config_files):
     for config_file in config_files:
         for name, volume_config in config_file.config.get('volumes', {}).items():
             volumes.update({name: volume_config})
+            external = volume_config.get('external')
+            if external:
+                if isinstance(external, dict):
+                    volume_config['external_name'] = external.get('name')
+                else:
+                    volume_config['external_name'] = name
+
     return volumes
 
 

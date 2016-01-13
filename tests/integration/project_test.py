@@ -687,7 +687,9 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], volumes={vol_name: {'external': True}}
+            }], volumes={
+                vol_name: {'external': True, 'external_name': vol_name}
+            }
         )
         project = Project.from_config(
             name='composetest',
@@ -706,7 +708,9 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top'
-            }], volumes={vol_name: {'external': True}}
+            }], volumes={
+                vol_name: {'external': True, 'external_name': vol_name}
+            }
         )
         project = Project.from_config(
             name='composetest',
