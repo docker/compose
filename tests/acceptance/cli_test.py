@@ -350,22 +350,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'simple_1  | simple' in result.stdout
         assert 'another_1 | another' in result.stdout
 
-    def test_up_without_networking(self):
-        self.base_dir = 'tests/fixtures/links-composefile'
-        self.dispatch(['up', '-d'], None)
-
-        networks = self.client.networks(names=[self.project.default_network.full_name])
-        self.assertEqual(len(networks), 0)
-
-        for service in self.project.get_services():
-            containers = service.containers()
-            self.assertEqual(len(containers), 1)
-            self.assertNotEqual(containers[0].get('Config.Hostname'), service.name)
-
-        web_container = self.project.get_service('web').containers()[0]
-        self.assertTrue(web_container.get('HostConfig.Links'))
-
-    def test_up_with_networking(self):
+    def test_up(self):
         self.base_dir = 'tests/fixtures/v2-simple'
         self.dispatch(['up', '-d'], None)
 
@@ -384,9 +369,6 @@ class CLITestCase(DockerClientTestCase):
             containers = service.containers()
             self.assertEqual(len(containers), 1)
             self.assertIn(containers[0].id, network['Containers'])
-
-        web_container = self.project.get_service('simple').containers()[0]
-        self.assertFalse(web_container.get('HostConfig.Links'))
 
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'
@@ -415,12 +397,25 @@ class CLITestCase(DockerClientTestCase):
     def test_up_with_links_v1(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'web'], None)
+
+        # No network was created
+        networks = self.client.networks(names=[self.project.default_network.full_name])
+        for n in networks:
+            self.addCleanup(self.client.remove_network, n['Id'])
+        self.assertEqual(len(networks), 0)
+
         web = self.project.get_service('web')
         db = self.project.get_service('db')
         console = self.project.get_service('console')
+
+        # console was not started
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
+
+        # web has links
+        web_container = web.containers()[0]
+        self.assertTrue(web_container.get('HostConfig.Links'))
 
     def test_up_with_net_is_invalid(self):
         self.base_dir = 'tests/fixtures/net-container'
