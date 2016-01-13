@@ -793,6 +793,19 @@ class ConfigTest(unittest.TestCase):
         assert 'ext2' in volumes
         assert volumes['ext2']['external']['name'] == 'aliased'
 
+    def test_external_volume_invalid_config(self):
+        config_details = build_config_details({
+            'version': 2,
+            'services': {
+                'bogus': {'image': 'busybox'}
+            },
+            'volumes': {
+                'ext': {'external': True, 'driver': 'foo'}
+            }
+        })
+        with self.assertRaises(ConfigurationError):
+            config.load(config_details)
+
 
 class PortsTest(unittest.TestCase):
     INVALID_PORTS_TYPES = [
