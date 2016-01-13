@@ -454,14 +454,14 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
         os.kill(proc.pid, signal.SIGINT)
-        wait_on_condition(ContainerCountCondition(self.project, 0))
+        wait_on_condition(ContainerCountCondition(self.project, 0), timeout=30)
 
     def test_up_handles_sigterm(self):
         proc = start_process(self.base_dir, ['up', '-t', '2'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
         os.kill(proc.pid, signal.SIGTERM)
-        wait_on_condition(ContainerCountCondition(self.project, 0))
+        wait_on_condition(ContainerCountCondition(self.project, 0), timeout=30)
 
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
