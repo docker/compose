@@ -739,6 +739,18 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
+    def test_stop_signal(self):
+        self.base_dir = 'tests/fixtures/stop-signal-composefile'
+        self.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.dispatch(['stop', '-t', '1'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
+        self.assertEqual(service.containers(stopped=True)[0].exit_code, 0)
+
     def test_start_no_containers(self):
         result = self.dispatch(['start'], returncode=1)
         assert 'No containers to start' in result.stderr

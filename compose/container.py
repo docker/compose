@@ -108,6 +108,10 @@ class Container(object):
         return self.get('Config.Labels') or {}
 
     @property
+    def stop_signal(self):
+        return self.get('Config.StopSignal')
+
+    @property
     def log_config(self):
         return self.get('HostConfig.LogConfig') or None
 
@@ -131,6 +135,10 @@ class Container(object):
     @property
     def environment(self):
         return dict(var.split("=", 1) for var in self.get('Config.Env') or [])
+
+    @property
+    def exit_code(self):
+        return self.get('State.ExitCode')
 
     @property
     def is_running(self):
