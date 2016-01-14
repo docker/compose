@@ -10,8 +10,8 @@ import subprocess
 import time
 from collections import namedtuple
 from operator import attrgetter
-from textwrap import dedent
 
+import yaml
 from docker import errors
 
 from .. import mock
@@ -148,8 +148,9 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = None
 
     def test_config_list_services(self):
+        self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
-        assert set(result.stdout.rstrip().split('\n')) == {'simple', 'another'}
+        assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
     def test_config_quiet_with_error(self):
         self.base_dir = None
@@ -160,20 +161,32 @@ class CLITestCase(DockerClientTestCase):
         assert "'notaservice' doesn't have any configuration" in result.stderr
 
     def test_config_quiet(self):
+        self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '-q']).stdout == ''
 
     def test_config_default(self):
+        self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
-        assert dedent("""
-            simple:
-              command: top
-              image: busybox:latest
-        """).lstrip() in result.stdout
-        assert dedent("""
-            another:
-              command: top
-              image: busybox:latest
-        """).lstrip() in result.stdout
+        # assert there are no python objects encoded in the output
+        assert '!!' not in result.stdout
+
+        output = yaml.load(result.stdout)
+        expected = {
+            'version': 2,
+            'volumes': {'data': {'driver': 'local'}},
+            'networks': {'front': {}},
+            'services': {
+                'web': {
+                    'build': os.path.abspath(self.base_dir),
+                    'networks': ['front', 'default'],
+                },
+                'other': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                },
+            },
+        }
+        assert output == expected
 
     def test_ps(self):
         self.project.get_service('simple').create_container()

@@ -14,7 +14,11 @@ services:
     networks:
       - front
       - default
+    volumes_from:
+      - other
 
   other:
     image: busybox:latest
     command: top
+    volumes:
+      - /data

@@ -217,7 +217,7 @@ class TopLevelCommand(DocoptCommand):
 
         compose_config = dict(
             (service.pop('name'), service) for service in compose_config.services)
-        print(yaml.dump(
+        print(yaml.safe_dump(
             compose_config,
             default_flow_style=False,
             indent=2,
