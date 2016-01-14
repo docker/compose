@@ -686,8 +686,8 @@ class ConfigTest(unittest.TestCase):
             )
         )
 
-        self.assertTrue(mock_logging.warn.called)
-        self.assertTrue(expected_warning_msg in mock_logging.warn.call_args[0][0])
+        assert mock_logging.warn.called
+        assert expected_warning_msg in mock_logging.warn.call_args[0][0]
 
     def test_config_valid_environment_dict_key_contains_dashes(self):
         services = config.load(
@@ -1664,15 +1664,13 @@ class ExtendsTest(unittest.TestCase):
             load_from_filename('tests/fixtures/extends/invalid-net.yml')
 
     @mock.patch.dict(os.environ)
-    def test_valid_interpolation_in_extended_service(self):
-        os.environ.update(
-            HOSTNAME_VALUE="penguin",
-        )
+    def test_load_config_runs_interpolation_in_extended_service(self):
+        os.environ.update(HOSTNAME_VALUE="penguin")
         expected_interpolated_value = "host-penguin"
-
-        service_dicts = load_from_filename('tests/fixtures/extends/valid-interpolation.yml')
+        service_dicts = load_from_filename(
+            'tests/fixtures/extends/valid-interpolation.yml')
         for service in service_dicts:
-            self.assertTrue(service['hostname'], expected_interpolated_value)
+            assert service['hostname'] == expected_interpolated_value
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     def test_volume_path(self):
