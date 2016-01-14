@@ -544,6 +544,13 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
+    def test_load_errors_on_uppercase_with_no_image(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details({
+                'Foo': {'build': '.'},
+            }, 'tests/fixtures/build-ctx'))
+            assert "Service 'Foo' contains uppercase characters" in exc.exconly()
+
     def test_invalid_config_build_and_image_specified(self):
         expected_error_msg = "Service 'foo' has both an image and build path specified."
         with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):

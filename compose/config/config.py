@@ -6,6 +6,7 @@ import functools
 import logging
 import operator
 import os
+import string
 import sys
 from collections import namedtuple
 
@@ -312,15 +313,11 @@ def load_services(working_dir, filename, service_configs, version):
         resolver = ServiceExtendsResolver(service_config, version)
         service_dict = process_service(resolver.run())
 
-        # TODO: move to validate_service()
-        validate_against_service_schema(service_dict, service_config.name, version)
-        validate_paths(service_dict)
-
+        validate_service(service_dict, service_config.name, version)
         service_dict = finalize_service(
             service_config._replace(config=service_dict),
             service_names,
             version)
-        service_dict['name'] = service_config.name
         return service_dict
 
     def build_services(service_config):
@@ -494,7 +491,21 @@ def validate_ulimits(ulimit_config):
                     "than 'hard' value".format(ulimit_config))
 
 
-# TODO: rename to normalize_service
+def validate_service(service_dict, service_name, version):
+    validate_against_service_schema(service_dict, service_name, version)
+    validate_paths(service_dict)
+
+    if 'ulimits' in service_dict:
+        validate_ulimits(service_dict['ulimits'])
+
+    if not service_dict.get('image') and has_uppercase(service_name):
+        raise ConfigurationError(
+            "Service '{name}' contains uppercase characters which are not valid "
+            "as part of an image name. Either use a lowercase service name or "
+            "use the `image` field to set a custom name for the service image."
+            .format(name=service_name))
+
+
 def process_service(service_config):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
@@ -525,10 +536,6 @@ def process_service(service_config):
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
-    # TODO: move to a validate_service()
-    if 'ulimits' in service_dict:
-        validate_ulimits(service_dict['ulimits'])
-
     return service_dict
 
 
@@ -554,6 +561,7 @@ def finalize_service(service_config, service_names, version):
 
     normalize_build(service_dict, service_config.working_dir)
 
+    service_dict['name'] = service_config.name
     return normalize_v1_service_format(service_dict)
 
 
@@ -859,6 +867,10 @@ def to_list(value):
         return [value]
     else:
         return value
+
+
+def has_uppercase(name):
+    return any(char in string.ascii_uppercase for char in name)
 
 
 def load_yaml(filename):
