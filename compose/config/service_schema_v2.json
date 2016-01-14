@@ -15,7 +15,20 @@
       "type": "object",
 
       "properties": {
-        "build": {"type": "string"},
+        "build": {
+          "oneOf": [
+            {"type": "string"},
+            {
+              "type": "object",
+              "properties": {
+                "context": {"type": "string"},
+                "dockerfile": {"type": "string"},
+                "args": {"$ref": "#/definitions/list_or_dict"}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cgroup_parent": {"type": "string"},
@@ -32,7 +45,6 @@
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
-        "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
         "entrypoint": {
           "oneOf": [
