@@ -112,6 +112,23 @@ class ConfigTest(unittest.TestCase):
             }
         })
 
+    def test_named_volume_config_empty(self):
+        config_details = build_config_details({
+            'version': 2,
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': {
+                'simple': None,
+                'other': {},
+            }
+        })
+        config_result = config.load(config_details)
+        volumes = config_result.volumes
+        assert 'simple' in volumes
+        assert volumes['simple'] == {}
+        assert volumes['other'] == {}
+
     def test_load_service_with_name_version(self):
         config_data = config.load(
             build_config_details({
