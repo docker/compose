@@ -133,12 +133,8 @@ class CLITestCase(DockerClientTestCase):
         self.client.exec_start(exc)
         return self.client.exec_inspect(exc)['ExitCode']
 
-    def lookup(self, container, service_name):
-        exit_code = self.execute(container, [
-            "nslookup",
-            "{}_{}_1".format(self.project.name, service_name)
-        ])
-        return exit_code == 0
+    def lookup(self, container, hostname):
+        return self.execute(container, ["nslookup", hostname]) == 0
 
     def test_help(self):
         self.base_dir = 'tests/fixtures/no-composefile'
@@ -413,6 +409,9 @@ class CLITestCase(DockerClientTestCase):
 
             networks = list(container.get('NetworkSettings.Networks'))
             self.assertEqual(networks, [network['Name']])
+
+            for service in services:
+                assert self.lookup(container, service.name)
 
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'

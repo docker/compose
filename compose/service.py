@@ -427,7 +427,9 @@ class Service(object):
     def connect_container_to_networks(self, container):
         for network in self.networks:
             log.debug('Connecting "{}" to "{}"'.format(container.name, network))
-            self.client.connect_container_to_network(container.id, network)
+            self.client.connect_container_to_network(
+                container.id, network,
+                aliases=[self.name])
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
@@ -597,6 +599,8 @@ class Service(object):
             override_options,
             one_off=one_off)
 
+        container_options['networking_config'] = self._get_container_networking_config()
+
         return container_options
 
     def _get_container_host_config(self, override_options, one_off=False):
@@ -630,6 +634,12 @@ class Service(object):
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
         )
+
+    def _get_container_networking_config(self):
+        return self.client.create_networking_config({
+            network_name: self.client.create_endpoint_config(aliases=[self.name])
+            for network_name in self.networks
+        })
 
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
