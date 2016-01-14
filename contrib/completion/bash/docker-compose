@@ -368,7 +368,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --help --no-build --no-color --no-deps --no-recreate --force-recreate --timeout -t" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit -d --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
