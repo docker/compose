@@ -172,13 +172,16 @@ class Project(object):
     def get_networks(self, service_dict, network_definitions):
         networks = []
         for name in service_dict.pop('networks', ['default']):
-            matches = [n for n in network_definitions if n.name == name]
-            if matches:
-                networks.append(matches[0].full_name)
+            if name in ['bridge', 'host']:
+                networks.append(name)
             else:
-                raise ConfigurationError(
-                    'Service "{}" uses an undefined network "{}"'
-                    .format(service_dict['name'], name))
+                matches = [n for n in network_definitions if n.name == name]
+                if matches:
+                    networks.append(matches[0].full_name)
+                else:
+                    raise ConfigurationError(
+                        'Service "{}" uses an undefined network "{}"'
+                        .format(service_dict['name'], name))
         return networks
 
     def get_links(self, service_dict):

@@ -437,6 +437,25 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Service "web" uses an undefined network "foo"' in result.stderr
 
+    def test_up_predefined_networks(self):
+        filename = 'predefined-networks.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+        assert not networks
+
+        for name in ['bridge', 'host', 'none']:
+            container = self.project.get_service(name).containers()[0]
+            assert container.get('NetworkSettings.Networks').keys() == [name]
+            assert container.get('HostConfig.NetworkMode') == name
+
     def test_up_no_services(self):
         self.base_dir = 'tests/fixtures/no-services'
         self.dispatch(['up', '-d'], None)
