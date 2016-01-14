@@ -34,7 +34,12 @@
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
-        "entrypoint": {"$ref": "#/definitions/string_or_list"},
+        "entrypoint": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
         "env_file": {"$ref": "#/definitions/string_or_list"},
         "environment": {"$ref": "#/definitions/list_or_dict"},
 
