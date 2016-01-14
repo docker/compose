@@ -6,6 +6,7 @@ import functools
 import logging
 import operator
 import os
+import string
 import sys
 from collections import namedtuple
 
@@ -497,6 +498,13 @@ def validate_service(service_dict, service_name, version):
     if 'ulimits' in service_dict:
         validate_ulimits(service_dict['ulimits'])
 
+    if not service_dict.get('image') and has_uppercase(service_name):
+        raise ConfigurationError(
+            "Service '{name}' contains uppercase characters which are not valid "
+            "as part of an image name. Either use a lowercase service name or "
+            "use the `image` field to set a custom name for the service image."
+            .format(name=service_name))
+
 
 def process_service(service_config):
     working_dir = service_config.working_dir
@@ -859,6 +867,10 @@ def to_list(value):
         return [value]
     else:
         return value
+
+
+def has_uppercase(name):
+    return any(char in string.ascii_uppercase for char in name)
 
 
 def load_yaml(filename):
