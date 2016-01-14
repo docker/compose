@@ -139,14 +139,16 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return {} if self.version == 1 else self.config.get('volumes', {})
 
 
-class Config(namedtuple('_Config', 'version services volumes')):
+class Config(namedtuple('_Config', 'version services volumes networks')):
     """
     :param version: configuration version
     :type  version: int
     :param services: List of service description dictionaries
     :type  services: :class:`list`
-    :param volumes: List of volume description dictionaries
-    :type  volumes: :class:`list`
+    :param volumes: Dictionary mapping volume names to description dictionaries
+    :type  volumes: :class:`dict`
+    :param networks: Dictionary mapping network names to description dictionaries
+    :type  networks: :class:`dict`
     """
 
 
@@ -256,39 +258,44 @@ def load(config_details):
     config_details = config_details._replace(config_files=processed_files)
 
     main_file = config_details.config_files[0]
-    volumes = load_volumes(config_details.config_files)
+    volumes = load_mapping(config_details.config_files, 'volumes', 'Volume')
+    networks = load_mapping(config_details.config_files, 'networks', 'Network')
     service_dicts = load_services(
         config_details.working_dir,
         main_file.filename,
         [file.get_service_dicts() for file in config_details.config_files],
         main_file.version)
-    return Config(main_file.version, service_dicts, volumes)
+    return Config(main_file.version, service_dicts, volumes, networks)
 
 
-def load_volumes(config_files):
-    volumes = {}
+def load_mapping(config_files, key, entity_type):
+    mapping = {}
+
     for config_file in config_files:
-        for name, volume_config in config_file.get_volumes().items():
-            volumes[name] = volume_config or {}
-            if not volume_config:
+        for name, config in config_file.config.get(key, {}).items():
+            mapping[name] = config or {}
+            if not config:
                 continue
 
-            external = volume_config.get('external')
+            external = config.get('external')
             if external:
-                if len(volume_config.keys()) > 1:
+                if len(config.keys()) > 1:
                     raise ConfigurationError(
-                        'Volume {0} declared as external but specifies'
-                        ' additional attributes ({1}). '.format(
+                        '{} {} declared as external but specifies'
+                        ' additional attributes ({}). '.format(
+                            entity_type,
                             name,
-                            ', '.join([k for k in volume_config.keys() if k != 'external'])
+                            ', '.join([k for k in config.keys() if k != 'external'])
                         )
                     )
                 if isinstance(external, dict):
-                    volume_config['external_name'] = external.get('name')
+                    config['external_name'] = external.get('name')
                 else:
-                    volume_config['external_name'] = name
+                    config['external_name'] = name
 
-    return volumes
+            mapping[name] = config
+
+    return mapping
 
 
 def load_services(working_dir, filename, service_configs, version):
