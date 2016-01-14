@@ -272,9 +272,21 @@ def load_volumes(config_files):
     volumes = {}
     for config_file in config_files:
         for name, volume_config in config_file.config.get('volumes', {}).items():
+            if volume_config is None:
+                volumes.update({name: {}})
+                continue
+
             volumes.update({name: volume_config})
             external = volume_config.get('external')
             if external:
+                if len(volume_config.keys()) > 1:
+                    raise ConfigurationError(
+                        'Volume {0} declared as external but specifies'
+                        ' additional attributes ({1}). '.format(
+                            name,
+                            ', '.join([k for k in volume_config.keys() if k != 'external'])
+                        )
+                    )
                 if isinstance(external, dict):
                     volume_config['external_name'] = external.get('name')
                 else:
