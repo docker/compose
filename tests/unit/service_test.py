@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
+from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
@@ -16,6 +17,7 @@ from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import ContainerNet
 from compose.service import get_container_data_volumes
+from compose.service import ImageType
 from compose.service import merge_volume_bindings
 from compose.service import NeedsBuildError
 from compose.service import Net
@@ -421,6 +423,38 @@ class ServiceTest(unittest.TestCase):
             'volumes_from': [],
         }
         self.assertEqual(config_dict, expected)
+
+    def test_remove_image_none(self):
+        web = Service('web', image='example', client=self.mock_client)
+        assert not web.remove_image(ImageType.none)
+        assert not self.mock_client.remove_image.called
+
+    def test_remove_image_local_with_image_name_doesnt_remove(self):
+        web = Service('web', image='example', client=self.mock_client)
+        assert not web.remove_image(ImageType.local)
+        assert not self.mock_client.remove_image.called
+
+    def test_remove_image_local_without_image_name_does_remove(self):
+        web = Service('web', build='.', client=self.mock_client)
+        assert web.remove_image(ImageType.local)
+        self.mock_client.remove_image.assert_called_once_with(web.image_name)
+
+    def test_remove_image_all_does_remove(self):
+        web = Service('web', image='example', client=self.mock_client)
+        assert web.remove_image(ImageType.all)
+        self.mock_client.remove_image.assert_called_once_with(web.image_name)
+
+    def test_remove_image_with_error(self):
+        self.mock_client.remove_image.side_effect = error = APIError(
+            message="testing",
+            response={},
+            explanation="Boom")
+
+        web = Service('web', image='example', client=self.mock_client)
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            assert not web.remove_image(ImageType.all)
+        mock_log.error.assert_called_once_with(
+            "Failed to remove image for service %s: %s", web.name, error)
 
     def test_specifies_host_port_with_no_ports(self):
         service = Service(

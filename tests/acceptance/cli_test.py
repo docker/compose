@@ -314,6 +314,22 @@ class CLITestCase(DockerClientTestCase):
             ['create', '--force-recreate', '--no-recreate'],
             returncode=1)
 
+    def test_down_invalid_rmi_flag(self):
+        result = self.dispatch(['down', '--rmi', 'bogus'], returncode=1)
+        assert '--rmi flag must be' in result.stderr
+
+    def test_down(self):
+        self.base_dir = 'tests/fixtures/shutdown'
+        self.dispatch(['up', '-d'])
+        wait_on_condition(ContainerCountCondition(self.project, 1))
+
+        result = self.dispatch(['down', '--rmi=local', '--volumes'])
+        assert 'Stopping shutdown_web_1' in result.stderr
+        assert 'Removing shutdown_web_1' in result.stderr
+        assert 'Removing volume shutdown_data' in result.stderr
+        assert 'Removing image shutdown_web' in result.stderr
+        assert 'Removing network shutdown_default' in result.stderr
+
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
         service = self.project.get_service('simple')

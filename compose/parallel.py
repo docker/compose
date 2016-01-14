@@ -24,7 +24,7 @@ def parallel_execute(objects, func, index_func, msg):
     object we give it.
     """
     objects = list(objects)
-    stream = get_output_stream(sys.stdout)
+    stream = get_output_stream(sys.stderr)
     writer = ParallelStreamWriter(stream, msg)
 
     for obj in objects:

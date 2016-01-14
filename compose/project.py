@@ -270,6 +270,24 @@ class Project(object):
                     )
                 )
 
+    def down(self, remove_image_type, include_volumes):
+        self.stop()
+        self.remove_stopped(v=include_volumes)
+        self.remove_network()
+
+        if include_volumes:
+            self.remove_volumes()
+
+        self.remove_images(remove_image_type)
+
+    def remove_images(self, remove_image_type):
+        for service in self.get_services():
+            service.remove_image(remove_image_type)
+
+    def remove_volumes(self):
+        for volume in self.volumes:
+            volume.remove()
+
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
         parallel.parallel_restart(containers, options)
@@ -419,8 +437,11 @@ class Project(object):
             self.client.create_network(self.default_network_name, driver=self.network_driver)
 
     def remove_network(self):
+        if not self.use_networking:
+            return
         network = self.get_network()
         if network:
+            log.info("Removing network %s", self.default_network_name)
             self.client.remove_network(network['Id'])
 
     def uses_default_network(self):
