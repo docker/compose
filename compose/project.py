@@ -72,7 +72,7 @@ class Project(object):
 
         for service_dict in config_data.services:
             if use_networking:
-                networks = project.get_networks(
+                networks = get_networks(
                     service_dict,
                     custom_networks + [project.default_network])
                 net = Net(networks[0]) if networks else Net("none")
@@ -170,21 +170,6 @@ class Project(object):
         for service in services:
             service.remove_duplicate_containers()
         return services
-
-    def get_networks(self, service_dict, network_definitions):
-        networks = []
-        for name in service_dict.pop('networks', ['default']):
-            if name in ['bridge', 'host']:
-                networks.append(name)
-            else:
-                matches = [n for n in network_definitions if n.name == name]
-                if matches:
-                    networks.append(matches[0].full_name)
-                else:
-                    raise ConfigurationError(
-                        'Service "{}" uses an undefined network "{}"'
-                        .format(service_dict['name'], name))
-        return networks
 
     def get_links(self, service_dict):
         links = []
@@ -472,6 +457,22 @@ class Project(object):
 
         dep_services.append(service)
         return acc + dep_services
+
+
+def get_networks(service_dict, network_definitions):
+    networks = []
+    for name in service_dict.pop('networks', ['default']):
+        if name in ['bridge', 'host']:
+            networks.append(name)
+        else:
+            matches = [n for n in network_definitions if n.name == name]
+            if matches:
+                networks.append(matches[0].full_name)
+            else:
+                raise ConfigurationError(
+                    'Service "{}" uses an undefined network "{}"'
+                    .format(service_dict['name'], name))
+    return networks
 
 
 def get_volumes_from(project, service_dict):
