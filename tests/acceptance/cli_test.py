@@ -126,6 +126,20 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, project_options + options)
         return wait_on_process(proc, returncode=returncode)
 
+    def execute(self, container, cmd):
+        # Remove once Hijack and CloseNotifier sign a peace treaty
+        self.client.close()
+        exc = self.client.exec_create(container.id, cmd)
+        self.client.exec_start(exc)
+        return self.client.exec_inspect(exc)['ExitCode']
+
+    def lookup(self, container, service_name):
+        exit_code = self.execute(container, [
+            "nslookup",
+            "{}_{}_1".format(self.project.name, service_name)
+        ])
+        return exit_code == 0
+
     def test_help(self):
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'up'], returncode=1)
@@ -403,6 +417,13 @@ class CLITestCase(DockerClientTestCase):
 
         # web and app joined the front network
         assert sorted(front_network['Containers']) == sorted([web_container.id, app_container.id])
+
+        # web can see app but not db
+        assert self.lookup(web_container, "app")
+        assert not self.lookup(web_container, "db")
+
+        # app can see db
+        assert self.lookup(app_container, "db")
 
     def test_up_missing_network(self):
         self.base_dir = 'tests/fixtures/networks'
