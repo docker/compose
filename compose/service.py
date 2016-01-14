@@ -619,7 +619,8 @@ class Service(object):
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
 
-        path = self.options['build']
+        build_opts = self.options.get('build', {})
+        path = build_opts.get('context')
         # python2 os.path() doesn't support unicode, so we need to encode it to
         # a byte string
         if not six.PY3:
@@ -633,7 +634,8 @@ class Service(object):
             forcerm=force_rm,
             pull=pull,
             nocache=no_cache,
-            dockerfile=self.options.get('dockerfile', None),
+            dockerfile=build_opts.get('dockerfile', None),
+            buildargs=build_opts.get('args', None),
         )
 
         try:

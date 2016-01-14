@@ -12,6 +12,7 @@ import py
 import pytest
 
 from compose.config import config
+from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.errors import ConfigurationError
 from compose.config.types import VolumeSpec
@@ -267,7 +268,7 @@ class ConfigTest(unittest.TestCase):
         expected = [
             {
                 'name': 'web',
-                'build': os.path.abspath('/'),
+                'build': {'context': os.path.abspath('/')},
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
                 'links': ['db'],
             },
@@ -397,6 +398,59 @@ class ConfigTest(unittest.TestCase):
         assert services[1]['name'] == 'db'
         assert services[2]['name'] == 'web'
 
+    def test_config_build_configuration(self):
+        service = config.load(
+            build_config_details(
+                {'web': {
+                    'build': '.',
+                    'dockerfile': 'Dockerfile-alt'
+                }},
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services
+        self.assertTrue('context' in service[0]['build'])
+        self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
+
+    def test_config_build_configuration_v2(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': 2,
+                    'services': {
+                        'web': {
+                            'build': '.',
+                            'dockerfile': 'Dockerfile-alt'
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services
+        self.assertTrue('context' in service[0]['build'])
+        self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
+
+        service = config.load(
+            build_config_details(
+                {
+                    'version': 2,
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt'
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services
+        self.assertTrue('context' in service[0]['build'])
+        self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
+
     def test_load_with_multiple_files_v2(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -428,7 +482,7 @@ class ConfigTest(unittest.TestCase):
         expected = [
             {
                 'name': 'web',
-                'build': os.path.abspath('/'),
+                'build': {'context': os.path.abspath('/')},
                 'image': 'example/web',
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
             },
@@ -1140,7 +1194,7 @@ class BuildOrImageMergeTest(unittest.TestCase):
 
         self.assertEqual(
             config.merge_service_dicts({'image': 'redis'}, {'build': '.'}, V1),
-            {'build': '.'},
+            {'build': '.'}
         )
 
 
@@ -1369,6 +1423,24 @@ class EnvTest(unittest.TestCase):
                 'ENV_DEF': 'E3',
                 'NO_DEF': ''
             },
+        )
+
+    @mock.patch.dict(os.environ)
+    def test_resolve_build_args(self):
+        os.environ['env_arg'] = 'value2'
+
+        build = {
+            'context': '.',
+            'args': {
+                'arg1': 'value1',
+                'empty_arg': '',
+                'env_arg': None,
+                'no_env': None
+            }
+        }
+        self.assertEqual(
+            resolve_build_args(build),
+            {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': ''},
         )
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
@@ -1856,7 +1928,7 @@ class BuildPathTest(unittest.TestCase):
 
     def test_from_file(self):
         service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
-        self.assertEquals(service_dict, [{'name': 'foo', 'build': self.abs_context_path}])
+        self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
 
     def test_valid_url_in_build_path(self):
         valid_urls = [
@@ -1871,7 +1943,7 @@ class BuildPathTest(unittest.TestCase):
             service_dict = config.load(build_config_details({
                 'validurl': {'build': valid_url},
             }, '.', None)).services
-            assert service_dict[0]['build'] == valid_url
+            assert service_dict[0]['build'] == {'context': valid_url}
 
     def test_invalid_url_in_build_path(self):
         invalid_urls = [

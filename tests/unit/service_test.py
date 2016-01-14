@@ -336,7 +336,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(parse_repository_tag("url:5000/repo@sha256:digest"), ("url:5000/repo", "sha256:digest", "@"))
 
     def test_create_container_with_build(self):
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = [
             NoSuchImageError,
             {'Id': 'abc123'},
@@ -355,17 +355,18 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
+            buildargs=None,
         )
 
     def test_create_container_no_build(self):
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
 
         service.create_container(do_build=False)
         self.assertFalse(self.mock_client.build.called)
 
     def test_create_container_no_build_but_needs_build(self):
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = NoSuchImageError
         with self.assertRaises(NeedsBuildError):
             service.create_container(do_build=False)
@@ -375,7 +376,7 @@ class ServiceTest(unittest.TestCase):
             b'{"stream": "Successfully built 12345"}',
         ]
 
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         service.build()
 
         self.assertEqual(self.mock_client.build.call_count, 1)
