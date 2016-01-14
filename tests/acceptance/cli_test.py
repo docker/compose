@@ -177,12 +177,16 @@ class CLITestCase(DockerClientTestCase):
             'networks': {'front': {}},
             'services': {
                 'web': {
-                    'build': os.path.abspath(self.base_dir),
+                    'build': {
+                        'context': os.path.abspath(self.base_dir),
+                    },
                     'networks': ['front', 'default'],
+                    'volumes_from': ['service:other:rw'],
                 },
                 'other': {
                     'image': 'busybox:latest',
                     'command': 'top',
+                    'volumes': ['/data:rw'],
                 },
             },
         }
