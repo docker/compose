@@ -22,11 +22,13 @@ def test_parse_extra_hosts_list():
     assert parse_extra_hosts([
         "www.example.com: 192.168.0.17",
         "static.example.com:192.168.0.19",
-        "api.example.com: 192.168.0.18"
+        "api.example.com: 192.168.0.18",
+        "v6.example.com: ::1"
     ]) == {
         'www.example.com': '192.168.0.17',
         'static.example.com': '192.168.0.19',
-        'api.example.com': '192.168.0.18'
+        'api.example.com': '192.168.0.18',
+        'v6.example.com': '::1'
     }
 
 

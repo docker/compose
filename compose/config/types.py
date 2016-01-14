@@ -96,7 +96,7 @@ def parse_extra_hosts(extra_hosts_config):
         extra_hosts_dict = {}
         for extra_hosts_line in extra_hosts_config:
             # TODO: validate string contains ':' ?
-            host, ip = extra_hosts_line.split(':')
+            host, ip = extra_hosts_line.split(':', 1)
             extra_hosts_dict[host.strip()] = ip.strip()
         return extra_hosts_dict
 
