@@ -228,18 +228,6 @@ Custom DNS search domains. Can be a single value or a list.
       - dc1.example.com
       - dc2.example.com
 
-### dockerfile
-
-Alternate Dockerfile.
-
-Compose will use an alternate file to build with. A build path must also be
-specified using the `build` key.
-
-    build: /path/to/build/dir
-    dockerfile: Dockerfile-alternate
-
-Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
-
 ### entrypoint
 
 Override the default entrypoint.

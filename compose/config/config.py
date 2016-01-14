@@ -457,8 +457,7 @@ def resolve_environment(service_dict):
 
 
 def resolve_build_args(build):
-    args = {}
-    args.update(parse_build_arguments(build.get('args')))
+    args = parse_build_arguments(build.get('args'))
     return dict(resolve_env_var(k, v) for k, v in six.iteritems(args))
 
 
@@ -699,6 +698,14 @@ parse_environment = functools.partial(parse_dict_or_list, split_env, 'environmen
 parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
 
 
+def parse_ulimits(ulimits):
+    if not ulimits:
+        return {}
+
+    if isinstance(ulimits, dict):
+        return dict(ulimits)
+
+
 def resolve_env_var(key, val):
     if val is not None:
         return key, val
@@ -743,13 +750,9 @@ def resolve_volume_path(working_dir, volume):
 
 
 def normalize_build(service_dict, working_dir):
-    build = {}
-
-    # supported in V1 only
-    if 'dockerfile' in service_dict:
-        build['dockerfile'] = service_dict.pop('dockerfile')
 
     if 'build' in service_dict:
+        build = {}
         # Shortcut where specifying a string is treated as the build context
         if isinstance(service_dict['build'], six.string_types):
             build['context'] = service_dict.pop('build')
@@ -758,7 +761,6 @@ def normalize_build(service_dict, working_dir):
             if 'args' in build:
                 build['args'] = resolve_build_args(build)
 
-    if build:
         service_dict['build'] = build
 
 
@@ -833,32 +835,6 @@ def join_path_mapping(pair):
         return container
     else:
         return ":".join((host, container))
-
-
-def parse_labels(labels):
-    if not labels:
-        return {}
-
-    if isinstance(labels, list):
-        return dict(split_label(e) for e in labels)
-
-    if isinstance(labels, dict):
-        return dict(labels)
-
-
-def split_label(label):
-    if '=' in label:
-        return label.split('=', 1)
-    else:
-        return label, ''
-
-
-def parse_ulimits(ulimits):
-    if not ulimits:
-        return {}
-
-    if isinstance(ulimits, dict):
-        return dict(ulimits)
 
 
 def expand_path(working_dir, path):
