@@ -562,6 +562,12 @@ def normalize_v1_service_format(service_dict):
             service_dict['logging']['options'] = service_dict['log_opt']
             del service_dict['log_opt']
 
+    if 'dockerfile' in service_dict:
+        service_dict['build'] = service_dict.get('build', {})
+        service_dict['build'].update({
+            'dockerfile': service_dict.pop('dockerfile')
+        })
+
     return service_dict
 
 

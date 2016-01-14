@@ -430,23 +430,35 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
 
     def test_config_build_configuration_v2(self):
-        service = config.load(
-            build_config_details(
-                {
-                    'version': 2,
-                    'services': {
-                        'web': {
-                            'build': '.',
-                            'dockerfile': 'Dockerfile-alt'
+        # service.dockerfile is invalid in v2
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details(
+                    {
+                        'version': 2,
+                        'services': {
+                            'web': {
+                                'build': '.',
+                                'dockerfile': 'Dockerfile-alt'
+                            }
                         }
-                    }
-                },
-                'tests/fixtures/extends',
-                'filename.yml'
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
             )
-        ).services
-        self.assertTrue('context' in service[0]['build'])
-        self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
+
+        service = config.load(
+            build_config_details({
+                'version': 2,
+                'services': {
+                    'web': {
+                        'build': '.'
+                    }
+                }
+            }, 'tests/fixtures/extends', 'filename.yml')
+        ).services[0]
+        self.assertTrue('context' in service['build'])
 
         service = config.load(
             build_config_details(
