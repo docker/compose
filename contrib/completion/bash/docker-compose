@@ -129,6 +129,22 @@ _docker_compose_docker_compose() {
 }
 
 
+_docker_compose_down() {
+	case "$prev" in
+		--rmi)
+			COMPREPLY=( $( compgen -W "all local" -- "$cur" ) )
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help --rmi --volumes -v" -- "$cur" ) )
+			;;
+	esac
+}
+
+
 _docker_compose_events() {
 	case "$prev" in
 		--json)
@@ -393,6 +409,7 @@ _docker_compose() {
 	local commands=(
 		build
 		config
+		down
 		events
 		help
 		kill
