@@ -390,7 +390,7 @@ class CLITestCase(DockerClientTestCase):
             container = containers[0]
             self.assertIn(container.id, network['Containers'])
 
-            networks = container.get('NetworkSettings.Networks').keys()
+            networks = list(container.get('NetworkSettings.Networks'))
             self.assertEqual(networks, [network['Name']])
 
     def test_up_with_networks(self):
@@ -453,7 +453,7 @@ class CLITestCase(DockerClientTestCase):
 
         for name in ['bridge', 'host', 'none']:
             container = self.project.get_service(name).containers()[0]
-            assert container.get('NetworkSettings.Networks').keys() == [name]
+            assert list(container.get('NetworkSettings.Networks')) == [name]
             assert container.get('HostConfig.NetworkMode') == name
 
     def test_up_external_networks(self):
@@ -477,7 +477,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['-f', filename, 'up', '-d'])
         container = self.project.containers()[0]
-        assert sorted(container.get('NetworkSettings.Networks').keys()) == sorted(network_names)
+        assert sorted(list(container.get('NetworkSettings.Networks'))) == sorted(network_names)
 
     def test_up_no_services(self):
         self.base_dir = 'tests/fixtures/no-services'
