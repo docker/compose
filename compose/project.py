@@ -64,7 +64,9 @@ class Project(object):
                 custom_networks.append(
                     Network(
                         client=client, project=name, name=network_name,
-                        driver=data.get('driver'), driver_opts=data.get('driver_opts')
+                        driver=data.get('driver'),
+                        driver_opts=data.get('driver_opts'),
+                        external_name=data.get('external_name'),
                     )
                 )
 

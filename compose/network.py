@@ -11,16 +11,35 @@ from .config import ConfigurationError
 log = logging.getLogger(__name__)
 
 
-# TODO: support external networks
 class Network(object):
-    def __init__(self, client, project, name, driver=None, driver_opts=None):
+    def __init__(self, client, project, name, driver=None, driver_opts=None,
+                 external_name=None):
         self.client = client
         self.project = project
         self.name = name
         self.driver = driver
         self.driver_opts = driver_opts
+        self.external_name = external_name
 
     def ensure(self):
+        if self.external_name:
+            try:
+                self.inspect()
+                log.debug(
+                    'Network {0} declared as external. No new '
+                    'network will be created.'.format(self.name)
+                )
+            except NotFound:
+                raise ConfigurationError(
+                    'Network {name} declared as external, but could'
+                    ' not be found. Please create the network manually'
+                    ' using `{command} {name}` and try again.'.format(
+                        name=self.external_name,
+                        command='docker network create'
+                    )
+                )
+            return
+
         try:
             data = self.inspect()
             if self.driver and data['Driver'] != self.driver:
@@ -55,4 +74,6 @@ class Network(object):
 
     @property
     def full_name(self):
+        if self.external_name:
+            return self.external_name
         return '{0}_{1}'.format(self.project, self.name)

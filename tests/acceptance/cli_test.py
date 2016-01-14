@@ -456,6 +456,29 @@ class CLITestCase(DockerClientTestCase):
             assert container.get('NetworkSettings.Networks').keys() == [name]
             assert container.get('HostConfig.NetworkMode') == name
 
+    def test_up_external_networks(self):
+        filename = 'external-networks.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        result = self.dispatch(['-f', filename, 'up', '-d'], returncode=1)
+        assert 'declared as external, but could not be found' in result.stderr
+
+        networks = [
+            n['Name'] for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+        assert not networks
+
+        network_names = ['{}_{}'.format(self.project.name, n) for n in ['foo', 'bar']]
+        for name in network_names:
+            self.client.create_network(name)
+
+        self.dispatch(['-f', filename, 'up', '-d'])
+        container = self.project.containers()[0]
+        assert sorted(container.get('NetworkSettings.Networks').keys()) == sorted(network_names)
+
     def test_up_no_services(self):
         self.base_dir = 'tests/fixtures/no-services'
         self.dispatch(['up', '-d'], None)
