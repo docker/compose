@@ -300,11 +300,7 @@ class Project(object):
         if not self.use_networking:
             return
 
-        networks = self.networks
-        if self.uses_default_network():
-            networks.append(self.default_network)
-
-        for network in networks:
+        for network in self.networks:
             network.ensure()
 
     def uses_default_network(self):
