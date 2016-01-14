@@ -32,17 +32,32 @@
   "definitions": {
     "volume": {
       "id": "#/definitions/volume",
-      "type": "object",
-      "properties": {
-        "driver": {"type": "string"},
-        "driver_opts": {
-          "type": "object",
-          "patternProperties": {
-            "^.+$": {"type": ["string", "number"]}
-          },
-          "additionalProperties": false
-        }
-      }
+      "oneOf": [{
+        "type": "object",
+        "properties": {
+          "driver": {"type": "string"},
+          "driver_opts": {
+            "type": "object",
+            "patternProperties": {
+              "^.+$": {"type": ["string", "number"]}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }, {
+        "type": "object",
+        "properties": {
+          "external": {
+            "type": ["boolean", "object"],
+            "properties": {
+              "name": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }]
     }
   },
   "additionalProperties": false

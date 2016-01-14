@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import random
 
 import py
+from docker.errors import NotFound
 
 from .testcases import DockerClientTestCase
 from compose.config import config
@@ -624,7 +625,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
-    def test_project_up_invalid_volume_driver(self):
+    def test_initialize_volumes_invalid_volume_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
 
         config_data = config.Config(
@@ -642,7 +643,7 @@ class ProjectTest(DockerClientTestCase):
         with self.assertRaises(config.ConfigurationError):
             project.initialize_volumes()
 
-    def test_project_up_updated_driver(self):
+    def test_initialize_volumes_updated_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
 
@@ -673,5 +674,50 @@ class ProjectTest(DockerClientTestCase):
         with self.assertRaises(config.ConfigurationError) as e:
             project.initialize_volumes()
         assert 'Configuration for volume {0} specifies driver smb'.format(
+            vol_name
+        ) in str(e.exception)
+
+    def test_initialize_volumes_external_volumes(self):
+        # Use composetest_ prefix so it gets garbage-collected in tearDown()
+        vol_name = 'composetest_{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
+        self.client.create_volume(vol_name)
+        config_data = config.Config(
+            version=2, services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], volumes={
+                vol_name: {'external': True, 'external_name': vol_name}
+            }
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.initialize_volumes()
+
+        with self.assertRaises(NotFound):
+            self.client.inspect_volume(full_vol_name)
+
+    def test_initialize_volumes_inexistent_external_volume(self):
+        vol_name = '{0:x}'.format(random.getrandbits(32))
+
+        config_data = config.Config(
+            version=2, services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }], volumes={
+                vol_name: {'external': True, 'external_name': vol_name}
+            }
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        with self.assertRaises(config.ConfigurationError) as e:
+            project.initialize_volumes()
+        assert 'Volume {0} declared as external'.format(
             vol_name
         ) in str(e.exception)

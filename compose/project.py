@@ -77,7 +77,9 @@ class Project(object):
                 project.volumes.append(
                     Volume(
                         client=client, project=name, name=vol_name,
-                        driver=data.get('driver'), driver_opts=data.get('driver_opts')
+                        driver=data.get('driver'),
+                        driver_opts=data.get('driver_opts'),
+                        external_name=data.get('external_name')
                     )
                 )
         return project
@@ -235,6 +237,21 @@ class Project(object):
     def initialize_volumes(self):
         try:
             for volume in self.volumes:
+                if volume.external:
+                    log.debug(
+                        'Volume {0} declared as external. No new '
+                        'volume will be created.'.format(volume.name)
+                    )
+                    if not volume.exists():
+                        raise ConfigurationError(
+                            'Volume {name} declared as external, but could'
+                            ' not be found. Please create the volume manually'
+                            ' using `{command}{name}` and try again.'.format(
+                                name=volume.full_name,
+                                command='docker volume create --name='
+                            )
+                        )
+                    continue
                 volume.create()
         except NotFound:
             raise ConfigurationError(
