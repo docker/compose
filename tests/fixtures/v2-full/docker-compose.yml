@@ -1,0 +1,20 @@
+
+version: 2
+
+volumes:
+  data:
+    driver: local
+
+networks:
+  front: {}
+
+services:
+  web:
+    build: .
+    networks:
+      - front
+      - default
+
+  other:
+    image: busybox:latest
+    command: top

@@ -340,16 +340,20 @@ class CLITestCase(DockerClientTestCase):
         assert '--rmi flag must be' in result.stderr
 
     def test_down(self):
-        self.base_dir = 'tests/fixtures/shutdown'
+        self.base_dir = 'tests/fixtures/v2-full'
         self.dispatch(['up', '-d'])
-        wait_on_condition(ContainerCountCondition(self.project, 1))
+        wait_on_condition(ContainerCountCondition(self.project, 2))
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
-        assert 'Stopping shutdown_web_1' in result.stderr
-        assert 'Removing shutdown_web_1' in result.stderr
-        assert 'Removing volume shutdown_data' in result.stderr
-        assert 'Removing image shutdown_web' in result.stderr
-        assert 'Removing network shutdown_default' in result.stderr
+        assert 'Stopping v2full_web_1' in result.stderr
+        assert 'Stopping v2full_other_1' in result.stderr
+        assert 'Removing v2full_web_1' in result.stderr
+        assert 'Removing v2full_other_1' in result.stderr
+        assert 'Removing volume v2full_data' in result.stderr
+        assert 'Removing image v2full_web' in result.stderr
+        assert 'Removing image busybox' not in result.stderr
+        assert 'Removing network v2full_default' in result.stderr
+        assert 'Removing network v2full_front' in result.stderr
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])

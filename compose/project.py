@@ -275,7 +275,7 @@ class Project(object):
     def down(self, remove_image_type, include_volumes):
         self.stop()
         self.remove_stopped(v=include_volumes)
-        self.remove_default_network()
+        self.remove_networks()
 
         if include_volumes:
             self.remove_volumes()
@@ -286,11 +286,11 @@ class Project(object):
         for service in self.get_services():
             service.remove_image(remove_image_type)
 
-    def remove_default_network(self):
+    def remove_networks(self):
         if not self.use_networking:
             return
-        if self.uses_default_network():
-            self.default_network.remove()
+        for network in self.networks:
+            network.remove()
 
     def remove_volumes(self):
         for volume in self.volumes:

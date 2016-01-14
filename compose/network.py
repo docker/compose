@@ -65,7 +65,10 @@ class Network(object):
             )
 
     def remove(self):
-        # TODO: don't remove external networks
+        if self.external_name:
+            log.info("Network %s is external, skipping", self.full_name)
+            return
+
         log.info("Removing network {}".format(self.full_name))
         self.client.remove_network(self.full_name)
 
