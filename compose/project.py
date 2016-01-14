@@ -69,13 +69,18 @@ class Project(object):
                 )
 
         for service_dict in config_data.services:
-            networks = project.get_networks(
-                service_dict,
-                custom_networks + [project.default_network])
+            if use_networking:
+                networks = project.get_networks(
+                    service_dict,
+                    custom_networks + [project.default_network])
+                net = Net(networks[0]) if networks else Net("none")
+                links = []
+            else:
+                networks = []
+                net = project.get_net(service_dict)
+                links = project.get_links(service_dict)
 
-            links = project.get_links(service_dict)
             volumes_from = get_volumes_from(project, service_dict)
-            net = project.get_net(service_dict)
 
             project.services.append(
                 Service(
@@ -194,9 +199,6 @@ class Project(object):
         return links
 
     def get_net(self, service_dict):
-        if self.use_networking:
-            return Net(None)
-
         net = service_dict.pop('net', None)
         if not net:
             return Net(None)

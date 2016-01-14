@@ -382,13 +382,16 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(networks[0]['Driver'], 'bridge')
 
         network = self.client.inspect_network(networks[0]['Id'])
-        # print self.project.services[0].containers()[0].get('NetworkSettings')
-        self.assertEqual(len(network['Containers']), len(services))
 
         for service in services:
             containers = service.containers()
             self.assertEqual(len(containers), 1)
-            self.assertIn(containers[0].id, network['Containers'])
+
+            container = containers[0]
+            self.assertIn(container.id, network['Containers'])
+
+            networks = container.get('NetworkSettings.Networks').keys()
+            self.assertEqual(networks, [network['Name']])
 
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'
