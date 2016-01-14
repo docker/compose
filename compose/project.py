@@ -60,7 +60,7 @@ class Project(object):
 
         for service_dict in config_data.services:
             links = project.get_links(service_dict)
-            volumes_from = project.get_volumes_from(service_dict)
+            volumes_from = get_volumes_from(project, service_dict)
             net = project.get_net(service_dict)
 
             project.services.append(
@@ -161,28 +161,6 @@ class Project(object):
                         'exist.' % (service_dict['name'], service_name))
             del service_dict['links']
         return links
-
-    def get_volumes_from(self, service_dict):
-        volumes_from = []
-        if 'volumes_from' in service_dict:
-            for volume_from_spec in service_dict.get('volumes_from', []):
-                # Get service
-                try:
-                    service = self.get_service(volume_from_spec.source)
-                    volume_from_spec = volume_from_spec._replace(source=service)
-                except NoSuchService:
-                    try:
-                        container = Container.from_id(self.client, volume_from_spec.source)
-                        volume_from_spec = volume_from_spec._replace(source=container)
-                    except APIError:
-                        raise ConfigurationError(
-                            'Service "%s" mounts volumes from "%s", which is '
-                            'not the name of a service or container.' % (
-                                service_dict['name'],
-                                volume_from_spec.source))
-                volumes_from.append(volume_from_spec)
-            del service_dict['volumes_from']
-        return volumes_from
 
     def get_net(self, service_dict):
         net = service_dict.pop('net', None)
@@ -484,6 +462,34 @@ def remove_links(service_dicts):
 
     for s in services_with_links:
         del s['links']
+
+
+def get_volumes_from(project, service_dict):
+    volumes_from = service_dict.pop('volumes_from', None)
+    if not volumes_from:
+        return []
+
+    def build_volume_from(spec):
+        if spec.type == 'service':
+            try:
+                return spec._replace(source=project.get_service(spec.source))
+            except NoSuchService:
+                pass
+
+        if spec.type == 'container':
+            try:
+                container = Container.from_id(project.client, spec.source)
+                return spec._replace(source=container)
+            except APIError:
+                pass
+
+        raise ConfigurationError(
+            "Service \"{}\" mounts volumes from \"{}\", which is not the name "
+            "of a service or container.".format(
+                service_dict['name'],
+                spec.source))
+
+    return [build_volume_from(vf) for vf in volumes_from]
 
 
 class NoSuchService(Exception):

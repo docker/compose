@@ -19,7 +19,7 @@ from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
 
-DEFAULT_VERSION = 2
+DEFAULT_VERSION = V2 = 2
 V1 = 1
 
 

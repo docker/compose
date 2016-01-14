@@ -105,8 +105,7 @@ def validate_top_level_service_objects(filename, service_dicts):
 def validate_top_level_object(config_file):
     if not isinstance(config_file.config, dict):
         raise ConfigurationError(
-            "Top level object in '{}' needs to be an object not '{}'. Check "
-            "that you have defined a service at the top level.".format(
+            "Top level object in '{}' needs to be an object not '{}'.".format(
                 config_file.filename,
                 type(config_file.config)))
 
@@ -291,13 +290,13 @@ def process_errors(errors, service_name=None):
     return '\n'.join(format_error_message(error, service_name) for error in errors)
 
 
-def validate_against_fields_schema(config, filename, version):
-    schema_filename = "fields_schema_v{0}.json".format(version)
+def validate_against_fields_schema(config_file):
+    schema_filename = "fields_schema_v{0}.json".format(config_file.version)
     _validate_against_schema(
-        config,
+        config_file.config,
         schema_filename,
         format_checker=["ports", "expose", "bool-value-in-mapping"],
-        filename=filename)
+        filename=config_file.filename)
 
 
 def validate_against_service_schema(config, service_name, version):

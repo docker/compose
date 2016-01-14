@@ -165,10 +165,10 @@ class ProjectTest(unittest.TestCase):
             {
                 'name': 'test',
                 'image': 'busybox:latest',
-                'volumes_from': [VolumeFromSpec('aaa', 'rw')]
+                'volumes_from': [VolumeFromSpec('aaa', 'rw', 'container')]
             }
         ], None), self.mock_client)
-        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_id + ":rw"])
+        assert project.get_service('test')._get_volumes_from() == [container_id + ":rw"]
 
     def test_use_volumes_from_service_no_container(self):
         container_name = 'test_vol_1'
@@ -188,10 +188,10 @@ class ProjectTest(unittest.TestCase):
             {
                 'name': 'test',
                 'image': 'busybox:latest',
-                'volumes_from': [VolumeFromSpec('vol', 'rw')]
+                'volumes_from': [VolumeFromSpec('vol', 'rw', 'service')]
             }
         ], None), self.mock_client)
-        self.assertEqual(project.get_service('test')._get_volumes_from(), [container_name + ":rw"])
+        assert project.get_service('test')._get_volumes_from() == [container_name + ":rw"]
 
     def test_use_volumes_from_service_container(self):
         container_ids = ['aabbccddee', '12345']
@@ -204,16 +204,17 @@ class ProjectTest(unittest.TestCase):
             {
                 'name': 'test',
                 'image': 'busybox:latest',
-                'volumes_from': [VolumeFromSpec('vol', 'rw')]
+                'volumes_from': [VolumeFromSpec('vol', 'rw', 'service')]
             }
         ], None), None)
         with mock.patch.object(Service, 'containers') as mock_return:
             mock_return.return_value = [
                 mock.Mock(id=container_id, spec=Container)
                 for container_id in container_ids]
-            self.assertEqual(
-                project.get_service('test')._get_volumes_from(),
-                [container_ids[0] + ':rw'])
+            assert (
+                project.get_service('test')._get_volumes_from() ==
+                [container_ids[0] + ':rw']
+            )
 
     def test_events(self):
         services = [Service(name='web'), Service(name='db')]

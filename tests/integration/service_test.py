@@ -224,8 +224,8 @@ class ServiceTest(DockerClientTestCase):
         host_service = self.create_service(
             'host',
             volumes_from=[
-                VolumeFromSpec(volume_service, 'rw'),
-                VolumeFromSpec(volume_container_2, 'rw')
+                VolumeFromSpec(volume_service, 'rw', 'service'),
+                VolumeFromSpec(volume_container_2, 'rw', 'container')
             ]
         )
         host_container = host_service.create_container()
