@@ -9,7 +9,6 @@ import sys
 from inspect import getdoc
 from operator import attrgetter
 
-import yaml
 from docker.errors import APIError
 from requests.exceptions import ReadTimeout
 
@@ -18,6 +17,7 @@ from .. import __version__
 from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -215,13 +215,7 @@ class TopLevelCommand(DocoptCommand):
             print('\n'.join(service['name'] for service in compose_config.services))
             return
 
-        compose_config = dict(
-            (service.pop('name'), service) for service in compose_config.services)
-        print(yaml.dump(
-            compose_config,
-            default_flow_style=False,
-            indent=2,
-            width=80))
+        print(serialize_config(compose_config))
 
     def create(self, project, options):
         """

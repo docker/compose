@@ -10,8 +10,8 @@ import subprocess
 import time
 from collections import namedtuple
 from operator import attrgetter
-from textwrap import dedent
 
+import yaml
 from docker import errors
 
 from .. import mock
@@ -148,8 +148,9 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = None
 
     def test_config_list_services(self):
+        self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
-        assert set(result.stdout.rstrip().split('\n')) == {'simple', 'another'}
+        assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
     def test_config_quiet_with_error(self):
         self.base_dir = None
@@ -160,20 +161,36 @@ class CLITestCase(DockerClientTestCase):
         assert "'notaservice' doesn't have any configuration" in result.stderr
 
     def test_config_quiet(self):
+        self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '-q']).stdout == ''
 
     def test_config_default(self):
+        self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
-        assert dedent("""
-            simple:
-              command: top
-              image: busybox:latest
-        """).lstrip() in result.stdout
-        assert dedent("""
-            another:
-              command: top
-              image: busybox:latest
-        """).lstrip() in result.stdout
+        # assert there are no python objects encoded in the output
+        assert '!!' not in result.stdout
+
+        output = yaml.load(result.stdout)
+        expected = {
+            'version': 2,
+            'volumes': {'data': {'driver': 'local'}},
+            'networks': {'front': {}},
+            'services': {
+                'web': {
+                    'build': {
+                        'context': os.path.abspath(self.base_dir),
+                    },
+                    'networks': ['front', 'default'],
+                    'volumes_from': ['service:other:rw'],
+                },
+                'other': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'volumes': ['/data:rw'],
+                },
+            },
+        }
+        assert output == expected
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
@@ -340,16 +357,20 @@ class CLITestCase(DockerClientTestCase):
         assert '--rmi flag must be' in result.stderr
 
     def test_down(self):
-        self.base_dir = 'tests/fixtures/shutdown'
+        self.base_dir = 'tests/fixtures/v2-full'
         self.dispatch(['up', '-d'])
-        wait_on_condition(ContainerCountCondition(self.project, 1))
+        wait_on_condition(ContainerCountCondition(self.project, 2))
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
-        assert 'Stopping shutdown_web_1' in result.stderr
-        assert 'Removing shutdown_web_1' in result.stderr
-        assert 'Removing volume shutdown_data' in result.stderr
-        assert 'Removing image shutdown_web' in result.stderr
-        assert 'Removing network shutdown_default' in result.stderr
+        assert 'Stopping v2full_web_1' in result.stderr
+        assert 'Stopping v2full_other_1' in result.stderr
+        assert 'Removing v2full_web_1' in result.stderr
+        assert 'Removing v2full_other_1' in result.stderr
+        assert 'Removing volume v2full_data' in result.stderr
+        assert 'Removing image v2full_web' in result.stderr
+        assert 'Removing image busybox' not in result.stderr
+        assert 'Removing network v2full_default' in result.stderr
+        assert 'Removing network v2full_front' in result.stderr
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])

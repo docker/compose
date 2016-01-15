@@ -460,7 +460,8 @@ class Service(object):
             'links': self.get_link_names(),
             'net': self.net.id,
             'volumes_from': [
-                (v.source.name, v.mode) for v in self.volumes_from if isinstance(v.source, Service)
+                (v.source.name, v.mode)
+                for v in self.volumes_from if isinstance(v.source, Service)
             ],
         }
 
@@ -519,12 +520,7 @@ class Service(object):
         return links
 
     def _get_volumes_from(self):
-        volumes_from = []
-        for volume_from_spec in self.volumes_from:
-            volumes = build_volume_from(volume_from_spec)
-            volumes_from.extend(volumes)
-
-        return volumes_from
+        return [build_volume_from(spec) for spec in self.volumes_from]
 
     def _get_container_create_options(
             self,
@@ -927,7 +923,7 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
 
 
 def build_volume_binding(volume_spec):
-    return volume_spec.internal, "{}:{}:{}".format(*volume_spec)
+    return volume_spec.internal, volume_spec.repr()
 
 
 def build_volume_from(volume_from_spec):
@@ -938,12 +934,14 @@ def build_volume_from(volume_from_spec):
     if isinstance(volume_from_spec.source, Service):
         containers = volume_from_spec.source.containers(stopped=True)
         if not containers:
-            return ["{}:{}".format(volume_from_spec.source.create_container().id, volume_from_spec.mode)]
+            return "{}:{}".format(
+                volume_from_spec.source.create_container().id,
+                volume_from_spec.mode)
 
         container = containers[0]
-        return ["{}:{}".format(container.id, volume_from_spec.mode)]
+        return "{}:{}".format(container.id, volume_from_spec.mode)
     elif isinstance(volume_from_spec.source, Container):
-        return ["{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)]
+        return "{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)
 
 
 # Labels
