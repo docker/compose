@@ -1,4 +1,0 @@
-#!/bin/sh
-set -ex
-docker build -t docker-compose .
-exec docker run -v /var/run/docker.sock:/var/run/docker.sock -v `pwd`:/code -ti --rm --entrypoint bash docker-compose
