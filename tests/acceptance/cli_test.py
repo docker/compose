@@ -48,7 +48,7 @@ def wait_on_process(proc, returncode=0):
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
-def wait_on_condition(condition, delay=0.1, timeout=20):
+def wait_on_condition(condition, delay=0.1, timeout=40):
     start_time = time.time()
     while not condition():
         if time.time() - start_time > timeout:
@@ -648,14 +648,14 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
         os.kill(proc.pid, signal.SIGINT)
-        wait_on_condition(ContainerCountCondition(self.project, 0), timeout=30)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
 
     def test_up_handles_sigterm(self):
         proc = start_process(self.base_dir, ['up', '-t', '2'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
         os.kill(proc.pid, signal.SIGTERM)
-        wait_on_condition(ContainerCountCondition(self.project, 0), timeout=30)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
 
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
