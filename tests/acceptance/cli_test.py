@@ -20,6 +20,7 @@ from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
+from tests.integration.testcases import v2_only
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -388,6 +389,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'simple_1  | simple' in result.stdout
         assert 'another_1 | another' in result.stdout
 
+    @v2_only()
     def test_up(self):
         self.base_dir = 'tests/fixtures/v2-simple'
         self.dispatch(['up', '-d'], None)
@@ -413,6 +415,7 @@ class CLITestCase(DockerClientTestCase):
             for service in services:
                 assert self.lookup(container, service.name)
 
+    @v2_only()
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'
         self.dispatch(['up', '-d'], None)
@@ -448,6 +451,7 @@ class CLITestCase(DockerClientTestCase):
         # app can see db
         assert self.lookup(app_container, "db")
 
+    @v2_only()
     def test_up_missing_network(self):
         self.base_dir = 'tests/fixtures/networks'
 
@@ -457,6 +461,7 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Service "web" uses an undefined network "foo"' in result.stderr
 
+    @v2_only()
     def test_up_predefined_networks(self):
         filename = 'predefined-networks.yml'
 
@@ -476,6 +481,7 @@ class CLITestCase(DockerClientTestCase):
             assert list(container.get('NetworkSettings.Networks')) == [name]
             assert container.get('HostConfig.NetworkMode') == name
 
+    @v2_only()
     def test_up_external_networks(self):
         filename = 'external-networks.yml'
 
@@ -499,6 +505,7 @@ class CLITestCase(DockerClientTestCase):
         container = self.project.containers()[0]
         assert sorted(list(container.get('NetworkSettings.Networks'))) == sorted(network_names)
 
+    @v2_only()
     def test_up_no_services(self):
         self.base_dir = 'tests/fixtures/no-services'
         self.dispatch(['up', '-d'], None)
@@ -513,6 +520,7 @@ class CLITestCase(DockerClientTestCase):
             for name in ['bar', 'foo']
         ]
 
+    @v2_only()
     def test_up_with_links_is_invalid(self):
         self.base_dir = 'tests/fixtures/v2-simple'
 
@@ -853,6 +861,7 @@ class CLITestCase(DockerClientTestCase):
         container, = service.containers(stopped=True, one_off=True)
         self.assertEqual(container.name, name)
 
+    @v2_only()
     def test_run_with_networking(self):
         self.base_dir = 'tests/fixtures/v2-simple'
         self.dispatch(['run', 'simple', 'true'], None)

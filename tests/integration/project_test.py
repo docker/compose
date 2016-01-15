@@ -14,6 +14,7 @@ from compose.const import LABEL_PROJECT
 from compose.container import Container
 from compose.project import Project
 from compose.service import ConvergenceStrategy
+from tests.integration.testcases import v2_only
 
 
 def build_service_dicts(service_config):
@@ -482,6 +483,7 @@ class ProjectTest(DockerClientTestCase):
         service = project.get_service('web')
         self.assertEqual(len(service.containers()), 1)
 
+    @v2_only()
     def test_project_up_networks(self):
         config_data = config.Config(
             version=2,
@@ -514,6 +516,7 @@ class ProjectTest(DockerClientTestCase):
         foo_data = self.client.inspect_network('composetest_foo')
         self.assertEqual(foo_data['Driver'], 'bridge')
 
+    @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
@@ -539,6 +542,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
+    @v2_only()
     def test_project_up_logging_with_multiple_files(self):
         base_file = config.ConfigFile(
             'base.yml',
@@ -590,6 +594,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertTrue(log_config)
         self.assertEqual(log_config.get('Type'), 'none')
 
+    @v2_only()
     def test_initialize_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
@@ -614,6 +619,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
+    @v2_only()
     def test_project_up_implicit_volume_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
@@ -638,6 +644,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
 
+    @v2_only()
     def test_initialize_volumes_invalid_volume_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
 
@@ -659,6 +666,7 @@ class ProjectTest(DockerClientTestCase):
         with self.assertRaises(config.ConfigurationError):
             project.initialize_volumes()
 
+    @v2_only()
     def test_initialize_volumes_updated_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
@@ -696,6 +704,7 @@ class ProjectTest(DockerClientTestCase):
             vol_name
         ) in str(e.exception)
 
+    @v2_only()
     def test_initialize_volumes_external_volumes(self):
         # Use composetest_ prefix so it gets garbage-collected in tearDown()
         vol_name = 'composetest_{0:x}'.format(random.getrandbits(32))
@@ -722,6 +731,7 @@ class ProjectTest(DockerClientTestCase):
         with self.assertRaises(NotFound):
             self.client.inspect_volume(full_vol_name)
 
+    @v2_only()
     def test_initialize_volumes_inexistent_external_volume(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
 

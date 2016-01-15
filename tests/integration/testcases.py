@@ -1,12 +1,16 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import functools
+import os
+
 from docker.utils import version_lt
 from pytest import skip
 
 from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
+from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
@@ -26,10 +30,35 @@ def get_links(container):
     return [format_link(link) for link in links]
 
 
+def engine_version_too_low_for_v2():
+    if 'DOCKER_VERSION' not in os.environ:
+        return False
+    version = os.environ['DOCKER_VERSION'].partition('-')[0]
+    return version_lt(version, '1.10')
+
+
+def v2_only():
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            if engine_version_too_low_for_v2():
+                skip("Engine version is too low")
+                return
+            return f(self, *args, **kwargs)
+        return wrapper
+
+    return decorator
+
+
 class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = docker_client()
+        if engine_version_too_low_for_v2():
+            version = API_VERSIONS[1]
+        else:
+            version = API_VERSIONS[2]
+
+        cls.client = docker_client(version)
 
     def tearDown(self):
         for c in self.client.containers(
