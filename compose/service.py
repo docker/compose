@@ -639,6 +639,7 @@ class Service(object):
         return self.client.create_networking_config({
             network_name: self.client.create_endpoint_config(aliases=[self.name])
             for network_name in self.networks
+            if network_name not in ['host', 'bridge']
         })
 
     def build(self, no_cache=False, pull=False, force_rm=False):
