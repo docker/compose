@@ -144,11 +144,15 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
         assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_quiet_with_error(self):
         self.base_dir = None
         result = self.dispatch([
@@ -157,10 +161,14 @@ class CLITestCase(DockerClientTestCase):
         ], returncode=1)
         assert "'notaservice' doesn't have any configuration" in result.stderr
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '-q']).stdout == ''
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
@@ -354,6 +362,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['down', '--rmi', 'bogus'], returncode=1)
         assert '--rmi flag must be' in result.stderr
 
+    @v2_only()
     def test_down(self):
         self.base_dir = 'tests/fixtures/v2-full'
         self.dispatch(['up', '-d'])
@@ -939,6 +948,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['start'], returncode=1)
         assert 'No containers to start' in result.stderr
 
+    @v2_only()
     def test_up_logging(self):
         self.base_dir = 'tests/fixtures/logging-composefile'
         self.dispatch(['up', '-d'])
