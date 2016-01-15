@@ -3,11 +3,11 @@
 set -ex
 
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-    script/build-linux
+    script/build/linux
     # TODO: requires auth to push, so disable for now
-    # script/build-image master
+    # script/build/image master
     # docker push docker/compose:master
 else
     script/prepare-osx
-    script/build-osx
+    script/build/osx
 fi

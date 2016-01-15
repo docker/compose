@@ -18,4 +18,4 @@ GIT_VOLUME="--volumes-from=$(hostname)"
 . script/test-versions
 
 >&2 echo "Building Linux binary"
-. script/build-linux-inner
+. script/build/linux-entrypoint
