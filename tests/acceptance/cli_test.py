@@ -238,7 +238,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Pulling simple (busybox:latest)...' in result.stderr
         assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
-        assert 'Error: image library/nonexisting-image:latest not found' in result.stderr
+        assert 'Error: image library/nonexisting-image' in result.stderr
+        assert 'not found' in result.stderr
 
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
