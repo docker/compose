@@ -5,10 +5,24 @@ language: python
 matrix:
   include:
     - os: linux
-      services:
-      - docker
+      services: [docker]
+      env:
+        - TOX_ENV=py27
+        - TEST_SUITE=tests
+        - DOCKER_VERSIONS=1.9.1
+        - BUILD_BINARY=true
+
+    - os: linux
+      services: [docker]
+      env: [TOX_ENV=py27, TEST_SUITE=tests, DOCKER_VERSIONS=1.10.0-rc1]
+
+    - os: linux
+      services: [docker]
+      env: [TOX_ENV=py34, TEST_SUITE=tests/unit]
+
     - os: osx
       language: generic
+      env: [TOX_ENV=py27, TEST_SUITE=tests/unit, BUILD_BINARY=true]
 
 install: ./script/travis/install
 

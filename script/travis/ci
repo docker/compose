@@ -1,10 +1,20 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-    tox -e py27,py34 -- tests/unit
+    if [[ "$TEST_SUITE" == "tests/unit" ]]; then
+        tox -e $TOX_ENV -- $TEST_SUITE
+        exit
+    fi
+
+    STORAGE_DRIVER="aufs"
+    export DOCKER_DAEMON_ARGS="--storage-driver=$STORAGE_DRIVER"
+    export GIT_VOLUME="--volume=$(pwd)/.git:/code/.git"
+    export TAG="docker-compose:$(git rev-parse --short HEAD)"
+
+    docker build -t "$TAG" . | tail -n 100
+    script/test-versions
 else
-    # TODO: we could also install py34 and test against it
-    python -m tox -e py27 -- tests/unit
+    python -m tox -e $TOX_ENV -- $TEST_SUITE
 fi

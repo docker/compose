@@ -2,7 +2,7 @@
 # This should be run inside a container built from the Dockerfile
 # at the root of the repo - script/test will do it automatically.
 
-set -e
+set -ex
 
 >&2 echo "Running lint checks"
 docker run --rm \
@@ -22,6 +22,9 @@ elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS=$($get_versions -n 2 recent)
 fi
 
+if [ "$TOX_ENV" == "" ]; then
+    TOX_ENV="py27,py34"
+fi
 
 BUILD_NUMBER=${BUILD_NUMBER-$USER}
 
@@ -58,6 +61,6 @@ for version in $DOCKER_VERSIONS; do
     --env="DOCKER_VERSION=$version" \
     --entrypoint="tox" \
     "$TAG" \
-    -e py27,py34 -- "$@"
+    -e "$TOX_ENV" -- "$@"
 
 done
