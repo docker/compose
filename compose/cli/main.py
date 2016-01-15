@@ -409,15 +409,26 @@ class TopLevelCommand(DocoptCommand):
         Usage: rm [options] [SERVICE...]
 
         Options:
+            --kill        Kill all the running Services
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
         """
+        killed = False
+        if options['--kill']:
+            print("Going to kill and remove all containers")
+            if options.get('--force') \
+                    or yesno("Are you sure? [yN] ", default=False):
+                        project.kill(service_names=options['SERVICE'], signal='SIGKILL')
+                        killed = True
+            else:
+                print("No containers killed")
+
         all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
-            if options.get('--force') \
+            if killed or options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
                 project.remove_stopped(
                     service_names=options['SERVICE'],
