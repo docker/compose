@@ -20,6 +20,7 @@ from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
+from tests.integration.testcases import v2_only
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -133,12 +134,8 @@ class CLITestCase(DockerClientTestCase):
         self.client.exec_start(exc)
         return self.client.exec_inspect(exc)['ExitCode']
 
-    def lookup(self, container, service_name):
-        exit_code = self.execute(container, [
-            "nslookup",
-            "{}_{}_1".format(self.project.name, service_name)
-        ])
-        return exit_code == 0
+    def lookup(self, container, hostname):
+        return self.execute(container, ["nslookup", hostname]) == 0
 
     def test_help(self):
         self.base_dir = 'tests/fixtures/no-composefile'
@@ -147,11 +144,15 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
         assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_quiet_with_error(self):
         self.base_dir = None
         result = self.dispatch([
@@ -160,10 +161,14 @@ class CLITestCase(DockerClientTestCase):
         ], returncode=1)
         assert "'notaservice' doesn't have any configuration" in result.stderr
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '-q']).stdout == ''
 
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
@@ -241,7 +246,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Pulling simple (busybox:latest)...' in result.stderr
         assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
-        assert 'Error: image library/nonexisting-image:latest not found' in result.stderr
+        assert 'Error: image library/nonexisting-image' in result.stderr
+        assert 'not found' in result.stderr
 
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
@@ -356,6 +362,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['down', '--rmi', 'bogus'], returncode=1)
         assert '--rmi flag must be' in result.stderr
 
+    @v2_only()
     def test_down(self):
         self.base_dir = 'tests/fixtures/v2-full'
         self.dispatch(['up', '-d'])
@@ -392,6 +399,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'simple_1  | simple' in result.stdout
         assert 'another_1 | another' in result.stdout
 
+    @v2_only()
     def test_up(self):
         self.base_dir = 'tests/fixtures/v2-simple'
         self.dispatch(['up', '-d'], None)
@@ -414,6 +422,10 @@ class CLITestCase(DockerClientTestCase):
             networks = list(container.get('NetworkSettings.Networks'))
             self.assertEqual(networks, [network['Name']])
 
+            for service in services:
+                assert self.lookup(container, service.name)
+
+    @v2_only()
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'
         self.dispatch(['up', '-d'], None)
@@ -449,6 +461,7 @@ class CLITestCase(DockerClientTestCase):
         # app can see db
         assert self.lookup(app_container, "db")
 
+    @v2_only()
     def test_up_missing_network(self):
         self.base_dir = 'tests/fixtures/networks'
 
@@ -458,6 +471,7 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Service "web" uses an undefined network "foo"' in result.stderr
 
+    @v2_only()
     def test_up_predefined_networks(self):
         filename = 'predefined-networks.yml'
 
@@ -477,6 +491,7 @@ class CLITestCase(DockerClientTestCase):
             assert list(container.get('NetworkSettings.Networks')) == [name]
             assert container.get('HostConfig.NetworkMode') == name
 
+    @v2_only()
     def test_up_external_networks(self):
         filename = 'external-networks.yml'
 
@@ -500,6 +515,7 @@ class CLITestCase(DockerClientTestCase):
         container = self.project.containers()[0]
         assert sorted(list(container.get('NetworkSettings.Networks'))) == sorted(network_names)
 
+    @v2_only()
     def test_up_no_services(self):
         self.base_dir = 'tests/fixtures/no-services'
         self.dispatch(['up', '-d'], None)
@@ -514,6 +530,7 @@ class CLITestCase(DockerClientTestCase):
             for name in ['bar', 'foo']
         ]
 
+    @v2_only()
     def test_up_with_links_is_invalid(self):
         self.base_dir = 'tests/fixtures/v2-simple'
 
@@ -854,6 +871,7 @@ class CLITestCase(DockerClientTestCase):
         container, = service.containers(stopped=True, one_off=True)
         self.assertEqual(container.name, name)
 
+    @v2_only()
     def test_run_with_networking(self):
         self.base_dir = 'tests/fixtures/v2-simple'
         self.dispatch(['run', 'simple', 'true'], None)
@@ -930,6 +948,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['start'], returncode=1)
         assert 'No containers to start' in result.stderr
 
+    @v2_only()
     def test_up_logging(self):
         self.base_dir = 'tests/fixtures/logging-composefile'
         self.dispatch(['up', '-d'])

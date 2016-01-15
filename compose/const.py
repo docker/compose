@@ -18,7 +18,5 @@ COMPOSEFILE_VERSIONS = (1, 2)
 
 API_VERSIONS = {
     1: '1.21',
-
-    # TODO: update to 1.22 when there's a Docker 1.10 build to test against
-    2: '1.21',
+    2: '1.22',
 }
