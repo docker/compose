@@ -151,9 +151,7 @@ class Project(object):
 
         Raises NoSuchService if any of the named services do not exist.
         """
-        if service_names is None or len(service_names) == 0:
-            service_names = self.service_names
-
+        service_names = service_names or self.service_names
         unsorted = [self.get_service(name) for name in service_names]
         services = [s for s in self.services if s in unsorted]
 
@@ -175,10 +173,8 @@ class Project(object):
         links = []
         if 'links' in service_dict:
             for link in service_dict.get('links', []):
-                if ':' in link:
-                    service_name, link_name = link.split(':', 1)
-                else:
-                    service_name, link_name = link, None
+                service_name, link_name = link.partition(':')
+                link_name = link_name or None
                 try:
                     links.append((self.get_service(service_name), link_name))
                 except NoSuchService:
