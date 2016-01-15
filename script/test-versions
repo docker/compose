@@ -18,8 +18,7 @@ get_versions="docker run --rm
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="$($get_versions default)"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
-  # TODO: `-n 2` when engine 1.10 releases
-  DOCKER_VERSIONS="$($get_versions recent -n 1)"
+  DOCKER_VERSIONS="1.9.1 1.10.0-dev"
 fi
 
 
@@ -39,12 +38,18 @@ for version in $DOCKER_VERSIONS; do
 
   trap "on_exit" EXIT
 
+  if [[ $version == *"-dev" ]]; then
+    repo="dnephin/dind"
+  else
+    repo="dockerswarm/dind"
+  fi
+
   docker run \
     -d \
     --name "$daemon_container" \
     --privileged \
     --volume="/var/lib/docker" \
-    dockerswarm/dind:$version \
+    "$repo:$version" \
     docker daemon -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
     2>&1 | tail -n 10
 
@@ -52,6 +57,7 @@ for version in $DOCKER_VERSIONS; do
     --rm \
     --link="$daemon_container:docker" \
     --env="DOCKER_HOST=tcp://docker:2375" \
+    --env="DOCKER_VERSION=$version" \
     --entrypoint="tox" \
     "$TAG" \
     -e py27,py34 -- "$@"
