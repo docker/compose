@@ -24,7 +24,7 @@ REPO=docker/compose
 script/clean
 script/build/linux
 # TODO: build osx binary
-# script/prepare-osx
+# script/setup/osx
 # script/build/osx
 # TODO: build or fetch the windows binary
 echo "You need to build the osx/windows binaries, that step is not automated yet."

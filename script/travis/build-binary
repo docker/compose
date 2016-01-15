@@ -8,6 +8,6 @@ if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
     # script/build/image master
     # docker push docker/compose:master
 else
-    script/prepare-osx
+    script/setup/osx
     script/build/osx
 fi

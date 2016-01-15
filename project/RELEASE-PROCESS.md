@@ -57,7 +57,7 @@ When prompted build the non-linux binaries and test them.
 
 1.  Build the Mac binary in a Mountain Lion VM:
 
-        script/prepare-osx
+        script/setup/osx
         script/build/osx
 
 2.  Download the windows binary from AppVeyor
