@@ -25,14 +25,15 @@ V1 = 1
 
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
+    """Test helper function to construct a ServiceExtendsResolver
     """
-    Test helper function to construct a ServiceExtendsResolver
-    """
-    resolver = config.ServiceExtendsResolver(config.ServiceConfig(
-        working_dir=working_dir,
-        filename=filename,
-        name=name,
-        config=service_dict), version=1)
+    resolver = config.ServiceExtendsResolver(
+        config.ServiceConfig(
+            working_dir=working_dir,
+            filename=filename,
+            name=name,
+            config=service_dict),
+        config.ConfigFile(filename=filename, config={}))
     return config.process_service(resolver.run())
 
 
@@ -1887,6 +1888,28 @@ class ExtendsTest(unittest.TestCase):
             config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
 
         assert config == expected
+
+    def test_extends_with_mixed_versions_is_error(self):
+        tmpdir = py.test.ensuretemp('test_extends_with_mixed_version')
+        self.addCleanup(tmpdir.remove)
+        tmpdir.join('docker-compose.yml').write("""
+            version: 2
+            services:
+              web:
+                extends:
+                  file: base.yml
+                  service: base
+                image: busybox
+        """)
+        tmpdir.join('base.yml').write("""
+            base:
+              volumes: ['/foo']
+              ports: ['3000:3000']
+        """)
+
+        with pytest.raises(ConfigurationError) as exc:
+            load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        assert 'Version mismatch' in exc.exconly()
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
