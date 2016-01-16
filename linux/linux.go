@@ -626,47 +626,53 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 	}
 	cr.Resources = c
 	r := spec.Linux.Resources
-	if r.Memory.Limit != nil {
-		c.Memory = int64(*r.Memory.Limit)
+	if r.Memory != nil {
+		if r.Memory.Limit != nil {
+			c.Memory = int64(*r.Memory.Limit)
+		}
+		if r.Memory.Reservation != nil {
+			c.MemoryReservation = int64(*r.Memory.Reservation)
+		}
+		if r.Memory.Swap != nil {
+			c.MemorySwap = int64(*r.Memory.Swap)
+		}
+		if r.Memory.Kernel != nil {
+			c.KernelMemory = int64(*r.Memory.Kernel)
+		}
+		if r.Memory.Swappiness != nil {
+			c.MemorySwappiness = int64(*r.Memory.Swappiness)
+		}
 	}
-	if r.Memory.Reservation != nil {
-		c.MemoryReservation = int64(*r.Memory.Reservation)
+	if r.CPU != nil {
+		if r.CPU.Shares != nil {
+			c.CpuShares = int64(*r.CPU.Shares)
+		}
+		if r.CPU.Quota != nil {
+			c.CpuQuota = int64(*r.CPU.Quota)
+		}
+		if r.CPU.Period != nil {
+			c.CpuPeriod = int64(*r.CPU.Period)
+		}
+		if r.CPU.RealtimeRuntime != nil {
+			c.CpuRtRuntime = int64(*r.CPU.RealtimeRuntime)
+		}
+		if r.CPU.RealtimePeriod != nil {
+			c.CpuRtPeriod = int64(*r.CPU.RealtimePeriod)
+		}
+		if r.CPU.Cpus != nil {
+			c.CpusetCpus = *r.CPU.Cpus
+		}
+		if r.CPU.Mems != nil {
+			c.CpusetMems = *r.CPU.Mems
+		}
 	}
-	if r.Memory.Swap != nil {
-		c.MemorySwap = int64(*r.Memory.Swap)
-	}
-	if r.Memory.Kernel != nil {
-		c.KernelMemory = int64(*r.Memory.Kernel)
-	}
-	if r.Memory.Swappiness != nil {
-		c.MemorySwappiness = int64(*r.Memory.Swappiness)
-	}
-	if r.CPU.Shares != nil {
-		c.CpuShares = int64(*r.CPU.Shares)
-	}
-	if r.CPU.Quota != nil {
-		c.CpuQuota = int64(*r.CPU.Quota)
-	}
-	if r.CPU.Period != nil {
-		c.CpuPeriod = int64(*r.CPU.Period)
-	}
-	if r.CPU.RealtimeRuntime != nil {
-		c.CpuRtRuntime = int64(*r.CPU.RealtimeRuntime)
-	}
-	if r.CPU.RealtimePeriod != nil {
-		c.CpuRtPeriod = int64(*r.CPU.RealtimePeriod)
-	}
-	if r.CPU.Cpus != nil {
-		c.CpusetCpus = *r.CPU.Cpus
-	}
-	if r.CPU.Mems != nil {
-		c.CpusetMems = *r.CPU.Mems
-	}
-	if r.BlockIO.Weight != nil {
-		c.BlkioWeight = *r.BlockIO.Weight
-	}
-	if r.BlockIO.LeafWeight != nil {
-		c.BlkioLeafWeight = *r.BlockIO.LeafWeight
+	if r.BlockIO != nil {
+		if r.BlockIO.Weight != nil {
+			c.BlkioWeight = *r.BlockIO.Weight
+		}
+		if r.BlockIO.LeafWeight != nil {
+			c.BlkioLeafWeight = *r.BlockIO.LeafWeight
+		}
 	}
 	for _, wd := range r.BlockIO.WeightDevice {
 		weightDevice := configs.NewWeightDevice(wd.Major, wd.Minor, *wd.Weight, *wd.LeafWeight)
@@ -695,12 +701,14 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 		})
 	}
 	c.OomKillDisable = r.DisableOOMKiller != nil && *r.DisableOOMKiller
-	c.NetClsClassid = r.Network.ClassID
-	for _, m := range r.Network.Priorities {
-		c.NetPrioIfpriomap = append(c.NetPrioIfpriomap, &configs.IfPrioMap{
-			Interface: m.Name,
-			Priority:  int64(m.Priority),
-		})
+	if r.Network != nil {
+		c.NetClsClassid = r.Network.ClassID
+		for _, m := range r.Network.Priorities {
+			c.NetPrioIfpriomap = append(c.NetPrioIfpriomap, &configs.IfPrioMap{
+				Interface: m.Name,
+				Priority:  int64(m.Priority),
+			})
+		}
 	}
 	return cr, nil
 }
