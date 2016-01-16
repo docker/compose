@@ -18,7 +18,7 @@ get_versions="docker run --rm
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="$($get_versions default)"
 elif [ "$DOCKER_VERSIONS" == "all" ]; then
-  DOCKER_VERSIONS="1.9.1 1.10.0-dev"
+  DOCKER_VERSIONS=$($get_versions -n 2 recent)
 fi
 
 
@@ -38,11 +38,7 @@ for version in $DOCKER_VERSIONS; do
 
   trap "on_exit" EXIT
 
-  if [[ $version == *"-dev" ]]; then
-    repo="dnephin/dind"
-  else
-    repo="dockerswarm/dind"
-  fi
+  repo="dockerswarm/dind"
 
   docker run \
     -d \
