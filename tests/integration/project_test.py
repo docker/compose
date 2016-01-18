@@ -517,6 +517,63 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(foo_data['Driver'], 'bridge')
 
     @v2_only()
+    def test_up_with_ipam_config(self):
+        config_data = config.Config(
+            version=2,
+            services=[],
+            volumes={},
+            networks={
+                'front': {
+                    'driver': 'bridge',
+                    'driver_opts': {
+                        "com.docker.network.bridge.enable_icc": "false",
+                    },
+                    'ipam': {
+                        'driver': 'default',
+                        'config': [{
+                            "subnet": "172.28.0.0/16",
+                            "ip_range": "172.28.5.0/24",
+                            "gateway": "172.28.5.254",
+                            "aux_addresses": {
+                                "a": "172.28.1.5",
+                                "b": "172.28.1.6",
+                                "c": "172.28.1.7",
+                            },
+                        }],
+                    },
+                },
+            },
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up()
+
+        network = self.client.networks(names=['composetest_front'])[0]
+
+        assert network['Options'] == {
+            "com.docker.network.bridge.enable_icc": "false"
+        }
+
+        assert network['IPAM'] == {
+            'Driver': 'default',
+            'Options': None,
+            'Config': [{
+                'Subnet': "172.28.0.0/16",
+                'IPRange': "172.28.5.0/24",
+                'Gateway': "172.28.5.254",
+                'AuxiliaryAddresses': {
+                    'a': '172.28.1.5',
+                    'b': '172.28.1.6',
+                    'c': '172.28.1.7',
+                },
+            }],
+        }
+
+    @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)

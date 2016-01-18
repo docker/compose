@@ -64,6 +64,7 @@ class Project(object):
                 client=client, project=name, name=network_name,
                 driver=data.get('driver'),
                 driver_opts=data.get('driver_opts'),
+                ipam=data.get('ipam'),
                 external_name=data.get('external_name'),
             )
             for network_name, data in network_config.items()
