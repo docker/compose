@@ -4,6 +4,8 @@ from __future__ import unicode_literals
 import logging
 
 from docker.errors import NotFound
+from docker.utils import create_ipam_config
+from docker.utils import create_ipam_pool
 
 from .config import ConfigurationError
 
@@ -13,12 +15,13 @@ log = logging.getLogger(__name__)
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 external_name=None):
+                 ipam=None, external_name=None):
         self.client = client
         self.project = project
         self.name = name
         self.driver = driver
         self.driver_opts = driver_opts
+        self.ipam = create_ipam_config_from_dict(ipam)
         self.external_name = external_name
 
     def ensure(self):
@@ -61,7 +64,10 @@ class Network(object):
             )
 
             self.client.create_network(
-                self.full_name, self.driver, self.driver_opts
+                name=self.full_name,
+                driver=self.driver,
+                options=self.driver_opts,
+                ipam=self.ipam,
             )
 
     def remove(self):
@@ -80,3 +86,21 @@ class Network(object):
         if self.external_name:
             return self.external_name
         return '{0}_{1}'.format(self.project, self.name)
+
+
+def create_ipam_config_from_dict(ipam_dict):
+    if not ipam_dict:
+        return None
+
+    return create_ipam_config(
+        driver=ipam_dict.get('driver'),
+        pool_configs=[
+            create_ipam_pool(
+                subnet=config.get('subnet'),
+                iprange=config.get('ip_range'),
+                gateway=config.get('gateway'),
+                aux_addresses=config.get('aux_addresses'),
+            )
+            for config in ipam_dict.get('config', [])
+        ],
+    )
