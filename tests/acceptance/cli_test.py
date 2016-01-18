@@ -409,6 +409,7 @@ class CLITestCase(DockerClientTestCase):
         networks = self.client.networks(names=[self.project.default_network.full_name])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['Driver'], 'bridge')
+        assert 'com.docker.network.bridge.enable_icc' not in networks[0]['Options']
 
         network = self.client.inspect_network(networks[0]['Id'])
 
@@ -424,6 +425,18 @@ class CLITestCase(DockerClientTestCase):
 
             for service in services:
                 assert self.lookup(container, service.name)
+
+    @v2_only()
+    def test_up_with_default_network_config(self):
+        filename = 'default-network-config.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+
+        networks = self.client.networks(names=[self.project.default_network.full_name])
+        assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
 
     @v2_only()
     def test_up_with_networks(self):

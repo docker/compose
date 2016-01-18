@@ -58,23 +58,24 @@ class Project(object):
         use_networking = (config_data.version and config_data.version >= 2)
         project = cls(name, [], client, use_networking=use_networking)
 
-        custom_networks = []
-        if config_data.networks:
-            for network_name, data in config_data.networks.items():
-                custom_networks.append(
-                    Network(
-                        client=client, project=name, name=network_name,
-                        driver=data.get('driver'),
-                        driver_opts=data.get('driver_opts'),
-                        external_name=data.get('external_name'),
-                    )
-                )
+        network_config = config_data.networks or {}
+        custom_networks = [
+            Network(
+                client=client, project=name, name=network_name,
+                driver=data.get('driver'),
+                driver_opts=data.get('driver_opts'),
+                external_name=data.get('external_name'),
+            )
+            for network_name, data in network_config.items()
+        ]
+
+        all_networks = custom_networks[:]
+        if 'default' not in network_config:
+            all_networks.append(project.default_network)
 
         for service_dict in config_data.services:
             if use_networking:
-                networks = get_networks(
-                    service_dict,
-                    custom_networks + [project.default_network])
+                networks = get_networks(service_dict, all_networks)
                 net = Net(networks[0]) if networks else Net("none")
                 links = []
             else:
@@ -96,7 +97,7 @@ class Project(object):
                     **service_dict))
 
         project.networks += custom_networks
-        if project.uses_default_network():
+        if 'default' not in network_config and project.uses_default_network():
             project.networks.append(project.default_network)
 
         if config_data.volumes:
