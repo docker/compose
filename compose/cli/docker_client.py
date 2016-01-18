@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import logging
 import os
 
@@ -9,9 +12,6 @@ from ..const import HTTP_TIMEOUT
 log = logging.getLogger(__name__)
 
 
-DEFAULT_API_VERSION = '1.19'
-
-
 def docker_client(version=None):
     """
     Returns a docker-py client configured using environment variables
@@ -21,8 +21,7 @@ def docker_client(version=None):
         log.warn('The DOCKER_CLIENT_TIMEOUT environment variable is deprecated. Please use COMPOSE_HTTP_TIMEOUT instead.')
 
     kwargs = kwargs_from_env(assert_hostname=False)
-    kwargs['version'] = version or os.environ.get(
-        'COMPOSE_API_VERSION',
-        DEFAULT_API_VERSION)
+    if version:
+        kwargs['version'] = version
     kwargs['timeout'] = HTTP_TIMEOUT
     return Client(**kwargs)

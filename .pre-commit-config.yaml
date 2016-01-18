@@ -14,7 +14,12 @@
     - id: requirements-txt-fixer
     - id: trailing-whitespace
 - repo: git://github.com/asottile/reorder_python_imports
-  sha: 3d86483455ab5bd06cc1069fdd5ac57be5463f10
+  sha: v0.1.0
   hooks:
     - id: reorder-python-imports
       language_version: 'python2.7'
+      args:
+        - --add-import
+        - from __future__ import absolute_import
+        - --add-import
+        - from __future__ import unicode_literals

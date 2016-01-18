@@ -42,13 +42,6 @@ class CLITestCase(unittest.TestCase):
         project_name = get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
-    def test_project_name_from_environment_old_var(self):
-        name = 'namefromenv'
-        with mock.patch.dict(os.environ):
-            os.environ['FIG_PROJECT_NAME'] = name
-            project_name = get_project_name(None)
-        self.assertEquals(project_name, name)
-
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         with mock.patch.dict(os.environ):
@@ -74,12 +67,6 @@ class CLITestCase(unittest.TestCase):
 
         self.assertIn('Usage: up', str(ctx.exception))
 
-    def test_command_help_dashes(self):
-        with self.assertRaises(SystemExit) as ctx:
-            TopLevelCommand().dispatch(['help', 'migrate-to-labels'], None)
-
-        self.assertIn('Usage: migrate-to-labels', str(ctx.exception))
-
     def test_command_help_nonexistent(self):
         with self.assertRaises(NoSuchCommand):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)
@@ -102,7 +89,6 @@ class CLITestCase(unittest.TestCase):
             '-e': ['BAR=NEW', 'OTHER=bär'.encode('utf-8')],
             '--user': None,
             '--no-deps': None,
-            '--allow-insecure-ssl': None,
             '-d': True,
             '-T': None,
             '--entrypoint': None,
@@ -132,7 +118,6 @@ class CLITestCase(unittest.TestCase):
             '-e': [],
             '--user': None,
             '--no-deps': None,
-            '--allow-insecure-ssl': None,
             '-d': True,
             '-T': None,
             '--entrypoint': None,
@@ -161,7 +146,6 @@ class CLITestCase(unittest.TestCase):
             '-e': [],
             '--user': None,
             '--no-deps': None,
-            '--allow-insecure-ssl': None,
             '-d': True,
             '-T': None,
             '--entrypoint': None,
@@ -193,7 +177,6 @@ class CLITestCase(unittest.TestCase):
                 '-e': [],
                 '--user': None,
                 '--no-deps': None,
-                '--allow-insecure-ssl': None,
                 '-d': True,
                 '-T': None,
                 '--entrypoint': None,

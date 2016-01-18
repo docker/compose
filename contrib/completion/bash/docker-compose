@@ -17,12 +17,18 @@
 #    . ~/.docker-compose-completion.sh
 
 
+# suppress trailing whitespace
+__docker_compose_nospace() {
+	# compopt is not available in ancient bash versions
+	type compopt &>/dev/null && compopt -o nospace
+}
+
 # For compatibility reasons, Compose and therefore its completion supports several
 # stack compositon files as listed here, in descending priority.
 # Support for these filenames might be dropped in some future version.
 __docker_compose_compose_file() {
 	local file
-	for file in docker-compose.y{,a}ml fig.y{,a}ml ; do
+	for file in docker-compose.y{,a}ml ; do
 		[ -e $file ] && {
 			echo $file
 			return
@@ -96,6 +102,11 @@ _docker_compose_build() {
 }
 
 
+_docker_compose_config() {
+	COMPREPLY=( $( compgen -W "--help --quiet -q --services" -- "$cur" ) )
+}
+
+
 _docker_compose_docker_compose() {
 	case "$prev" in
 		--file|-f)
@@ -105,18 +116,48 @@ _docker_compose_docker_compose() {
 		--project-name|-p)
 			return
 			;;
-		--x-network-driver)
-			COMPREPLY=( $( compgen -W "bridge host none overlay" -- "$cur" ) )
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v" -- "$cur" ) )
+			;;
+		*)
+			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
+			;;
+	esac
+}
+
+
+_docker_compose_down() {
+	case "$prev" in
+		--rmi)
+			COMPREPLY=( $( compgen -W "all local" -- "$cur" ) )
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v --x-networking --x-network-driver" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --rmi --volumes -v" -- "$cur" ) )
+			;;
+	esac
+}
+
+
+_docker_compose_events() {
+	case "$prev" in
+		--json)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help --json" -- "$cur" ) )
 			;;
 		*)
-			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
+			__docker_compose_services_all
 			;;
 	esac
 }
@@ -153,15 +194,6 @@ _docker_compose_logs() {
 			;;
 		*)
 			__docker_compose_services_all
-			;;
-	esac
-}
-
-
-_docker_compose_migrate_to_labels() {
-	case "$cur" in
-		-*)
-			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 	esac
 }
@@ -259,7 +291,7 @@ _docker_compose_run() {
 	case "$prev" in
 		-e)
 			COMPREPLY=( $( compgen -e -- "$cur" ) )
-			compopt -o nospace
+			__docker_compose_nospace
 			return
 			;;
 		--entrypoint|--name|--user|-u)
@@ -295,7 +327,7 @@ _docker_compose_scale() {
 			;;
 		*)
 			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
-			compopt -o nospace
+			__docker_compose_nospace
 			;;
 	esac
 }
@@ -352,7 +384,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --help --no-build --no-color --no-deps --no-recreate --force-recreate --timeout -t" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit -d --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
@@ -376,10 +408,12 @@ _docker_compose() {
 
 	local commands=(
 		build
+		config
+		down
+		events
 		help
 		kill
 		logs
-		migrate-to-labels
 		pause
 		port
 		ps
@@ -413,9 +447,6 @@ _docker_compose() {
 			--project-name|p)
 				(( counter++ ))
 				compose_project="${words[$counter]}"
-				;;
-			--x-network-driver)
-				(( counter++ ))
 				;;
 			-*)
 				;;

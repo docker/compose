@@ -30,8 +30,8 @@ and a `docker-compose.yml` file.
     The Dockerfile defines an application's image content via one or more build
     commands that configure that image. Once built, you can run the image in a
     container.  For more information on `Dockerfiles`, see the [Docker user
-    guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile)
-    and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+    guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile)
+    and the [Dockerfile reference](https://docs.docker.com/engine/reference/builder/).
 
 3. Add the following content to the `Dockerfile`.
 
@@ -144,7 +144,7 @@ In this section, you set up the database connection for Django.
         }
 
     These settings are determined by the
-    [postgres](https://registry.hub.docker.com/_/postgres/) Docker image
+    [postgres](https://hub.docker.com/_/postgres/) Docker image
     specified in `docker-compose.yml`.
 
 3. Save and close the file.
@@ -171,7 +171,7 @@ In this section, you set up the database connection for Django.
 
 ## More Compose documentation
 
-- [User guide](../index.md)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Rails](rails.md)

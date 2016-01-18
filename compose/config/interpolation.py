@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import logging
 import os
 from string import Template
@@ -8,35 +11,32 @@ from .errors import ConfigurationError
 log = logging.getLogger(__name__)
 
 
-def interpolate_environment_variables(config):
+def interpolate_environment_variables(config, section):
     mapping = BlankDefaultDict(os.environ)
 
+    def process_item(name, config_dict):
+        return dict(
+            (key, interpolate_value(name, key, val, section, mapping))
+            for key, val in (config_dict or {}).items()
+        )
+
     return dict(
-        (service_name, process_service(service_name, service_dict, mapping))
-        for (service_name, service_dict) in config.items()
+        (name, process_item(name, config_dict))
+        for name, config_dict in config.items()
     )
 
 
-def process_service(service_name, service_dict, mapping):
-    return dict(
-        (key, interpolate_value(service_name, key, val, mapping))
-        for (key, val) in service_dict.items()
-    )
-
-
-def interpolate_value(service_name, config_key, value, mapping):
+def interpolate_value(name, config_key, value, section, mapping):
     try:
         return recursive_interpolate(value, mapping)
     except InvalidInterpolation as e:
         raise ConfigurationError(
             'Invalid interpolation format for "{config_key}" option '
-            'in service "{service_name}": "{string}"'
-            .format(
+            'in {section} "{name}": "{string}"'.format(
                 config_key=config_key,
-                service_name=service_name,
-                string=e.string,
-            )
-        )
+                name=name,
+                section=section,
+                string=e.string))
 
 
 def recursive_interpolate(obj, mapping):

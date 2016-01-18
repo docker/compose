@@ -28,9 +28,9 @@ to the name of your project.
 Next, inside that directory, create a `Dockerfile`, a file that defines what
 environment your app is going to run in. For more information on how to write
 Dockerfiles, see the
-[Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the
-[Dockerfile reference](http://docs.docker.com/reference/builder/). In this case,
-your Dockerfile should be:
+[Docker user guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the
+[Dockerfile reference](https://docs.docker.com/engine/reference/builder/). In
+this case, your Dockerfile should be:
 
     FROM orchardup/php5
     ADD . /code
@@ -89,11 +89,11 @@ configuration at the `db` container:
 
 With those four files in place, run `docker-compose up` inside your WordPress
 directory and it'll pull and build the needed images, and then start the web and
-database containers. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` gives you the machine address and you can open `http://MACHINE_VM_IP:8000` in a browser.
+database containers. If you're using [Docker Machine](https://docs.docker.com/machine/), then `docker-machine ip MACHINE_VM` gives you the machine address and you can open `http://MACHINE_VM_IP:8000` in a browser.
 
 ## More Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)

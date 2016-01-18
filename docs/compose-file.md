@@ -24,12 +24,95 @@ As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
+## Versioning
+
+It is possible to use different versions of the `compose.yml` format.
+Below are the formats currently supported by compose.
+
+
+### Version 1
+
+Compose files that do not declare a version are considered "version 1". In
+those files, all the [services](#service-configuration-reference) are declared
+at the root of the document.
+
+Version 1 files do not support the declaration of
+named [volumes](#volume-configuration-reference) or
+[build arguments](#args).
+
+Example:
+
+    web:
+      build: .
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+       - logvolume01:/var/log
+      links:
+       - redis
+    redis:
+      image: redis
+
+
+### Version 2
+
+Compose files using the version 2 syntax must indicate the version number at
+the root of the document. All [services](#service-configuration-reference)
+must be declared under the `services` key.
+Named [volumes](#volume-configuration-reference) must be declared under the
+`volumes` key.
+
+Example:
+
+    version: 2
+    services:
+      web:
+        build: .
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+         - logvolume01:/var/log
+        links:
+         - redis
+      redis:
+        image: redis
+    volumes:
+      logvolume01:
+        driver: default
+
+
 ## Service configuration reference
 
 This section contains a list of all configuration options supported by a service
 definition.
 
 ### build
+
+Configuration options that are applied at build time.
+
+In version 1 this must be given as a string representing the context.
+
+  build: .
+
+In version 2 this can alternatively be given as an object with extra options.
+
+  version: 2
+  services:
+    web:
+      build: .
+
+    version: 2
+    services:
+      web:
+        build:
+          context: .
+          dockerfile: Dockerfile-alternate
+          args:
+            buildno: 1
+
+#### context
 
 Either a path to a directory containing a Dockerfile, or a url to a git repository.
 
@@ -41,8 +124,45 @@ Compose will build and tag it with a generated name, and use that image thereaft
 
     build: /path/to/build/dir
 
-Using `build` together with `image` is not allowed. Attempting to do so results in
+    build:
+      context: /path/to/build/dir
+
+Using `context` together with `image` is not allowed. Attempting to do so results in
 an error.
+
+#### dockerfile
+
+Alternate Dockerfile.
+
+Compose will use an alternate file to build with. A build path must also be
+specified using the `build` key.
+
+    build:
+      context: /path/to/build/dir
+      dockerfile: Dockerfile-alternate
+
+Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
+
+#### args
+
+Add build arguments. You can use either an array or a dictionary. Any
+boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
+they are not converted to True or False by the YML parser.
+
+Build arguments with only a key are resolved to their environment value on the
+machine Compose is running on.
+
+> **Note:** Introduced in version 2 of the compose file format.
+
+    build:
+      args:
+        buildno: 1
+        user: someuser
+
+    build:
+      args:
+        - buildno=1
+        - user=someuser
 
 ### cap_add, cap_drop
 
@@ -61,6 +181,10 @@ See `man 7 capabilities` for a full list.
 Override the default command.
 
     command: bundle exec thin -p 3000
+
+The command can also be a list, in a manner similar to [dockerfile](https://docs.docker.com/engine/reference/builder/#cmd):
+
+    command: [bundle, exec, thin, -p, 3000]
 
 ### cgroup_parent
 
@@ -104,17 +228,22 @@ Custom DNS search domains. Can be a single value or a list.
       - dc1.example.com
       - dc2.example.com
 
-### dockerfile
+### entrypoint
 
-Alternate Dockerfile.
+Override the default entrypoint.
 
-Compose will use an alternate file to build with. A build path must also be
-specified using the `build` key.
+    entrypoint: /code/entrypoint.sh
 
-    build: /path/to/build/dir
-    dockerfile: Dockerfile-alternate
+The entrypoint can also be a list, in a manner similar to [dockerfile](https://docs.docker.com/engine/reference/builder/#entrypoint):
 
-Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
+    entrypoint:
+        - php
+        - -d
+        - zend_extension=/usr/local/lib/php/extensions/no-debug-non-zts-20100525/xdebug.so
+        - -d
+        - memory_limit=-1
+        - vendor/bin/phpunit
+
 
 ### env_file
 
@@ -231,7 +360,7 @@ pull if it doesn't exist locally.
 
 ### labels
 
-Add metadata to containers using [Docker labels](http://docs.docker.com/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
+Add metadata to containers using [Docker labels](https://docs.docker.com/engine/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
 
@@ -266,29 +395,37 @@ for this service, e.g:
 Environment variables will also be created - see the [environment variable
 reference](env.md) for details.
 
-### log_driver
+### logging
 
-Specify a logging driver for the service's containers, as with the ``--log-driver``
-option for docker run ([documented here](https://docs.docker.com/reference/logging/overview/)).
+Logging configuration for the service. This configuration replaces the previous
+`log_driver` and `log_opt` keys.
+
+    logging:
+        driver: log_driver
+        options:
+            syslog-address: "tcp://192.168.0.42:123"
+
+The `driver`  name specifies a logging driver for the service's
+containers, as with the ``--log-driver`` option for docker run
+([documented here](https://docs.docker.com/engine/reference/logging/overview/)).
 
 The default value is json-file.
 
-    log_driver: "json-file"
-    log_driver: "syslog"
-    log_driver: "none"
+    driver: "json-file"
+    driver: "syslog"
+    driver: "none"
 
 > **Note:** Only the `json-file` driver makes the logs available directly from
 > `docker-compose up` and `docker-compose logs`. Using any other driver will not
 > print any logs.
 
-### log_opt
+Specify logging options for the logging driver with the ``options`` key, as with the ``--log-opt`` option for `docker run`.
 
-Specify logging options with `log_opt` for the logging driver, as with the ``--log-opt`` option for `docker run`.
 
 Logging options are key value pairs. An example of `syslog` options:
 
-    log_driver: "syslog"
-    log_opt:
+    driver: "syslog"
+    options:
       syslog-address: "tcp://192.168.0.42:123"
 
 ### net
@@ -371,8 +508,8 @@ a `volume_driver`.
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
 
-See [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/) and
-[Volume Plugins](https://docs.docker.com/extend/plugins_volume/) for more
+See [Docker Volumes](https://docs.docker.com/engine/userguide/dockervolumes/) and
+[Volume Plugins](https://docs.docker.com/engine/extend/plugins_volume/) for more
 information.
 
 ### volumes_from
@@ -385,15 +522,15 @@ specifying read-only access(``ro``) or read-write(``rw``).
      - container_name
      - service_name:rw
 
-### cpu\_shares, cpuset, domainname, entrypoint, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
+### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
-[docker run](https://docs.docker.com/reference/run/) counterpart.
+[docker run](https://docs.docker.com/engine/reference/run/) counterpart.
 
     cpu_shares: 73
+    cpu_quota: 50000
     cpuset: 0,1
 
-    entrypoint: /code/entrypoint.sh
     user: postgresql
     working_dir: /code
 
@@ -411,6 +548,34 @@ Each of these is a single value, analogous to its
     read_only: true
     stdin_open: true
     tty: true
+
+
+## Volume configuration reference
+
+While it is possible to declare volumes on the fly as part of the service
+declaration, this section allows you to create named volumes that can be
+reused across multiple services (without relying on `volumes_from`), and are
+easily retrieved and inspected using the docker command line or API.
+See the [docker volume](http://docs.docker.com/reference/commandline/volume/)
+subcommand documentation for more information.
+
+### driver
+
+Specify which volume driver should be used for this volume. Defaults to
+`local`. An exception will be raised if the driver is not available.
+
+      driver: foobar
+
+### driver_opts
+
+Specify a list of options as key-value pairs to pass to the driver for this
+volume. Those options are driver dependent - consult the driver's
+documentation for more information. Optional.
+
+      driver_opts:
+        foo: "bar"
+        baz: 1
+
 
 ## Variable substitution
 

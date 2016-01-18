@@ -24,7 +24,7 @@
 # Support for these filenames might be dropped in some future version.
 __docker-compose_compose_file() {
     local file
-    for file in docker-compose.y{,a}ml fig.y{,a}ml ; do
+    for file in docker-compose.y{,a}ml ; do
         [ -e $file ] && {
             echo $file
             return
@@ -197,6 +197,18 @@ __docker-compose_subcommand() {
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
+        (config)
+            _arguments \
+                $opts_help \
+                '(--quiet -q)'{--quiet,-q}"[Only validate the configuration, don't print anything.]" \
+                '--services[Print the service names, one per line.]' && ret=0
+            ;;
+        (events)
+            _arguments \
+                $opts_help \
+                '--json[Output events as a stream of json objects.]' \
+                '*:services:__docker-compose_services_all' && ret=0
+            ;;
         (help)
             _arguments ':subcommand:__docker-compose_commands' && ret=0
             ;;
@@ -211,11 +223,6 @@ __docker-compose_subcommand() {
                 $opts_help \
                 '--no-color[Produce monochrome output.]' \
                 '*:services:__docker-compose_services_all' && ret=0
-            ;;
-        (migrate-to-labels)
-            _arguments -A '-*' \
-                $opts_help \
-                '(-):Recreate containers to add labels' && ret=0
             ;;
         (pause)
             _arguments \
@@ -331,8 +338,6 @@ _docker-compose() {
         '(- :)'{-v,--version}'[Print version and exit]' \
         '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
-        '--x-networking[(EXPERIMENTAL) Use new Docker networking functionality. Requires Docker 1.9 or later.]' \
-        '--x-network-driver[(EXPERIMENTAL) Specify a network driver (default: "bridge"). Requires Docker 1.9 or later.]:Network Driver:(bridge host none overlay)' \
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 

@@ -13,6 +13,7 @@ from requests.exceptions import SSLError
 from . import errors
 from . import verbose_proxy
 from .. import config
+from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
 from .utils import call_silently
@@ -46,23 +47,18 @@ def friendly_error_message():
 def project_from_options(base_dir, options):
     return get_project(
         base_dir,
-        get_config_path(options.get('--file')),
+        get_config_path_from_options(options),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
-        use_networking=options.get('--x-networking'),
-        network_driver=options.get('--x-network-driver'),
     )
 
 
-def get_config_path(file_option):
+def get_config_path_from_options(options):
+    file_option = options.get('--file')
     if file_option:
         return file_option
 
-    if 'FIG_FILE' in os.environ:
-        log.warn('The FIG_FILE environment variable is deprecated.')
-        log.warn('Please use COMPOSE_FILE instead.')
-
-    config_file = os.environ.get('COMPOSE_FILE') or os.environ.get('FIG_FILE')
+    config_file = os.environ.get('COMPOSE_FILE')
     return [config_file] if config_file else None
 
 
@@ -78,31 +74,24 @@ def get_client(verbose=False, version=None):
     return client
 
 
-def get_project(base_dir, config_path=None, project_name=None, verbose=False,
-                use_networking=False, network_driver=None):
+def get_project(base_dir, config_path=None, project_name=None, verbose=False):
     config_details = config.find(base_dir, config_path)
+    project_name = get_project_name(config_details.working_dir, project_name)
+    config_data = config.load(config_details)
 
-    api_version = '1.21' if use_networking else None
-    return Project.from_dicts(
-        get_project_name(config_details.working_dir, project_name),
-        config.load(config_details),
-        get_client(verbose=verbose, version=api_version),
-        use_networking=use_networking,
-        network_driver=network_driver)
+    api_version = os.environ.get(
+        'COMPOSE_API_VERSION',
+        API_VERSIONS[config_data.version])
+    client = get_client(verbose=verbose, version=api_version)
+
+    return Project.from_config(project_name, config_data, client)
 
 
 def get_project_name(working_dir, project_name=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    if 'FIG_PROJECT_NAME' in os.environ:
-        log.warn('The FIG_PROJECT_NAME environment variable is deprecated.')
-        log.warn('Please use COMPOSE_PROJECT_NAME instead.')
-
-    project_name = (
-        project_name or
-        os.environ.get('COMPOSE_PROJECT_NAME') or
-        os.environ.get('FIG_PROJECT_NAME'))
+    project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME')
     if project_name is not None:
         return normalize_name(project_name)
 

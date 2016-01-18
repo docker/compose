@@ -18,13 +18,23 @@ exe = EXE(pyz,
           a.datas,
           [
             (
-                'compose/config/fields_schema.json',
-                'compose/config/fields_schema.json',
+                'compose/config/fields_schema_v1.json',
+                'compose/config/fields_schema_v1.json',
                 'DATA'
             ),
             (
-                'compose/config/service_schema.json',
-                'compose/config/service_schema.json',
+                'compose/config/fields_schema_v2.json',
+                'compose/config/fields_schema_v2.json',
+                'DATA'
+            ),
+            (
+                'compose/config/service_schema_v1.json',
+                'compose/config/service_schema_v1.json',
+                'DATA'
+            ),
+            (
+                'compose/config/service_schema_v2.json',
+                'compose/config/service_schema_v2.json',
                 'DATA'
             ),
             (
@@ -33,6 +43,7 @@ exe = EXE(pyz,
                 'DATA'
             )
           ],
+
           name='docker-compose',
           debug=False,
           strip=None,

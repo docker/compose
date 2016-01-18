@@ -22,7 +22,7 @@ VERSION="$(git config "branch.${BRANCH}.release")" || usage
 
 
 COMMIT_MSG="Bump $VERSION"
-sha="$(git log --grep "$COMMIT_MSG" --format="%H")"
+sha="$(git log --grep "$COMMIT_MSG\$" --format="%H")"
 if [ -z "$sha" ]; then
     >&2 echo "No commit with message \"$COMMIT_MSG\""
     exit 2

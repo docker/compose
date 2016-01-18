@@ -1,4 +1,8 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import unittest
+from time import sleep
 
 from compose.cli.multiplexer import Multiplexer
 
@@ -43,3 +47,15 @@ class MultiplexerTest(unittest.TestCase):
 
         with self.assertRaises(Problem):
             list(mux.loop())
+
+    def test_cascade_stop(self):
+        def fast_stream():
+            for num in range(3):
+                yield "stream1 %s" % num
+
+        def slow_stream():
+            sleep(5)
+            yield "stream2 FAIL"
+
+        mux = Multiplexer([fast_stream(), slow_stream()], cascade_stop=True)
+        assert "stream2 FAIL" not in set(mux.loop())

@@ -1,6 +1,6 @@
 *.egg-info
 *.pyc
-/.coverage
+.coverage*
 /.tox
 /build
 /coverage-html
