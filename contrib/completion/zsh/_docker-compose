@@ -179,7 +179,7 @@ __docker-compose_commands() {
         local -a lines
         lines=(${(f)"$(_call_program commands docker-compose 2>&1)"})
         _docker_compose_subcommands=(${${${lines[$((${lines[(i)Commands:]} + 1)),${lines[(I)  *]}]}## #}/ ##/:})
-        _store_cache docker_compose_subcommands _docker_compose_subcommands
+        (( $#_docker_compose_subcommands > 0 )) && _store_cache docker_compose_subcommands _docker_compose_subcommands
     fi
     _describe -t docker-compose-commands "docker-compose command" _docker_compose_subcommands
 }
