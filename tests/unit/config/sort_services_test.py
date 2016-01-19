@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import pytest
+
 from compose.config.errors import DependencyError
 from compose.config.sort_services import sort_service_dicts
 from compose.config.types import VolumeFromSpec
@@ -240,3 +242,15 @@ class SortServiceTest(unittest.TestCase):
             self.assertIn('web', e.msg)
         else:
             self.fail('Should have thrown an DependencyError')
+
+    def test_sort_service_dicts_depends_on_self(self):
+        services = [
+            {
+                'depends_on': ['web'],
+                'name': 'web'
+            },
+        ]
+
+        with pytest.raises(DependencyError) as exc:
+            sort_service_dicts(services)
+        assert 'A service can not depend on itself: web' in exc.exconly()

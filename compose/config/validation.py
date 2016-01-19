@@ -123,6 +123,14 @@ def validate_extends_file_path(service_name, extends_options, filename):
         )
 
 
+def validate_depends_on(service_config, service_names):
+    for dependency in service_config.config.get('depends_on', []):
+        if dependency not in service_names:
+            raise ConfigurationError(
+                "Service '{s.name}' depends on service '{dep}' which is "
+                "undefined.".format(s=service_config, dep=dependency))
+
+
 def get_unsupported_config_msg(service_name, error_key):
     msg = "Unsupported config option for '{}' service: '{}'".format(service_name, error_key)
     if error_key in DOCKER_CONFIG_HINTS:

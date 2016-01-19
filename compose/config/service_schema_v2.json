@@ -42,6 +42,7 @@
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
+        "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
