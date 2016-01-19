@@ -45,8 +45,7 @@ A `docker-compose.yml` looks like this:
       redis:
         image: redis
     volumes:
-      logvolume01:
-        driver: default
+      logvolume01: {}
 
 For more information about the Compose file, see the
 [Compose file reference](compose-file.md)
