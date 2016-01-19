@@ -162,11 +162,11 @@ class Service(object):
         - starts containers until there are at least `desired_num` running
         - removes all stopped containers
         """
-        if self.custom_container_name() and desired_num > 1:
+        if self.custom_container_name and desired_num > 1:
             log.warn('The "%s" service is using the custom container name "%s". '
                      'Docker requires each container to have a unique name. '
                      'Remove the custom name to scale the service.'
-                     % (self.name, self.custom_container_name()))
+                     % (self.name, self.custom_container_name))
 
         if self.specifies_host_port():
             log.warn('The "%s" service specifies a port on the host. If multiple containers '
@@ -496,10 +496,6 @@ class Service(object):
     def get_volumes_from_names(self):
         return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
-    def get_container_name(self, number, one_off=False):
-        # TODO: Implement issue #652 here
-        return build_container_name(self.project, self.name, number, one_off)
-
     # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
@@ -561,9 +557,7 @@ class Service(object):
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        if self.custom_container_name() and not one_off:
-            container_options['name'] = self.custom_container_name()
-        elif not container_options.get('name'):
+        if not container_options.get('name'):
             container_options['name'] = self.get_container_name(number, one_off)
 
         container_options.setdefault('detach', True)
@@ -706,8 +700,15 @@ class Service(object):
             '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
         ]
 
+    @property
     def custom_container_name(self):
         return self.options.get('container_name')
+
+    def get_container_name(self, number, one_off=False):
+        if self.custom_container_name and not one_off:
+            return self.custom_container_name
+
+        return build_container_name(self.project, self.name, number, one_off)
 
     def remove_image(self, image_type):
         if not image_type or image_type == ImageType.none:
