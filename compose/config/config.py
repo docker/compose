@@ -31,6 +31,7 @@ from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_top_level_object
 from .validation import validate_top_level_service_objects
+from .validation import validate_ulimits
 
 
 DOCKER_CONFIG_KEYS = [
@@ -488,23 +489,12 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'depends_on' cannot be extended" % error_prefix)
 
 
-def validate_ulimits(ulimit_config):
-    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
-        if isinstance(soft_hard_values, dict):
-            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
-                raise ConfigurationError(
-                    "ulimit_config \"{}\" cannot contain a 'soft' value higher "
-                    "than 'hard' value".format(ulimit_config))
-
-
 def validate_service(service_config, service_names, version):
     service_dict, service_name = service_config.config, service_config.name
     validate_against_service_schema(service_dict, service_name, version)
     validate_paths(service_dict)
 
-    if 'ulimits' in service_dict:
-        validate_ulimits(service_dict['ulimits'])
-
+    validate_ulimits(service_config)
     validate_depends_on(service_config, service_names)
 
     if not service_dict.get('image') and has_uppercase(service_name):
