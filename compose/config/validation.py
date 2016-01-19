@@ -110,6 +110,18 @@ def validate_top_level_object(config_file):
                 type(config_file.config)))
 
 
+def validate_ulimits(service_config):
+    ulimit_config = service_config.config.get('ulimits', {})
+    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+        if isinstance(soft_hard_values, dict):
+            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
+                raise ConfigurationError(
+                    "Service '{s.name}' has invalid ulimit '{ulimit}'. "
+                    "'soft' value can not be greater than 'hard' value ".format(
+                        s=service_config,
+                        ulimit=ulimit_config))
+
+
 def validate_extends_file_path(service_name, extends_options, filename):
     """
     The service to be extended must either be defined in the config key 'file',

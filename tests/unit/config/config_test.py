@@ -700,7 +700,7 @@ class ConfigTest(unittest.TestCase):
         assert "'hard' is a required property" in exc.exconly()
 
     def test_config_ulimits_soft_greater_than_hard_error(self):
-        expected = "cannot contain a 'soft' value higher than 'hard' value"
+        expected = "'soft' value can not be greater than 'hard' value"
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
