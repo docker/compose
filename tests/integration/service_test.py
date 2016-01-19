@@ -343,6 +343,31 @@ class ServiceTest(DockerClientTestCase):
         )
         self.assertEqual(new_container.get_mount('/data')['Source'], volume_path)
 
+    def test_execute_convergence_plan_when_host_volume_is_removed(self):
+        host_path = '/tmp/host-path'
+        service = self.create_service(
+            'db',
+            build={'context': 'tests/fixtures/dockerfile-with-volume'},
+            volumes=[VolumeSpec(host_path, '/data', 'rw')])
+
+        old_container = create_and_start_container(service)
+        assert (
+            [mount['Destination'] for mount in old_container.get('Mounts')] ==
+            ['/data']
+        )
+        service.options['volumes'] = []
+
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            new_container, = service.execute_convergence_plan(
+                ConvergencePlan('recreate', [old_container]))
+
+        assert not mock_log.warn.called
+        assert (
+            [mount['Destination'] for mount in new_container.get('Mounts')],
+            ['/data']
+        )
+        assert new_container.get_mount('/data')['Source'] != host_path
+
     def test_execute_convergence_plan_without_start(self):
         service = self.create_service(
             'db',

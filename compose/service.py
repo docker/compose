@@ -917,6 +917,10 @@ def get_container_data_volumes(container, volumes_option):
         if not mount:
             continue
 
+        # Volume was previously a host volume, now it's a container volume
+        if not mount.get('Name'):
+            continue
+
         # Copy existing volume from old container
         volume = volume._replace(external=mount['Source'])
         volumes.append(volume)
