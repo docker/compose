@@ -33,7 +33,8 @@ def sort_service_dicts(services):
             service for service in services
             if (name in get_service_names(service.get('links', [])) or
                 name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
-                name == get_service_name_from_net(service.get('net')))
+                name == get_service_name_from_net(service.get('net')) or
+                name in service.get('depends_on', []))
         ]
 
     def visit(n):
@@ -42,8 +43,10 @@ def sort_service_dicts(services):
                 raise DependencyError('A service can not link to itself: %s' % n['name'])
             if n['name'] in n.get('volumes_from', []):
                 raise DependencyError('A service can not mount itself as volume: %s' % n['name'])
-            else:
-                raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
+            if n['name'] in n.get('depends_on', []):
+                raise DependencyError('A service can not depend on itself: %s' % n['name'])
+            raise DependencyError('Circular dependency between %s' % ' and '.join(temporary_marked))
+
         if n in unmarked:
             temporary_marked.add(n['name'])
             for m in get_service_dependents(n, services):

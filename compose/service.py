@@ -471,7 +471,8 @@ class Service(object):
         net_name = self.net.service_name
         return (self.get_linked_service_names() +
                 self.get_volumes_from_names() +
-                ([net_name] if net_name else []))
+                ([net_name] if net_name else []) +
+                self.options.get('depends_on', []))
 
     def get_linked_service_names(self):
         return [service.name for (service, _) in self.links]
