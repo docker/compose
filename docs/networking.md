@@ -12,7 +12,7 @@ weight=6
 
 # Networking in Compose
 
-> **Note:** This document only applies if you're using v2 of the [Compose file format](compose-file.md). Networking features are not supported for legacy Compose files.
+> **Note:** This document only applies if you're using [version 2 of the Compose file format](compose-file.md#versioning). Networking features are not supported for version 1 (legacy) Compose files.
 
 By default Compose sets up a single
 [network](/engine/reference/commandline/network_create.md) for your app. Each
@@ -69,7 +69,7 @@ Instead of just using the default app network, you can specify your own networks
 
 Each service can specify what networks to connect to with the *service-level* `networks` key, which is a list of names referencing entries under the *top-level* `networks` key.
 
-Here's an example Compose file defining several networks. The `proxy` service is the gateway to the outside world, via a network called `outside` which is expected to already exist. `proxy` is isolated from the `db` service, because they do not share a network in common - only `app` can talk to both.
+Here's an example Compose file defining two custom networks. The `proxy` service is isolated from the `db` service, because they do not share a network in common - only `app` can talk to both.
 
     version: 2
 
@@ -77,7 +77,6 @@ Here's an example Compose file defining several networks. The `proxy` service is
       proxy:
         build: ./proxy
         networks:
-          - outside
           - front
       app:
         build: ./app
@@ -99,10 +98,6 @@ Here's an example Compose file defining several networks. The `proxy` service is
         options:
           foo: "1"
           bar: "2"
-      outside:
-        # The 'outside' network is expected to already exist - Compose will not
-        # attempt to create it
-        external: true
 
 ## Configuring the default network
 
@@ -122,6 +117,17 @@ Instead of (or as well as) specifying your own networks, you can also change the
       default:
         # Use the overlay driver for multi-host communication
         driver: overlay
+
+## Using a pre-existing network
+
+If you want your containers to join a pre-existing network, use the [`external` option](compose-file.md#network-configuration-reference):
+
+    networks:
+      default:
+        external:
+          name: my-pre-existing-network
+
+Instead of attemping to create a network called `[projectname]_default`, Compose will look for a network called `my-pre-existing-network` and connect your app's containers to it.
 
 ## Custom container network modes
 
