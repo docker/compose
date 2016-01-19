@@ -502,24 +502,31 @@ class Service(object):
         if self.use_networking:
             return []
 
-        links = []
+        links = {}
+
         for service, link_name in self.links:
             for container in service.containers():
-                links.append((container.name, link_name or service.name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                links[link_name or service.name] = container.name
+                links[container.name] = container.name
+                links[container.name_without_project] = container.name
+
         if link_to_self:
             for container in self.containers():
-                links.append((container.name, self.name))
-                links.append((container.name, container.name))
-                links.append((container.name, container.name_without_project))
+                links[self.name] = container.name
+                links[container.name] = container.name
+                links[container.name_without_project] = container.name
+
         for external_link in self.options.get('external_links') or []:
             if ':' not in external_link:
                 link_name = external_link
             else:
                 external_link, link_name = external_link.split(':')
-            links.append((external_link, link_name))
-        return links
+            links[link_name] = external_link
+
+        return [
+            (alias, container_name)
+            for (container_name, alias) in links.items()
+        ]
 
     def _get_volumes_from(self):
         return [build_volume_from(spec) for spec in self.volumes_from]
