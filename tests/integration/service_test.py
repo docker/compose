@@ -7,7 +7,6 @@ import tempfile
 from os import path
 
 from docker.errors import APIError
-from pytest import mark
 from six import StringIO
 from six import text_type
 
@@ -372,7 +371,6 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
         self.assertEqual(db.containers()[0].environment['FOO'], 'BAR')
 
-    @mark.skipif(True, reason="Engine returns error - needs investigating")
     def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, None)])
@@ -389,7 +387,6 @@ class ServiceTest(DockerClientTestCase):
                 'db'])
         )
 
-    @mark.skipif(True, reason="Engine returns error - needs investigating")
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'custom_link_name')])
@@ -433,7 +430,6 @@ class ServiceTest(DockerClientTestCase):
         c = create_and_start_container(db)
         self.assertEqual(set(get_links(c)), set([]))
 
-    @mark.skipif(True, reason="Engine returns error - needs investigating")
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
 
