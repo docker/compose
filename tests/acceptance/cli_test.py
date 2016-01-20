@@ -461,6 +461,10 @@ class CLITestCase(DockerClientTestCase):
         app_container = self.project.get_service('app').containers()[0]
         db_container = self.project.get_service('db').containers()[0]
 
+        for net_name in [front_name, back_name]:
+            links = app_container.get('NetworkSettings.Networks.{}.Links'.format(net_name))
+            assert '{}:database'.format(db_container.name) in links
+
         # db and app joined the back network
         assert sorted(back_network['Containers']) == sorted([db_container.id, app_container.id])
 
@@ -473,6 +477,9 @@ class CLITestCase(DockerClientTestCase):
 
         # app can see db
         assert self.lookup(app_container, "db")
+
+        # app has aliased db to "database"
+        assert self.lookup(app_container, "database")
 
     @v2_only()
     def test_up_missing_network(self):
@@ -565,18 +572,6 @@ class CLITestCase(DockerClientTestCase):
             '{}_{}'.format(self.project.name, name)
             for name in ['bar', 'foo']
         ]
-
-    @v2_only()
-    def test_up_with_links_is_invalid(self):
-        self.base_dir = 'tests/fixtures/v2-simple'
-
-        result = self.dispatch(
-            ['-f', 'links-invalid.yml', 'up', '-d'],
-            returncode=1)
-
-        # TODO: fix validation error messages for v2 files
-        # assert "Unsupported config option for service 'simple': 'links'" in result.stderr
-        assert "Unsupported config option" in result.stderr
 
     def test_up_with_links_v1(self):
         self.base_dir = 'tests/fixtures/links-composefile'
