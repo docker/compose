@@ -27,9 +27,11 @@ from .types import VolumeFromSpec
 from .types import VolumeSpec
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
+from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_top_level_object
 from .validation import validate_top_level_service_objects
+from .validation import validate_ulimits
 
 
 DOCKER_CONFIG_KEYS = [
@@ -312,9 +314,10 @@ def load_services(working_dir, config_file, service_configs):
         resolver = ServiceExtendsResolver(service_config, config_file)
         service_dict = process_service(resolver.run())
 
-        validate_service(service_dict, service_config.name, config_file.version)
+        service_config = service_config._replace(config=service_dict)
+        validate_service(service_config, service_names, config_file.version)
         service_dict = finalize_service(
-            service_config._replace(config=service_dict),
+            service_config,
             service_names,
             config_file.version)
         return service_dict
@@ -481,22 +484,18 @@ def validate_extended_service_dict(service_dict, filename, service):
             raise ConfigurationError(
                 "%s services with 'net: container' cannot be extended" % error_prefix)
 
-
-def validate_ulimits(ulimit_config):
-    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
-        if isinstance(soft_hard_values, dict):
-            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
-                raise ConfigurationError(
-                    "ulimit_config \"{}\" cannot contain a 'soft' value higher "
-                    "than 'hard' value".format(ulimit_config))
+    if 'depends_on' in service_dict:
+        raise ConfigurationError(
+            "%s services with 'depends_on' cannot be extended" % error_prefix)
 
 
-def validate_service(service_dict, service_name, version):
+def validate_service(service_config, service_names, version):
+    service_dict, service_name = service_config.config, service_config.name
     validate_against_service_schema(service_dict, service_name, version)
     validate_paths(service_dict)
 
-    if 'ulimits' in service_dict:
-        validate_ulimits(service_dict['ulimits'])
+    validate_ulimits(service_config)
+    validate_depends_on(service_config, service_names)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(

@@ -700,7 +700,7 @@ class ConfigTest(unittest.TestCase):
         assert "'hard' is a required property" in exc.exconly()
 
     def test_config_ulimits_soft_greater_than_hard_error(self):
-        expected = "cannot contain a 'soft' value higher than 'hard' value"
+        expected = "'soft' value can not be greater than 'hard' value"
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
@@ -894,8 +894,34 @@ class ConfigTest(unittest.TestCase):
                 'ext': {'external': True, 'driver': 'foo'}
             }
         })
-        with self.assertRaises(ConfigurationError):
+        with pytest.raises(ConfigurationError):
             config.load(config_details)
+
+    def test_depends_on_orders_services(self):
+        config_details = build_config_details({
+            'version': 2,
+            'services': {
+                'one': {'image': 'busybox', 'depends_on': ['three', 'two']},
+                'two': {'image': 'busybox', 'depends_on': ['three']},
+                'three': {'image': 'busybox'},
+            },
+        })
+        actual = config.load(config_details)
+        assert (
+            [service['name'] for service in actual.services] ==
+            ['three', 'two', 'one']
+        )
+
+    def test_depends_on_unknown_service_errors(self):
+        config_details = build_config_details({
+            'version': 2,
+            'services': {
+                'one': {'image': 'busybox', 'depends_on': ['three']},
+            },
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "Service 'one' depends on service 'three'" in exc.exconly()
 
 
 class PortsTest(unittest.TestCase):
