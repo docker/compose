@@ -627,7 +627,11 @@ documentation for more information. Optional.
 ## external
 
 If set to `true`, specifies that this volume has been created outside of
-Compose.
+Compose. `docker-compose up` will not attempt to create it, and will raise
+an error if it doesn't exist.
+
+`external` cannot be used in conjunction with other volume configuration keys
+(`driver`, `driver_opts`).
 
 In the example below, instead of attemping to create a volume called
 `[projectname]_data`, Compose will look for an existing volume simply
@@ -712,7 +716,11 @@ A full example:
 ### external
 
 If set to `true`, specifies that this network has been created outside of
-Compose.
+Compose. `docker-compose up` will not attempt to create it, and will raise
+an error if it doesn't exist.
+
+`external` cannot be used in conjunction with other network configuration keys
+(`driver`, `driver_opts`, `ipam`).
 
 In the example below, `proxy` is the gateway to the outside world. Instead of
 attemping to create a network called `[projectname]_outside`, Compose will
