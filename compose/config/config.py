@@ -134,6 +134,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
             return 1
         return version
 
+    def get_service(self, name):
+        return self.get_service_dicts()[name]
+
     def get_service_dicts(self):
         return self.config if self.version == 1 else self.config.get('services', {})
 
@@ -351,19 +354,19 @@ def process_config_file(config_file, service_name=None):
 
     if config_file.version == 2:
         processed_config = dict(config_file.config)
-        processed_config['services'] = interpolated_config
+        processed_config['services'] = services = interpolated_config
         processed_config['volumes'] = interpolate_environment_variables(
             config_file.get_volumes(), 'volume')
         processed_config['networks'] = interpolate_environment_variables(
             config_file.get_networks(), 'network')
 
     if config_file.version == 1:
-        processed_config = interpolated_config
+        processed_config = services = interpolated_config
 
     config_file = config_file._replace(config=processed_config)
     validate_against_fields_schema(config_file)
 
-    if service_name and service_name not in processed_config:
+    if service_name and service_name not in services:
         raise ConfigurationError(
             "Cannot extend service '{}' in {}: Service not found".format(
                 service_name, config_file.filename))
@@ -408,7 +411,8 @@ class ServiceExtendsResolver(object):
         extended_file = process_config_file(
             extends_file,
             service_name=service_name)
-        service_config = extended_file.config[service_name]
+        service_config = extended_file.get_service(service_name)
+
         return config_path, service_config, service_name
 
     def resolve_extends(self, extended_config_path, service_dict, service_name):
