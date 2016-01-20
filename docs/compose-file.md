@@ -80,7 +80,7 @@ Example:
         image: redis
     volumes:
       logvolume01:
-        driver: default
+        driver: local
 
 
 ## Service configuration reference
@@ -575,6 +575,20 @@ documentation for more information. Optional.
       driver_opts:
         foo: "bar"
         baz: 1
+
+### external
+
+Specify if a volume is external. If this parameter is set, other parameters
+become invalid.
+An external volume is considered to exist outside of compose's managed
+application and will not be created or modified. An error will be raised
+if the volume doesn't exist during the compose "up" phase.
+The value for this parameter can either be a boolean or a string. If a
+string is provided, it is considered to be the name of the volume in the
+Docker engine.
+
+    volume01:
+      external: data_d341c8ee
 
 
 ## Variable substitution
