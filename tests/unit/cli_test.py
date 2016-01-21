@@ -72,8 +72,8 @@ class CLITestCase(unittest.TestCase):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
-    @mock.patch('compose.cli.main.dockerpty', autospec=True)
-    def test_run_with_environment_merged_with_options_list(self, mock_dockerpty):
+    @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    def test_run_with_environment_merged_with_options_list(self, mock_pseudo_terminal):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
         mock_project = mock.Mock(client=mock_client)
