@@ -57,7 +57,18 @@ If any containers have connections open to the old container, they will be close
 
 ## Links
 
-Docker links are a one-way, single-host communication system. They should now be considered deprecated, and as part of upgrading your app to the v2 format, you must remove any `links` sections from your `docker-compose.yml` and use service names (e.g. `web`, `db`) as the hostnames to connect to.
+Links allow you to define extra aliases by which a service is reachable from another service. They are not required to enable services to communicate - by default, any service can reach any other service at that service's name. In the following example, `db` is reachable from `web` at the hostnames `db` and `database`:
+
+    version: 2
+    services:
+      web:
+        build: .
+        links:
+          - "db:database"
+      db:
+        image: postgres
+
+See the [links reference](compose-file.md#links) for more information.
 
 ## Multi-host networking
 

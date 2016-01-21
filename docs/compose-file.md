@@ -318,6 +318,10 @@ container name and the link alias (`CONTAINER:ALIAS`).
      - project_db_1:mysql
      - project_db_1:postgresql
 
+> **Note:** If you're using the [version 2 file format](#version-2), the
+> externally-created containers must be connected to at least one of the same
+> networks as the service which is linking to them.
+
 ### extra_hosts
 
 Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
@@ -358,27 +362,24 @@ It's recommended that you use reverse-DNS notation to prevent your labels from c
 
 ### links
 
-> [Version 1 file format](#version-1) only. In version 2 files, use
-> [networking](networking.md) for communication between containers.
-
 Link to containers in another service. Either specify both the service name and
-the link alias (`SERVICE:ALIAS`), or just the service name (which will also be
-used for the alias).
+a link alias (`SERVICE:ALIAS`), or just the service name.
 
-    links:
-     - db
-     - db:database
-     - redis
+    web:
+      links:
+       - db
+       - db:database
+       - redis
 
-An entry with the alias' name will be created in `/etc/hosts` inside containers
-for this service, e.g:
+Containers for the linked service will be reachable at a hostname identical to
+the alias, or the service name if no alias was specified.
 
-    172.17.2.186  db
-    172.17.2.186  database
-    172.17.2.187  redis
+Links also express dependency between services in the same way as
+[depends_on](#depends-on), so they determine the order of service startup.
 
-Environment variables will also be created - see the [environment variable
-reference](env.md) for details.
+> **Note:** If you define both links and [networks](#networks), services with
+> links between them must share at least one network in common in order to
+> communicate.
 
 ### logging
 
@@ -862,7 +863,6 @@ In the majority of cases, moving from version 1 to 2 is a very simple process:
 
 1. Indent the whole file by one level and put a `services:` key at the top.
 2. Add a `version: 2` line at the top of the file.
-3. Delete all `links` entries.
 
 It's more complicated if you're using particular configuration features:
 
@@ -879,14 +879,28 @@ It's more complicated if you're using particular configuration features:
           options:
             syslog-address: "tcp://192.168.0.42:123"
 
--   `links` with aliases: If you've defined a link with an alias such as
-    `myservice:db`, there's currently no equivalent to this in version 2. You
-    will have to refer to the service using its name (in this example,
-    `myservice`).
+-   `links` with environment variables: As documented in the
+    [environment variables reference](env.md), environment variables created by
+    links have been deprecated for some time. In the new Docker network system,
+    they have been removed. You should either connect directly to the
+    appropriate hostname or set the relevant environment variable yourself,
+    using the link hostname:
 
--   `external_links`: Links are deprecated, so you should use
-    [external networks](networking.md#using-externally-created-networks) to
-    communicate with containers outside the app.
+        web:
+          links:
+            - db
+          environment:
+            - DB_PORT=tcp://db:5432
+
+-   `external_links`: Compose uses Docker networks when running version 2
+    projects, so links behave slightly differently. In particular, two
+    containers must be connected to at least one network in common in order to
+    communicate, even if explicitly linked together.
+
+    Either connect the external container to your app's
+    [default network](networking.md), or connect both the external container and
+    your service's containers to an
+    [external network](networking.md#using-a-pre-existing-network).
 
 -   `net`: If you're using `host`, `bridge` or `none`, this is now replaced by
     `networks`:
