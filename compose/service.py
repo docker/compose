@@ -656,13 +656,17 @@ class Service(object):
         )
 
     def _get_container_networking_config(self, one_off=False):
+        if self.net.mode in ['host', 'bridge']:
+            return None
+
+        if self.net.mode not in self.networks:
+            return None
+
         return self.client.create_networking_config({
-            network_name: self.client.create_endpoint_config(
+            self.net.mode: self.client.create_endpoint_config(
                 aliases=self._get_aliases(one_off=one_off),
                 links=self._get_links(False),
             )
-            for network_name in self.networks
-            if network_name not in ['host', 'bridge']
         })
 
     def build(self, no_cache=False, pull=False, force_rm=False):
