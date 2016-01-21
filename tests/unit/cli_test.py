@@ -73,6 +73,37 @@ class CLITestCase(unittest.TestCase):
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock(client=mock_client)
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            environment=['FOO=ONE', 'BAR=TWO'],
+            image='someimage')
+
+        with pytest.raises(SystemExit):
+            command.run(mock_project, {
+                'SERVICE': 'service',
+                'COMMAND': None,
+                '-e': ['BAR=NEW', 'OTHER=bär'.encode('utf-8')],
+                '--user': None,
+                '--no-deps': None,
+                '-d': False,
+                '-T': None,
+                '--entrypoint': None,
+                '--service-ports': None,
+                '--publish': [],
+                '--rm': None,
+                '--name': None,
+            })
+
+        _, _, call_kwargs = mock_pseudo_terminal.mock_calls[0]
+        assert call_kwargs['logs'] is False
+
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
+    @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
     def test_run_with_environment_merged_with_options_list(self, mock_pseudo_terminal):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
