@@ -14,8 +14,8 @@ func TestNotifier(t *testing.T) {
 	s.Add(ch1, "1")
 	s.Add(ch2, "2")
 	s.m.Lock()
-	if len(s.chMap) != 2 {
-		t.Fatalf("expected 2 channels, got %d", len(s.chMap))
+	if len(s.doneCh) != 2 {
+		t.Fatalf("expected 2 channels, got %d", len(s.doneCh))
 	}
 	s.m.Unlock()
 	ch1 <- struct{}{}
@@ -32,8 +32,8 @@ func TestNotifier(t *testing.T) {
 	close(ch2)
 	time.Sleep(100 * time.Millisecond)
 	s.m.Lock()
-	if len(s.chMap) != 0 {
-		t.Fatalf("expected 0 channels, got %d", len(s.chMap))
+	if len(s.doneCh) != 0 {
+		t.Fatalf("expected 0 channels, got %d", len(s.doneCh))
 	}
 	s.m.Unlock()
 }
