@@ -1937,6 +1937,30 @@ class ExtendsTest(unittest.TestCase):
             load_from_filename(str(tmpdir.join('docker-compose.yml')))
         assert 'Version mismatch' in exc.exconly()
 
+    def test_extends_with_defined_version_passes(self):
+        tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
+        self.addCleanup(tmpdir.remove)
+        tmpdir.join('docker-compose.yml').write("""
+            version: 2
+            services:
+              web:
+                extends:
+                  file: base.yml
+                  service: base
+                image: busybox
+        """)
+        tmpdir.join('base.yml').write("""
+            version: 2
+            services:
+                base:
+                  volumes: ['/foo']
+                  ports: ['3000:3000']
+                  command: top
+        """)
+
+        service = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        self.assertEquals(service[0]['command'], "top")
+
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ExpandPathTest(unittest.TestCase):
