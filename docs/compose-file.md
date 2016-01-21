@@ -169,6 +169,29 @@ client create option.
     devices:
       - "/dev/ttyUSB0:/dev/ttyUSB0"
 
+### depends_on
+
+Express dependency between services, which has two effects:
+
+- `docker-compose up` will start services in dependency order. In the following
+  example, `db` and `redis` will be started before `web`.
+
+- `docker-compose up SERVICE` will automatically include `SERVICE`'s
+  dependencies. In the following example, `docker-compose up web` will also
+  create and start `db` and `redis`.
+
+    version: 2
+    services:
+      web:
+        build: .
+        depends_on:
+          - db
+          - redis
+      redis:
+        image: redis
+      db:
+        image: postgres
+
 ### dns
 
 Custom DNS servers. Can be a single value or a list.
