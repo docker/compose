@@ -104,16 +104,16 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
    
 GLOBAL OPTIONS:
-   --id "deathstar"                 unique containerd id to identify the instance
-   --debug                      enable debug output in the logs
-   --state-dir "/run/containerd"            runtime state directory
-   -c, --concurrency "10"               set the concurrency level for tasks
-   --metrics-interval "1m0s"                interval for flushing metrics to the store
-   --listen, -l "/run/containerd/containerd.sock"   Address on which GRPC API will listen
-   --oom-notify                     enable oom notifications for containers
-   --help, -h                       show help
-   --version, -v                    print the version
-   
+    --id "deathstar"                                     unique containerd id to identify the instance
+    --debug                                              enable debug output in the logs
+    --state-dir "/run/containerd"                        runtime state directory
+    -c, --concurrency "10"                               set the concurrency level for tasks
+    --metrics-interval "1m0s"                            interval for flushing metrics to the store
+    --listen, -l "/run/containerd/containerd.sock"       Address on which GRPC API will listen
+    --oom-notify                                         enable oom notifications for containers
+    --graphite-address                                   Address of graphite server
+    --help, -h                                           show help
+    --version, -v                                        print the version
 ```
 
 # Roadmap 
