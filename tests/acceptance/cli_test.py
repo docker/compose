@@ -903,14 +903,47 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(container.name, name)
 
     @v2_only()
-    def test_run_with_networking(self):
-        self.base_dir = 'tests/fixtures/v2-simple'
-        self.dispatch(['run', 'simple', 'true'], None)
-        service = self.project.get_service('simple')
-        container, = service.containers(stopped=True, one_off=True)
-        networks = self.client.networks(names=[self.project.default_network.full_name])
-        self.assertEqual(len(networks), 1)
-        self.assertEqual(container.human_readable_command, u'true')
+    def test_run_interactive_connects_to_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+
+        self.dispatch(['up', '-d'])
+        self.dispatch(['run', 'app', 'nslookup', 'app'])
+        self.dispatch(['run', 'app', 'nslookup', 'db'])
+
+        containers = self.project.get_service('app').containers(
+            stopped=True, one_off=True)
+        assert len(containers) == 2
+
+        for container in containers:
+            networks = container.get('NetworkSettings.Networks')
+
+            assert sorted(list(networks)) == [
+                '{}_{}'.format(self.project.name, name)
+                for name in ['back', 'front']
+            ]
+
+            for _, config in networks.items():
+                assert not config['Aliases']
+
+    @v2_only()
+    def test_run_detached_connects_to_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['up', '-d'])
+        self.dispatch(['run', '-d', 'app', 'top'])
+
+        container = self.project.get_service('app').containers(one_off=True)[0]
+        networks = container.get('NetworkSettings.Networks')
+
+        assert sorted(list(networks)) == [
+            '{}_{}'.format(self.project.name, name)
+            for name in ['back', 'front']
+        ]
+
+        for _, config in networks.items():
+            assert not config['Aliases']
+
+        assert self.lookup(container, 'app')
+        assert self.lookup(container, 'db')
 
     def test_run_handles_sigint(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
