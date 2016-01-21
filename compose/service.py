@@ -430,10 +430,12 @@ class Service(object):
         return container
 
     def connect_container_to_networks(self, container):
+        one_off = (container.labels.get(LABEL_ONE_OFF) == "True")
+
         for network in self.networks:
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=[self.name],
+                aliases=self._get_aliases(one_off=one_off),
                 links=self._get_links(False),
             )
 
@@ -504,6 +506,12 @@ class Service(object):
         ])
         numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
+
+    def _get_aliases(self, one_off):
+        if one_off:
+            return []
+
+        return [self.name]
 
     def _get_links(self, link_to_self):
         links = {}
@@ -610,7 +618,8 @@ class Service(object):
             override_options,
             one_off=one_off)
 
-        container_options['networking_config'] = self._get_container_networking_config()
+        container_options['networking_config'] = self._get_container_networking_config(
+            one_off=one_off)
 
         return container_options
 
@@ -646,10 +655,10 @@ class Service(object):
             cpu_quota=options.get('cpu_quota'),
         )
 
-    def _get_container_networking_config(self):
+    def _get_container_networking_config(self, one_off=False):
         return self.client.create_networking_config({
             network_name: self.client.create_endpoint_config(
-                aliases=[self.name],
+                aliases=self._get_aliases(one_off=one_off),
                 links=self._get_links(False),
             )
             for network_name in self.networks
