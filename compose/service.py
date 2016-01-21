@@ -27,9 +27,7 @@ from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
 from .parallel import parallel_execute
-from .parallel import parallel_remove
 from .parallel import parallel_start
-from .parallel import parallel_stop
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
@@ -180,6 +178,10 @@ class Service(object):
             service.start_container(container)
             return container
 
+        def stop_and_remove(container):
+            container.stop(timeout=timeout)
+            container.remove()
+
         running_containers = self.containers(stopped=False)
         num_running = len(running_containers)
 
@@ -225,12 +227,17 @@ class Service(object):
 
         if desired_num < num_running:
             num_to_stop = num_running - desired_num
+
             sorted_running_containers = sorted(
                 running_containers,
                 key=attrgetter('number'))
-            containers_to_stop = sorted_running_containers[-num_to_stop:]
-            parallel_stop(containers_to_stop, dict(timeout=timeout))
-            parallel_remove(containers_to_stop, {})
+
+            parallel_execute(
+                sorted_running_containers[-num_to_stop:],
+                stop_and_remove,
+                lambda c: c.name,
+                "Stopping and removing",
+            )
 
     def create_container(self,
                          one_off=False,
