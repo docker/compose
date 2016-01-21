@@ -746,6 +746,11 @@ class ServiceTest(DockerClientTestCase):
         for container in containers:
             self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
 
+    def test_scale_with_immediate_exit(self):
+        service = self.create_service('web', image='busybox', command='true')
+        service.scale(2)
+        assert len(service.containers(stopped=True)) == 2
+
     def test_network_mode_none(self):
         service = self.create_service('web', net=Net('none'))
         container = create_and_start_container(service)
