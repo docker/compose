@@ -228,11 +228,9 @@ class Service(object):
             sorted_running_containers = sorted(
                 running_containers,
                 key=attrgetter('number'))
-            parallel_stop(
-                sorted_running_containers[-num_to_stop:],
-                dict(timeout=timeout))
-
-        parallel_remove(self.containers(stopped=True), {})
+            containers_to_stop = sorted_running_containers[-num_to_stop:]
+            parallel_stop(containers_to_stop, dict(timeout=timeout))
+            parallel_remove(containers_to_stop, {})
 
     def create_container(self,
                          one_off=False,
