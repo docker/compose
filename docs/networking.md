@@ -110,6 +110,11 @@ Here's an example Compose file defining two custom networks. The `proxy` service
           foo: "1"
           bar: "2"
 
+For full details of the network configuration options available, see the following references:
+
+- [Top-level `networks` key](compose-file.md#network-configuration-reference)
+- [Service-level `networks` key](compose-file.md#networks)
+
 ## Configuring the default network
 
 Instead of (or as well as) specifying your own networks, you can also change the settings of the app-wide default network by defining an entry under `networks` named `default`:
