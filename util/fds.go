@@ -1,3 +1,5 @@
+// +build !windows,!darwin
+
 package util
 
 import (
