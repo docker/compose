@@ -328,13 +328,15 @@ class TopLevelCommand(DocoptCommand):
         Usage: logs [options] [SERVICE...]
 
         Options:
-            --no-color  Produce monochrome output.
+            --no-color      Produce monochrome output.
+            -f, --follow    Follow log output
         """
         containers = project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
+        follow = options['--follow']
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, monochrome=monochrome).run()
+        LogPrinter(containers, monochrome=monochrome, follow=follow).run()
 
     def pause(self, project, options):
         """
@@ -660,7 +662,8 @@ class TopLevelCommand(DocoptCommand):
 
             if detached:
                 return
-            log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop)
+            log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop,
+                                            follow=True)
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
@@ -758,13 +761,13 @@ def run_one_off_container(container_options, project, service, options):
     sys.exit(exit_code)
 
 
-def build_log_printer(containers, service_names, monochrome, cascade_stop):
+def build_log_printer(containers, service_names, monochrome, cascade_stop, follow):
     if service_names:
         containers = [
             container
             for container in containers if container.service in service_names
         ]
-    return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop)
+    return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop, follow=follow)
 
 
 @contextlib.contextmanager

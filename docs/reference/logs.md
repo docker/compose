@@ -16,6 +16,7 @@ Usage: logs [options] [SERVICE...]
 
 Options:
 --no-color  Produce monochrome output.
+-f, --follow    Follow log output
 ```
 
 Displays log output from services.

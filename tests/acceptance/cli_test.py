@@ -398,6 +398,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'simple_1  | simple' in result.stdout
         assert 'another_1 | another' in result.stdout
+        assert 'simple_1 exited with code 0' in result.stdout
+        assert 'another_1 exited with code 0' in result.stdout
 
     @v2_only()
     def test_up(self):
@@ -1140,6 +1142,26 @@ class CLITestCase(DockerClientTestCase):
 
     def test_logs_invalid_service_name(self):
         self.dispatch(['logs', 'madeupname'], returncode=1)
+
+    def test_logs_follow(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        self.dispatch(['up', '-d'], None)
+
+        result = self.dispatch(['logs', '-f'])
+
+        assert result.stdout.count('\n') == 5
+        assert 'simple' in result.stdout
+        assert 'another' in result.stdout
+        assert 'exited with code 0' in result.stdout
+
+    def test_logs_unfollow(self):
+        self.base_dir = 'tests/fixtures/logs-composefile'
+        self.dispatch(['up', '-d'], None)
+
+        result = self.dispatch(['logs'])
+
+        assert result.stdout.count('\n') >= 1
+        assert 'exited with code 0' not in result.stdout
 
     def test_kill(self):
         self.dispatch(['up', '-d'], None)

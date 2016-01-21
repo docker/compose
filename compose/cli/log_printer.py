@@ -13,11 +13,13 @@ from compose.utils import split_buffer
 class LogPrinter(object):
     """Print logs from many containers to a single output stream."""
 
-    def __init__(self, containers, output=sys.stdout, monochrome=False, cascade_stop=False):
+    def __init__(self, containers, output=sys.stdout, monochrome=False,
+                 cascade_stop=False, follow=False):
         self.containers = containers
         self.output = utils.get_output_stream(output)
         self.monochrome = monochrome
         self.cascade_stop = cascade_stop
+        self.follow = follow
 
     def run(self):
         if not self.containers:
@@ -41,7 +43,7 @@ class LogPrinter(object):
         for color_func, container in zip(color_funcs, self.containers):
             generator_func = get_log_generator(container)
             prefix = color_func(build_log_prefix(container, prefix_width))
-            yield generator_func(container, prefix, color_func)
+            yield generator_func(container, prefix, color_func, self.follow)
 
 
 def build_log_prefix(container, prefix_width):
@@ -64,28 +66,31 @@ def get_log_generator(container):
     return build_no_log_generator
 
 
-def build_no_log_generator(container, prefix, color_func):
+def build_no_log_generator(container, prefix, color_func, follow):
     """Return a generator that prints a warning about logs and waits for
     container to exit.
     """
     yield "{} WARNING: no logs are available with the '{}' log driver\n".format(
         prefix,
         container.log_driver)
-    yield color_func(wait_on_exit(container))
+    if follow:
+        yield color_func(wait_on_exit(container))
 
 
-def build_log_generator(container, prefix, color_func):
+def build_log_generator(container, prefix, color_func, follow):
     # if the container doesn't have a log_stream we need to attach to container
     # before log printer starts running
     if container.log_stream is None:
-        stream = container.attach(stdout=True, stderr=True,  stream=True, logs=True)
+        stream = container.logs(stdout=True, stderr=True, stream=True,
+                                follow=follow)
         line_generator = split_buffer(stream)
     else:
         line_generator = split_buffer(container.log_stream)
 
     for line in line_generator:
         yield prefix + line
-    yield color_func(wait_on_exit(container))
+    if follow:
+        yield color_func(wait_on_exit(container))
 
 
 def wait_on_exit(container):
