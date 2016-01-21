@@ -28,22 +28,22 @@ func New() *Notifier {
 
 // Chan returns channel on which client listen for notifications.
 // IDs of notifications is sent to the returned channel.
-func (s *Notifier) Chan() <-chan string {
-	return s.c
+func (n *Notifier) Chan() <-chan string {
+	return n.c
 }
 
-func (s *Notifier) killWorker(id string, done chan struct{}) {
-	s.m.Lock()
-	delete(s.doneCh, id)
-	s.m.Unlock()
+func (n *Notifier) killWorker(id string, done chan struct{}) {
+	n.m.Lock()
+	delete(n.doneCh, id)
+	n.m.Unlock()
 }
 
 // Add adds new notification channel to Notifier.
-func (s *Notifier) Add(ch <-chan struct{}, id string) {
+func (n *Notifier) Add(ch <-chan struct{}, id string) {
 	done := make(chan struct{})
-	s.m.Lock()
-	s.doneCh[id] = done
-	s.m.Unlock()
+	n.m.Lock()
+	n.doneCh[id] = done
+	n.m.Unlock()
 
 	go func(ch <-chan struct{}, id string, done chan struct{}) {
 		for {
@@ -52,13 +52,13 @@ func (s *Notifier) Add(ch <-chan struct{}, id string) {
 				if !ok {
 					// If the channel is closed, we don't need the goroutine
 					// or the done channel mechanism running anymore.
-					s.killWorker(id, done)
+					n.killWorker(id, done)
 					return
 				}
-				s.c <- id
+				n.c <- id
 			case <-done:
 				// We don't need this goroutine running anymore, return.
-				s.killWorker(id, done)
+				n.killWorker(id, done)
 				return
 			}
 		}
@@ -66,12 +66,12 @@ func (s *Notifier) Add(ch <-chan struct{}, id string) {
 }
 
 // Close closes the notifier and releases its underlying resources.
-func (s *Notifier) Close() {
-	s.m.Lock()
-	defer s.m.Unlock()
-	for _, done := range s.doneCh {
+func (n *Notifier) Close() {
+	n.m.Lock()
+	defer n.m.Unlock()
+	for _, done := range n.doneCh {
 		close(done)
 	}
-	close(s.c)
+	close(n.c)
 	// TODO(jbd): Don't allow Add after Close returns.
 }
