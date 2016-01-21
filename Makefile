@@ -44,7 +44,7 @@ fmt:
 lint:
 	@golint ./... | grep -v vendor | grep -v .pb. | tee /dev/stderr
 
-shell:
+shell: dbuild
 	$(DOCKER_RUN) bash
 
 test: all validate
