@@ -12,78 +12,32 @@ parent="smn_compose_ref"
 
 # Compose file reference
 
-The compose file is a [YAML](http://yaml.org/) file where all the top level
-keys are the name of a service, and the values are the service definition.
-The default path for a compose file is `./docker-compose.yml`.
+The Compose file is a [YAML](http://yaml.org/) file defining
+[services](#service-configuration-reference),
+[networks](#network-configuration-reference) and
+[volumes](#volume-configuration-reference).
+The default path for a Compose file is `./docker-compose.yml`.
 
-Each service defined in `docker-compose.yml` must specify exactly one of
-`image` or `build`. Other keys are optional, and are analogous to their
-`docker run` command-line counterparts.
+A service definition contains configuration which will be applied to each
+container started for that service, much like passing command-line parameters to
+`docker run`. Likewise, network and volume definitions are analogous to
+`docker network create` and `docker volume create`.
 
 As with `docker run`, options specified in the Dockerfile (e.g., `CMD`,
 `EXPOSE`, `VOLUME`, `ENV`) are respected by default - you don't need to
 specify them again in `docker-compose.yml`.
 
-## Versioning
-
-It is possible to use different versions of the `compose.yml` format.
-Below are the formats currently supported by compose.
-
-
-### Version 1
-
-Compose files that do not declare a version are considered "version 1". In
-those files, all the [services](#service-configuration-reference) are declared
-at the root of the document.
-
-Version 1 files do not support the declaration of
-named [volumes](#volume-configuration-reference) or
-[build arguments](#args).
-
-Example:
-
-    web:
-      build: .
-      ports:
-       - "5000:5000"
-      volumes:
-       - .:/code
-       - logvolume01:/var/log
-      links:
-       - redis
-    redis:
-      image: redis
-
-
-### Version 2
-
-Compose files using the version 2 syntax must indicate the version number at
-the root of the document. All [services](#service-configuration-reference)
-must be declared under the `services` key.
-Named [volumes](#volume-configuration-reference) must be declared under the
-`volumes` key.
-
-Example:
-
-    version: 2
-    services:
-      web:
-        build: .
-        ports:
-         - "5000:5000"
-        volumes:
-         - .:/code
-         - logvolume01:/var/log
-        links:
-         - redis
-      redis:
-        image: redis
-    volumes:
-      logvolume01:
-        driver: default
+You can use environment variables in configuration values with a Bash-like
+`${VARIABLE}` syntax - see [variable substitution](#variable-substitution) for
+full details.
 
 
 ## Service configuration reference
+
+> **Note:** There are two versions of the Compose file format – version 1 (the
+> legacy format, which does not support volumes or networks) and version 2 (the
+> most up-to-date). For more information, see the [Versioning](#versioning)
+> section.
 
 This section contains a list of all configuration options supported by a service
 definition.
@@ -92,27 +46,29 @@ definition.
 
 Configuration options that are applied at build time.
 
-In version 1 this must be given as a string representing the context.
+`build` can be specified either as a string containing a path to the build
+context, or an object with the path specified under [context](#context) and
+optionally [dockerfile](#dockerfile) and [args](#args).
 
-  build: .
+    build: ./dir
 
-In version 2 this can alternatively be given as an object with extra options.
+    build:
+      context: ./dir
+      dockerfile: Dockerfile-alternate
+      args:
+        buildno: 1
 
-  version: 2
-  services:
-    web:
-      build: .
-
-    version: 2
-    services:
-      web:
-        build:
-          context: .
-          dockerfile: Dockerfile-alternate
-          args:
-            buildno: 1
+> **Note**: In the [version 1 file format](#version-1), `build` is different in
+> two ways:
+>
+> -   Only the string form (`build: .`) is allowed - not the object form.
+> -   Using `build` together with `image` is not allowed. Attempting to do so
+>     results in an error.
 
 #### context
+
+> [Version 2 file format](#version-2) only. In version 1, just use
+> [build](#build).
 
 Either a path to a directory containing a Dockerfile, or a url to a git repository.
 
@@ -122,28 +78,33 @@ sent to the Docker daemon.
 
 Compose will build and tag it with a generated name, and use that image thereafter.
 
-    build: /path/to/build/dir
-
     build:
-      context: /path/to/build/dir
-
-Using `context` together with `image` is not allowed. Attempting to do so results in
-an error.
+      context: ./dir
 
 #### dockerfile
 
 Alternate Dockerfile.
 
 Compose will use an alternate file to build with. A build path must also be
-specified using the `build` key.
+specified.
 
     build:
-      context: /path/to/build/dir
+      context: .
       dockerfile: Dockerfile-alternate
 
-Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
+> **Note**: In the [version 1 file format](#version-1), `dockerfile` is
+> different in two ways:
+>
+> -   It appears alongside `build`, not as a sub-option:
+>
+>         build: .
+>         dockerfile: Dockerfile-alternate
+> -   Using `dockerfile` together with `image` is not allowed. Attempting to do
+>     so results in an error.
 
 #### args
+
+> [Version 2 file format](#version-2) only.
 
 Add build arguments. You can use either an array or a dictionary. Any
 boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
@@ -151,8 +112,6 @@ they are not converted to True or False by the YML parser.
 
 Build arguments with only a key are resolved to their environment value on the
 machine Compose is running on.
-
-> **Note:** Introduced in version 2 of the compose file format.
 
     build:
       args:
@@ -209,6 +168,29 @@ client create option.
 
     devices:
       - "/dev/ttyUSB0:/dev/ttyUSB0"
+
+### depends_on
+
+Express dependency between services, which has two effects:
+
+- `docker-compose up` will start services in dependency order. In the following
+  example, `db` and `redis` will be started before `web`.
+
+- `docker-compose up SERVICE` will automatically include `SERVICE`'s
+  dependencies. In the following example, `docker-compose up web` will also
+  create and start `db` and `redis`.
+
+    version: 2
+    services:
+      web:
+        build: .
+        depends_on:
+          - db
+          - redis
+      redis:
+        image: redis
+      db:
+        image: postgres
 
 ### dns
 
@@ -336,6 +318,10 @@ container name and the link alias (`CONTAINER:ALIAS`).
      - project_db_1:mysql
      - project_db_1:postgresql
 
+> **Note:** If you're using the [version 2 file format](#version-2), the
+> externally-created containers must be connected to at least one of the same
+> networks as the service which is linking to them.
+
 ### extra_hosts
 
 Add hostname mappings. Use the same values as the docker client `--add-host` parameter.
@@ -377,33 +363,35 @@ It's recommended that you use reverse-DNS notation to prevent your labels from c
 ### links
 
 Link to containers in another service. Either specify both the service name and
-the link alias (`SERVICE:ALIAS`), or just the service name (which will also be
-used for the alias).
+a link alias (`SERVICE:ALIAS`), or just the service name.
 
-    links:
-     - db
-     - db:database
-     - redis
+    web:
+      links:
+       - db
+       - db:database
+       - redis
 
-An entry with the alias' name will be created in `/etc/hosts` inside containers
-for this service, e.g:
+Containers for the linked service will be reachable at a hostname identical to
+the alias, or the service name if no alias was specified.
 
-    172.17.2.186  db
-    172.17.2.186  database
-    172.17.2.187  redis
+Links also express dependency between services in the same way as
+[depends_on](#depends-on), so they determine the order of service startup.
 
-Environment variables will also be created - see the [environment variable
-reference](env.md) for details.
+> **Note:** If you define both links and [networks](#networks), services with
+> links between them must share at least one network in common in order to
+> communicate.
 
 ### logging
 
-Logging configuration for the service. This configuration replaces the previous
-`log_driver` and `log_opt` keys.
+> [Version 2 file format](#version-2) only. In version 1, use
+> [log_driver](#log_driver) and [log_opt](#log_opt).
+
+Logging configuration for the service.
 
     logging:
-        driver: log_driver
-        options:
-            syslog-address: "tcp://192.168.0.42:123"
+      driver: syslog
+      options:
+        syslog-address: "tcp://192.168.0.42:123"
 
 The `driver`  name specifies a logging driver for the service's
 containers, as with the ``--log-driver`` option for docker run
@@ -421,14 +409,35 @@ The default value is json-file.
 
 Specify logging options for the logging driver with the ``options`` key, as with the ``--log-opt`` option for `docker run`.
 
-
-Logging options are key value pairs. An example of `syslog` options:
+Logging options are key-value pairs. An example of `syslog` options:
 
     driver: "syslog"
     options:
       syslog-address: "tcp://192.168.0.42:123"
 
+### log_driver
+
+> [Version 1 file format](#version-1) only. In version 2, use
+> [logging](#logging).
+
+Specify a log driver. The default is `json-file`.
+
+    log_driver: syslog
+
+### log_opt
+
+> [Version 1 file format](#version-1) only. In version 2, use
+> [logging](#logging).
+
+Specify logging options as key-value pairs. An example of `syslog` options:
+
+    log_opt:
+      syslog-address: "tcp://192.168.0.42:123"
+
 ### net
+
+> [Version 1 file format](#version-1) only. In version 2, use
+> [networks](#networks).
 
 Networking mode. Use the same values as the docker client `--net` parameter.
 
@@ -436,6 +445,22 @@ Networking mode. Use the same values as the docker client `--net` parameter.
     net: "none"
     net: "container:[name or id]"
     net: "host"
+
+### networks
+
+> [Version 2 file format](#version-2) only. In version 1, use [net](#net).
+
+Networks to join, referencing entries under the
+[top-level `networks` key](#network-configuration-reference).
+
+    networks:
+      - some-network
+      - other-network
+
+The values `bridge`, `host` and `none` can also be used, and are equivalent to
+`net: "bridge"`, `net: "host"` or `net: "none"` in version 1.
+
+There is no equivalent to `net: "container:[name or id]"`.
 
 ### pid
 
@@ -487,23 +512,36 @@ limit as an integer or soft/hard limits as a mapping.
 
 ### volumes, volume\_driver
 
-Mount paths as volumes, optionally specifying a path on the host machine
-(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
-
-    volumes:
-     - /var/lib/mysql
-     - ./cache:/tmp/cache
-     - ~/configs:/etc/configs/:ro
+Mount paths or named volumes, optionally specifying a path on the host machine
+(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`). Named volumes can
+be specified with the
+[top-level `volumes` key](#volume-configuration-reference), but this is
+optional - the Docker Engine will create the volume if it doesn't exist.
 
 You can mount a relative path on the host, which will expand relative to
 the directory of the Compose configuration file being used. Relative paths
 should always begin with `.` or `..`.
 
+    volumes:
+      # Just specify a path and let the Engine create a volume
+      - /var/lib/mysql
+
+      # Specify an absolute path mapping
+      - /opt/data:/var/lib/mysql
+
+      # Path on the host, relative to the Compose file
+      - ./cache:/tmp/cache
+
+      # User-relative path
+      - ~/configs:/etc/configs/:ro
+
+      # Named volume
+      - datavolume:/var/lib/mysql
+
 If you use a volume name (instead of a volume path), you may also specify
 a `volume_driver`.
 
     volume_driver: mydriver
-
 
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
@@ -519,8 +557,18 @@ specifying read-only access(``ro``) or read-write(``rw``).
 
     volumes_from:
      - service_name
-     - container_name
-     - service_name:rw
+     - service_name:ro
+     - container:container_name
+     - container:container_name:rw
+
+> **Note:** The `container:...` formats are only supported in the
+> [version 2 file format](#version-2). In [version 1](#version-1), you can use
+> container names without marking them as such:
+>
+>     - service_name
+>     - service_name:ro
+>     - container_name
+>     - container_name:rw
 
 ### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
 
@@ -562,19 +610,316 @@ subcommand documentation for more information.
 ### driver
 
 Specify which volume driver should be used for this volume. Defaults to
-`local`. An exception will be raised if the driver is not available.
+`local`. The Docker Engine will return an error if the driver is not available.
 
       driver: foobar
 
 ### driver_opts
 
 Specify a list of options as key-value pairs to pass to the driver for this
-volume. Those options are driver dependent - consult the driver's
+volume. Those options are driver-dependent - consult the driver's
 documentation for more information. Optional.
 
       driver_opts:
         foo: "bar"
         baz: 1
+
+## external
+
+If set to `true`, specifies that this volume has been created outside of
+Compose. `docker-compose up` will not attempt to create it, and will raise
+an error if it doesn't exist.
+
+`external` cannot be used in conjunction with other volume configuration keys
+(`driver`, `driver_opts`).
+
+In the example below, instead of attemping to create a volume called
+`[projectname]_data`, Compose will look for an existing volume simply
+called `data` and mount it into the `db` service's containers.
+
+    version: 2
+
+    services:
+      db:
+        image: postgres
+        volumes:
+          - data:/var/lib/postgres/data
+
+    volumes:
+      data:
+        external: true
+
+You can also specify the name of the volume separately from the name used to
+refer to it within the Compose file:
+
+    volumes
+      data:
+        external:
+          name: actual-name-of-volume
+
+
+## Network configuration reference
+
+The top-level `networks` key lets you specify networks to be created. For a full
+explanation of Compose's use of Docker networking features, see the
+[Networking guide](networking.md).
+
+### driver
+
+Specify which driver should be used for this network.
+
+The default driver depends on how the Docker Engine you're using is configured,
+but in most instances it will be `bridge` on a single host and `overlay` on a
+Swarm.
+
+The Docker Engine will return an error if the driver is not available.
+
+    driver: overlay
+
+### driver_opts
+
+Specify a list of options as key-value pairs to pass to the driver for this
+network. Those options are driver-dependent - consult the driver's
+documentation for more information. Optional.
+
+      driver_opts:
+        foo: "bar"
+        baz: 1
+
+### ipam
+
+Specify custom IPAM config. This is an object with several properties, each of
+which is optional:
+
+-   `driver`: Custom IPAM driver, instead of the default.
+-   `config`: A list with zero or more config blocks, each containing any of
+    the following keys:
+    - `subnet`: Subnet in CIDR format that represents a network segment
+    - `ip_range`: Range of IPs from which to allocate container IPs
+    - `gateway`: IPv4 or IPv6 gateway for the master subnet
+    - `aux_addresses`: Auxiliary IPv4 or IPv6 addresses used by Network driver,
+      as a mapping from hostname to IP
+
+A full example:
+
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          ip_range: 172.28.5.0/24
+          gateway: 172.28.5.254
+          aux_addresses:
+            host1: 172.28.1.5
+            host2: 172.28.1.6
+            host3: 172.28.1.7
+
+### external
+
+If set to `true`, specifies that this network has been created outside of
+Compose. `docker-compose up` will not attempt to create it, and will raise
+an error if it doesn't exist.
+
+`external` cannot be used in conjunction with other network configuration keys
+(`driver`, `driver_opts`, `ipam`).
+
+In the example below, `proxy` is the gateway to the outside world. Instead of
+attemping to create a network called `[projectname]_outside`, Compose will
+look for an existing network simply called `outside` and connect the `proxy`
+service's containers to it.
+
+    version: 2
+
+    services:
+      proxy:
+        build: ./proxy
+        networks:
+          - outside
+          - default
+      app:
+        build: ./app
+        networks:
+          - default
+
+    networks
+      outside:
+        external: true
+
+You can also specify the name of the network separately from the name used to
+refer to it within the Compose file:
+
+    networks
+      outside:
+        external:
+          name: actual-name-of-network
+
+
+## Versioning
+
+There are two versions of the Compose file format:
+
+- Version 1, the legacy format. This is specified by omitting a `version` key at
+  the root of the YAML.
+- Version 2, the recommended format. This is specified with a `version: 2` entry
+  at the root of the YAML.
+
+To move your project from version 1 to 2, see the [Upgrading](#upgrading)
+section.
+
+> **Note:** If you're using
+> [multiple Compose files](extends.md#different-environments) or
+> [extending services](extends.md#extending-services), each file must be of the
+> same version - you cannot mix version 1 and 2 in a single project.
+
+Several things differ depending on which version you use:
+
+- The structure and permitted configuration keys
+- The minimum Docker Engine version you must be running
+- Compose's behaviour with regards to networking
+
+These differences are explained below.
+
+
+### Version 1
+
+Compose files that do not declare a version are considered "version 1". In
+those files, all the [services](#service-configuration-reference) are declared
+at the root of the document.
+
+Version 1 is supported by **Compose up to 1.6.x**. It will be deprecated in a
+future Compose release.
+
+Version 1 files cannot declare named
+[volumes](#volume-configuration-reference), [networks](networking.md) or
+[build arguments](#args). They *can*, however, define [links](#links).
+
+Example:
+
+    web:
+      build: .
+      ports:
+       - "5000:5000"
+      volumes:
+       - .:/code
+      links:
+       - redis
+    redis:
+      image: redis
+
+
+### Version 2
+
+Compose files using the version 2 syntax must indicate the version number at
+the root of the document. All [services](#service-configuration-reference)
+must be declared under the `services` key.
+
+Version 2 files are supported by **Compose 1.6.0+** and require a Docker Engine
+of version **1.10.0+**.
+
+Named [volumes](#volume-configuration-reference) can be declared under the
+`volumes` key, and [networks](#network-configuration-reference) can be declared
+under the `networks` key.
+
+You cannot define links when using version 2. Instead, you should use
+[networking](networking.md) for communication between containers. In most cases,
+this will involve less configuration than links.
+
+Simple example:
+
+    version: 2
+    services:
+      web:
+        build: .
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+      redis:
+        image: redis
+
+A more extended example, defining volumes and networks:
+
+    version: 2
+    services:
+      web:
+        build: .
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+        networks:
+          - front
+          - back
+      redis:
+        image: redis
+        volumes:
+          - data:/var/lib/redis
+        networks:
+          - back
+    volumes:
+      data:
+        driver: local
+    networks:
+      front:
+        driver: bridge
+      back:
+        driver: bridge
+
+
+### Upgrading
+
+In the majority of cases, moving from version 1 to 2 is a very simple process:
+
+1. Indent the whole file by one level and put a `services:` key at the top.
+2. Add a `version: 2` line at the top of the file.
+
+It's more complicated if you're using particular configuration features:
+
+-   `dockerfile`: This now lives under the `build` key:
+
+        build:
+          context: .
+          dockerfile: Dockerfile-alternate
+
+-   `log_driver`, `log_opt`: These now live under the `logging` key:
+
+        logging:
+          driver: syslog
+          options:
+            syslog-address: "tcp://192.168.0.42:123"
+
+-   `links` with environment variables: As documented in the
+    [environment variables reference](env.md), environment variables created by
+    links have been deprecated for some time. In the new Docker network system,
+    they have been removed. You should either connect directly to the
+    appropriate hostname or set the relevant environment variable yourself,
+    using the link hostname:
+
+        web:
+          links:
+            - db
+          environment:
+            - DB_PORT=tcp://db:5432
+
+-   `external_links`: Compose uses Docker networks when running version 2
+    projects, so links behave slightly differently. In particular, two
+    containers must be connected to at least one network in common in order to
+    communicate, even if explicitly linked together.
+
+    Either connect the external container to your app's
+    [default network](networking.md), or connect both the external container and
+    your service's containers to an
+    [external network](networking.md#using-a-pre-existing-network).
+
+-   `net`: If you're using `host`, `bridge` or `none`, this is now replaced by
+    `networks`:
+
+        net: host    ->  networks: ["host"]
+        net: bridge  ->  networks: ["bridge"]
+        net: none    ->  networks: ["none"]
+
+    If you're using `net: "container:<name>"`, there is no equivalent to this in
+    version 2 - you should use [Docker networks](networking.md) for
+    communication instead.
 
 
 ## Variable substitution
