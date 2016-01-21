@@ -426,10 +426,11 @@ class Service(object):
 
     def connect_container_to_networks(self, container):
         for network in self.networks:
-            log.debug('Connecting "{}" to "{}"'.format(container.name, network))
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=[self.name])
+                aliases=[self.name],
+                links=self._get_links(False),
+            )
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
@@ -500,9 +501,6 @@ class Service(object):
         return 1 if not numbers else max(numbers) + 1
 
     def _get_links(self, link_to_self):
-        if self.use_networking:
-            return []
-
         links = {}
 
         for service, link_name in self.links:
@@ -645,7 +643,10 @@ class Service(object):
 
     def _get_container_networking_config(self):
         return self.client.create_networking_config({
-            network_name: self.client.create_endpoint_config(aliases=[self.name])
+            network_name: self.client.create_endpoint_config(
+                aliases=[self.name],
+                links=self._get_links(False),
+            )
             for network_name in self.networks
             if network_name not in ['host', 'bridge']
         })

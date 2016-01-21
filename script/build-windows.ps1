@@ -41,6 +41,9 @@ Get-ChildItem -Recurse -Include *.pyc | foreach ($_) { Remove-Item $_.FullName }
 # Create virtualenv
 virtualenv .\venv
 
+# pip and pyinstaller generate lots of warnings, so we need to ignore them
+$ErrorActionPreference = "Continue"
+
 # Install dependencies
 .\venv\Scripts\pip install pypiwin32==219
 .\venv\Scripts\pip install -r requirements.txt
@@ -50,8 +53,6 @@ virtualenv .\venv
 git rev-parse --short HEAD | out-file -encoding ASCII compose\GITSHA
 
 # Build binary
-# pyinstaller has lots of warnings, so we need to run with ErrorAction = Continue
-$ErrorActionPreference = "Continue"
 .\venv\Scripts\pyinstaller .\docker-compose.spec
 $ErrorActionPreference = "Stop"
 

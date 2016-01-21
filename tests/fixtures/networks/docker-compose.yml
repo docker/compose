@@ -9,6 +9,8 @@ services:
     image: busybox
     command: top
     networks: ["front", "back"]
+    links:
+      - "db:database"
   db:
     image: busybox
     command: top

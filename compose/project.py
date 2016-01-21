@@ -78,12 +78,11 @@ class Project(object):
             if use_networking:
                 networks = get_networks(service_dict, all_networks)
                 net = Net(networks[0]) if networks else Net("none")
-                links = []
             else:
                 networks = []
                 net = project.get_net(service_dict)
-                links = project.get_links(service_dict)
 
+            links = project.get_links(service_dict)
             volumes_from = get_volumes_from(project, service_dict)
 
             project.services.append(
