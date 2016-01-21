@@ -88,11 +88,26 @@ class ConfigTest(unittest.TestCase):
                         'driver': 'default',
                         'driver_opts': {'beep': 'boop'}
                     }
+                },
+                'networks': {
+                    'default': {
+                        'driver': 'bridge',
+                        'driver_opts': {'beep': 'boop'}
+                    },
+                    'with_ipam': {
+                        'ipam': {
+                            'driver': 'default',
+                            'config': [
+                                {'subnet': '172.28.0.0/16'}
+                            ]
+                        }
+                    }
                 }
             }, 'working_dir', 'filename.yml')
         )
         service_dicts = config_data.services
         volume_dict = config_data.volumes
+        networks_dict = config_data.networks
         self.assertEqual(
             service_sort(service_dicts),
             service_sort([
@@ -111,6 +126,20 @@ class ConfigTest(unittest.TestCase):
             'hello': {
                 'driver': 'default',
                 'driver_opts': {'beep': 'boop'}
+            }
+        })
+        self.assertEqual(networks_dict, {
+            'default': {
+                'driver': 'bridge',
+                'driver_opts': {'beep': 'boop'}
+            },
+            'with_ipam': {
+                'ipam': {
+                    'driver': 'default',
+                    'config': [
+                        {'subnet': '172.28.0.0/16'}
+                    ]
+                }
             }
         })
 
@@ -189,6 +218,18 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
+            )
+
+    def test_load_throws_error_with_invalid_network_fields(self):
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': 2,
+                    'services': {'web': 'busybox:latest'},
+                    'networks': {
+                        'invalid': {'foo', 'bar'}
+                    }
+                }, 'working_dir', 'filename.yml')
             )
 
     def test_load_config_invalid_service_names(self):

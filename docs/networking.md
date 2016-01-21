@@ -106,7 +106,7 @@ Here's an example Compose file defining two custom networks. The `proxy` service
       back:
         # Use a custom driver which takes special options
         driver: my-custom-driver
-        options:
+        driver_opts:
           foo: "1"
           bar: "2"
 
