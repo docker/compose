@@ -494,9 +494,17 @@ port (a random host port will be chosen).
 
 Override the default labeling scheme for each container.
 
-      security_opt:
-        - label:user:USER
-        - label:role:ROLE
+    security_opt:
+      - label:user:USER
+      - label:role:ROLE
+
+### stop_signal
+
+Sets an alternative signal to stop the container. By default `stop` uses
+SIGTERM. Setting an alternative signal using `stop_signal` will cause
+`stop` to send that signal instead.
+
+    stop_signal: SIGUSR1
 
 ### ulimits
 
@@ -504,11 +512,11 @@ Override the default ulimits for a container. You can either specify a single
 limit as an integer or soft/hard limits as a mapping.
 
 
-      ulimits:
-        nproc: 65535
-        nofile:
-          soft: 20000
-          hard: 40000
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
 
 ### volumes, volume\_driver
 
@@ -612,7 +620,7 @@ subcommand documentation for more information.
 Specify which volume driver should be used for this volume. Defaults to
 `local`. The Docker Engine will return an error if the driver is not available.
 
-      driver: foobar
+     driver: foobar
 
 ### driver_opts
 
@@ -620,9 +628,9 @@ Specify a list of options as key-value pairs to pass to the driver for this
 volume. Those options are driver-dependent - consult the driver's
 documentation for more information. Optional.
 
-      driver_opts:
-        foo: "bar"
-        baz: 1
+     driver_opts:
+       foo: "bar"
+       baz: 1
 
 ## external
 
