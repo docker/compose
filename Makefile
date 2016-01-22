@@ -51,7 +51,7 @@ shell: dbuild
 test: all validate
 	go test -v $(shell go list ./... | grep -v /vendor)
 
-validate: fmt lint vet
+validate: fmt
 
 vet:
 	go vet $(shell go list ./... | grep -v vendor)
