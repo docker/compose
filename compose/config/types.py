@@ -163,3 +163,9 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
     def repr(self):
         external = self.external + ':' if self.external else ''
         return '{ext}{v.internal}:{v.mode}'.format(ext=external, v=self)
+
+    @property
+    def is_named_volume(self):
+        return self.external and not (
+            self.external.startswith('.') or self.external.startswith('/')
+        )
