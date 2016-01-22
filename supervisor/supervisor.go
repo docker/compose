@@ -50,7 +50,7 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		go func() {
 			for id := range s.notifier.Chan() {
 				e := NewEvent(OOMEventType)
-				e.ID = id
+				e.ID = id.(string)
 				s.SendEvent(e)
 			}
 		}()

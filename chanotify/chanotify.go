@@ -11,41 +11,41 @@ import (
 // notification from Notifier, close doesn't spawn anything and removes channel
 // from Notifier.
 type Notifier struct {
-	c chan string
+	c chan interface{}
 
 	m      sync.Mutex // guards doneCh
-	doneCh map[string]chan struct{}
+	doneCh map[interface{}]chan struct{}
 }
 
 // New returns a new *Notifier.
 func New() *Notifier {
 	s := &Notifier{
-		c:      make(chan string),
-		doneCh: make(map[string]chan struct{}),
+		c:      make(chan interface{}),
+		doneCh: make(map[interface{}]chan struct{}),
 	}
 	return s
 }
 
 // Chan returns channel on which client listen for notifications.
 // IDs of notifications is sent to the returned channel.
-func (n *Notifier) Chan() <-chan string {
+func (n *Notifier) Chan() <-chan interface{} {
 	return n.c
 }
 
-func (n *Notifier) killWorker(id string, done chan struct{}) {
+func (n *Notifier) killWorker(id interface{}, done chan struct{}) {
 	n.m.Lock()
 	delete(n.doneCh, id)
 	n.m.Unlock()
 }
 
 // Add adds new notification channel to Notifier.
-func (n *Notifier) Add(ch <-chan struct{}, id string) {
+func (n *Notifier) Add(id interface{}, ch <-chan struct{}) {
 	done := make(chan struct{})
 	n.m.Lock()
 	n.doneCh[id] = done
 	n.m.Unlock()
 
-	go func(ch <-chan struct{}, id string, done chan struct{}) {
+	go func(ch <-chan struct{}, id interface{}, done chan struct{}) {
 		for {
 			select {
 			case _, ok := <-ch:

@@ -74,7 +74,7 @@ func (w *worker) Start() {
 			if err != nil {
 				logrus.WithField("error", err).Error("containerd: notify OOM events")
 			} else {
-				w.s.notifier.Add(n, t.Container.ID())
+				w.s.notifier.Add(t.Container.ID(), n)
 			}
 		}
 		ContainerStartTimer.UpdateSince(started)
