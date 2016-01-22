@@ -1,7 +1,6 @@
 package chanotify
 
 import (
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -11,29 +10,30 @@ func TestNotifier(t *testing.T) {
 	s := New()
 	ch1 := make(chan struct{}, 1)
 	ch2 := make(chan struct{}, 1)
-	s.Add("1", ch1)
-	s.Add("2", ch2)
+	id1 := "1"
+	id2 := "2"
+
+	s.Add(id1, ch1)
+	s.Add(id2, ch2)
 	s.m.Lock()
 	if len(s.doneCh) != 2 {
-		t.Fatalf("expected 2 channels, got %d", len(s.doneCh))
+		t.Fatalf("want 2 channels, got %d", len(s.doneCh))
 	}
 	s.m.Unlock()
 	ch1 <- struct{}{}
-	id1 := <-s.Chan()
-	if id1.(string) != "1" {
-		t.Fatalf("1 should be spawned, got %s", id1)
+	if got, want := <-s.Chan(), id1; got != want {
+		t.Fatalf("got %v; want %v", got, want)
 	}
 	ch2 <- struct{}{}
-	id2 := <-s.Chan()
-	if id2.(string) != "2" {
-		t.Fatalf("2 should be spawned, got %s", id2)
+	if got, want := <-s.Chan(), id2; got != want {
+		t.Fatalf("got %v; want %v", got, want)
 	}
 	close(ch1)
 	close(ch2)
 	time.Sleep(100 * time.Millisecond)
 	s.m.Lock()
 	if len(s.doneCh) != 0 {
-		t.Fatalf("expected 0 channels, got %d", len(s.doneCh))
+		t.Fatalf("want 0 channels, got %d", len(s.doneCh))
 	}
 	s.m.Unlock()
 }
@@ -43,7 +43,7 @@ func TestConcurrentNotifier(t *testing.T) {
 	var chs []chan struct{}
 	for i := 0; i < 8; i++ {
 		ch := make(chan struct{}, 2)
-		s.Add(strconv.Itoa(i), ch)
+		s.Add(i, ch)
 		chs = append(chs, ch)
 	}
 	testCounter := make(map[interface{}]int)
@@ -82,14 +82,14 @@ func TestConcurrentNotifier(t *testing.T) {
 func TestAddToBlocked(t *testing.T) {
 	s := New()
 	ch := make(chan struct{}, 1)
+	id := 1
 	go func() {
 		// give some time to start first select
 		time.Sleep(1 * time.Second)
-		s.Add("1", ch)
+		s.Add(id, ch)
 		ch <- struct{}{}
 	}()
-	val := <-s.Chan()
-	if val != "1" {
-		t.Fatalf("Expected 1, got %s", val)
+	if got, want := <-s.Chan(), id; got != want {
+		t.Fatalf("got %v; want %v", got, want)
 	}
 }
