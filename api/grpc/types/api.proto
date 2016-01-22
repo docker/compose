@@ -21,12 +21,12 @@ message CreateContainerRequest {
 	string stdin = 3; // path to the file where stdin will be read (optional)
 	string stdout = 4; // path to file where stdout will be written (optional)
 	string stderr = 5; // path to file where stderr will be written (optional)
-    string console = 6; // path to the console for a container (optional)
+	string console = 6; // path to the console for a container (optional)
 	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
 }
 
 message CreateContainerResponse {
-    uint32 pid = 1; // PID of the containers main process
+	uint32 pid = 1; // PID of the containers main process
 }
 
 message SignalRequest {
@@ -45,10 +45,10 @@ message AddProcessRequest {
 	repeated string args = 4; // Arguments for process, first is binary path itself
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
-    string stdin = 7; // path to the file where stdin will be read (optional)
+	string stdin = 7; // path to the file where stdin will be read (optional)
 	string stdout = 8; // path to file where stdout will be written (optional)
 	string stderr = 9; // path to file where stderr will be written (optional)
-    string console = 10; // path to the console for a container (optional)
+	string console = 10; // path to the console for a container (optional)
 };
 
 message User {
