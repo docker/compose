@@ -1,0 +1,8 @@
+language: go
+
+go:
+    - 1.2
+
+install:
+    - 'go install github.com/onsi/ginkgo/ginkgo'
+script: 'ginkgo -r'
