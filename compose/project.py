@@ -74,6 +74,17 @@ class Project(object):
         if 'default' not in network_config:
             all_networks.append(project.default_network)
 
+        if config_data.volumes:
+            for vol_name, data in config_data.volumes.items():
+                project.volumes.append(
+                    Volume(
+                        client=client, project=name, name=vol_name,
+                        driver=data.get('driver'),
+                        driver_opts=data.get('driver_opts'),
+                        external_name=data.get('external_name')
+                    )
+                )
+
         for service_dict in config_data.services:
             if use_networking:
                 networks = get_networks(service_dict, all_networks)
@@ -86,6 +97,9 @@ class Project(object):
 
             volumes_from = get_volumes_from(project, service_dict)
 
+            if config_data.version == 2:
+                match_named_volumes(service_dict, project.volumes)
+
             project.services.append(
                 Service(
                     client=client,
@@ -95,22 +109,12 @@ class Project(object):
                     links=links,
                     net=net,
                     volumes_from=volumes_from,
-                    **service_dict))
+                    **service_dict)
+            )
 
         project.networks += custom_networks
         if 'default' not in network_config and project.uses_default_network():
             project.networks.append(project.default_network)
-
-        if config_data.volumes:
-            for vol_name, data in config_data.volumes.items():
-                project.volumes.append(
-                    Volume(
-                        client=client, project=name, name=vol_name,
-                        driver=data.get('driver'),
-                        driver_opts=data.get('driver_opts'),
-                        external_name=data.get('external_name')
-                    )
-                )
 
         return project
 
@@ -471,6 +475,23 @@ def get_networks(service_dict, network_definitions):
                     'Service "{}" uses an undefined network "{}"'
                     .format(service_dict['name'], name))
     return networks
+
+
+def match_named_volumes(service_dict, project_volumes):
+    for volume_spec in service_dict.get('volumes', []):
+        if volume_spec.is_named_volume:
+            declared_volume = next(
+                (v for v in project_volumes if v.name == volume_spec.external),
+                None
+            )
+            if not declared_volume:
+                raise ConfigurationError(
+                    'Named volume "{0}" is used in service "{1}" but no'
+                    ' declaration was found in the volumes section.'.format(
+                        volume_spec.repr(), service_dict.get('name')
+                    )
+                )
+            volume_spec._replace(external=declared_volume.full_name)
 
 
 def get_volumes_from(project, service_dict):

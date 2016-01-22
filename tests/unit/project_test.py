@@ -7,8 +7,10 @@ import docker
 
 from .. import mock
 from .. import unittest
+from compose.config import ConfigurationError
 from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
+from compose.config.types import VolumeSpec
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
@@ -476,3 +478,44 @@ class ProjectTest(unittest.TestCase):
             ),
         )
         self.assertEqual([c.id for c in project.containers()], ['1'])
+
+    def test_undeclared_volume_v2(self):
+        config = Config(
+            version=2,
+            services=[
+                {
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                    'volumes': [VolumeSpec.parse('data0028:/data:ro')],
+                },
+            ],
+            networks=None,
+            volumes=None,
+        )
+        with self.assertRaises(ConfigurationError):
+            Project.from_config('composetest', config, None)
+
+        config = Config(
+            version=2,
+            services=[
+                {
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                    'volumes': [VolumeSpec.parse('./data0028:/data:ro')],
+                },
+            ], networks=None, volumes=None,
+        )
+        Project.from_config('composetest', config, None)
+
+    def test_undeclared_volume_v1(self):
+        config = Config(
+            version=1,
+            services=[
+                {
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                    'volumes': [VolumeSpec.parse('data0028:/data:ro')],
+                },
+            ], networks=None, volumes=None,
+        )
+        Project.from_config('composetest', config, None)
