@@ -166,6 +166,4 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
 
     @property
     def is_named_volume(self):
-        return self.external and not (
-            self.external.startswith('.') or self.external.startswith('/')
-        )
+        return self.external and not self.external.startswith(('.', '/', '~'))

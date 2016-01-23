@@ -846,6 +846,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(volumes), 1)
         self.assertEqual(volumes[0].external, full_vol_name)
         project.up()
-        engine_volumes = self.client.volumes()
-        self.assertIsNone(next(v for v in engine_volumes if v['Name'] == vol_name))
-        self.assertIsNotNone(next(v for v in engine_volumes if v['Name'] == full_vol_name))
+        engine_volumes = self.client.volumes()['Volumes']
+        container = service.get_container()
+        assert [mount['Name'] for mount in container.get('Mounts')] == [full_vol_name]
+        assert next((v for v in engine_volumes if v['Name'] == vol_name), None) is None
