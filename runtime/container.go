@@ -87,7 +87,7 @@ type Container interface {
 	Path() string
 	// Pid returns the container's init process id
 	Pid() (int, error)
-	// SetExited sets the exit status of the container after it's init dies
+	// SetExited sets the exit status of the container after its init dies
 	SetExited(status int)
 	// Delete deletes the container
 	Delete() error
