@@ -478,7 +478,8 @@ def get_networks(service_dict, network_definitions):
 
 
 def match_named_volumes(service_dict, project_volumes):
-    for volume_spec in service_dict.get('volumes', []):
+    service_volumes = service_dict.get('volumes', [])
+    for volume_spec in service_volumes:
         if volume_spec.is_named_volume:
             declared_volume = next(
                 (v for v in project_volumes if v.name == volume_spec.external),
@@ -491,7 +492,9 @@ def match_named_volumes(service_dict, project_volumes):
                         volume_spec.repr(), service_dict.get('name')
                     )
                 )
-            volume_spec._replace(external=declared_volume.full_name)
+            service_volumes[service_volumes.index(volume_spec)] = (
+                volume_spec._replace(external=declared_volume.full_name)
+            )
 
 
 def get_volumes_from(project, service_dict):
