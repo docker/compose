@@ -42,7 +42,7 @@ class Project(object):
         self.use_networking = use_networking
         self.network_driver = network_driver
         self.networks = networks or []
-        self.volumes = volumes or []
+        self.volumes = volumes or {}
 
     def labels(self, one_off=False):
         return [
@@ -76,13 +76,11 @@ class Project(object):
 
         if config_data.volumes:
             for vol_name, data in config_data.volumes.items():
-                project.volumes.append(
-                    Volume(
-                        client=client, project=name, name=vol_name,
-                        driver=data.get('driver'),
-                        driver_opts=data.get('driver_opts'),
-                        external_name=data.get('external_name')
-                    )
+                project.volumes[vol_name] = Volume(
+                    client=client, project=name, name=vol_name,
+                    driver=data.get('driver'),
+                    driver_opts=data.get('driver_opts'),
+                    external_name=data.get('external_name')
                 )
 
         for service_dict in config_data.services:
@@ -97,7 +95,13 @@ class Project(object):
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version == 2:
-                match_named_volumes(service_dict, project.volumes)
+                service_volumes = service_dict.get('volumes', [])
+                for volume_spec in service_volumes:
+                    if volume_spec.is_named_volume:
+                        declared_volume = project.volumes[volume_spec.external]
+                        service_volumes[service_volumes.index(volume_spec)] = (
+                            volume_spec._replace(external=declared_volume.full_name)
+                        )
 
             project.services.append(
                 Service(
@@ -243,7 +247,7 @@ class Project(object):
 
     def initialize_volumes(self):
         try:
-            for volume in self.volumes:
+            for volume in self.volumes.values():
                 if volume.external:
                     log.debug(
                         'Volume {0} declared as external. No new '
@@ -298,7 +302,7 @@ class Project(object):
             network.remove()
 
     def remove_volumes(self):
-        for volume in self.volumes:
+        for volume in self.volumes.values():
             volume.remove()
 
     def initialize_networks(self):
@@ -474,26 +478,6 @@ def get_networks(service_dict, network_definitions):
                     'Service "{}" uses an undefined network "{}"'
                     .format(service_dict['name'], name))
     return networks
-
-
-def match_named_volumes(service_dict, project_volumes):
-    service_volumes = service_dict.get('volumes', [])
-    for volume_spec in service_volumes:
-        if volume_spec.is_named_volume:
-            declared_volume = next(
-                (v for v in project_volumes if v.name == volume_spec.external),
-                None
-            )
-            if not declared_volume:
-                raise ConfigurationError(
-                    'Named volume "{0}" is used in service "{1}" but no'
-                    ' declaration was found in the volumes section.'.format(
-                        volume_spec.repr(), service_dict.get('name')
-                    )
-                )
-            service_volumes[service_volumes.index(volume_spec)] = (
-                volume_spec._replace(external=declared_volume.full_name)
-            )
 
 
 def get_volumes_from(project, service_dict):

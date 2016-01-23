@@ -25,6 +25,7 @@ from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import VolumeFromSpec
 from .types import VolumeSpec
+from .validation import match_named_volumes
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_depends_on
@@ -274,6 +275,11 @@ def load(config_details):
         config_details.working_dir,
         main_file,
         [file.get_service_dicts() for file in config_details.config_files])
+
+    if main_file.version >= 2:
+        for service_dict in service_dicts:
+            match_named_volumes(service_dict, volumes)
+
     return Config(main_file.version, service_dicts, volumes, networks)
 
 

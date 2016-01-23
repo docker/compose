@@ -77,6 +77,18 @@ def format_boolean_in_environment(instance):
     return True
 
 
+def match_named_volumes(service_dict, project_volumes):
+    service_volumes = service_dict.get('volumes', [])
+    for volume_spec in service_volumes:
+        if volume_spec.is_named_volume and volume_spec.external not in project_volumes:
+            raise ConfigurationError(
+                'Named volume "{0}" is used in service "{1}" but no'
+                ' declaration was found in the volumes section.'.format(
+                    volume_spec.repr(), service_dict.get('name')
+                )
+            )
+
+
 def validate_top_level_service_objects(filename, service_dicts):
     """Perform some high level validation of the service name and value.
 
