@@ -1443,7 +1443,7 @@ class EnvTest(unittest.TestCase):
         }
         self.assertEqual(
             resolve_environment(service_dict),
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
+            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3'},
         )
 
     def test_resolve_environment_from_env_file(self):
@@ -1484,7 +1484,6 @@ class EnvTest(unittest.TestCase):
                 'FILE_DEF': u'bär',
                 'FILE_DEF_EMPTY': '',
                 'ENV_DEF': 'E3',
-                'NO_DEF': ''
             },
         )
 
@@ -1503,7 +1502,7 @@ class EnvTest(unittest.TestCase):
         }
         self.assertEqual(
             resolve_build_args(build),
-            {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': ''},
+            {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2'},
         )
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
