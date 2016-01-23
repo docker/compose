@@ -36,20 +36,20 @@ func getClient(ctx *cli.Context) types.APIClient {
 	return types.NewAPIClient(conn)
 }
 
-var ContainersCommand = cli.Command{
+var containersCommand = cli.Command{
 	Name:  "containers",
 	Usage: "interact with running containers",
 	Subcommands: []cli.Command{
-		ExecCommand,
-		KillCommand,
-		ListCommand,
-		StartCommand,
-		StatsCommand,
+		execCommand,
+		killCommand,
+		listCommand,
+		startCommand,
+		statsCommand,
 	},
 	Action: listContainers,
 }
 
-var ListCommand = cli.Command{
+var listCommand = cli.Command{
 	Name:   "list",
 	Usage:  "list all running containers",
 	Action: listContainers,
@@ -71,7 +71,7 @@ func listContainers(context *cli.Context) {
 	}
 }
 
-var StartCommand = cli.Command{
+var startCommand = cli.Command{
 	Name:  "start",
 	Usage: "start a container",
 	Flags: []cli.Flag{
@@ -239,7 +239,7 @@ func attachStdio(stdins, stdout, stderr *string) error {
 	return nil
 }
 
-var KillCommand = cli.Command{
+var killCommand = cli.Command{
 	Name:  "kill",
 	Usage: "send a signal to a container or it's processes",
 	Flags: []cli.Flag{
@@ -269,7 +269,7 @@ var KillCommand = cli.Command{
 	},
 }
 
-var ExecCommand = cli.Command{
+var execCommand = cli.Command{
 	Name:  "exec",
 	Usage: "exec another process in an existing container",
 	Flags: []cli.Flag{
@@ -356,7 +356,7 @@ var ExecCommand = cli.Command{
 	},
 }
 
-var StatsCommand = cli.Command{
+var statsCommand = cli.Command{
 	Name:  "stats",
 	Usage: "get stats for running container",
 	Action: func(context *cli.Context) {

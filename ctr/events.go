@@ -10,7 +10,7 @@ import (
 	netcontext "golang.org/x/net/context"
 )
 
-var EventsCommand = cli.Command{
+var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "receive events from the containerd daemon",
 	Action: func(context *cli.Context) {

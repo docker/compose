@@ -10,17 +10,17 @@ import (
 	netcontext "golang.org/x/net/context"
 )
 
-var CheckpointCommand = cli.Command{
+var checkpointCommand = cli.Command{
 	Name:  "checkpoints",
 	Usage: "list all checkpoints",
 	Subcommands: []cli.Command{
-		ListCheckpointCommand,
-		CreateCheckpointCommand,
+		listCheckpointCommand,
+		createCheckpointCommand,
 	},
 	Action: listCheckpoints,
 }
 
-var ListCheckpointCommand = cli.Command{
+var listCheckpointCommand = cli.Command{
 	Name:   "list",
 	Usage:  "list all checkpoints for a container",
 	Action: listCheckpoints,
@@ -50,7 +50,7 @@ func listCheckpoints(context *cli.Context) {
 	}
 }
 
-var CreateCheckpointCommand = cli.Command{
+var createCheckpointCommand = cli.Command{
 	Name:  "create",
 	Usage: "create a new checkpoint for the container",
 	Flags: []cli.Flag{
@@ -94,7 +94,7 @@ var CreateCheckpointCommand = cli.Command{
 	},
 }
 
-var DeleteCheckpointCommand = cli.Command{
+var deleteCheckpointCommand = cli.Command{
 	Name:  "delete",
 	Usage: "delete a container's checkpoint",
 	Action: func(context *cli.Context) {
