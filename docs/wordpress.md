@@ -1,16 +1,16 @@
 <!--[metadata]>
 +++
-title = "Quickstart Guide: Compose and WordPress"
+title = "Quickstart: Compose and WordPress"
 description = "Getting started with Compose and WordPress"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
 [menu.main]
-parent="smn_workw_compose"
+parent="workw_compose"
 weight=6
 +++
 <![end-metadata]-->
 
 
-# Quickstart Guide: Compose and WordPress
+# Quickstart: Compose and WordPress
 
 You can use Compose to easily run WordPress in an isolated environment built
 with Docker containers.

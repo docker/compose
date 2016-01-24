@@ -4,8 +4,8 @@ title = "Frequently Asked Questions"
 description = "Docker Compose FAQ"
 keywords = "documentation, docs,  docker, compose, faq"
 [menu.main]
-parent="smn_workw_compose"
-weight=9
+parent="workw_compose"
+weight=90
 +++
 <![end-metadata]-->
 

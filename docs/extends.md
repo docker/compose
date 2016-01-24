@@ -4,7 +4,7 @@ title = "Extending services in Compose"
 description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
 keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
 [menu.main]
-parent="smn_workw_compose"
+parent="workw_compose"
 weight=2
 +++
 <![end-metadata]-->

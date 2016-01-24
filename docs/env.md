@@ -1,11 +1,11 @@
 <!--[metadata]>
 +++
-title = "Compose environment variables reference"
+title = "Environment variables reference"
 description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
-parent="smn_compose_ref"
-weight=3
+parent="workw_compose"
+weight=89
 +++
 <![end-metadata]-->
 

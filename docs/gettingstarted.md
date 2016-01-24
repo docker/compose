@@ -4,8 +4,8 @@ title = "Getting Started"
 description = "Getting started with Docker Compose"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
 [menu.main]
-parent="smn_workw_compose"
-weight=3
+parent="workw_compose"
+weight=-85
 +++
 <![end-metadata]-->
 

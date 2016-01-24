@@ -1,16 +1,16 @@
 <!--[metadata]>
 +++
-title = "Quickstart Guide: Compose and Django"
+title = "Quickstart: Compose and Django"
 description = "Getting started with Docker Compose and Django"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
 [menu.main]
-parent="smn_workw_compose"
+parent="workw_compose"
 weight=4
 +++
 <![end-metadata]-->
 
 
-# Quickstart Guide: Compose and Django
+# Quickstart: Compose and Django
 
 This quick-start guide demonstrates how to use Compose to set up and run a
 simple Django/PostgreSQL app. Before starting, you'll need to have
