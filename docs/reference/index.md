@@ -1,15 +1,16 @@
 <!--[metadata]>
 +++
-title = "Compose CLI reference"
+title = "Command line reference"
 description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
 identifier = "smn_compose_cli"
-parent = "smn_compose_ref"
+parent = "workw_compose"
+weight=80
 +++
 <![end-metadata]-->
 
-## Compose CLI reference
+## Compose command-line reference
 
 The following pages describe the usage information for the [docker-compose](docker-compose.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
 

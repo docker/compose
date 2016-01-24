@@ -1,11 +1,11 @@
 <!--[metadata]>
 +++
-title = "Docker Compose"
+title = "Install Compose"
 description = "How to install Docker Compose"
 keywords = ["compose, orchestration, install, installation, docker, documentation"]
 [menu.main]
-parent="mn_install"
-weight=4
+parent="workw_compose"
+weight=-90
 +++
 <![end-metadata]-->
 
