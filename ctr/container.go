@@ -241,7 +241,7 @@ func attachStdio(stdins, stdout, stderr *string) error {
 
 var KillCommand = cli.Command{
 	Name:  "kill",
-	Usage: "send a signal to a container or it's processes",
+	Usage: "send a signal to a container or its processes",
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "pid,p",

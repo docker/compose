@@ -212,9 +212,9 @@ $ sudo ctr containers start redis /containers/redis
 ### Kill a container's process
 
 ```
-$ ctr containers kill -h 
+$ ctr containers kill -h
 NAME:
-   kill - send a signal to a container or it's processes
+   kill - send a signal to a container or its processes
 
 USAGE:
    command kill [command options] [arguments...]
@@ -227,7 +227,7 @@ OPTIONS:
 ### Exec another process into a container
 
 ```
-$ ctr containers exec -h 
+$ ctr containers exec -h
 NAME:
    exec - exec another process in an existing container
 
@@ -242,13 +242,13 @@ OPTIONS:
    --env, -e [--env option --env option]        environment variables for the process
    --uid, -u "0"                                user id of the user for the process
    --gid, -g "0"                                group id of the user for the process
-   
+
 ```
 
 ### Stats for a container
 
 ```
-$ ctr containers stats -h 
+$ ctr containers stats -h
 NAME:
    stats - get stats for running container
 
@@ -280,7 +280,7 @@ OPTIONS:
    --unix-sockets       perist unix sockets
    --exit               exit the container after the checkpoint completes successfully
    --shell              checkpoint shell jobs
-   
+
 ```
 
 ### Get events
