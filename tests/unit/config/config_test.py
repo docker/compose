@@ -1762,6 +1762,7 @@ class ExtendsTest(unittest.TestCase):
                 'name': 'myweb',
                 'image': 'busybox',
                 'command': 'top',
+                'network_mode': 'bridge',
                 'links': ['mydb:db'],
                 'environment': {
                     "FOO": "1",
@@ -1779,6 +1780,7 @@ class ExtendsTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'busybox',
                 'command': '/bin/true',
+                'network_mode': 'host',
                 'environment': {
                     "FOO": "2",
                     "BAR": "1",
@@ -1797,6 +1799,7 @@ class ExtendsTest(unittest.TestCase):
                 'name': 'myweb',
                 'image': 'busybox',
                 'command': '/bin/true',
+                'network_mode': 'host',
                 'environment': {
                     "FOO": "2",
                     "BAR": "2",
