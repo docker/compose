@@ -28,13 +28,6 @@ const (
 	minRlimit = 1024
 )
 
-var authors = []cli.Author{
-	{
-		Name:  "@crosbymichael",
-		Email: "crosbymichael@gmail.com",
-	},
-}
-
 var daemonFlags = []cli.Flag{
 	cli.StringFlag{
 		Name:  "id",
@@ -80,7 +73,6 @@ func main() {
 	app.Name = "containerd"
 	app.Version = containerd.Version
 	app.Usage = usage
-	app.Authors = authors
 	app.Flags = daemonFlags
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

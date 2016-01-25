@@ -16,12 +16,6 @@ func main() {
 	app.Name = "ctr"
 	app.Version = containerd.Version
 	app.Usage = usage
-	app.Authors = []cli.Author{
-		{
-			Name:  "@crosbymichael",
-			Email: "crosbymichael@gmail.com",
-		},
-	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
