@@ -430,12 +430,16 @@ class Service(object):
         return container
 
     def connect_container_to_networks(self, container):
-        one_off = (container.labels.get(LABEL_ONE_OFF) == "True")
+        connected_networks = container.get('NetworkSettings.Networks')
 
         for network in self.networks:
+            if network in connected_networks:
+                self.client.disconnect_container_from_network(
+                    container.id, network)
+
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=self._get_aliases(one_off=one_off),
+                aliases=self._get_aliases(container),
                 links=self._get_links(False),
             )
 
@@ -507,11 +511,11 @@ class Service(object):
         numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
 
-    def _get_aliases(self, one_off):
-        if one_off:
+    def _get_aliases(self, container):
+        if container.labels.get(LABEL_ONE_OFF) == "True":
             return []
 
-        return [self.name]
+        return [self.name, container.short_id]
 
     def _get_links(self, link_to_self):
         links = {}
@@ -618,9 +622,6 @@ class Service(object):
             override_options,
             one_off=one_off)
 
-        container_options['networking_config'] = self._get_container_networking_config(
-            one_off=one_off)
-
         return container_options
 
     def _get_container_host_config(self, override_options, one_off=False):
@@ -654,20 +655,6 @@ class Service(object):
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
         )
-
-    def _get_container_networking_config(self, one_off=False):
-        if self.net.mode in ['host', 'bridge']:
-            return None
-
-        if self.net.mode not in self.networks:
-            return None
-
-        return self.client.create_networking_config({
-            self.net.mode: self.client.create_endpoint_config(
-                aliases=self._get_aliases(one_off=one_off),
-                links=self._get_links(False),
-            )
-        })
 
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
