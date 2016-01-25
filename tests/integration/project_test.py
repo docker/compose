@@ -4,10 +4,12 @@ from __future__ import unicode_literals
 import random
 
 import py
+import pytest
 from docker.errors import NotFound
 
 from .testcases import DockerClientTestCase
 from compose.config import config
+from compose.config import ConfigurationError
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
@@ -104,7 +106,71 @@ class ProjectTest(DockerClientTestCase):
         db = project.get_service('db')
         self.assertEqual(db._get_volumes_from(), [data_container.id + ':rw'])
 
-    def test_net_from_service(self):
+    @v2_only()
+    def test_network_mode_from_service(self):
+        project = Project.from_config(
+            name='composetest',
+            client=self.client,
+            config_data=build_service_dicts({
+                'version': 2,
+                'services': {
+                    'net': {
+                        'image': 'busybox:latest',
+                        'command': ["top"]
+                    },
+                    'web': {
+                        'image': 'busybox:latest',
+                        'network_mode': 'service:net',
+                        'command': ["top"]
+                    },
+                },
+            }),
+        )
+
+        project.up()
+
+        web = project.get_service('web')
+        net = project.get_service('net')
+        self.assertEqual(web.net.mode, 'container:' + net.containers()[0].id)
+
+    @v2_only()
+    def test_network_mode_from_container(self):
+        def get_project():
+            return Project.from_config(
+                name='composetest',
+                config_data=build_service_dicts({
+                    'version': 2,
+                    'services': {
+                        'web': {
+                            'image': 'busybox:latest',
+                            'network_mode': 'container:composetest_net_container'
+                        },
+                    },
+                }),
+                client=self.client,
+            )
+
+        with pytest.raises(ConfigurationError) as excinfo:
+            get_project()
+
+        assert "container 'composetest_net_container' which does not exist" in excinfo.exconly()
+
+        net_container = Container.create(
+            self.client,
+            image='busybox:latest',
+            name='composetest_net_container',
+            command='top',
+            labels={LABEL_PROJECT: 'composetest'},
+        )
+        net_container.start()
+
+        project = get_project()
+        project.up()
+
+        web = project.get_service('web')
+        self.assertEqual(web.net.mode, 'container:' + net_container.id)
+
+    def test_net_from_service_v1(self):
         project = Project.from_config(
             name='composetest',
             config_data=build_service_dicts({
@@ -127,7 +193,24 @@ class ProjectTest(DockerClientTestCase):
         net = project.get_service('net')
         self.assertEqual(web.net.mode, 'container:' + net.containers()[0].id)
 
-    def test_net_from_container(self):
+    def test_net_from_container_v1(self):
+        def get_project():
+            return Project.from_config(
+                name='composetest',
+                config_data=build_service_dicts({
+                    'web': {
+                        'image': 'busybox:latest',
+                        'net': 'container:composetest_net_container'
+                    },
+                }),
+                client=self.client,
+            )
+
+        with pytest.raises(ConfigurationError) as excinfo:
+            get_project()
+
+        assert "container 'composetest_net_container' which does not exist" in excinfo.exconly()
+
         net_container = Container.create(
             self.client,
             image='busybox:latest',
@@ -137,17 +220,7 @@ class ProjectTest(DockerClientTestCase):
         )
         net_container.start()
 
-        project = Project.from_config(
-            name='composetest',
-            config_data=build_service_dicts({
-                'web': {
-                    'image': 'busybox:latest',
-                    'net': 'container:composetest_net_container'
-                },
-            }),
-            client=self.client,
-        )
-
+        project = get_project()
         project.up()
 
         web = project.get_service('web')

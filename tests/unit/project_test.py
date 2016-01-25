@@ -365,7 +365,7 @@ class ProjectTest(unittest.TestCase):
                     {
                         'name': 'test',
                         'image': 'busybox:latest',
-                        'net': 'container:aaa'
+                        'network_mode': 'container:aaa'
                     },
                 ],
                 networks=None,
@@ -398,7 +398,7 @@ class ProjectTest(unittest.TestCase):
                     {
                         'name': 'test',
                         'image': 'busybox:latest',
-                        'net': 'container:aaa'
+                        'network_mode': 'service:aaa'
                     },
                 ],
                 networks=None,

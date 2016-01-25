@@ -10,6 +10,7 @@ from docker.errors import NotFound
 
 from . import parallel
 from .config import ConfigurationError
+from .config.sort_services import get_container_name_from_net
 from .config.sort_services import get_service_name_from_net
 from .const import DEFAULT_TIMEOUT
 from .const import IMAGE_EVENTS
@@ -86,12 +87,11 @@ class Project(object):
         for service_dict in config_data.services:
             if use_networking:
                 networks = get_networks(service_dict, all_networks)
-                net = Net(networks[0]) if networks else Net("none")
             else:
                 networks = []
-                net = project.get_net(service_dict)
 
             links = project.get_links(service_dict)
+            net = project.get_net(service_dict, networks)
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version == 2:
@@ -197,27 +197,27 @@ class Project(object):
             del service_dict['links']
         return links
 
-    def get_net(self, service_dict):
-        net = service_dict.pop('net', None)
+    def get_net(self, service_dict, networks):
+        net = service_dict.pop('network_mode', None)
         if not net:
+            if self.use_networking:
+                return Net(networks[0]) if networks else Net('none')
             return Net(None)
 
-        net_name = get_service_name_from_net(net)
-        if not net_name:
-            return Net(net)
+        service_name = get_service_name_from_net(net)
+        if service_name:
+            return ServiceNet(self.get_service(service_name))
 
-        try:
-            return ServiceNet(self.get_service(net_name))
-        except NoSuchService:
-            pass
-        try:
-            return ContainerNet(Container.from_id(self.client, net_name))
-        except APIError:
-            raise ConfigurationError(
-                'Service "%s" is trying to use the network of "%s", '
-                'which is not the name of a service or container.' % (
-                    service_dict['name'],
-                    net_name))
+        container_name = get_container_name_from_net(net)
+        if container_name:
+            try:
+                return ContainerNet(Container.from_id(self.client, container_name))
+            except APIError:
+                raise ConfigurationError(
+                    "Service '{name}' uses the network stack of container '{dep}' which "
+                    "does not exist.".format(name=service_dict['name'], dep=container_name))
+
+        return Net(net)
 
     def start(self, service_names=None, **options):
         containers = []
@@ -465,9 +465,12 @@ class Project(object):
 
 
 def get_networks(service_dict, network_definitions):
+    if 'network_mode' in service_dict:
+        return []
+
     networks = []
     for name in service_dict.pop('networks', ['default']):
-        if name in ['bridge', 'host']:
+        if name in ['bridge']:
             networks.append(name)
         else:
             matches = [n for n in network_definitions if n.name == name]
