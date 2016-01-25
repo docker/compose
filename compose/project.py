@@ -10,8 +10,8 @@ from docker.errors import NotFound
 
 from . import parallel
 from .config import ConfigurationError
-from .config.sort_services import get_container_name_from_net
-from .config.sort_services import get_service_name_from_net
+from .config.sort_services import get_container_name_from_network_mode
+from .config.sort_services import get_service_name_from_network_mode
 from .const import DEFAULT_TIMEOUT
 from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
@@ -19,11 +19,11 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
 from .network import Network
-from .service import ContainerNet
+from .service import ContainerNetworkMode
 from .service import ConvergenceStrategy
-from .service import Net
+from .service import NetworkMode
 from .service import Service
-from .service import ServiceNet
+from .service import ServiceNetworkMode
 from .utils import microseconds_from_time_nano
 from .volume import Volume
 
@@ -91,7 +91,7 @@ class Project(object):
                 networks = []
 
             links = project.get_links(service_dict)
-            net = project.get_net(service_dict, networks)
+            network_mode = project.get_network_mode(service_dict, networks)
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version == 2:
@@ -110,7 +110,7 @@ class Project(object):
                     use_networking=use_networking,
                     networks=networks,
                     links=links,
-                    net=net,
+                    network_mode=network_mode,
                     volumes_from=volumes_from,
                     **service_dict)
             )
@@ -197,27 +197,27 @@ class Project(object):
             del service_dict['links']
         return links
 
-    def get_net(self, service_dict, networks):
-        net = service_dict.pop('network_mode', None)
-        if not net:
+    def get_network_mode(self, service_dict, networks):
+        network_mode = service_dict.pop('network_mode', None)
+        if not network_mode:
             if self.use_networking:
-                return Net(networks[0]) if networks else Net('none')
-            return Net(None)
+                return NetworkMode(networks[0]) if networks else NetworkMode('none')
+            return NetworkMode(None)
 
-        service_name = get_service_name_from_net(net)
+        service_name = get_service_name_from_network_mode(network_mode)
         if service_name:
-            return ServiceNet(self.get_service(service_name))
+            return ServiceNetworkMode(self.get_service(service_name))
 
-        container_name = get_container_name_from_net(net)
+        container_name = get_container_name_from_network_mode(network_mode)
         if container_name:
             try:
-                return ContainerNet(Container.from_id(self.client, container_name))
+                return ContainerNetworkMode(Container.from_id(self.client, container_name))
             except APIError:
                 raise ConfigurationError(
                     "Service '{name}' uses the network stack of container '{dep}' which "
                     "does not exist.".format(name=service_dict['name'], dep=container_name))
 
-        return Net(net)
+        return NetworkMode(network_mode)
 
     def start(self, service_names=None, **options):
         containers = []
