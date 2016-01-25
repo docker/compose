@@ -203,6 +203,14 @@ __docker-compose_subcommand() {
                 '(--quiet -q)'{--quiet,-q}"[Only validate the configuration, don't print anything.]" \
                 '--services[Print the service names, one per line.]' && ret=0
             ;;
+        (create)
+            _arguments \
+                $opts_help \
+                "(--no-recreate --no-build)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
+                "(--force-recreate)--no-build[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
+                "(--force-recreate)--no-recreate[Don't build an image, even if it's missing]" \
+                '*:services:__docker-compose_services_all' && ret=0
+            ;;
         (down)
             _arguments \
                 $opts_help \
