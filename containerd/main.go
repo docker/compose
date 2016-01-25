@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	Usage     = `High performance container daemon`
+	usage     = `High performance container daemon`
 	minRlimit = 1024
 )
 
@@ -79,7 +79,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "containerd"
 	app.Version = containerd.Version
-	app.Usage = Usage
+	app.Usage = usage
 	app.Authors = authors
 	app.Flags = daemonFlags
 	app.Before = func(context *cli.Context) error {
