@@ -9,13 +9,13 @@ import (
 	"github.com/docker/containerd"
 )
 
-const Usage = `High performance container daemon cli`
+const usage = `High performance container daemon cli`
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "ctr"
 	app.Version = containerd.Version
-	app.Usage = Usage
+	app.Usage = usage
 	app.Authors = []cli.Author{
 		{
 			Name:  "@crosbymichael",
@@ -34,9 +34,9 @@ func main() {
 		},
 	}
 	app.Commands = []cli.Command{
-		CheckpointCommand,
-		ContainersCommand,
-		EventsCommand,
+		checkpointCommand,
+		containersCommand,
+		eventsCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
