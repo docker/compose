@@ -564,6 +564,56 @@ class ConfigTest(unittest.TestCase):
         ]
         assert service_sort(service_dicts) == service_sort(expected)
 
+    def test_undeclared_volume_v2(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': 2,
+                'services': {
+                    'web': {
+                        'image': 'busybox:latest',
+                        'volumes': ['data0028:/data:ro'],
+                    },
+                },
+            }
+        )
+        details = config.ConfigDetails('.', [base_file])
+        with self.assertRaises(ConfigurationError):
+            config.load(details)
+
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': 2,
+                'services': {
+                    'web': {
+                        'image': 'busybox:latest',
+                        'volumes': ['./data0028:/data:ro'],
+                    },
+                },
+            }
+        )
+        details = config.ConfigDetails('.', [base_file])
+        config_data = config.load(details)
+        volume = config_data.services[0].get('volumes')[0]
+        assert not volume.is_named_volume
+
+    def test_undeclared_volume_v1(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'web': {
+                    'image': 'busybox:latest',
+                    'volumes': ['data0028:/data:ro'],
+                },
+            }
+        )
+        details = config.ConfigDetails('.', [base_file])
+        config_data = config.load(details)
+        volume = config_data.services[0].get('volumes')[0]
+        assert volume.external == 'data0028'
+        assert volume.is_named_volume
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             services = config.load(

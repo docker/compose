@@ -813,3 +813,40 @@ class ProjectTest(DockerClientTestCase):
         assert 'Volume {0} declared as external'.format(
             vol_name
         ) in str(e.exception)
+
+    @v2_only()
+    def test_project_up_named_volumes_in_binds(self):
+        vol_name = '{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
+
+        base_file = config.ConfigFile(
+            'base.yml',
+            {
+                'version': 2,
+                'services': {
+                    'simple': {
+                        'image': 'busybox:latest',
+                        'command': 'top',
+                        'volumes': ['{0}:/data'.format(vol_name)]
+                    },
+                },
+                'volumes': {
+                    vol_name: {'driver': 'local'}
+                }
+
+            })
+        config_details = config.ConfigDetails('.', [base_file])
+        config_data = config.load(config_details)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        service = project.services[0]
+        self.assertEqual(service.name, 'simple')
+        volumes = service.options.get('volumes')
+        self.assertEqual(len(volumes), 1)
+        self.assertEqual(volumes[0].external, full_vol_name)
+        project.up()
+        engine_volumes = self.client.volumes()['Volumes']
+        container = service.get_container()
+        assert [mount['Name'] for mount in container.get('Mounts')] == [full_vol_name]
+        assert next((v for v in engine_volumes if v['Name'] == vol_name), None) is None

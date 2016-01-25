@@ -42,7 +42,7 @@ class Project(object):
         self.use_networking = use_networking
         self.network_driver = network_driver
         self.networks = networks or []
-        self.volumes = volumes or []
+        self.volumes = volumes or {}
 
     def labels(self, one_off=False):
         return [
@@ -74,6 +74,15 @@ class Project(object):
         if 'default' not in network_config:
             all_networks.append(project.default_network)
 
+        if config_data.volumes:
+            for vol_name, data in config_data.volumes.items():
+                project.volumes[vol_name] = Volume(
+                    client=client, project=name, name=vol_name,
+                    driver=data.get('driver'),
+                    driver_opts=data.get('driver_opts'),
+                    external_name=data.get('external_name')
+                )
+
         for service_dict in config_data.services:
             if use_networking:
                 networks = get_networks(service_dict, all_networks)
@@ -85,6 +94,15 @@ class Project(object):
             links = project.get_links(service_dict)
             volumes_from = get_volumes_from(project, service_dict)
 
+            if config_data.version == 2:
+                service_volumes = service_dict.get('volumes', [])
+                for volume_spec in service_volumes:
+                    if volume_spec.is_named_volume:
+                        declared_volume = project.volumes[volume_spec.external]
+                        service_volumes[service_volumes.index(volume_spec)] = (
+                            volume_spec._replace(external=declared_volume.full_name)
+                        )
+
             project.services.append(
                 Service(
                     client=client,
@@ -94,22 +112,12 @@ class Project(object):
                     links=links,
                     net=net,
                     volumes_from=volumes_from,
-                    **service_dict))
+                    **service_dict)
+            )
 
         project.networks += custom_networks
         if 'default' not in network_config and project.uses_default_network():
             project.networks.append(project.default_network)
-
-        if config_data.volumes:
-            for vol_name, data in config_data.volumes.items():
-                project.volumes.append(
-                    Volume(
-                        client=client, project=name, name=vol_name,
-                        driver=data.get('driver'),
-                        driver_opts=data.get('driver_opts'),
-                        external_name=data.get('external_name')
-                    )
-                )
 
         return project
 
@@ -239,7 +247,7 @@ class Project(object):
 
     def initialize_volumes(self):
         try:
-            for volume in self.volumes:
+            for volume in self.volumes.values():
                 if volume.external:
                     log.debug(
                         'Volume {0} declared as external. No new '
@@ -294,7 +302,7 @@ class Project(object):
             network.remove()
 
     def remove_volumes(self):
-        for volume in self.volumes:
+        for volume in self.volumes.values():
             volume.remove()
 
     def initialize_networks(self):
