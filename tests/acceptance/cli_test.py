@@ -420,8 +420,12 @@ class CLITestCase(DockerClientTestCase):
             container = containers[0]
             self.assertIn(container.id, network['Containers'])
 
-            networks = list(container.get('NetworkSettings.Networks'))
-            self.assertEqual(networks, [network['Name']])
+            networks = container.get('NetworkSettings.Networks')
+            self.assertEqual(list(networks), [network['Name']])
+
+            self.assertEqual(
+                sorted(networks[network['Name']]['Aliases']),
+                sorted([service.name, container.short_id]))
 
             for service in services:
                 assert self.lookup(container, service.name)
