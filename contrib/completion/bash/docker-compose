@@ -17,6 +17,10 @@
 #    . ~/.docker-compose-completion.sh
 
 
+__docker_compose_q() {
+	docker-compose 2>/dev/null ${compose_file:+-f $compose_file} ${compose_project:+-p $compose_project} "$@"
+}
+
 # suppress trailing whitespace
 __docker_compose_nospace() {
 	# compopt is not available in ancient bash versions
@@ -39,7 +43,7 @@ __docker_compose_compose_file() {
 
 # Extracts all service names from the compose file.
 ___docker_compose_all_services_in_compose_file() {
-	awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-$(__docker_compose_compose_file)}" 2>/dev/null
+	__docker_compose_q config --services
 }
 
 # All services, even those without an existing container
@@ -49,8 +53,12 @@ __docker_compose_services_all() {
 
 # All services that have an entry with the given key in their compose_file section
 ___docker_compose_services_with_key() {
-	# flatten sections to one line, then filter lines containing the key and return section name.
-	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker_compose_compose_file)}" 2>/dev/null | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
+	# flatten sections under "services" to one line, then filter lines containing the key and return section name
+	__docker_compose_q config \
+		| sed -n -e '/^services:/,/^[^ ]/p' \
+		| sed -n 's/^  //p' \
+		| awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
+		| awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
 }
 
 # All services that are defined by a Dockerfile reference
@@ -67,11 +75,9 @@ __docker_compose_services_from_image() {
 # by a boolean expression passed in as argument.
 __docker_compose_services_with() {
 	local containers names
-	containers="$(docker-compose 2>/dev/null ${compose_file:+-f $compose_file} ${compose_project:+-p $compose_project} ps -q)"
-	names=( $(docker 2>/dev/null inspect --format "{{if ${1:-true}}} {{ .Name }} {{end}}" $containers) )
-	names=( ${names[@]%_*} )  # strip trailing numbers
-	names=( ${names[@]#*_} )  # strip project name
-	COMPREPLY=( $(compgen -W "${names[*]}" -- "$cur") )
+	containers="$(__docker_compose_q ps -q)"
+	names=$(docker 2>/dev/null inspect -f "{{if ${1:-true}}}{{range \$k, \$v := .Config.Labels}}{{if eq \$k \"com.docker.compose.service\"}}{{\$v}}{{end}}{{end}}{{end}}" $containers)
+	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 # The services for which at least one paused container exists
