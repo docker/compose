@@ -47,7 +47,6 @@ DOCKER_START_KEYS = [
     'extra_hosts',
     'ipc',
     'read_only',
-    'net',
     'log_driver',
     'log_opt',
     'mem_limit',
@@ -113,7 +112,7 @@ class Service(object):
         use_networking=False,
         links=None,
         volumes_from=None,
-        net=None,
+        network_mode=None,
         networks=None,
         **options
     ):
@@ -123,7 +122,7 @@ class Service(object):
         self.use_networking = use_networking
         self.links = links or []
         self.volumes_from = volumes_from or []
-        self.net = net or Net(None)
+        self.network_mode = network_mode or NetworkMode(None)
         self.networks = networks or []
         self.options = options
 
@@ -472,7 +471,7 @@ class Service(object):
             'options': self.options,
             'image_id': self.image()['Id'],
             'links': self.get_link_names(),
-            'net': self.net.id,
+            'net': self.network_mode.id,
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
@@ -480,7 +479,7 @@ class Service(object):
         }
 
     def get_dependency_names(self):
-        net_name = self.net.service_name
+        net_name = self.network_mode.service_name
         return (self.get_linked_service_names() +
                 self.get_volumes_from_names() +
                 ([net_name] if net_name else []) +
@@ -636,7 +635,7 @@ class Service(object):
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=options.get('privileged', False),
-            network_mode=self.net.mode,
+            network_mode=self.network_mode.mode,
             devices=options.get('devices'),
             dns=options.get('dns'),
             dns_search=options.get('dns_search'),
@@ -774,22 +773,22 @@ class Service(object):
                 log.error(six.text_type(e))
 
 
-class Net(object):
+class NetworkMode(object):
     """A `standard` network mode (ex: host, bridge)"""
 
     service_name = None
 
-    def __init__(self, net):
-        self.net = net
+    def __init__(self, network_mode):
+        self.network_mode = network_mode
 
     @property
     def id(self):
-        return self.net
+        return self.network_mode
 
     mode = id
 
 
-class ContainerNet(object):
+class ContainerNetworkMode(object):
     """A network mode that uses a container's network stack."""
 
     service_name = None
@@ -806,7 +805,7 @@ class ContainerNet(object):
         return 'container:' + self.container.id
 
 
-class ServiceNet(object):
+class ServiceNetworkMode(object):
     """A network mode that uses a service's network stack."""
 
     def __init__(self, service):

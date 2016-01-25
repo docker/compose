@@ -19,8 +19,8 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
-from .sort_services import get_container_name_from_net
-from .sort_services import get_service_name_from_net
+from .sort_services import get_container_name_from_network_mode
+from .sort_services import get_service_name_from_network_mode
 from .sort_services import sort_service_dicts
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
@@ -492,12 +492,12 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'volumes_from' cannot be extended" % error_prefix)
 
     if 'net' in service_dict:
-        if get_container_name_from_net(service_dict['net']):
+        if get_container_name_from_network_mode(service_dict['net']):
             raise ConfigurationError(
                 "%s services with 'net: container' cannot be extended" % error_prefix)
 
     if 'network_mode' in service_dict:
-        if get_service_name_from_net(service_dict['network_mode']):
+        if get_service_name_from_network_mode(service_dict['network_mode']):
             raise ConfigurationError(
                 "%s services with 'network_mode: service' cannot be extended" % error_prefix)
 
@@ -575,7 +575,7 @@ def finalize_service(service_config, service_names, version):
 
     if 'net' in service_dict:
         network_mode = service_dict.pop('net')
-        container_name = get_container_name_from_net(network_mode)
+        container_name = get_container_name_from_network_mode(network_mode)
         if container_name and container_name in service_names:
             service_dict['network_mode'] = 'service:{}'.format(container_name)
         else:

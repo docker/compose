@@ -131,7 +131,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web.net.mode, 'container:' + net.containers()[0].id)
+        self.assertEqual(web.network_mode.mode, 'container:' + net.containers()[0].id)
 
     @v2_only()
     def test_network_mode_from_container(self):
@@ -168,7 +168,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web.net.mode, 'container:' + net_container.id)
+        self.assertEqual(web.network_mode.mode, 'container:' + net_container.id)
 
     def test_net_from_service_v1(self):
         project = Project.from_config(
@@ -191,7 +191,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web.net.mode, 'container:' + net.containers()[0].id)
+        self.assertEqual(web.network_mode.mode, 'container:' + net.containers()[0].id)
 
     def test_net_from_container_v1(self):
         def get_project():
@@ -224,7 +224,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web.net.mode, 'container:' + net_container.id)
+        self.assertEqual(web.network_mode.mode, 'container:' + net_container.id)
 
     def test_start_pause_unpause_stop_kill_remove(self):
         web = self.create_service('web')

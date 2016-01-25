@@ -15,7 +15,7 @@ from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
-from .sort_services import get_service_name_from_net
+from .sort_services import get_service_name_from_network_mode
 
 
 log = logging.getLogger(__name__)
@@ -156,7 +156,7 @@ def validate_network_mode(service_config, service_names):
     if 'networks' in service_config.config:
         raise ConfigurationError("'network_mode' and 'networks' cannot be combined")
 
-    dependency = get_service_name_from_net(network_mode)
+    dependency = get_service_name_from_network_mode(network_mode)
     if not dependency:
         return
 
