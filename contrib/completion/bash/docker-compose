@@ -107,6 +107,18 @@ _docker_compose_config() {
 }
 
 
+_docker_compose_create() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--force-recreate --help --no-build --no-recreate" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_all
+			;;
+	esac
+}
+
+
 _docker_compose_docker_compose() {
 	case "$prev" in
 		--file|-f)
@@ -409,6 +421,7 @@ _docker_compose() {
 	local commands=(
 		build
 		config
+		create
 		down
 		events
 		help
