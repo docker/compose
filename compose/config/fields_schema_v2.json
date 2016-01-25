@@ -41,7 +41,34 @@
   "definitions": {
     "network": {
       "id": "#/definitions/network",
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "driver": {"type": "string"},
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": ["string", "number"]}
+          }
+        },
+        "ipam": {
+            "type": "object",
+            "properties": {
+                "driver": {"type": "string"},
+                "config": {
+                    "type": "array"
+                }
+            },
+            "additionalProperties": false
+        },
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "volume": {
       "id": "#/definitions/volume",
