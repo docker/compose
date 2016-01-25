@@ -5,10 +5,18 @@ from compose.config.errors import DependencyError
 
 
 def get_service_name_from_net(net_config):
+    return get_source_name_from_net(net_config, 'service')
+
+
+def get_container_name_from_net(net_config):
+    return get_source_name_from_net(net_config, 'container')
+
+
+def get_source_name_from_net(net_config, source_type):
     if not net_config:
         return
 
-    if not net_config.startswith('container:'):
+    if not net_config.startswith(source_type+':'):
         return
 
     _, net_name = net_config.split(':', 1)
@@ -33,7 +41,7 @@ def sort_service_dicts(services):
             service for service in services
             if (name in get_service_names(service.get('links', [])) or
                 name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
-                name == get_service_name_from_net(service.get('net')) or
+                name == get_service_name_from_net(service.get('network_mode')) or
                 name in service.get('depends_on', []))
         ]
 

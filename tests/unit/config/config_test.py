@@ -1015,6 +1015,126 @@ class ConfigTest(unittest.TestCase):
         assert "Service 'one' depends on service 'three'" in exc.exconly()
 
 
+class NetworkModeTest(unittest.TestCase):
+    def test_network_mode_standard(self):
+        config_data = config.load(build_config_details({
+            'version': 2,
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': "top",
+                    'network_mode': 'bridge',
+                },
+            },
+        }))
+
+        assert config_data.services[0]['network_mode'] == 'bridge'
+
+    def test_network_mode_standard_v1(self):
+        config_data = config.load(build_config_details({
+            'web': {
+                'image': 'busybox',
+                'command': "top",
+                'net': 'bridge',
+            },
+        }))
+
+        assert config_data.services[0]['network_mode'] == 'bridge'
+        assert 'net' not in config_data.services[0]
+
+    def test_network_mode_container(self):
+        config_data = config.load(build_config_details({
+            'version': 2,
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': "top",
+                    'network_mode': 'container:foo',
+                },
+            },
+        }))
+
+        assert config_data.services[0]['network_mode'] == 'container:foo'
+
+    def test_network_mode_container_v1(self):
+        config_data = config.load(build_config_details({
+            'web': {
+                'image': 'busybox',
+                'command': "top",
+                'net': 'container:foo',
+            },
+        }))
+
+        assert config_data.services[0]['network_mode'] == 'container:foo'
+
+    def test_network_mode_service(self):
+        config_data = config.load(build_config_details({
+            'version': 2,
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': "top",
+                    'network_mode': 'service:foo',
+                },
+                'foo': {
+                    'image': 'busybox',
+                    'command': "top",
+                },
+            },
+        }))
+
+        assert config_data.services[1]['network_mode'] == 'service:foo'
+
+    def test_network_mode_service_v1(self):
+        config_data = config.load(build_config_details({
+            'web': {
+                'image': 'busybox',
+                'command': "top",
+                'net': 'container:foo',
+            },
+            'foo': {
+                'image': 'busybox',
+                'command': "top",
+            },
+        }))
+
+        assert config_data.services[1]['network_mode'] == 'service:foo'
+
+    def test_network_mode_service_nonexistent(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(build_config_details({
+                'version': 2,
+                'services': {
+                    'web': {
+                        'image': 'busybox',
+                        'command': "top",
+                        'network_mode': 'service:foo',
+                    },
+                },
+            }))
+
+        assert "service 'foo' which is undefined" in excinfo.exconly()
+
+    def test_network_mode_plus_networks_is_invalid(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(build_config_details({
+                'version': 2,
+                'services': {
+                    'web': {
+                        'image': 'busybox',
+                        'command': "top",
+                        'network_mode': 'bridge',
+                        'networks': ['front'],
+                    },
+                },
+                'networks': {
+                    'front': None,
+                }
+            }))
+
+        assert "'network_mode' and 'networks' cannot be combined" in excinfo.exconly()
+
+
 class PortsTest(unittest.TestCase):
     INVALID_PORTS_TYPES = [
         {"1": "8000"},
@@ -1867,10 +1987,17 @@ class ExtendsTest(unittest.TestCase):
             load_from_filename('tests/fixtures/extends/invalid-volumes.yml')
 
     def test_invalid_net_in_extended_service(self):
-        expected_error_msg = "services with 'net: container' cannot be extended"
+        with pytest.raises(ConfigurationError) as excinfo:
+            load_from_filename('tests/fixtures/extends/invalid-net-v2.yml')
 
-        with self.assertRaisesRegexp(ConfigurationError, expected_error_msg):
+        assert 'network_mode: service' in excinfo.exconly()
+        assert 'cannot be extended' in excinfo.exconly()
+
+        with pytest.raises(ConfigurationError) as excinfo:
             load_from_filename('tests/fixtures/extends/invalid-net.yml')
+
+        assert 'net: container' in excinfo.exconly()
+        assert 'cannot be extended' in excinfo.exconly()
 
     @mock.patch.dict(os.environ)
     def test_load_config_runs_interpolation_in_extended_service(self):

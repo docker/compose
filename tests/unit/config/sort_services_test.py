@@ -100,7 +100,7 @@ class TestSortService(object):
             },
             {
                 'name': 'parent',
-                'net': 'container:child'
+                'network_mode': 'service:child'
             },
             {
                 'name': 'child'
@@ -137,7 +137,7 @@ class TestSortService(object):
     def test_sort_service_dicts_7(self):
         services = [
             {
-                'net': 'container:three',
+                'network_mode': 'service:three',
                 'name': 'four'
             },
             {

@@ -15,6 +15,7 @@ from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
+from .sort_services import get_service_name_from_net
 
 
 log = logging.getLogger(__name__)
@@ -145,6 +146,24 @@ def validate_extends_file_path(service_name, extends_options, filename):
         raise ConfigurationError(
             "%s you need to specify a 'file', e.g. 'file: something.yml'" % error_prefix
         )
+
+
+def validate_network_mode(service_config, service_names):
+    network_mode = service_config.config.get('network_mode')
+    if not network_mode:
+        return
+
+    if 'networks' in service_config.config:
+        raise ConfigurationError("'network_mode' and 'networks' cannot be combined")
+
+    dependency = get_service_name_from_net(network_mode)
+    if not dependency:
+        return
+
+    if dependency not in service_names:
+        raise ConfigurationError(
+            "Service '{s.name}' uses the network stack of service '{dep}' which "
+            "is undefined.".format(s=service_config, dep=dependency))
 
 
 def validate_depends_on(service_config, service_names):

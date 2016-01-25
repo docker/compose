@@ -19,6 +19,7 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
+from .sort_services import get_container_name_from_net
 from .sort_services import get_service_name_from_net
 from .sort_services import sort_service_dicts
 from .types import parse_extra_hosts
@@ -30,6 +31,7 @@ from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
+from .validation import validate_network_mode
 from .validation import validate_top_level_object
 from .validation import validate_top_level_service_objects
 from .validation import validate_ulimits
@@ -490,9 +492,14 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'volumes_from' cannot be extended" % error_prefix)
 
     if 'net' in service_dict:
-        if get_service_name_from_net(service_dict['net']) is not None:
+        if get_container_name_from_net(service_dict['net']):
             raise ConfigurationError(
                 "%s services with 'net: container' cannot be extended" % error_prefix)
+
+    if 'network_mode' in service_dict:
+        if get_service_name_from_net(service_dict['network_mode']):
+            raise ConfigurationError(
+                "%s services with 'network_mode: service' cannot be extended" % error_prefix)
 
     if 'depends_on' in service_dict:
         raise ConfigurationError(
@@ -505,6 +512,7 @@ def validate_service(service_config, service_names, version):
     validate_paths(service_dict)
 
     validate_ulimits(service_config)
+    validate_network_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
 
     if not service_dict.get('image') and has_uppercase(service_name):
@@ -564,6 +572,14 @@ def finalize_service(service_config, service_names, version):
     if 'volumes' in service_dict:
         service_dict['volumes'] = [
             VolumeSpec.parse(v) for v in service_dict['volumes']]
+
+    if 'net' in service_dict:
+        network_mode = service_dict.pop('net')
+        container_name = get_container_name_from_net(network_mode)
+        if container_name and container_name in service_names:
+            service_dict['network_mode'] = 'service:{}'.format(container_name)
+        else:
+            service_dict['network_mode'] = network_mode
 
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])

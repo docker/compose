@@ -496,8 +496,29 @@ class CLITestCase(DockerClientTestCase):
         assert 'Service "web" uses an undefined network "foo"' in result.stderr
 
     @v2_only()
-    def test_up_predefined_networks(self):
-        filename = 'predefined-networks.yml'
+    def test_up_with_bridge_network_plus_default(self):
+        filename = 'bridge.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+
+        container = self.project.containers()[0]
+
+        assert sorted(list(container.get('NetworkSettings.Networks'))) == sorted([
+            'bridge',
+            self.project.default_network.full_name,
+        ])
+
+    @v2_only()
+    def test_up_with_network_mode(self):
+        c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
+        self.addCleanup(self.client.remove_container, c, force=True)
+        self.client.start(c)
+        container_mode_source = 'container:{}'.format(c['Id'])
+
+        filename = 'network-mode.yml'
 
         self.base_dir = 'tests/fixtures/networks'
         self._project = get_project(self.base_dir, [filename])
@@ -514,6 +535,16 @@ class CLITestCase(DockerClientTestCase):
             container = self.project.get_service(name).containers()[0]
             assert list(container.get('NetworkSettings.Networks')) == [name]
             assert container.get('HostConfig.NetworkMode') == name
+
+        service_mode_source = 'container:{}'.format(
+            self.project.get_service('bridge').containers()[0].id)
+        service_mode_container = self.project.get_service('service').containers()[0]
+        assert not service_mode_container.get('NetworkSettings.Networks')
+        assert service_mode_container.get('HostConfig.NetworkMode') == service_mode_source
+
+        container_mode_container = self.project.get_service('container').containers()[0]
+        assert not container_mode_container.get('NetworkSettings.Networks')
+        assert container_mode_container.get('HostConfig.NetworkMode') == container_mode_source
 
     @v2_only()
     def test_up_external_networks(self):
