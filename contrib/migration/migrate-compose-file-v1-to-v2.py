@@ -106,7 +106,7 @@ def parse_opts(args):
 
 
 def main(args):
-    logging.basicConfig()
+    logging.basicConfig(format='\033[33m%(levelname)s:\033[37m %(message)s\n')
 
     opts = parse_opts(args)
 
