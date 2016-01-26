@@ -950,6 +950,27 @@ It's more complicated if you're using particular configuration features:
         net: "container:cont-name"  ->  network_mode: "container:cont-name"
         net: "container:abc12345"   ->  network_mode: "container:abc12345"
 
+-   `volumes` with named volumes: these must now be explicitly declared in a
+    top-level `volumes` section of your Compose file. If a service mounts a
+    named volume called `data`, you must declare a `data` volume in your
+    top-level `volumes` section. The whole file might look like this:
+
+        version: 2
+        services:
+          db:
+            image: postgres
+            volumes:
+              - data:/var/lib/postgresql/data
+        volumes:
+          data: {}
+
+    By default, Compose creates a volume whose name is prefixed with your
+    project name. If you want it to just be called `data`, declared it as
+    external:
+
+        volumes:
+          data:
+            external: true
 
 ## Variable substitution
 
