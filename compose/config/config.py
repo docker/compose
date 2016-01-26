@@ -30,6 +30,7 @@ from .types import parse_restart_spec
 from .types import ServiceLink
 from .types import VolumeFromSpec
 from .types import VolumeSpec
+from .validation import load_jsonschema
 from .validation import match_named_volumes
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
@@ -388,16 +389,19 @@ def load_services(working_dir, config_file, service_configs):
     return build_services(service_config)
 
 
-def interpolate_config_section(filename, config, section):
+def interpolate_config_section(filename, config, section, jsonschema):
     validate_config_section(filename, config, section)
-    return interpolate_environment_variables(config, section)
+    return interpolate_environment_variables(config, section, jsonschema)
 
 
 def process_config_file(config_file, service_name=None):
+    jsonschema = load_jsonschema('service', config_file.version)
+
     services = interpolate_config_section(
         config_file.filename,
         config_file.get_service_dicts(),
-        'service')
+        'service',
+        jsonschema)
 
     if config_file.version == V2_0:
         processed_config = dict(config_file.config)
@@ -405,11 +409,13 @@ def process_config_file(config_file, service_name=None):
         processed_config['volumes'] = interpolate_config_section(
             config_file.filename,
             config_file.get_volumes(),
-            'volume')
+            'volume',
+            jsonschema)
         processed_config['networks'] = interpolate_config_section(
             config_file.filename,
             config_file.get_networks(),
-            'network')
+            'network',
+            jsonschema)
 
     if config_file.version == V1:
         processed_config = services

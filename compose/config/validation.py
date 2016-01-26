@@ -386,10 +386,10 @@ def process_errors(errors, path_prefix=None):
 
 
 def validate_against_fields_schema(config_file):
-    schema_filename = "fields_schema_v{0}.json".format(config_file.version)
+    schema = load_jsonschema("fields", config_file.version)
     _validate_against_schema(
         config_file.config,
-        schema_filename,
+        schema,
         format_checker=["ports", "expose", "bool-value-in-mapping"],
         filename=config_file.filename)
 
@@ -397,19 +397,33 @@ def validate_against_fields_schema(config_file):
 def validate_against_service_schema(config, service_name, version):
     _validate_against_schema(
         config,
-        "service_schema_v{0}.json".format(version),
+        load_jsonschema("service", version),
         format_checker=["ports"],
         path_prefix=[service_name])
 
 
+def load_jsonschema(prefix, version):
+    schema_filename = "{0}_schema_v{1}.json".format(prefix, version)
+    config_source_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if sys.platform == "win32":
+        config_source_dir = config_source_dir.replace('\\', '/')
+
+    schema_file = os.path.join(config_source_dir, schema_filename)
+
+    with open(schema_file, "r") as schema_fh:
+        schema = json.load(schema_fh)
+    return schema
+
+
 def _validate_against_schema(
         config,
-        schema_filename,
+        schema,
         format_checker=(),
         path_prefix=None,
         filename=None):
-    config_source_dir = os.path.dirname(os.path.abspath(__file__))
 
+    config_source_dir = os.path.dirname(os.path.abspath(__file__))
     if sys.platform == "win32":
         file_pre_fix = "///"
         config_source_dir = config_source_dir.replace('\\', '/')
@@ -417,10 +431,6 @@ def _validate_against_schema(
         file_pre_fix = "//"
 
     resolver_full_path = "file:{}{}/".format(file_pre_fix, config_source_dir)
-    schema_file = os.path.join(config_source_dir, schema_filename)
-
-    with open(schema_file, "r") as schema_fh:
-        schema = json.load(schema_fh)
 
     resolver = RefResolver(resolver_full_path, schema)
     validation_output = Draft4Validator(
