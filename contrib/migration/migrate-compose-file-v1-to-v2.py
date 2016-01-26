@@ -12,6 +12,8 @@ import sys
 
 import ruamel.yaml
 
+from compose.config.types import VolumeSpec
+
 
 log = logging.getLogger('migrate')
 
@@ -82,8 +84,37 @@ def migrate(content):
 
     data['version'] = 2
     data['services'] = services
+    create_volumes_section(data)
 
     return data
+
+
+def create_volumes_section(data):
+    named_volumes = get_named_volumes(data['services'])
+    if named_volumes:
+        log.warn(
+            "Named volumes ({names}) must be explicitly declared. Creating a "
+            "'volumes' section with declarations.\n\n"
+            "For backwards-compatibility, they've been declared as external. "
+            "If you don't mind the volume names being prefixed with the "
+            "project name, you can remove the 'external' option from each one."
+            .format(names=', '.join(list(named_volumes))))
+
+        data['volumes'] = named_volumes
+
+
+def get_named_volumes(services):
+    volume_specs = [
+        VolumeSpec.parse(volume)
+        for service in services.values()
+        for volume in service.get('volumes', [])
+    ]
+    names = {
+        spec.external
+        for spec in volume_specs
+        if spec.is_named_volume
+    }
+    return {name: {'external': True} for name in names}
 
 
 def write(stream, new_format, indent, width):
