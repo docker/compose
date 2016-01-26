@@ -78,8 +78,11 @@ def migrate(content):
             if volume_from.split(':', 1)[0] not in service_names:
                 service['volumes_from'][idx] = 'container:%s' % volume_from
 
-    data['services'] = {name: data.pop(name) for name in data.keys()}
+    services = {name: data.pop(name) for name in data.keys()}
+
     data['version'] = 2
+    data['services'] = services
+
     return data
 
 
