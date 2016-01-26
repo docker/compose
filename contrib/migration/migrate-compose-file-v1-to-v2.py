@@ -24,61 +24,12 @@ def migrate(content):
     service_names = data.keys()
 
     for name, service in data.items():
-        links = service.get('links')
-        if links:
-            example_service = links[0].partition(':')[0]
-            log.warn(
-                "Service {name} has links, which no longer create environment "
-                "variables such as {example_service_upper}_PORT. "
-                "If you are using those in your application code, you should "
-                "instead connect directly to the hostname, e.g. "
-                "'{example_service}'."
-                .format(name=name, example_service=example_service,
-                        example_service_upper=example_service.upper()))
-
-        external_links = service.get('external_links')
-        if external_links:
-            log.warn(
-                "Service {name} has external_links: {ext}, which now work "
-                "slightly differently. In particular, two containers must be "
-                "connected to at least one network in common in order to "
-                "communicate, even if explicitly linked together.\n\n"
-                "Either connect the external container to your app's default "
-                "network, or connect both the external container and your "
-                "service's containers to a pre-existing network. See "
-                "https://docs.docker.com/compose/networking/ "
-                "for more on how to do this."
-                .format(name=name, ext=external_links))
-
-        # net is now network_mode
-        if 'net' in service:
-            network_mode = service.pop('net')
-
-            # "container:<service name>" is now "service:<service name>"
-            if network_mode.startswith('container:'):
-                name = network_mode.partition(':')[2]
-                if name in service_names:
-                    network_mode = 'service:{}'.format(name)
-
-            service['network_mode'] = network_mode
-
-        # create build section
-        if 'dockerfile' in service:
-            service['build'] = {
-                'context': service.pop('build'),
-                'dockerfile': service.pop('dockerfile'),
-            }
-
-        # create logging section
-        if 'log_driver' in service:
-            service['logging'] = {'driver': service.pop('log_driver')}
-            if 'log_opt' in service:
-                service['logging']['options'] = service.pop('log_opt')
-
-        # volumes_from prefix with 'container:'
-        for idx, volume_from in enumerate(service.get('volumes_from', [])):
-            if volume_from.split(':', 1)[0] not in service_names:
-                service['volumes_from'][idx] = 'container:%s' % volume_from
+        warn_for_links(name, service)
+        warn_for_external_links(name, service)
+        rewrite_net(service, service_names)
+        rewrite_build(service)
+        rewrite_logging(service)
+        rewrite_volumes_from(service, service_names)
 
     services = {name: data.pop(name) for name in data.keys()}
 
@@ -87,6 +38,70 @@ def migrate(content):
     create_volumes_section(data)
 
     return data
+
+
+def warn_for_links(name, service):
+    links = service.get('links')
+    if links:
+        example_service = links[0].partition(':')[0]
+        log.warn(
+            "Service {name} has links, which no longer create environment "
+            "variables such as {example_service_upper}_PORT. "
+            "If you are using those in your application code, you should "
+            "instead connect directly to the hostname, e.g. "
+            "'{example_service}'."
+            .format(name=name, example_service=example_service,
+                    example_service_upper=example_service.upper()))
+
+
+def warn_for_external_links(name, service):
+    external_links = service.get('external_links')
+    if external_links:
+        log.warn(
+            "Service {name} has external_links: {ext}, which now work "
+            "slightly differently. In particular, two containers must be "
+            "connected to at least one network in common in order to "
+            "communicate, even if explicitly linked together.\n\n"
+            "Either connect the external container to your app's default "
+            "network, or connect both the external container and your "
+            "service's containers to a pre-existing network. See "
+            "https://docs.docker.com/compose/networking/ "
+            "for more on how to do this."
+            .format(name=name, ext=external_links))
+
+
+def rewrite_net(service, service_names):
+    if 'net' in service:
+        network_mode = service.pop('net')
+
+        # "container:<service name>" is now "service:<service name>"
+        if network_mode.startswith('container:'):
+            name = network_mode.partition(':')[2]
+            if name in service_names:
+                network_mode = 'service:{}'.format(name)
+
+        service['network_mode'] = network_mode
+
+
+def rewrite_build(service):
+    if 'dockerfile' in service:
+        service['build'] = {
+            'context': service.pop('build'),
+            'dockerfile': service.pop('dockerfile'),
+        }
+
+
+def rewrite_logging(service):
+    if 'log_driver' in service:
+        service['logging'] = {'driver': service.pop('log_driver')}
+        if 'log_opt' in service:
+            service['logging']['options'] = service.pop('log_opt')
+
+
+def rewrite_volumes_from(service, service_names):
+    for idx, volume_from in enumerate(service.get('volumes_from', [])):
+        if volume_from.split(':', 1)[0] not in service_names:
+            service['volumes_from'][idx] = 'container:%s' % volume_from
 
 
 def create_volumes_section(data):
