@@ -20,20 +20,45 @@ def migrate(content):
     data = ruamel.yaml.load(content, ruamel.yaml.RoundTripLoader)
 
     service_names = data.keys()
+
     for name, service in data.items():
-        # remove links and external links
-        service.pop('links', None)
-        external_links = service.pop('external_links', None)
+        links = service.get('links')
+        if links:
+            example_service = links[0].partition(':')[0]
+            log.warn(
+                "Service {name} has links, which no longer create environment "
+                "variables such as {example_service_upper}_PORT. "
+                "If you are using those in your application code, you should "
+                "instead connect directly to the hostname, e.g. "
+                "'{example_service}'."
+                .format(name=name, example_service=example_service,
+                        example_service_upper=example_service.upper()))
+
+        external_links = service.get('external_links')
         if external_links:
             log.warn(
-                "Service {name} has external_links: {ext}, which are no longer "
-                "supported. See https://docs.docker.com/compose/networking/ "
-                "for options on how to connect external containers to the "
-                "compose network.".format(name=name, ext=external_links))
+                "Service {name} has external_links: {ext}, which now work "
+                "slightly differently. In particular, two containers must be "
+                "connected to at least one network in common in order to "
+                "communicate, even if explicitly linked together.\n\n"
+                "Either connect the external container to your app's default "
+                "network, or connect both the external container and your "
+                "service's containers to a pre-existing network. See "
+                "https://docs.docker.com/compose/networking/ "
+                "for more on how to do this."
+                .format(name=name, ext=external_links))
 
-        # net is now networks
+        # net is now network_mode
         if 'net' in service:
-            service['networks'] = [service.pop('net')]
+            network_mode = service.pop('net')
+
+            # "container:<service name>" is now "service:<service name>"
+            if network_mode.startswith('container:'):
+                name = network_mode.partition(':')[2]
+                if name in service_names:
+                    network_mode = 'service:{}'.format(name)
+
+            service['network_mode'] = network_mode
 
         # create build section
         if 'dockerfile' in service:
