@@ -96,6 +96,10 @@ var startCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
+		bpath, err := filepath.Abs(path)
+		if err != nil {
+			fatal(fmt.Sprintf("cannot get the absolute path of the bundle: %v", err), 1)
+		}
 		c := getClient(context)
 		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
 		if err != nil {
@@ -103,11 +107,11 @@ var startCommand = cli.Command{
 		}
 		r := &types.CreateContainerRequest{
 			Id:         id,
-			BundlePath: path,
+			BundlePath: bpath,
 			Checkpoint: context.String("checkpoint"),
 		}
 		if context.Bool("attach") {
-			mkterm, err := readTermSetting(path)
+			mkterm, err := readTermSetting(bpath)
 			if err != nil {
 				fatal(err.Error(), 1)
 			}
