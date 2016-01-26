@@ -414,7 +414,11 @@ func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtim
 			return nil, nil, err
 		}
 	} else {
-		i, err := process.InitializeIO(int(spec.Process.User.UID))
+		uid, err := config.HostUID()
+		if err != nil {
+			return nil, nil, err
+		}
+		i, err := process.InitializeIO(uid)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -449,7 +453,11 @@ func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process
 			return nil, nil, err
 		}
 	} else {
-		i, err := process.InitializeIO(int(p.User.UID))
+		uid, err := c.c.Config().HostUID()
+		if err != nil {
+			return nil, nil, err
+		}
+		i, err := process.InitializeIO(uid)
 		if err != nil {
 			return nil, nil, err
 		}
