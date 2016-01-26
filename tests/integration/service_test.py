@@ -26,7 +26,7 @@ from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
-from compose.service import Net
+from compose.service import NetworkMode
 from compose.service import Service
 
 
@@ -752,17 +752,17 @@ class ServiceTest(DockerClientTestCase):
         assert len(service.containers(stopped=True)) == 2
 
     def test_network_mode_none(self):
-        service = self.create_service('web', net=Net('none'))
+        service = self.create_service('web', network_mode=NetworkMode('none'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'none')
 
     def test_network_mode_bridged(self):
-        service = self.create_service('web', net=Net('bridge'))
+        service = self.create_service('web', network_mode=NetworkMode('bridge'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'bridge')
 
     def test_network_mode_host(self):
-        service = self.create_service('web', net=Net('host'))
+        service = self.create_service('web', network_mode=NetworkMode('host'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 

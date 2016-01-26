@@ -437,14 +437,29 @@ Specify logging options as key-value pairs. An example of `syslog` options:
 ### net
 
 > [Version 1 file format](#version-1) only. In version 2, use
-> [networks](#networks).
+> [network_mode](#network_mode).
 
-Networking mode. Use the same values as the docker client `--net` parameter.
+Network mode. Use the same values as the docker client `--net` parameter.
+The `container:...` form can take a service name instead of a container name or
+id.
 
     net: "bridge"
-    net: "none"
-    net: "container:[name or id]"
     net: "host"
+    net: "none"
+    net: "container:[service name or container name/id]"
+
+### network_mode
+
+> [Version 2 file format](#version-1) only. In version 1, use [net](#net).
+
+Network mode. Use the same values as the docker client `--net` parameter, plus
+the special form `service:[service name]`.
+
+    network_mode: "bridge"
+    network_mode: "host"
+    network_mode: "none"
+    network_mode: "service:[service name]"
+    network_mode: "container:[container name/id]"
 
 ### networks
 
@@ -457,8 +472,8 @@ Networks to join, referencing entries under the
       - some-network
       - other-network
 
-The values `bridge`, `host` and `none` can also be used, and are equivalent to
-`net: "bridge"`, `net: "host"` or `net: "none"` in version 1.
+The value `bridge` can also be used to make containers join the pre-defined
+`bridge` network.
 
 There is no equivalent to `net: "container:[name or id]"`.
 
@@ -918,16 +933,22 @@ It's more complicated if you're using particular configuration features:
     your service's containers to an
     [external network](networking.md#using-a-pre-existing-network).
 
--   `net`: If you're using `host`, `bridge` or `none`, this is now replaced by
-    `networks`:
+-   `net`: This is now replaced by [network_mode](#network_mode):
 
-        net: host    ->  networks: ["host"]
-        net: bridge  ->  networks: ["bridge"]
-        net: none    ->  networks: ["none"]
+        net: host    ->  network_mode: host
+        net: bridge  ->  network_mode: bridge
+        net: none    ->  network_mode: none
 
-    If you're using `net: "container:<name>"`, there is no equivalent to this in
-    version 2 - you should use [Docker networks](networking.md) for
-    communication instead.
+    If you're using `net: "container:[service name]"`, you must now use
+    `network_mode: "service:[service name]"` instead.
+
+        net: "container:web"  ->  network_mode: "service:web"
+
+    If you're using `net: "container:[container name/id]"`, the value does not
+    need to change.
+
+        net: "container:cont-name"  ->  network_mode: "container:cont-name"
+        net: "container:abc12345"   ->  network_mode: "container:abc12345"
 
 
 ## Variable substitution

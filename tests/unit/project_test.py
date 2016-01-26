@@ -349,7 +349,7 @@ class ProjectTest(unittest.TestCase):
             ),
         )
         service = project.get_service('test')
-        self.assertEqual(service.net.id, None)
+        self.assertEqual(service.network_mode.id, None)
         self.assertNotIn('NetworkMode', service._get_container_host_config({}))
 
     def test_use_net_from_container(self):
@@ -365,7 +365,7 @@ class ProjectTest(unittest.TestCase):
                     {
                         'name': 'test',
                         'image': 'busybox:latest',
-                        'net': 'container:aaa'
+                        'network_mode': 'container:aaa'
                     },
                 ],
                 networks=None,
@@ -373,7 +373,7 @@ class ProjectTest(unittest.TestCase):
             ),
         )
         service = project.get_service('test')
-        self.assertEqual(service.net.mode, 'container:' + container_id)
+        self.assertEqual(service.network_mode.mode, 'container:' + container_id)
 
     def test_use_net_from_service(self):
         container_name = 'test_aaa_1'
@@ -398,7 +398,7 @@ class ProjectTest(unittest.TestCase):
                     {
                         'name': 'test',
                         'image': 'busybox:latest',
-                        'net': 'container:aaa'
+                        'network_mode': 'service:aaa'
                     },
                 ],
                 networks=None,
@@ -407,7 +407,7 @@ class ProjectTest(unittest.TestCase):
         )
 
         service = project.get_service('test')
-        self.assertEqual(service.net.mode, 'container:' + container_name)
+        self.assertEqual(service.network_mode.mode, 'container:' + container_name)
 
     def test_uses_default_network_true(self):
         project = Project.from_config(

@@ -10,7 +10,8 @@ from docker.errors import NotFound
 
 from . import parallel
 from .config import ConfigurationError
-from .config.sort_services import get_service_name_from_net
+from .config.sort_services import get_container_name_from_network_mode
+from .config.sort_services import get_service_name_from_network_mode
 from .const import DEFAULT_TIMEOUT
 from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
@@ -18,11 +19,11 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
 from .network import Network
-from .service import ContainerNet
+from .service import ContainerNetworkMode
 from .service import ConvergenceStrategy
-from .service import Net
+from .service import NetworkMode
 from .service import Service
-from .service import ServiceNet
+from .service import ServiceNetworkMode
 from .utils import microseconds_from_time_nano
 from .volume import Volume
 
@@ -86,12 +87,11 @@ class Project(object):
         for service_dict in config_data.services:
             if use_networking:
                 networks = get_networks(service_dict, all_networks)
-                net = Net(networks[0]) if networks else Net("none")
             else:
                 networks = []
-                net = project.get_net(service_dict)
 
             links = project.get_links(service_dict)
+            network_mode = project.get_network_mode(service_dict, networks)
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version == 2:
@@ -110,7 +110,7 @@ class Project(object):
                     use_networking=use_networking,
                     networks=networks,
                     links=links,
-                    net=net,
+                    network_mode=network_mode,
                     volumes_from=volumes_from,
                     **service_dict)
             )
@@ -197,27 +197,27 @@ class Project(object):
             del service_dict['links']
         return links
 
-    def get_net(self, service_dict):
-        net = service_dict.pop('net', None)
-        if not net:
-            return Net(None)
+    def get_network_mode(self, service_dict, networks):
+        network_mode = service_dict.pop('network_mode', None)
+        if not network_mode:
+            if self.use_networking:
+                return NetworkMode(networks[0]) if networks else NetworkMode('none')
+            return NetworkMode(None)
 
-        net_name = get_service_name_from_net(net)
-        if not net_name:
-            return Net(net)
+        service_name = get_service_name_from_network_mode(network_mode)
+        if service_name:
+            return ServiceNetworkMode(self.get_service(service_name))
 
-        try:
-            return ServiceNet(self.get_service(net_name))
-        except NoSuchService:
-            pass
-        try:
-            return ContainerNet(Container.from_id(self.client, net_name))
-        except APIError:
-            raise ConfigurationError(
-                'Service "%s" is trying to use the network of "%s", '
-                'which is not the name of a service or container.' % (
-                    service_dict['name'],
-                    net_name))
+        container_name = get_container_name_from_network_mode(network_mode)
+        if container_name:
+            try:
+                return ContainerNetworkMode(Container.from_id(self.client, container_name))
+            except APIError:
+                raise ConfigurationError(
+                    "Service '{name}' uses the network stack of container '{dep}' which "
+                    "does not exist.".format(name=service_dict['name'], dep=container_name))
+
+        return NetworkMode(network_mode)
 
     def start(self, service_names=None, **options):
         containers = []
@@ -465,9 +465,12 @@ class Project(object):
 
 
 def get_networks(service_dict, network_definitions):
+    if 'network_mode' in service_dict:
+        return []
+
     networks = []
     for name in service_dict.pop('networks', ['default']):
-        if name in ['bridge', 'host']:
+        if name in ['bridge']:
             networks.append(name)
         else:
             matches = [n for n in network_definitions if n.name == name]

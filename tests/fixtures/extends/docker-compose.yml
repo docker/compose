@@ -11,6 +11,7 @@ myweb:
     BAR: "2"
     # add BAZ
     BAZ: "2"
+  net: bridge
 mydb:
   image: busybox
   command: top

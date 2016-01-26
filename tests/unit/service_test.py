@@ -15,16 +15,16 @@ from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
-from compose.service import ContainerNet
+from compose.service import ContainerNetworkMode
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
 from compose.service import merge_volume_bindings
 from compose.service import NeedsBuildError
-from compose.service import Net
+from compose.service import NetworkMode
 from compose.service import NoSuchImageError
 from compose.service import parse_repository_tag
 from compose.service import Service
-from compose.service import ServiceNet
+from compose.service import ServiceNetworkMode
 from compose.service import warn_on_masked_volume
 
 
@@ -407,7 +407,7 @@ class ServiceTest(unittest.TestCase):
             'foo',
             image='example.com/foo',
             client=self.mock_client,
-            net=ServiceNet(Service('other')),
+            network_mode=ServiceNetworkMode(Service('other')),
             links=[(Service('one'), 'one')],
             volumes_from=[VolumeFromSpec(Service('two'), 'rw', 'service')])
 
@@ -421,7 +421,7 @@ class ServiceTest(unittest.TestCase):
         }
         self.assertEqual(config_dict, expected)
 
-    def test_config_dict_with_net_from_container(self):
+    def test_config_dict_with_network_mode_from_container(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         container = Container(
             self.mock_client,
@@ -430,7 +430,7 @@ class ServiceTest(unittest.TestCase):
             'foo',
             image='example.com/foo',
             client=self.mock_client,
-            net=container)
+            network_mode=ContainerNetworkMode(container))
 
         config_dict = service.config_dict()
         expected = {
@@ -589,20 +589,20 @@ class BuildUlimitsTestCase(unittest.TestCase):
 
 class NetTestCase(unittest.TestCase):
 
-    def test_net(self):
-        net = Net('host')
-        self.assertEqual(net.id, 'host')
-        self.assertEqual(net.mode, 'host')
-        self.assertEqual(net.service_name, None)
+    def test_network_mode(self):
+        network_mode = NetworkMode('host')
+        self.assertEqual(network_mode.id, 'host')
+        self.assertEqual(network_mode.mode, 'host')
+        self.assertEqual(network_mode.service_name, None)
 
-    def test_net_container(self):
+    def test_network_mode_container(self):
         container_id = 'abcd'
-        net = ContainerNet(Container(None, {'Id': container_id}))
-        self.assertEqual(net.id, container_id)
-        self.assertEqual(net.mode, 'container:' + container_id)
-        self.assertEqual(net.service_name, None)
+        network_mode = ContainerNetworkMode(Container(None, {'Id': container_id}))
+        self.assertEqual(network_mode.id, container_id)
+        self.assertEqual(network_mode.mode, 'container:' + container_id)
+        self.assertEqual(network_mode.service_name, None)
 
-    def test_net_service(self):
+    def test_network_mode_service(self):
         container_id = 'bbbb'
         service_name = 'web'
         mock_client = mock.create_autospec(docker.Client)
@@ -611,23 +611,23 @@ class NetTestCase(unittest.TestCase):
         ]
 
         service = Service(name=service_name, client=mock_client)
-        net = ServiceNet(service)
+        network_mode = ServiceNetworkMode(service)
 
-        self.assertEqual(net.id, service_name)
-        self.assertEqual(net.mode, 'container:' + container_id)
-        self.assertEqual(net.service_name, service_name)
+        self.assertEqual(network_mode.id, service_name)
+        self.assertEqual(network_mode.mode, 'container:' + container_id)
+        self.assertEqual(network_mode.service_name, service_name)
 
-    def test_net_service_no_containers(self):
+    def test_network_mode_service_no_containers(self):
         service_name = 'web'
         mock_client = mock.create_autospec(docker.Client)
         mock_client.containers.return_value = []
 
         service = Service(name=service_name, client=mock_client)
-        net = ServiceNet(service)
+        network_mode = ServiceNetworkMode(service)
 
-        self.assertEqual(net.id, service_name)
-        self.assertEqual(net.mode, None)
-        self.assertEqual(net.service_name, service_name)
+        self.assertEqual(network_mode.id, service_name)
+        self.assertEqual(network_mode.mode, None)
+        self.assertEqual(network_mode.service_name, service_name)
 
 
 def build_mount(destination, source, mode='rw'):

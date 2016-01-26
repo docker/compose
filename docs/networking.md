@@ -144,15 +144,3 @@ If you want your containers to join a pre-existing network, use the [`external` 
           name: my-pre-existing-network
 
 Instead of attemping to create a network called `[projectname]_default`, Compose will look for a network called `my-pre-existing-network` and connect your app's containers to it.
-
-## Custom container network modes
-
-The `docker` CLI command allows you to specify a custom network mode for a container with the `--net` option - for example, `--net=host` specifies that the container should use the same network namespace as the Docker host, and `--net=none` specifies that it should have no networking capabilities.
-
-To make use of this in Compose, specify a `networks` list with a single item `host`, `bridge` or `none`:
-
-    app:
-      build: ./app
-      networks: ["host"]
-
-There is no equivalent to `--net=container:CONTAINER_NAME` in the v2 Compose file format. You should instead use networks to enable communication.
