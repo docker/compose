@@ -19,9 +19,9 @@ Major Features:
 -   Support for networking has exited experimental status and is the recommended
     way to enable communication between containers.
 
-    If you use the new file format, your app will use networking. If you want to
-    keep using links, just leave your Compose file as it is and it'll continue
-    to work just the same.
+    If you use the new file format, your app will use networking. If you aren't
+    ready yet, just leave your Compose file as it is and it'll continue to work
+    just the same.
 
     By default, you don't have to configure any networks. In fact, using
     networking with Compose involves even less configuration than using links.
@@ -48,6 +48,10 @@ Major Features:
     building tools on top of Compose for performing actions when particular
     things happen, such as containers starting and stopping.
 
+-   There's a new `depends_on` option for specifying dependencies between
+    services. This enforces the order of startup, and ensures that when you run
+    `docker-compose up SERVICE` on a service with dependencies, those are started
+    as well.
 
 New Features:
 
@@ -107,6 +111,11 @@ Bug Fixes:
 
 -   Fixed a bug where a container would be reported as "Up" when it was
     in the restarting state.
+
+-   Fixed a confusing error message when DOCKER_CERT_PATH was not set properly.
+
+-   Fixed a bug where attaching to a container would fail if it was using a
+    non-standard logging driver (or none at all).
 
 
 1.5.2 (2015-12-03)
