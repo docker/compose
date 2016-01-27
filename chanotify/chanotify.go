@@ -15,6 +15,7 @@ type Notifier struct {
 
 	m      sync.Mutex // guards doneCh
 	doneCh map[interface{}]chan struct{}
+	closed bool
 }
 
 // New returns a new *Notifier.
@@ -42,6 +43,9 @@ func (n *Notifier) killWorker(id interface{}, done chan struct{}) {
 func (n *Notifier) Add(id interface{}, ch <-chan struct{}) {
 	done := make(chan struct{})
 	n.m.Lock()
+	if n.closed {
+		panic("notifier closed; cannot add the channel")
+	}
 	n.doneCh[id] = done
 	n.m.Unlock()
 
@@ -73,5 +77,5 @@ func (n *Notifier) Close() {
 		close(done)
 	}
 	close(n.c)
-	// TODO(jbd): Don't allow Add after Close returns.
+	n.closed = true
 }
