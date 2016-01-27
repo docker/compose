@@ -83,6 +83,7 @@
           ]
         },
 
+        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
