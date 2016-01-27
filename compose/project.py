@@ -1,26 +1,31 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import datetime
 import logging
 from functools import reduce
 
 from docker.errors import APIError
 from docker.errors import NotFound
 
+from . import parallel
 from .config import ConfigurationError
-from .config.sort_services import get_service_name_from_net
+from .config.sort_services import get_container_name_from_network_mode
+from .config.sort_services import get_service_name_from_network_mode
 from .const import DEFAULT_TIMEOUT
+from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
-from .legacy import check_for_legacy_containers
-from .service import ContainerNet
+from .network import Network
+from .service import ContainerNetworkMode
 from .service import ConvergenceStrategy
-from .service import Net
+from .service import NetworkMode
 from .service import Service
-from .service import ServiceNet
-from .utils import parallel_execute
+from .service import ServiceNetworkMode
+from .utils import microseconds_from_time_nano
+from .volume import Volume
 
 
 log = logging.getLogger(__name__)
@@ -30,12 +35,15 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, use_networking=False, network_driver=None):
+    def __init__(self, name, services, client, networks=None, volumes=None,
+                 use_networking=False, network_driver=None):
         self.name = name
         self.services = services
         self.client = client
         self.use_networking = use_networking
         self.network_driver = network_driver
+        self.networks = networks or []
+        self.volumes = volumes or {}
 
     def labels(self, one_off=False):
         return [
@@ -44,29 +52,73 @@ class Project(object):
         ]
 
     @classmethod
-    def from_dicts(cls, name, service_dicts, client, use_networking=False, network_driver=None):
+    def from_config(cls, name, config_data, client):
         """
-        Construct a ServiceCollection from a list of dicts representing services.
+        Construct a Project from a config.Config object.
         """
-        project = cls(name, [], client, use_networking=use_networking, network_driver=network_driver)
+        use_networking = (config_data.version and config_data.version >= 2)
+        project = cls(name, [], client, use_networking=use_networking)
 
-        if use_networking:
-            remove_links(service_dicts)
+        network_config = config_data.networks or {}
+        custom_networks = [
+            Network(
+                client=client, project=name, name=network_name,
+                driver=data.get('driver'),
+                driver_opts=data.get('driver_opts'),
+                ipam=data.get('ipam'),
+                external_name=data.get('external_name'),
+            )
+            for network_name, data in network_config.items()
+        ]
 
-        for service_dict in service_dicts:
+        all_networks = custom_networks[:]
+        if 'default' not in network_config:
+            all_networks.append(project.default_network)
+
+        if config_data.volumes:
+            for vol_name, data in config_data.volumes.items():
+                project.volumes[vol_name] = Volume(
+                    client=client, project=name, name=vol_name,
+                    driver=data.get('driver'),
+                    driver_opts=data.get('driver_opts'),
+                    external_name=data.get('external_name')
+                )
+
+        for service_dict in config_data.services:
+            if use_networking:
+                networks = get_networks(service_dict, all_networks)
+            else:
+                networks = []
+
             links = project.get_links(service_dict)
-            volumes_from = project.get_volumes_from(service_dict)
-            net = project.get_net(service_dict)
+            network_mode = project.get_network_mode(service_dict, networks)
+            volumes_from = get_volumes_from(project, service_dict)
+
+            if config_data.version == 2:
+                service_volumes = service_dict.get('volumes', [])
+                for volume_spec in service_volumes:
+                    if volume_spec.is_named_volume:
+                        declared_volume = project.volumes[volume_spec.external]
+                        service_volumes[service_volumes.index(volume_spec)] = (
+                            volume_spec._replace(external=declared_volume.full_name)
+                        )
 
             project.services.append(
                 Service(
                     client=client,
                     project=name,
                     use_networking=use_networking,
+                    networks=networks,
                     links=links,
-                    net=net,
+                    network_mode=network_mode,
                     volumes_from=volumes_from,
-                    **service_dict))
+                    **service_dict)
+            )
+
+        project.networks += custom_networks
+        if 'default' not in network_config and project.uses_default_network():
+            project.networks.append(project.default_network)
+
         return project
 
     @property
@@ -109,20 +161,24 @@ class Project(object):
         Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            return self.get_services(
-                service_names=self.service_names,
-                include_deps=include_deps
-            )
-        else:
-            unsorted = [self.get_service(name) for name in service_names]
-            services = [s for s in self.services if s in unsorted]
+            service_names = self.service_names
 
-            if include_deps:
-                services = reduce(self._inject_deps, services, [])
+        unsorted = [self.get_service(name) for name in service_names]
+        services = [s for s in self.services if s in unsorted]
 
-            uniques = []
-            [uniques.append(s) for s in services if s not in uniques]
-            return uniques
+        if include_deps:
+            services = reduce(self._inject_deps, services, [])
+
+        uniques = []
+        [uniques.append(s) for s in services if s not in uniques]
+
+        return uniques
+
+    def get_services_without_duplicate(self, service_names=None, include_deps=False):
+        services = self.get_services(service_names, include_deps)
+        for service in services:
+            service.remove_duplicate_containers()
+        return services
 
     def get_links(self, service_dict):
         links = []
@@ -141,93 +197,135 @@ class Project(object):
             del service_dict['links']
         return links
 
-    def get_volumes_from(self, service_dict):
-        volumes_from = []
-        if 'volumes_from' in service_dict:
-            for volume_from_spec in service_dict.get('volumes_from', []):
-                # Get service
-                try:
-                    service = self.get_service(volume_from_spec.source)
-                    volume_from_spec = volume_from_spec._replace(source=service)
-                except NoSuchService:
-                    try:
-                        container = Container.from_id(self.client, volume_from_spec.source)
-                        volume_from_spec = volume_from_spec._replace(source=container)
-                    except APIError:
-                        raise ConfigurationError(
-                            'Service "%s" mounts volumes from "%s", which is '
-                            'not the name of a service or container.' % (
-                                service_dict['name'],
-                                volume_from_spec.source))
-                volumes_from.append(volume_from_spec)
-            del service_dict['volumes_from']
-        return volumes_from
-
-    def get_net(self, service_dict):
-        net = service_dict.pop('net', None)
-        if not net:
+    def get_network_mode(self, service_dict, networks):
+        network_mode = service_dict.pop('network_mode', None)
+        if not network_mode:
             if self.use_networking:
-                return Net(self.name)
-            return Net(None)
+                return NetworkMode(networks[0]) if networks else NetworkMode('none')
+            return NetworkMode(None)
 
-        net_name = get_service_name_from_net(net)
-        if not net_name:
-            return Net(net)
+        service_name = get_service_name_from_network_mode(network_mode)
+        if service_name:
+            return ServiceNetworkMode(self.get_service(service_name))
 
-        try:
-            return ServiceNet(self.get_service(net_name))
-        except NoSuchService:
-            pass
-        try:
-            return ContainerNet(Container.from_id(self.client, net_name))
-        except APIError:
-            raise ConfigurationError(
-                'Service "%s" is trying to use the network of "%s", '
-                'which is not the name of a service or container.' % (
-                    service_dict['name'],
-                    net_name))
+        container_name = get_container_name_from_network_mode(network_mode)
+        if container_name:
+            try:
+                return ContainerNetworkMode(Container.from_id(self.client, container_name))
+            except APIError:
+                raise ConfigurationError(
+                    "Service '{name}' uses the network stack of container '{dep}' which "
+                    "does not exist.".format(name=service_dict['name'], dep=container_name))
+
+        return NetworkMode(network_mode)
 
     def start(self, service_names=None, **options):
+        containers = []
         for service in self.get_services(service_names):
-            service.start(**options)
+            service_containers = service.start(**options)
+            containers.extend(service_containers)
+        return containers
 
     def stop(self, service_names=None, **options):
-        parallel_execute(
-            objects=self.containers(service_names),
-            obj_callable=lambda c: c.stop(**options),
-            msg_index=lambda c: c.name,
-            msg="Stopping"
-        )
+        parallel.parallel_stop(self.containers(service_names), options)
 
     def pause(self, service_names=None, **options):
-        for service in reversed(self.get_services(service_names)):
-            service.pause(**options)
+        containers = self.containers(service_names)
+        parallel.parallel_pause(reversed(containers), options)
+        return containers
 
     def unpause(self, service_names=None, **options):
-        for service in self.get_services(service_names):
-            service.unpause(**options)
+        containers = self.containers(service_names)
+        parallel.parallel_unpause(containers, options)
+        return containers
 
     def kill(self, service_names=None, **options):
-        parallel_execute(
-            objects=self.containers(service_names),
-            obj_callable=lambda c: c.kill(**options),
-            msg_index=lambda c: c.name,
-            msg="Killing"
-        )
+        parallel.parallel_kill(self.containers(service_names), options)
 
     def remove_stopped(self, service_names=None, **options):
-        all_containers = self.containers(service_names, stopped=True)
-        stopped_containers = [c for c in all_containers if not c.is_running]
-        parallel_execute(
-            objects=stopped_containers,
-            obj_callable=lambda c: c.remove(**options),
-            msg_index=lambda c: c.name,
-            msg="Removing"
+        parallel.parallel_remove(self.containers(service_names, stopped=True), options)
+
+    def initialize_volumes(self):
+        try:
+            for volume in self.volumes.values():
+                if volume.external:
+                    log.debug(
+                        'Volume {0} declared as external. No new '
+                        'volume will be created.'.format(volume.name)
+                    )
+                    if not volume.exists():
+                        raise ConfigurationError(
+                            'Volume {name} declared as external, but could'
+                            ' not be found. Please create the volume manually'
+                            ' using `{command}{name}` and try again.'.format(
+                                name=volume.full_name,
+                                command='docker volume create --name='
+                            )
+                        )
+                    continue
+                volume.create()
+        except NotFound:
+            raise ConfigurationError(
+                'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
+            )
+        except APIError as e:
+            if 'Choose a different volume name' in str(e):
+                raise ConfigurationError(
+                    'Configuration for volume {0} specifies driver {1}, but '
+                    'a volume with the same name uses a different driver '
+                    '({3}). If you wish to use the new configuration, please '
+                    'remove the existing volume "{2}" first:\n'
+                    '$ docker volume rm {2}'.format(
+                        volume.name, volume.driver, volume.full_name,
+                        volume.inspect()['Driver']
+                    )
+                )
+
+    def down(self, remove_image_type, include_volumes):
+        self.stop()
+        self.remove_stopped(v=include_volumes)
+        self.remove_networks()
+
+        if include_volumes:
+            self.remove_volumes()
+
+        self.remove_images(remove_image_type)
+
+    def remove_images(self, remove_image_type):
+        for service in self.get_services():
+            service.remove_image(remove_image_type)
+
+    def remove_networks(self):
+        if not self.use_networking:
+            return
+        for network in self.networks:
+            network.remove()
+
+    def remove_volumes(self):
+        for volume in self.volumes.values():
+            volume.remove()
+
+    def initialize_networks(self):
+        if not self.use_networking:
+            return
+
+        for network in self.networks:
+            network.ensure()
+
+    def uses_default_network(self):
+        return any(
+            self.default_network.full_name in service.networks
+            for service in self.services
         )
 
+    @property
+    def default_network(self):
+        return Network(client=self.client, project=self.name, name='default')
+
     def restart(self, service_names=None, **options):
-        for service in self.get_services(service_names):
-            service.restart(**options)
+        containers = self.containers(service_names, stopped=True)
+        parallel.parallel_restart(containers, options)
+        return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False):
         for service in self.get_services(service_names):
@@ -235,6 +333,51 @@ class Project(object):
                 service.build(no_cache, pull, force_rm)
             else:
                 log.info('%s uses an image, skipping' % service.name)
+
+    def create(self, service_names=None, strategy=ConvergenceStrategy.changed, do_build=True):
+        services = self.get_services_without_duplicate(service_names, include_deps=True)
+
+        plans = self._get_convergence_plans(services, strategy)
+
+        for service in services:
+            service.execute_convergence_plan(
+                plans[service.name],
+                do_build,
+                detached=True,
+                start=False)
+
+    def events(self):
+        def build_container_event(event, container):
+            time = datetime.datetime.fromtimestamp(event['time'])
+            time = time.replace(
+                microsecond=microseconds_from_time_nano(event['timeNano']))
+            return {
+                'time': time,
+                'type': 'container',
+                'action': event['status'],
+                'id': container.id,
+                'service': container.service,
+                'attributes': {
+                    'name': container.name,
+                    'image': event['from'],
+                }
+            }
+
+        service_names = set(self.service_names)
+        for event in self.client.events(
+            filters={'label': self.labels()},
+            decode=True
+        ):
+            if event['status'] in IMAGE_EVENTS:
+                # We don't receive any image events because labels aren't applied
+                # to images
+                continue
+
+            # TODO: get labels from the API v1.22 , see github issue 2618
+            container = Container.from_id(self.client, event['id'])
+            if container.service not in service_names:
+                continue
+            yield build_container_event(event, container)
 
     def up(self,
            service_names=None,
@@ -244,15 +387,12 @@ class Project(object):
            timeout=DEFAULT_TIMEOUT,
            detached=False):
 
-        services = self.get_services(service_names, include_deps=start_deps)
-
-        for service in services:
-            service.remove_duplicate_containers()
+        services = self.get_services_without_duplicate(service_names, include_deps=start_deps)
 
         plans = self._get_convergence_plans(services, strategy)
 
-        if self.use_networking and self.uses_default_network():
-            self.ensure_network_exists()
+        self.initialize_networks()
+        self.initialize_volumes()
 
         return [
             container
@@ -272,8 +412,8 @@ class Project(object):
             updated_dependencies = [
                 name
                 for name in service.get_dependency_names()
-                if name in plans
-                and plans[name].action in ('recreate', 'create')
+                if name in plans and
+                plans[name].action in ('recreate', 'create')
             ]
 
             if updated_dependencies and strategy.allows_recreate:
@@ -307,37 +447,7 @@ class Project(object):
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names
 
-        if not containers:
-            check_for_legacy_containers(
-                self.client,
-                self.name,
-                self.service_names,
-            )
-
         return [c for c in containers if matches_service_names(c)]
-
-    def get_network(self):
-        try:
-            return self.client.inspect_network(self.name)
-        except NotFound:
-            return None
-
-    def ensure_network_exists(self):
-        # TODO: recreate network if driver has changed?
-        if self.get_network() is None:
-            log.info(
-                'Creating network "{}" with driver "{}"'
-                .format(self.name, self.network_driver)
-            )
-            self.client.create_network(self.name, driver=self.network_driver)
-
-    def remove_network(self):
-        network = self.get_network()
-        if network:
-            self.client.remove_network(network['Id'])
-
-    def uses_default_network(self):
-        return any(service.net.mode == self.name for service in self.services)
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
@@ -354,24 +464,48 @@ class Project(object):
         return acc + dep_services
 
 
-def remove_links(service_dicts):
-    services_with_links = [s for s in service_dicts if 'links' in s]
-    if not services_with_links:
-        return
+def get_networks(service_dict, network_definitions):
+    if 'network_mode' in service_dict:
+        return []
 
-    if len(services_with_links) == 1:
-        prefix = '"{}" defines'.format(services_with_links[0]['name'])
-    else:
-        prefix = 'Some services ({}) define'.format(
-            ", ".join('"{}"'.format(s['name']) for s in services_with_links))
+    networks = []
+    for name in service_dict.pop('networks', ['default']):
+        matches = [n for n in network_definitions if n.name == name]
+        if matches:
+            networks.append(matches[0].full_name)
+        else:
+            raise ConfigurationError(
+                'Service "{}" uses an undefined network "{}"'
+                .format(service_dict['name'], name))
+    return networks
 
-    log.warn(
-        '\n{} links, which are not compatible with Docker networking and will be ignored.\n'
-        'Future versions of Docker will not support links - you should remove them for '
-        'forwards-compatibility.\n'.format(prefix))
 
-    for s in services_with_links:
-        del s['links']
+def get_volumes_from(project, service_dict):
+    volumes_from = service_dict.pop('volumes_from', None)
+    if not volumes_from:
+        return []
+
+    def build_volume_from(spec):
+        if spec.type == 'service':
+            try:
+                return spec._replace(source=project.get_service(spec.source))
+            except NoSuchService:
+                pass
+
+        if spec.type == 'container':
+            try:
+                container = Container.from_id(project.client, spec.source)
+                return spec._replace(source=container)
+            except APIError:
+                pass
+
+        raise ConfigurationError(
+            "Service \"{}\" mounts volumes from \"{}\", which is not the name "
+            "of a service or container.".format(
+                service_dict['name'],
+                spec.source))
+
+    return [build_volume_from(vf) for vf in volumes_from]
 
 
 class NoSuchService(Exception):

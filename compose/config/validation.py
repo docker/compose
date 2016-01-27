@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import json
 import logging
 import os
@@ -12,6 +15,7 @@ from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
+from .sort_services import get_service_name_from_network_mode
 
 
 log = logging.getLogger(__name__)
@@ -35,7 +39,7 @@ DOCKER_CONFIG_HINTS = {
 
 
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
-VALID_EXPOSE_FORMAT = r'^\d+(\/[a-zA-Z]+)?$'
+VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
 
 
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)
@@ -74,18 +78,30 @@ def format_boolean_in_environment(instance):
     return True
 
 
-def validate_top_level_service_objects(config_file):
+def match_named_volumes(service_dict, project_volumes):
+    service_volumes = service_dict.get('volumes', [])
+    for volume_spec in service_volumes:
+        if volume_spec.is_named_volume and volume_spec.external not in project_volumes:
+            raise ConfigurationError(
+                'Named volume "{0}" is used in service "{1}" but no'
+                ' declaration was found in the volumes section.'.format(
+                    volume_spec.repr(), service_dict.get('name')
+                )
+            )
+
+
+def validate_top_level_service_objects(filename, service_dicts):
     """Perform some high level validation of the service name and value.
 
     This validation must happen before interpolation, which must happen
     before the rest of validation, which is why it's separate from the
     rest of the service validation.
     """
-    for service_name, service_dict in config_file.config.items():
+    for service_name, service_dict in service_dicts.items():
         if not isinstance(service_name, six.string_types):
             raise ConfigurationError(
                 "In file '{}' service name: {} needs to be a string, eg '{}'".format(
-                    config_file.filename,
+                    filename,
                     service_name,
                     service_name))
 
@@ -94,18 +110,29 @@ def validate_top_level_service_objects(config_file):
                 "In file '{}' service '{}' doesn\'t have any configuration options. "
                 "All top level keys in your docker-compose.yml must map "
                 "to a dictionary of configuration options.".format(
-                    config_file.filename,
-                    service_name))
+                    filename, service_name
+                )
+            )
 
 
 def validate_top_level_object(config_file):
     if not isinstance(config_file.config, dict):
         raise ConfigurationError(
-            "Top level object in '{}' needs to be an object not '{}'. Check "
-            "that you have defined a service at the top level.".format(
+            "Top level object in '{}' needs to be an object not '{}'.".format(
                 config_file.filename,
                 type(config_file.config)))
-    validate_top_level_service_objects(config_file)
+
+
+def validate_ulimits(service_config):
+    ulimit_config = service_config.config.get('ulimits', {})
+    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+        if isinstance(soft_hard_values, dict):
+            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
+                raise ConfigurationError(
+                    "Service '{s.name}' has invalid ulimit '{ulimit}'. "
+                    "'soft' value can not be greater than 'hard' value ".format(
+                        s=service_config,
+                        ulimit=ulimit_config))
 
 
 def validate_extends_file_path(service_name, extends_options, filename):
@@ -121,6 +148,32 @@ def validate_extends_file_path(service_name, extends_options, filename):
         )
 
 
+def validate_network_mode(service_config, service_names):
+    network_mode = service_config.config.get('network_mode')
+    if not network_mode:
+        return
+
+    if 'networks' in service_config.config:
+        raise ConfigurationError("'network_mode' and 'networks' cannot be combined")
+
+    dependency = get_service_name_from_network_mode(network_mode)
+    if not dependency:
+        return
+
+    if dependency not in service_names:
+        raise ConfigurationError(
+            "Service '{s.name}' uses the network stack of service '{dep}' which "
+            "is undefined.".format(s=service_config, dep=dependency))
+
+
+def validate_depends_on(service_config, service_names):
+    for dependency in service_config.config.get('depends_on', []):
+        if dependency not in service_names:
+            raise ConfigurationError(
+                "Service '{s.name}' depends on service '{dep}' which is "
+                "undefined.".format(s=service_config, dep=dependency))
+
+
 def get_unsupported_config_msg(service_name, error_key):
     msg = "Unsupported config option for '{}' service: '{}'".format(service_name, error_key)
     if error_key in DOCKER_CONFIG_HINTS:
@@ -134,26 +187,43 @@ def anglicize_validator(validator):
     return 'a ' + validator
 
 
+def is_service_dict_schema(schema_id):
+    return schema_id == 'fields_schema_v1.json' or schema_id == '#/properties/services'
+
+
 def handle_error_for_schema_with_id(error, service_name):
     schema_id = error.schema['id']
 
-    if schema_id == 'fields_schema.json' and error.validator == 'additionalProperties':
+    if is_service_dict_schema(schema_id) and error.validator == 'additionalProperties':
         return "Invalid service name '{}' - only {} characters are allowed".format(
             # The service_name is the key to the json object
             list(error.instance)[0],
             VALID_NAME_CHARS)
 
     if schema_id == '#/definitions/constraints':
-        if 'image' in error.instance and 'build' in error.instance:
+        # Build context could in 'build' or 'build.context' and dockerfile could be
+        # in 'dockerfile' or 'build.dockerfile'
+        context = False
+        dockerfile = 'dockerfile' in error.instance
+        if 'build' in error.instance:
+            if isinstance(error.instance['build'], six.string_types):
+                context = True
+            else:
+                context = 'context' in error.instance['build']
+                dockerfile = dockerfile or 'dockerfile' in error.instance['build']
+
+        # TODO: only applies to v1
+        if 'image' in error.instance and context:
             return (
                 "Service '{}' has both an image and build path specified. "
                 "A service can either be built to image or use an existing "
                 "image, not both.".format(service_name))
-        if 'image' not in error.instance and 'build' not in error.instance:
+        if 'image' not in error.instance and not context:
             return (
                 "Service '{}' has neither an image nor a build path "
-                "specified. Exactly one must be provided.".format(service_name))
-        if 'image' in error.instance and 'dockerfile' in error.instance:
+                "specified. At least one must be provided.".format(service_name))
+        # TODO: only applies to v1
+        if 'image' in error.instance and dockerfile:
             return (
                 "Service '{}' has both an image and alternate Dockerfile. "
                 "A service can either be built to image or use an existing "
@@ -247,7 +317,8 @@ def _parse_oneof_validator(error):
             )
             return "{}contains {}, which is an invalid type, it should be {}".format(
                 invalid_config_key,
-                context.instance,
+                # Always print the json repr of the invalid value
+                json.dumps(context.instance),
                 _parse_valid_types_from_validator(context.validator_value))
 
         if context.validator == 'uniqueItems':
@@ -281,18 +352,19 @@ def process_errors(errors, service_name=None):
     return '\n'.join(format_error_message(error, service_name) for error in errors)
 
 
-def validate_against_fields_schema(config, filename):
+def validate_against_fields_schema(config_file):
+    schema_filename = "fields_schema_v{0}.json".format(config_file.version)
     _validate_against_schema(
-        config,
-        "fields_schema.json",
+        config_file.config,
+        schema_filename,
         format_checker=["ports", "expose", "bool-value-in-mapping"],
-        filename=filename)
+        filename=config_file.filename)
 
 
-def validate_against_service_schema(config, service_name):
+def validate_against_service_schema(config, service_name, version):
     _validate_against_schema(
         config,
-        "service_schema.json",
+        "service_schema_v{0}.json".format(version),
         format_checker=["ports"],
         service_name=service_name)
 

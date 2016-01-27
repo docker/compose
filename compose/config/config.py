@@ -1,28 +1,40 @@
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 import codecs
+import functools
 import logging
+import operator
 import os
+import string
 import sys
 from collections import namedtuple
 
 import six
 import yaml
+from cached_property import cached_property
 
+from ..const import COMPOSEFILE_VERSIONS
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .interpolation import interpolate_environment_variables
-from .sort_services import get_service_name_from_net
+from .sort_services import get_container_name_from_network_mode
+from .sort_services import get_service_name_from_network_mode
 from .sort_services import sort_service_dicts
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import VolumeFromSpec
 from .types import VolumeSpec
+from .validation import match_named_volumes
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
+from .validation import validate_depends_on
 from .validation import validate_extends_file_path
+from .validation import validate_network_mode
 from .validation import validate_top_level_object
+from .validation import validate_top_level_service_objects
+from .validation import validate_ulimits
 
 
 DOCKER_CONFIG_KEYS = [
@@ -30,6 +42,7 @@ DOCKER_CONFIG_KEYS = [
     'cap_drop',
     'cgroup_parent',
     'command',
+    'cpu_quota',
     'cpu_shares',
     'cpuset',
     'detach',
@@ -46,8 +59,6 @@ DOCKER_CONFIG_KEYS = [
     'ipc',
     'labels',
     'links',
-    'log_driver',
-    'log_opt',
     'mac_address',
     'mem_limit',
     'memswap_limit',
@@ -59,6 +70,7 @@ DOCKER_CONFIG_KEYS = [
     'restart',
     'security_opt',
     'stdin_open',
+    'stop_signal',
     'tty',
     'user',
     'volume_driver',
@@ -73,6 +85,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'dockerfile',
     'expose',
     'external_links',
+    'logging',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -86,8 +99,6 @@ DOCKER_VALID_URL_PREFIXES = (
 SUPPORTED_FILENAMES = [
     'docker-compose.yml',
     'docker-compose.yaml',
-    'fig.yml',
-    'fig.yaml',
 ]
 
 DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
@@ -115,6 +126,43 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     @classmethod
     def from_filename(cls, filename):
         return cls(filename, load_yaml(filename))
+
+    @cached_property
+    def version(self):
+        if self.config is None:
+            return 1
+        version = self.config.get('version', 1)
+        if isinstance(version, dict):
+            log.warn("Unexpected type for field 'version', in file {} assuming "
+                     "version is the name of a service, and defaulting to "
+                     "Compose file version 1".format(self.filename))
+            return 1
+        return version
+
+    def get_service(self, name):
+        return self.get_service_dicts()[name]
+
+    def get_service_dicts(self):
+        return self.config if self.version == 1 else self.config.get('services', {})
+
+    def get_volumes(self):
+        return {} if self.version == 1 else self.config.get('volumes', {})
+
+    def get_networks(self):
+        return {} if self.version == 1 else self.config.get('networks', {})
+
+
+class Config(namedtuple('_Config', 'version services volumes networks')):
+    """
+    :param version: configuration version
+    :type  version: int
+    :param services: List of service description dictionaries
+    :type  services: :class:`list`
+    :param volumes: Dictionary mapping volume names to description dictionaries
+    :type  volumes: :class:`dict`
+    :param networks: Dictionary mapping network names to description dictionaries
+    :type  networks: :class:`dict`
+    """
 
 
 class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name config')):
@@ -148,6 +196,26 @@ def find(base_dir, filenames):
         [ConfigFile.from_filename(f) for f in filenames])
 
 
+def validate_config_version(config_files):
+    main_file = config_files[0]
+    validate_top_level_object(main_file)
+    for next_file in config_files[1:]:
+        validate_top_level_object(next_file)
+
+        if main_file.version != next_file.version:
+            raise ConfigurationError(
+                "Version mismatch: file {0} specifies version {1} but "
+                "extension file {2} uses version {3}".format(
+                    main_file.filename,
+                    main_file.version,
+                    next_file.filename,
+                    next_file.version))
+
+    if main_file.version not in COMPOSEFILE_VERSIONS:
+        raise ConfigurationError(
+            'Invalid Compose file version: {0}'.format(main_file.version))
+
+
 def get_default_config_files(base_dir):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
@@ -159,15 +227,6 @@ def get_default_config_files(base_dir):
     if len(candidates) > 1:
         log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
         log.warn("Using %s\n", winner)
-
-    if winner == 'docker-compose.yaml':
-        log.warn("Please be aware that .yml is the expected extension "
-                 "in most cases, and using .yaml can cause compatibility "
-                 "issues in future.\n")
-
-    if winner.startswith("fig."):
-        log.warn("%s is deprecated and will not be supported in future. "
-                 "Please rename your config file to docker-compose.yml\n" % winner)
 
     return [os.path.join(path, winner)] + get_default_override_file(path)
 
@@ -203,28 +262,82 @@ def load(config_details):
 
     Return a fully interpolated, extended and validated configuration.
     """
+    validate_config_version(config_details.config_files)
 
-    def build_service(filename, service_name, service_dict):
+    processed_files = [
+        process_config_file(config_file)
+        for config_file in config_details.config_files
+    ]
+    config_details = config_details._replace(config_files=processed_files)
+
+    main_file = config_details.config_files[0]
+    volumes = load_mapping(config_details.config_files, 'get_volumes', 'Volume')
+    networks = load_mapping(config_details.config_files, 'get_networks', 'Network')
+    service_dicts = load_services(
+        config_details.working_dir,
+        main_file,
+        [file.get_service_dicts() for file in config_details.config_files])
+
+    if main_file.version >= 2:
+        for service_dict in service_dicts:
+            match_named_volumes(service_dict, volumes)
+
+    return Config(main_file.version, service_dicts, volumes, networks)
+
+
+def load_mapping(config_files, get_func, entity_type):
+    mapping = {}
+
+    for config_file in config_files:
+        for name, config in getattr(config_file, get_func)().items():
+            mapping[name] = config or {}
+            if not config:
+                continue
+
+            external = config.get('external')
+            if external:
+                if len(config.keys()) > 1:
+                    raise ConfigurationError(
+                        '{} {} declared as external but specifies'
+                        ' additional attributes ({}). '.format(
+                            entity_type,
+                            name,
+                            ', '.join([k for k in config.keys() if k != 'external'])
+                        )
+                    )
+                if isinstance(external, dict):
+                    config['external_name'] = external.get('name')
+                else:
+                    config['external_name'] = name
+
+            mapping[name] = config
+
+    return mapping
+
+
+def load_services(working_dir, config_file, service_configs):
+    def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
-            config_details.working_dir,
-            filename,
+            working_dir,
+            config_file.filename,
             service_name,
             service_dict)
-        resolver = ServiceExtendsResolver(service_config)
+        resolver = ServiceExtendsResolver(service_config, config_file)
         service_dict = process_service(resolver.run())
 
-        # TODO: move to validate_service()
-        validate_against_service_schema(service_dict, service_config.name)
-        validate_paths(service_dict)
-
-        service_dict = finalize_service(service_config._replace(config=service_dict))
-        service_dict['name'] = service_config.name
+        service_config = service_config._replace(config=service_dict)
+        validate_service(service_config, service_names, config_file.version)
+        service_dict = finalize_service(
+            service_config,
+            service_names,
+            config_file.version)
         return service_dict
 
-    def build_services(config_file):
+    def build_services(service_config):
+        service_names = service_config.keys()
         return sort_service_dicts([
-            build_service(config_file.filename, name, service_dict)
-            for name, service_dict in config_file.config.items()
+            build_service(name, service_dict, service_names)
+            for name, service_dict in service_config.items()
         ])
 
     def merge_services(base, override):
@@ -232,38 +345,52 @@ def load(config_details):
         return {
             name: merge_service_dicts_from_files(
                 base.get(name, {}),
-                override.get(name, {}))
+                override.get(name, {}),
+                config_file.version)
             for name in all_service_names
         }
 
-    config_file = process_config_file(config_details.config_files[0])
-    for next_file in config_details.config_files[1:]:
-        next_file = process_config_file(next_file)
+    service_config = service_configs[0]
+    for next_config in service_configs[1:]:
+        service_config = merge_services(service_config, next_config)
 
-        config = merge_services(config_file.config, next_file.config)
-        config_file = config_file._replace(config=config)
-
-    return build_services(config_file)
+    return build_services(service_config)
 
 
 def process_config_file(config_file, service_name=None):
-    validate_top_level_object(config_file)
-    processed_config = interpolate_environment_variables(config_file.config)
-    validate_against_fields_schema(processed_config, config_file.filename)
+    service_dicts = config_file.get_service_dicts()
+    validate_top_level_service_objects(config_file.filename, service_dicts)
 
-    if service_name and service_name not in processed_config:
+    interpolated_config = interpolate_environment_variables(service_dicts, 'service')
+
+    if config_file.version == 2:
+        processed_config = dict(config_file.config)
+        processed_config['services'] = services = interpolated_config
+        processed_config['volumes'] = interpolate_environment_variables(
+            config_file.get_volumes(), 'volume')
+        processed_config['networks'] = interpolate_environment_variables(
+            config_file.get_networks(), 'network')
+
+    if config_file.version == 1:
+        processed_config = services = interpolated_config
+
+    config_file = config_file._replace(config=processed_config)
+    validate_against_fields_schema(config_file)
+
+    if service_name and service_name not in services:
         raise ConfigurationError(
             "Cannot extend service '{}' in {}: Service not found".format(
                 service_name, config_file.filename))
 
-    return config_file._replace(config=processed_config)
+    return config_file
 
 
 class ServiceExtendsResolver(object):
-    def __init__(self, service_config, already_seen=None):
+    def __init__(self, service_config, config_file, already_seen=None):
         self.service_config = service_config
         self.working_dir = service_config.working_dir
         self.already_seen = already_seen or []
+        self.config_file = config_file
 
     @property
     def signature(self):
@@ -290,10 +417,13 @@ class ServiceExtendsResolver(object):
         config_path = self.get_extended_config_path(extends)
         service_name = extends['service']
 
+        extends_file = ConfigFile.from_filename(config_path)
+        validate_config_version([self.config_file, extends_file])
         extended_file = process_config_file(
-            ConfigFile.from_filename(config_path),
+            extends_file,
             service_name=service_name)
-        service_config = extended_file.config[service_name]
+        service_config = extended_file.get_service(service_name)
+
         return config_path, service_config, service_name
 
     def resolve_extends(self, extended_config_path, service_dict, service_name):
@@ -303,6 +433,7 @@ class ServiceExtendsResolver(object):
                 extended_config_path,
                 service_name,
                 service_dict),
+            self.config_file,
             already_seen=self.already_seen + [self.signature])
 
         service_config = resolver.run()
@@ -310,10 +441,12 @@ class ServiceExtendsResolver(object):
         validate_extended_service_dict(
             other_service_dict,
             extended_config_path,
-            service_name,
-        )
+            service_name)
 
-        return merge_service_dicts(other_service_dict, self.service_config.config)
+        return merge_service_dicts(
+            other_service_dict,
+            self.service_config.config,
+            self.config_file.version)
 
     def get_extended_config_path(self, extends_options):
         """Service we are extending either has a value for 'file' set, which we
@@ -342,6 +475,11 @@ def resolve_environment(service_dict):
     return dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
 
 
+def resolve_build_args(build):
+    args = parse_build_arguments(build.get('args'))
+    return dict(resolve_env_var(k, v) for k, v in six.iteritems(args))
+
+
 def validate_extended_service_dict(service_dict, filename, service):
     error_prefix = "Cannot extend service '%s' in %s:" % (service, filename)
 
@@ -354,21 +492,37 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'volumes_from' cannot be extended" % error_prefix)
 
     if 'net' in service_dict:
-        if get_service_name_from_net(service_dict['net']) is not None:
+        if get_container_name_from_network_mode(service_dict['net']):
             raise ConfigurationError(
                 "%s services with 'net: container' cannot be extended" % error_prefix)
 
+    if 'network_mode' in service_dict:
+        if get_service_name_from_network_mode(service_dict['network_mode']):
+            raise ConfigurationError(
+                "%s services with 'network_mode: service' cannot be extended" % error_prefix)
 
-def validate_ulimits(ulimit_config):
-    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
-        if isinstance(soft_hard_values, dict):
-            if not soft_hard_values['soft'] <= soft_hard_values['hard']:
-                raise ConfigurationError(
-                    "ulimit_config \"{}\" cannot contain a 'soft' value higher "
-                    "than 'hard' value".format(ulimit_config))
+    if 'depends_on' in service_dict:
+        raise ConfigurationError(
+            "%s services with 'depends_on' cannot be extended" % error_prefix)
 
 
-# TODO: rename to normalize_service
+def validate_service(service_config, service_names, version):
+    service_dict, service_name = service_config.config, service_config.name
+    validate_against_service_schema(service_dict, service_name, version)
+    validate_paths(service_dict)
+
+    validate_ulimits(service_config)
+    validate_network_mode(service_config, service_names)
+    validate_depends_on(service_config, service_names)
+
+    if not service_dict.get('image') and has_uppercase(service_name):
+        raise ConfigurationError(
+            "Service '{name}' contains uppercase characters which are not valid "
+            "as part of an image name. Either use a lowercase service name or "
+            "use the `image` field to set a custom name for the service image."
+            .format(name=service_name))
+
+
 def process_service(service_config):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
@@ -379,11 +533,15 @@ def process_service(service_config):
             for path in to_list(service_dict['env_file'])
         ]
 
+    if 'build' in service_dict:
+        if isinstance(service_dict['build'], six.string_types):
+            service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
+        elif isinstance(service_dict['build'], dict) and 'context' in service_dict['build']:
+            path = service_dict['build']['context']
+            service_dict['build']['context'] = resolve_build_path(working_dir, path)
+
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
-
-    if 'build' in service_dict:
-        service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
 
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
@@ -391,14 +549,14 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
-    # TODO: move to a validate_service()
-    if 'ulimits' in service_dict:
-        validate_ulimits(service_dict['ulimits'])
+    for field in ['dns', 'dns_search']:
+        if field in service_dict:
+            service_dict[field] = to_list(service_dict[field])
 
     return service_dict
 
 
-def finalize_service(service_config):
+def finalize_service(service_config, service_names, version):
     service_dict = dict(service_config.config)
 
     if 'environment' in service_dict or 'env_file' in service_dict:
@@ -407,100 +565,140 @@ def finalize_service(service_config):
 
     if 'volumes_from' in service_dict:
         service_dict['volumes_from'] = [
-            VolumeFromSpec.parse(vf) for vf in service_dict['volumes_from']]
+            VolumeFromSpec.parse(vf, service_names, version)
+            for vf in service_dict['volumes_from']
+        ]
 
     if 'volumes' in service_dict:
         service_dict['volumes'] = [
             VolumeSpec.parse(v) for v in service_dict['volumes']]
 
+    if 'net' in service_dict:
+        network_mode = service_dict.pop('net')
+        container_name = get_container_name_from_network_mode(network_mode)
+        if container_name and container_name in service_names:
+            service_dict['network_mode'] = 'service:{}'.format(container_name)
+        else:
+            service_dict['network_mode'] = network_mode
+
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
+
+    normalize_build(service_dict, service_config.working_dir)
+
+    service_dict['name'] = service_config.name
+    return normalize_v1_service_format(service_dict)
+
+
+def normalize_v1_service_format(service_dict):
+    if 'log_driver' in service_dict or 'log_opt' in service_dict:
+        if 'logging' not in service_dict:
+            service_dict['logging'] = {}
+        if 'log_driver' in service_dict:
+            service_dict['logging']['driver'] = service_dict['log_driver']
+            del service_dict['log_driver']
+        if 'log_opt' in service_dict:
+            service_dict['logging']['options'] = service_dict['log_opt']
+            del service_dict['log_opt']
+
+    if 'dockerfile' in service_dict:
+        service_dict['build'] = service_dict.get('build', {})
+        service_dict['build'].update({
+            'dockerfile': service_dict.pop('dockerfile')
+        })
 
     return service_dict
 
 
-def merge_service_dicts_from_files(base, override):
+def merge_service_dicts_from_files(base, override, version):
     """When merging services from multiple files we need to merge the `extends`
     field. This is not handled by `merge_service_dicts()` which is used to
     perform the `extends`.
     """
-    new_service = merge_service_dicts(base, override)
+    new_service = merge_service_dicts(base, override, version)
     if 'extends' in override:
         new_service['extends'] = override['extends']
+    elif 'extends' in base:
+        new_service['extends'] = base['extends']
     return new_service
 
 
-def merge_service_dicts(base, override):
-    d = base.copy()
+def merge_service_dicts(base, override, version):
+    d = {}
 
-    if 'environment' in base or 'environment' in override:
-        d['environment'] = merge_environment(
-            base.get('environment'),
-            override.get('environment'),
-        )
+    def merge_field(field, merge_func, default=None):
+        if field in base or field in override:
+            d[field] = merge_func(
+                base.get(field, default),
+                override.get(field, default))
 
-    path_mapping_keys = ['volumes', 'devices']
+    def merge_mapping(mapping, parse_func):
+        if mapping in base or mapping in override:
+            merged = parse_func(base.get(mapping, None))
+            merged.update(parse_func(override.get(mapping, None)))
+            d[mapping] = merged
 
-    for key in path_mapping_keys:
-        if key in base or key in override:
-            d[key] = merge_path_mappings(
-                base.get(key),
-                override.get(key),
-            )
+    merge_mapping('environment', parse_environment)
+    merge_mapping('labels', parse_labels)
+    merge_mapping('ulimits', parse_ulimits)
 
-    if 'labels' in base or 'labels' in override:
-        d['labels'] = merge_labels(
-            base.get('labels'),
-            override.get('labels'),
-        )
+    for field in ['volumes', 'devices']:
+        merge_field(field, merge_path_mappings)
 
-    if 'image' in override and 'build' in d:
-        del d['build']
+    for field in ['ports', 'expose', 'external_links']:
+        merge_field(field, operator.add, default=[])
 
-    if 'build' in override and 'image' in d:
-        del d['image']
+    for field in ['dns', 'dns_search', 'env_file']:
+        merge_field(field, merge_list_or_string)
 
-    list_keys = ['ports', 'expose', 'external_links']
+    for field in set(ALLOWED_KEYS) - set(d):
+        if field in base or field in override:
+            d[field] = override.get(field, base.get(field))
 
-    for key in list_keys:
-        if key in base or key in override:
-            d[key] = base.get(key, []) + override.get(key, [])
-
-    list_or_string_keys = ['dns', 'dns_search', 'env_file']
-
-    for key in list_or_string_keys:
-        if key in base or key in override:
-            d[key] = to_list(base.get(key)) + to_list(override.get(key))
-
-    already_merged_keys = ['environment', 'labels'] + path_mapping_keys + list_keys + list_or_string_keys
-
-    for k in set(ALLOWED_KEYS) - set(already_merged_keys):
-        if k in override:
-            d[k] = override[k]
+    if version == 1:
+        legacy_v1_merge_image_or_build(d, base, override)
+    else:
+        merge_build(d, base, override)
 
     return d
+
+
+def merge_build(output, base, override):
+    build = {}
+
+    if 'build' in base:
+        if isinstance(base['build'], six.string_types):
+            build['context'] = base['build']
+        else:
+            build.update(base['build'])
+
+    if 'build' in override:
+        if isinstance(override['build'], six.string_types):
+            build['context'] = override['build']
+        else:
+            build.update(override['build'])
+
+    if build:
+        output['build'] = build
+
+
+def legacy_v1_merge_image_or_build(output, base, override):
+    output.pop('image', None)
+    output.pop('build', None)
+    if 'image' in override:
+        output['image'] = override['image']
+    elif 'build' in override:
+        output['build'] = override['build']
+    elif 'image' in base:
+        output['image'] = base['image']
+    elif 'build' in base:
+        output['build'] = base['build']
 
 
 def merge_environment(base, override):
     env = parse_environment(base)
     env.update(parse_environment(override))
     return env
-
-
-def parse_environment(environment):
-    if not environment:
-        return {}
-
-    if isinstance(environment, list):
-        return dict(split_env(e) for e in environment)
-
-    if isinstance(environment, dict):
-        return dict(environment)
-
-    raise ConfigurationError(
-        "environment \"%s\" must be a list or mapping," %
-        environment
-    )
 
 
 def split_env(env):
@@ -510,6 +708,42 @@ def split_env(env):
         return env.split('=', 1)
     else:
         return env, None
+
+
+def split_label(label):
+    if '=' in label:
+        return label.split('=', 1)
+    else:
+        return label, ''
+
+
+def parse_dict_or_list(split_func, type_name, arguments):
+    if not arguments:
+        return {}
+
+    if isinstance(arguments, list):
+        return dict(split_func(e) for e in arguments)
+
+    if isinstance(arguments, dict):
+        return dict(arguments)
+
+    raise ConfigurationError(
+        "%s \"%s\" must be a list or mapping," %
+        (type_name, arguments)
+    )
+
+
+parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
+parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
+parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
+
+
+def parse_ulimits(ulimits):
+    if not ulimits:
+        return {}
+
+    if isinstance(ulimits, dict):
+        return dict(ulimits)
 
 
 def resolve_env_var(key, val):
@@ -555,6 +789,21 @@ def resolve_volume_path(working_dir, volume):
         return container_path
 
 
+def normalize_build(service_dict, working_dir):
+
+    if 'build' in service_dict:
+        build = {}
+        # Shortcut where specifying a string is treated as the build context
+        if isinstance(service_dict['build'], six.string_types):
+            build['context'] = service_dict.pop('build')
+        else:
+            build.update(service_dict['build'])
+            if 'args' in build:
+                build['args'] = resolve_build_args(build)
+
+        service_dict['build'] = build
+
+
 def resolve_build_path(working_dir, build_path):
     if is_url(build_path):
         return build_path
@@ -567,7 +816,13 @@ def is_url(build_path):
 
 def validate_paths(service_dict):
     if 'build' in service_dict:
-        build_path = service_dict['build']
+        build = service_dict.get('build', {})
+
+        if isinstance(build, six.string_types):
+            build_path = build
+        elif isinstance(build, dict) and 'context' in build:
+            build_path = build['context']
+
         if (
             not is_url(build_path) and
             (not os.path.exists(build_path) or not os.access(build_path, os.R_OK))
@@ -622,32 +877,12 @@ def join_path_mapping(pair):
         return ":".join((host, container))
 
 
-def merge_labels(base, override):
-    labels = parse_labels(base)
-    labels.update(parse_labels(override))
-    return labels
-
-
-def parse_labels(labels):
-    if not labels:
-        return {}
-
-    if isinstance(labels, list):
-        return dict(split_label(e) for e in labels)
-
-    if isinstance(labels, dict):
-        return dict(labels)
-
-
-def split_label(label):
-    if '=' in label:
-        return label.split('=', 1)
-    else:
-        return label, ''
-
-
 def expand_path(working_dir, path):
     return os.path.abspath(os.path.join(working_dir, os.path.expanduser(path)))
+
+
+def merge_list_or_string(base, override):
+    return to_list(base) + to_list(override)
 
 
 def to_list(value):
@@ -657,6 +892,10 @@ def to_list(value):
         return [value]
     else:
         return value
+
+
+def has_uppercase(name):
+    return any(char in string.ascii_uppercase for char in name)
 
 
 def load_yaml(filename):

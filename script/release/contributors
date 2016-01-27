@@ -18,10 +18,13 @@ PREV_RELEASE=$1
 VERSION=HEAD
 URL="https://api.github.com/repos/docker/compose/compare"
 
-curl -sf "$URL/$PREV_RELEASE...$VERSION" | \
+contribs=$(curl -sf "$URL/$PREV_RELEASE...$VERSION" | \
     jq -r '.commits[].author.login' | \
     sort | \
     uniq -c | \
-    sort -nr | \
-    awk '{print "@"$2","}' | \
-    xargs echo
+    sort -nr)
+
+echo "Contributions by user: "
+echo "$contribs"
+echo
+echo "$contribs" | awk '{print "@"$2","}' | xargs

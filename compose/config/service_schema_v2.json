@@ -1,15 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "service_schema_v2.json",
 
   "type": "object",
-  "id": "fields_schema.json",
 
-  "patternProperties": {
-    "^[a-zA-Z0-9._-]+$": {
-      "$ref": "#/definitions/service"
-    }
-  },
-  "additionalProperties": false,
+  "allOf": [
+    {"$ref": "#/definitions/service"},
+    {"$ref": "#/definitions/constraints"}
+  ],
 
   "definitions": {
     "service": {
@@ -17,7 +15,20 @@
       "type": "object",
 
       "properties": {
-        "build": {"type": "string"},
+        "build": {
+          "oneOf": [
+            {"type": "string"},
+            {
+              "type": "object",
+              "properties": {
+                "context": {"type": "string"},
+                "dockerfile": {"type": "string"},
+                "args": {"$ref": "#/definitions/list_or_dict"}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cgroup_parent": {"type": "string"},
@@ -29,13 +40,19 @@
         },
         "container_name": {"type": "string"},
         "cpu_shares": {"type": ["number", "string"]},
+        "cpu_quota": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
+        "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
-        "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
-        "entrypoint": {"$ref": "#/definitions/string_or_list"},
+        "entrypoint": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
         "env_file": {"$ref": "#/definitions/string_or_list"},
         "environment": {"$ref": "#/definitions/list_or_dict"},
 
@@ -66,21 +83,35 @@
           ]
         },
 
-        "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
         "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
-        "log_driver": {"type": "string"},
-        "log_opt": {"type": "object"},
+        "logging": {
+            "type": "object",
+
+            "properties": {
+                "driver": {"type": "string"},
+                "options": {"type": "object"}
+            },
+            "additionalProperties": false
+        },
 
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
         "memswap_limit": {"type": ["number", "string"]},
-        "net": {"type": "string"},
+        "network_mode": {"type": "string"},
+
+        "networks": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+
         "pid": {"type": ["string", "null"]},
 
         "ports": {
@@ -97,6 +128,7 @@
         "restart": {"type": "string"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "stdin_open": {"type": "boolean"},
+        "stop_signal": {"type": "string"},
         "tty": {"type": "boolean"},
         "ulimits": {
           "type": "object",
@@ -156,6 +188,13 @@
           "additionalProperties": false
         },
         {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      ]
+    },
+    "constraints": {
+      "id": "#/definitions/constraints",
+      "anyOf": [
+          {"required": ["build"]},
+          {"required": ["image"]}
       ]
     }
   }

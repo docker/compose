@@ -31,16 +31,21 @@ they can be run together in an isolated environment.
 
 A `docker-compose.yml` looks like this:
 
-    web:
-      build: .
-      ports:
-       - "5000:5000"
-      volumes:
-       - .:/code
-      links:
-       - redis
-    redis:
-      image: redis
+    version: 2
+    services:
+      web:
+        build: .
+        ports:
+         - "5000:5000"
+        volumes:
+         - .:/code
+         - logvolume01:/var/log
+        links:
+         - redis
+      redis:
+        image: redis
+    volumes:
+      logvolume01: {}
 
 For more information about the Compose file, see the
 [Compose file reference](compose-file.md)
@@ -148,8 +153,7 @@ environments in just a few commands:
 
     $ docker-compose up -d
     $ ./run_tests
-    $ docker-compose stop
-    $ docker-compose rm -f
+    $ docker-compose down
 
 ### Single host deployments
 
@@ -183,4 +187,4 @@ individuals, we have a number of open channels for communication.
 
 * To contribute code or documentation changes: please submit a [pull request on Github](https://github.com/docker/compose/pulls).
 
-For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/project/get-help/).
+For more information and resources, please visit the [Getting Help project page](https://docs.docker.com/opensource/get-help/).

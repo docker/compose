@@ -14,19 +14,25 @@ parent = "smn_compose_ref"
 The following pages describe the usage information for the [docker-compose](docker-compose.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
 
 * [build](build.md)
+* [config](config.md)
+* [create](create.md)
+* [down](down.md)
+* [events](events.md)
 * [help](help.md)
 * [kill](kill.md)
-* [ps](ps.md)
-* [restart](restart.md)
-* [run](run.md)
-* [start](start.md)
-* [up](up.md)
 * [logs](logs.md)
+* [pause](pause.md)
 * [port](port.md)
+* [ps](ps.md)
 * [pull](pull.md)
+* [restart](restart.md)
 * [rm](rm.md)
+* [run](run.md)
 * [scale](scale.md)
+* [start](start.md)
 * [stop](stop.md)
+* [unpause](unpause.md)
+* [up](up.md)
 
 ## Where to go next
 

@@ -15,9 +15,9 @@ Before you start, you’ll need to install the experimental build of Docker, and
         $ curl -L https://experimental.docker.com/builds/Darwin/x86_64/docker-latest > /usr/local/bin/docker
         $ chmod +x /usr/local/bin/docker
 
--   To install Machine, follow the instructions [here](http://docs.docker.com/machine/).
+-   To install Machine, follow the instructions [here](https://docs.docker.com/machine/install-machine/).
 
--   To install Compose, follow the instructions [here](http://docs.docker.com/compose/install/).
+-   To install Compose, follow the instructions [here](https://docs.docker.com/compose/install/).
 
 You’ll also need a [Docker Hub](https://hub.docker.com/account/signup/) account and a [Digital Ocean](https://www.digitalocean.com/) account.
 

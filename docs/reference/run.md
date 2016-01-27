@@ -17,6 +17,7 @@ Usage: run [options] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 Options:
 -d                    Detached mode: Run container in the background, print
                           new container name.
+--name NAME           Assign a name to the container
 --entrypoint CMD      Override the entrypoint of the image.
 -e KEY=VAL            Set an environment variable (can be used multiple times)
 -u, --user=""         Run as specified username or uid
