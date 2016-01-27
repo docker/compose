@@ -86,10 +86,10 @@ echo "Push branch to user remote"
 GITHUB_USER=$USER
 USER_REMOTE="$(find_remote $GITHUB_USER/compose)"
 if [ -z "$USER_REMOTE" ]; then
-    echo "No user remote found for $GITHUB_USER"
-    read -r -p "Enter the name of your github user: " GITHUB_USER
+    echo "$GITHUB_USER/compose not found"
+    read -r -p "Enter the name of your GitHub fork (username/repo): " GITHUB_REPO
     # assumes there is already a user remote somewhere
-    USER_REMOTE=$(find_remote $GITHUB_USER/compose)
+    USER_REMOTE=$(find_remote $GITHUB_REPO)
 fi
 if [ -z "$USER_REMOTE" ]; then
     >&2 echo "No user remote found. You need to 'git push' your branch."
