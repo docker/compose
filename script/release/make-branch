@@ -63,15 +63,17 @@ git merge --strategy=ours --no-edit $REMOTE/release
 git config "branch.${BRANCH}.release" $VERSION
 
 
+editor=${EDITOR:-vim}
+
 echo "Update versions in docs/install.md, compose/__init__.py, script/run.sh"
-$EDITOR docs/install.md
-$EDITOR compose/__init__.py
-$EDITOR script/run.sh
+$editor docs/install.md
+$editor compose/__init__.py
+$editor script/run.sh
 
 
 echo "Write release notes in CHANGELOG.md"
 browser "https://github.com/docker/compose/issues?q=milestone%3A$VERSION+is%3Aclosed"
-$EDITOR CHANGELOG.md
+$editor CHANGELOG.md
 
 
 git diff
