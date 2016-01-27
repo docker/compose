@@ -250,6 +250,21 @@ class CLITestCase(DockerClientTestCase):
         assert 'Error: image library/nonexisting-image' in result.stderr
         assert 'not found' in result.stderr
 
+    def test_pull_with_no_deps(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        result = self.dispatch(['pull', 'web'])
+        assert sorted(result.stderr.split('\n'))[1:] == [
+            'Pulling web (busybox:latest)...',
+        ]
+
+    def test_pull_with_include_deps(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        result = self.dispatch(['pull', '--include-deps', 'web'])
+        assert sorted(result.stderr.split('\n'))[1:] == [
+            'Pulling db (busybox:latest)...',
+            'Pulling web (busybox:latest)...',
+        ]
+
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         self.dispatch(['build', 'simple'])

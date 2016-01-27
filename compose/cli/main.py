@@ -499,10 +499,12 @@ class TopLevelCommand(object):
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
+            --include-deps          Pull dependencies.
         """
         self.project.pull(
             service_names=options['SERVICE'],
-            ignore_pull_failures=options.get('--ignore-pull-failures')
+            ignore_pull_failures=options.get('--ignore-pull-failures'),
+            include_deps=options.get('--include-deps'),
         )
 
     def rm(self, options):
