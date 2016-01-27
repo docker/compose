@@ -677,12 +677,14 @@ class TopLevelCommand(object):
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
             --parallel              Pull multiple images in parallel.
             -q, --quiet             Pull without printing progress information
+            --include-deps          Also pull services declared as dependencies
         """
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
             parallel_pull=options.get('--parallel'),
             silent=options.get('--quiet'),
+            include_deps=options.get('--include-deps'),
         )
 
     def push(self, options):
