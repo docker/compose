@@ -15,16 +15,12 @@ type Process interface {
 	Signal(os.Signal) error
 }
 
-type Status string
+type State string
 
 const (
-	Paused  Status = "paused"
-	Running Status = "running"
+	Paused  = State("paused")
+	Running = State("running")
 )
-
-type State struct {
-	Status Status
-}
 
 type Console interface {
 	io.ReadWriter

@@ -201,7 +201,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 			Id:         c.ID(),
 			BundlePath: c.Path(),
 			Processes:  procs,
-			Status:     string(c.State().Status),
+			Status:     string(c.State()),
 		})
 	}
 	return state, nil
@@ -213,9 +213,7 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 	if r.Signal != 0 {
 		e.Signal = syscall.Signal(r.Signal)
 	}
-	e.State = &runtime.State{
-		Status: runtime.Status(r.Status),
-	}
+	e.State = runtime.State(r.Status)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err

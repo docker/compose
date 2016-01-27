@@ -289,19 +289,16 @@ func (c *libcontainerContainer) Pause() error {
 }
 
 func (c *libcontainerContainer) State() runtime.State {
-	s := runtime.State{}
 	// TODO: what to do with error
 	state, err := c.c.Status()
 	if err != nil {
-		return s
+		return runtime.State("")
 	}
 	switch state {
 	case libcontainer.Paused, libcontainer.Pausing:
-		s.Status = runtime.Paused
-	default:
-		s.Status = runtime.Running
+		return runtime.Paused
 	}
-	return s
+	return runtime.State("")
 }
 
 func (c *libcontainerContainer) ID() string {

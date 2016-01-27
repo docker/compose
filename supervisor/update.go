@@ -12,8 +12,8 @@ func (h *UpdateEvent) Handle(e *Event) error {
 		return ErrContainerNotFound
 	}
 	container := i.container
-	if e.State.Status != "" {
-		switch e.State.Status {
+	if e.State != "" {
+		switch e.State {
 		case runtime.Running:
 			if err := container.Resume(); err != nil {
 				return ErrUnknownContainerStatus
