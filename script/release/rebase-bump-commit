@@ -32,7 +32,7 @@ if [[ "$sha" == "$(git rev-parse HEAD)" ]]; then
     exit 0
 fi
 
-commits=$(git log --format="%H" "$sha..HEAD" | wc -l)
+commits=$(git log --format="%H" "$sha..HEAD" | wc -l | xargs echo)
 
 git rebase --onto $sha~1 HEAD~$commits $BRANCH
 git cherry-pick $sha
