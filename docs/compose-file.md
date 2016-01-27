@@ -808,7 +808,7 @@ future Compose release.
 
 Version 1 files cannot declare named
 [volumes](#volume-configuration-reference), [networks](networking.md) or
-[build arguments](#args). They *can*, however, define [links](#links).
+[build arguments](#args).
 
 Example:
 
@@ -836,10 +836,6 @@ of version **1.10.0+**.
 Named [volumes](#volume-configuration-reference) can be declared under the
 `volumes` key, and [networks](#network-configuration-reference) can be declared
 under the `networks` key.
-
-You cannot define links when using version 2. Instead, you should use
-[networking](networking.md) for communication between containers. In most cases,
-this will involve less configuration than links.
 
 Simple example:
 
