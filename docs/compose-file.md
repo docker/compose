@@ -472,11 +472,6 @@ Networks to join, referencing entries under the
       - some-network
       - other-network
 
-The value `bridge` can also be used to make containers join the pre-defined
-`bridge` network.
-
-There is no equivalent to `net: "container:[name or id]"`.
-
 ### pid
 
     pid: "host"
