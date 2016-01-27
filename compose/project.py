@@ -470,16 +470,13 @@ def get_networks(service_dict, network_definitions):
 
     networks = []
     for name in service_dict.pop('networks', ['default']):
-        if name in ['bridge']:
-            networks.append(name)
+        matches = [n for n in network_definitions if n.name == name]
+        if matches:
+            networks.append(matches[0].full_name)
         else:
-            matches = [n for n in network_definitions if n.name == name]
-            if matches:
-                networks.append(matches[0].full_name)
-            else:
-                raise ConfigurationError(
-                    'Service "{}" uses an undefined network "{}"'
-                    .format(service_dict['name'], name))
+            raise ConfigurationError(
+                'Service "{}" uses an undefined network "{}"'
+                .format(service_dict['name'], name))
     return networks
 
 

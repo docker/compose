@@ -496,22 +496,6 @@ class CLITestCase(DockerClientTestCase):
         assert 'Service "web" uses an undefined network "foo"' in result.stderr
 
     @v2_only()
-    def test_up_with_bridge_network_plus_default(self):
-        filename = 'bridge.yml'
-
-        self.base_dir = 'tests/fixtures/networks'
-        self._project = get_project(self.base_dir, [filename])
-
-        self.dispatch(['-f', filename, 'up', '-d'], None)
-
-        container = self.project.containers()[0]
-
-        assert sorted(list(container.get('NetworkSettings.Networks'))) == sorted([
-            'bridge',
-            self.project.default_network.full_name,
-        ])
-
-    @v2_only()
     def test_up_with_network_mode(self):
         c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
         self.addCleanup(self.client.remove_container, c, force=True)
