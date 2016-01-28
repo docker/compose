@@ -82,6 +82,7 @@ DOCKER_CONFIG_KEYS = [
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
     'container_name',
+    'depends_on',
     'dockerfile',
     'expose',
     'external_links',
