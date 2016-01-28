@@ -5,6 +5,7 @@ description = "How Compose sets up networking between containers"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers, networking"]
 [menu.main]
 parent="workw_compose"
+weight=21
 +++
 <![end-metadata]-->
 
