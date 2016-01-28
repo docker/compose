@@ -1,15 +1,15 @@
 <!--[metadata]>
 +++
-title = "Quickstart Guide: Compose and Rails"
+title = "Quickstart: Compose and Rails"
 description = "Getting started with Docker Compose and Rails"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
 [menu.main]
-parent="smn_workw_compose"
+parent="workw_compose"
 weight=5
 +++
 <![end-metadata]-->
 
-## Quickstart Guide: Compose and Rails
+## Quickstart: Compose and Rails
 
 This Quickstart guide will show you how to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
 
