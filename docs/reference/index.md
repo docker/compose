@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Command line reference"
+title = "Command-line Reference"
 description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]

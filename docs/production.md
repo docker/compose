@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Using Compose in production"
+title = "Using Compose in Production"
 description = "Guide to using Docker Compose in production"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers,  production"]
 [menu.main]
