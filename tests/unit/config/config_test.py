@@ -253,15 +253,31 @@ class ConfigTest(unittest.TestCase):
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
     def test_load_with_invalid_field_name(self):
-        config_details = build_config_details(
-            {'web': {'image': 'busybox', 'name': 'bogus'}},
-            'working_dir',
-            'filename.yml')
         with pytest.raises(ConfigurationError) as exc:
-            config.load(config_details)
-        error_msg = "Unsupported config option for 'web' service: 'name'"
-        assert error_msg in exc.exconly()
-        assert "Validation failed in file 'filename.yml'" in exc.exconly()
+            config.load(build_config_details(
+                {
+                    'version': 2,
+                    'services': {
+                        'web': {'image': 'busybox', 'name': 'bogus'},
+                    }
+                },
+                'working_dir',
+                'filename.yml',
+            ))
+
+        assert "Unsupported config option for services.web: 'name'" in exc.exconly()
+
+    def test_load_with_invalid_field_name_v1(self):
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(
+                {
+                    'web': {'image': 'busybox', 'name': 'bogus'},
+                },
+                'working_dir',
+                'filename.yml',
+            ))
+
+        assert "Unsupported config option for web: 'name'" in exc.exconly()
 
     def test_load_invalid_service_definition(self):
         config_details = build_config_details(
@@ -645,6 +661,39 @@ class ConfigTest(unittest.TestCase):
             }, 'tests/fixtures/build-ctx'))
             assert "Service 'Foo' contains uppercase characters" in exc.exconly()
 
+    def test_invalid_config_v1(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'foo': {'image': 1},
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
+        assert "foo.image contains an invalid type, it should be a string" \
+            in excinfo.exconly()
+
+    def test_invalid_config_v2(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': 2,
+                        'services': {
+                            'foo': {'image': 1},
+                        },
+                    },
+                    'tests/fixtures/extends',
+                    'filename.yml'
+                )
+            )
+
+        assert "services.foo.image contains an invalid type, it should be a string" \
+            in excinfo.exconly()
+
     def test_invalid_config_build_and_image_specified_v1(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
@@ -657,7 +706,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'foo' has both an image and build path specified." in excinfo.exconly()
+        assert "foo has both an image and build path specified." in excinfo.exconly()
 
     def test_invalid_config_type_should_be_an_array(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -671,7 +720,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'foo' configuration key 'links' contains an invalid type, it should be an array" \
+        assert "foo.links contains an invalid type, it should be an array" \
             in excinfo.exconly()
 
     def test_invalid_config_not_a_dictionary(self):
@@ -713,7 +762,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'web' configuration key 'command' contains 1, which is an invalid type, it should be a string" \
+        assert "web.command contains 1, which is an invalid type, it should be a string" \
             in excinfo.exconly()
 
     def test_load_config_dockerfile_without_build_raises_error_v1(self):
@@ -725,7 +774,7 @@ class ConfigTest(unittest.TestCase):
                 }
             }))
 
-        assert "Service 'web' has both an image and alternate Dockerfile." in exc.exconly()
+        assert "web has both an image and alternate Dockerfile." in exc.exconly()
 
     def test_config_extra_hosts_string_raises_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -740,7 +789,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'web' configuration key 'extra_hosts' contains an invalid type" \
+        assert "web.extra_hosts contains an invalid type" \
             in excinfo.exconly()
 
     def test_config_extra_hosts_list_of_dicts_validation_error(self):
@@ -759,7 +808,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "key 'extra_hosts' contains {\"somehost\": \"162.242.195.82\"}, " \
+        assert "web.extra_hosts contains {\"somehost\": \"162.242.195.82\"}, " \
                "which is an invalid type, it should be a string" \
             in excinfo.exconly()
 
@@ -781,7 +830,7 @@ class ConfigTest(unittest.TestCase):
                 'working_dir',
                 'filename.yml'))
 
-        assert "Service 'web' configuration key 'ulimits' 'nofile' contains unsupported option: 'not_soft_or_hard'" \
+        assert "web.ulimits.nofile contains unsupported option: 'not_soft_or_hard'" \
             in exc.exconly()
 
     def test_config_ulimits_required_keys_validation_error(self):
@@ -795,7 +844,7 @@ class ConfigTest(unittest.TestCase):
                 },
                 'working_dir',
                 'filename.yml'))
-        assert "Service 'web' configuration key 'ulimits' 'nofile'" in exc.exconly()
+        assert "web.ulimits.nofile" in exc.exconly()
         assert "'hard' is a required property" in exc.exconly()
 
     def test_config_ulimits_soft_greater_than_hard_error(self):
@@ -896,7 +945,7 @@ class ConfigTest(unittest.TestCase):
                     'extra_hosts': "www.example.com: 192.168.0.17",
                 }
             }))
-        assert "'extra_hosts' contains an invalid type" in exc.exconly()
+        assert "web.extra_hosts contains an invalid type" in exc.exconly()
 
     def test_validate_extra_hosts_invalid_list(self):
         with pytest.raises(ConfigurationError) as exc:
@@ -1593,7 +1642,7 @@ class MemoryOptionsTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'foo' configuration key 'memswap_limit' is invalid: when defining " \
+        assert "foo.memswap_limit is invalid: when defining " \
                "'memswap_limit' you must set 'mem_limit' as well" \
             in excinfo.exconly()
 
@@ -1905,7 +1954,7 @@ class ExtendsTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'web' configuration key 'extends' contains unsupported option: 'rogue_key'" \
+        assert "web.extends contains unsupported option: 'rogue_key'" \
             in excinfo.exconly()
 
     def test_extends_validation_sub_property_key(self):
@@ -1926,7 +1975,7 @@ class ExtendsTest(unittest.TestCase):
                 )
             )
 
-        assert "Service 'web' configuration key 'extends' 'file' contains 1, which is an invalid type, it should be a string" \
+        assert "web.extends.file contains 1, which is an invalid type, it should be a string" \
             in excinfo.exconly()
 
     def test_extends_validation_no_file_key_no_filename_set(self):
@@ -1956,7 +2005,7 @@ class ExtendsTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
         assert (
-            "Service 'myweb' has neither an image nor a build path specified" in
+            "myweb has neither an image nor a build path specified" in
             exc.exconly()
         )
 
