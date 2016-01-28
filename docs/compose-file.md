@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Compose file reference"
+title = "Compose File Reference"
 description = "Compose file reference"
 keywords = ["fig, composition, compose, docker"]
 aliases = ["/compose/yml"]

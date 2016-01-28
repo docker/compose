@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Environment variables reference"
+title = "Environment Variables Reference"
 description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]

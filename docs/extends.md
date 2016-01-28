@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Extending services in Compose"
+title = "Extending Services in Compose"
 description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
 keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
 [menu.main]
