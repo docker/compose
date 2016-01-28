@@ -5,7 +5,7 @@ description = "How to use Docker Compose's extends keyword to share configuratio
 keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
 [menu.main]
 parent="workw_compose"
-weight=2
+weight=20
 +++
 <![end-metadata]-->
 
