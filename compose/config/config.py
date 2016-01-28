@@ -129,8 +129,6 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
     @cached_property
     def version(self):
-        if self.config is None:
-            return 1
         version = self.config.get('version', 1)
         if isinstance(version, dict):
             log.warn("Unexpected type for field 'version', in file {} assuming "
