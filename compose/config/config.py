@@ -84,10 +84,7 @@ DOCKER_CONFIG_KEYS = [
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
     'container_name',
-    'depends_on',
     'dockerfile',
-    'expose',
-    'external_links',
     'logging',
 ]
 
@@ -666,7 +663,14 @@ def merge_service_dicts(base, override, version):
     for field in ['volumes', 'devices']:
         merge_field(field, merge_path_mappings)
 
-    for field in ['ports', 'expose', 'external_links']:
+    for field in [
+        'depends_on',
+        'expose',
+        'external_links',
+        'links',
+        'ports',
+        'volumes_from',
+    ]:
         merge_field(field, operator.add, default=[])
 
     for field in ['dns', 'dns_search', 'env_file']:

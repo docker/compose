@@ -602,6 +602,7 @@ class ConfigTest(unittest.TestCase):
                 'services': {
                     'web': {
                         'image': 'example/web',
+                        'depends_on': ['db'],
                     },
                     'db': {
                         'image': 'example/db',
@@ -616,7 +617,11 @@ class ConfigTest(unittest.TestCase):
                     'web': {
                         'build': '/',
                         'volumes': ['/home/user/project:/code'],
+                        'depends_on': ['other'],
                     },
+                    'other': {
+                        'image': 'example/other',
+                    }
                 }
             })
         details = config.ConfigDetails('.', [base_file, override_file])
@@ -628,10 +633,15 @@ class ConfigTest(unittest.TestCase):
                 'build': {'context': os.path.abspath('/')},
                 'image': 'example/web',
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
+                'depends_on': ['db', 'other'],
             },
             {
                 'name': 'db',
                 'image': 'example/db',
+            },
+            {
+                'name': 'other',
+                'image': 'example/other',
             },
         ]
         assert service_sort(service_dicts) == service_sort(expected)
@@ -2298,6 +2308,24 @@ class ExtendsTest(unittest.TestCase):
 
         service = load_from_filename(str(tmpdir.join('docker-compose.yml')))
         self.assertEquals(service[0]['command'], "top")
+
+    def test_extends_with_depends_on(self):
+        tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
+        self.addCleanup(tmpdir.remove)
+        tmpdir.join('docker-compose.yml').write("""
+            version: 2
+            services:
+              base:
+                image: example
+              web:
+                extends: base
+                image: busybox
+                depends_on: ['other']
+              other:
+                image: example
+        """)
+        services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        assert service_sort(services)[2]['depends_on'] == ['other']
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
