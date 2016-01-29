@@ -96,6 +96,7 @@ class Project(object):
 
             project.services.append(
                 Service(
+                    service_dict.pop('name'),
                     client=client,
                     project=name,
                     use_networking=use_networking,

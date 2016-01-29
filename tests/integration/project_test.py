@@ -832,7 +832,8 @@ class ProjectTest(DockerClientTestCase):
         )
         project = Project.from_config(
             name='composetest',
-            config_data=config_data, client=self.client
+            config_data=config_data,
+            client=self.client
         )
         with self.assertRaises(config.ConfigurationError) as e:
             project.initialize_volumes()

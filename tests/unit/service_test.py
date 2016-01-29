@@ -266,7 +266,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(
             opts['labels'][LABEL_CONFIG_HASH],
-            '3c85881a8903b9d73a06c41860c8be08acce1494ab4cf8408375966dccd714de')
+            'f8bfa1058ad1f4231372a0b1639f0dfdb574dafff4e8d7938049ae993f7cf1fc')
         self.assertEqual(
             opts['environment'],
             {
@@ -417,9 +417,10 @@ class ServiceTest(unittest.TestCase):
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
+            'networks': [],
             'volumes_from': [('two', 'rw')],
         }
-        self.assertEqual(config_dict, expected)
+        assert config_dict == expected
 
     def test_config_dict_with_network_mode_from_container(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
@@ -437,10 +438,11 @@ class ServiceTest(unittest.TestCase):
             'image_id': 'abcd',
             'options': {'image': 'example.com/foo'},
             'links': [],
+            'networks': [],
             'net': 'aaabbb',
             'volumes_from': [],
         }
-        self.assertEqual(config_dict, expected)
+        assert config_dict == expected
 
     def test_remove_image_none(self):
         web = Service('web', image='example', client=self.mock_client)
