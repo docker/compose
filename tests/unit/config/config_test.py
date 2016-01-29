@@ -232,13 +232,18 @@ class ConfigTest(unittest.TestCase):
         assert volumes['other'] == {}
 
     def test_load_service_with_name_version(self):
-        config_data = config.load(
-            build_config_details({
-                'version': {
-                    'image': 'busybox'
-                }
-            }, 'working_dir', 'filename.yml')
-        )
+        with mock.patch('compose.config.config.log') as mock_logging:
+            config_data = config.load(
+                build_config_details({
+                    'version': {
+                        'image': 'busybox'
+                    }
+                }, 'working_dir', 'filename.yml')
+            )
+
+        assert 'Unexpected type for "version" key in "filename.yml"' \
+            in mock_logging.warn.call_args[0][0]
+
         service_dicts = config_data.services
         self.assertEqual(
             service_sort(service_dicts),
