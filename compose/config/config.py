@@ -138,9 +138,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         version = self.config['version']
 
         if isinstance(version, dict):
-            log.warn("Unexpected type for field 'version', in file {} assuming "
-                     "version is the name of a service, and defaulting to "
-                     "Compose file version 1".format(self.filename))
+            log.warn('Unexpected type for "version" key in "{}". Assuming '
+                     '"version" is the name of a service, and defaulting to '
+                     'Compose file version 1.'.format(self.filename))
             return V1
 
         if not isinstance(version, six.string_types):
