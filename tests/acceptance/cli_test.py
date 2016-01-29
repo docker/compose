@@ -406,7 +406,7 @@ class CLITestCase(DockerClientTestCase):
 
         services = self.project.get_services()
 
-        network_name = self.project.networks.networks['default']
+        network_name = self.project.networks.networks['default'].full_name
         networks = self.client.networks(names=[network_name])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['Driver'], 'bridge')
@@ -440,7 +440,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['-f', filename, 'up', '-d'], None)
 
-        network_name = self.project.networks.networks['default']
+        network_name = self.project.networks.networks['default'].full_name
         networks = self.client.networks(names=[network_name])
 
         assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
@@ -596,7 +596,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d', 'web'], None)
 
         # No network was created
-        network_name = self.project.networks.networks['default']
+        network_name = self.project.networks.networks['default'].full_name
         networks = self.client.networks(names=[network_name])
         assert networks == []
 

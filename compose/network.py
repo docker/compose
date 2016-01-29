@@ -136,7 +136,7 @@ class ProjectNetworks(object):
         service_networks = {
             network: networks.get(network)
             for service in services
-            for network in service.get('networks', ['default'])
+            for network in get_network_names_for_service(service)
         }
         unused = set(networks) - set(service_networks) - {'default'}
         if unused:
@@ -159,12 +159,15 @@ class ProjectNetworks(object):
             network.ensure()
 
 
-def get_networks(service_dict, network_definitions):
+def get_network_names_for_service(service_dict):
     if 'network_mode' in service_dict:
         return []
+    return service_dict.get('networks', ['default'])
 
+
+def get_networks(service_dict, network_definitions):
     networks = []
-    for name in service_dict.pop('networks', ['default']):
+    for name in get_network_names_for_service(service_dict):
         network = network_definitions.get(name)
         if network:
             networks.append(network.full_name)
@@ -172,4 +175,5 @@ def get_networks(service_dict, network_definitions):
             raise ConfigurationError(
                 'Service "{}" uses an undefined network "{}"'
                 .format(service_dict['name'], name))
+
     return networks
