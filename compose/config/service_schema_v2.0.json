@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "service_schema_v2.json",
+  "id": "service_schema_v2.0.json",
 
   "type": "object",
 

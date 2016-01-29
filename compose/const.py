@@ -14,9 +14,12 @@ LABEL_PROJECT = 'com.docker.compose.project'
 LABEL_SERVICE = 'com.docker.compose.service'
 LABEL_VERSION = 'com.docker.compose.version'
 LABEL_CONFIG_HASH = 'com.docker.compose.config-hash'
-COMPOSEFILE_VERSIONS = (1, 2)
+
+COMPOSEFILE_V1 = '1'
+COMPOSEFILE_V2_0 = '2.0'
+COMPOSEFILE_VERSIONS = (COMPOSEFILE_V1, COMPOSEFILE_V2_0)
 
 API_VERSIONS = {
-    1: '1.21',
-    2: '1.22',
+    COMPOSEFILE_V1: '1.21',
+    COMPOSEFILE_V2_0: '1.22',
 }
