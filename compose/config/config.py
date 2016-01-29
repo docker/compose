@@ -16,10 +16,10 @@ from cached_property import cached_property
 
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
-from ..const import COMPOSEFILE_VERSIONS
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
+from .errors import VERSION_EXPLANATION
 from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
 from .sort_services import get_service_name_from_network_mode
@@ -105,6 +105,7 @@ SUPPORTED_FILENAMES = [
 
 DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 
+
 log = logging.getLogger(__name__)
 
 
@@ -131,7 +132,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
     @cached_property
     def version(self):
-        version = self.config.get('version', V1)
+        if 'version' not in self.config:
+            return V1
+
+        version = self.config['version']
 
         if isinstance(version, dict):
             log.warn("Unexpected type for field 'version', in file {} assuming "
@@ -139,12 +143,23 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                      "Compose file version 1".format(self.filename))
             return V1
 
+        if not isinstance(version, six.string_types):
+            raise ConfigurationError(
+                'Version in "{}" is invalid - it should be a string.'
+                .format(self.filename))
+
+        if version == '1':
+            raise ConfigurationError(
+                'Version in "{}" is invalid. {}'
+                .format(self.filename, VERSION_EXPLANATION))
+
         if version == '2':
             version = V2_0
 
-        if version not in COMPOSEFILE_VERSIONS:
+        if version != V2_0:
             raise ConfigurationError(
-                'Invalid Compose file version: {0}'.format(version))
+                'Version in "{}" is unsupported. {}'
+                .format(self.filename, VERSION_EXPLANATION))
 
         return version
 

@@ -17,6 +17,7 @@ from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.errors import ConfigurationError
+from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
@@ -159,8 +160,8 @@ class ConfigTest(unittest.TestCase):
         assert list(s['name'] for s in cfg.services) == ['version']
 
     def test_wrong_version_type(self):
-        for version in [None, 2, 2.0]:
-            with pytest.raises(ConfigurationError):
+        for version in [None, 1, 2, 2.0]:
+            with pytest.raises(ConfigurationError) as excinfo:
                 config.load(
                     build_config_details(
                         {'version': version},
@@ -168,8 +169,11 @@ class ConfigTest(unittest.TestCase):
                     )
                 )
 
+            assert 'Version in "filename.yml" is invalid - it should be a string.' \
+                in excinfo.exconly()
+
     def test_unsupported_version(self):
-        with pytest.raises(ConfigurationError):
+        with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
                     {'version': '2.1'},
@@ -177,18 +181,38 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-    def test_v1_file_with_version_is_invalid(self):
-        for version in [1, "1"]:
-            with pytest.raises(ConfigurationError):
-                config.load(
-                    build_config_details(
-                        {
-                            'version': version,
-                            'web': {'image': 'busybox'},
-                        },
-                        filename='filename.yml',
-                    )
+        assert 'Version in "filename.yml" is unsupported' in excinfo.exconly()
+        assert VERSION_EXPLANATION in excinfo.exconly()
+
+    def test_version_1_is_invalid(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '1',
+                        'web': {'image': 'busybox'},
+                    },
+                    filename='filename.yml',
                 )
+            )
+
+        assert 'Version in "filename.yml" is invalid' in excinfo.exconly()
+        assert VERSION_EXPLANATION in excinfo.exconly()
+
+    def test_v1_file_with_version_is_invalid(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '2',
+                        'web': {'image': 'busybox'},
+                    },
+                    filename='filename.yml',
+                )
+            )
+
+        assert 'Additional properties are not allowed' in excinfo.exconly()
+        assert VERSION_EXPLANATION in excinfo.exconly()
 
     def test_named_volume_config_empty(self):
         config_details = build_config_details({
@@ -225,27 +249,6 @@ class ConfigTest(unittest.TestCase):
                 }
             ])
         )
-
-    def test_load_invalid_version(self):
-        with self.assertRaises(ConfigurationError):
-            config.load(
-                build_config_details({
-                    'version': 18,
-                    'services': {
-                        'foo': {'image': 'busybox'}
-                    }
-                }, 'working_dir', 'filename.yml')
-            )
-
-        with self.assertRaises(ConfigurationError):
-            config.load(
-                build_config_details({
-                    'version': 'two point oh',
-                    'services': {
-                        'foo': {'image': 'busybox'}
-                    }
-                }, 'working_dir', 'filename.yml')
-            )
 
     def test_load_throws_error_when_not_dict(self):
         with self.assertRaises(ConfigurationError):
