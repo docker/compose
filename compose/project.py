@@ -351,13 +351,12 @@ class Project(object):
            timeout=DEFAULT_TIMEOUT,
            detached=False):
 
-        services = self.get_services_without_duplicate(service_names, include_deps=start_deps)
+        self.initialize()
+        services = self.get_services_without_duplicate(
+            service_names,
+            include_deps=start_deps)
 
         plans = self._get_convergence_plans(services, strategy)
-
-        self.networks.initialize()
-        self.initialize_volumes()
-
         return [
             container
             for service in services
@@ -368,6 +367,10 @@ class Project(object):
                 detached=detached
             )
         ]
+
+    def initialize(self):
+        self.networks.initialize()
+        self.initialize_volumes()
 
     def _get_convergence_plans(self, services, strategy):
         plans = {}

@@ -133,12 +133,17 @@ class ProjectNetworks(object):
 
     @classmethod
     def from_services(cls, services, networks, use_networking):
-        networks = {
-            network: networks[network]
+        service_networks = {
+            network: networks.get(network)
             for service in services
             for network in service.get('networks', ['default'])
         }
-        return cls(networks, use_networking)
+        unused = set(networks) - set(service_networks) - {'default'}
+        if unused:
+            log.warn(
+                "Some networks were defined but are not used by any service: "
+                "{}".format(", ".join(unused)))
+        return cls(service_networks, use_networking)
 
     def remove(self):
         if not self.use_networking:

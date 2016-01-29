@@ -565,6 +565,7 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top',
+                'networks': ['foo', 'bar', 'baz'],
             }],
             volumes={},
             networks={
@@ -594,7 +595,11 @@ class ProjectTest(DockerClientTestCase):
     def test_up_with_ipam_config(self):
         config_data = config.Config(
             version=V2_0,
-            services=[],
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': ['front'],
+            }],
             volumes={},
             networks={
                 'front': {
