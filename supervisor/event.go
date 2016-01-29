@@ -52,7 +52,7 @@ type Event struct {
 	Status        int
 	Signal        os.Signal
 	Process       *specs.Process
-	State         *runtime.State
+	State         runtime.State
 	Containers    []runtime.Container
 	Checkpoint    *runtime.Checkpoint
 	Err           chan error
