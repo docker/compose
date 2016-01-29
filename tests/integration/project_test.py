@@ -749,7 +749,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data, client=self.client
         )
-        project.initialize_volumes()
+        project.volumes.initialize()
 
         volume_data = self.client.inspect_volume(full_vol_name)
         self.assertEqual(volume_data['Name'], full_vol_name)
@@ -800,7 +800,7 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data, client=self.client
         )
         with self.assertRaises(config.ConfigurationError):
-            project.initialize_volumes()
+            project.volumes.initialize()
 
     @v2_only()
     def test_initialize_volumes_updated_driver(self):
@@ -821,7 +821,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data, client=self.client
         )
-        project.initialize_volumes()
+        project.volumes.initialize()
 
         volume_data = self.client.inspect_volume(full_vol_name)
         self.assertEqual(volume_data['Name'], full_vol_name)
@@ -836,7 +836,7 @@ class ProjectTest(DockerClientTestCase):
             client=self.client
         )
         with self.assertRaises(config.ConfigurationError) as e:
-            project.initialize_volumes()
+            project.volumes.initialize()
         assert 'Configuration for volume {0} specifies driver smb'.format(
             vol_name
         ) in str(e.exception)
@@ -863,7 +863,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data, client=self.client
         )
-        project.initialize_volumes()
+        project.volumes.initialize()
 
         with self.assertRaises(NotFound):
             self.client.inspect_volume(full_vol_name)
@@ -889,7 +889,7 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data, client=self.client
         )
         with self.assertRaises(config.ConfigurationError) as e:
-            project.initialize_volumes()
+            project.volumes.initialize()
         assert 'Volume {0} declared as external'.format(
             vol_name
         ) in str(e.exception)
