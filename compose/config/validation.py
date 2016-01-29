@@ -15,6 +15,7 @@ from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from .errors import ConfigurationError
+from .errors import VERSION_EXPLANATION
 from .sort_services import get_service_name_from_network_mode
 
 
@@ -229,10 +230,13 @@ def handle_error_for_schema_with_id(error, path):
                 "A service can either be built to image or use an existing "
                 "image, not both.".format(path_string(path)))
 
-    if schema_id == '#/definitions/service':
-        if error.validator == 'additionalProperties':
+    if error.validator == 'additionalProperties':
+        if schema_id == '#/definitions/service':
             invalid_config_key = parse_key_from_error_msg(error)
             return get_unsupported_config_msg(path, invalid_config_key)
+
+        if not error.path:
+            return '{}\n{}'.format(error.message, VERSION_EXPLANATION)
 
 
 def handle_generic_service_error(error, path):
