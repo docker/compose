@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -18,10 +20,13 @@ import (
 	"github.com/opencontainers/specs"
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/grpclog"
 )
 
 // TODO: parse flags and pass opts
 func getClient(ctx *cli.Context) types.APIClient {
+	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
+	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
@@ -99,10 +104,6 @@ var attachCommand = cli.Command{
 			fatal("container id cannot be empty", 1)
 		}
 		c := getClient(context)
-		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
-		if err != nil {
-			fatal(err.Error(), 1)
-		}
 		type bundleState struct {
 			Bundle string `json:"bundle"`
 		}
@@ -134,21 +135,18 @@ var attachCommand = cli.Command{
 		); err != nil {
 			fatal(err.Error(), 1)
 		}
-		go func() {
-			io.Copy(stdin, os.Stdin)
+		closer := func() {
 			if state != nil {
 				term.RestoreTerminal(os.Stdin.Fd(), state)
 			}
 			stdin.Close()
+		}
+		go func() {
+			io.Copy(stdin, os.Stdin)
+			closer()
 		}()
-		for {
-			e, err := events.Recv()
-			if err != nil {
-				fatal(err.Error(), 1)
-			}
-			if e.Id == id && e.Type == "exit" && e.Pid == pid {
-				os.Exit(int(e.Status))
-			}
+		if err := waitForExit(c, id, closer); err != nil {
+			fatal(err.Error(), 1)
 		}
 	},
 }
@@ -183,10 +181,6 @@ var startCommand = cli.Command{
 			fatal(fmt.Sprintf("cannot get the absolute path of the bundle: %v", err), 1)
 		}
 		c := getClient(context)
-		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
-		if err != nil {
-			fatal(err.Error(), 1)
-		}
 		r := &types.CreateContainerRequest{
 			Id:         id,
 			BundlePath: bpath,
@@ -223,16 +217,8 @@ var startCommand = cli.Command{
 				io.Copy(stdin, os.Stdin)
 				restoreAndCloseStdin()
 			}()
-			for {
-				e, err := events.Recv()
-				if err != nil {
-					restoreAndCloseStdin()
-					fatal(err.Error(), 1)
-				}
-				if e.Id == id && e.Type == "exit" && e.Pid == "init" {
-					restoreAndCloseStdin()
-					os.Exit(int(e.Status))
-				}
+			if err := waitForExit(c, id, restoreAndCloseStdin); err != nil {
+				fatal(err.Error(), 1)
 			}
 		}
 	},
@@ -419,4 +405,24 @@ var statsCommand = cli.Command{
 			fmt.Println(stats)
 		}
 	},
+}
+
+func waitForExit(c types.APIClient, id string, closer func()) error {
+	events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
+	if err != nil {
+		return err
+	}
+	for {
+		e, err := events.Recv()
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{})
+			continue
+		}
+		if e.Id == id && e.Type == "exit" && e.Pid == "init" {
+			closer()
+			os.Exit(int(e.Status))
+		}
+	}
+	return nil
 }
