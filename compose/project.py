@@ -6,7 +6,6 @@ import logging
 from functools import reduce
 
 from docker.errors import APIError
-from docker.errors import NotFound
 
 from . import parallel
 from .config import ConfigurationError
@@ -28,7 +27,7 @@ from .service import NetworkMode
 from .service import Service
 from .service import ServiceNetworkMode
 from .utils import microseconds_from_time_nano
-from .volume import Volume
+from .volume import ProjectVolumes
 
 
 log = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ class Project(object):
         self.name = name
         self.services = services
         self.client = client
-        self.volumes = volumes or {}
+        self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
 
     def labels(self, one_off=False):
@@ -62,16 +61,8 @@ class Project(object):
             config_data.services,
             networks,
             use_networking)
-        project = cls(name, [], client, project_networks)
-
-        if config_data.volumes:
-            for vol_name, data in config_data.volumes.items():
-                project.volumes[vol_name] = Volume(
-                    client=client, project=name, name=vol_name,
-                    driver=data.get('driver'),
-                    driver_opts=data.get('driver_opts'),
-                    external_name=data.get('external_name')
-                )
+        volumes = ProjectVolumes.from_config(name, config_data, client)
+        project = cls(name, [], client, project_networks, volumes)
 
         for service_dict in config_data.services:
             service_dict = dict(service_dict)
@@ -86,13 +77,10 @@ class Project(object):
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version != V1:
-                service_volumes = service_dict.get('volumes', [])
-                for volume_spec in service_volumes:
-                    if volume_spec.is_named_volume:
-                        declared_volume = project.volumes[volume_spec.external]
-                        service_volumes[service_volumes.index(volume_spec)] = (
-                            volume_spec._replace(external=declared_volume.full_name)
-                        )
+                service_dict['volumes'] = [
+                    volumes.namespace_spec(volume_spec)
+                    for volume_spec in service_dict.get('volumes', [])
+                ]
 
             project.services.append(
                 Service(
@@ -233,59 +221,19 @@ class Project(object):
     def remove_stopped(self, service_names=None, **options):
         parallel.parallel_remove(self.containers(service_names, stopped=True), options)
 
-    def initialize_volumes(self):
-        try:
-            for volume in self.volumes.values():
-                if volume.external:
-                    log.debug(
-                        'Volume {0} declared as external. No new '
-                        'volume will be created.'.format(volume.name)
-                    )
-                    if not volume.exists():
-                        raise ConfigurationError(
-                            'Volume {name} declared as external, but could'
-                            ' not be found. Please create the volume manually'
-                            ' using `{command}{name}` and try again.'.format(
-                                name=volume.full_name,
-                                command='docker volume create --name='
-                            )
-                        )
-                    continue
-                volume.create()
-        except NotFound:
-            raise ConfigurationError(
-                'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
-            )
-        except APIError as e:
-            if 'Choose a different volume name' in str(e):
-                raise ConfigurationError(
-                    'Configuration for volume {0} specifies driver {1}, but '
-                    'a volume with the same name uses a different driver '
-                    '({3}). If you wish to use the new configuration, please '
-                    'remove the existing volume "{2}" first:\n'
-                    '$ docker volume rm {2}'.format(
-                        volume.name, volume.driver, volume.full_name,
-                        volume.inspect()['Driver']
-                    )
-                )
-
     def down(self, remove_image_type, include_volumes):
         self.stop()
         self.remove_stopped(v=include_volumes)
         self.networks.remove()
 
         if include_volumes:
-            self.remove_volumes()
+            self.volumes.remove()
 
         self.remove_images(remove_image_type)
 
     def remove_images(self, remove_image_type):
         for service in self.get_services():
             service.remove_image(remove_image_type)
-
-    def remove_volumes(self):
-        for volume in self.volumes.values():
-            volume.remove()
 
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
@@ -371,7 +319,7 @@ class Project(object):
 
     def initialize(self):
         self.networks.initialize()
-        self.initialize_volumes()
+        self.volumes.initialize()
 
     def _get_convergence_plans(self, services, strategy):
         plans = {}
