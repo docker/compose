@@ -43,7 +43,8 @@ def start_process(base_dir, options):
 def wait_on_process(proc, returncode=0):
     stdout, stderr = proc.communicate()
     if proc.returncode != returncode:
-        print(stderr.decode('utf-8'))
+        print("Stderr: {}".format(stderr))
+        print("Stdout: {}".format(stdout))
         assert proc.returncode == returncode
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
@@ -81,7 +82,6 @@ class ContainerStateCondition(object):
         self.name = name
         self.running = running
 
-    # State.Running == true
     def __call__(self):
         try:
             container = self.client.inspect_container(self.name)
@@ -704,6 +704,17 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, ['up', '-t', '2'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
+        os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+
+    @v2_only()
+    def test_up_handles_force_shutdown(self):
+        self.base_dir = 'tests/fixtures/sleeps-composefile'
+        proc = start_process(self.base_dir, ['up', '-t', '200'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(proc.pid, signal.SIGTERM)
+        time.sleep(0.1)
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
