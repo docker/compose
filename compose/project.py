@@ -19,7 +19,9 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
-from .network import Network
+from .network import build_networks
+from .network import get_networks
+from .network import ProjectNetworks
 from .service import ContainerNetworkMode
 from .service import ConvergenceStrategy
 from .service import NetworkMode
@@ -36,15 +38,12 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, networks=None, volumes=None,
-                 use_networking=False, network_driver=None):
+    def __init__(self, name, services, client, networks=None, volumes=None):
         self.name = name
         self.services = services
         self.client = client
-        self.use_networking = use_networking
-        self.network_driver = network_driver
-        self.networks = networks or []
         self.volumes = volumes or {}
+        self.networks = networks or ProjectNetworks({}, False)
 
     def labels(self, one_off=False):
         return [
@@ -58,23 +57,12 @@ class Project(object):
         Construct a Project from a config.Config object.
         """
         use_networking = (config_data.version and config_data.version != V1)
-        project = cls(name, [], client, use_networking=use_networking)
-
-        network_config = config_data.networks or {}
-        custom_networks = [
-            Network(
-                client=client, project=name, name=network_name,
-                driver=data.get('driver'),
-                driver_opts=data.get('driver_opts'),
-                ipam=data.get('ipam'),
-                external_name=data.get('external_name'),
-            )
-            for network_name, data in network_config.items()
-        ]
-
-        all_networks = custom_networks[:]
-        if 'default' not in network_config:
-            all_networks.append(project.default_network)
+        networks = build_networks(name, config_data, client)
+        project_networks = ProjectNetworks.from_services(
+            config_data.services,
+            networks,
+            use_networking)
+        project = cls(name, [], client, project_networks)
 
         if config_data.volumes:
             for vol_name, data in config_data.volumes.items():
@@ -86,13 +74,15 @@ class Project(object):
                 )
 
         for service_dict in config_data.services:
+            service_dict = dict(service_dict)
             if use_networking:
-                networks = get_networks(service_dict, all_networks)
+                service_networks = get_networks(service_dict, networks)
             else:
-                networks = []
+                service_networks = []
 
+            service_dict.pop('networks', None)
             links = project.get_links(service_dict)
-            network_mode = project.get_network_mode(service_dict, networks)
+            network_mode = project.get_network_mode(service_dict, service_networks)
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version != V1:
@@ -109,16 +99,12 @@ class Project(object):
                     client=client,
                     project=name,
                     use_networking=use_networking,
-                    networks=networks,
+                    networks=service_networks,
                     links=links,
                     network_mode=network_mode,
                     volumes_from=volumes_from,
                     **service_dict)
             )
-
-        project.networks += custom_networks
-        if 'default' not in network_config and project.uses_default_network():
-            project.networks.append(project.default_network)
 
         return project
 
@@ -201,7 +187,7 @@ class Project(object):
     def get_network_mode(self, service_dict, networks):
         network_mode = service_dict.pop('network_mode', None)
         if not network_mode:
-            if self.use_networking:
+            if self.networks.use_networking:
                 return NetworkMode(networks[0]) if networks else NetworkMode('none')
             return NetworkMode(None)
 
@@ -285,7 +271,7 @@ class Project(object):
     def down(self, remove_image_type, include_volumes):
         self.stop()
         self.remove_stopped(v=include_volumes)
-        self.remove_networks()
+        self.networks.remove()
 
         if include_volumes:
             self.remove_volumes()
@@ -296,32 +282,9 @@ class Project(object):
         for service in self.get_services():
             service.remove_image(remove_image_type)
 
-    def remove_networks(self):
-        if not self.use_networking:
-            return
-        for network in self.networks:
-            network.remove()
-
     def remove_volumes(self):
         for volume in self.volumes.values():
             volume.remove()
-
-    def initialize_networks(self):
-        if not self.use_networking:
-            return
-
-        for network in self.networks:
-            network.ensure()
-
-    def uses_default_network(self):
-        return any(
-            self.default_network.full_name in service.networks
-            for service in self.services
-        )
-
-    @property
-    def default_network(self):
-        return Network(client=self.client, project=self.name, name='default')
 
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
@@ -392,7 +355,7 @@ class Project(object):
 
         plans = self._get_convergence_plans(services, strategy)
 
-        self.initialize_networks()
+        self.networks.initialize()
         self.initialize_volumes()
 
         return [
@@ -463,22 +426,6 @@ class Project(object):
 
         dep_services.append(service)
         return acc + dep_services
-
-
-def get_networks(service_dict, network_definitions):
-    if 'network_mode' in service_dict:
-        return []
-
-    networks = []
-    for name in service_dict.pop('networks', ['default']):
-        matches = [n for n in network_definitions if n.name == name]
-        if matches:
-            networks.append(matches[0].full_name)
-        else:
-            raise ConfigurationError(
-                'Service "{}" uses an undefined network "{}"'
-                .format(service_dict['name'], name))
-    return networks
 
 
 def get_volumes_from(project, service_dict):

@@ -45,7 +45,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
         self.assertEqual(project.get_service('db').name, 'db')
         self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
-        self.assertFalse(project.use_networking)
+        self.assertFalse(project.networks.use_networking)
 
     def test_from_config_v2(self):
         config = Config(
@@ -65,7 +65,7 @@ class ProjectTest(unittest.TestCase):
         )
         project = Project.from_config('composetest', config, None)
         self.assertEqual(len(project.services), 2)
-        self.assertTrue(project.use_networking)
+        self.assertTrue(project.networks.use_networking)
 
     def test_get_service(self):
         web = Service(
@@ -426,7 +426,7 @@ class ProjectTest(unittest.TestCase):
             ),
         )
 
-        assert project.uses_default_network()
+        assert 'default' in project.networks.networks
 
     def test_uses_default_network_false(self):
         project = Project.from_config(
@@ -446,7 +446,7 @@ class ProjectTest(unittest.TestCase):
             ),
         )
 
-        assert not project.uses_default_network()
+        assert 'default' not in project.networks.networks
 
     def test_container_without_name(self):
         self.mock_client.containers.return_value = [
