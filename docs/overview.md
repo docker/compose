@@ -93,7 +93,7 @@ this project name to:
 The default project name is the basename of the project directory. You can set
 a custom project name by using the
 [`-p` command line option](./reference/docker-compose.md) or the
-[`COMPOSE_PROJECT_NAME` environment variable](./reference/overview.md#compose-project-name).
+[`COMPOSE_PROJECT_NAME` environment variable](./reference/envvars.md#compose-project-name).
 
 ### Preserve volume data when containers are created
 

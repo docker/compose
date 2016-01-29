@@ -51,7 +51,7 @@ Compose uses the project name to create unique identifiers for all of a
 project's  containers and other resources. To run multiple copies of a project,
 set a custom project name using the [`-p` command line
 option](./reference/docker-compose.md) or the [`COMPOSE_PROJECT_NAME`
-environment variable](./reference/overview.md#compose-project-name).
+environment variable](./reference/envvars.md#compose-project-name).
 
 ## What's the difference between `up`, `run`, and `start`?
 
