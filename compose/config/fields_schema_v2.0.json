@@ -1,18 +1,18 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
-  "id": "fields_schema_v2.json",
+  "id": "fields_schema_v2.0.json",
 
   "properties": {
     "version": {
-      "enum": [2]
+      "type": "string"
     },
     "services": {
       "id": "#/properties/services",
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9._-]+$": {
-          "$ref": "service_schema_v2.json#/definitions/service"
+          "$ref": "service_schema_v2.0.json#/definitions/service"
         }
       },
       "additionalProperties": false

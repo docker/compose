@@ -10,6 +10,7 @@ from docker.errors import NotFound
 from .testcases import DockerClientTestCase
 from compose.config import config
 from compose.config import ConfigurationError
+from compose.config.config import V2_0
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
@@ -112,7 +113,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             client=self.client,
             config_data=build_service_dicts({
-                'version': 2,
+                'version': V2_0,
                 'services': {
                     'net': {
                         'image': 'busybox:latest',
@@ -139,7 +140,7 @@ class ProjectTest(DockerClientTestCase):
             return Project.from_config(
                 name='composetest',
                 config_data=build_service_dicts({
-                    'version': 2,
+                    'version': V2_0,
                     'services': {
                         'web': {
                             'image': 'busybox:latest',
@@ -559,7 +560,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_project_up_networks(self):
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -592,7 +593,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_up_with_ipam_config(self):
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[],
             volumes={},
             networks={
@@ -651,7 +652,7 @@ class ProjectTest(DockerClientTestCase):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -677,7 +678,7 @@ class ProjectTest(DockerClientTestCase):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': 2,
+                'version': V2_0,
                 'services': {
                     'simple': {'image': 'busybox:latest', 'command': 'top'},
                     'another': {
@@ -696,7 +697,7 @@ class ProjectTest(DockerClientTestCase):
         override_file = config.ConfigFile(
             'override.yml',
             {
-                'version': 2,
+                'version': V2_0,
                 'services': {
                     'another': {
                         'logging': {
@@ -729,7 +730,7 @@ class ProjectTest(DockerClientTestCase):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -754,7 +755,7 @@ class ProjectTest(DockerClientTestCase):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -779,7 +780,7 @@ class ProjectTest(DockerClientTestCase):
         vol_name = '{0:x}'.format(random.getrandbits(32))
 
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -802,7 +803,7 @@ class ProjectTest(DockerClientTestCase):
         full_vol_name = 'composetest_{0}'.format(vol_name)
 
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -841,7 +842,7 @@ class ProjectTest(DockerClientTestCase):
         full_vol_name = 'composetest_{0}'.format(vol_name)
         self.client.create_volume(vol_name)
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -866,7 +867,7 @@ class ProjectTest(DockerClientTestCase):
         vol_name = '{0:x}'.format(random.getrandbits(32))
 
         config_data = config.Config(
-            version=2,
+            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -895,7 +896,7 @@ class ProjectTest(DockerClientTestCase):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': 2,
+                'version': V2_0,
                 'services': {
                     'simple': {
                         'image': 'busybox:latest',

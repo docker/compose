@@ -14,14 +14,15 @@ import pytest
 from compose.config import config
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
+from compose.config.config import V1
+from compose.config.config import V2_0
 from compose.config.errors import ConfigurationError
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
 
-DEFAULT_VERSION = V2 = 2
-V1 = 1
+DEFAULT_VERSION = V2_0
 
 
 def make_service_dict(name, service_dict, working_dir, filename=None):
@@ -78,7 +79,7 @@ class ConfigTest(unittest.TestCase):
     def test_load_v2(self):
         config_data = config.load(
             build_config_details({
-                'version': 2,
+                'version': '2',
                 'services': {
                     'foo': {'image': 'busybox'},
                     'bar': {'image': 'busybox', 'environment': ['FOO=1']},
@@ -143,9 +144,55 @@ class ConfigTest(unittest.TestCase):
             }
         })
 
+    def test_valid_versions(self):
+        for version in ['2', '2.0']:
+            cfg = config.load(build_config_details({'version': version}))
+            assert cfg.version == V2_0
+
+    def test_v1_file_version(self):
+        cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
+        assert cfg.version == V1
+        assert list(s['name'] for s in cfg.services) == ['web']
+
+        cfg = config.load(build_config_details({'version': {'image': 'busybox'}}))
+        assert cfg.version == V1
+        assert list(s['name'] for s in cfg.services) == ['version']
+
+    def test_wrong_version_type(self):
+        for version in [None, 2, 2.0]:
+            with pytest.raises(ConfigurationError):
+                config.load(
+                    build_config_details(
+                        {'version': version},
+                        filename='filename.yml',
+                    )
+                )
+
+    def test_unsupported_version(self):
+        with pytest.raises(ConfigurationError):
+            config.load(
+                build_config_details(
+                    {'version': '2.1'},
+                    filename='filename.yml',
+                )
+            )
+
+    def test_v1_file_with_version_is_invalid(self):
+        for version in [1, "1"]:
+            with pytest.raises(ConfigurationError):
+                config.load(
+                    build_config_details(
+                        {
+                            'version': version,
+                            'web': {'image': 'busybox'},
+                        },
+                        filename='filename.yml',
+                    )
+                )
+
     def test_named_volume_config_empty(self):
         config_details = build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'simple': {'image': 'busybox'}
             },
@@ -214,7 +261,7 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             config.load(
                 build_config_details(
-                    {'version': 2, 'services': {'web': 'busybox:latest'}},
+                    {'version': '2', 'services': {'web': 'busybox:latest'}},
                     'working_dir',
                     'filename.yml'
                 )
@@ -224,7 +271,7 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             config.load(
                 build_config_details({
-                    'version': 2,
+                    'version': '2',
                     'services': {'web': 'busybox:latest'},
                     'networks': {
                         'invalid': {'foo', 'bar'}
@@ -246,7 +293,7 @@ class ConfigTest(unittest.TestCase):
             with pytest.raises(ConfigurationError) as exc:
                 config.load(
                     build_config_details({
-                        'version': 2,
+                        'version': '2',
                         'services': {invalid_name: {'image': 'busybox'}}
                     }, 'working_dir', 'filename.yml')
                 )
@@ -256,7 +303,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
                 {
-                    'version': 2,
+                    'version': '2',
                     'services': {
                         'web': {'image': 'busybox', 'name': 'bogus'},
                     }
@@ -307,7 +354,7 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'version': 2,
+                        'version': '2',
                         'services': {1: {'image': 'busybox'}}
                     },
                     'working_dir',
@@ -370,7 +417,7 @@ class ConfigTest(unittest.TestCase):
     def test_load_with_multiple_files_and_empty_override_v2(self):
         base_file = config.ConfigFile(
             'base.yml',
-            {'version': 2, 'services': {'web': {'image': 'example/web'}}})
+            {'version': '2', 'services': {'web': {'image': 'example/web'}}})
         override_file = config.ConfigFile('override.yml', None)
         details = config.ConfigDetails('.', [base_file, override_file])
 
@@ -394,7 +441,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile('base.yml', None)
         override_file = config.ConfigFile(
             'override.tml',
-            {'version': 2, 'services': {'web': {'image': 'example/web'}}}
+            {'version': '2', 'services': {'web': {'image': 'example/web'}}}
         )
         details = config.ConfigDetails('.', [base_file, override_file])
         with pytest.raises(ConfigurationError) as exc:
@@ -494,7 +541,7 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'version': 2,
+                        'version': '2',
                         'services': {
                             'web': {
                                 'build': '.',
@@ -509,7 +556,7 @@ class ConfigTest(unittest.TestCase):
 
         service = config.load(
             build_config_details({
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'build': '.'
@@ -522,7 +569,7 @@ class ConfigTest(unittest.TestCase):
         service = config.load(
             build_config_details(
                 {
-                    'version': 2,
+                    'version': '2',
                     'services': {
                         'web': {
                             'build': {
@@ -543,7 +590,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile(
             'base.yaml',
             {
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'image': 'example/web',
@@ -556,7 +603,7 @@ class ConfigTest(unittest.TestCase):
         override_file = config.ConfigFile(
             'override.yaml',
             {
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'build': '/',
@@ -585,7 +632,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile(
             'base.yaml',
             {
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'image': 'busybox:latest',
@@ -601,7 +648,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile(
             'base.yaml',
             {
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'image': 'busybox:latest',
@@ -681,7 +728,7 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'version': 2,
+                        'version': '2',
                         'services': {
                             'foo': {'image': 1},
                         },
@@ -1016,7 +1063,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_external_volume_config(self):
         config_details = build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'bogus': {'image': 'busybox'}
             },
@@ -1034,7 +1081,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_external_volume_invalid_config(self):
         config_details = build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'bogus': {'image': 'busybox'}
             },
@@ -1047,7 +1094,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_depends_on_orders_services(self):
         config_details = build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'one': {'image': 'busybox', 'depends_on': ['three', 'two']},
                 'two': {'image': 'busybox', 'depends_on': ['three']},
@@ -1062,7 +1109,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_depends_on_unknown_service_errors(self):
         config_details = build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'one': {'image': 'busybox', 'depends_on': ['three']},
             },
@@ -1075,7 +1122,7 @@ class ConfigTest(unittest.TestCase):
 class NetworkModeTest(unittest.TestCase):
     def test_network_mode_standard(self):
         config_data = config.load(build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'web': {
                     'image': 'busybox',
@@ -1101,7 +1148,7 @@ class NetworkModeTest(unittest.TestCase):
 
     def test_network_mode_container(self):
         config_data = config.load(build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'web': {
                     'image': 'busybox',
@@ -1126,7 +1173,7 @@ class NetworkModeTest(unittest.TestCase):
 
     def test_network_mode_service(self):
         config_data = config.load(build_config_details({
-            'version': 2,
+            'version': '2',
             'services': {
                 'web': {
                     'image': 'busybox',
@@ -1160,7 +1207,7 @@ class NetworkModeTest(unittest.TestCase):
     def test_network_mode_service_nonexistent(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(build_config_details({
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'image': 'busybox',
@@ -1175,7 +1222,7 @@ class NetworkModeTest(unittest.TestCase):
     def test_network_mode_plus_networks_is_invalid(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(build_config_details({
-                'version': 2,
+                'version': '2',
                 'services': {
                     'web': {
                         'image': 'busybox',
@@ -2202,7 +2249,7 @@ class ExtendsTest(unittest.TestCase):
         tmpdir = py.test.ensuretemp('test_extends_with_mixed_version')
         self.addCleanup(tmpdir.remove)
         tmpdir.join('docker-compose.yml').write("""
-            version: 2
+            version: "2"
             services:
               web:
                 extends:
@@ -2224,7 +2271,7 @@ class ExtendsTest(unittest.TestCase):
         tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
         self.addCleanup(tmpdir.remove)
         tmpdir.join('docker-compose.yml').write("""
-            version: 2
+            version: "2"
             services:
               web:
                 extends:
@@ -2233,7 +2280,7 @@ class ExtendsTest(unittest.TestCase):
                 image: busybox
         """)
         tmpdir.join('base.yml').write("""
-            version: 2
+            version: "2"
             services:
                 base:
                   volumes: ['/foo']

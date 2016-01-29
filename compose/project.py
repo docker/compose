@@ -10,6 +10,7 @@ from docker.errors import NotFound
 
 from . import parallel
 from .config import ConfigurationError
+from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
 from .config.sort_services import get_service_name_from_network_mode
 from .const import DEFAULT_TIMEOUT
@@ -56,7 +57,7 @@ class Project(object):
         """
         Construct a Project from a config.Config object.
         """
-        use_networking = (config_data.version and config_data.version >= 2)
+        use_networking = (config_data.version and config_data.version != V1)
         project = cls(name, [], client, use_networking=use_networking)
 
         network_config = config_data.networks or {}
@@ -94,7 +95,7 @@ class Project(object):
             network_mode = project.get_network_mode(service_dict, networks)
             volumes_from = get_volumes_from(project, service_dict)
 
-            if config_data.version == 2:
+            if config_data.version != V1:
                 service_volumes = service_dict.get('volumes', [])
                 for volume_spec in service_volumes:
                     if volume_spec.is_named_volume:
