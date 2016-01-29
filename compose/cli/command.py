@@ -92,7 +92,7 @@ def get_project_name(working_dir, project_name=None):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
     project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME')
-    if project_name is not None:
+    if project_name:
         return normalize_name(project_name)
 
     project = os.path.basename(os.path.abspath(working_dir))
