@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "docker-compose"
+title = "docker-compose Command"
 description = "docker-compose Command Binary"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  docker-compose"]
 [menu.main]
@@ -12,7 +12,13 @@ weight=-2
 
 # docker-compose Command
 
+This page provides the usage information for the `docker-compose` Command.
+You can also see this information by running `docker-compose --help` from the
+command line.
+
 ```
+Define and run multi-container applications with Docker.
+
 Usage:
   docker-compose [-f=<arg>...] [options] [COMMAND] [ARGS...]
   docker-compose -h|--help
@@ -25,6 +31,10 @@ Options:
 
 Commands:
   build              Build or rebuild services
+  config             Validate and view the compose file
+  create             Create services
+  down               Stop and remove containers, networks, images, and volumes
+  events             Receive real time events from containers
   help               Get help on a command
   kill               Kill containers
   logs               View output from containers
@@ -41,6 +51,7 @@ Commands:
   unpause            Unpause services
   up                 Create and start containers
   version            Show the Docker-Compose version information
+
 ```
 
 The Docker Compose binary. You use this command to build and manage multiple
@@ -92,15 +103,15 @@ same directory level, Compose combines the two files into a single configuration
 The configuration in the `docker-compose.override.yml` file is applied over and
 in addition to the values in the `docker-compose.yml` file.
 
-See also the `COMPOSE_FILE` [environment variable](overview.md#compose-file).
+See also the `COMPOSE_FILE` [environment variable](envvars.md#compose-file).
 
 Each configuration has a project name. If you supply a `-p` flag, you can
 specify a project name. If you don't specify the flag, Compose uses the current
 directory name. See also the `COMPOSE_PROJECT_NAME` [environment variable](
-overview.md#compose-project-name)
+envvars.md#compose-project-name)
 
 
 ## Where to go next
 
-* [CLI environment variables](overview.md)
+* [CLI environment variables](envvars.md)
 * [Command line reference](index.md)
