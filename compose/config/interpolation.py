@@ -68,7 +68,7 @@ class BlankDefaultDict(dict):
     def __getitem__(self, key):
         if key == "RANDOM":
             from random import randint
-            rand = (randint(2,9999))
+            rand = (randint(2, 9999))
             return rand
         else:
             try:
