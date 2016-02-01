@@ -11,11 +11,23 @@ import (
 	"github.com/docker/containerd/util"
 )
 
-var fexec bool
+var (
+	fexec       bool
+	fcheckpoint string
+)
 
 func init() {
 	flag.BoolVar(&fexec, "exec", false, "exec a process instead of starting the init")
+	flag.StringVar(&fcheckpoint, "checkpoint", "", "start container from an existing checkpoint")
 	flag.Parse()
+}
+
+func setupLogger() {
+	f, err := os.OpenFile("/tmp/shim.log", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
+	if err != nil {
+		panic(err)
+	}
+	logrus.SetOutput(f)
 }
 
 // containerd-shim is a small shim that sits in front of a runc implementation
@@ -38,7 +50,7 @@ func main() {
 		logrus.WithField("error", err).Fatal("shim: open exit pipe")
 	}
 	defer f.Close()
-	p, err := newProcess(flag.Arg(0), flag.Arg(1), fexec)
+	p, err := newProcess(flag.Arg(0), flag.Arg(1), fexec, fcheckpoint)
 	if err != nil {
 		logrus.WithField("error", err).Fatal("shim: create new process")
 	}

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/specs"
@@ -18,7 +19,7 @@ type Container interface {
 	// Path returns the path to the bundle
 	Path() string
 	// Start starts the init process of the container
-	Start() (Process, error)
+	Start(checkpoint string) (Process, error)
 	// Exec starts another process in an existing container
 	Exec(string, specs.Process) (Process, error)
 	// Delete removes the container's state and any resources
@@ -31,18 +32,16 @@ type Container interface {
 	Resume() error
 	// Pause pauses a running container
 	Pause() error
+	// RemoveProcess removes the specified process from the container
 	RemoveProcess(string) error
 	// Checkpoints returns all the checkpoints for a container
-	// Checkpoints() ([]Checkpoint, error)
+	Checkpoints() ([]Checkpoint, error)
 	// Checkpoint creates a new checkpoint
-	// Checkpoint(Checkpoint) error
+	Checkpoint(Checkpoint) error
 	// DeleteCheckpoint deletes the checkpoint for the provided name
-	// DeleteCheckpoint(name string) error
-	// Restore restores the container to that of the checkpoint provided by name
-	// Restore(name string) error
+	DeleteCheckpoint(name string) error
 	// Stats returns realtime container stats and resource information
-	// Stats() (*Stat, error)
-	// OOM signals the channel if the container received an OOM notification
+	// Stats() (*Stat, error) // OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
 }
 
@@ -138,12 +137,12 @@ func (c *container) Path() string {
 	return c.bundle
 }
 
-func (c *container) Start() (Process, error) {
+func (c *container) Start(checkpoint string) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, InitProcessID)
 	if err := os.MkdirAll(processRoot, 0755); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("containerd-shim", c.id, c.bundle)
+	cmd := exec.Command("containerd-shim", "-checkpoint", checkpoint, c.id, c.bundle)
 	cmd.Dir = processRoot
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
@@ -224,4 +223,73 @@ func (c *container) Processes() ([]Process, error) {
 func (c *container) RemoveProcess(pid string) error {
 	delete(c.processes, pid)
 	return nil
+}
+
+func (c *container) Checkpoints() ([]Checkpoint, error) {
+	dirs, err := ioutil.ReadDir(filepath.Join(c.bundle, "checkpoints"))
+	if err != nil {
+		return nil, err
+	}
+	var out []Checkpoint
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		path := filepath.Join(c.bundle, "checkpoints", d.Name(), "config.json")
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		var cpt Checkpoint
+		if err := json.Unmarshal(data, &cpt); err != nil {
+			return nil, err
+		}
+		out = append(out, cpt)
+	}
+	return out, nil
+}
+
+func (c *container) Checkpoint(cpt Checkpoint) error {
+	if err := os.MkdirAll(filepath.Join(c.bundle, "checkpoints"), 0755); err != nil {
+		return err
+	}
+	path := filepath.Join(c.bundle, "checkpoints", cpt.Name)
+	if err := os.Mkdir(path, 0755); err != nil {
+		return err
+	}
+	f, err := os.Create(filepath.Join(path, "config.json"))
+	if err != nil {
+		return err
+	}
+	cpt.Created = time.Now()
+	err = json.NewEncoder(f).Encode(cpt)
+	f.Close()
+	if err != nil {
+		return err
+	}
+	args := []string{
+		"--id", c.id,
+		"checkpoint",
+		"--image-path", path,
+	}
+	add := func(flags ...string) {
+		args = append(args, flags...)
+	}
+	if !cpt.Exit {
+		add("--leave-running")
+	}
+	if cpt.Shell {
+		add("--shell-job")
+	}
+	if cpt.Tcp {
+		add("--tcp-established")
+	}
+	if cpt.UnixSockets {
+		add("--ext-unix-sk")
+	}
+	return exec.Command("runc", args...).Run()
+}
+
+func (c *container) DeleteCheckpoint(name string) error {
+	return os.RemoveAll(filepath.Join(c.bundle, "checkpoints", name))
 }

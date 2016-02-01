@@ -37,30 +37,14 @@ type worker struct {
 func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
-		var (
-			err     error
-			process runtime.Process
-			started = time.Now()
-		)
-		if t.Checkpoint != "" {
-			/*
-				if err := t.Container.Restore(t.Checkpoint); err != nil {
-					evt := NewEvent(DeleteEventType)
-					evt.ID = t.Container.ID()
-					w.s.SendEvent(evt)
-					t.Err <- err
-					continue
-				}
-			*/
-		} else {
-			process, err = t.Container.Start()
-			if err != nil {
-				evt := NewEvent(DeleteEventType)
-				evt.ID = t.Container.ID()
-				w.s.SendEvent(evt)
-				t.Err <- err
-				continue
-			}
+		started := time.Now()
+		process, err := t.Container.Start(t.Checkpoint)
+		if err != nil {
+			evt := NewEvent(DeleteEventType)
+			evt.ID = t.Container.ID()
+			w.s.SendEvent(evt)
+			t.Err <- err
+			continue
 		}
 		/*
 		   if w.s.notifier != nil {

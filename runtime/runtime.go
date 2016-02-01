@@ -48,15 +48,15 @@ type Stat struct {
 
 type Checkpoint struct {
 	// Timestamp is the time that checkpoint happened
-	Timestamp time.Time
+	Created time.Time `json:"created"`
 	// Name is the name of the checkpoint
-	Name string
+	Name string `json:"name"`
 	// Tcp checkpoints open tcp connections
-	Tcp bool
+	Tcp bool `json:"tcp"`
 	// UnixSockets persists unix sockets in the checkpoint
-	UnixSockets bool
+	UnixSockets bool `json:"unixSockets"`
 	// Shell persists tty sessions in the checkpoint
-	Shell bool
+	Shell bool `json:"shell"`
 	// Exit exits the container after the checkpoint is finished
-	Exit bool
+	Exit bool `json:"exit"`
 }

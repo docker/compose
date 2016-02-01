@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/specs"
 )
@@ -21,26 +22,57 @@ type process struct {
 	s            specs.Process
 	exec         bool
 	containerPid int
+	checkpoint   *runtime.Checkpoint
 }
 
-func newProcess(id, bundle string, exec bool) (*process, error) {
-	f, err := os.Open("process.json")
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func newProcess(id, bundle string, exec bool, checkpoint string) (*process, error) {
 	p := &process{
 		id:     id,
 		bundle: bundle,
 		exec:   exec,
 	}
-	if err := json.NewDecoder(f).Decode(&p.s); err != nil {
+	s, err := loadProcess()
+	if err != nil {
 		return nil, err
+	}
+	p.s = *s
+	if checkpoint != "" {
+		cpt, err := loadCheckpoint(bundle, checkpoint)
+		if err != nil {
+			return nil, err
+		}
+		p.checkpoint = cpt
 	}
 	if err := p.openIO(); err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+func loadProcess() (*specs.Process, error) {
+	f, err := os.Open("process.json")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var s specs.Process
+	if err := json.NewDecoder(f).Decode(&s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func loadCheckpoint(bundle, name string) (*runtime.Checkpoint, error) {
+	f, err := os.Open(filepath.Join(bundle, "checkpoints", name, "config.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var cpt runtime.Checkpoint
+	if err := json.NewDecoder(f).Decode(&cpt); err != nil {
+		return nil, err
+	}
+	return &cpt, nil
 }
 
 func (p *process) start() error {
@@ -53,17 +85,37 @@ func (p *process) start() error {
 	}
 	if p.exec {
 		args = append(args, "exec",
-			"--process", filepath.Join(cwd, "process.json"))
+			"--process", filepath.Join(cwd, "process.json"),
+			"--console", p.stdio.console,
+		)
+	} else if p.checkpoint != nil {
+		args = append(args, "restore",
+			"--image-path", filepath.Join(p.bundle, "checkpoints", p.checkpoint.Name),
+		)
+		add := func(flags ...string) {
+			args = append(args, flags...)
+		}
+		if p.checkpoint.Shell {
+			add("--shell-job")
+		}
+		if p.checkpoint.Tcp {
+			add("--tcp-established")
+		}
+		if p.checkpoint.UnixSockets {
+			add("--ext-unix-sk")
+		}
 	} else {
 		args = append(args, "start",
-			"--bundle", p.bundle)
+			"--bundle", p.bundle,
+			"--console", p.stdio.console,
+		)
 	}
 	args = append(args,
 		"-d",
-		"--console", p.stdio.console,
 		"--pid-file", filepath.Join(cwd, "pid"),
 	)
 	cmd := exec.Command("runc", args...)
+	cmd.Dir = p.bundle
 	cmd.Stdin = p.stdio.stdin
 	cmd.Stdout = p.stdio.stdout
 	cmd.Stderr = p.stdio.stderr
@@ -114,9 +166,7 @@ func (p *process) openIO() error {
 		if err != nil {
 			return err
 		}
-		go func() {
-			io.Copy(console, stdin)
-		}()
+		go io.Copy(console, stdin)
 		stdout, err := os.OpenFile("stdout", syscall.O_RDWR, 0)
 		if err != nil {
 			return err
@@ -127,21 +177,75 @@ func (p *process) openIO() error {
 		}()
 		return nil
 	}
+	i, err := p.initializeIO(int(p.s.User.UID))
+	if err != nil {
+		return err
+	}
 	// non-tty
-	for name, dest := range map[string]**os.File{
-		"stdin":  &p.stdio.stdin,
-		"stdout": &p.stdio.stdout,
-		"stderr": &p.stdio.stderr,
+	for name, dest := range map[string]func(f *os.File){
+		"stdin": func(f *os.File) {
+			go io.Copy(i.Stdin, f)
+		},
+		"stdout": func(f *os.File) {
+			go io.Copy(f, i.Stdout)
+		},
+		"stderr": func(f *os.File) {
+			go io.Copy(f, i.Stderr)
+		},
 	} {
 		f, err := os.OpenFile(name, syscall.O_RDWR, 0)
 		if err != nil {
 			return err
 		}
-		*dest = f
+		dest(f)
 	}
 	return nil
 }
 
+type IO struct {
+	Stdin  io.WriteCloser
+	Stdout io.ReadCloser
+	Stderr io.ReadCloser
+}
+
+func (p *process) initializeIO(rootuid int) (i *IO, err error) {
+	var fds []uintptr
+	i = &IO{}
+	// cleanup in case of an error
+	defer func() {
+		if err != nil {
+			for _, fd := range fds {
+				syscall.Close(int(fd))
+			}
+		}
+	}()
+	// STDIN
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	fds = append(fds, r.Fd(), w.Fd())
+	p.stdio.stdin, i.Stdin = r, w
+	// STDOUT
+	if r, w, err = os.Pipe(); err != nil {
+		return nil, err
+	}
+	fds = append(fds, r.Fd(), w.Fd())
+	p.stdio.stdout, i.Stdout = w, r
+	// STDERR
+	if r, w, err = os.Pipe(); err != nil {
+		return nil, err
+	}
+	fds = append(fds, r.Fd(), w.Fd())
+	p.stdio.stderr, i.Stderr = w, r
+	// change ownership of the pipes incase we are in a user namespace
+	for _, fd := range fds {
+		if err := syscall.Fchown(int(fd), rootuid, rootuid); err != nil {
+			return nil, err
+		}
+	}
+	return i, nil
+}
 func (p *process) Close() error {
 	return p.stdio.Close()
 }

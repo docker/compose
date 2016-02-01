@@ -149,22 +149,20 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 		return nil, grpc.Errorf(codes.NotFound, "no such containers")
 	}
 	var out []*types.Checkpoint
-	/*
-		checkpoints, err := container.Checkpoints()
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range checkpoints {
-			out = append(out, &types.Checkpoint{
-				Name:        c.Name,
-				Tcp:         c.Tcp,
-				Shell:       c.Shell,
-				UnixSockets: c.UnixSockets,
-				// TODO: figure out timestamp
-				//Timestamp:   c.Timestamp,
-			})
-		}
-	*/
+	checkpoints, err := container.Checkpoints()
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range checkpoints {
+		out = append(out, &types.Checkpoint{
+			Name:        c.Name,
+			Tcp:         c.Tcp,
+			Shell:       c.Shell,
+			UnixSockets: c.UnixSockets,
+			// TODO: figure out timestamp
+			//Timestamp:   c.Timestamp,
+		})
+	}
 	return &types.ListCheckpointResponse{Checkpoints: out}, nil
 }
 
