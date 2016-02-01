@@ -2313,7 +2313,7 @@ class ExtendsTest(unittest.TestCase):
         tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
         self.addCleanup(tmpdir.remove)
         tmpdir.join('docker-compose.yml').write("""
-            version: 2
+            version: "2"
             services:
               base:
                 image: example
