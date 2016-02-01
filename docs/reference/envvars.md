@@ -3,7 +3,6 @@
 title = "CLI Environment Variables"
 description = "CLI Environment Variables"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
-aliases = ["/compose/reference/overview/"]
 [menu.main]
 parent = "smn_compose_cli"
 weight=-1
@@ -24,14 +23,14 @@ Sets the project name. This value is prepended along with the service name to th
 
 Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME`
 defaults to the `basename` of the project directory. See also the `-p`
-[command-line option](docker-compose.md).
+[command-line option](overview.md).
 
 ## COMPOSE\_FILE
 
 Specify the file containing the compose configuration. If not provided,
 Compose looks for a file named  `docker-compose.yml` in the current directory
 and then each parent directory in succession until a file by that name is
-found. See also the `-f` [command-line option](docker-compose.md).
+found. See also the `-f` [command-line option](overview.md).
 
 ## COMPOSE\_API\_VERSION
 

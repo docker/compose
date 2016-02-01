@@ -1,8 +1,9 @@
 <!--[metadata]>
 +++
-title = "docker-compose Command"
-description = "docker-compose Command Binary"
+title = "Overview of docker-compose CLI"
+description = "Overview of docker-compose CLI"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  docker-compose"]
+aliases = ["/compose/reference/docker-compose/"]
 [menu.main]
 parent = "smn_compose_cli"
 weight=-2
@@ -10,7 +11,7 @@ weight=-2
 <![end-metadata]-->
 
 
-# docker-compose Command
+# Overview of docker-compose CLI
 
 This page provides the usage information for the `docker-compose` Command.
 You can also see this information by running `docker-compose --help` from the
@@ -114,4 +115,3 @@ envvars.md#compose-project-name)
 ## Where to go next
 
 * [CLI environment variables](envvars.md)
-* [Command line reference](index.md)
