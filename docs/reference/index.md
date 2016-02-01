@@ -12,9 +12,9 @@ weight=80
 
 ## Compose command-line reference
 
-The following pages describe the usage information for the [docker-compose](docker-compose.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
+The following pages describe the usage information for the [docker-compose](overview.md) subcommands. You can also see this information by running `docker-compose [SUBCOMMAND] --help` from the command line.
 
-* [docker-compose](docker-compose.md)
+* [docker-compose](overview.md)
 * [build](build.md)
 * [config](config.md)
 * [create](create.md)
@@ -39,4 +39,4 @@ The following pages describe the usage information for the [docker-compose](dock
 ## Where to go next
 
 * [CLI environment variables](envvars.md)
-* [docker-compose Command](docker-compose.md)
+* [docker-compose Command](overview.md)
