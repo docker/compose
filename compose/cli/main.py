@@ -15,7 +15,6 @@ from requests.exceptions import ReadTimeout
 
 from . import signals
 from .. import __version__
-from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.serialize import serialize_config
@@ -29,8 +28,8 @@ from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
 from .command import friendly_error_message
-from .command import get_config_path_from_options
-from .command import project_from_options
+from .command import get_name_and_config
+from .command import get_project
 from .docopt_command import DocoptCommand
 from .docopt_command import NoSuchCommand
 from .errors import UserError
@@ -165,11 +164,13 @@ class TopLevelCommand(DocoptCommand):
             handler(None, command_options)
             return
 
+        project_name, compose_config = get_name_and_config(self.base_dir, options)
+
         if options['COMMAND'] == 'config':
-            handler(options, command_options)
+            handler(compose_config, command_options)
             return
 
-        project = project_from_options(self.base_dir, options)
+        project = get_project(project_name, compose_config, options)
         with friendly_error_message():
             handler(project, command_options)
 
@@ -194,7 +195,7 @@ class TopLevelCommand(DocoptCommand):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)))
 
-    def config(self, config_options, options):
+    def config(self, compose_config, options):
         """
         Validate and view the compose file.
 
@@ -206,9 +207,6 @@ class TopLevelCommand(DocoptCommand):
             --services      Print the service names, one per line.
 
         """
-        config_path = get_config_path_from_options(config_options)
-        compose_config = config.load(config.find(self.base_dir, config_path))
-
         if options['--quiet']:
             return
 

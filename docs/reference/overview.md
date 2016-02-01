@@ -36,6 +36,10 @@ Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME`
 defaults to the `basename` of the project directory. See also the `-p`
 [command-line option](docker-compose.md).
 
+This environment variable is always available from a Compose file. If the `-p`
+option is used, or if no project name is set, Compose will inject the chosen
+project name into the environment.
+
 ### COMPOSE\_FILE
 
 Specify the file containing the compose configuration. If not provided,
