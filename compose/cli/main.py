@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import contextlib
 import json
 import logging
 import re
@@ -53,7 +54,7 @@ def main():
         command = TopLevelCommand()
         command.sys_dispatch()
     except KeyboardInterrupt:
-        log.error("\nAborting.")
+        log.error("Aborting.")
         sys.exit(1)
     except (UserError, NoSuchService, ConfigurationError) as e:
         log.error(e.msg)
@@ -629,18 +630,20 @@ class TopLevelCommand(DocoptCommand):
         if detached and cascade_stop:
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        to_attach = project.up(
-            service_names=service_names,
-            start_deps=start_deps,
-            strategy=convergence_strategy_from_opts(options),
-            do_build=not options['--no-build'],
-            timeout=timeout,
-            detached=detached
-        )
+        with up_shutdown_context(project, service_names, timeout, detached):
+            to_attach = project.up(
+                service_names=service_names,
+                start_deps=start_deps,
+                strategy=convergence_strategy_from_opts(options),
+                do_build=not options['--no-build'],
+                timeout=timeout,
+                detached=detached)
 
-        if not detached:
+            if detached:
+                return
             log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop)
-            attach_to_logs(project, log_printer, service_names, timeout)
+            print("Attaching to", list_containers(log_printer.containers))
+            log_printer.run()
 
     def version(self, project, options):
         """
@@ -740,13 +743,16 @@ def build_log_printer(containers, service_names, monochrome, cascade_stop):
     return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop)
 
 
-def attach_to_logs(project, log_printer, service_names, timeout):
-    print("Attaching to", list_containers(log_printer.containers))
-    signals.set_signal_handler_to_shutdown()
+@contextlib.contextmanager
+def up_shutdown_context(project, service_names, timeout, detached):
+    if detached:
+        yield
+        return
 
+    signals.set_signal_handler_to_shutdown()
     try:
         try:
-            log_printer.run()
+            yield
         except signals.ShutdownException:
             print("Gracefully stopping... (press Ctrl+C again to force)")
             project.stop(service_names=service_names, timeout=timeout)

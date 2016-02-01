@@ -6,12 +6,9 @@ import logging
 from compose import container
 from compose.cli.errors import UserError
 from compose.cli.formatter import ConsoleWarningFormatter
-from compose.cli.log_printer import LogPrinter
-from compose.cli.main import attach_to_logs
 from compose.cli.main import build_log_printer
 from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import setup_console_handler
-from compose.project import Project
 from compose.service import ConvergenceStrategy
 from tests import mock
 from tests import unittest
@@ -48,21 +45,6 @@ class CLIMainTestCase(unittest.TestCase):
         service_names = []
         log_printer = build_log_printer(containers, service_names, True, False)
         self.assertEqual(log_printer.containers, containers)
-
-    def test_attach_to_logs(self):
-        project = mock.create_autospec(Project)
-        log_printer = mock.create_autospec(LogPrinter, containers=[])
-        service_names = ['web', 'db']
-        timeout = 12
-
-        with mock.patch('compose.cli.main.signals.signal', autospec=True) as mock_signal:
-            attach_to_logs(project, log_printer, service_names, timeout)
-
-        assert mock_signal.signal.mock_calls == [
-            mock.call(mock_signal.SIGINT, mock.ANY),
-            mock.call(mock_signal.SIGTERM, mock.ANY),
-        ]
-        log_printer.run.assert_called_once_with()
 
 
 class SetupConsoleHandlerTestCase(unittest.TestCase):
