@@ -3,7 +3,7 @@ package supervisor
 import (
 	"io/ioutil"
 	"os"
-	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -76,7 +76,6 @@ func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) 
 
 type containerInfo struct {
 	container runtime.Container
-	copier    *copier
 }
 
 type Supervisor struct {
@@ -195,14 +194,6 @@ func (s *Supervisor) restore() error {
 		id := d.Name()
 		container, err := runtime.Load(s.stateDir, id)
 		if err != nil {
-			if err == runtime.ErrContainerExited {
-				logrus.WithField("id", id).Debug("containerd: container exited while away")
-				// TODO: fire events to do the removal
-				if err := os.RemoveAll(filepath.Join(s.stateDir, id)); err != nil {
-					logrus.WithField("error", err).Warn("containerd: remove container state")
-				}
-				continue
-			}
 			return err
 		}
 		processes, err := container.Processes()
@@ -214,11 +205,42 @@ func (s *Supervisor) restore() error {
 			container: container,
 		}
 		logrus.WithField("id", id).Debug("containerd: container restored")
+		var exitedProcesses []runtime.Process
 		for _, p := range processes {
-			if err := s.monitorProcess(p); err != nil {
-				return err
+			if _, err := p.ExitStatus(); err == nil {
+				exitedProcesses = append(exitedProcesses, p)
+			} else {
+				if err := s.monitorProcess(p); err != nil {
+					return err
+				}
+			}
+		}
+		if len(exitedProcesses) > 0 {
+			// sort processes so that init is fired last because that is how the kernel sends the
+			// exit events
+			sort.Sort(&processSorter{exitedProcesses})
+			for _, p := range exitedProcesses {
+				e := NewEvent(ExitEventType)
+				e.Process = p
+				s.SendEvent(e)
 			}
 		}
 	}
 	return nil
+}
+
+type processSorter struct {
+	processes []runtime.Process
+}
+
+func (s *processSorter) Len() int {
+	return len(s.processes)
+}
+
+func (s *processSorter) Swap(i, j int) {
+	s.processes[i], s.processes[j] = s.processes[j], s.processes[i]
+}
+
+func (s *processSorter) Less(i, j int) bool {
+	return s.processes[j].ID() == "init"
 }

@@ -11,6 +11,7 @@ var (
 	EventsCounter          = metrics.NewCounter()
 	ExecProcessTimer       = metrics.NewTimer()
 	ExitProcessTimer       = metrics.NewTimer()
+	EpollFdCounter         = metrics.NewCounter()
 )
 
 func Metrics() map[string]interface{} {
@@ -23,5 +24,6 @@ func Metrics() map[string]interface{} {
 		"events":                EventsCounter,
 		"exec-process-time":     ExecProcessTimer,
 		"exit-process-time":     ExitProcessTimer,
+		"epoll-fds":             EpollFdCounter,
 	}
 }

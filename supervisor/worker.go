@@ -15,7 +15,6 @@ type Worker interface {
 type StartTask struct {
 	Container     runtime.Container
 	Checkpoint    string
-	IO            *runtime.IO
 	Stdin         string
 	Stdout        string
 	Stderr        string

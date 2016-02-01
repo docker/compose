@@ -1,96 +1,16 @@
 package runtime
 
 import (
-	"io"
+	"encoding/json"
+	"io/ioutil"
 	"os"
-	"time"
+	"os/exec"
+	"path/filepath"
+	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/specs"
 )
-
-type Process interface {
-	io.Closer
-
-	// ID of the process.
-	// This is either "init" when it is the container's init process or
-	// it is a user provided id for the process similar to the container id
-	ID() string
-	// Stdin returns the path the the processes stdin fifo
-	Stdin() string
-	// Stdout returns the path the the processes stdout fifo
-	Stdout() string
-	// Stderr returns the path the the processes stderr fifo
-	Stderr() string
-	// ExitFD returns the fd the provides an event when the process exits
-	ExitFD() int
-	// ExitStatus returns the exit status of the process or an error if it
-	// has not exited
-	ExitStatus() (int, error)
-	Spec() specs.Process
-	// Signal sends the provided signal to the process
-	Signal(os.Signal) error
-	// Container returns the container that the process belongs to
-	Container() Container
-}
-
-type State string
-
-const (
-	Paused  = State("paused")
-	Running = State("running")
-)
-
-type Console interface {
-	io.ReadWriter
-	io.Closer
-}
-
-type IO struct {
-	Stdin  io.WriteCloser
-	Stdout io.ReadCloser
-	Stderr io.ReadCloser
-}
-
-func (i *IO) Close() error {
-	var oerr error
-	for _, c := range []io.Closer{
-		i.Stdin,
-		i.Stdout,
-		i.Stderr,
-	} {
-		if c != nil {
-			if err := c.Close(); oerr == nil {
-				oerr = err
-			}
-		}
-	}
-	return oerr
-}
-
-type Stat struct {
-	// Timestamp is the time that the statistics where collected
-	Timestamp time.Time
-	// Data is the raw stats
-	// TODO: it is currently an interface because we don't know what type of exec drivers
-	// we will have or what the structure should look like at the moment os the containers
-	// can return what they want and we could marshal to json or whatever.
-	Data interface{}
-}
-
-type Checkpoint struct {
-	// Timestamp is the time that checkpoint happened
-	Timestamp time.Time
-	// Name is the name of the checkpoint
-	Name string
-	// Tcp checkpoints open tcp connections
-	Tcp bool
-	// UnixSockets persists unix sockets in the checkpoint
-	UnixSockets bool
-	// Shell persists tty sessions in the checkpoint
-	Shell bool
-	// Exit exits the container after the checkpoint is finished
-	Exit bool
-}
 
 type Container interface {
 	// ID returns the container ID
@@ -99,10 +19,10 @@ type Container interface {
 	Path() string
 	// Start starts the init process of the container
 	Start() (Process, error)
+	// Exec starts another process in an existing container
+	Exec(string, specs.Process) (Process, error)
 	// Delete removes the container's state and any resources
 	Delete() error
-	// Pid returns the container's init process id
-	// Pid() (int, error)
 	// Processes returns all the containers processes that have been added
 	Processes() ([]Process, error)
 	// State returns the containers runtime state
@@ -111,6 +31,7 @@ type Container interface {
 	Resume() error
 	// Pause pauses a running container
 	Pause() error
+	RemoveProcess(string) error
 	// Checkpoints returns all the checkpoints for a container
 	// Checkpoints() ([]Checkpoint, error)
 	// Checkpoint creates a new checkpoint
@@ -123,4 +44,184 @@ type Container interface {
 	// Stats() (*Stat, error)
 	// OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
+}
+
+// New returns a new container
+func New(root, id, bundle string) (Container, error) {
+	c := &container{
+		root:      root,
+		id:        id,
+		bundle:    bundle,
+		processes: make(map[string]*process),
+	}
+	if err := os.Mkdir(filepath.Join(root, id), 0755); err != nil {
+		return nil, err
+	}
+	f, err := os.Create(filepath.Join(root, id, StateFile))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if err := json.NewEncoder(f).Encode(state{
+		Bundle: bundle,
+	}); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func Load(root, id string) (Container, error) {
+	var s state
+	f, err := os.Open(filepath.Join(root, id, StateFile))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if err := json.NewDecoder(f).Decode(&s); err != nil {
+		return nil, err
+	}
+	c := &container{
+		root:      root,
+		id:        id,
+		bundle:    s.Bundle,
+		processes: make(map[string]*process),
+	}
+	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		pid := d.Name()
+		s, err := readProcessSpec(filepath.Join(root, id, pid))
+		if err != nil {
+			return nil, err
+		}
+		p, err := loadProcess(filepath.Join(root, id, pid), pid, c, *s)
+		if err != nil {
+			logrus.WithField("id", id).WithField("pid", pid).Debug("containerd: error loading process %s", err)
+			continue
+		}
+		c.processes[pid] = p
+	}
+	return c, nil
+}
+
+func readProcessSpec(dir string) (*specs.Process, error) {
+	f, err := os.Open(filepath.Join(dir, "process.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var s specs.Process
+	if err := json.NewDecoder(f).Decode(&s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+type container struct {
+	// path to store runtime state information
+	root      string
+	id        string
+	bundle    string
+	processes map[string]*process
+}
+
+func (c *container) ID() string {
+	return c.id
+}
+
+func (c *container) Path() string {
+	return c.bundle
+}
+
+func (c *container) Start() (Process, error) {
+	processRoot := filepath.Join(c.root, c.id, InitProcessID)
+	if err := os.MkdirAll(processRoot, 0755); err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("containerd-shim", c.id, c.bundle)
+	cmd.Dir = processRoot
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+	spec, err := c.readSpec()
+	if err != nil {
+		return nil, err
+	}
+	p, err := newProcess(processRoot, InitProcessID, c, spec.Process)
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	c.processes[InitProcessID] = p
+	return p, nil
+}
+
+func (c *container) Exec(pid string, spec specs.Process) (Process, error) {
+	processRoot := filepath.Join(c.root, c.id, pid)
+	if err := os.MkdirAll(processRoot, 0755); err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("containerd-shim", "-exec", c.id, c.bundle)
+	cmd.Dir = processRoot
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+	p, err := newProcess(processRoot, pid, c, spec)
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	c.processes[pid] = p
+	return p, nil
+}
+
+func (c *container) readSpec() (*specs.LinuxSpec, error) {
+	var spec specs.LinuxSpec
+	f, err := os.Open(filepath.Join(c.bundle, "config.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if err := json.NewDecoder(f).Decode(&spec); err != nil {
+		return nil, err
+	}
+	return &spec, nil
+}
+
+func (c *container) Pause() error {
+	return exec.Command("runc", "--id", c.id, "pause").Run()
+}
+
+func (c *container) Resume() error {
+	return exec.Command("runc", "--id", c.id, "resume").Run()
+}
+
+func (c *container) State() State {
+	return Running
+}
+
+func (c *container) Delete() error {
+	return os.RemoveAll(filepath.Join(c.root, c.id))
+}
+
+func (c *container) Processes() ([]Process, error) {
+	out := []Process{}
+	for _, p := range c.processes {
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+func (c *container) RemoveProcess(pid string) error {
+	delete(c.processes, pid)
+	return nil
 }

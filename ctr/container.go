@@ -145,7 +145,7 @@ var attachCommand = cli.Command{
 			io.Copy(stdin, os.Stdin)
 			closer()
 		}()
-		if err := waitForExit(c, id, closer); err != nil {
+		if err := waitForExit(c, id, "init", closer); err != nil {
 			fatal(err.Error(), 1)
 		}
 	},
@@ -217,7 +217,7 @@ var startCommand = cli.Command{
 				io.Copy(stdin, os.Stdin)
 				restoreAndCloseStdin()
 			}()
-			if err := waitForExit(c, id, restoreAndCloseStdin); err != nil {
+			if err := waitForExit(c, id, "init", restoreAndCloseStdin); err != nil {
 				fatal(err.Error(), 1)
 			}
 		}
@@ -303,6 +303,10 @@ var execCommand = cli.Command{
 			Name:  "id",
 			Usage: "container id to add the process to",
 		},
+		cli.StringFlag{
+			Name:  "pid",
+			Usage: "process id for the new process",
+		},
 		cli.BoolFlag{
 			Name:  "attach,a",
 			Usage: "connect to the stdio of the container",
@@ -330,58 +334,50 @@ var execCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) {
-		panic("not implemented")
-		/*
-			p := &types.AddProcessRequest{
-				Args:     context.Args(),
-				Cwd:      context.String("cwd"),
-				Terminal: context.Bool("tty"),
-				Id:       context.String("id"),
-				Env:      context.StringSlice("env"),
-				User: &types.User{
-					Uid: uint32(context.Int("uid")),
-					Gid: uint32(context.Int("gid")),
-				},
-			}
-			c := getClient(context)
-					events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
-					if err != nil {
-						fatal(err.Error(), 1)
-					}
-						if context.Bool("attach") {
-							if p.Terminal {
-								if err := attachTty(&p.Console); err != nil {
-									fatal(err.Error(), 1)
-								}
-							} else {
-								if err := attachStdio(&p.Stdin, &p.Stdout, &p.Stderr); err != nil {
-									fatal(err.Error(), 1)
-								}
-							}
-						}
-				r, err := c.AddProcess(netcontext.Background(), p)
+		p := &types.AddProcessRequest{
+			Pid:      context.String("pid"),
+			Args:     context.Args(),
+			Cwd:      context.String("cwd"),
+			Terminal: context.Bool("tty"),
+			Id:       context.String("id"),
+			Env:      context.StringSlice("env"),
+			User: &types.User{
+				Uid: uint32(context.Int("uid")),
+				Gid: uint32(context.Int("gid")),
+			},
+		}
+		c := getClient(context)
+		resp, err := c.AddProcess(netcontext.Background(), p)
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		if context.Bool("attach") {
+			if context.Bool("tty") {
+				s, err := term.SetRawTerminal(os.Stdin.Fd())
 				if err != nil {
 					fatal(err.Error(), 1)
 				}
-				if context.Bool("attach") {
-					go func() {
-						io.Copy(stdin, os.Stdin)
-						if state != nil {
-							term.RestoreTerminal(os.Stdin.Fd(), state)
-						}
-						stdin.Close()
-					}()
-					for {
-							e, err := events.Recv()
-							if err != nil {
-								fatal(err.Error(), 1)
-							}
-								if e.Pid == r.Pid && e.Type == "exit" {
-									os.Exit(int(e.Status))
-								}
-					}
+				state = s
+			}
+			if err := attachStdio(resp.Stdin, resp.Stdout, resp.Stderr); err != nil {
+				fatal(err.Error(), 1)
+			}
+		}
+		if context.Bool("attach") {
+			restoreAndCloseStdin := func() {
+				if state != nil {
+					term.RestoreTerminal(os.Stdin.Fd(), state)
 				}
-		*/
+				stdin.Close()
+			}
+			go func() {
+				io.Copy(stdin, os.Stdin)
+				restoreAndCloseStdin()
+			}()
+			if err := waitForExit(c, context.String("id"), context.String("pid"), restoreAndCloseStdin); err != nil {
+				fatal(err.Error(), 1)
+			}
+		}
 	},
 }
 
@@ -407,7 +403,7 @@ var statsCommand = cli.Command{
 	},
 }
 
-func waitForExit(c types.APIClient, id string, closer func()) error {
+func waitForExit(c types.APIClient, id, pid string, closer func()) error {
 	events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
 	if err != nil {
 		return err
@@ -419,7 +415,7 @@ func waitForExit(c types.APIClient, id string, closer func()) error {
 			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{})
 			continue
 		}
-		if e.Id == id && e.Type == "exit" && e.Pid == "init" {
+		if e.Id == id && e.Type == "exit" && e.Pid == pid {
 			closer()
 			os.Exit(int(e.Status))
 		}

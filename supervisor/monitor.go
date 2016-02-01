@@ -44,6 +44,7 @@ func (m *Monitor) Monitor(p runtime.Process) error {
 	if err := syscall.EpollCtl(m.epollFd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
 		return err
 	}
+	EpollFdCounter.Inc(1)
 	m.processes[fd] = p
 	return nil
 }
@@ -75,6 +76,7 @@ func (m *Monitor) start() {
 				}); err != nil {
 					logrus.WithField("error", err).Fatal("containerd: epoll remove fd")
 				}
+				EpollFdCounter.Dec(1)
 				if err := proc.Close(); err != nil {
 					logrus.WithField("error", err).Error("containerd: close process IO")
 				}

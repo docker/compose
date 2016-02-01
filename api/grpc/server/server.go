@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"syscall"
 
 	"google.golang.org/grpc"
@@ -75,18 +76,27 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 			AdditionalGids: r.User.AdditionalGids,
 		},
 	}
+	if r.Id == "" {
+		return nil, fmt.Errorf("container id cannot be empty")
+	}
+	if r.Pid == "" {
+		return nil, fmt.Errorf("process id cannot be empty")
+	}
 	e := supervisor.NewEvent(supervisor.AddProcessEventType)
 	e.ID = r.Id
+	e.Pid = r.Pid
 	e.ProcessSpec = process
-	e.Console = r.Console
-	e.Stdin = r.Stdin
-	e.Stdout = r.Stdout
-	e.Stderr = r.Stderr
+	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	return &types.AddProcessResponse{}, nil
+	sr := <-e.StartResponse
+	return &types.AddProcessResponse{
+		Stdin:  sr.Stdin,
+		Stdout: sr.Stdout,
+		Stderr: sr.Stderr,
+	}, nil
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {

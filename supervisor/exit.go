@@ -25,7 +25,9 @@ func (h *ExitEvent) Handle(e *Event) error {
 	if proc.ID() != runtime.InitProcessID {
 		ne := NewEvent(ExecExitEventType)
 		ne.ID = proc.Container().ID()
+		ne.Pid = proc.ID()
 		ne.Status = status
+		ne.Process = proc
 		h.s.SendEvent(ne)
 
 		return nil
@@ -51,17 +53,11 @@ type ExecExitEvent struct {
 }
 
 func (h *ExecExitEvent) Handle(e *Event) error {
+	container := e.Process.Container()
 	// exec process: we remove this process without notifying the main event loop
-	/*
-		info := h.s.processes[e.Pid]
-			if err := info.container.RemoveProcess(e.Pid); err != nil {
-				logrus.WithField("error", err).Error("containerd: find container for pid")
-			}
-			if err := info.copier.Close(); err != nil {
-				logrus.WithField("error", err).Error("containerd: close process IO")
-			}
-			delete(h.s.processes, e.Pid)
-			h.s.notifySubscribers(e)
-	*/
+	if err := container.RemoveProcess(e.Pid); err != nil {
+		logrus.WithField("error", err).Error("containerd: find container for pid")
+	}
+	h.s.notifySubscribers(e)
 	return nil
 }
