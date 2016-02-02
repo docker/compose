@@ -168,3 +168,22 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
     @property
     def is_named_volume(self):
         return self.external and not self.external.startswith(('.', '/', '~'))
+
+
+class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
+
+    @classmethod
+    def parse(cls, link_spec):
+        target, _, alias = link_spec.partition(':')
+        if not alias:
+            alias = target
+        return cls(target, alias)
+
+    def repr(self):
+        if self.target == self.alias:
+            return self.target
+        return '{s.target}:{s.alias}'.format(s=self)
+
+    @property
+    def merge_field(self):
+        return self.alias
