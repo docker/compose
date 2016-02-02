@@ -9,20 +9,16 @@ install:
 # Build the binary after tests
 build: false
 
-environment:
-  BINTRAY_USER: "docker-compose-roleuser"
-  BINTRAY_PATH: "docker-compose/master/windows/master/docker-compose-Windows-x86_64.exe"
-
 test_script:
   - "tox -e py27,py34 -- tests/unit"
   - ps: ".\\script\\build-windows.ps1"
 
-deploy_script:
-  - "curl -sS
-        -u \"%BINTRAY_USER%:%BINTRAY_API_KEY%\"
-        -X PUT \"https://api.bintray.com/content/%BINTRAY_PATH%?override=1&publish=1\"
-        --data-binary @dist\\docker-compose-Windows-x86_64.exe"
-
 artifacts:
   - path: .\dist\docker-compose-Windows-x86_64.exe
     name: "Compose Windows binary"
+
+deploy:
+  - provider: Environment
+    name: master-builds
+    on:
+      branch: master
