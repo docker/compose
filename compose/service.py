@@ -424,8 +424,8 @@ class Service(object):
             return self.start_container(container)
 
     def start_container(self, container):
-        container.start()
         self.connect_container_to_networks(container)
+        container.start()
         return container
 
     def connect_container_to_networks(self, container):
