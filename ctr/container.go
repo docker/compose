@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -190,11 +191,13 @@ var startCommand = cli.Command{
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
+		var tty bool
 		if context.Bool("attach") {
 			mkterm, err := readTermSetting(bpath)
 			if err != nil {
 				fatal(err.Error(), 1)
 			}
+			tty = mkterm
 			if mkterm {
 				s, err := term.SetRawTerminal(os.Stdin.Fd())
 				if err != nil {
@@ -224,11 +227,39 @@ var startCommand = cli.Command{
 				}
 				restoreAndCloseStdin()
 			}()
+			if tty {
+				resize(id, "init", c)
+				go func() {
+					s := make(chan os.Signal, 64)
+					signal.Notify(s, syscall.SIGWINCH)
+					for range s {
+						if err := resize(id, "init", c); err != nil {
+							log.Println(err)
+						}
+					}
+				}()
+			}
 			if err := waitForExit(c, id, "init", restoreAndCloseStdin); err != nil {
 				fatal(err.Error(), 1)
 			}
 		}
 	},
+}
+
+func resize(id, pid string, c types.APIClient) error {
+	ws, err := term.GetWinsize(os.Stdin.Fd())
+	if err != nil {
+		return err
+	}
+	if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
+		Id:     id,
+		Pid:    "init",
+		Width:  uint32(ws.Width),
+		Height: uint32(ws.Height),
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 var (
