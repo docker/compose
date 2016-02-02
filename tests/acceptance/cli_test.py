@@ -406,7 +406,8 @@ class CLITestCase(DockerClientTestCase):
 
         services = self.project.get_services()
 
-        networks = self.client.networks(names=[self.project.default_network.full_name])
+        network_name = self.project.networks.networks['default'].full_name
+        networks = self.client.networks(names=[network_name])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['Driver'], 'bridge')
         assert 'com.docker.network.bridge.enable_icc' not in networks[0]['Options']
@@ -439,7 +440,9 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['-f', filename, 'up', '-d'], None)
 
-        networks = self.client.networks(names=[self.project.default_network.full_name])
+        network_name = self.project.networks.networks['default'].full_name
+        networks = self.client.networks(names=[network_name])
+
         assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
 
     @v2_only()
@@ -586,18 +589,15 @@ class CLITestCase(DockerClientTestCase):
             n['Name'] for n in self.client.networks()
             if n['Name'].startswith('{}_'.format(self.project.name))
         ]
-
-        assert sorted(network_names) == [
-            '{}_{}'.format(self.project.name, name)
-            for name in ['bar', 'foo']
-        ]
+        assert network_names == []
 
     def test_up_with_links_v1(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'web'], None)
 
         # No network was created
-        networks = self.client.networks(names=[self.project.default_network.full_name])
+        network_name = self.project.networks.networks['default'].full_name
+        networks = self.client.networks(names=[network_name])
         assert networks == []
 
         web = self.project.get_service('web')

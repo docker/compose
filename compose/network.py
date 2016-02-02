@@ -104,3 +104,76 @@ def create_ipam_config_from_dict(ipam_dict):
             for config in ipam_dict.get('config', [])
         ],
     )
+
+
+def build_networks(name, config_data, client):
+    network_config = config_data.networks or {}
+    networks = {
+        network_name: Network(
+            client=client, project=name, name=network_name,
+            driver=data.get('driver'),
+            driver_opts=data.get('driver_opts'),
+            ipam=data.get('ipam'),
+            external_name=data.get('external_name'),
+        )
+        for network_name, data in network_config.items()
+    }
+
+    if 'default' not in networks:
+        networks['default'] = Network(client, name, 'default')
+
+    return networks
+
+
+class ProjectNetworks(object):
+
+    def __init__(self, networks, use_networking):
+        self.networks = networks or {}
+        self.use_networking = use_networking
+
+    @classmethod
+    def from_services(cls, services, networks, use_networking):
+        service_networks = {
+            network: networks.get(network)
+            for service in services
+            for network in get_network_names_for_service(service)
+        }
+        unused = set(networks) - set(service_networks) - {'default'}
+        if unused:
+            log.warn(
+                "Some networks were defined but are not used by any service: "
+                "{}".format(", ".join(unused)))
+        return cls(service_networks, use_networking)
+
+    def remove(self):
+        if not self.use_networking:
+            return
+        for network in self.networks.values():
+            network.remove()
+
+    def initialize(self):
+        if not self.use_networking:
+            return
+
+        for network in self.networks.values():
+            network.ensure()
+
+
+def get_network_names_for_service(service_dict):
+    if 'network_mode' in service_dict:
+        return []
+    return service_dict.get('networks', ['default'])
+
+
+def get_networks(service_dict, network_definitions):
+    networks = []
+    for name in get_network_names_for_service(service_dict):
+        network = network_definitions.get(name)
+        if network:
+            networks.append(network.full_name)
+        else:
+            raise ConfigurationError(
+                'Service "{}" uses an undefined network "{}"'
+                .format(service_dict['name'], name))
+
+    return networks

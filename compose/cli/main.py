@@ -693,7 +693,7 @@ def run_one_off_container(container_options, project, service, options):
                 start_deps=True,
                 strategy=ConvergenceStrategy.never)
 
-    project.initialize_networks()
+    project.initialize()
 
     container = service.create_container(
         quiet=True,
