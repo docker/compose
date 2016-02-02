@@ -4,7 +4,7 @@ title = "down"
 description = "down"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  down"]
 [menu.main]
-identifier="build.compose"
+identifier="down.compose"
 parent = "smn_compose_cli"
 +++
 <![end-metadata]-->
