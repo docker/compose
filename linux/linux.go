@@ -560,6 +560,15 @@ func (r *libcontainerRuntime) createLibcontainerConfig(cgroupName, bundlePath st
 		}
 		config.Mounts = append(config.Mounts, r.createLibcontainerMount(bundlePath, mp.Path, m))
 	}
+
+	// Convert rootfs propagation flag
+	if rspec.Linux.RootfsPropagation != "" {
+		_, pflags, _ := parseMountOptions([]string{rspec.Linux.RootfsPropagation})
+		if len(pflags) == 1 {
+			config.RootPropagation = pflags[0]
+		}
+	}
+
 	if err := r.createDevices(rspec, config); err != nil {
 		return nil, err
 	}
