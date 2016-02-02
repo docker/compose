@@ -14,10 +14,12 @@ import six
 import yaml
 from cached_property import cached_property
 
-from ..const import COMPOSEFILE_VERSIONS
+from ..const import COMPOSEFILE_V1 as V1
+from ..const import COMPOSEFILE_V2_0 as V2_0
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
+from .errors import VERSION_EXPLANATION
 from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
 from .sort_services import get_service_name_from_network_mode
@@ -103,6 +105,7 @@ SUPPORTED_FILENAMES = [
 
 DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 
+
 log = logging.getLogger(__name__)
 
 
@@ -129,27 +132,48 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
     @cached_property
     def version(self):
-        if self.config is None:
-            return 1
-        version = self.config.get('version', 1)
+        if 'version' not in self.config:
+            return V1
+
+        version = self.config['version']
+
         if isinstance(version, dict):
-            log.warn("Unexpected type for field 'version', in file {} assuming "
-                     "version is the name of a service, and defaulting to "
-                     "Compose file version 1".format(self.filename))
-            return 1
+            log.warn('Unexpected type for "version" key in "{}". Assuming '
+                     '"version" is the name of a service, and defaulting to '
+                     'Compose file version 1.'.format(self.filename))
+            return V1
+
+        if not isinstance(version, six.string_types):
+            raise ConfigurationError(
+                'Version in "{}" is invalid - it should be a string.'
+                .format(self.filename))
+
+        if version == '1':
+            raise ConfigurationError(
+                'Version in "{}" is invalid. {}'
+                .format(self.filename, VERSION_EXPLANATION))
+
+        if version == '2':
+            version = V2_0
+
+        if version != V2_0:
+            raise ConfigurationError(
+                'Version in "{}" is unsupported. {}'
+                .format(self.filename, VERSION_EXPLANATION))
+
         return version
 
     def get_service(self, name):
         return self.get_service_dicts()[name]
 
     def get_service_dicts(self):
-        return self.config if self.version == 1 else self.config.get('services', {})
+        return self.config if self.version == V1 else self.config.get('services', {})
 
     def get_volumes(self):
-        return {} if self.version == 1 else self.config.get('volumes', {})
+        return {} if self.version == V1 else self.config.get('volumes', {})
 
     def get_networks(self):
-        return {} if self.version == 1 else self.config.get('networks', {})
+        return {} if self.version == V1 else self.config.get('networks', {})
 
 
 class Config(namedtuple('_Config', 'version services volumes networks')):
@@ -210,10 +234,6 @@ def validate_config_version(config_files):
                     main_file.version,
                     next_file.filename,
                     next_file.version))
-
-    if main_file.version not in COMPOSEFILE_VERSIONS:
-        raise ConfigurationError(
-            'Invalid Compose file version: {0}'.format(main_file.version))
 
 
 def get_default_config_files(base_dir):
@@ -278,7 +298,7 @@ def load(config_details):
         main_file,
         [file.get_service_dicts() for file in config_details.config_files])
 
-    if main_file.version >= 2:
+    if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
@@ -363,7 +383,7 @@ def process_config_file(config_file, service_name=None):
 
     interpolated_config = interpolate_environment_variables(service_dicts, 'service')
 
-    if config_file.version == 2:
+    if config_file.version == V2_0:
         processed_config = dict(config_file.config)
         processed_config['services'] = services = interpolated_config
         processed_config['volumes'] = interpolate_environment_variables(
@@ -371,7 +391,7 @@ def process_config_file(config_file, service_name=None):
         processed_config['networks'] = interpolate_environment_variables(
             config_file.get_networks(), 'network')
 
-    if config_file.version == 1:
+    if config_file.version == V1:
         processed_config = services = interpolated_config
 
     config_file = config_file._replace(config=processed_config)
@@ -655,7 +675,7 @@ def merge_service_dicts(base, override, version):
         if field in base or field in override:
             d[field] = override.get(field, base.get(field))
 
-    if version == 1:
+    if version == V1:
         legacy_v1_merge_image_or_build(d, base, override)
     else:
         merge_build(d, base, override)

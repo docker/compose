@@ -7,6 +7,7 @@ from __future__ import unicode_literals
 import os
 from collections import namedtuple
 
+from compose.config.config import V1
 from compose.config.errors import ConfigurationError
 from compose.const import IS_WINDOWS_PLATFORM
 
@@ -16,7 +17,7 @@ class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode type')):
     # TODO: drop service_names arg when v1 is removed
     @classmethod
     def parse(cls, volume_from_config, service_names, version):
-        func = cls.parse_v1 if version == 1 else cls.parse_v2
+        func = cls.parse_v1 if version == V1 else cls.parse_v2
         return func(service_names, volume_from_config)
 
     @classmethod

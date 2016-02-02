@@ -10,6 +10,8 @@ from pytest import skip
 from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
+from compose.config.config import V1
+from compose.config.config import V2_0
 from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
@@ -54,9 +56,9 @@ class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if engine_version_too_low_for_v2():
-            version = API_VERSIONS[1]
+            version = API_VERSIONS[V1]
         else:
-            version = API_VERSIONS[2]
+            version = API_VERSIONS[V2_0]
 
         cls.client = docker_client(version)
 

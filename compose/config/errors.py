@@ -2,6 +2,14 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 
+VERSION_EXPLANATION = (
+    'Either specify a version of "2" (or "2.0") and place your service '
+    'definitions under the `services` key, or omit the `version` key and place '
+    'your service definitions at the root of the file to use version 1.\n'
+    'For more on the Compose file format versions, see '
+    'https://docs.docker.com/compose/compose-file/')
+
+
 class ConfigurationError(Exception):
     def __init__(self, msg):
         self.msg = msg

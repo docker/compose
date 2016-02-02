@@ -177,7 +177,7 @@ class CLITestCase(DockerClientTestCase):
 
         output = yaml.load(result.stdout)
         expected = {
-            'version': 2,
+            'version': '2.0',
             'volumes': {'data': {'driver': 'local'}},
             'networks': {'front': {}},
             'services': {
