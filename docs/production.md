@@ -60,7 +60,7 @@ recreating any services which `web` depends on.
 You can use Compose to deploy an app to a remote Docker host by setting the
 `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, and `DOCKER_CERT_PATH` environment variables
 appropriately. For tasks like this,
-[Docker Machine](https://docs.docker.com/machine/) makes managing local and
+[Docker Machine](/machine/overview) makes managing local and
 remote Docker hosts very easy, and is recommended even if you're not deploying
 remotely.
 
@@ -69,14 +69,12 @@ commands will work with no further configuration.
 
 ### Running Compose on a Swarm cluster
 
-[Docker Swarm](https://docs.docker.com/swarm/), a Docker-native clustering
+[Docker Swarm](/swarm/overview), a Docker-native clustering
 system, exposes the same API as a single Docker host, which means you can use
 Compose against a Swarm instance and run your apps across multiple hosts.
 
-Compose/Swarm integration is still in the experimental stage, and Swarm is still
-in beta, but if you'd like to explore and experiment, check out the <a
-href="https://github.com/docker/compose/blob/master/SWARM.md">integration
-guide</a>.
+Compose/Swarm integration is still in the experimental stage, but if you'd like
+to explore and experiment, check out the [integration guide](swarm.md).
 
 ## Compose documentation
 

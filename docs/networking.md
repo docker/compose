@@ -76,7 +76,9 @@ See the [links reference](compose-file.md#links) for more information.
 
 ## Multi-host networking
 
-When deploying a Compose application to a Swarm cluster, you can make use of the built-in `overlay` driver to enable multi-host communication between containers with no changes to application code. Consult the [Getting started with multi-host networking](/engine/userguide/networking/get-started-overlay.md) to see how to set up the overlay driver, and then specify `driver: overlay` in your networking config (see the sections below for how to do this).
+When [deploying a Compose application to a Swarm cluster](swarm.md), you can make use of the built-in `overlay` driver to enable multi-host communication between containers with no changes to your Compose file or application code.
+
+Consult the [Getting started with multi-host networking](/engine/userguide/networking/get-started-overlay.md) to see how to set up a Swarm cluster. The cluster will use the `overlay` driver by default, but you can specify it explicitly if you prefer - see below for how to do this.
 
 ## Specifying custom networks
 
@@ -105,11 +107,11 @@ Here's an example Compose file defining two custom networks. The `proxy` service
 
     networks:
       front:
-        # Use the overlay driver for multi-host communication
-        driver: overlay
+        # Use a custom driver
+        driver: custom-driver-1
       back:
         # Use a custom driver which takes special options
-        driver: my-custom-driver
+        driver: custom-driver-2
         driver_opts:
           foo: "1"
           bar: "2"
@@ -135,8 +137,8 @@ Instead of (or as well as) specifying your own networks, you can also change the
 
     networks:
       default:
-        # Use the overlay driver for multi-host communication
-        driver: overlay
+        # Use a custom driver
+        driver: custom-driver-1
 
 ## Using a pre-existing network
 
