@@ -1,11 +1,11 @@
 <!--[metadata]>
 +++
-title = "Extending services in Compose"
+title = "Extending Services in Compose"
 description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
 keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
 [menu.main]
 parent="workw_compose"
-weight=2
+weight=20
 +++
 <![end-metadata]-->
 
@@ -42,7 +42,7 @@ are copied.
 To use multiple override files, or an override file with a different name, you
 can use the `-f` option to specify the list of files. Compose merges files in
 the order they're specified on the command line. See the [`docker-compose`
-command reference](./reference/docker-compose.md) for more information about
+command reference](./reference/overview.md) for more information about
 using `-f`.
 
 When you use multiple configuration files, you must make sure all paths in the

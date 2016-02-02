@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Compose"
+title = "Docker Compose"
 description = "Introduction and Overview of Compose"
 keywords = ["documentation, docs,  docker, compose, orchestration,  containers"]
 [menu.main]

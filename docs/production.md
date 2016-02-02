@@ -1,11 +1,11 @@
 <!--[metadata]>
 +++
-title = "Using Compose in production"
+title = "Using Compose in Production"
 description = "Guide to using Docker Compose in production"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers,  production"]
 [menu.main]
 parent="workw_compose"
-weight=1
+weight=22
 +++
 <![end-metadata]-->
 

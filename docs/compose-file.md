@@ -1,6 +1,6 @@
 <!--[metadata]>
 +++
-title = "Compose file reference"
+title = "Compose File Reference"
 description = "Compose file reference"
 keywords = ["fig, composition, compose, docker"]
 aliases = ["/compose/yml"]
@@ -903,7 +903,8 @@ It's more complicated if you're using particular configuration features:
             syslog-address: "tcp://192.168.0.42:123"
 
 -   `links` with environment variables: As documented in the
-    [environment variables reference](env.md), environment variables created by
+    [environment variables reference](link-env-deprecated.md), environment variables
+    created by
     links have been deprecated for some time. In the new Docker network system,
     they have been removed. You should either connect directly to the
     appropriate hostname or set the relevant environment variable yourself,

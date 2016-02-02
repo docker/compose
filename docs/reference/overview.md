@@ -1,8 +1,9 @@
 <!--[metadata]>
 +++
-title = "Introduction to the CLI"
-description = "Introduction to the CLI"
-keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
+title = "Overview of docker-compose CLI"
+description = "Overview of docker-compose CLI"
+keywords = ["fig, composition, compose, docker, orchestration, cli,  docker-compose"]
+aliases = ["/compose/reference/docker-compose/"]
 [menu.main]
 parent = "smn_compose_cli"
 weight=-2
@@ -10,80 +11,107 @@ weight=-2
 <![end-metadata]-->
 
 
-# Introduction to the CLI
+# Overview of docker-compose CLI
 
-This section describes the subcommands you can use with the `docker-compose` command.  You can run subcommand against one or more services. To run against a specific service, you supply the service name from your compose configuration. If you do not specify the service name, the command runs against all the services in your configuration.
+This page provides the usage information for the `docker-compose` Command.
+You can also see this information by running `docker-compose --help` from the
+command line.
+
+```
+Define and run multi-container applications with Docker.
+
+Usage:
+  docker-compose [-f=<arg>...] [options] [COMMAND] [ARGS...]
+  docker-compose -h|--help
+
+Options:
+  -f, --file FILE           Specify an alternate compose file (default: docker-compose.yml)
+  -p, --project-name NAME   Specify an alternate project name (default: directory name)
+  --verbose                 Show more output
+  -v, --version             Print version and exit
+
+Commands:
+  build              Build or rebuild services
+  config             Validate and view the compose file
+  create             Create services
+  down               Stop and remove containers, networks, images, and volumes
+  events             Receive real time events from containers
+  help               Get help on a command
+  kill               Kill containers
+  logs               View output from containers
+  pause              Pause services
+  port               Print the public port for a port binding
+  ps                 List containers
+  pull               Pulls service images
+  restart            Restart services
+  rm                 Remove stopped containers
+  run                Run a one-off command
+  scale              Set number of containers for a service
+  start              Start services
+  stop               Stop services
+  unpause            Unpause services
+  up                 Create and start containers
+  version            Show the Docker-Compose version information
+
+```
+
+The Docker Compose binary. You use this command to build and manage multiple
+services in Docker containers.
+
+Use the `-f` flag to specify the location of a Compose configuration file. You
+can supply multiple `-f` configuration files. When you supply multiple files,
+Compose combines them into a single configuration. Compose builds the
+configuration in the order you supply the files. Subsequent files override and
+add to their successors.
+
+For example, consider this command line:
+
+```
+$ docker-compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db`
+```
+
+The `docker-compose.yml` file might specify a `webapp` service.
+
+```
+webapp:
+  image: examples/web
+  ports:
+    - "8000:8000"
+  volumes:
+    - "/data"
+```
+
+If the `docker-compose.admin.yml` also specifies this same service, any matching
+fields will override the previous file. New values, add to the `webapp` service
+configuration.
+
+```
+webapp:
+  build: .
+  environment:
+    - DEBUG=1
+```
+
+Use a `-f` with `-` (dash) as the filename to read the configuration from
+stdin. When stdin is used all paths in the configuration are
+relative to the current working directory.
+
+The `-f` flag is optional. If you don't provide this flag on the command line,
+Compose traverses the working directory and its parent directories looking for a
+`docker-compose.yml` and a `docker-compose.override.yml` file. You must
+supply at least the `docker-compose.yml` file. If both files are present on the
+same directory level, Compose combines the two files into a single configuration.
+The configuration in the `docker-compose.override.yml` file is applied over and
+in addition to the values in the `docker-compose.yml` file.
+
+See also the `COMPOSE_FILE` [environment variable](envvars.md#compose-file).
+
+Each configuration has a project name. If you supply a `-p` flag, you can
+specify a project name. If you don't specify the flag, Compose uses the current
+directory name. See also the `COMPOSE_PROJECT_NAME` [environment variable](
+envvars.md#compose-project-name)
 
 
-## Commands
+## Where to go next
 
-* [docker-compose Command](docker-compose.md)
-* [CLI Reference](index.md)
-
-
-## Environment Variables
-
-Several environment variables are available for you to configure the Docker Compose command-line behaviour.
-
-Variables starting with `DOCKER_` are the same as those used to configure the
-Docker command-line client. If you're using `docker-machine`, then the `eval "$(docker-machine env my-docker-vm)"` command should set them to their correct values. (In this example, `my-docker-vm` is the name of a machine you created.)
-
-### COMPOSE\_PROJECT\_NAME
-
-Sets the project name. This value is prepended along with the service name to the container container on start up. For example, if you project name is `myapp` and it includes two services `db` and `web` then compose starts containers named  `myapp_db_1` and `myapp_web_1` respectively.
-
-Setting this is optional. If you do not set this, the `COMPOSE_PROJECT_NAME`
-defaults to the `basename` of the project directory. See also the `-p`
-[command-line option](docker-compose.md).
-
-### COMPOSE\_FILE
-
-Specify the file containing the compose configuration. If not provided,
-Compose looks for a file named  `docker-compose.yml` in the current directory
-and then each parent directory in succession until a file by that name is
-found. See also the `-f` [command-line option](docker-compose.md).
-
-### COMPOSE\_API\_VERSION
-
-The Docker API only supports requests from clients which report a specific
-version. If you receive a `client and server don't have same version error` using
-`docker-compose`, you can workaround this error by setting this environment
-variable. Set the version value to match the server version.
-
-Setting this variable is intended as a workaround for situations where you need
-to run temporarily with a mismatch between the client and server version. For
-example, if you can upgrade the client but need to wait to upgrade the server.
-
-Running with this variable set and a known mismatch does prevent some Docker
-features from working properly. The exact features that fail would depend on the
-Docker client and server versions. For this reason, running with this variable
-set is only intended as a workaround and it is not officially supported.
-
-If you run into problems running with this set, resolve the mismatch through
-upgrade and remove this setting to see if your problems resolve before notifying
-support.
-
-### DOCKER\_HOST
-
-Sets the URL of the `docker` daemon. As with the Docker client, defaults to `unix:///var/run/docker.sock`.
-
-### DOCKER\_TLS\_VERIFY
-
-When set to anything other than an empty string, enables TLS communication with
-the `docker` daemon.
-
-### DOCKER\_CERT\_PATH
-
-Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TLS verification. Defaults to `~/.docker`.
-
-### COMPOSE\_HTTP\_TIMEOUT
-
-Configures the time (in seconds) a request to the Docker daemon is allowed to hang before Compose considers
-it failed. Defaults to 60 seconds.
-
-
-## Related Information
-
-- [User guide](../index.md)
-- [Installing Compose](../install.md)
-- [Compose file reference](../compose-file.md)
+* [CLI environment variables](envvars.md)
