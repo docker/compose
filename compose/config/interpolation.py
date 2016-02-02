@@ -29,46 +29,35 @@ def interpolate_environment_variables(config, section, schema):
     )
 
 
-def _cast_interpolated(interpolated_value, expected_type):
+def _cast_interpolated_inside_list(interpolated_value, possible_types):
+    if "string" in possible_types:
+        possible_types.remove("string")
+    for possible_type in possible_types:
+        v = _cast_interpolated(interpolated_value, possible_type)
+        if v is not None:
+            return v
+    return interpolated_value
 
-    if expected_type == "string":
-        return None
-    elif expected_type == "number":
-        try:
-            return int(interpolated_value)
-        except ValueError:
-            return None
-    elif expected_type == "boolean":
-        if "true" == interpolated_value.lower():
-            return True
-        if "false" == interpolated_value.lower():
-            return False
-        return None
-    elif expected_type == "array":
-        if isinstance(interpolated_value, list):
+
+def _cast_interpolated(interpolated_value, field_def):
+    field_type = field_def
+    if "type" in field_def:
+        field_type = field_def["type"]
+    if isinstance(field_type, list):
+        return _cast_interpolated_inside_list(interpolated_value, field_type)
+    if field_type == "array" and isinstance(interpolated_value, list):
+        return [_cast_interpolated(subfield, field_def["items"]["type"]) for subfield in interpolated_value]
+    try:
+        return json.loads(interpolated_value.replace("'", "\""))
+    except ValueError:
             return interpolated_value
-        return json.loads("{{\"data\":{0}}}".format(interpolated_value.replace("'", "\"")))["data"]
 
 
 def interpolate_value(name, config_key, value, section, mapping, schema):
     try:
-        interpolated = recursive_interpolate(value, mapping)
-        if (interpolated != value):
-            # cast as needed
-            if config_key in schema["definitions"]["service"]["properties"]:
-                field_def = schema["definitions"]["service"]["properties"][config_key]
-                if "type" in field_def:
-                    allowed_types = field_def["type"]
-                    if isinstance(allowed_types, list):
-                        for allowed_type in allowed_types:
-                            converted = _cast_interpolated(interpolated, allowed_type)
-                            if converted is not None:
-                                return converted
-                    else:
-                        converted = _cast_interpolated(interpolated, allowed_types)
-                        if converted is not None:
-                            return converted
-        return interpolated
+        properties_schema = schema["definitions"]["service"]["properties"]
+        field_def = properties_schema.get(config_key, None)
+        return recursive_interpolate(value, mapping, field_def)
     except InvalidInterpolation as e:
         raise ConfigurationError(
             'Invalid interpolation format for "{config_key}" option '
@@ -79,23 +68,42 @@ def interpolate_value(name, config_key, value, section, mapping, schema):
                 string=e.string))
 
 
-def recursive_interpolate(obj, mapping):
+def _get_field_types(field_def):
+    if "type" in field_def:
+        return field_def["type"]
+    if "oneOf" in field_def:
+        return [_get_field_types(f_def) for f_def in field_def["oneOf"]]
+
+
+def _get_sub_field_def(field_def, name):
+    if field_def is None:
+        return None
+    for option_def in field_def.get("oneOf", []):
+        if name in option_def.get("properties", []):
+            return option_def["properties"][name]
+    return field_def.get(name, None)
+
+
+def recursive_interpolate(obj, mapping, field_def):
     if isinstance(obj, six.string_types):
-        if '$' in obj:
-            return interpolate(obj, mapping)
-        return obj
+        value = interpolate(obj, mapping)
+        if value != obj and field_def is not None:
+            return _cast_interpolated(value, field_def)
+        return value
     elif isinstance(obj, dict):
         return dict(
-            (key, recursive_interpolate(val, mapping))
+            (key, recursive_interpolate(val, mapping, _get_sub_field_def(field_def, key)))
             for (key, val) in obj.items()
         )
     elif isinstance(obj, list):
-        return [recursive_interpolate(val, mapping) for val in obj]
+        return [recursive_interpolate(val, mapping, _get_sub_field_def(field_def, "items")) for val in obj]
     else:
         return obj
 
 
 def interpolate(string, mapping):
+    if '$' not in string:
+        return string
     try:
         return Template(string).substitute(mapping)
     except ValueError:

@@ -17,7 +17,10 @@ def mock_env():
         os.environ['FOO'] = 'bar'
         os.environ['RO'] = 'false'
         os.environ['VOLUMES'] = "['/tmp/bar:/bar', '/tmp/foo:/foo']"
+        os.environ['VOLUMES_ITEM'] = '/tmp/foo:/foo'
         os.environ['CPU_SHARES'] = '512'
+        os.environ['PORTS'] = "[ 8080 , 8089 ]"
+        os.environ['SINGLE_PORT'] = '8787'
         yield
 
 
@@ -68,6 +71,40 @@ def test_interpolate_environment_variables_arrays_in_services(mock_env):
             'image': 'example:jenny',
             'volumes': ['/tmp/bar:/bar', '/tmp/foo:/foo'],
             'cpu_shares': 512,
+            }
+        }
+    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
+
+
+def test_interpolate_environment_variables_array_element_in_services(mock_env):
+    services = {
+        'servivea': {
+            'image': 'example:${USER}',
+            'volumes': ['/tmp/bar:/bar', '${VOLUMES_ITEM}'],
+            'cpu_shares': '${CPU_SHARES}',
+            }
+        }
+    expected = {
+        'servivea': {
+            'image': 'example:jenny',
+            'volumes': ['/tmp/bar:/bar', '/tmp/foo:/foo'],
+            'cpu_shares': 512,
+            }
+        }
+    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
+
+
+def test_interpolate_environment_variables_array_numbers_in_services(mock_env):
+    services = {
+        'servivea': {
+            'expose': '${PORTS}',
+            'ports': [8080, '${SINGLE_PORT}']
+            }
+        }
+    expected = {
+        'servivea': {
+            'expose': [8080, 8089],
+            'ports': [8080, 8787]
             }
         }
     assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
