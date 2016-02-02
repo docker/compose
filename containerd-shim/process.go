@@ -23,6 +23,9 @@ type process struct {
 	exec         bool
 	containerPid int
 	checkpoint   *runtime.Checkpoint
+	shimIO       *IO
+	console      libcontainer.Console
+	consolePath  string
 }
 
 func newProcess(id, bundle string, exec bool, checkpoint string) (*process, error) {
@@ -86,7 +89,7 @@ func (p *process) start() error {
 	if p.exec {
 		args = append(args, "exec",
 			"--process", filepath.Join(cwd, "process.json"),
-			"--console", p.stdio.console,
+			"--console", p.consolePath,
 		)
 	} else if p.checkpoint != nil {
 		args = append(args, "restore",
@@ -107,7 +110,7 @@ func (p *process) start() error {
 	} else {
 		args = append(args, "start",
 			"--bundle", p.bundle,
-			"--console", p.stdio.console,
+			"--console", p.consolePath,
 		)
 	}
 	args = append(args,
@@ -161,7 +164,8 @@ func (p *process) openIO() error {
 		if err != nil {
 			return err
 		}
-		p.stdio.console = console.Path()
+		p.console = console
+		p.consolePath = console.Path()
 		stdin, err := os.OpenFile("stdin", syscall.O_RDWR, 0)
 		if err != nil {
 			return err
@@ -181,6 +185,7 @@ func (p *process) openIO() error {
 	if err != nil {
 		return err
 	}
+	p.shimIO = i
 	// non-tty
 	for name, dest := range map[string]func(f *os.File){
 		"stdin": func(f *os.File) {
@@ -251,10 +256,9 @@ func (p *process) Close() error {
 }
 
 type stdio struct {
-	stdin   *os.File
-	stdout  *os.File
-	stderr  *os.File
-	console string
+	stdin  *os.File
+	stdout *os.File
+	stderr *os.File
 }
 
 func (s *stdio) Close() error {

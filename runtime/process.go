@@ -2,12 +2,14 @@ package runtime
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/opencontainers/specs"
 )
@@ -21,6 +23,8 @@ type Process interface {
 	ID() string
 	// Stdin returns the path the the processes stdin fifo
 	Stdin() string
+	CloseStdin() error
+	Resize(int, int) error
 	// Stdout returns the path the the processes stdout fifo
 	Stdout() string
 	// Stderr returns the path the the processes stderr fifo
@@ -68,7 +72,12 @@ func newProcess(root, id string, c *container, s specs.Process) (*process, error
 	if err != nil {
 		return nil, err
 	}
+	control, err := getControlPipe(filepath.Join(root, ControlFile))
+	if err != nil {
+		return nil, err
+	}
 	p.exitPipe = exit
+	p.controlPipe = control
 	return p, nil
 }
 
@@ -105,17 +114,26 @@ func getExitPipe(path string) (*os.File, error) {
 	return os.OpenFile(path, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
 }
 
+func getControlPipe(path string) (*os.File, error) {
+	if err := syscall.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+	return os.OpenFile(path, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+}
+
 type process struct {
 	root string
 	id   string
+	pid  int
 	// stdio fifos
 	stdin  string
 	stdout string
 	stderr string
 
-	exitPipe  *os.File
-	container *container
-	spec      specs.Process
+	exitPipe    *os.File
+	controlPipe *os.File
+	container   *container
+	spec        specs.Process
 }
 
 func (p *process) ID() string {
@@ -131,6 +149,16 @@ func (p *process) ExitFD() int {
 	return int(p.exitPipe.Fd())
 }
 
+func (p *process) CloseStdin() error {
+	_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 0, 0, 0)
+	return err
+}
+
+func (p *process) Resize(w, h int) error {
+	_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 1, w, h)
+	return err
+}
+
 func (p *process) ExitStatus() (int, error) {
 	data, err := ioutil.ReadFile(filepath.Join(p.root, ExitStatusFile))
 	if err != nil {
@@ -142,16 +170,12 @@ func (p *process) ExitStatus() (int, error) {
 	if len(data) == 0 {
 		return -1, ErrProcessNotExited
 	}
-	i, err := strconv.Atoi(string(data))
-	if err != nil {
-		return -1, err
-	}
-	return i, nil
+	return strconv.Atoi(string(data))
 }
 
 // Signal sends the provided signal to the process
 func (p *process) Signal(s os.Signal) error {
-	return errNotImplemented
+	return syscall.Kill(p.pid, s.(syscall.Signal))
 }
 
 func (p *process) Spec() specs.Process {
@@ -173,4 +197,24 @@ func (p *process) Stderr() string {
 // Close closes any open files and/or resouces on the process
 func (p *process) Close() error {
 	return p.exitPipe.Close()
+}
+
+func (p *process) getPid() (int, error) {
+	for i := 0; i < 20; i++ {
+		data, err := ioutil.ReadFile(filepath.Join(p.root, "pid"))
+		if err != nil {
+			if os.IsNotExist(err) {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			return -1, err
+		}
+		i, err := strconv.Atoi(string(data))
+		if err != nil {
+			return -1, err
+		}
+		p.pid = i
+		return i, nil
+	}
+	return -1, fmt.Errorf("containerd: cannot read pid file")
 }

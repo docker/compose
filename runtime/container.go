@@ -158,6 +158,9 @@ func (c *container) Start(checkpoint string) (Process, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	if _, err := p.getPid(); err != nil {
+		return p, nil
+	}
 	c.processes[InitProcessID] = p
 	return p, nil
 }
@@ -178,6 +181,9 @@ func (c *container) Exec(pid string, spec specs.Process) (Process, error) {
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
+	}
+	if _, err := p.getPid(); err != nil {
+		return p, nil
 	}
 	c.processes[pid] = p
 	return p, nil

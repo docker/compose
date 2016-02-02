@@ -213,15 +213,26 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
 	e := supervisor.NewEvent(supervisor.UpdateContainerEventType)
 	e.ID = r.Id
-	if r.Signal != 0 {
-		e.Signal = syscall.Signal(r.Signal)
-	}
 	e.State = runtime.State(r.Status)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
 	return &types.UpdateContainerResponse{}, nil
+}
+
+func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessRequest) (*types.UpdateProcessResponse, error) {
+	e := supervisor.NewEvent(supervisor.UpdateProcessEventType)
+	e.ID = r.Id
+	e.Pid = r.Pid
+	e.Height = int(r.Height)
+	e.Width = int(r.Width)
+	e.CloseStdin = r.CloseStdin
+	s.sv.SendEvent(e)
+	if err := <-e.Err; err != nil {
+		return nil, err
+	}
+	return &types.UpdateProcessResponse{}, nil
 }
 
 func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {

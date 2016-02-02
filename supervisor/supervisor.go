@@ -66,6 +66,7 @@ func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) 
 		StatsEventType:            &StatsEvent{s},
 		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
 		StopStatsEventType:        &StopStatsEvent{s},
+		UpdateProcessEventType:    &UpdateProcessEvent{s},
 	}
 	go s.exitHandler()
 	if err := s.restore(); err != nil {

@@ -22,6 +22,7 @@ const (
 	ExitFile       = "exit"
 	ExitStatusFile = "exitStatus"
 	StateFile      = "state.json"
+	ControlFile    = "control"
 	InitProcessID  = "init"
 )
 

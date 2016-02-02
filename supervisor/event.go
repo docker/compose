@@ -19,6 +19,7 @@ const (
 	SignalEventType           EventType = "signal"
 	AddProcessEventType       EventType = "addProcess"
 	UpdateContainerEventType  EventType = "updateContainer"
+	UpdateProcessEventType    EventType = "updateProcess"
 	CreateCheckpointEventType EventType = "createCheckpoint"
 	DeleteCheckpointEventType EventType = "deleteCheckpoint"
 	StatsEventType            EventType = "events"
@@ -61,6 +62,10 @@ type Event struct {
 	Err           chan error
 	StartResponse chan StartResponse
 	Stats         chan interface{}
+	CloseStdin    bool
+	ResizeTty     bool
+	Width         int
+	Height        int
 }
 
 type Handler interface {

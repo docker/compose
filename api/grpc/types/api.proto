@@ -6,6 +6,7 @@ service API {
 	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
 	rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse) {}
 	rpc Signal(SignalRequest) returns (SignalResponse) {}
+    rpc UpdateProcess(UpdateProcessRequest) returns (UpdateProcessResponse) {}
 	rpc AddProcess(AddProcessRequest) returns (AddProcessResponse) {}
 	rpc CreateCheckpoint(CreateCheckpointRequest) returns (CreateCheckpointResponse) {}
 	rpc DeleteCheckpoint(DeleteCheckpointRequest) returns (DeleteCheckpointResponse) {}
@@ -13,6 +14,17 @@ service API {
 	rpc State(StateRequest) returns (StateResponse) {}
 	rpc Events(EventsRequest) returns (stream Event) {}
 	rpc GetStats(StatsRequest) returns (stream Stats) {}
+}
+
+message UpdateProcessRequest {
+    string id = 1; 
+    string pid = 2;
+    bool closeStdin = 3; // Close stdin of the container
+    uint32 width = 4;
+    uint32 height = 5;
+}
+
+message UpdateProcessResponse {
 }
 
 message CreateContainerRequest {
@@ -129,7 +141,7 @@ message StateResponse {
 
 message UpdateContainerRequest {
 	string id = 1; // ID of container
-	uint32 signal = 2; // Signal
+    string pid = 2;
 	string status = 3; // Status to whcih containerd will try to change
 }
 

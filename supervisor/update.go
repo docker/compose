@@ -26,18 +26,41 @@ func (h *UpdateEvent) Handle(e *Event) error {
 			return ErrUnknownContainerStatus
 		}
 	}
-	if e.Signal != nil {
-		// signal the pid1/main process of the container
-		processes, err := container.Processes()
-		if err != nil {
+	return nil
+}
+
+type UpdateProcessEvent struct {
+	s *Supervisor
+}
+
+func (h *UpdateProcessEvent) Handle(e *Event) error {
+	i, ok := h.s.containers[e.ID]
+	if !ok {
+		return ErrContainerNotFound
+	}
+	processes, err := i.container.Processes()
+	if err != nil {
+		return err
+	}
+	var process runtime.Process
+	for _, p := range processes {
+		if p.ID() == e.Pid {
+			process = p
+			break
+		}
+	}
+	if process == nil {
+		return ErrProcessNotFound
+	}
+	if e.CloseStdin {
+		if err := process.CloseStdin(); err != nil {
 			return err
 		}
-		for _, p := range processes {
-			if p.ID() == runtime.InitProcessID {
-				return p.Signal(e.Signal)
-			}
+	}
+	if e.Width > 0 || e.Height > 0 {
+		if err := process.Resize(e.Width, e.Height); err != nil {
+			return err
 		}
-		return ErrProcessNotFound
 	}
 	return nil
 }

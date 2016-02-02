@@ -215,6 +215,13 @@ var startCommand = cli.Command{
 			}
 			go func() {
 				io.Copy(stdin, os.Stdin)
+				if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
+					Id:         id,
+					Pid:        "init",
+					CloseStdin: true,
+				}); err != nil {
+					fatal(err.Error(), 1)
+				}
 				restoreAndCloseStdin()
 			}()
 			if err := waitForExit(c, id, "init", restoreAndCloseStdin); err != nil {
@@ -245,7 +252,7 @@ func readTermSetting(path string) (bool, error) {
 }
 
 func attachStdio(stdins, stdout, stderr string) error {
-	stdinf, err := os.OpenFile(stdins, syscall.O_RDWR, 0)
+	stdinf, err := os.OpenFile(stdins, syscall.O_WRONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -271,6 +278,7 @@ var killCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "pid,p",
+			Value: "init",
 			Usage: "pid of the process to signal within the container",
 		},
 		cli.IntFlag{
