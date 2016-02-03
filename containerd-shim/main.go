@@ -61,6 +61,7 @@ func main() {
 		logrus.WithField("error", err).Fatal("shim: create new process")
 	}
 	if err := p.start(); err != nil {
+		p.delete()
 		logrus.WithField("error", err).Fatal("shim: start process")
 	}
 	go func() {

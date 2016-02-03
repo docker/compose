@@ -34,6 +34,10 @@ type Process interface {
 	Signal(os.Signal) error
 	// Container returns the container that the process belongs to
 	Container() Container
+	// Stdio of the container
+	Stdio() Stdio
+	// SystemPid is the pid on the system
+	SystemPid() int
 }
 
 func newProcess(root, id string, c *container, s specs.Process, stdio Stdio) (*process, error) {
@@ -81,6 +85,9 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 			Stdout: s.Stdout,
 			Stderr: s.Stderr,
 		},
+	}
+	if _, err := p.getPid(); err != nil {
+		return nil, err
 	}
 	if _, err := p.ExitStatus(); err != nil {
 		if err == ErrProcessNotExited {
@@ -131,6 +138,10 @@ func (p *process) Container() Container {
 	return p.container
 }
 
+func (p *process) SystemPid() int {
+	return p.pid
+}
+
 // ExitFD returns the fd of the exit pipe
 func (p *process) ExitFD() int {
 	return int(p.exitPipe.Fd())
@@ -167,6 +178,10 @@ func (p *process) Signal(s os.Signal) error {
 
 func (p *process) Spec() specs.Process {
 	return p.spec
+}
+
+func (p *process) Stdio() Stdio {
+	return p.stdio
 }
 
 // Close closes any open files and/or resouces on the process

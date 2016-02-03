@@ -17,16 +17,20 @@ func (p *testProcess) ID() string {
 	return p.id
 }
 
-func (p *testProcess) Stdin() string {
-	return ""
+func (p *testProcess) CloseStdin() error {
+	return nil
 }
 
-func (p *testProcess) Stdout() string {
-	return ""
+func (p *testProcess) Resize(w, h int) error {
+	return nil
 }
 
-func (p *testProcess) Stderr() string {
-	return ""
+func (p *testProcess) Stdio() runtime.Stdio {
+	return runtime.Stdio{}
+}
+
+func (p *testProcess) SystemPid() int {
+	return -1
 }
 
 func (p *testProcess) ExitFD() int {

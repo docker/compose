@@ -116,6 +116,10 @@ message Process {
 	repeated string args = 4; // Arguments for process, first is binary path itself
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
+    uint32 systemPid = 7;
+    string stdin = 8; // path to the file where stdin will be read (optional)
+	string stdout = 9; // path to file where stdout will be written (optional)
+	string stderr = 10; // path to file where stderr will be written (optional)
 }
 
 message Container {

@@ -54,6 +54,23 @@ var containersCommand = cli.Command{
 	Action: listContainers,
 }
 
+var stateCommand = cli.Command{
+	Name:  "state",
+	Usage: "get a raw dump of the containerd state",
+	Action: func(context *cli.Context) {
+		c := getClient(context)
+		resp, err := c.State(netcontext.Background(), &types.StateRequest{})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		data, err := json.Marshal(resp)
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		fmt.Print(string(data))
+	},
+}
+
 var listCommand = cli.Command{
 	Name:   "list",
 	Usage:  "list all running containers",

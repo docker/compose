@@ -185,12 +185,17 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 		var procs []*types.Process
 		for _, p := range processes {
 			oldProc := p.Spec()
+			stdio := p.Stdio()
 			procs = append(procs, &types.Process{
-				Pid:      p.ID(),
-				Terminal: oldProc.Terminal,
-				Args:     oldProc.Args,
-				Env:      oldProc.Env,
-				Cwd:      oldProc.Cwd,
+				Pid:       p.ID(),
+				SystemPid: uint32(p.SystemPid()),
+				Terminal:  oldProc.Terminal,
+				Args:      oldProc.Args,
+				Env:       oldProc.Env,
+				Cwd:       oldProc.Cwd,
+				Stdin:     stdio.Stdin,
+				Stdout:    stdio.Stdout,
+				Stderr:    stdio.Stderr,
 				User: &types.User{
 					Uid:            oldProc.User.UID,
 					Gid:            oldProc.User.GID,
