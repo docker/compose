@@ -30,14 +30,13 @@ message UpdateProcessResponse {
 message CreateContainerRequest {
 	string id = 1; // ID of container
 	string bundlePath = 2; // path to OCI bundle
-	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
+	string checkpoint = 3; // checkpoint name if you want to create immediate checkpoint (optional)
+    string stdin = 4; // path to the file where stdin will be read (optional)
+	string stdout = 5; // path to file where stdout will be written (optional)
+	string stderr = 6; // path to file where stderr will be written (optional)
 }
 
 message CreateContainerResponse {
-	uint32 pid = 1; // PID of the containers main process
-	string stdin = 2; // path to the file where stdin will be read (optional)
-	string stdout = 3; // path to file where stdout will be written (optional)
-	string stderr = 4; // path to file where stderr will be written (optional)
 }
 
 message SignalRequest {
@@ -57,7 +56,10 @@ message AddProcessRequest {
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
     string pid = 7; // Process ID 
-};
+    string stdin = 8; // path to the file where stdin will be read (optional)
+	string stdout = 9; // path to file where stdout will be written (optional)
+	string stderr = 10; // path to file where stderr will be written (optional)
+}
 
 message User {
 	uint32 uid = 1; // UID of user
@@ -66,9 +68,6 @@ message User {
 }
 
 message AddProcessResponse {
-    string stdin = 1; // path to the file where stdin will be read (optional)
-	string stdout = 2; // path to file where stdout will be written (optional)
-	string stderr = 3; // path to file where stderr will be written (optional)
 }
 
 message CreateCheckpointRequest {

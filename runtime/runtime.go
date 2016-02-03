@@ -3,6 +3,8 @@ package runtime
 import (
 	"errors"
 	"time"
+
+	"github.com/opencontainers/specs"
 )
 
 var (
@@ -35,6 +37,16 @@ const (
 
 type state struct {
 	Bundle string `json:"bundle"`
+	Stdin  string `json:"stdin"`
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+}
+
+type ProcessState struct {
+	specs.Process
+	Stdin  string `json:"containerdStdin"`
+	Stdout string `json:"containerdStdout"`
+	Stderr string `json:"containerdStderr"`
 }
 
 type Stat struct {

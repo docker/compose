@@ -24,6 +24,9 @@ func (h *StartEvent) Handle(e *Event) error {
 		Err:           e.Err,
 		Container:     container,
 		StartResponse: e.StartResponse,
+		Stdin:         e.Stdin,
+		Stdout:        e.Stdout,
+		Stderr:        e.Stderr,
 	}
 	if e.Checkpoint != nil {
 		task.Checkpoint = e.Checkpoint.Name

@@ -1,6 +1,10 @@
 package supervisor
 
-import "time"
+import (
+	"time"
+
+	"github.com/docker/containerd/runtime"
+)
 
 type AddProcessEvent struct {
 	s *Supervisor
@@ -14,7 +18,11 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 	if !ok {
 		return ErrContainerNotFound
 	}
-	process, err := ci.container.Exec(e.Pid, *e.ProcessSpec)
+	process, err := ci.container.Exec(e.Pid, *e.ProcessSpec, runtime.Stdio{
+		Stdin:  e.Stdin,
+		Stdout: e.Stdout,
+		Stderr: e.Stderr,
+	})
 	if err != nil {
 		return err
 	}
@@ -22,10 +30,6 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 		return err
 	}
 	ExecProcessTimer.UpdateSince(start)
-	e.StartResponse <- StartResponse{
-		Stdin:  process.Stdin(),
-		Stdout: process.Stdout(),
-		Stderr: process.Stderr(),
-	}
+	e.StartResponse <- StartResponse{}
 	return nil
 }

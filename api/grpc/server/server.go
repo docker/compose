@@ -34,6 +34,9 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e := supervisor.NewEvent(supervisor.StartContainerEventType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
+	e.Stdin = c.Stdin
+	e.Stdout = c.Stdout
+	e.Stderr = c.Stderr
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
@@ -44,12 +47,8 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	sr := <-e.StartResponse
-	return &types.CreateContainerResponse{
-		Stdin:  sr.Stdin,
-		Stdout: sr.Stdout,
-		Stderr: sr.Stderr,
-	}, nil
+	<-e.StartResponse
+	return &types.CreateContainerResponse{}, nil
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
@@ -86,17 +85,16 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	e.ID = r.Id
 	e.Pid = r.Pid
 	e.ProcessSpec = process
+	e.Stdin = r.Stdin
+	e.Stdout = r.Stdout
+	e.Stderr = r.Stderr
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	sr := <-e.StartResponse
-	return &types.AddProcessResponse{
-		Stdin:  sr.Stdin,
-		Stdout: sr.Stdout,
-		Stderr: sr.Stderr,
-	}, nil
+	<-e.StartResponse
+	return &types.AddProcessResponse{}, nil
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {

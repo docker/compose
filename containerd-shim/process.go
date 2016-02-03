@@ -12,20 +12,19 @@ import (
 
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
-	"github.com/opencontainers/specs"
 )
 
 type process struct {
 	id           string
 	bundle       string
 	stdio        *stdio
-	s            specs.Process
 	exec         bool
 	containerPid int
 	checkpoint   *runtime.Checkpoint
 	shimIO       *IO
 	console      libcontainer.Console
 	consolePath  string
+	state        *runtime.ProcessState
 }
 
 func newProcess(id, bundle string, exec bool, checkpoint string) (*process, error) {
@@ -38,7 +37,7 @@ func newProcess(id, bundle string, exec bool, checkpoint string) (*process, erro
 	if err != nil {
 		return nil, err
 	}
-	p.s = *s
+	p.state = s
 	if checkpoint != "" {
 		cpt, err := loadCheckpoint(bundle, checkpoint)
 		if err != nil {
@@ -52,13 +51,13 @@ func newProcess(id, bundle string, exec bool, checkpoint string) (*process, erro
 	return p, nil
 }
 
-func loadProcess() (*specs.Process, error) {
+func loadProcess() (*runtime.ProcessState, error) {
 	f, err := os.Open("process.json")
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	var s specs.Process
+	var s runtime.ProcessState
 	if err := json.NewDecoder(f).Decode(&s); err != nil {
 		return nil, err
 	}
@@ -158,20 +157,24 @@ func (p *process) delete() error {
 // in RDWR so that they remain open if the other side stops listening
 func (p *process) openIO() error {
 	p.stdio = &stdio{}
-	if p.s.Terminal {
+	var (
+		uid = int(p.state.User.UID)
+		gid = int(p.state.User.GID)
+	)
+	if p.state.Terminal {
 		// FIXME: this is wrong for user namespaces and will need to be translated
-		console, err := libcontainer.NewConsole(int(p.s.User.UID), int(p.s.User.GID))
+		console, err := libcontainer.NewConsole(uid, gid)
 		if err != nil {
 			return err
 		}
 		p.console = console
 		p.consolePath = console.Path()
-		stdin, err := os.OpenFile("stdin", syscall.O_RDWR, 0)
+		stdin, err := os.OpenFile(p.state.Stdin, syscall.O_RDWR, 0)
 		if err != nil {
 			return err
 		}
 		go io.Copy(console, stdin)
-		stdout, err := os.OpenFile("stdout", syscall.O_RDWR, 0)
+		stdout, err := os.OpenFile(p.state.Stdout, syscall.O_RDWR, 0)
 		if err != nil {
 			return err
 		}
@@ -181,20 +184,20 @@ func (p *process) openIO() error {
 		}()
 		return nil
 	}
-	i, err := p.initializeIO(int(p.s.User.UID))
+	i, err := p.initializeIO(uid)
 	if err != nil {
 		return err
 	}
 	p.shimIO = i
 	// non-tty
 	for name, dest := range map[string]func(f *os.File){
-		"stdin": func(f *os.File) {
+		p.state.Stdin: func(f *os.File) {
 			go io.Copy(i.Stdin, f)
 		},
-		"stdout": func(f *os.File) {
+		p.state.Stdout: func(f *os.File) {
 			go io.Copy(f, i.Stdout)
 		},
-		"stderr": func(f *os.File) {
+		p.state.Stderr: func(f *os.File) {
 			go io.Copy(f, i.Stderr)
 		},
 	} {

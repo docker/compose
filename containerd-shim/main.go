@@ -41,7 +41,6 @@ func main() {
 	// or if runc exits before we hit the handler
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals)
-	setupLogger()
 	// set the shim as the subreaper for all orphaned processes created by the container
 	if err := util.SetSubreaper(1); err != nil {
 		logrus.WithField("error", err).Fatal("shim: set as subreaper")

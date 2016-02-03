@@ -21,19 +21,14 @@ type Process interface {
 	// This is either "init" when it is the container's init process or
 	// it is a user provided id for the process similar to the container id
 	ID() string
-	// Stdin returns the path the the processes stdin fifo
-	Stdin() string
 	CloseStdin() error
 	Resize(int, int) error
-	// Stdout returns the path the the processes stdout fifo
-	Stdout() string
-	// Stderr returns the path the the processes stderr fifo
-	Stderr() string
 	// ExitFD returns the fd the provides an event when the process exits
 	ExitFD() int
 	// ExitStatus returns the exit status of the process or an error if it
 	// has not exited
 	ExitStatus() (int, error)
+	// Spec returns the process spec that created the process
 	Spec() specs.Process
 	// Signal sends the provided signal to the process
 	Signal(os.Signal) error
@@ -41,32 +36,26 @@ type Process interface {
 	Container() Container
 }
 
-func newProcess(root, id string, c *container, s specs.Process) (*process, error) {
+func newProcess(root, id string, c *container, s specs.Process, stdio Stdio) (*process, error) {
 	p := &process{
 		root:      root,
 		id:        id,
 		container: c,
 		spec:      s,
+		stdio:     stdio,
 	}
 	f, err := os.Create(filepath.Join(root, "process.json"))
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	if err := json.NewEncoder(f).Encode(s); err != nil {
+	if err := json.NewEncoder(f).Encode(ProcessState{
+		Process: s,
+		Stdin:   stdio.Stdin,
+		Stdout:  stdio.Stdout,
+		Stderr:  stdio.Stderr,
+	}); err != nil {
 		return nil, err
-	}
-	// create fifo's for the process
-	for name, fd := range map[string]*string{
-		"stdin":  &p.stdin,
-		"stdout": &p.stdout,
-		"stderr": &p.stderr,
-	} {
-		path := filepath.Join(root, name)
-		if err := syscall.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
-			return nil, err
-		}
-		*fd = path
 	}
 	exit, err := getExitPipe(filepath.Join(root, ExitFile))
 	if err != nil {
@@ -81,15 +70,17 @@ func newProcess(root, id string, c *container, s specs.Process) (*process, error
 	return p, nil
 }
 
-func loadProcess(root, id string, c *container, s specs.Process) (*process, error) {
+func loadProcess(root, id string, c *container, s *ProcessState) (*process, error) {
 	p := &process{
 		root:      root,
 		id:        id,
 		container: c,
-		spec:      s,
-		stdin:     filepath.Join(root, "stdin"),
-		stdout:    filepath.Join(root, "stdout"),
-		stderr:    filepath.Join(root, "stderr"),
+		spec:      s.Process,
+		stdio: Stdio{
+			Stdin:  s.Stdin,
+			Stdout: s.Stdout,
+			Stderr: s.Stderr,
+		},
 	}
 	if _, err := p.ExitStatus(); err != nil {
 		if err == ErrProcessNotExited {
@@ -122,18 +113,14 @@ func getControlPipe(path string) (*os.File, error) {
 }
 
 type process struct {
-	root string
-	id   string
-	pid  int
-	// stdio fifos
-	stdin  string
-	stdout string
-	stderr string
-
+	root        string
+	id          string
+	pid         int
 	exitPipe    *os.File
 	controlPipe *os.File
 	container   *container
 	spec        specs.Process
+	stdio       Stdio
 }
 
 func (p *process) ID() string {
@@ -180,18 +167,6 @@ func (p *process) Signal(s os.Signal) error {
 
 func (p *process) Spec() specs.Process {
 	return p.spec
-}
-
-func (p *process) Stdin() string {
-	return p.stdin
-}
-
-func (p *process) Stdout() string {
-	return p.stdout
-}
-
-func (p *process) Stderr() string {
-	return p.stderr
 }
 
 // Close closes any open files and/or resouces on the process

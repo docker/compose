@@ -37,9 +37,6 @@ func NewEvent(t EventType) *Event {
 }
 
 type StartResponse struct {
-	Stdin  string
-	Stdout string
-	Stderr string
 }
 
 type Event struct {

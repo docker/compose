@@ -38,7 +38,11 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
-		process, err := t.Container.Start(t.Checkpoint)
+		process, err := t.Container.Start(t.Checkpoint, runtime.Stdio{
+			Stdin:  t.Stdin,
+			Stdout: t.Stdout,
+			Stderr: t.Stderr,
+		})
 		if err != nil {
 			evt := NewEvent(DeleteEventType)
 			evt.ID = t.Container.ID()
@@ -61,10 +65,6 @@ func (w *worker) Start() {
 		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
-		t.StartResponse <- StartResponse{
-			Stdin:  process.Stdin(),
-			Stdout: process.Stdout(),
-			Stderr: process.Stderr(),
-		}
+		t.StartResponse <- StartResponse{}
 	}
 }

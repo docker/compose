@@ -19,9 +19,9 @@ type Container interface {
 	// Path returns the path to the bundle
 	Path() string
 	// Start starts the init process of the container
-	Start(checkpoint string) (Process, error)
+	Start(checkpoint string, s Stdio) (Process, error)
 	// Exec starts another process in an existing container
-	Exec(string, specs.Process) (Process, error)
+	Exec(string, specs.Process, Stdio) (Process, error)
 	// Delete removes the container's state and any resources
 	Delete() error
 	// Processes returns all the containers processes that have been added
@@ -43,6 +43,12 @@ type Container interface {
 	// Stats returns realtime container stats and resource information
 	// Stats() (*Stat, error) // OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
+}
+
+type Stdio struct {
+	Stdin  string
+	Stdout string
+	Stderr string
 }
 
 // New returns a new container
@@ -94,11 +100,11 @@ func Load(root, id string) (Container, error) {
 			continue
 		}
 		pid := d.Name()
-		s, err := readProcessSpec(filepath.Join(root, id, pid))
+		s, err := readProcessState(filepath.Join(root, id, pid))
 		if err != nil {
 			return nil, err
 		}
-		p, err := loadProcess(filepath.Join(root, id, pid), pid, c, *s)
+		p, err := loadProcess(filepath.Join(root, id, pid), pid, c, s)
 		if err != nil {
 			logrus.WithField("id", id).WithField("pid", pid).Debug("containerd: error loading process %s", err)
 			continue
@@ -108,13 +114,13 @@ func Load(root, id string) (Container, error) {
 	return c, nil
 }
 
-func readProcessSpec(dir string) (*specs.Process, error) {
+func readProcessState(dir string) (*ProcessState, error) {
 	f, err := os.Open(filepath.Join(dir, "process.json"))
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	var s specs.Process
+	var s ProcessState
 	if err := json.NewDecoder(f).Decode(&s); err != nil {
 		return nil, err
 	}
@@ -127,6 +133,7 @@ type container struct {
 	id        string
 	bundle    string
 	processes map[string]*process
+	stdio     Stdio
 }
 
 func (c *container) ID() string {
@@ -137,12 +144,15 @@ func (c *container) Path() string {
 	return c.bundle
 }
 
-func (c *container) Start(checkpoint string) (Process, error) {
+func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, InitProcessID)
-	if err := os.MkdirAll(processRoot, 0755); err != nil {
+	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("containerd-shim", "-checkpoint", checkpoint, c.id, c.bundle)
+	cmd := exec.Command("containerd-shim",
+		"-checkpoint", checkpoint,
+		c.id, c.bundle,
+	)
 	cmd.Dir = processRoot
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
@@ -151,7 +161,7 @@ func (c *container) Start(checkpoint string) (Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	p, err := newProcess(processRoot, InitProcessID, c, spec.Process)
+	p, err := newProcess(processRoot, InitProcessID, c, spec.Process, s)
 	if err != nil {
 		return nil, err
 	}
@@ -165,17 +175,20 @@ func (c *container) Start(checkpoint string) (Process, error) {
 	return p, nil
 }
 
-func (c *container) Exec(pid string, spec specs.Process) (Process, error) {
+func (c *container) Exec(pid string, spec specs.Process, s Stdio) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, pid)
-	if err := os.MkdirAll(processRoot, 0755); err != nil {
+	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("containerd-shim", "-exec", c.id, c.bundle)
+	cmd := exec.Command("containerd-shim",
+		"-exec",
+		c.id, c.bundle,
+	)
 	cmd.Dir = processRoot
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	p, err := newProcess(processRoot, pid, c, spec)
+	p, err := newProcess(processRoot, pid, c, spec, s)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +241,7 @@ func (c *container) Processes() ([]Process, error) {
 
 func (c *container) RemoveProcess(pid string) error {
 	delete(c.processes, pid)
-	return nil
+	return os.RemoveAll(filepath.Join(c.root, c.id, pid))
 }
 
 func (c *container) Checkpoints() ([]Checkpoint, error) {
