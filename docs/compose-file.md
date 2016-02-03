@@ -181,6 +181,8 @@ Express dependency between services, which has two effects:
   dependencies. In the following example, `docker-compose up web` will also
   create and start `db` and `redis`.
 
+Simple example:
+
     version: 2
     services:
       web:
