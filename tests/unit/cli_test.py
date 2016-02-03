@@ -49,6 +49,13 @@ class CLITestCase(unittest.TestCase):
             project_name = get_project_name(None)
         self.assertEquals(project_name, name)
 
+    def test_project_name_with_empty_environment_var(self):
+        base_dir = 'tests/fixtures/simple-composefile'
+        with mock.patch.dict(os.environ):
+            os.environ['COMPOSE_PROJECT_NAME'] = ''
+            project_name = get_project_name(base_dir)
+        self.assertEquals('simplecomposefile', project_name)
+
     def test_get_project(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'
         project = get_project(base_dir)
