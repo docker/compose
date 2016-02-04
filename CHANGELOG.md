@@ -1,6 +1,123 @@
 Change log
 ==========
 
+1.6.0 (2016-01-15)
+------------------
+
+Major Features:
+
+-   Compose 1.6 introduces a new format for `docker-compose.yml` which lets
+    you define networks and volumes in the Compose file as well as services. It
+    also makes a few changes to the structure of some configuration options.
+
+    You don't have to use it - your existing Compose files will run on Compose
+    1.6 exactly as they do today.
+
+    Check the upgrade guide for full details:
+    https://docs.docker.com/compose/compose-file/upgrading
+
+-   Support for networking has exited experimental status and is the recommended
+    way to enable communication between containers.
+
+    If you use the new file format, your app will use networking. If you aren't
+    ready yet, just leave your Compose file as it is and it'll continue to work
+    just the same.
+
+    By default, you don't have to configure any networks. In fact, using
+    networking with Compose involves even less configuration than using links.
+    Consult the networking guide for how to use it:
+    https://docs.docker.com/compose/networking
+
+    The experimental flags `--x-networking` and `--x-network-driver`, introduced
+    in Compose 1.5, have been removed.
+
+-   You can now pass arguments to a build if you're using the new file format:
+
+        build:
+          context: .
+          args:
+            buildno: 1
+
+-   You can now specify both a `build` and an `image` key if you're using the
+    new file format. `docker-compose build` will build the image and tag it with
+    the name you've specified, while `docker-compose pull` will attempt to pull
+    it.
+
+-   There's a new `events` command for monitoring container events from
+    the application, much like `docker events`. This is a good primitive for
+    building tools on top of Compose for performing actions when particular
+    things happen, such as containers starting and stopping.
+
+-   There's a new `depends_on` option for specifying dependencies between
+    services. This enforces the order of startup, and ensures that when you run
+    `docker-compose up SERVICE` on a service with dependencies, those are started
+    as well.
+
+New Features:
+
+-   Added a new command `config` which validates and prints the Compose
+    configuration after interpolating variables, resolving relative paths, and
+    merging multiple files and `extends`.
+
+-   Added a new command `create` for creating containers without starting them.
+
+-   Added a new command `down` to stop and remove all the resources created by
+    `up` in a single command.
+
+-   Added support for the `cpu_quota` configuration option.
+
+-   Added support for the `stop_signal` configuration option.
+
+-   Commands `start`, `restart`, `pause`, and `unpause` now exit with an
+    error status code if no containers were modified.
+
+-   Added a new `--abort-on-container-exit` flag to `up` which causes `up` to
+    stop all container and exit once the first container exits.
+
+-   Removed support for `FIG_FILE`, `FIG_PROJECT_NAME`, and no longer reads
+    `fig.yml` as a default Compose file location.
+
+-   Removed the `migrate-to-labels` command.
+
+-   Removed the `--allow-insecure-ssl` flag.
+
+
+Bug Fixes:
+
+-   Fixed a validation bug that prevented the use of a range of ports in
+    the `expose` field.
+
+-   Fixed a validation bug that prevented the use of arrays in the `entrypoint`
+    field if they contained duplicate entries.
+
+-   Fixed a bug that caused `ulimits` to be ignored when used with `extends`.
+
+-   Fixed a bug that prevented ipv6 addresses in `extra_hosts`.
+
+-   Fixed a bug that caused `extends` to be ignored when included from
+    multiple Compose files.
+
+-   Fixed an incorrect warning when a container volume was defined in
+    the Compose file.
+
+-   Fixed a bug that prevented the force shutdown behaviour of `up` and
+    `logs`.
+
+-   Fixed a bug that caused `None` to be printed as the network driver name
+    when the default network driver was used.
+
+-   Fixed a bug where using the string form of `dns` or `dns_search` would
+    cause an error.
+
+-   Fixed a bug where a container would be reported as "Up" when it was
+    in the restarting state.
+
+-   Fixed a confusing error message when DOCKER_CERT_PATH was not set properly.
+
+-   Fixed a bug where attaching to a container would fail if it was using a
+    non-standard logging driver (or none at all).
+
+
 1.5.2 (2015-12-03)
 ------------------
 
