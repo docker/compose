@@ -42,7 +42,7 @@ from .utils import yesno
 
 
 if not IS_WINDOWS_PLATFORM:
-    from dockerpty.pty import PseudoTerminal
+    from dockerpty.pty import PseudoTerminal, RunOperation
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
@@ -712,12 +712,13 @@ def run_one_off_container(container_options, project, service, options):
     signals.set_signal_handler_to_shutdown()
     try:
         try:
-            pty = PseudoTerminal(
+            operation = RunOperation(
                 project.client,
                 container.id,
                 interactive=not options['-T'],
                 logs=False,
             )
+            pty = PseudoTerminal(project.client, operation)
             sockets = pty.sockets()
             service.start_container(container)
             pty.start(sockets)
