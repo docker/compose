@@ -4,8 +4,8 @@ title = "Command-line Completion"
 description = "Compose CLI reference"
 keywords = ["fig, composition, compose, docker, orchestration, cli,  reference"]
 [menu.main]
-parent="smn_workw_compose"
-weight=10
+parent="workw_compose"
+weight=88
 +++
 <![end-metadata]-->
 
@@ -23,7 +23,7 @@ On a Mac, install with `brew install bash-completion`
 
 Place the completion script in `/etc/bash_completion.d/` (`/usr/local/etc/bash_completion.d/` on a Mac), using e.g.
 
-     curl -L https://raw.githubusercontent.com/docker/compose/$(docker-compose --version | awk 'NR==1{print $NF}')/contrib/completion/bash/docker-compose > /etc/bash_completion.d/docker-compose
+     curl -L https://raw.githubusercontent.com/docker/compose/$(docker-compose version --short)/contrib/completion/bash/docker-compose > /etc/bash_completion.d/docker-compose
 
 Completion will be available upon next login.
 
@@ -32,7 +32,7 @@ Completion will be available upon next login.
 Place the completion script in your `/path/to/zsh/completion`, using e.g. `~/.zsh/completion/`
 
     mkdir -p ~/.zsh/completion
-    curl -L https://raw.githubusercontent.com/docker/compose/$(docker-compose --version | awk 'NR==1{print $NF}')/contrib/completion/zsh/_docker-compose > ~/.zsh/completion/_docker-compose
+    curl -L https://raw.githubusercontent.com/docker/compose/$(docker-compose version --short)/contrib/completion/zsh/_docker-compose > ~/.zsh/completion/_docker-compose
 
 Include the directory in your `$fpath`, e.g. by adding in `~/.zshrc`
 

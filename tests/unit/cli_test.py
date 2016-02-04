@@ -42,19 +42,19 @@ class CLITestCase(unittest.TestCase):
         project_name = get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
-    def test_project_name_from_environment_old_var(self):
-        name = 'namefromenv'
-        with mock.patch.dict(os.environ):
-            os.environ['FIG_PROJECT_NAME'] = name
-            project_name = get_project_name(None)
-        self.assertEquals(project_name, name)
-
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         with mock.patch.dict(os.environ):
             os.environ['COMPOSE_PROJECT_NAME'] = name
             project_name = get_project_name(None)
         self.assertEquals(project_name, name)
+
+    def test_project_name_with_empty_environment_var(self):
+        base_dir = 'tests/fixtures/simple-composefile'
+        with mock.patch.dict(os.environ):
+            os.environ['COMPOSE_PROJECT_NAME'] = ''
+            project_name = get_project_name(base_dir)
+        self.assertEquals('simplecomposefile', project_name)
 
     def test_get_project(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'
@@ -74,19 +74,44 @@ class CLITestCase(unittest.TestCase):
 
         self.assertIn('Usage: up', str(ctx.exception))
 
-    def test_command_help_dashes(self):
-        with self.assertRaises(SystemExit) as ctx:
-            TopLevelCommand().dispatch(['help', 'migrate-to-labels'], None)
-
-        self.assertIn('Usage: migrate-to-labels', str(ctx.exception))
-
     def test_command_help_nonexistent(self):
         with self.assertRaises(NoSuchCommand):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
-    @mock.patch('compose.cli.main.dockerpty', autospec=True)
-    def test_run_with_environment_merged_with_options_list(self, mock_dockerpty):
+    @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal):
+        command = TopLevelCommand()
+        mock_client = mock.create_autospec(docker.Client)
+        mock_project = mock.Mock(client=mock_client)
+        mock_project.get_service.return_value = Service(
+            'service',
+            client=mock_client,
+            environment=['FOO=ONE', 'BAR=TWO'],
+            image='someimage')
+
+        with pytest.raises(SystemExit):
+            command.run(mock_project, {
+                'SERVICE': 'service',
+                'COMMAND': None,
+                '-e': ['BAR=NEW', 'OTHER=bär'.encode('utf-8')],
+                '--user': None,
+                '--no-deps': None,
+                '-d': False,
+                '-T': None,
+                '--entrypoint': None,
+                '--service-ports': None,
+                '--publish': [],
+                '--rm': None,
+                '--name': None,
+            })
+
+        _, _, call_kwargs = mock_pseudo_terminal.mock_calls[0]
+        assert call_kwargs['logs'] is False
+
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
+    @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    def test_run_with_environment_merged_with_options_list(self, mock_pseudo_terminal):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
         mock_project = mock.Mock(client=mock_client)
@@ -102,7 +127,6 @@ class CLITestCase(unittest.TestCase):
             '-e': ['BAR=NEW', 'OTHER=bär'.encode('utf-8')],
             '--user': None,
             '--no-deps': None,
-            '--allow-insecure-ssl': None,
             '-d': True,
             '-T': None,
             '--entrypoint': None,
@@ -132,7 +156,6 @@ class CLITestCase(unittest.TestCase):
             '-e': [],
             '--user': None,
             '--no-deps': None,
-            '--allow-insecure-ssl': None,
             '-d': True,
             '-T': None,
             '--entrypoint': None,
@@ -161,7 +184,6 @@ class CLITestCase(unittest.TestCase):
             '-e': [],
             '--user': None,
             '--no-deps': None,
-            '--allow-insecure-ssl': None,
             '-d': True,
             '-T': None,
             '--entrypoint': None,
@@ -193,7 +215,6 @@ class CLITestCase(unittest.TestCase):
                 '-e': [],
                 '--user': None,
                 '--no-deps': None,
-                '--allow-insecure-ssl': None,
                 '-d': True,
                 '-T': None,
                 '--entrypoint': None,

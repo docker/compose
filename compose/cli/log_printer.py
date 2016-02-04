@@ -13,10 +13,11 @@ from compose.utils import split_buffer
 class LogPrinter(object):
     """Print logs from many containers to a single output stream."""
 
-    def __init__(self, containers, output=sys.stdout, monochrome=False):
+    def __init__(self, containers, output=sys.stdout, monochrome=False, cascade_stop=False):
         self.containers = containers
         self.output = utils.get_output_stream(output)
         self.monochrome = monochrome
+        self.cascade_stop = cascade_stop
 
     def run(self):
         if not self.containers:
@@ -24,7 +25,7 @@ class LogPrinter(object):
 
         prefix_width = max_name_width(self.containers)
         generators = list(self._make_log_generators(self.monochrome, prefix_width))
-        for line in Multiplexer(generators).loop():
+        for line in Multiplexer(generators, cascade_stop=self.cascade_stop).loop():
             self.output.write(line)
             self.output.flush()
 

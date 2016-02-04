@@ -17,12 +17,22 @@
 #    . ~/.docker-compose-completion.sh
 
 
+__docker_compose_q() {
+	docker-compose 2>/dev/null ${compose_file:+-f $compose_file} ${compose_project:+-p $compose_project} "$@"
+}
+
+# suppress trailing whitespace
+__docker_compose_nospace() {
+	# compopt is not available in ancient bash versions
+	type compopt &>/dev/null && compopt -o nospace
+}
+
 # For compatibility reasons, Compose and therefore its completion supports several
 # stack compositon files as listed here, in descending priority.
 # Support for these filenames might be dropped in some future version.
 __docker_compose_compose_file() {
 	local file
-	for file in docker-compose.y{,a}ml fig.y{,a}ml ; do
+	for file in docker-compose.y{,a}ml ; do
 		[ -e $file ] && {
 			echo $file
 			return
@@ -33,7 +43,7 @@ __docker_compose_compose_file() {
 
 # Extracts all service names from the compose file.
 ___docker_compose_all_services_in_compose_file() {
-	awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-$(__docker_compose_compose_file)}" 2>/dev/null
+	__docker_compose_q config --services
 }
 
 # All services, even those without an existing container
@@ -43,8 +53,12 @@ __docker_compose_services_all() {
 
 # All services that have an entry with the given key in their compose_file section
 ___docker_compose_services_with_key() {
-	# flatten sections to one line, then filter lines containing the key and return section name.
-	awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker_compose_compose_file)}" 2>/dev/null | awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
+	# flatten sections under "services" to one line, then filter lines containing the key and return section name
+	__docker_compose_q config \
+		| sed -n -e '/^services:/,/^[^ ]/p' \
+		| sed -n 's/^  //p' \
+		| awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
+		| awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
 }
 
 # All services that are defined by a Dockerfile reference
@@ -61,11 +75,9 @@ __docker_compose_services_from_image() {
 # by a boolean expression passed in as argument.
 __docker_compose_services_with() {
 	local containers names
-	containers="$(docker-compose 2>/dev/null ${compose_file:+-f $compose_file} ${compose_project:+-p $compose_project} ps -q)"
-	names=( $(docker 2>/dev/null inspect --format "{{if ${1:-true}}} {{ .Name }} {{end}}" $containers) )
-	names=( ${names[@]%_*} )  # strip trailing numbers
-	names=( ${names[@]#*_} )  # strip project name
-	COMPREPLY=( $(compgen -W "${names[*]}" -- "$cur") )
+	containers="$(__docker_compose_q ps -q)"
+	names=$(docker 2>/dev/null inspect -f "{{if ${1:-true}}}{{range \$k, \$v := .Config.Labels}}{{if eq \$k \"com.docker.compose.service\"}}{{\$v}}{{end}}{{end}}{{end}}" $containers)
+	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 # The services for which at least one paused container exists
@@ -96,6 +108,23 @@ _docker_compose_build() {
 }
 
 
+_docker_compose_config() {
+	COMPREPLY=( $( compgen -W "--help --quiet -q --services" -- "$cur" ) )
+}
+
+
+_docker_compose_create() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--force-recreate --help --no-build --no-recreate" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_all
+			;;
+	esac
+}
+
+
 _docker_compose_docker_compose() {
 	case "$prev" in
 		--file|-f)
@@ -105,18 +134,48 @@ _docker_compose_docker_compose() {
 		--project-name|-p)
 			return
 			;;
-		--x-network-driver)
-			COMPREPLY=( $( compgen -W "bridge host none overlay" -- "$cur" ) )
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v" -- "$cur" ) )
+			;;
+		*)
+			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
+			;;
+	esac
+}
+
+
+_docker_compose_down() {
+	case "$prev" in
+		--rmi)
+			COMPREPLY=( $( compgen -W "all local" -- "$cur" ) )
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v --x-networking --x-network-driver" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --rmi --volumes -v" -- "$cur" ) )
+			;;
+	esac
+}
+
+
+_docker_compose_events() {
+	case "$prev" in
+		--json)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help --json" -- "$cur" ) )
 			;;
 		*)
-			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
+			__docker_compose_services_all
 			;;
 	esac
 }
@@ -153,15 +212,6 @@ _docker_compose_logs() {
 			;;
 		*)
 			__docker_compose_services_all
-			;;
-	esac
-}
-
-
-_docker_compose_migrate_to_labels() {
-	case "$cur" in
-		-*)
-			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 	esac
 }
@@ -259,7 +309,7 @@ _docker_compose_run() {
 	case "$prev" in
 		-e)
 			COMPREPLY=( $( compgen -e -- "$cur" ) )
-			compopt -o nospace
+			__docker_compose_nospace
 			return
 			;;
 		--entrypoint|--name|--user|-u)
@@ -295,7 +345,7 @@ _docker_compose_scale() {
 			;;
 		*)
 			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
-			compopt -o nospace
+			__docker_compose_nospace
 			;;
 	esac
 }
@@ -352,7 +402,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --help --no-build --no-color --no-deps --no-recreate --force-recreate --timeout -t" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit -d --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
@@ -376,10 +426,13 @@ _docker_compose() {
 
 	local commands=(
 		build
+		config
+		create
+		down
+		events
 		help
 		kill
 		logs
-		migrate-to-labels
 		pause
 		port
 		ps
@@ -413,9 +466,6 @@ _docker_compose() {
 			--project-name|p)
 				(( counter++ ))
 				compose_project="${words[$counter]}"
-				;;
-			--x-network-driver)
-				(( counter++ ))
 				;;
 			-*)
 				;;

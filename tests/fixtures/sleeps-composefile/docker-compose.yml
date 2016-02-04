@@ -1,0 +1,10 @@
+
+version: "2"
+
+services:
+  simple:
+    image: busybox:latest
+    command: sleep 200
+  another:
+    image: busybox:latest
+    command: sleep 200

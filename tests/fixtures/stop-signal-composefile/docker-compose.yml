@@ -1,0 +1,10 @@
+simple:
+  image: busybox:latest
+  command:
+    - sh
+    - '-c'
+    - |
+        trap 'exit 0' SIGINT
+        trap 'exit 1' SIGTERM
+        while true; do :; done
+  stop_signal: SIGINT

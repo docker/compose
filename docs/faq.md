@@ -4,8 +4,9 @@ title = "Frequently Asked Questions"
 description = "Docker Compose FAQ"
 keywords = "documentation, docs,  docker, compose, faq"
 [menu.main]
-parent="smn_workw_compose"
-weight=9
+identifier="faq.compose"
+parent="workw_compose"
+weight=90
 +++
 <![end-metadata]-->
 
@@ -50,8 +51,8 @@ handling `SIGTERM` properly.
 Compose uses the project name to create unique identifiers for all of a
 project's  containers and other resources. To run multiple copies of a project,
 set a custom project name using the [`-p` command line
-option](./reference/docker-compose.md) or the [`COMPOSE_PROJECT_NAME`
-environment variable](./reference/overview.md#compose-project-name).
+option](./reference/overview.md) or the [`COMPOSE_PROJECT_NAME`
+environment variable](./reference/envvars.md#compose-project-name).
 
 ## What's the difference between `up`, `run`, and `start`?
 

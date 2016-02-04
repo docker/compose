@@ -1,0 +1,12 @@
+version: "2"
+services:
+  myweb:
+    build: '.'
+    extends:
+      service: web
+    command: top
+  web:
+    build: '.'
+    network_mode: "service:net"
+  net:
+    build: '.'

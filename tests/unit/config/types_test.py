@@ -1,7 +1,13 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import pytest
 
+from compose.config.config import V1
+from compose.config.config import V2_0
 from compose.config.errors import ConfigurationError
 from compose.config.types import parse_extra_hosts
+from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 
@@ -16,11 +22,13 @@ def test_parse_extra_hosts_list():
     assert parse_extra_hosts([
         "www.example.com: 192.168.0.17",
         "static.example.com:192.168.0.19",
-        "api.example.com: 192.168.0.18"
+        "api.example.com: 192.168.0.18",
+        "v6.example.com: ::1"
     ]) == {
         'www.example.com': '192.168.0.17',
         'static.example.com': '192.168.0.19',
-        'api.example.com': '192.168.0.18'
+        'api.example.com': '192.168.0.18',
+        'v6.example.com': '::1'
     }
 
 
@@ -64,3 +72,45 @@ class TestVolumeSpec(object):
             "/opt/shiny/config",
             "ro"
         )
+
+
+class TestVolumesFromSpec(object):
+
+    services = ['servicea', 'serviceb']
+
+    def test_parse_v1_from_service(self):
+        volume_from = VolumeFromSpec.parse('servicea', self.services, V1)
+        assert volume_from == VolumeFromSpec('servicea', 'rw', 'service')
+
+    def test_parse_v1_from_container(self):
+        volume_from = VolumeFromSpec.parse('foo:ro', self.services, V1)
+        assert volume_from == VolumeFromSpec('foo', 'ro', 'container')
+
+    def test_parse_v1_invalid(self):
+        with pytest.raises(ConfigurationError):
+            VolumeFromSpec.parse('unknown:format:ro', self.services, V1)
+
+    def test_parse_v2_from_service(self):
+        volume_from = VolumeFromSpec.parse('servicea', self.services, V2_0)
+        assert volume_from == VolumeFromSpec('servicea', 'rw', 'service')
+
+    def test_parse_v2_from_service_with_mode(self):
+        volume_from = VolumeFromSpec.parse('servicea:ro', self.services, V2_0)
+        assert volume_from == VolumeFromSpec('servicea', 'ro', 'service')
+
+    def test_parse_v2_from_container(self):
+        volume_from = VolumeFromSpec.parse('container:foo', self.services, V2_0)
+        assert volume_from == VolumeFromSpec('foo', 'rw', 'container')
+
+    def test_parse_v2_from_container_with_mode(self):
+        volume_from = VolumeFromSpec.parse('container:foo:ro', self.services, V2_0)
+        assert volume_from == VolumeFromSpec('foo', 'ro', 'container')
+
+    def test_parse_v2_invalid_type(self):
+        with pytest.raises(ConfigurationError) as exc:
+            VolumeFromSpec.parse('bogus:foo:ro', self.services, V2_0)
+        assert "Unknown volumes_from type 'bogus'" in exc.exconly()
+
+    def test_parse_v2_invalid(self):
+        with pytest.raises(ConfigurationError):
+            VolumeFromSpec.parse('unknown:format:ro', self.services, V2_0)

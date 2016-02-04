@@ -1,14 +1,25 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 from compose.config.errors import DependencyError
 
 
-def get_service_name_from_net(net_config):
-    if not net_config:
+def get_service_name_from_network_mode(network_mode):
+    return get_source_name_from_network_mode(network_mode, 'service')
+
+
+def get_container_name_from_network_mode(network_mode):
+    return get_source_name_from_network_mode(network_mode, 'container')
+
+
+def get_source_name_from_network_mode(network_mode, source_type):
+    if not network_mode:
         return
 
-    if not net_config.startswith('container:'):
+    if not network_mode.startswith(source_type+':'):
         return
 
-    _, net_name = net_config.split(':', 1)
+    _, net_name = network_mode.split(':', 1)
     return net_name
 
 
@@ -30,7 +41,8 @@ def sort_service_dicts(services):
             service for service in services
             if (name in get_service_names(service.get('links', [])) or
                 name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
-                name == get_service_name_from_net(service.get('net')))
+                name == get_service_name_from_network_mode(service.get('network_mode')) or
+                name in service.get('depends_on', []))
         ]
 
     def visit(n):
@@ -39,8 +51,10 @@ def sort_service_dicts(services):
                 raise DependencyError('A service can not link to itself: %s' % n['name'])
             if n['name'] in n.get('volumes_from', []):
                 raise DependencyError('A service can not mount itself as volume: %s' % n['name'])
-            else:
-                raise DependencyError('Circular import between %s' % ' and '.join(temporary_marked))
+            if n['name'] in n.get('depends_on', []):
+                raise DependencyError('A service can not depend on itself: %s' % n['name'])
+            raise DependencyError('Circular dependency between %s' % ' and '.join(temporary_marked))
+
         if n in unmarked:
             temporary_marked.add(n['name'])
             for m in get_service_dependents(n, services):
