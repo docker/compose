@@ -18,7 +18,7 @@ first.
 
 To install Compose, do the following:
 
-1. Install Docker Engine version 1.7.1 or greater:
+1. Install Docker Engine:
 
      * <a href="https://docs.docker.com/engine/installation/mac/" target="_blank">Mac OS X installation</a> (Toolbox installation includes both Engine and Compose)
 
@@ -39,7 +39,7 @@ which the release page specifies, in your terminal.
 
      The following is an example command illustrating the format:
 
-        curl -L https://github.com/docker/compose/releases/download/1.5.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        curl -L https://github.com/docker/compose/releases/download/1.6.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 
      If you have problems installing with `curl`, see
      [Alternative Install Options](#alternative-install-options).
