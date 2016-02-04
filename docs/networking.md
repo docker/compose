@@ -28,7 +28,7 @@ identical to the container name.
 
 For example, suppose your app is in a directory called `myapp`, and your `docker-compose.yml` looks like this:
 
-    version: 2
+    version: '2'
 
     services:
       web:
@@ -63,7 +63,7 @@ If any containers have connections open to the old container, they will be close
 
 Links allow you to define extra aliases by which a service is reachable from another service. They are not required to enable services to communicate - by default, any service can reach any other service at that service's name. In the following example, `db` is reachable from `web` at the hostnames `db` and `database`:
 
-    version: 2
+    version: '2'
     services:
       web:
         build: .
@@ -86,7 +86,7 @@ Each service can specify what networks to connect to with the *service-level* `n
 
 Here's an example Compose file defining two custom networks. The `proxy` service is isolated from the `db` service, because they do not share a network in common - only `app` can talk to both.
 
-    version: 2
+    version: '2'
 
     services:
       proxy:
@@ -123,7 +123,7 @@ For full details of the network configuration options available, see the followi
 
 Instead of (or as well as) specifying your own networks, you can also change the settings of the app-wide default network by defining an entry under `networks` named `default`:
 
-    version: 2
+    version: '2'
 
     services:
       web:
