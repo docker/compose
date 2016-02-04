@@ -183,7 +183,7 @@ Express dependency between services, which has two effects:
 
 Simple example:
 
-    version: 2
+    version: '2'
     services:
       web:
         build: .
@@ -658,7 +658,7 @@ In the example below, instead of attemping to create a volume called
 `[projectname]_data`, Compose will look for an existing volume simply
 called `data` and mount it into the `db` service's containers.
 
-    version: 2
+    version: '2'
 
     services:
       db:
@@ -748,7 +748,7 @@ attemping to create a network called `[projectname]_outside`, Compose will
 look for an existing network simply called `outside` and connect the `proxy`
 service's containers to it.
 
-    version: 2
+    version: '2'
 
     services:
       proxy:
@@ -780,7 +780,7 @@ There are two versions of the Compose file format:
 
 - Version 1, the legacy format. This is specified by omitting a `version` key at
   the root of the YAML.
-- Version 2, the recommended format. This is specified with a `version: 2` entry
+- Version 2, the recommended format. This is specified with a `version: '2'` entry
   at the root of the YAML.
 
 To move your project from version 1 to 2, see the [Upgrading](#upgrading)
@@ -842,7 +842,7 @@ under the `networks` key.
 
 Simple example:
 
-    version: 2
+    version: '2'
     services:
       web:
         build: .
@@ -855,7 +855,7 @@ Simple example:
 
 A more extended example, defining volumes and networks:
 
-    version: 2
+    version: '2'
     services:
       web:
         build: .
@@ -887,7 +887,7 @@ A more extended example, defining volumes and networks:
 In the majority of cases, moving from version 1 to 2 is a very simple process:
 
 1. Indent the whole file by one level and put a `services:` key at the top.
-2. Add a `version: 2` line at the top of the file.
+2. Add a `version: '2'` line at the top of the file.
 
 It's more complicated if you're using particular configuration features:
 
@@ -950,7 +950,7 @@ It's more complicated if you're using particular configuration features:
     named volume called `data`, you must declare a `data` volume in your
     top-level `volumes` section. The whole file might look like this:
 
-        version: 2
+        version: '2'
         services:
           db:
             image: postgres
