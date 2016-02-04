@@ -862,21 +862,21 @@ A more extended example, defining volumes and networks:
         volumes:
          - .:/code
         networks:
-          - front
-          - back
+          - front-tier
+          - back-tier
       redis:
         image: redis
         volumes:
-          - data:/var/lib/redis
+          - redis-data:/var/lib/redis
         networks:
-          - back
+          - back-tier
     volumes:
-      data:
+      redis-data:
         driver: local
     networks:
-      front:
+      front-tier:
         driver: bridge
-      back:
+      back-tier:
         driver: bridge
 
 
