@@ -1,0 +1,14 @@
+version: "2"
+services:
+  simple:
+    image: busybox:latest
+    command: top
+    logging:
+      driver: "none"
+  another:
+    image: busybox:latest
+    command: top
+    logging:
+      driver: "json-file"
+      options:
+          max-size: "10m"

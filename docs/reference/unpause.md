@@ -9,7 +9,7 @@ parent = "smn_compose_cli"
 +++
 <![end-metadata]-->
 
-# pause
+# unpause
 
 ```
 Usage: unpause [SERVICE...]

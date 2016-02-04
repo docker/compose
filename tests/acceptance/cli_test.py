@@ -1,5 +1,8 @@
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
+import datetime
+import json
 import os
 import shlex
 import signal
@@ -8,14 +11,16 @@ import time
 from collections import namedtuple
 from operator import attrgetter
 
+import yaml
 from docker import errors
 
 from .. import mock
 from compose.cli.command import get_project
-from compose.cli.docker_client import docker_client
 from compose.container import Container
 from tests.integration.testcases import DockerClientTestCase
+from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
+from tests.integration.testcases import v2_only
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -38,17 +43,23 @@ def start_process(base_dir, options):
 def wait_on_process(proc, returncode=0):
     stdout, stderr = proc.communicate()
     if proc.returncode != returncode:
-        print(stderr.decode('utf-8'))
+        print("Stderr: {}".format(stderr))
+        print("Stdout: {}".format(stdout))
         assert proc.returncode == returncode
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
-def wait_on_condition(condition, delay=0.1, timeout=5):
+def wait_on_condition(condition, delay=0.1, timeout=40):
     start_time = time.time()
     while not condition():
         if time.time() - start_time > timeout:
             raise AssertionError("Timeout: %s" % condition)
         time.sleep(delay)
+
+
+def kill_service(service):
+    for container in service.containers():
+        container.kill()
 
 
 class ContainerCountCondition(object):
@@ -71,7 +82,6 @@ class ContainerStateCondition(object):
         self.name = name
         self.running = running
 
-    # State.Running == true
     def __call__(self):
         try:
             container = self.client.inspect_container(self.name)
@@ -80,7 +90,8 @@ class ContainerStateCondition(object):
             return False
 
     def __str__(self):
-        return "waiting for container to have state %s" % self.expected
+        state = 'running' if self.running else 'stopped'
+        return "waiting for container to be %s" % state
 
 
 class CLITestCase(DockerClientTestCase):
@@ -90,10 +101,18 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/simple-composefile'
 
     def tearDown(self):
-        self.project.kill()
-        self.project.remove_stopped()
-        for container in self.project.containers(stopped=True, one_off=True):
-            container.remove(force=True)
+        if self.base_dir:
+            self.project.kill()
+            self.project.remove_stopped()
+
+            for container in self.project.containers(stopped=True, one_off=True):
+                container.remove(force=True)
+
+            networks = self.client.networks()
+            for n in networks:
+                if n['Name'].startswith('{}_'.format(self.project.name)):
+                    self.client.remove_network(n['Name'])
+
         super(CLITestCase, self).tearDown()
 
     @property
@@ -108,14 +127,75 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, project_options + options)
         return wait_on_process(proc, returncode=returncode)
 
+    def execute(self, container, cmd):
+        # Remove once Hijack and CloseNotifier sign a peace treaty
+        self.client.close()
+        exc = self.client.exec_create(container.id, cmd)
+        self.client.exec_start(exc)
+        return self.client.exec_inspect(exc)['ExitCode']
+
+    def lookup(self, container, hostname):
+        return self.execute(container, ["nslookup", hostname]) == 0
+
     def test_help(self):
-        old_base_dir = self.base_dir
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'up'], returncode=1)
         assert 'Usage: up [options] [SERVICE...]' in result.stderr
-        # self.project.kill() fails during teardown
-        # unless there is a composefile.
-        self.base_dir = old_base_dir
+        # Prevent tearDown from trying to create a project
+        self.base_dir = None
+
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
+    def test_config_list_services(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        result = self.dispatch(['config', '--services'])
+        assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
+
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
+    def test_config_quiet_with_error(self):
+        self.base_dir = None
+        result = self.dispatch([
+            '-f', 'tests/fixtures/invalid-composefile/invalid.yml',
+            'config', '-q'
+        ], returncode=1)
+        assert "'notaservice' doesn't have any configuration" in result.stderr
+
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
+    def test_config_quiet(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        assert self.dispatch(['config', '-q']).stdout == ''
+
+    # TODO: this shouldn't be v2-dependent
+    @v2_only()
+    def test_config_default(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        result = self.dispatch(['config'])
+        # assert there are no python objects encoded in the output
+        assert '!!' not in result.stdout
+
+        output = yaml.load(result.stdout)
+        expected = {
+            'version': '2.0',
+            'volumes': {'data': {'driver': 'local'}},
+            'networks': {'front': {}},
+            'services': {
+                'web': {
+                    'build': {
+                        'context': os.path.abspath(self.base_dir),
+                    },
+                    'networks': ['front', 'default'],
+                    'volumes_from': ['service:other:rw'],
+                },
+                'other': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'volumes': ['/data:rw'],
+                },
+            },
+        }
+        assert output == expected
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
@@ -166,7 +246,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Pulling simple (busybox:latest)...' in result.stderr
         assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
-        assert 'Error: image library/nonexisting-image:latest not found' in result.stderr
+        assert 'Error: image library/nonexisting-image' in result.stderr
+        assert 'not found' in result.stderr
 
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
@@ -231,6 +312,73 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert not containers
 
+    def test_create(self):
+        self.dispatch(['create'])
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(another.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertEqual(len(another.containers(stopped=True)), 1)
+
+    def test_create_with_force_recreate(self):
+        self.dispatch(['create'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        old_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.dispatch(['create', '--force-recreate'], None)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        new_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.assertNotEqual(old_ids, new_ids)
+
+    def test_create_with_no_recreate(self):
+        self.dispatch(['create'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        old_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.dispatch(['create', '--no-recreate'], None)
+        self.assertEqual(len(service.containers()), 0)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+
+        new_ids = [c.id for c in service.containers(stopped=True)]
+
+        self.assertEqual(old_ids, new_ids)
+
+    def test_create_with_force_recreate_and_no_recreate(self):
+        self.dispatch(
+            ['create', '--force-recreate', '--no-recreate'],
+            returncode=1)
+
+    def test_down_invalid_rmi_flag(self):
+        result = self.dispatch(['down', '--rmi', 'bogus'], returncode=1)
+        assert '--rmi flag must be' in result.stderr
+
+    @v2_only()
+    def test_down(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        self.dispatch(['up', '-d'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        result = self.dispatch(['down', '--rmi=local', '--volumes'])
+        assert 'Stopping v2full_web_1' in result.stderr
+        assert 'Stopping v2full_other_1' in result.stderr
+        assert 'Removing v2full_web_1' in result.stderr
+        assert 'Removing v2full_other_1' in result.stderr
+        assert 'Removing volume v2full_data' in result.stderr
+        assert 'Removing image v2full_web' in result.stderr
+        assert 'Removing image busybox' not in result.stderr
+        assert 'Removing network v2full_default' in result.stderr
+        assert 'Removing network v2full_front' in result.stderr
+
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
         service = self.project.get_service('simple')
@@ -251,59 +399,243 @@ class CLITestCase(DockerClientTestCase):
         assert 'simple_1  | simple' in result.stdout
         assert 'another_1 | another' in result.stdout
 
-    def test_up_without_networking(self):
-        self.require_api_version('1.21')
-
-        self.base_dir = 'tests/fixtures/links-composefile'
+    @v2_only()
+    def test_up(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
         self.dispatch(['up', '-d'], None)
-        client = docker_client(version='1.21')
-
-        networks = client.networks(names=[self.project.name])
-        self.assertEqual(len(networks), 0)
-
-        for service in self.project.get_services():
-            containers = service.containers()
-            self.assertEqual(len(containers), 1)
-            self.assertNotEqual(containers[0].get('Config.Hostname'), service.name)
-
-        web_container = self.project.get_service('web').containers()[0]
-        self.assertTrue(web_container.get('HostConfig.Links'))
-
-    def test_up_with_networking(self):
-        self.require_api_version('1.21')
-
-        self.base_dir = 'tests/fixtures/links-composefile'
-        self.dispatch(['--x-networking', 'up', '-d'], None)
-        client = docker_client(version='1.21')
 
         services = self.project.get_services()
 
-        networks = client.networks(names=[self.project.name])
-        for n in networks:
-            self.addCleanup(client.remove_network, n['Id'])
+        network_name = self.project.networks.networks['default'].full_name
+        networks = self.client.networks(names=[network_name])
         self.assertEqual(len(networks), 1)
         self.assertEqual(networks[0]['Driver'], 'bridge')
+        assert 'com.docker.network.bridge.enable_icc' not in networks[0]['Options']
 
-        network = client.inspect_network(networks[0]['Id'])
-        self.assertEqual(len(network['Containers']), len(services))
+        network = self.client.inspect_network(networks[0]['Id'])
 
         for service in services:
             containers = service.containers()
             self.assertEqual(len(containers), 1)
-            self.assertIn(containers[0].id, network['Containers'])
+
+            container = containers[0]
+            self.assertIn(container.id, network['Containers'])
+
+            networks = container.get('NetworkSettings.Networks')
+            self.assertEqual(list(networks), [network['Name']])
+
+            self.assertEqual(
+                sorted(networks[network['Name']]['Aliases']),
+                sorted([service.name, container.short_id]))
+
+            for service in services:
+                assert self.lookup(container, service.name)
+
+    @v2_only()
+    def test_up_with_default_network_config(self):
+        filename = 'default-network-config.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+
+        network_name = self.project.networks.networks['default'].full_name
+        networks = self.client.networks(names=[network_name])
+
+        assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
+
+    @v2_only()
+    def test_up_with_networks(self):
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['up', '-d'], None)
+
+        back_name = '{}_back'.format(self.project.name)
+        front_name = '{}_front'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # Two networks were created: back and front
+        assert sorted(n['Name'] for n in networks) == [back_name, front_name]
+
+        back_network = [n for n in networks if n['Name'] == back_name][0]
+        front_network = [n for n in networks if n['Name'] == front_name][0]
 
         web_container = self.project.get_service('web').containers()[0]
-        self.assertFalse(web_container.get('HostConfig.Links'))
+        app_container = self.project.get_service('app').containers()[0]
+        db_container = self.project.get_service('db').containers()[0]
 
-    def test_up_with_links(self):
+        for net_name in [front_name, back_name]:
+            links = app_container.get('NetworkSettings.Networks.{}.Links'.format(net_name))
+            assert '{}:database'.format(db_container.name) in links
+
+        # db and app joined the back network
+        assert sorted(back_network['Containers']) == sorted([db_container.id, app_container.id])
+
+        # web and app joined the front network
+        assert sorted(front_network['Containers']) == sorted([web_container.id, app_container.id])
+
+        # web can see app but not db
+        assert self.lookup(web_container, "app")
+        assert not self.lookup(web_container, "db")
+
+        # app can see db
+        assert self.lookup(app_container, "db")
+
+        # app has aliased db to "database"
+        assert self.lookup(app_container, "database")
+
+    @v2_only()
+    def test_up_missing_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+
+        result = self.dispatch(
+            ['-f', 'missing-network.yml', 'up', '-d'],
+            returncode=1)
+
+        assert 'Service "web" uses an undefined network "foo"' in result.stderr
+
+    @v2_only()
+    def test_up_with_network_mode(self):
+        c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
+        self.addCleanup(self.client.remove_container, c, force=True)
+        self.client.start(c)
+        container_mode_source = 'container:{}'.format(c['Id'])
+
+        filename = 'network-mode.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+        assert not networks
+
+        for name in ['bridge', 'host', 'none']:
+            container = self.project.get_service(name).containers()[0]
+            assert list(container.get('NetworkSettings.Networks')) == [name]
+            assert container.get('HostConfig.NetworkMode') == name
+
+        service_mode_source = 'container:{}'.format(
+            self.project.get_service('bridge').containers()[0].id)
+        service_mode_container = self.project.get_service('service').containers()[0]
+        assert not service_mode_container.get('NetworkSettings.Networks')
+        assert service_mode_container.get('HostConfig.NetworkMode') == service_mode_source
+
+        container_mode_container = self.project.get_service('container').containers()[0]
+        assert not container_mode_container.get('NetworkSettings.Networks')
+        assert container_mode_container.get('HostConfig.NetworkMode') == container_mode_source
+
+    @v2_only()
+    def test_up_external_networks(self):
+        filename = 'external-networks.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        result = self.dispatch(['-f', filename, 'up', '-d'], returncode=1)
+        assert 'declared as external, but could not be found' in result.stderr
+
+        networks = [
+            n['Name'] for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+        assert not networks
+
+        network_names = ['{}_{}'.format(self.project.name, n) for n in ['foo', 'bar']]
+        for name in network_names:
+            self.client.create_network(name)
+
+        self.dispatch(['-f', filename, 'up', '-d'])
+        container = self.project.containers()[0]
+        assert sorted(list(container.get('NetworkSettings.Networks'))) == sorted(network_names)
+
+    @v2_only()
+    def test_up_with_external_default_network(self):
+        filename = 'external-default.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        result = self.dispatch(['-f', filename, 'up', '-d'], returncode=1)
+        assert 'declared as external, but could not be found' in result.stderr
+
+        networks = [
+            n['Name'] for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+        assert not networks
+
+        network_name = 'composetest_external_network'
+        self.client.create_network(network_name)
+
+        self.dispatch(['-f', filename, 'up', '-d'])
+        container = self.project.containers()[0]
+        assert list(container.get('NetworkSettings.Networks')) == [network_name]
+
+    @v2_only()
+    def test_up_no_services(self):
+        self.base_dir = 'tests/fixtures/no-services'
+        self.dispatch(['up', '-d'], None)
+
+        network_names = [
+            n['Name'] for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+        assert network_names == []
+
+    def test_up_with_links_v1(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'web'], None)
+
+        # No network was created
+        network_name = self.project.networks.networks['default'].full_name
+        networks = self.client.networks(names=[network_name])
+        assert networks == []
+
         web = self.project.get_service('web')
         db = self.project.get_service('db')
         console = self.project.get_service('console')
+
+        # console was not started
         self.assertEqual(len(web.containers()), 1)
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
+
+        # web has links
+        web_container = web.containers()[0]
+        self.assertTrue(web_container.get('HostConfig.Links'))
+
+    def test_up_with_net_is_invalid(self):
+        self.base_dir = 'tests/fixtures/net-container'
+
+        result = self.dispatch(
+            ['-f', 'v2-invalid.yml', 'up', '-d'],
+            returncode=1)
+
+        # TODO: fix validation error messages for v2 files
+        # assert "Unsupported config option for service 'web': 'net'" in exc.exconly()
+        assert "Unsupported config option" in result.stderr
+
+    def test_up_with_net_v1(self):
+        self.base_dir = 'tests/fixtures/net-container'
+        self.dispatch(['up', '-d'], None)
+
+        bar = self.project.get_service('bar')
+        bar_container = bar.containers()[0]
+
+        foo = self.project.get_service('foo')
+        foo_container = foo.containers()[0]
+
+        assert foo_container.get('HostConfig.NetworkMode') == \
+            'container:{}'.format(bar_container.id)
 
     def test_up_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
@@ -372,6 +704,17 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, ['up', '-t', '2'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
+        os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+
+    @v2_only()
+    def test_up_handles_force_shutdown(self):
+        self.base_dir = 'tests/fixtures/sleeps-composefile'
+        proc = start_process(self.base_dir, ['up', '-t', '200'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(proc.pid, signal.SIGTERM)
+        time.sleep(0.1)
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
@@ -558,6 +901,28 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "127.0.0.1:30000")
         self.assertEqual(port_full, "127.0.0.1:30001")
 
+    def test_run_with_expose_ports(self):
+        # create one off container
+        self.base_dir = 'tests/fixtures/expose-composefile'
+        self.dispatch(['run', '-d', '--service-ports', 'simple'])
+        container = self.project.get_service('simple').containers(one_off=True)[0]
+
+        ports = container.ports
+        self.assertEqual(len(ports), 9)
+        # exposed ports are not mapped to host ports
+        assert ports['3000/tcp'] is None
+        assert ports['3001/tcp'] is None
+        assert ports['3001/udp'] is None
+        assert ports['3002/tcp'] is None
+        assert ports['3003/tcp'] is None
+        assert ports['3004/tcp'] is None
+        assert ports['3005/tcp'] is None
+        assert ports['3006/udp'] is None
+        assert ports['3007/udp'] is None
+
+        # close all one off containers we just created
+        container.stop()
+
     def test_run_with_custom_name(self):
         self.base_dir = 'tests/fixtures/environment-composefile'
         name = 'the-container-name'
@@ -567,18 +932,48 @@ class CLITestCase(DockerClientTestCase):
         container, = service.containers(stopped=True, one_off=True)
         self.assertEqual(container.name, name)
 
-    def test_run_with_networking(self):
-        self.require_api_version('1.21')
-        client = docker_client(version='1.21')
-        self.base_dir = 'tests/fixtures/simple-dockerfile'
-        self.dispatch(['--x-networking', 'run', 'simple', 'true'], None)
-        service = self.project.get_service('simple')
-        container, = service.containers(stopped=True, one_off=True)
-        networks = client.networks(names=[self.project.name])
-        for n in networks:
-            self.addCleanup(client.remove_network, n['Id'])
-        self.assertEqual(len(networks), 1)
-        self.assertEqual(container.human_readable_command, u'true')
+    @v2_only()
+    def test_run_interactive_connects_to_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+
+        self.dispatch(['up', '-d'])
+        self.dispatch(['run', 'app', 'nslookup', 'app'])
+        self.dispatch(['run', 'app', 'nslookup', 'db'])
+
+        containers = self.project.get_service('app').containers(
+            stopped=True, one_off=True)
+        assert len(containers) == 2
+
+        for container in containers:
+            networks = container.get('NetworkSettings.Networks')
+
+            assert sorted(list(networks)) == [
+                '{}_{}'.format(self.project.name, name)
+                for name in ['back', 'front']
+            ]
+
+            for _, config in networks.items():
+                assert not config['Aliases']
+
+    @v2_only()
+    def test_run_detached_connects_to_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['up', '-d'])
+        self.dispatch(['run', '-d', 'app', 'top'])
+
+        container = self.project.get_service('app').containers(one_off=True)[0]
+        networks = container.get('NetworkSettings.Networks')
+
+        assert sorted(list(networks)) == [
+            '{}_{}'.format(self.project.name, name)
+            for name in ['back', 'front']
+        ]
+
+        for _, config in networks.items():
+            assert not config['Aliases']
+
+        assert self.lookup(container, 'app')
+        assert self.lookup(container, 'db')
 
     def test_run_handles_sigint(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
@@ -609,13 +1004,13 @@ class CLITestCase(DockerClientTestCase):
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
-        service.kill()
+        kill_service(service)
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['rm', '--force'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
         service = self.project.get_service('simple')
         service.create_container()
-        service.kill()
+        kill_service(service)
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
@@ -631,6 +1026,51 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.assertFalse(service.containers(stopped=True)[0].is_running)
 
+    def test_stop_signal(self):
+        self.base_dir = 'tests/fixtures/stop-signal-composefile'
+        self.dispatch(['up', '-d'], None)
+        service = self.project.get_service('simple')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertTrue(service.containers()[0].is_running)
+
+        self.dispatch(['stop', '-t', '1'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertFalse(service.containers(stopped=True)[0].is_running)
+        self.assertEqual(service.containers(stopped=True)[0].exit_code, 0)
+
+    def test_start_no_containers(self):
+        result = self.dispatch(['start'], returncode=1)
+        assert 'No containers to start' in result.stderr
+
+    @v2_only()
+    def test_up_logging(self):
+        self.base_dir = 'tests/fixtures/logging-composefile'
+        self.dispatch(['up', '-d'])
+        simple = self.project.get_service('simple').containers()[0]
+        log_config = simple.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'none')
+
+        another = self.project.get_service('another').containers()[0]
+        log_config = another.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'json-file')
+        self.assertEqual(log_config.get('Config')['max-size'], '10m')
+
+    def test_up_logging_legacy(self):
+        self.base_dir = 'tests/fixtures/logging-composefile-legacy'
+        self.dispatch(['up', '-d'])
+        simple = self.project.get_service('simple').containers()[0]
+        log_config = simple.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'none')
+
+        another = self.project.get_service('another').containers()[0]
+        log_config = another.get('HostConfig.LogConfig')
+        self.assertTrue(log_config)
+        self.assertEqual(log_config.get('Type'), 'json-file')
+        self.assertEqual(log_config.get('Config')['max-size'], '10m')
+
     def test_pause_unpause(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -641,6 +1081,14 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['unpause'], None)
         self.assertFalse(service.containers()[0].is_paused)
+
+    def test_pause_no_containers(self):
+        result = self.dispatch(['pause'], returncode=1)
+        assert 'No containers to pause' in result.stderr
+
+    def test_unpause_no_containers(self):
+        result = self.dispatch(['unpause'], returncode=1)
+        assert 'No containers to unpause' in result.stderr
 
     def test_logs_invalid_service_name(self):
         self.dispatch(['logs', 'madeupname'], returncode=1)
@@ -682,7 +1130,7 @@ class CLITestCase(DockerClientTestCase):
     def test_restart(self):
         service = self.project.get_service('simple')
         container = service.create_container()
-        container.start()
+        service.start_container(container)
         started_at = container.dictionary['State']['StartedAt']
         self.dispatch(['restart', '-t', '1'], None)
         container.inspect()
@@ -703,6 +1151,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['restart', '-t', '1'], None)
         self.assertEqual(len(service.containers(stopped=False)), 1)
+
+    def test_restart_no_containers(self):
+        result = self.dispatch(['restart'], returncode=1)
+        assert 'No containers to restart' in result.stderr
 
     def test_scale(self):
         project = self.project
@@ -758,6 +1210,35 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(get_port(3000, index=2), containers[1].get_local_port(3000))
         self.assertEqual(get_port(3002), "")
 
+    def test_events_json(self):
+        events_proc = start_process(self.base_dir, ['events', '--json'])
+        self.dispatch(['up', '-d'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(events_proc.pid, signal.SIGINT)
+        result = wait_on_process(events_proc, returncode=1)
+        lines = [json.loads(line) for line in result.stdout.rstrip().split('\n')]
+        assert [e['action'] for e in lines] == ['create', 'start', 'create', 'start']
+
+    def test_events_human_readable(self):
+        events_proc = start_process(self.base_dir, ['events'])
+        self.dispatch(['up', '-d', 'simple'])
+        wait_on_condition(ContainerCountCondition(self.project, 1))
+
+        os.kill(events_proc.pid, signal.SIGINT)
+        result = wait_on_process(events_proc, returncode=1)
+        lines = result.stdout.rstrip().split('\n')
+        assert len(lines) == 2
+
+        container, = self.project.containers()
+        expected_template = (
+            ' container {} {} (image=busybox:latest, '
+            'name=simplecomposefile_simple_1)')
+
+        assert expected_template.format('create', container.id) in lines[0]
+        assert expected_template.format('start', container.id) in lines[1]
+        assert lines[0].startswith(datetime.date.today().isoformat())
+
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
         self.dispatch(['-f', config_path, 'up', '-d'], None)
@@ -776,7 +1257,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'], None)
 
         container = self.project.containers(stopped=True)[0]
-        actual_host_path = container.get('Volumes')['/container-path']
+        actual_host_path = container.get_mount('/container-path')['Source']
         components = actual_host_path.split('/')
         assert components[-2:] == ['home-dir', 'my-volume']
 
@@ -814,7 +1295,7 @@ class CLITestCase(DockerClientTestCase):
 
         web, other, db = containers
         self.assertEqual(web.human_readable_command, 'top')
-        self.assertTrue({'db', 'other'} <= set(web.links()))
+        self.assertTrue({'db', 'other'} <= set(get_links(web)))
         self.assertEqual(db.human_readable_command, 'top')
         self.assertEqual(other.human_readable_command, 'top')
 
@@ -836,7 +1317,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 2)
         web = containers[1]
 
-        self.assertEqual(set(web.links()), set(['db', 'mydb_1', 'extends_mydb_1']))
+        self.assertEqual(
+            set(get_links(web)),
+            set(['db', 'mydb_1', 'extends_mydb_1']))
 
         expected_env = set([
             "FOO=1",

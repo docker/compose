@@ -7,14 +7,21 @@ from __future__ import unicode_literals
 import os
 from collections import namedtuple
 
+from compose.config.config import V1
 from compose.config.errors import ConfigurationError
 from compose.const import IS_WINDOWS_PLATFORM
 
 
-class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode')):
+class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode type')):
+
+    # TODO: drop service_names arg when v1 is removed
+    @classmethod
+    def parse(cls, volume_from_config, service_names, version):
+        func = cls.parse_v1 if version == V1 else cls.parse_v2
+        return func(service_names, volume_from_config)
 
     @classmethod
-    def parse(cls, volume_from_config):
+    def parse_v1(cls, service_names, volume_from_config):
         parts = volume_from_config.split(':')
         if len(parts) > 2:
             raise ConfigurationError(
@@ -27,7 +34,42 @@ class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode')):
         else:
             source, mode = parts
 
-        return cls(source, mode)
+        type = 'service' if source in service_names else 'container'
+        return cls(source, mode, type)
+
+    @classmethod
+    def parse_v2(cls, service_names, volume_from_config):
+        parts = volume_from_config.split(':')
+        if len(parts) > 3:
+            raise ConfigurationError(
+                "volume_from {} has incorrect format, should be one of "
+                "'<service name>[:<mode>]' or "
+                "'container:<container name>[:<mode>]'".format(volume_from_config))
+
+        if len(parts) == 1:
+            source = parts[0]
+            return cls(source, 'rw', 'service')
+
+        if len(parts) == 2:
+            if parts[0] == 'container':
+                type, source = parts
+                return cls(source, 'rw', type)
+
+            source, mode = parts
+            return cls(source, mode, 'service')
+
+        if len(parts) == 3:
+            type, source, mode = parts
+            if type not in ('service', 'container'):
+                raise ConfigurationError(
+                    "Unknown volumes_from type '{}' in '{}'".format(
+                        type,
+                        volume_from_config))
+
+        return cls(source, mode, type)
+
+    def repr(self):
+        return '{v.type}:{v.source}:{v.mode}'.format(v=self)
 
 
 def parse_restart_spec(restart_config):
@@ -58,7 +100,7 @@ def parse_extra_hosts(extra_hosts_config):
         extra_hosts_dict = {}
         for extra_hosts_line in extra_hosts_config:
             # TODO: validate string contains ':' ?
-            host, ip = extra_hosts_line.split(':')
+            host, ip = extra_hosts_line.split(':', 1)
             extra_hosts_dict[host.strip()] = ip.strip()
         return extra_hosts_dict
 
@@ -118,3 +160,30 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
             mode = parts[2]
 
         return cls(external, internal, mode)
+
+    def repr(self):
+        external = self.external + ':' if self.external else ''
+        return '{ext}{v.internal}:{v.mode}'.format(ext=external, v=self)
+
+    @property
+    def is_named_volume(self):
+        return self.external and not self.external.startswith(('.', '/', '~'))
+
+
+class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
+
+    @classmethod
+    def parse(cls, link_spec):
+        target, _, alias = link_spec.partition(':')
+        if not alias:
+            alias = target
+        return cls(target, alias)
+
+    def repr(self):
+        if self.target == self.alias:
+            return self.target
+        return '{s.target}:{s.alias}'.format(s=self)
+
+    @property
+    def merge_field(self):
+        return self.alias

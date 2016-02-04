@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "id": "fields_schema_v2.0.json",
+
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "services": {
+      "id": "#/properties/services",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "service_schema_v2.0.json#/definitions/service"
+        }
+      },
+      "additionalProperties": false
+    },
+    "networks": {
+      "id": "#/properties/networks",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/network"
+        }
+      }
+    },
+    "volumes": {
+      "id": "#/properties/volumes",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/volume"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "definitions": {
+    "network": {
+      "id": "#/definitions/network",
+      "type": "object",
+      "properties": {
+        "driver": {"type": "string"},
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": ["string", "number"]}
+          }
+        },
+        "ipam": {
+            "type": "object",
+            "properties": {
+                "driver": {"type": "string"},
+                "config": {
+                    "type": "array"
+                }
+            },
+            "additionalProperties": false
+        },
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "volume": {
+      "id": "#/definitions/volume",
+      "type": ["object", "null"],
+      "properties": {
+        "driver": {"type": "string"},
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": ["string", "number"]}
+          }
+        },
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          }
+        },
+        "additionalProperties": false
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

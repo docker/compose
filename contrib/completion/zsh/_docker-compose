@@ -24,7 +24,7 @@
 # Support for these filenames might be dropped in some future version.
 __docker-compose_compose_file() {
     local file
-    for file in docker-compose.y{,a}ml fig.y{,a}ml ; do
+    for file in docker-compose.y{,a}ml ; do
         [ -e $file ] && {
             echo $file
             return
@@ -179,7 +179,7 @@ __docker-compose_commands() {
         local -a lines
         lines=(${(f)"$(_call_program commands docker-compose 2>&1)"})
         _docker_compose_subcommands=(${${${lines[$((${lines[(i)Commands:]} + 1)),${lines[(I)  *]}]}## #}/ ##/:})
-        _store_cache docker_compose_subcommands _docker_compose_subcommands
+        (( $#_docker_compose_subcommands > 0 )) && _store_cache docker_compose_subcommands _docker_compose_subcommands
     fi
     _describe -t docker-compose-commands "docker-compose command" _docker_compose_subcommands
 }
@@ -197,6 +197,32 @@ __docker-compose_subcommand() {
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
+        (config)
+            _arguments \
+                $opts_help \
+                '(--quiet -q)'{--quiet,-q}"[Only validate the configuration, don't print anything.]" \
+                '--services[Print the service names, one per line.]' && ret=0
+            ;;
+        (create)
+            _arguments \
+                $opts_help \
+                "(--no-recreate --no-build)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
+                "(--force-recreate)--no-build[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
+                "(--force-recreate)--no-recreate[Don't build an image, even if it's missing]" \
+                '*:services:__docker-compose_services_all' && ret=0
+            ;;
+        (down)
+            _arguments \
+                $opts_help \
+                "--rmi[Remove images, type may be one of: 'all' to remove all images, or 'local' to remove only images that don't have an custom name set by the 'image' field]:type:(all local)" \
+                '(-v --volumes)'{-v,--volumes}"[Remove data volumes]" && ret=0
+            ;;
+        (events)
+            _arguments \
+                $opts_help \
+                '--json[Output events as a stream of json objects.]' \
+                '*:services:__docker-compose_services_all' && ret=0
+            ;;
         (help)
             _arguments ':subcommand:__docker-compose_commands' && ret=0
             ;;
@@ -211,11 +237,6 @@ __docker-compose_subcommand() {
                 $opts_help \
                 '--no-color[Produce monochrome output.]' \
                 '*:services:__docker-compose_services_all' && ret=0
-            ;;
-        (migrate-to-labels)
-            _arguments -A '-*' \
-                $opts_help \
-                '(-):Recreate containers to add labels' && ret=0
             ;;
         (pause)
             _arguments \
@@ -291,12 +312,13 @@ __docker-compose_subcommand() {
         (up)
             _arguments \
                 $opts_help \
-                '-d[Detached mode: Run containers in the background, print new container names.]' \
+                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names.]' \
                 '--no-color[Produce monochrome output.]' \
                 "--no-deps[Don't start linked services.]" \
                 "--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
                 "--no-recreate[If containers already exist, don't recreate them.]" \
                 "--no-build[Don't build an image, even if it's missing]" \
+                "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
                 '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
@@ -331,8 +353,6 @@ _docker-compose() {
         '(- :)'{-v,--version}'[Print version and exit]' \
         '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
-        '--x-networking[(EXPERIMENTAL) Use new Docker networking functionality. Requires Docker 1.9 or later.]' \
-        '--x-network-driver[(EXPERIMENTAL) Specify a network driver (default: "bridge"). Requires Docker 1.9 or later.]:Network Driver:(bridge host none overlay)' \
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 

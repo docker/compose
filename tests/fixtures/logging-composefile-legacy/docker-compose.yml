@@ -1,0 +1,10 @@
+simple:
+  image: busybox:latest
+  command: top
+  log_driver: "none"
+another:
+  image: busybox:latest
+  command: top
+  log_driver: "json-file"
+  log_opt:
+    max-size: "10m"

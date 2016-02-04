@@ -1,15 +1,15 @@
 <!--[metadata]>
 +++
-title = "Quickstart Guide: Compose and Rails"
+title = "Quickstart: Compose and Rails"
 description = "Getting started with Docker Compose and Rails"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
 [menu.main]
-parent="smn_workw_compose"
+parent="workw_compose"
 weight=5
 +++
 <![end-metadata]-->
 
-## Quickstart Guide: Compose and Rails
+## Quickstart: Compose and Rails
 
 This Quickstart guide will show you how to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
 
@@ -30,7 +30,7 @@ Dockerfile consists of:
     RUN bundle install
     ADD . /myapp
 
-That'll put your application code inside an image that will build a container with Ruby, Bundler and all your dependencies inside it. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+That'll put your application code inside an image that will build a container with Ruby, Bundler and all your dependencies inside it. For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](https://docs.docker.com/engine/reference/builder/).
 
 Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten in a moment by `rails new`.
 
@@ -128,12 +128,12 @@ Finally, you need to create the database. In another terminal, run:
 
     $ docker-compose run web rake db:create
 
-That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine), then `docker-machine ip MACHINE_VM` returns the Docker host IP address.
+That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine/), then `docker-machine ip MACHINE_VM` returns the Docker host IP address.
 
 
 ## More Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)

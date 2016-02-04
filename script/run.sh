@@ -15,7 +15,7 @@
 
 set -e
 
-VERSION="1.5.2"
+VERSION="1.6.0"
 IMAGE="docker/compose:$VERSION"
 
 
@@ -40,8 +40,14 @@ if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
 fi
 if [ -n "$HOME" ]; then
-    VOLUMES="$VOLUMES -v $HOME:$HOME"
+    VOLUMES="$VOLUMES -v $HOME:$HOME -v $HOME:/root" # mount $HOME in /root to share docker.config
 fi
 
+# Only allocate tty if we detect one
+if [ -t 1 ]; then
+    DOCKER_RUN_OPTIONS="-ti"
+else
+    DOCKER_RUN_OPTIONS="-i"
+fi
 
-exec docker run --rm -ti $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w $(pwd) $IMAGE $@
+exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w $(pwd) $IMAGE $@

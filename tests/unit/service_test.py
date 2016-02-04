@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
+from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
@@ -14,15 +15,16 @@ from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
-from compose.service import ContainerNet
+from compose.service import ContainerNetworkMode
 from compose.service import get_container_data_volumes
+from compose.service import ImageType
 from compose.service import merge_volume_bindings
 from compose.service import NeedsBuildError
-from compose.service import Net
+from compose.service import NetworkMode
 from compose.service import NoSuchImageError
 from compose.service import parse_repository_tag
 from compose.service import Service
-from compose.service import ServiceNet
+from compose.service import ServiceNetworkMode
 from compose.service import warn_on_masked_volume
 
 
@@ -70,7 +72,11 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'test',
             image='foo',
-            volumes_from=[VolumeFromSpec(mock.Mock(id=container_id, spec=Container), 'rw')])
+            volumes_from=[
+                VolumeFromSpec(
+                    mock.Mock(id=container_id, spec=Container),
+                    'rw',
+                    'container')])
 
         self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
 
@@ -79,7 +85,11 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'test',
             image='foo',
-            volumes_from=[VolumeFromSpec(mock.Mock(id=container_id, spec=Container), 'ro')])
+            volumes_from=[
+                VolumeFromSpec(
+                    mock.Mock(id=container_id, spec=Container),
+                    'ro',
+                    'container')])
 
         self.assertEqual(service._get_volumes_from(), [container_id + ':ro'])
 
@@ -90,7 +100,10 @@ class ServiceTest(unittest.TestCase):
             mock.Mock(id=container_id, spec=Container)
             for container_id in container_ids
         ]
-        service = Service('test', volumes_from=[VolumeFromSpec(from_service, 'rw')], image='foo')
+        service = Service(
+            'test',
+            volumes_from=[VolumeFromSpec(from_service, 'rw', 'service')],
+            image='foo')
 
         self.assertEqual(service._get_volumes_from(), [container_ids[0] + ":rw"])
 
@@ -102,7 +115,10 @@ class ServiceTest(unittest.TestCase):
                 mock.Mock(id=container_id.split(':')[0], spec=Container)
                 for container_id in container_ids
             ]
-            service = Service('test', volumes_from=[VolumeFromSpec(from_service, mode)], image='foo')
+            service = Service(
+                'test',
+                volumes_from=[VolumeFromSpec(from_service, mode, 'service')],
+                image='foo')
 
             self.assertEqual(service._get_volumes_from(), [container_ids[0]])
 
@@ -113,7 +129,10 @@ class ServiceTest(unittest.TestCase):
         from_service.create_container.return_value = mock.Mock(
             id=container_id,
             spec=Container)
-        service = Service('test', image='foo', volumes_from=[VolumeFromSpec(from_service, 'rw')])
+        service = Service(
+            'test',
+            image='foo',
+            volumes_from=[VolumeFromSpec(from_service, 'rw', 'service')])
 
         self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
         from_service.create_container.assert_called_once_with()
@@ -156,7 +175,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.create_host_config.return_value = {}
 
         log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, log_driver='syslog', log_opt=log_opt)
+        logging = {'driver': 'syslog', 'options': log_opt}
+        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, logging=logging)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -234,6 +254,7 @@ class ServiceTest(unittest.TestCase):
         prev_container = mock.Mock(
             id='ababab',
             image_config={'ContainerConfig': {}})
+        prev_container.get.return_value = None
 
         opts = service._get_container_create_options(
             {},
@@ -245,7 +266,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(
             opts['labels'][LABEL_CONFIG_HASH],
-            '3c85881a8903b9d73a06c41860c8be08acce1494ab4cf8408375966dccd714de')
+            'f8bfa1058ad1f4231372a0b1639f0dfdb574dafff4e8d7938049ae993f7cf1fc')
         self.assertEqual(
             opts['environment'],
             {
@@ -334,7 +355,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(parse_repository_tag("url:5000/repo@sha256:digest"), ("url:5000/repo", "sha256:digest", "@"))
 
     def test_create_container_with_build(self):
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = [
             NoSuchImageError,
             {'Id': 'abc123'},
@@ -353,17 +374,18 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
+            buildargs=None,
         )
 
     def test_create_container_no_build(self):
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
 
         service.create_container(do_build=False)
         self.assertFalse(self.mock_client.build.called)
 
     def test_create_container_no_build_but_needs_build(self):
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = NoSuchImageError
         with self.assertRaises(NeedsBuildError):
             service.create_container(do_build=False)
@@ -373,7 +395,7 @@ class ServiceTest(unittest.TestCase):
             b'{"stream": "Successfully built 12345"}',
         ]
 
-        service = Service('foo', client=self.mock_client, build='.')
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
         service.build()
 
         self.assertEqual(self.mock_client.build.call_count, 1)
@@ -385,9 +407,9 @@ class ServiceTest(unittest.TestCase):
             'foo',
             image='example.com/foo',
             client=self.mock_client,
-            net=ServiceNet(Service('other')),
+            network_mode=ServiceNetworkMode(Service('other')),
             links=[(Service('one'), 'one')],
-            volumes_from=[VolumeFromSpec(Service('two'), 'rw')])
+            volumes_from=[VolumeFromSpec(Service('two'), 'rw', 'service')])
 
         config_dict = service.config_dict()
         expected = {
@@ -395,11 +417,12 @@ class ServiceTest(unittest.TestCase):
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
+            'networks': [],
             'volumes_from': [('two', 'rw')],
         }
-        self.assertEqual(config_dict, expected)
+        assert config_dict == expected
 
-    def test_config_dict_with_net_from_container(self):
+    def test_config_dict_with_network_mode_from_container(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         container = Container(
             self.mock_client,
@@ -408,17 +431,50 @@ class ServiceTest(unittest.TestCase):
             'foo',
             image='example.com/foo',
             client=self.mock_client,
-            net=container)
+            network_mode=ContainerNetworkMode(container))
 
         config_dict = service.config_dict()
         expected = {
             'image_id': 'abcd',
             'options': {'image': 'example.com/foo'},
             'links': [],
+            'networks': [],
             'net': 'aaabbb',
             'volumes_from': [],
         }
-        self.assertEqual(config_dict, expected)
+        assert config_dict == expected
+
+    def test_remove_image_none(self):
+        web = Service('web', image='example', client=self.mock_client)
+        assert not web.remove_image(ImageType.none)
+        assert not self.mock_client.remove_image.called
+
+    def test_remove_image_local_with_image_name_doesnt_remove(self):
+        web = Service('web', image='example', client=self.mock_client)
+        assert not web.remove_image(ImageType.local)
+        assert not self.mock_client.remove_image.called
+
+    def test_remove_image_local_without_image_name_does_remove(self):
+        web = Service('web', build='.', client=self.mock_client)
+        assert web.remove_image(ImageType.local)
+        self.mock_client.remove_image.assert_called_once_with(web.image_name)
+
+    def test_remove_image_all_does_remove(self):
+        web = Service('web', image='example', client=self.mock_client)
+        assert web.remove_image(ImageType.all)
+        self.mock_client.remove_image.assert_called_once_with(web.image_name)
+
+    def test_remove_image_with_error(self):
+        self.mock_client.remove_image.side_effect = error = APIError(
+            message="testing",
+            response={},
+            explanation="Boom")
+
+        web = Service('web', image='example', client=self.mock_client)
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            assert not web.remove_image(ImageType.all)
+        mock_log.error.assert_called_once_with(
+            "Failed to remove image for service %s: %s", web.name, error)
 
     def test_specifies_host_port_with_no_ports(self):
         service = Service(
@@ -482,13 +538,14 @@ class ServiceTest(unittest.TestCase):
             ports=["127.0.0.1:1000-2000:2000-3000"])
         self.assertEqual(service.specifies_host_port(), True)
 
-    def test_get_links_with_networking(self):
-        service = Service(
-            'foo',
-            image='foo',
-            links=[(Service('one'), 'one')],
-            use_networking=True)
-        self.assertEqual(service._get_links(link_to_self=True), [])
+    def test_image_name_from_config(self):
+        image_name = 'example/web:latest'
+        service = Service('foo', image=image_name)
+        assert service.image_name == image_name
+
+    def test_image_name_default(self):
+        service = Service('foo', project='testing')
+        assert service.image_name == 'testing_foo'
 
 
 def sort_by_name(dictionary_list):
@@ -534,20 +591,20 @@ class BuildUlimitsTestCase(unittest.TestCase):
 
 class NetTestCase(unittest.TestCase):
 
-    def test_net(self):
-        net = Net('host')
-        self.assertEqual(net.id, 'host')
-        self.assertEqual(net.mode, 'host')
-        self.assertEqual(net.service_name, None)
+    def test_network_mode(self):
+        network_mode = NetworkMode('host')
+        self.assertEqual(network_mode.id, 'host')
+        self.assertEqual(network_mode.mode, 'host')
+        self.assertEqual(network_mode.service_name, None)
 
-    def test_net_container(self):
+    def test_network_mode_container(self):
         container_id = 'abcd'
-        net = ContainerNet(Container(None, {'Id': container_id}))
-        self.assertEqual(net.id, container_id)
-        self.assertEqual(net.mode, 'container:' + container_id)
-        self.assertEqual(net.service_name, None)
+        network_mode = ContainerNetworkMode(Container(None, {'Id': container_id}))
+        self.assertEqual(network_mode.id, container_id)
+        self.assertEqual(network_mode.mode, 'container:' + container_id)
+        self.assertEqual(network_mode.service_name, None)
 
-    def test_net_service(self):
+    def test_network_mode_service(self):
         container_id = 'bbbb'
         service_name = 'web'
         mock_client = mock.create_autospec(docker.Client)
@@ -556,23 +613,27 @@ class NetTestCase(unittest.TestCase):
         ]
 
         service = Service(name=service_name, client=mock_client)
-        net = ServiceNet(service)
+        network_mode = ServiceNetworkMode(service)
 
-        self.assertEqual(net.id, service_name)
-        self.assertEqual(net.mode, 'container:' + container_id)
-        self.assertEqual(net.service_name, service_name)
+        self.assertEqual(network_mode.id, service_name)
+        self.assertEqual(network_mode.mode, 'container:' + container_id)
+        self.assertEqual(network_mode.service_name, service_name)
 
-    def test_net_service_no_containers(self):
+    def test_network_mode_service_no_containers(self):
         service_name = 'web'
         mock_client = mock.create_autospec(docker.Client)
         mock_client.containers.return_value = []
 
         service = Service(name=service_name, client=mock_client)
-        net = ServiceNet(service)
+        network_mode = ServiceNetworkMode(service)
 
-        self.assertEqual(net.id, service_name)
-        self.assertEqual(net.mode, None)
-        self.assertEqual(net.service_name, service_name)
+        self.assertEqual(network_mode.id, service_name)
+        self.assertEqual(network_mode.mode, None)
+        self.assertEqual(network_mode.service_name, service_name)
+
+
+def build_mount(destination, source, mode='rw'):
+    return {'Source': source, 'Destination': destination, 'Mode': mode}
 
 
 class ServiceVolumesTest(unittest.TestCase):
@@ -600,12 +661,33 @@ class ServiceVolumesTest(unittest.TestCase):
         }
         container = Container(self.mock_client, {
             'Image': 'ababab',
-            'Volumes': {
-                '/host/volume': '/host/volume',
-                '/existing/volume': '/var/lib/docker/aaaaaaaa',
-                '/removed/volume': '/var/lib/docker/bbbbbbbb',
-                '/mnt/image/data': '/var/lib/docker/cccccccc',
-            },
+            'Mounts': [
+                {
+                    'Source': '/host/volume',
+                    'Destination': '/host/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'hostvolume',
+                }, {
+                    'Source': '/var/lib/docker/aaaaaaaa',
+                    'Destination': '/existing/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'existingvolume',
+                }, {
+                    'Source': '/var/lib/docker/bbbbbbbb',
+                    'Destination': '/removed/volume',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'removedvolume',
+                }, {
+                    'Source': '/var/lib/docker/cccccccc',
+                    'Destination': '/mnt/image/data',
+                    'Mode': '',
+                    'RW': True,
+                    'Name': 'imagedata',
+                },
+            ]
         }, has_been_inspected=True)
 
         expected = [
@@ -630,7 +712,13 @@ class ServiceVolumesTest(unittest.TestCase):
 
         intermediate_container = Container(self.mock_client, {
             'Image': 'ababab',
-            'Volumes': {'/existing/volume': '/var/lib/docker/aaaaaaaa'},
+            'Mounts': [{
+                'Source': '/var/lib/docker/aaaaaaaa',
+                'Destination': '/existing/volume',
+                'Mode': '',
+                'RW': True,
+                'Name': 'existingvolume',
+            }],
         }, has_been_inspected=True)
 
         expected = [
@@ -693,9 +781,16 @@ class ServiceVolumesTest(unittest.TestCase):
         self.mock_client.inspect_container.return_value = {
             'Id': '123123123',
             'Image': 'ababab',
-            'Volumes': {
-                '/data': '/mnt/sda1/host/path',
-            },
+            'Mounts': [
+                {
+                    'Destination': '/data',
+                    'Source': '/mnt/sda1/host/path',
+                    'Mode': '',
+                    'RW': True,
+                    'Driver': 'local',
+                    'Name': 'abcdefff1234'
+                },
+            ]
         }
 
         service._get_container_create_options(
@@ -735,6 +830,18 @@ class ServiceVolumesTest(unittest.TestCase):
     def test_warn_on_masked_no_warning_with_same_path(self):
         volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
         container_volumes = [VolumeSpec('/home/user', '/path', 'rw')]
+        service = 'service_name'
+
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            warn_on_masked_volume(volumes_option, container_volumes, service)
+
+        assert not mock_log.warn.called
+
+    def test_warn_on_masked_no_warning_with_container_only_option(self):
+        volumes_option = [VolumeSpec(None, '/path', 'rw')]
+        container_volumes = [
+            VolumeSpec('/var/lib/docker/volume/path', '/path', 'rw')
+        ]
         service = 'service_name'
 
         with mock.patch('compose.service.log', autospec=True) as mock_log:

@@ -1,4 +1,46 @@
-Aanand Prasad <aanand.prasad@gmail.com> (@aanand)
-Ben Firshman <ben@firshman.co.uk> (@bfirsh)
-Daniel Nephin <dnephin@gmail.com> (@dnephin)
-Mazz Mosley <mazz@houseofmnowster.com> (@mnowster)
+# Compose maintainers file
+#
+# This file describes who runs the docker/compose project and how.
+# This is a living document - if you see something out of date or missing, speak up!
+#
+# It is structured to be consumable by both humans and programs.
+# To extract its contents programmatically, use any TOML-compliant parser.
+#
+# This file is compiled into the MAINTAINERS file in docker/opensource.
+#
+[Org]
+	[Org."Core maintainers"]
+		people = [
+			"aanand",
+			"bfirsh",
+			"dnephin",
+			"mnowster",
+		]
+
+[people]
+
+# A reference list of all people associated with the project.
+# All other sections should refer to people by their canonical key
+# in the people section.
+
+	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
+
+	[people.aanand]
+	Name = "Aanand Prasad"
+	Email = "aanand.prasad@gmail.com"
+	GitHub = "aanand"
+
+	[people.bfirsh]
+	Name = "Ben Firshman"
+	Email = "ben@firshman.co.uk"
+	GitHub = "bfirsh"
+
+	[people.dnephin]
+	Name = "Daniel Nephin"
+	Email = "dnephin@gmail.com"
+	GitHub = "dnephin"
+
+	[people.mnowster]
+	Name = "Mazz Mosley"
+	Email = "mazz@houseofmnowster.com"
+	GitHub = "mnowster"

@@ -1,11 +1,11 @@
 <!--[metadata]>
 +++
-title = "Docker Compose"
+title = "Install Compose"
 description = "How to install Docker Compose"
 keywords = ["compose, orchestration, install, installation, docker, documentation"]
 [menu.main]
-parent="mn_install"
-weight=4
+parent="workw_compose"
+weight=-90
 +++
 <![end-metadata]-->
 
@@ -20,11 +20,11 @@ To install Compose, do the following:
 
 1. Install Docker Engine version 1.7.1 or greater:
 
-     * <a href="https://docs.docker.com/installation/mac/" target="_blank">Mac OS X installation</a> (Toolbox installation includes both Engine and Compose)
+     * <a href="https://docs.docker.com/engine/installation/mac/" target="_blank">Mac OS X installation</a> (Toolbox installation includes both Engine and Compose)
 
-     * <a href="https://docs.docker.com/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
+     * <a href="https://docs.docker.com/engine/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
 
-     * <a href="https://docs.docker.com/installation/" target="_blank">other system installations</a>
+     * <a href="https://docs.docker.com/engine/installation/" target="_blank">other system installations</a>
 
 2. Mac OS X users are done installing. Others should continue to the next step.
 
@@ -39,7 +39,7 @@ which the release page specifies, in your terminal.
 
      The following is an example command illustrating the format:
 
-        curl -L https://github.com/docker/compose/releases/download/1.5.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        curl -L https://github.com/docker/compose/releases/download/1.6.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 
      If you have problems installing with `curl`, see
      [Alternative Install Options](#alternative-install-options).
@@ -54,7 +54,7 @@ which the release page specifies, in your terminal.
 7. Test the installation.
 
         $ docker-compose --version
-        docker-compose version: 1.5.2
+        docker-compose version: 1.6.0
 
 
 ## Alternative install options
@@ -77,7 +77,7 @@ to get started.
 Compose can also be run inside a container, from a small bash script wrapper.
 To install compose as a container run:
 
-    $ curl -L https://github.com/docker/compose/releases/download/1.5.2/run.sh > /usr/local/bin/docker-compose
+    $ curl -L https://github.com/docker/compose/releases/download/1.6.0/run.sh > /usr/local/bin/docker-compose
     $ chmod +x /usr/local/bin/docker-compose
 
 ## Master builds
@@ -98,7 +98,7 @@ be recreated with labels added.
 If Compose detects containers that were created without labels, it will refuse
 to run so that you don't end up with two sets of them. If you want to keep using
 your existing containers (for example, because they have data volumes you want
-to preserve) you can migrate them with the following command:
+to preserve) you can use compose 1.5.x to migrate them with the following command:
 
     $ docker-compose migrate-to-labels
 
@@ -127,7 +127,7 @@ To uninstall Docker Compose if you installed using `pip`:
 
 ## Where to go next
 
-- [User guide](/)
+- [User guide](index.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)
 - [Get started with Rails](rails.md)

@@ -1,11 +1,11 @@
 <!--[metadata]>
 +++
-title = "Extending services in Compose"
+title = "Extending Services in Compose"
 description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
 keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
 [menu.main]
-parent="smn_workw_compose"
-weight=2
+parent="workw_compose"
+weight=20
 +++
 <![end-metadata]-->
 
@@ -32,17 +32,14 @@ contains your base configuration. The override file, as its name implies, can
 contain configuration overrides for existing services or entirely new
 services.
 
-If a service is defined in both files, Compose merges the configurations using
-the same rules as the `extends` field (see [Adding and overriding
-configuration](#adding-and-overriding-configuration)), with one exception.  If a
-service contains `links` or `volumes_from` those fields are copied over and
-replace any values in the original service, in the same way single-valued fields
-are copied.
+If a service is defined in both files Compose merges the configurations using
+the rules described in [Adding and overriding
+configuration](#adding-and-overriding-configuration).
 
 To use multiple override files, or an override file with a different name, you
 can use the `-f` option to specify the list of files. Compose merges files in
 the order they're specified on the command line. See the [`docker-compose`
-command reference](./reference/docker-compose.md) for more information about
+command reference](./reference/overview.md) for more information about
 using `-f`.
 
 When you use multiple configuration files, you must make sure all paths in the
@@ -176,10 +173,12 @@ is useful if you have several services that reuse a common set of configuration
 options. Using `extends` you can define a common set of service options in one
 place and refer to it from anywhere.
 
-> **Note:** `links` and `volumes_from` are never shared between services using
-> `extends`. See
-> [Adding and overriding configuration](#adding-and-overriding-configuration)
- > for more information.
+> **Note:** `links`, `volumes_from`, and `depends_on` are never shared between
+> services using >`extends`. These exceptions exist to avoid
+> implicit dependencies&mdash;you always define `links` and `volumes_from`
+> locally. This ensures dependencies between services are clearly visible when
+> reading the current file. Defining these locally also ensures changes to the
+> referenced file don't result in breakage.
 
 ### Understand the extends configuration
 
@@ -275,13 +274,7 @@ common configuration:
 
 ## Adding and overriding configuration
 
-Compose copies configurations from the original service over to the local one,
-**except** for `links` and `volumes_from`. These exceptions exist to avoid
-implicit dependencies&mdash;you always define `links` and `volumes_from`
-locally. This ensures dependencies between services are clearly visible when
-reading the current file. Defining these locally also ensures changes to the
-referenced file don't result in breakage.
-
+Compose copies configurations from the original service over to the local one.
 If a configuration option is defined in both the original service the local
 service, the local value *replaces* or *extends* the original value.
 
@@ -365,7 +358,7 @@ In the case of `environment`, `labels`, `volumes` and `devices`, Compose
 
 ## Compose documentation
 
-- [User guide](/)
+- [User guide](index.md)
 - [Installing Compose](install.md)
 - [Getting Started](gettingstarted.md)
 - [Get started with Django](django.md)

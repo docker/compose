@@ -28,13 +28,14 @@ def find_version(*file_paths):
 
 
 install_requires = [
+    'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 0.7',
     'PyYAML >= 3.10, < 4',
     'requests >= 2.6.1, < 2.8',
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.32.0, < 1.0',
-    'docker-py >= 1.5.0, < 2',
-    'dockerpty >= 0.3.4, < 0.4',
+    'docker-py >= 1.7.0, < 2',
+    'dockerpty >= 0.4.1, < 0.5',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
 ]
@@ -66,4 +67,14 @@ setup(
     [console_scripts]
     docker-compose=compose.cli.main:main
     """,
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
+    ],
 )

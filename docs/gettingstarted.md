@@ -4,8 +4,8 @@ title = "Getting Started"
 description = "Getting started with Docker Compose"
 keywords = ["documentation, docs,  docker, compose, orchestration, containers"]
 [menu.main]
-parent="smn_workw_compose"
-weight=3
+parent="workw_compose"
+weight=-85
 +++
 <![end-metadata]-->
 
@@ -77,7 +77,7 @@ dependencies the Python application requires, including Python itself.
   * Install the Python dependencies.
   * Set the default command for the container to `python app.py`
 
-  For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
+  For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](http://docs.docker.com/reference/builder/).
 
 2. Build the image.
 

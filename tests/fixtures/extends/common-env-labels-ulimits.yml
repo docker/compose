@@ -1,0 +1,13 @@
+web:
+  extends:
+    file: common.yml
+    service: web
+  environment:
+    - FOO=2
+    - BAZ=3
+  labels: ['label=one']
+  ulimits:
+    nproc: 65535
+    memlock:
+        soft: 1024
+        hard: 2048

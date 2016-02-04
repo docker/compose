@@ -108,6 +108,10 @@ class Container(object):
         return self.get('Config.Labels') or {}
 
     @property
+    def stop_signal(self):
+        return self.get('Config.StopSignal')
+
+    @property
     def log_config(self):
         return self.get('HostConfig.LogConfig') or None
 
@@ -115,6 +119,8 @@ class Container(object):
     def human_readable_state(self):
         if self.is_paused:
             return 'Paused'
+        if self.is_restarting:
+            return 'Restarting'
         if self.is_running:
             return 'Ghost' if self.get('State.Ghost') else 'Up'
         else:
@@ -131,8 +137,16 @@ class Container(object):
         return dict(var.split("=", 1) for var in self.get('Config.Env') or [])
 
     @property
+    def exit_code(self):
+        return self.get('State.ExitCode')
+
+    @property
     def is_running(self):
         return self.get('State.Running')
+
+    @property
+    def is_restarting(self):
+        return self.get('State.Restarting')
 
     @property
     def is_paused(self):
@@ -170,6 +184,12 @@ class Container(object):
     def get_local_port(self, port, protocol='tcp'):
         port = self.ports.get("%s/%s" % (port, protocol))
         return "{HostIp}:{HostPort}".format(**port[0]) if port else None
+
+    def get_mount(self, mount_dest):
+        for mount in self.get('Mounts'):
+            if mount['Destination'] == mount_dest:
+                return mount
+        return None
 
     def start(self, **options):
         return self.client.start(self.id, **options)
@@ -215,16 +235,6 @@ class Container(object):
         self.dictionary = self.client.inspect_container(self.id)
         self.has_been_inspected = True
         return self.dictionary
-
-    # TODO: only used by tests, move to test module
-    def links(self):
-        links = []
-        for container in self.client.containers():
-            for name in container['Names']:
-                bits = name.split('/')
-                if len(bits) > 2 and bits[1] == self.name:
-                    links.append(bits[2])
-        return links
 
     def attach(self, *args, **kwargs):
         return self.client.attach(self.id, *args, **kwargs)

@@ -1,3 +1,12 @@
+<!--[metadata]>
++++
+draft = true
+title = "Compose README"
+description = "Compose README"
+keywords = ["Docker, documentation, manual, guide, reference, api"]
++++
+<![end-metadata]-->
+
 # Contributing to the Docker Compose documentation
 
 The documentation in this directory is part of the [https://docs.docker.com](https://docs.docker.com) website.  Docker uses [the Hugo static generator](http://gohugo.io/overview/introduction/) to convert project Markdown files to a static HTML site.
@@ -49,7 +58,7 @@ The top of each Docker Compose documentation file contains TOML metadata. The me
     description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
     keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
     [menu.main]
-    parent="smn_workw_compose"
+    parent="workw_compose"
     weight=2
     +++
     <![end-metadata]-->
@@ -61,7 +70,7 @@ The metadata alone has this structure:
     description = "How to use Docker Compose's extends keyword to share configuration between files and projects"
     keywords = ["fig, composition, compose, docker, orchestration, documentation, docs"]
     [menu.main]
-    parent="smn_workw_compose"
+    parent="workw_compose"
     weight=2
     +++
 
