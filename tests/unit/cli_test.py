@@ -79,8 +79,9 @@ class CLITestCase(unittest.TestCase):
             TopLevelCommand().dispatch(['help', 'nonexistent'], None)
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
+    @mock.patch('compose.cli.main.RunOperation', autospec=True)
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
-    def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal):
+    def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
         mock_project = mock.Mock(client=mock_client)
@@ -106,7 +107,7 @@ class CLITestCase(unittest.TestCase):
                 '--name': None,
             })
 
-        _, _, call_kwargs = mock_pseudo_terminal.mock_calls[0]
+        _, _, call_kwargs = mock_run_operation.mock_calls[0]
         assert call_kwargs['logs'] is False
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
