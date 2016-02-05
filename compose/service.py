@@ -57,6 +57,7 @@ DOCKER_START_KEYS = [
     'volumes_from',
     'security_opt',
     'cpu_quota',
+    'shm_size',
 ]
 
 
@@ -654,6 +655,7 @@ class Service(object):
             ipc_mode=options.get('ipc'),
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
+            shm_size=options.get('shm_size'),
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
