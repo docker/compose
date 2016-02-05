@@ -30,9 +30,8 @@ def interpolate_environment_variables(config, section, schema):
 
 
 def _cast_interpolated_inside_list(interpolated_value, possible_types):
-    if "string" in possible_types:
-        possible_types.remove("string")
-    for possible_type in possible_types:
+    castable_types = [t for t in possible_types if t != "string"]
+    for possible_type in castable_types:
         v = _cast_interpolated(interpolated_value, possible_type)
         if v is not None:
             return v
