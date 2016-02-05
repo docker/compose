@@ -66,17 +66,17 @@ class CLITestCase(unittest.TestCase):
     def test_help(self):
         command = TopLevelCommand()
         with self.assertRaises(SystemExit):
-            command.dispatch(['-h'], None)
+            command.dispatch(['-h'])
 
     def test_command_help(self):
         with self.assertRaises(SystemExit) as ctx:
-            TopLevelCommand().dispatch(['help', 'up'], None)
+            TopLevelCommand().dispatch(['help', 'up'])
 
         self.assertIn('Usage: up', str(ctx.exception))
 
     def test_command_help_nonexistent(self):
         with self.assertRaises(NoSuchCommand):
-            TopLevelCommand().dispatch(['help', 'nonexistent'], None)
+            TopLevelCommand().dispatch(['help', 'nonexistent'])
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
     @mock.patch('compose.cli.main.RunOperation', autospec=True)
