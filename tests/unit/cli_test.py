@@ -10,13 +10,14 @@ import pytest
 
 from .. import mock
 from .. import unittest
+from ..helpers import build_config
 from compose.cli.command import get_project
 from compose.cli.command import get_project_name
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.const import IS_WINDOWS_PLATFORM
-from compose.service import Service
+from compose.project import Project
 
 
 class CLITestCase(unittest.TestCase):
@@ -84,18 +85,19 @@ class CLITestCase(unittest.TestCase):
     def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
         command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock(client=mock_client)
-        mock_project.get_service.return_value = Service(
-            'service',
+        project = Project.from_config(
+            name='composetest',
             client=mock_client,
-            environment=['FOO=ONE', 'BAR=TWO'],
-            image='someimage')
+            config_data=build_config({
+                'service': {'image': 'busybox'}
+            }),
+        )
 
         with pytest.raises(SystemExit):
-            command.run(mock_project, {
+            command.run(project, {
                 'SERVICE': 'service',
                 'COMMAND': None,
-                '-e': ['BAR=NEW', 'OTHER=bär'.encode('utf-8')],
+                '-e': [],
                 '--user': None,
                 '--no-deps': None,
                 '-d': False,
@@ -111,15 +113,21 @@ class CLITestCase(unittest.TestCase):
         assert call_kwargs['logs'] is False
 
     def test_run_service_with_restart_always(self):
-        command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock(client=mock_client)
-        mock_project.get_service.return_value = Service(
-            'service',
+
+        project = Project.from_config(
+            name='composetest',
             client=mock_client,
-            restart={'Name': 'always', 'MaximumRetryCount': 0},
-            image='someimage')
-        command.run(mock_project, {
+            config_data=build_config({
+                'service': {
+                    'image': 'busybox',
+                    'restart': 'always',
+                }
+            }),
+        )
+
+        command = TopLevelCommand()
+        command.run(project, {
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
@@ -140,14 +148,7 @@ class CLITestCase(unittest.TestCase):
         )
 
         command = TopLevelCommand()
-        mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock(client=mock_client)
-        mock_project.get_service.return_value = Service(
-            'service',
-            client=mock_client,
-            restart='always',
-            image='someimage')
-        command.run(mock_project, {
+        command.run(project, {
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
@@ -168,17 +169,16 @@ class CLITestCase(unittest.TestCase):
 
     def test_command_manula_and_service_ports_together(self):
         command = TopLevelCommand()
-        mock_client = mock.create_autospec(docker.Client)
-        mock_project = mock.Mock(client=mock_client)
-        mock_project.get_service.return_value = Service(
-            'service',
-            client=mock_client,
-            restart='always',
-            image='someimage',
+        project = Project.from_config(
+            name='composetest',
+            client=None,
+            config_data=build_config({
+                'service': {'image': 'busybox'},
+            }),
         )
 
         with self.assertRaises(UserError):
-            command.run(mock_project, {
+            command.run(project, {
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
