@@ -40,6 +40,7 @@ DOCKER_START_KEYS = [
     'cap_add',
     'cap_drop',
     'cgroup_parent',
+    'cpu_quota',
     'devices',
     'dns',
     'dns_search',
@@ -54,10 +55,9 @@ DOCKER_START_KEYS = [
     'pid',
     'privileged',
     'restart',
-    'volumes_from',
     'security_opt',
-    'cpu_quota',
     'shm_size',
+    'volumes_from',
 ]
 
 
