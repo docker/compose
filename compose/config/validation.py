@@ -388,7 +388,7 @@ def process_errors(errors, path_prefix=None):
 def validate_against_config_schema(config_file):
     _validate_against_schema(
         config_file.config,
-        "service_schema_v{0}.json".format(config_file.version),
+        "config_schema_v{0}.json".format(config_file.version),
         format_checker=["ports", "expose", "bool-value-in-mapping"],
         filename=config_file.filename)
 
