@@ -464,18 +464,12 @@ def resolve_environment(service_dict):
         env.update(env_vars_from_file(env_file))
 
     env.update(parse_environment(service_dict.get('environment')))
-    d = dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
-    if '_' in d.keys():
-        del d['_']
-    return d
+    return dict(filter(None, (resolve_env_var(k, v) for k, v in six.iteritems(env))))
 
 
 def resolve_build_args(build):
     args = parse_build_arguments(build.get('args'))
-    d = dict(resolve_env_var(k, v) for k, v in six.iteritems(args))
-    if '_' in d.keys():
-        del d['_']
-    return d
+    return dict(filter(None, (resolve_env_var(k, v) for k, v in six.iteritems(args))))
 
 
 def validate_extended_service_dict(service_dict, filename, service):
@@ -736,7 +730,7 @@ def resolve_env_var(key, val):
     elif key in os.environ:
         return key, os.environ[key]
     else:
-        return "_", None
+        return ()
 
 
 def env_vars_from_file(filename):
