@@ -23,18 +23,13 @@ exe = EXE(pyz,
                 'DATA'
             ),
             (
-                'compose/config/fields_schema_v2.0.json',
-                'compose/config/fields_schema_v2.0.json',
-                'DATA'
-            ),
-            (
                 'compose/config/service_schema_v1.json',
                 'compose/config/service_schema_v1.json',
                 'DATA'
             ),
             (
-                'compose/config/service_schema_v2.0.json',
-                'compose/config/service_schema_v2.0.json',
+                'compose/config/config_schema_v2.0.json',
+                'compose/config/config_schema_v2.0.json',
                 'DATA'
             ),
             (

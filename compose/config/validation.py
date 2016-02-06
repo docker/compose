@@ -385,21 +385,17 @@ def process_errors(errors, path_prefix=None):
     return '\n'.join(format_error_message(error) for error in errors)
 
 
-def validate_against_fields_schema(config_file):
-    schema_filename = "fields_schema_v{0}.json".format(config_file.version)
+def validate_against_config_schema(config_file):
     _validate_against_schema(
         config_file.config,
-        schema_filename,
+        "service_schema_v{0}.json".format(config_file.version),
         format_checker=["ports", "expose", "bool-value-in-mapping"],
         filename=config_file.filename)
 
 
-def validate_against_service_schema(config, service_name, version):
-    _validate_against_schema(
-        config,
-        "service_schema_v{0}.json".format(version),
-        format_checker=["ports"],
-        path_prefix=[service_name])
+def validate_service_constraints(config, service_name, version):
+    # TODO:
+    pass
 
 
 def _validate_against_schema(

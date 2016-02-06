@@ -1,15 +1,50 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "service_schema_v2.0.json",
-
+  "id": "config_schema_v2.0.json",
   "type": "object",
 
-  "allOf": [
-    {"$ref": "#/definitions/service"},
-    {"$ref": "#/definitions/constraints"}
-  ],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+
+    "services": {
+      "id": "#/properties/services",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/service"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "networks": {
+      "id": "#/properties/networks",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/network"
+        }
+      }
+    },
+
+    "volumes": {
+      "id": "#/properties/volumes",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/volume"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "additionalProperties": false,
 
   "definitions": {
+
     "service": {
       "id": "#/definitions/service",
       "type": "object",
@@ -193,6 +228,60 @@
       "additionalProperties": false
     },
 
+    "network": {
+      "id": "#/definitions/network",
+      "type": "object",
+      "properties": {
+        "driver": {"type": "string"},
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": ["string", "number"]}
+          }
+        },
+        "ipam": {
+            "type": "object",
+            "properties": {
+                "driver": {"type": "string"},
+                "config": {
+                    "type": "array"
+                }
+            },
+            "additionalProperties": false
+        },
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "volume": {
+      "id": "#/definitions/volume",
+      "type": ["object", "null"],
+      "properties": {
+        "driver": {"type": "string"},
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": ["string", "number"]}
+          }
+        },
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          }
+        },
+        "additionalProperties": false
+      },
+      "additionalProperties": false
+    },
+
     "string_or_list": {
       "oneOf": [
         {"type": "string"},
@@ -221,15 +310,18 @@
         {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
       ]
     },
+
     "constraints": {
-      "id": "#/definitions/constraints",
-      "anyOf": [
+      "services": {
+        "id": "#/definitions/services/constraints",
+        "anyOf": [
           {"required": ["build"]},
           {"required": ["image"]}
-      ],
-      "properties": {
-        "build": {
-          "required": ["context"]
+        ],
+        "properties": {
+          "build": {
+            "required": ["context"]
+          }
         }
       }
     }

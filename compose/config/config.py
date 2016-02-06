@@ -31,12 +31,12 @@ from .types import ServiceLink
 from .types import VolumeFromSpec
 from .types import VolumeSpec
 from .validation import match_named_volumes
-from .validation import validate_against_fields_schema
-from .validation import validate_against_service_schema
 from .validation import validate_config_section
+from .validation import validate_against_config_schema
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_network_mode
+from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
 
@@ -415,7 +415,7 @@ def process_config_file(config_file, service_name=None):
         processed_config = services
 
     config_file = config_file._replace(config=processed_config)
-    validate_against_fields_schema(config_file)
+    validate_against_config_schema(config_file)
 
     if service_name and service_name not in services:
         raise ConfigurationError(
@@ -548,7 +548,7 @@ def validate_extended_service_dict(service_dict, filename, service):
 
 def validate_service(service_config, service_names, version):
     service_dict, service_name = service_config.config, service_config.name
-    validate_against_service_schema(service_dict, service_name, version)
+    validate_service_constraints(service_dict, service_name, version)
     validate_paths(service_dict)
 
     validate_ulimits(service_config)
