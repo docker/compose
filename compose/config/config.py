@@ -698,6 +698,7 @@ def merge_service_dicts(base, override, version):
         'depends_on',
         'expose',
         'external_links',
+        'networks',
         'ports',
         'volumes_from',
     ]:
