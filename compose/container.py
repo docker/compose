@@ -60,7 +60,7 @@ class Container(object):
 
     @property
     def short_id(self):
-        return self.id[:10]
+        return self.id[:12]
 
     @property
     def name(self):
