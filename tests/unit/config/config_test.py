@@ -1594,30 +1594,64 @@ class BuildOrImageMergeTest(unittest.TestCase):
         )
 
 
-class MergeListsTest(unittest.TestCase):
+class MergeListsTest(object):
+    def config_name(self):
+        return ""
+
+    def base_config(self):
+        return []
+
+    def override_config(self):
+        return []
+
+    def merged_config(self):
+        return set(self.base_config()) | set(self.override_config())
+
     def test_empty(self):
-        assert 'ports' not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
+        assert self.config_name() not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {'ports': ['10:8000', '9000']},
+            {self.config_name(): self.base_config()},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict['ports']) == set(['10:8000', '9000'])
+        assert set(service_dict[self.config_name()]) == set(self.base_config())
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {'ports': ['10:8000', '9000']},
+            {self.config_name(): self.base_config()},
             DEFAULT_VERSION)
-        assert set(service_dict['ports']) == set(['10:8000', '9000'])
+        assert set(service_dict[self.config_name()]) == set(self.base_config())
 
     def test_add_item(self):
         service_dict = config.merge_service_dicts(
-            {'ports': ['10:8000', '9000']},
-            {'ports': ['20:8000']},
+            {self.config_name(): self.base_config()},
+            {self.config_name(): self.override_config()},
             DEFAULT_VERSION)
-        assert set(service_dict['ports']) == set(['10:8000', '9000', '20:8000'])
+        assert set(service_dict[self.config_name()]) == set(self.merged_config())
+
+
+class MergePortsTest(unittest.TestCase, MergeListsTest):
+    def config_name(self):
+        return 'ports'
+
+    def base_config(self):
+        return ['10:8000', '9000']
+
+    def override_config(self):
+        return ['20:8000']
+
+
+class MergeNetworksTest(unittest.TestCase, MergeListsTest):
+    def config_name(self):
+        return 'networks'
+
+    def base_config(self):
+        return ['frontend', 'backend']
+
+    def override_config(self):
+        return ['monitoring']
 
 
 class MergeStringsOrListsTest(unittest.TestCase):
