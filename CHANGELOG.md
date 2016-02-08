@@ -14,7 +14,7 @@ Major Features:
     1.6 exactly as they do today.
 
     Check the upgrade guide for full details:
-    https://docs.docker.com/compose/compose-file/upgrading
+    https://docs.docker.com/compose/compose-file#upgrading
 
 -   Support for networking has exited experimental status and is the recommended
     way to enable communication between containers.
