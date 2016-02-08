@@ -1506,57 +1506,54 @@ class VolumeConfigTest(unittest.TestCase):
 
 
 class MergePathMappingTest(object):
-    def config_name(self):
-        return ""
+    config_name = ""
 
     def test_empty(self):
         service_dict = config.merge_service_dicts({}, {}, DEFAULT_VERSION)
-        assert self.config_name() not in service_dict
+        assert self.config_name not in service_dict
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/data']},
+            {self.config_name: ['/foo:/code', '/data']},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/foo:/code', '/data'])
+        assert set(service_dict[self.config_name]) == set(['/foo:/code', '/data'])
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {self.config_name(): ['/bar:/code']},
+            {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code'])
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/data']},
-            {self.config_name(): ['/bar:/code']},
+            {self.config_name: ['/foo:/code', '/data']},
+            {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/data']},
-            {self.config_name(): ['/bar:/code', '/quux:/data']},
+            {self.config_name: ['/foo:/code', '/data']},
+            {self.config_name: ['/bar:/code', '/quux:/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/quux:/data'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/quux:/data'])
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/quux:/data']},
-            {self.config_name(): ['/bar:/code', '/data']},
+            {self.config_name: ['/foo:/code', '/quux:/data']},
+            {self.config_name: ['/bar:/code', '/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
 
 
 class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
-    def config_name(self):
-        return 'volumes'
+    config_name = 'volumes'
 
 
 class MergeDevicesTest(unittest.TestCase, MergePathMappingTest):
-    def config_name(self):
-        return 'devices'
+    config_name = 'devices'
 
 
 class BuildOrImageMergeTest(unittest.TestCase):
@@ -1595,63 +1592,48 @@ class BuildOrImageMergeTest(unittest.TestCase):
 
 
 class MergeListsTest(object):
-    def config_name(self):
-        return ""
-
-    def base_config(self):
-        return []
-
-    def override_config(self):
-        return []
+    config_name = ""
+    base_config = []
+    override_config = []
 
     def merged_config(self):
-        return set(self.base_config()) | set(self.override_config())
+        return set(self.base_config) | set(self.override_config)
 
     def test_empty(self):
-        assert self.config_name() not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
+        assert self.config_name not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): self.base_config()},
+            {self.config_name: self.base_config},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(self.base_config())
+        assert set(service_dict[self.config_name]) == set(self.base_config)
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {self.config_name(): self.base_config()},
+            {self.config_name: self.base_config},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(self.base_config())
+        assert set(service_dict[self.config_name]) == set(self.base_config)
 
     def test_add_item(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): self.base_config()},
-            {self.config_name(): self.override_config()},
+            {self.config_name: self.base_config},
+            {self.config_name: self.override_config},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(self.merged_config())
+        assert set(service_dict[self.config_name]) == set(self.merged_config())
 
 
 class MergePortsTest(unittest.TestCase, MergeListsTest):
-    def config_name(self):
-        return 'ports'
-
-    def base_config(self):
-        return ['10:8000', '9000']
-
-    def override_config(self):
-        return ['20:8000']
+    config_name = 'ports'
+    base_config = ['10:8000', '9000']
+    override_config = ['20:8000']
 
 
 class MergeNetworksTest(unittest.TestCase, MergeListsTest):
-    def config_name(self):
-        return 'networks'
-
-    def base_config(self):
-        return ['frontend', 'backend']
-
-    def override_config(self):
-        return ['monitoring']
+    config_name = 'networks'
+    base_config = ['frontend', 'backend']
+    override_config = ['monitoring']
 
 
 class MergeStringsOrListsTest(unittest.TestCase):
