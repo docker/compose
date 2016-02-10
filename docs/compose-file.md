@@ -645,7 +645,7 @@ documentation for more information. Optional.
        foo: "bar"
        baz: 1
 
-## external
+### external
 
 If set to `true`, specifies that this volume has been created outside of
 Compose. `docker-compose up` will not attempt to create it, and will raise
