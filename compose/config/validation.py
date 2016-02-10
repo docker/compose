@@ -253,10 +253,9 @@ def handle_generic_service_error(error, path):
         msg_format = "{path} contains an invalid type, it should be {msg}"
         error_msg = _parse_valid_types_from_validator(error.validator_value)
 
-    # TODO: no test case for this branch, there are no config options
-    # which exercise this branch
     elif error.validator == 'required':
-        msg_format = "{path} is invalid, {msg}"
+        error_msg = ", ".join(error.validator_value)
+        msg_format = "{path} is invalid, {msg} is required."
 
     elif error.validator == 'dependencies':
         config_key = list(error.validator_value.keys())[0]

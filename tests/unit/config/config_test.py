@@ -1136,6 +1136,17 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         assert "Service 'one' depends on service 'three'" in exc.exconly()
 
+    def test_load_dockerfile_without_context(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'one': {'build': {'dockerfile': 'Dockerfile.foo'}},
+            },
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert 'one.build is invalid, context is required.' in exc.exconly()
+
 
 class NetworkModeTest(unittest.TestCase):
     def test_network_mode_standard(self):

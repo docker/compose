@@ -195,7 +195,12 @@
       "anyOf": [
           {"required": ["build"]},
           {"required": ["image"]}
-      ]
+      ],
+      "properties": {
+        "build": {
+          "required": ["context"]
+        }
+      }
     }
   }
 }

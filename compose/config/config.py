@@ -878,6 +878,9 @@ def validate_paths(service_dict):
             build_path = build
         elif isinstance(build, dict) and 'context' in build:
             build_path = build['context']
+        else:
+            # We have a build section but no context, so nothing to validate
+            return
 
         if (
             not is_url(build_path) and
