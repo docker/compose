@@ -761,14 +761,14 @@ service's containers to it.
         networks:
           - default
 
-    networks
+    networks:
       outside:
         external: true
 
 You can also specify the name of the network separately from the name used to
 refer to it within the Compose file:
 
-    networks
+    networks:
       outside:
         external:
           name: actual-name-of-network
