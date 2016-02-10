@@ -167,8 +167,8 @@
     },
 
     "constraints": {
-      "services": {
-        "id": "#/definitions/services/constraints",
+      "service": {
+        "id": "#/definitions/constraints/service",
         "anyOf": [
           {
             "required": ["build"],

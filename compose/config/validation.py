@@ -14,6 +14,7 @@ from jsonschema import FormatChecker
 from jsonschema import RefResolver
 from jsonschema import ValidationError
 
+from ..const import COMPOSEFILE_V1 as V1
 from .errors import ConfigurationError
 from .errors import VERSION_EXPLANATION
 from .sort_services import get_service_name_from_network_mode
@@ -209,7 +210,7 @@ def anglicize_json_type(json_type):
 
 
 def is_service_dict_schema(schema_id):
-    return schema_id == 'fields_schema_v1.json' or schema_id == '#/properties/services'
+    return schema_id in ('config_schema_v1.json',  '#/properties/services')
 
 
 def handle_error_for_schema_with_id(error, path):
@@ -221,35 +222,6 @@ def handle_error_for_schema_with_id(error, path):
             list(error.instance)[0],
             VALID_NAME_CHARS)
 
-    if schema_id == '#/definitions/constraints':
-        # Build context could in 'build' or 'build.context' and dockerfile could be
-        # in 'dockerfile' or 'build.dockerfile'
-        context = False
-        dockerfile = 'dockerfile' in error.instance
-        if 'build' in error.instance:
-            if isinstance(error.instance['build'], six.string_types):
-                context = True
-            else:
-                context = 'context' in error.instance['build']
-                dockerfile = dockerfile or 'dockerfile' in error.instance['build']
-
-        # TODO: only applies to v1
-        if 'image' in error.instance and context:
-            return (
-                "{} has both an image and build path specified. "
-                "A service can either be built to image or use an existing "
-                "image, not both.".format(path_string(path)))
-        if 'image' not in error.instance and not context:
-            return (
-                "{} has neither an image nor a build path specified. "
-                "At least one must be provided.".format(path_string(path)))
-        # TODO: only applies to v1
-        if 'image' in error.instance and dockerfile:
-            return (
-                "{} has both an image and alternate Dockerfile. "
-                "A service can either be built to image or use an existing "
-                "image, not both.".format(path_string(path)))
-
     if error.validator == 'additionalProperties':
         if schema_id == '#/definitions/service':
             invalid_config_key = parse_key_from_error_msg(error)
@@ -259,7 +231,7 @@ def handle_error_for_schema_with_id(error, path):
             return '{}\n{}'.format(error.message, VERSION_EXPLANATION)
 
 
-def handle_generic_service_error(error, path):
+def handle_generic_error(error, path):
     msg_format = None
     error_msg = error.message
 
@@ -365,71 +337,94 @@ def _parse_oneof_validator(error):
     return (None, "contains an invalid type, it should be {}".format(valid_types))
 
 
-def process_errors(errors, path_prefix=None):
-    """jsonschema gives us an error tree full of information to explain what has
-    gone wrong. Process each error and pull out relevant information and re-write
-    helpful error messages that are relevant.
-    """
-    path_prefix = path_prefix or []
+def process_service_constraint_errors(error, service_name, version):
+    if version == V1:
+        if 'image' in error.instance and 'build' in error.instance:
+            return (
+                "Service {} has both an image and build path specified. "
+                "A service can either be built to image or use an existing "
+                "image, not both.".format(service_name))
 
-    def format_error_message(error):
-        path = path_prefix + list(error.path)
+        if 'image' in error.instance and 'dockerfile' in error.instance:
+            return (
+                "Service {} has both an image and alternate Dockerfile. "
+                "A service can either be built to image or use an existing "
+                "image, not both.".format(service_name))
 
-        if 'id' in error.schema:
-            error_msg = handle_error_for_schema_with_id(error, path)
-            if error_msg:
-                return error_msg
+    if 'image' not in error.instance and 'build' not in error.instance:
+        return (
+            "Service {} has neither an image nor a build context specified. "
+            "At least one must be provided.".format(service_name))
 
-        return handle_generic_service_error(error, path)
 
-    return '\n'.join(format_error_message(error) for error in errors)
+def process_config_schema_errors(error):
+    path = list(error.path)
+
+    if 'id' in error.schema:
+        error_msg = handle_error_for_schema_with_id(error, path)
+        if error_msg:
+            return error_msg
+
+    return handle_generic_error(error, path)
 
 
 def validate_against_config_schema(config_file):
-    _validate_against_schema(
-        config_file.config,
-        "config_schema_v{0}.json".format(config_file.version),
-        format_checker=["ports", "expose", "bool-value-in-mapping"],
-        filename=config_file.filename)
+    schema = load_jsonschema(config_file.version)
+    format_checker = FormatChecker(["ports", "expose", "bool-value-in-mapping"])
+    validator = Draft4Validator(
+        schema,
+        resolver=RefResolver(get_resolver_path(), schema),
+        format_checker=format_checker)
+    handle_errors(
+        validator.iter_errors(config_file.config),
+        process_config_schema_errors,
+        config_file.filename)
 
 
 def validate_service_constraints(config, service_name, version):
-    # TODO:
-    pass
+    def handler(errors):
+        return process_service_constraint_errors(errors, service_name, version)
+
+    schema = load_jsonschema(version)
+    validator = Draft4Validator(schema['definitions']['constraints']['service'])
+    handle_errors(validator.iter_errors(config), handler, None)
 
 
-def _validate_against_schema(
-        config,
-        schema_filename,
-        format_checker=(),
-        path_prefix=None,
-        filename=None):
-    config_source_dir = os.path.dirname(os.path.abspath(__file__))
+def get_schema_path():
+    return os.path.dirname(os.path.abspath(__file__))
 
+
+def load_jsonschema(version):
+    filename = os.path.join(
+        get_schema_path(),
+        "config_schema_v{0}.json".format(version))
+
+    with open(filename, "r") as fh:
+        return json.load(fh)
+
+
+def get_resolver_path():
+    schema_path = get_schema_path()
     if sys.platform == "win32":
-        file_pre_fix = "///"
-        config_source_dir = config_source_dir.replace('\\', '/')
+        scheme = "///"
+        # TODO: why is this necessary?
+        schema_path = schema_path.replace('\\', '/')
     else:
-        file_pre_fix = "//"
+        scheme = "//"
+    return "file:{}{}/".format(scheme, schema_path)
 
-    resolver_full_path = "file:{}{}/".format(file_pre_fix, config_source_dir)
-    schema_file = os.path.join(config_source_dir, schema_filename)
 
-    with open(schema_file, "r") as schema_fh:
-        schema = json.load(schema_fh)
-
-    resolver = RefResolver(resolver_full_path, schema)
-    validation_output = Draft4Validator(
-        schema,
-        resolver=resolver,
-        format_checker=FormatChecker(format_checker))
-
-    errors = [error for error in sorted(validation_output.iter_errors(config), key=str)]
+def handle_errors(errors, format_error_func, filename):
+    """jsonschema returns an error tree full of information to explain what has
+    gone wrong. Process each error and pull out relevant information and re-write
+    helpful error messages that are relevant.
+    """
+    errors = list(sorted(errors, key=str))
     if not errors:
         return
 
-    error_msg = process_errors(errors, path_prefix=path_prefix)
-    file_msg = " in file '{}'".format(filename) if filename else ''
-    raise ConfigurationError("Validation failed{}, reason(s):\n{}".format(
-        file_msg,
-        error_msg))
+    error_msg = '\n'.join(format_error_func(error) for error in errors)
+    raise ConfigurationError(
+        "Validation failed{file_msg}, reason(s):\n{error_msg}".format(
+            file_msg=" in file '{}'".format(filename) if filename else "",
+            error_msg=error_msg))

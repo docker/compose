@@ -31,8 +31,8 @@ from .types import ServiceLink
 from .types import VolumeFromSpec
 from .types import VolumeSpec
 from .validation import match_named_volumes
-from .validation import validate_config_section
 from .validation import validate_against_config_schema
+from .validation import validate_config_section
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_network_mode

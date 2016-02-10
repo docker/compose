@@ -342,20 +342,17 @@ class ConfigTest(unittest.TestCase):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
                 config.load(build_config_details(
-                    {invalid_name: {'image': 'busybox'}},
-                    'working_dir',
-                    'filename.yml'))
+                    {invalid_name: {'image': 'busybox'}}))
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
-    def test_config_invalid_service_names_v2(self):
+    def test_load_config_invalid_service_names_v2(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
-                config.load(
-                    build_config_details({
+                config.load(build_config_details(
+                    {
                         'version': '2',
-                        'services': {invalid_name: {'image': 'busybox'}}
-                    }, 'working_dir', 'filename.yml')
-                )
+                        'services': {invalid_name: {'image': 'busybox'}},
+                    }))
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
     def test_load_with_invalid_field_name(self):
@@ -1317,7 +1314,7 @@ class ConfigTest(unittest.TestCase):
         })
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        assert 'one.build is invalid, context is required.' in exc.exconly()
+        assert 'has neither an image nor a build context' in exc.exconly()
 
 
 class NetworkModeTest(unittest.TestCase):
@@ -2269,7 +2266,7 @@ class ExtendsTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
         assert (
-            "myweb has neither an image nor a build path specified" in
+            "myweb has neither an image nor a build context specified" in
             exc.exconly()
         )
 
