@@ -1079,6 +1079,39 @@ class ConfigTest(unittest.TestCase):
             'extends': {'service': 'foo'}
         }
 
+    def test_merge_build_args(self):
+        base = {
+            'build': {
+                'context': '.',
+                'args': {
+                    'ONE': '1',
+                    'TWO': '2',
+                },
+            }
+        }
+        override = {
+            'build': {
+                'args': {
+                    'TWO': 'dos',
+                    'THREE': '3',
+                },
+            }
+        }
+        actual = config.merge_service_dicts(
+            base,
+            override,
+            DEFAULT_VERSION)
+        assert actual == {
+            'build': {
+                'context': '.',
+                'args': {
+                    'ONE': '1',
+                    'TWO': 'dos',
+                    'THREE': '3',
+                },
+            }
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
