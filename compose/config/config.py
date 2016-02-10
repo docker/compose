@@ -87,6 +87,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'container_name',
     'dockerfile',
     'logging',
+    'network_mode',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -698,6 +699,7 @@ def merge_service_dicts(base, override, version):
         'depends_on',
         'expose',
         'external_links',
+        'networks',
         'ports',
         'volumes_from',
     ]:
