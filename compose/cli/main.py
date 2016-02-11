@@ -458,11 +458,12 @@ class TopLevelCommand(DocoptCommand):
         """
         service = project.get_service(options['SERVICE'])
         detach = options['-d']
+        no_ptty = options['-T']
 
-        if IS_WINDOWS_PLATFORM and not detach:
+        if IS_WINDOWS_PLATFORM and (not detach and not no_ptty):
             raise UserError(
                 "Interactive mode is not yet supported on Windows.\n"
-                "Please pass the -d flag when using `docker-compose run`."
+                "Please pass either -d or -T flag when using `docker-compose run`."
             )
 
         if options['COMMAND']:
