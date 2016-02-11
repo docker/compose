@@ -714,29 +714,24 @@ def merge_service_dicts(base, override, version):
 
     if version == V1:
         legacy_v1_merge_image_or_build(md, base, override)
-    else:
-        merge_build(md, base, override)
+    elif md.needs_merge('build'):
+        md['build'] = merge_build(md, base, override)
 
     return dict(md)
 
 
 def merge_build(output, base, override):
-    build = {}
+    def to_dict(service):
+        build_config = service.get('build', {})
+        if isinstance(build_config, six.string_types):
+            return {'context': build_config}
+        return build_config
 
-    if 'build' in base:
-        if isinstance(base['build'], six.string_types):
-            build['context'] = base['build']
-        else:
-            build.update(base['build'])
-
-    if 'build' in override:
-        if isinstance(override['build'], six.string_types):
-            build['context'] = override['build']
-        else:
-            build.update(override['build'])
-
-    if build:
-        output['build'] = build
+    md = MergeDict(to_dict(base), to_dict(override))
+    md.merge_scalar('context')
+    md.merge_scalar('dockerfile')
+    md.merge_mapping('args', parse_build_arguments)
+    return dict(md)
 
 
 def legacy_v1_merge_image_or_build(output, base, override):
