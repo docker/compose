@@ -82,9 +82,7 @@ func (p *process) start() error {
 	if err != nil {
 		return err
 	}
-	args := []string{
-		"--id", p.id,
-	}
+	args := []string{}
 	if p.exec {
 		args = append(args, "exec",
 			"--process", filepath.Join(cwd, "process.json"),
@@ -115,6 +113,7 @@ func (p *process) start() error {
 	args = append(args,
 		"-d",
 		"--pid-file", filepath.Join(cwd, "pid"),
+		p.id,
 	)
 	cmd := exec.Command("runc", args...)
 	cmd.Dir = p.bundle
@@ -148,7 +147,7 @@ func (p *process) pid() int {
 
 func (p *process) delete() error {
 	if !p.exec {
-		return exec.Command("runc", "--id", p.id, "delete").Run()
+		return exec.Command("runc", "delete", p.id).Run()
 	}
 	return nil
 }

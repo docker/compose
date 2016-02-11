@@ -216,11 +216,11 @@ func (c *container) readSpec() (*specs.LinuxSpec, error) {
 }
 
 func (c *container) Pause() error {
-	return exec.Command("runc", "--id", c.id, "pause").Run()
+	return exec.Command("runc", "pause", c.id).Run()
 }
 
 func (c *container) Resume() error {
-	return exec.Command("runc", "--id", c.id, "resume").Run()
+	return exec.Command("runc", "resume", c.id).Run()
 }
 
 func (c *container) State() State {
@@ -287,7 +287,6 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 		return err
 	}
 	args := []string{
-		"--id", c.id,
 		"checkpoint",
 		"--image-path", path,
 	}
@@ -306,6 +305,7 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 	if cpt.UnixSockets {
 		add("--ext-unix-sk")
 	}
+	add(c.id)
 	return exec.Command("runc", args...).Run()
 }
 
