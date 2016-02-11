@@ -172,6 +172,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
 	e := supervisor.NewEvent(supervisor.GetContainerEventType)
+	e.ID = r.Id
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err

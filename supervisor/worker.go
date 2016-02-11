@@ -38,11 +38,7 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
-		process, err := t.Container.Start(t.Checkpoint, runtime.Stdio{
-			Stdin:  t.Stdin,
-			Stdout: t.Stdout,
-			Stderr: t.Stderr,
-		})
+		process, err := t.Container.Start(t.Checkpoint, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
 			evt := NewEvent(DeleteEventType)
 			evt.ID = t.Container.ID()

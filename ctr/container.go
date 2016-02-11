@@ -59,7 +59,9 @@ var stateCommand = cli.Command{
 	Usage: "get a raw dump of the containerd state",
 	Action: func(context *cli.Context) {
 		c := getClient(context)
-		resp, err := c.State(netcontext.Background(), &types.StateRequest{})
+		resp, err := c.State(netcontext.Background(), &types.StateRequest{
+			Id: context.Args().First(),
+		})
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
@@ -79,7 +81,9 @@ var listCommand = cli.Command{
 
 func listContainers(context *cli.Context) {
 	c := getClient(context)
-	resp, err := c.State(netcontext.Background(), &types.StateRequest{})
+	resp, err := c.State(netcontext.Background(), &types.StateRequest{
+		Id: context.Args().First(),
+	})
 	if err != nil {
 		fatal(err.Error(), 1)
 	}

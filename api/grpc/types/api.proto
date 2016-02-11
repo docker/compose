@@ -104,6 +104,7 @@ message ListCheckpointResponse {
 }
 
 message StateRequest {
+    string id = 1; // container id for a single container
 }
 
 message ContainerState {

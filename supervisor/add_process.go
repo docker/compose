@@ -18,11 +18,7 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 	if !ok {
 		return ErrContainerNotFound
 	}
-	process, err := ci.container.Exec(e.Pid, *e.ProcessSpec, runtime.Stdio{
-		Stdin:  e.Stdin,
-		Stdout: e.Stdout,
-		Stderr: e.Stderr,
-	})
+	process, err := ci.container.Exec(e.Pid, *e.ProcessSpec, runtime.NewStdio(e.Stdin, e.Stdout, e.Stderr))
 	if err != nil {
 		return err
 	}

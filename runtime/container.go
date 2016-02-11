@@ -51,6 +51,21 @@ type Stdio struct {
 	Stderr string
 }
 
+func NewStdio(stdin, stdout, stderr string) Stdio {
+	for _, s := range []*string{
+		&stdin, &stdout, &stderr,
+	} {
+		if *s == "" {
+			*s = "/dev/null"
+		}
+	}
+	return Stdio{
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+	}
+}
+
 // New returns a new container
 func New(root, id, bundle string) (Container, error) {
 	c := &container{
