@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/specs"
 )
 
@@ -42,6 +43,8 @@ type Container interface {
 	DeleteCheckpoint(name string) error
 	// Labels are user provided labels for the container
 	Labels() []string
+	// Pids returns all pids inside the container
+	Pids() ([]int, error)
 	// Stats returns realtime container stats and resource information
 	// Stats() (*Stat, error) // OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
@@ -351,6 +354,18 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 
 func (c *container) DeleteCheckpoint(name string) error {
 	return os.RemoveAll(filepath.Join(c.bundle, "checkpoints", name))
+}
+
+func (c *container) Pids() ([]int, error) {
+	f, err := libcontainer.New(specs.LinuxStateDirectory, libcontainer.Cgroupfs)
+	if err != nil {
+		return nil, err
+	}
+	container, err := f.Load(c.id)
+	if err != nil {
+		return nil, err
+	}
+	return container.Processes()
 }
 
 func getRootIDs(s *specs.LinuxSpec) (int, int, error) {

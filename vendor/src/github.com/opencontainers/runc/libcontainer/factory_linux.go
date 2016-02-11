@@ -5,7 +5,6 @@ package libcontainer
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +18,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/configs/validate"
+	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 const (
@@ -202,8 +202,12 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		criuPath:      l.CriuPath,
 		cgroupManager: l.NewCgroupsManager(state.Config.Cgroups, state.CgroupPaths),
 		root:          containerRoot,
+		created:       state.Created,
 	}
-	c.state = &nullState{c: c}
+	c.state = &createdState{c: c, s: Created}
+	if err := c.refreshState(); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -226,21 +230,29 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 	// clear the current process's environment to clean any libcontainer
 	// specific env vars.
 	os.Clearenv()
+	var i initer
 	defer func() {
 		// if we have an error during the initialization of the container's init then send it back to the
 		// parent process in the form of an initError.
 		if err != nil {
-			// ensure that any data sent from the parent is consumed so it doesn't
-			// receive ECONNRESET when the child writes to the pipe.
-			ioutil.ReadAll(pipe)
-			if err := json.NewEncoder(pipe).Encode(newSystemError(err)); err != nil {
+			if _, ok := i.(*linuxStandardInit); ok {
+				//  Synchronisation only necessary for standard init.
+				if err := utils.WriteJSON(pipe, syncT{procError}); err != nil {
+					panic(err)
+				}
+			}
+			if err := utils.WriteJSON(pipe, newSystemError(err)); err != nil {
+				panic(err)
+			}
+		} else {
+			if err := utils.WriteJSON(pipe, syncT{procStart}); err != nil {
 				panic(err)
 			}
 		}
 		// ensure that this pipe is always closed
 		pipe.Close()
 	}()
-	i, err := newContainerInit(it, pipe)
+	i, err = newContainerInit(it, pipe)
 	if err != nil {
 		return err
 	}

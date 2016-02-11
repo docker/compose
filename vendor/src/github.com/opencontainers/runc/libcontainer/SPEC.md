@@ -142,6 +142,7 @@ system resources like cpu, memory, and device access.
 | perf_event | 1       |
 | freezer    | 1       |
 | hugetlb    | 1       |
+| pids       | 1       |
 
 
 All cgroup subsystem are joined so that statistics can be collected from
@@ -199,7 +200,7 @@ provide a good default for security and flexibility for the applications.
 | CAP_SYS_BOOT         | 0       |
 | CAP_LEASE            | 0       |
 | CAP_WAKE_ALARM       | 0       |
-| CAP_BLOCK_SUSPE      | 0       |
+| CAP_BLOCK_SUSPEND    | 0       |
 
 
 Additional security layers like [apparmor](https://wiki.ubuntu.com/AppArmor)

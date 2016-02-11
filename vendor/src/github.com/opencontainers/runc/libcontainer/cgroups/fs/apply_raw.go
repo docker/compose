@@ -23,6 +23,7 @@ var (
 		&MemoryGroup{},
 		&CpuGroup{},
 		&CpuacctGroup{},
+		&PidsGroup{},
 		&BlkioGroup{},
 		&HugetlbGroup{},
 		&NetClsGroup{},
@@ -93,11 +94,10 @@ func getCgroupRoot() (string, error) {
 }
 
 type cgroupData struct {
-	root   string
-	parent string
-	name   string
-	config *configs.Cgroup
-	pid    int
+	root      string
+	innerPath string
+	config    *configs.Cgroup
+	pid       int
 }
 
 func (m *Manager) Apply(pid int) (err error) {
@@ -110,6 +110,22 @@ func (m *Manager) Apply(pid int) (err error) {
 	d, err := getCgroupData(m.Cgroups, pid)
 	if err != nil {
 		return err
+	}
+
+	if c.Paths != nil {
+		paths := make(map[string]string)
+		for name, path := range c.Paths {
+			_, err := d.path(name)
+			if err != nil {
+				if cgroups.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			paths[name] = path
+		}
+		m.Paths = paths
+		return cgroups.EnterPid(m.Paths, pid)
 	}
 
 	paths := make(map[string]string)
@@ -135,17 +151,13 @@ func (m *Manager) Apply(pid int) (err error) {
 		paths[sys.Name()] = p
 	}
 	m.Paths = paths
-
-	if paths["cpu"] != "" {
-		if err := CheckCpushares(paths["cpu"], c.Resources.CpuShares); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
 func (m *Manager) Destroy() error {
+	if m.Cgroups.Paths != nil {
+		return nil
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err := cgroups.RemovePaths(m.Paths); err != nil {
@@ -179,12 +191,25 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
-	for name, path := range m.Paths {
-		sys, err := subsystems.Get(name)
-		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
-			continue
+	for _, sys := range subsystems {
+		// Generate fake cgroup data.
+		d, err := getCgroupData(container.Cgroups, -1)
+		if err != nil {
+			return err
 		}
+		// Get the path, but don't error out if the cgroup wasn't found.
+		path, err := d.path(sys.Name())
+		if err != nil && !cgroups.IsNotFound(err) {
+			return err
+		}
+
 		if err := sys.Set(path, container.Cgroups); err != nil {
+			return err
+		}
+	}
+
+	if m.Paths["cpu"] != "" {
+		if err := CheckCpushares(m.Paths["cpu"], container.Cgroups.Resources.CpuShares); err != nil {
 			return err
 		}
 	}
@@ -217,17 +242,28 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 }
 
 func (m *Manager) GetPids() ([]int, error) {
-	d, err := getCgroupData(m.Cgroups, 0)
+	dir, err := getCgroupPath(m.Cgroups)
 	if err != nil {
 		return nil, err
 	}
-
-	dir, err := d.path("devices")
-	if err != nil {
-		return nil, err
-	}
-
 	return cgroups.GetPids(dir)
+}
+
+func (m *Manager) GetAllPids() ([]int, error) {
+	dir, err := getCgroupPath(m.Cgroups)
+	if err != nil {
+		return nil, err
+	}
+	return cgroups.GetAllPids(dir)
+}
+
+func getCgroupPath(c *configs.Cgroup) (string, error) {
+	d, err := getCgroupData(c, 0)
+	if err != nil {
+		return "", err
+	}
+
+	return d.path("devices")
 }
 
 func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
@@ -236,12 +272,20 @@ func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
 		return nil, err
 	}
 
+	if (c.Name != "" || c.Parent != "") && c.Path != "" {
+		return nil, fmt.Errorf("cgroup: either Path or Name and Parent should be used")
+	}
+
+	innerPath := c.Path
+	if innerPath == "" {
+		innerPath = filepath.Join(c.Parent, c.Name)
+	}
+
 	return &cgroupData{
-		root:   root,
-		parent: c.Parent,
-		name:   c.Name,
-		config: c,
-		pid:    pid,
+		root:      root,
+		innerPath: c.Path,
+		config:    c,
+		pid:       pid,
 	}, nil
 }
 
@@ -269,11 +313,10 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 		return "", err
 	}
 
-	cgPath := filepath.Join(raw.parent, raw.name)
 	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
-	if filepath.IsAbs(cgPath) {
+	if filepath.IsAbs(raw.innerPath) {
 		// Sometimes subsystems can be mounted togethger as 'cpu,cpuacct'.
-		return filepath.Join(raw.root, filepath.Base(mnt), cgPath), nil
+		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
 	}
 
 	parentPath, err := raw.parentPath(subsystem, mnt, root)
@@ -281,7 +324,7 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(parentPath, cgPath), nil
+	return filepath.Join(parentPath, raw.innerPath), nil
 }
 
 func (raw *cgroupData) join(subsystem string) (string, error) {

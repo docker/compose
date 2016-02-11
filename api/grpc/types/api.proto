@@ -132,6 +132,7 @@ message Container {
 	repeated Process processes = 4; // List of processes which run in container
 	string status = 5; // Container status ("running", "paused", etc.)
     repeated string labels = 6;
+    repeated uint32 pids = 7;
 }
 
 // Machine is information about machine on which containerd is run

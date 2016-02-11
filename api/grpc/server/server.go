@@ -221,13 +221,26 @@ func createAPIContainer(c runtime.Container) (*types.Container, error) {
 			},
 		})
 	}
+	pids, err := c.Pids()
+	if err != nil {
+		return nil, grpc.Errorf(codes.Internal, "get all pids for container")
+	}
 	return &types.Container{
 		Id:         c.ID(),
 		BundlePath: c.Path(),
 		Processes:  procs,
 		Labels:     c.Labels(),
 		Status:     string(c.State()),
+		Pids:       toUint32(pids),
 	}, nil
+}
+
+func toUint32(its []int) []uint32 {
+	o := []uint32{}
+	for _, i := range its {
+		o = append(o, uint32(i))
+	}
+	return o
 }
 
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
