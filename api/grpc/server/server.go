@@ -8,10 +8,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/supervisor"
+	"github.com/opencontainers/runc/libcontainer"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/specs"
 	"golang.org/x/net/context"
 )
@@ -297,38 +298,87 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	return nil
 }
 
-func (s *apiServer) GetStats(r *types.StatsRequest, stream types.API_GetStatsServer) error {
+func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.StatsResponse, error) {
 	e := supervisor.NewEvent(supervisor.StatsEventType)
 	e.ID = r.Id
+	e.Stat = make(chan *runtime.Stat, 1)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
-		if err == supervisor.ErrContainerNotFound {
-			return grpc.Errorf(codes.NotFound, err.Error())
-		}
-		return err
+		return nil, err
 	}
-	defer func() {
-		ue := supervisor.NewEvent(supervisor.UnsubscribeStatsEventType)
-		ue.ID = e.ID
-		ue.Stats = e.Stats
-		s.sv.SendEvent(ue)
-		if err := <-ue.Err; err != nil {
-			logrus.Errorf("Error unsubscribing %s: %v", r.Id, err)
-		}
-	}()
-	for {
-		select {
-		case st := <-e.Stats:
-			pbSt, ok := st.(*types.Stats)
-			if !ok {
-				panic("invalid stats type from collector")
-			}
-			if err := stream.Send(pbSt); err != nil {
-				return err
-			}
-		case <-stream.Context().Done():
-			return nil
+	stats := <-e.Stat
+	t := convertToPb(stats)
+	return t, nil
+}
+
+func convertToPb(st *runtime.Stat) *types.StatsResponse {
+	pbSt := &types.StatsResponse{
+		Timestamp:   uint64(st.Timestamp.Unix()),
+		CgroupStats: &types.CgroupStats{},
+	}
+	lcSt, ok := st.Data.(*libcontainer.Stats)
+	if !ok {
+		return pbSt
+	}
+	cpuSt := lcSt.CgroupStats.CpuStats
+	pbSt.CgroupStats.CpuStats = &types.CpuStats{
+		CpuUsage: &types.CpuUsage{
+			TotalUsage:        cpuSt.CpuUsage.TotalUsage,
+			PercpuUsage:       cpuSt.CpuUsage.PercpuUsage,
+			UsageInKernelmode: cpuSt.CpuUsage.UsageInKernelmode,
+			UsageInUsermode:   cpuSt.CpuUsage.UsageInUsermode,
+		},
+		ThrottlingData: &types.ThrottlingData{
+			Periods:          cpuSt.ThrottlingData.Periods,
+			ThrottledPeriods: cpuSt.ThrottlingData.ThrottledPeriods,
+			ThrottledTime:    cpuSt.ThrottlingData.ThrottledTime,
+		},
+	}
+	memSt := lcSt.CgroupStats.MemoryStats
+	pbSt.CgroupStats.MemoryStats = &types.MemoryStats{
+		Cache: memSt.Cache,
+		Usage: &types.MemoryData{
+			Usage:    memSt.Usage.Usage,
+			MaxUsage: memSt.Usage.MaxUsage,
+			Failcnt:  memSt.Usage.Failcnt,
+		},
+		SwapUsage: &types.MemoryData{
+			Usage:    memSt.SwapUsage.Usage,
+			MaxUsage: memSt.SwapUsage.MaxUsage,
+			Failcnt:  memSt.SwapUsage.Failcnt,
+		},
+	}
+	blkSt := lcSt.CgroupStats.BlkioStats
+	pbSt.CgroupStats.BlkioStats = &types.BlkioStats{
+		IoServiceBytesRecursive: convertBlkioEntryToPb(blkSt.IoServiceBytesRecursive),
+		IoServicedRecursive:     convertBlkioEntryToPb(blkSt.IoServicedRecursive),
+		IoQueuedRecursive:       convertBlkioEntryToPb(blkSt.IoQueuedRecursive),
+		IoServiceTimeRecursive:  convertBlkioEntryToPb(blkSt.IoServiceTimeRecursive),
+		IoWaitTimeRecursive:     convertBlkioEntryToPb(blkSt.IoWaitTimeRecursive),
+		IoMergedRecursive:       convertBlkioEntryToPb(blkSt.IoMergedRecursive),
+		IoTimeRecursive:         convertBlkioEntryToPb(blkSt.IoTimeRecursive),
+		SectorsRecursive:        convertBlkioEntryToPb(blkSt.SectorsRecursive),
+	}
+	pbSt.CgroupStats.HugetlbStats = make(map[string]*types.HugetlbStats)
+	for k, st := range lcSt.CgroupStats.HugetlbStats {
+		pbSt.CgroupStats.HugetlbStats[k] = &types.HugetlbStats{
+			Usage:    st.Usage,
+			MaxUsage: st.MaxUsage,
+			Failcnt:  st.Failcnt,
 		}
 	}
-	return nil
+	return pbSt
+}
+
+func convertBlkioEntryToPb(b []cgroups.BlkioStatEntry) []*types.BlkioStatsEntry {
+	var pbEs []*types.BlkioStatsEntry
+	for _, e := range b {
+		pbEs = append(pbEs, &types.BlkioStatsEntry{
+			Major: e.Major,
+			Minor: e.Minor,
+			Op:    e.Op,
+			Value: e.Value,
+		})
+	}
+	return pbEs
 }

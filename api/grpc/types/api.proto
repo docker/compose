@@ -13,7 +13,7 @@ service API {
 	rpc ListCheckpoint(ListCheckpointRequest) returns (ListCheckpointResponse) {}
 	rpc State(StateRequest) returns (StateResponse) {}
 	rpc Events(EventsRequest) returns (stream Event) {}
-	rpc GetStats(StatsRequest) returns (stream Stats) {}
+	rpc Stats(StatsRequest) returns (StatsResponse) {}
 }
 
 message UpdateProcessRequest {
@@ -246,7 +246,7 @@ message CgroupStats {
 	map<string, HugetlbStats> hugetlb_stats = 4; // the map is in the format "size of hugepage: stats of the hugepage"
 }
 
-message Stats {
+message StatsResponse {
 	repeated NetworkStats network_stats = 1;
 	CgroupStats cgroup_stats = 2;
 	uint64 timestamp = 3;

@@ -39,10 +39,6 @@ func (h *ExitEvent) Handle(e *Event) error {
 	ne.Pid = proc.ID()
 	h.s.SendEvent(ne)
 
-	// remove stats collection for container
-	stopCollect := NewEvent(StopStatsEventType)
-	stopCollect.ID = container.ID()
-	h.s.SendEvent(stopCollect)
 	ExitProcessTimer.UpdateSince(start)
 
 	return nil

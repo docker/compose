@@ -423,17 +423,15 @@ var statsCommand = cli.Command{
 			Id: context.Args().First(),
 		}
 		c := getClient(context)
-		stream, err := c.GetStats(netcontext.Background(), req)
+		stats, err := c.Stats(netcontext.Background(), req)
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
-		for {
-			stats, err := stream.Recv()
-			if err != nil {
-				fatal(err.Error(), 1)
-			}
-			fmt.Println(stats)
+		data, err := json.Marshal(stats)
+		if err != nil {
+			fatal(err.Error(), 1)
 		}
+		fmt.Print(string(data))
 	},
 }
 

@@ -5,7 +5,6 @@ import (
 	"os"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/chanotify"
@@ -14,7 +13,6 @@ import (
 )
 
 const (
-	statsInterval     = 1 * time.Second
 	defaultBufferSize = 2048 // size of queue in eventloop
 )
 
@@ -32,14 +30,13 @@ func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) 
 		return nil, err
 	}
 	s := &Supervisor{
-		stateDir:       stateDir,
-		containers:     make(map[string]*containerInfo),
-		tasks:          tasks,
-		machine:        machine,
-		subscribers:    make(map[chan *Event]struct{}),
-		statsCollector: newStatsCollector(statsInterval),
-		el:             eventloop.NewChanLoop(defaultBufferSize),
-		monitor:        monitor,
+		stateDir:    stateDir,
+		containers:  make(map[string]*containerInfo),
+		tasks:       tasks,
+		machine:     machine,
+		subscribers: make(map[chan *Event]struct{}),
+		el:          eventloop.NewChanLoop(defaultBufferSize),
+		monitor:     monitor,
 	}
 	if oom {
 		s.notifier = chanotify.New()
@@ -64,8 +61,6 @@ func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) 
 		CreateCheckpointEventType: &CreateCheckpointEvent{s},
 		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
 		StatsEventType:            &StatsEvent{s},
-		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
-		StopStatsEventType:        &StopStatsEvent{s},
 		UpdateProcessEventType:    &UpdateProcessEvent{s},
 	}
 	go s.exitHandler()
@@ -91,7 +86,6 @@ type Supervisor struct {
 	subscriberLock sync.RWMutex
 	subscribers    map[chan *Event]struct{}
 	machine        Machine
-	statsCollector *statsCollector
 	notifier       *chanotify.Notifier
 	el             eventloop.EventLoop
 	monitor        *Monitor

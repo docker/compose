@@ -46,7 +46,8 @@ type Container interface {
 	// Pids returns all pids inside the container
 	Pids() ([]int, error)
 	// Stats returns realtime container stats and resource information
-	// Stats() (*Stat, error) // OOM signals the channel if the container received an OOM notification
+	Stats() (*Stat, error)
+	// OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
 }
 
@@ -357,15 +358,35 @@ func (c *container) DeleteCheckpoint(name string) error {
 }
 
 func (c *container) Pids() ([]int, error) {
-	f, err := libcontainer.New(specs.LinuxStateDirectory, libcontainer.Cgroupfs)
-	if err != nil {
-		return nil, err
-	}
-	container, err := f.Load(c.id)
+	container, err := c.getLibctContainer()
 	if err != nil {
 		return nil, err
 	}
 	return container.Processes()
+}
+
+func (c *container) Stats() (*Stat, error) {
+	container, err := c.getLibctContainer()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	stats, err := container.Stats()
+	if err != nil {
+		return nil, err
+	}
+	return &Stat{
+		Timestamp: now,
+		Data:      stats,
+	}, nil
+}
+
+func (c *container) getLibctContainer() (libcontainer.Container, error) {
+	f, err := libcontainer.New(specs.LinuxStateDirectory, libcontainer.Cgroupfs)
+	if err != nil {
+		return nil, err
+	}
+	return f.Load(c.id)
 }
 
 func getRootIDs(s *specs.LinuxSpec) (int, int, error) {
