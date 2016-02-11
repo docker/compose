@@ -103,6 +103,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.get('HostConfig.CpuQuota'), 40000)
 
     def test_create_container_with_shm_size(self):
+        self.require_api_version('1.22')
         service = self.create_service('db', shm_size=67108864)
         container = service.create_container()
         service.start_container(container)
