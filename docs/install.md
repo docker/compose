@@ -54,7 +54,7 @@ which the release page specifies, in your terminal.
 7. Test the installation.
 
         $ docker-compose --version
-        docker-compose version: 1.5.2
+        docker-compose version: 1.6.0
 
 
 ## Alternative install options
