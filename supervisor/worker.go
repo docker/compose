@@ -65,6 +65,8 @@ func (w *worker) Start() {
 		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
-		t.StartResponse <- StartResponse{}
+		t.StartResponse <- StartResponse{
+			Container: t.Container,
+		}
 	}
 }

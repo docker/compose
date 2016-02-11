@@ -47,8 +47,14 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	<-e.StartResponse
-	return &types.CreateContainerResponse{}, nil
+	r := <-e.StartResponse
+	apiC, err := createAPIContainer(r.Container)
+	if err != nil {
+		return nil, err
+	}
+	return &types.CreateContainerResponse{
+		Container: apiC,
+	}, nil
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
@@ -178,39 +184,47 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 		},
 	}
 	for _, c := range e.Containers {
-		processes, err := c.Processes()
+		apiC, err := createAPIContainer(c)
 		if err != nil {
-			return nil, grpc.Errorf(codes.Internal, "get processes for container")
+			return nil, err
 		}
-		var procs []*types.Process
-		for _, p := range processes {
-			oldProc := p.Spec()
-			stdio := p.Stdio()
-			procs = append(procs, &types.Process{
-				Pid:       p.ID(),
-				SystemPid: uint32(p.SystemPid()),
-				Terminal:  oldProc.Terminal,
-				Args:      oldProc.Args,
-				Env:       oldProc.Env,
-				Cwd:       oldProc.Cwd,
-				Stdin:     stdio.Stdin,
-				Stdout:    stdio.Stdout,
-				Stderr:    stdio.Stderr,
-				User: &types.User{
-					Uid:            oldProc.User.UID,
-					Gid:            oldProc.User.GID,
-					AdditionalGids: oldProc.User.AdditionalGids,
-				},
-			})
-		}
-		state.Containers = append(state.Containers, &types.Container{
-			Id:         c.ID(),
-			BundlePath: c.Path(),
-			Processes:  procs,
-			Status:     string(c.State()),
-		})
+		state.Containers = append(state.Containers, apiC)
 	}
 	return state, nil
+}
+
+func createAPIContainer(c runtime.Container) (*types.Container, error) {
+	processes, err := c.Processes()
+	if err != nil {
+		return nil, grpc.Errorf(codes.Internal, "get processes for container")
+	}
+	var procs []*types.Process
+	for _, p := range processes {
+		oldProc := p.Spec()
+		stdio := p.Stdio()
+		procs = append(procs, &types.Process{
+			Pid:       p.ID(),
+			SystemPid: uint32(p.SystemPid()),
+			Terminal:  oldProc.Terminal,
+			Args:      oldProc.Args,
+			Env:       oldProc.Env,
+			Cwd:       oldProc.Cwd,
+			Stdin:     stdio.Stdin,
+			Stdout:    stdio.Stdout,
+			Stderr:    stdio.Stderr,
+			User: &types.User{
+				Uid:            oldProc.User.UID,
+				Gid:            oldProc.User.GID,
+				AdditionalGids: oldProc.User.AdditionalGids,
+			},
+		})
+	}
+	return &types.Container{
+		Id:         c.ID(),
+		BundlePath: c.Path(),
+		Processes:  procs,
+		Status:     string(c.State()),
+	}, nil
 }
 
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {

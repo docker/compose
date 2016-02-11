@@ -37,6 +37,7 @@ func NewEvent(t EventType) *Event {
 }
 
 type StartResponse struct {
+	Container runtime.Container
 }
 
 type Event struct {

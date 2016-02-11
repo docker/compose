@@ -37,6 +37,7 @@ message CreateContainerRequest {
 }
 
 message CreateContainerResponse {
+    Container container = 1;
 }
 
 message SignalRequest {
