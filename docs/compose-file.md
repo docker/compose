@@ -591,7 +591,7 @@ specifying read-only access(``ro``) or read-write(``rw``).
 >     - container_name
 >     - container_name:rw
 
-### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
+### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, shm\_size, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/engine/reference/run/) counterpart.
@@ -615,6 +615,7 @@ Each of these is a single value, analogous to its
     restart: always
 
     read_only: true
+    shm_size: 64M
     stdin_open: true
     tty: true
 

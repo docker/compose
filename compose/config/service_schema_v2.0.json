@@ -127,6 +127,7 @@
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "shm_size": {"type": ["number", "string"]},
         "stdin_open": {"type": "boolean"},
         "stop_signal": {"type": "string"},
         "tty": {"type": "boolean"},

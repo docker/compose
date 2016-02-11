@@ -102,6 +102,12 @@ class ServiceTest(DockerClientTestCase):
         container.start()
         self.assertEqual(container.get('HostConfig.CpuQuota'), 40000)
 
+    def test_create_container_with_shm_size(self):
+        service = self.create_service('db', shm_size=67108864)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.ShmSize'), 67108864)
+
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
         service = self.create_service('db', extra_hosts=extra_hosts)
