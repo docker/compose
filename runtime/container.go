@@ -40,6 +40,8 @@ type Container interface {
 	Checkpoint(Checkpoint) error
 	// DeleteCheckpoint deletes the checkpoint for the provided name
 	DeleteCheckpoint(name string) error
+	// Labels are user provided labels for the container
+	Labels() []string
 	// Stats returns realtime container stats and resource information
 	// Stats() (*Stat, error) // OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
@@ -67,11 +69,12 @@ func NewStdio(stdin, stdout, stderr string) Stdio {
 }
 
 // New returns a new container
-func New(root, id, bundle string) (Container, error) {
+func New(root, id, bundle string, labels []string) (Container, error) {
 	c := &container{
 		root:      root,
 		id:        id,
 		bundle:    bundle,
+		labels:    labels,
 		processes: make(map[string]*process),
 	}
 	if err := os.Mkdir(filepath.Join(root, id), 0755); err != nil {
@@ -84,6 +87,7 @@ func New(root, id, bundle string) (Container, error) {
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(state{
 		Bundle: bundle,
+		Labels: labels,
 	}); err != nil {
 		return nil, err
 	}
@@ -104,6 +108,7 @@ func Load(root, id string) (Container, error) {
 		root:      root,
 		id:        id,
 		bundle:    s.Bundle,
+		labels:    s.Labels,
 		processes: make(map[string]*process),
 	}
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
@@ -149,6 +154,7 @@ type container struct {
 	bundle    string
 	processes map[string]*process
 	stdio     Stdio
+	labels    []string
 }
 
 func (c *container) ID() string {
@@ -157,6 +163,10 @@ func (c *container) ID() string {
 
 func (c *container) Path() string {
 	return c.bundle
+}
+
+func (c *container) Labels() []string {
+	return c.labels
 }
 
 func (c *container) Start(checkpoint string, s Stdio) (Process, error) {

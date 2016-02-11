@@ -37,6 +37,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.Stdin = c.Stdin
 	e.Stdout = c.Stdout
 	e.Stderr = c.Stderr
+	e.Labels = c.Labels
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
@@ -224,6 +225,7 @@ func createAPIContainer(c runtime.Container) (*types.Container, error) {
 		Id:         c.ID(),
 		BundlePath: c.Path(),
 		Processes:  procs,
+		Labels:     c.Labels(),
 		Status:     string(c.State()),
 	}, nil
 }

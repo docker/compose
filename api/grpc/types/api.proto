@@ -34,6 +34,7 @@ message CreateContainerRequest {
     string stdin = 4; // path to the file where stdin will be read (optional)
 	string stdout = 5; // path to file where stdout will be written (optional)
 	string stderr = 6; // path to file where stderr will be written (optional)
+    repeated string labels = 7;
 }
 
 message CreateContainerResponse {
@@ -130,6 +131,7 @@ message Container {
 	string bundlePath = 3; // Path to OCI bundle
 	repeated Process processes = 4; // List of processes which run in container
 	string status = 5; // Container status ("running", "paused", etc.)
+    repeated string labels = 6;
 }
 
 // Machine is information about machine on which containerd is run

@@ -64,6 +64,7 @@ type Event struct {
 	ResizeTty     bool
 	Width         int
 	Height        int
+	Labels        []string
 }
 
 type Handler interface {

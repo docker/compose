@@ -114,6 +114,11 @@ var startCommand = cli.Command{
 			Name:  "attach,a",
 			Usage: "connect to the stdio of the container",
 		},
+		cli.StringSliceFlag{
+			Name:  "label,l",
+			Value: &cli.StringSlice{},
+			Usage: "set labels for the container",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -144,6 +149,7 @@ var startCommand = cli.Command{
 				Stdin:      s.stdin,
 				Stdout:     s.stdout,
 				Stderr:     s.stderr,
+				Labels:     context.StringSlice("label"),
 			}
 		)
 		if context.Bool("attach") {
