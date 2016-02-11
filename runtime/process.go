@@ -40,32 +40,47 @@ type Process interface {
 	SystemPid() int
 }
 
-func newProcess(root, id string, c *container, s specs.Process, stdio Stdio) (*process, error) {
+type processConfig struct {
+	id          string
+	root        string
+	processSpec specs.Process
+	spec        *specs.LinuxSpec
+	c           *container
+	stdio       Stdio
+}
+
+func newProcess(config *processConfig) (*process, error) {
 	p := &process{
-		root:      root,
-		id:        id,
-		container: c,
-		spec:      s,
-		stdio:     stdio,
+		root:      config.root,
+		id:        config.id,
+		container: config.c,
+		spec:      config.processSpec,
+		stdio:     config.stdio,
 	}
-	f, err := os.Create(filepath.Join(root, "process.json"))
+	uid, gid, err := getRootIDs(config.spec)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Create(filepath.Join(config.root, "process.json"))
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(ProcessState{
-		Process: s,
-		Stdin:   stdio.Stdin,
-		Stdout:  stdio.Stdout,
-		Stderr:  stdio.Stderr,
+		Process: config.processSpec,
+		RootUID: uid,
+		RootGID: gid,
+		Stdin:   config.stdio.Stdin,
+		Stdout:  config.stdio.Stdout,
+		Stderr:  config.stdio.Stderr,
 	}); err != nil {
 		return nil, err
 	}
-	exit, err := getExitPipe(filepath.Join(root, ExitFile))
+	exit, err := getExitPipe(filepath.Join(config.root, ExitFile))
 	if err != nil {
 		return nil, err
 	}
-	control, err := getControlPipe(filepath.Join(root, ControlFile))
+	control, err := getControlPipe(filepath.Join(config.root, ControlFile))
 	if err != nil {
 		return nil, err
 	}

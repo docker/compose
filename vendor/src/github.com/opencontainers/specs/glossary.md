@@ -6,7 +6,7 @@ A [directory structure](bundle.md) that is written ahead of time, distributed, a
 
 ## Configuration
 
-The [`config.json`](config.md) and [`runtime.json`](runtime-config.md) files in a [bundle](#bundle) which define the intended [container](#container) and container process.
+The [`config.json`](config.md) file in a [bundle](#bundle) which defines the intended [container](#container) and container process.
 
 ## Container
 

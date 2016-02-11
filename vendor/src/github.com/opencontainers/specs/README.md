@@ -6,12 +6,11 @@
 Table of Contents
 
 - [Container Principles](principles.md)
+- [Specification Style](style.md)
 - [Filesystem Bundle](bundle.md)
 - Configuration
-  - [Container Configuration](config.md)
-  - [Container Configuration (Linux-specific)](config-linux.md)
-  - [Runtime Configuration](runtime-config.md)
-  - [Runtime Configuration (Linux-specific)](runtime-config-linux.md)
+  - [General](config.md)
+  - [Linux-specific](config-linux.md)
 - [Runtime and Lifecycle](runtime.md)
   - [Linux Specific Runtime](runtime-linux.md)
 - [Implementations](implementations.md)
@@ -23,9 +22,20 @@ In the specifications in the above table of contents, the keywords "MUST", "MUST
 
 To provide context for users the following section gives example use cases for each part of the spec.
 
-## Filesystem Bundle & Configuration
+#### Application Bundle Builders
 
-- A user can create a root filesystem and configuration, with low-level OS and host specific details, and launch it as a container under an Open Container runtime.
+Application bundle builders can create a [bundle](bundle.md) directory that includes all of the files required for launching an application as a container.
+The bundle contains an OCI [configuration file](config.md) where the builder can specify host-independent details such as [which executable to launch](config.md#process-configuration) and host-specific settings such as [mount](config.md#mounts) locations, [hook](config.md#hooks) paths, Linux [namespaces](config-linux.md#namespaces) and [cgroups](config-linux.md#control-groups).
+Because the configuration includes host-specific settings, application bundle directories copied between two hosts may require configuration adjustments.
+
+#### Hook Developers
+
+[Hook](config.md#hooks) developers can extend the functionality of an OCI-compliant runtime by hooking into a container's lifecycle with an external application.
+Example use cases include sophisticated network configuration, volume garbage collection, etc.
+
+#### Runtime Developers
+
+Runtime developers can build runtime implementations that run OCI-compliant bundles and container configuration, containing low-level OS and host specific details, on a particular platform.
 
 # Releases
 

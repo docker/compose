@@ -157,11 +157,10 @@ func (p *process) delete() error {
 func (p *process) openIO() error {
 	p.stdio = &stdio{}
 	var (
-		uid = int(p.state.User.UID)
-		gid = int(p.state.User.GID)
+		uid = p.state.RootUID
+		gid = p.state.RootGID
 	)
 	if p.state.Terminal {
-		// FIXME: this is wrong for user namespaces and will need to be translated
 		console, err := libcontainer.NewConsole(uid, gid)
 		if err != nil {
 			return err
