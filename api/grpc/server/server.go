@@ -183,7 +183,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 	state := &types.StateResponse{
 		Machine: &types.Machine{
 			Cpus:   uint32(m.Cpus),
-			Memory: uint64(m.Cpus),
+			Memory: uint64(m.Memory),
 		},
 	}
 	for _, c := range e.Containers {

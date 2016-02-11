@@ -18,6 +18,6 @@ func CollectMachineInformation() (Machine, error) {
 	if err := mem.Get(); err != nil {
 		return m, err
 	}
-	m.Memory = int64(mem.Total)
+	m.Memory = int64(mem.Total / 1024 / 1024)
 	return m, nil
 }
