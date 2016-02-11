@@ -27,19 +27,18 @@ type process struct {
 	state        *runtime.ProcessState
 }
 
-func newProcess(id, bundle string, exec bool, checkpoint string) (*process, error) {
+func newProcess(id, bundle string) (*process, error) {
 	p := &process{
 		id:     id,
 		bundle: bundle,
-		exec:   exec,
 	}
 	s, err := loadProcess()
 	if err != nil {
 		return nil, err
 	}
 	p.state = s
-	if checkpoint != "" {
-		cpt, err := loadCheckpoint(bundle, checkpoint)
+	if s.Checkpoint != "" {
+		cpt, err := loadCheckpoint(bundle, s.Checkpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +82,7 @@ func (p *process) start() error {
 		return err
 	}
 	args := []string{}
-	if p.exec {
+	if p.state.Exec {
 		args = append(args, "exec",
 			"--process", filepath.Join(cwd, "process.json"),
 			"--console", p.consolePath,
@@ -146,7 +145,7 @@ func (p *process) pid() int {
 }
 
 func (p *process) delete() error {
-	if !p.exec {
+	if !p.state.Exec {
 		return exec.Command("runc", "delete", p.id).Run()
 	}
 	return nil

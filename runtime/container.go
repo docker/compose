@@ -150,7 +150,6 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 		return nil, err
 	}
 	cmd := exec.Command("containerd-shim",
-		"-checkpoint", checkpoint,
 		c.id, c.bundle,
 	)
 	cmd.Dir = processRoot
@@ -162,6 +161,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 		return nil, err
 	}
 	config := &processConfig{
+		checkpoint:  checkpoint,
 		root:        processRoot,
 		id:          InitProcessID,
 		c:           c,
@@ -189,7 +189,6 @@ func (c *container) Exec(pid string, spec specs.Process, s Stdio) (Process, erro
 		return nil, err
 	}
 	cmd := exec.Command("containerd-shim",
-		"-exec",
 		c.id, c.bundle,
 	)
 	cmd.Dir = processRoot
@@ -197,6 +196,7 @@ func (c *container) Exec(pid string, spec specs.Process, s Stdio) (Process, erro
 		Setpgid: true,
 	}
 	config := &processConfig{
+		exec:        true,
 		id:          pid,
 		root:        processRoot,
 		c:           c,

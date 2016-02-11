@@ -12,17 +12,6 @@ import (
 	"github.com/docker/docker/pkg/term"
 )
 
-var (
-	fexec       bool
-	fcheckpoint string
-)
-
-func init() {
-	flag.BoolVar(&fexec, "exec", false, "exec a process instead of starting the init")
-	flag.StringVar(&fcheckpoint, "checkpoint", "", "start container from an existing checkpoint")
-	flag.Parse()
-}
-
 func setupLogger() {
 	f, err := os.OpenFile("/tmp/shim.log", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
@@ -37,6 +26,7 @@ func setupLogger() {
 // the cwd of the shim should be the bundle for the container.  Arg1 should be the path
 // to the state directory where the shim can locate fifos and other information.
 func main() {
+	flag.Parse()
 	// start handling signals as soon as possible so that things are properly reaped
 	// or if runc exits before we hit the handler
 	signals := make(chan os.Signal, 2048)
@@ -56,7 +46,7 @@ func main() {
 		logrus.WithField("error", err).Fatal("shim: open control pipe")
 	}
 	defer control.Close()
-	p, err := newProcess(flag.Arg(0), flag.Arg(1), fexec, fcheckpoint)
+	p, err := newProcess(flag.Arg(0), flag.Arg(1))
 	if err != nil {
 		logrus.WithField("error", err).Fatal("shim: create new process")
 	}

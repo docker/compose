@@ -44,11 +44,13 @@ type state struct {
 
 type ProcessState struct {
 	specs.Process
-	RootUID int    `json:"rootUID"`
-	RootGID int    `json:"rootGID"`
-	Stdin   string `json:"containerdStdin"`
-	Stdout  string `json:"containerdStdout"`
-	Stderr  string `json:"containerdStderr"`
+	Exec       bool   `json:"exec"`
+	Checkpoint string `json:"checkpoint"`
+	RootUID    int    `json:"rootUID"`
+	RootGID    int    `json:"rootGID"`
+	Stdin      string `json:"containerdStdin"`
+	Stdout     string `json:"containerdStdout"`
+	Stderr     string `json:"containerdStderr"`
 }
 
 type Stat struct {

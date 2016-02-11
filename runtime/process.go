@@ -47,6 +47,8 @@ type processConfig struct {
 	spec        *specs.LinuxSpec
 	c           *container
 	stdio       Stdio
+	exec        bool
+	checkpoint  string
 }
 
 func newProcess(config *processConfig) (*process, error) {
@@ -67,12 +69,14 @@ func newProcess(config *processConfig) (*process, error) {
 	}
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(ProcessState{
-		Process: config.processSpec,
-		RootUID: uid,
-		RootGID: gid,
-		Stdin:   config.stdio.Stdin,
-		Stdout:  config.stdio.Stdout,
-		Stderr:  config.stdio.Stderr,
+		Process:    config.processSpec,
+		Exec:       config.exec,
+		Checkpoint: config.checkpoint,
+		RootUID:    uid,
+		RootGID:    gid,
+		Stdin:      config.stdio.Stdin,
+		Stdout:     config.stdio.Stdout,
+		Stderr:     config.stdio.Stderr,
 	}); err != nil {
 		return nil, err
 	}
