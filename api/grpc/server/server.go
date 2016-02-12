@@ -51,7 +51,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 		return nil, err
 	}
 	r := <-e.StartResponse
-	apiC, err := createAPIContainer(r.Container)
+	apiC, err := createAPIContainer(r.Container, false)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 		},
 	}
 	for _, c := range e.Containers {
-		apiC, err := createAPIContainer(c)
+		apiC, err := createAPIContainer(c, true)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 	return state, nil
 }
 
-func createAPIContainer(c runtime.Container) (*types.Container, error) {
+func createAPIContainer(c runtime.Container, getPids bool) (*types.Container, error) {
 	processes, err := c.Processes()
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, "get processes for container")
@@ -223,9 +223,11 @@ func createAPIContainer(c runtime.Container) (*types.Container, error) {
 			},
 		})
 	}
-	pids, err := c.Pids()
-	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, "get all pids for container")
+	var pids []int
+	if getPids {
+		if pids, err = c.Pids(); err != nil {
+			return nil, grpc.Errorf(codes.Internal, "get all pids for container")
+		}
 	}
 	return &types.Container{
 		Id:         c.ID(),
