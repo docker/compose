@@ -157,6 +157,7 @@ message UpdateContainerResponse {
 }
 
 message EventsRequest {
+    uint64 timestamp = 1;
 }
 
 message Event {

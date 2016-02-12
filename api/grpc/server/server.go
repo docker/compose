@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -270,7 +271,7 @@ func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessReq
 }
 
 func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
-	events := s.sv.Events()
+	events := s.sv.Events(time.Unix(int64(r.Timestamp), 0))
 	defer s.sv.Unsubscribe(events)
 	for e := range events {
 		if err := stream.Send(&types.Event{

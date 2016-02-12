@@ -101,7 +101,7 @@ func checkLimits() error {
 		logrus.WithFields(logrus.Fields{
 			"current": l.Cur,
 			"max":     l.Max,
-		}).Warn("low RLIMIT_NOFILE changing to max")
+		}).Warn("containerd: low RLIMIT_NOFILE changing to max")
 		l.Cur = l.Max
 		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
 	}
@@ -120,7 +120,6 @@ func debugMetrics(interval time.Duration, graphiteAddr string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Debugf("Sending metrics to Graphite server on %s", graphiteAddr)
 		go graphite.Graphite(metrics.DefaultRegistry, 10e9, "metrics", addr)
 	} else {
 		l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
@@ -144,13 +143,13 @@ func processMetrics() {
 		// collect the number of open fds
 		fds, err := util.GetOpenFds(os.Getpid())
 		if err != nil {
-			logrus.WithField("error", err).Error("get open fd count")
+			logrus.WithField("error", err).Error("containerd: get open fd count")
 		}
 		fg.Update(int64(fds))
 		// get the memory used
 		m := sigar.ProcMem{}
 		if err := m.Get(os.Getpid()); err != nil {
-			logrus.WithField("error", err).Error("get pid memory information")
+			logrus.WithField("error", err).Error("containerd: get pid memory information")
 		}
 		memg.Update(int64(m.Size))
 	}
@@ -188,7 +187,7 @@ func daemon(address, stateDir string, concurrency int, oom bool) error {
 	}
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(sv))
-	logrus.Debugf("GRPC API listen on %s", address)
+	logrus.Debugf("containerd: grpc api on %s", address)
 	return s.Serve(l)
 }
 
