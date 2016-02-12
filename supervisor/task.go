@@ -8,26 +8,26 @@ import (
 	"github.com/opencontainers/specs"
 )
 
-type EventType string
+type TaskType string
 
 const (
-	ExecExitEventType         EventType = "execExit"
-	ExitEventType             EventType = "exit"
-	StartContainerEventType   EventType = "startContainer"
-	DeleteEventType           EventType = "deleteContainerEvent"
-	GetContainerEventType     EventType = "getContainer"
-	SignalEventType           EventType = "signal"
-	AddProcessEventType       EventType = "addProcess"
-	UpdateContainerEventType  EventType = "updateContainer"
-	UpdateProcessEventType    EventType = "updateProcess"
-	CreateCheckpointEventType EventType = "createCheckpoint"
-	DeleteCheckpointEventType EventType = "deleteCheckpoint"
-	StatsEventType            EventType = "events"
-	OOMEventType              EventType = "oom"
+	ExecExitTaskType         TaskType = "execExit"
+	ExitTaskType             TaskType = "exit"
+	StartContainerTaskType   TaskType = "startContainer"
+	DeleteTaskType           TaskType = "deleteContainerEvent"
+	GetContainerTaskType     TaskType = "getContainer"
+	SignalTaskType           TaskType = "signal"
+	AddProcessTaskType       TaskType = "addProcess"
+	UpdateContainerTaskType  TaskType = "updateContainer"
+	UpdateProcessTaskType    TaskType = "updateProcess"
+	CreateCheckpointTaskType TaskType = "createCheckpoint"
+	DeleteCheckpointTaskType TaskType = "deleteCheckpoint"
+	StatsTaskType            TaskType = "events"
+	OOMTaskType              TaskType = "oom"
 )
 
-func NewEvent(t EventType) *Event {
-	return &Event{
+func NewTask(t TaskType) *Task {
+	return &Task{
 		Type:      t,
 		Timestamp: time.Now(),
 		Err:       make(chan error, 1),
@@ -38,8 +38,8 @@ type StartResponse struct {
 	Container runtime.Container
 }
 
-type Event struct {
-	Type          EventType
+type Task struct {
+	Type          TaskType
 	Timestamp     time.Time
 	ID            string
 	BundlePath    string
@@ -66,18 +66,18 @@ type Event struct {
 }
 
 type Handler interface {
-	Handle(*Event) error
+	Handle(*Task) error
 }
 
-type commonEvent struct {
-	data *Event
+type commonTask struct {
+	data *Task
 	sv   *Supervisor
 }
 
-func (e *commonEvent) Handle() {
+func (e *commonTask) Handle() {
 	h, ok := e.sv.handlers[e.data.Type]
 	if !ok {
-		e.data.Err <- ErrUnknownEvent
+		e.data.Err <- ErrUnknownTask
 		return
 	}
 	err := h.Handle(e.data)

@@ -12,7 +12,7 @@ type Worker interface {
 	Start()
 }
 
-type StartTask struct {
+type startTask struct {
 	Container     runtime.Container
 	Checkpoint    string
 	Stdin         string
@@ -40,9 +40,9 @@ func (w *worker) Start() {
 		started := time.Now()
 		process, err := t.Container.Start(t.Checkpoint, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
-			evt := NewEvent(DeleteEventType)
+			evt := NewTask(DeleteTaskType)
 			evt.ID = t.Container.ID()
-			w.s.SendEvent(evt)
+			w.s.SendTask(evt)
 			t.Err <- err
 			continue
 		}
@@ -64,5 +64,10 @@ func (w *worker) Start() {
 		t.StartResponse <- StartResponse{
 			Container: t.Container,
 		}
+		w.s.notifySubscribers(Event{
+			Timestamp: time.Now(),
+			ID:        t.Container.ID(),
+			Type:      "start-container",
+		})
 	}
 }

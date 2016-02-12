@@ -4,13 +4,13 @@ import "errors"
 
 var (
 	// External errors
-	ErrEventChanNil           = errors.New("containerd: event channel is nil")
+	ErrTaskChanNil            = errors.New("containerd: task channel is nil")
 	ErrBundleNotFound         = errors.New("containerd: bundle not found")
 	ErrContainerNotFound      = errors.New("containerd: container not found")
 	ErrContainerExists        = errors.New("containerd: container already exists")
 	ErrProcessNotFound        = errors.New("containerd: processs not found for container")
 	ErrUnknownContainerStatus = errors.New("containerd: unknown container status ")
-	ErrUnknownEvent           = errors.New("containerd: unknown event type")
+	ErrUnknownTask            = errors.New("containerd: unknown task type")
 
 	// Internal errors
 	errShutdown          = errors.New("containerd: supervisor is shutdown")

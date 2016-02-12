@@ -1,10 +1,10 @@
 package supervisor
 
-type GetContainersEvent struct {
+type GetContainersTask struct {
 	s *Supervisor
 }
 
-func (h *GetContainersEvent) Handle(e *Event) error {
+func (h *GetContainersTask) Handle(e *Task) error {
 	if e.ID != "" {
 		ci := h.s.containers[e.ID]
 		if ci == nil {

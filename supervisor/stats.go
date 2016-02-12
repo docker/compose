@@ -2,11 +2,11 @@ package supervisor
 
 import "time"
 
-type StatsEvent struct {
+type StatsTask struct {
 	s *Supervisor
 }
 
-func (h *StatsEvent) Handle(e *Event) error {
+func (h *StatsTask) Handle(e *Task) error {
 	start := time.Now()
 	i, ok := h.s.containers[e.ID]
 	if !ok {

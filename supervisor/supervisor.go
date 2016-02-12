@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/chanotify"
@@ -17,7 +18,8 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
+func New(stateDir string, oom bool) (*Supervisor, error) {
+	tasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
@@ -34,7 +36,7 @@ func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) 
 		containers:  make(map[string]*containerInfo),
 		tasks:       tasks,
 		machine:     machine,
-		subscribers: make(map[chan *Event]struct{}),
+		subscribers: make(map[chan Event]struct{}),
 		el:          eventloop.NewChanLoop(defaultBufferSize),
 		monitor:     monitor,
 	}
@@ -42,26 +44,26 @@ func New(stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) 
 		s.notifier = chanotify.New()
 		go func() {
 			for id := range s.notifier.Chan() {
-				e := NewEvent(OOMEventType)
+				e := NewTask(OOMTaskType)
 				e.ID = id.(string)
-				s.SendEvent(e)
+				s.SendTask(e)
 			}
 		}()
 	}
 	// register default event handlers
-	s.handlers = map[EventType]Handler{
-		ExecExitEventType:         &ExecExitEvent{s},
-		ExitEventType:             &ExitEvent{s},
-		StartContainerEventType:   &StartEvent{s},
-		DeleteEventType:           &DeleteEvent{s},
-		GetContainerEventType:     &GetContainersEvent{s},
-		SignalEventType:           &SignalEvent{s},
-		AddProcessEventType:       &AddProcessEvent{s},
-		UpdateContainerEventType:  &UpdateEvent{s},
-		CreateCheckpointEventType: &CreateCheckpointEvent{s},
-		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
-		StatsEventType:            &StatsEvent{s},
-		UpdateProcessEventType:    &UpdateProcessEvent{s},
+	s.handlers = map[TaskType]Handler{
+		ExecExitTaskType:         &ExecExitTask{s},
+		ExitTaskType:             &ExitTask{s},
+		StartContainerTaskType:   &StartTask{s},
+		DeleteTaskType:           &DeleteTask{s},
+		GetContainerTaskType:     &GetContainersTask{s},
+		SignalTaskType:           &SignalTask{s},
+		AddProcessTaskType:       &AddProcessTask{s},
+		UpdateContainerTaskType:  &UpdateTask{s},
+		CreateCheckpointTaskType: &CreateCheckpointTask{s},
+		DeleteCheckpointTaskType: &DeleteCheckpointTask{s},
+		StatsTaskType:            &StatsTask{s},
+		UpdateProcessTaskType:    &UpdateProcessTask{s},
 	}
 	go s.exitHandler()
 	if err := s.restore(); err != nil {
@@ -78,13 +80,13 @@ type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir   string
 	containers map[string]*containerInfo
-	handlers   map[EventType]Handler
-	events     chan *Event
-	tasks      chan *StartTask
+	handlers   map[TaskType]Handler
+	events     chan *Task
+	tasks      chan *startTask
 	// we need a lock around the subscribers map only because additions and deletions from
 	// the map are via the API so we cannot really control the concurrency
 	subscriberLock sync.RWMutex
-	subscribers    map[chan *Event]struct{}
+	subscribers    map[chan Event]struct{}
 	machine        Machine
 	notifier       *chanotify.Notifier
 	el             eventloop.EventLoop
@@ -105,19 +107,27 @@ func (s *Supervisor) Close() error {
 	return nil
 }
 
+type Event struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	Pid       string    `json:"pid,omitempty"`
+	Status    int       `json:"status,omitempty"`
+}
+
 // Events returns an event channel that external consumers can use to receive updates
 // on container events
-func (s *Supervisor) Events() chan *Event {
+func (s *Supervisor) Events() chan Event {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
-	c := make(chan *Event, defaultBufferSize)
+	c := make(chan Event, defaultBufferSize)
 	EventSubscriberCounter.Inc(1)
 	s.subscribers[c] = struct{}{}
 	return c
 }
 
 // Unsubscribe removes the provided channel from receiving any more events
-func (s *Supervisor) Unsubscribe(sub chan *Event) {
+func (s *Supervisor) Unsubscribe(sub chan Event) {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
 	delete(s.subscribers, sub)
@@ -127,7 +137,7 @@ func (s *Supervisor) Unsubscribe(sub chan *Event) {
 
 // notifySubscribers will send the provided event to the external subscribers
 // of the events channel
-func (s *Supervisor) notifySubscribers(e *Event) {
+func (s *Supervisor) notifySubscribers(e Event) {
 	s.subscriberLock.RLock()
 	defer s.subscriberLock.RUnlock()
 	for sub := range s.subscribers {
@@ -159,17 +169,17 @@ func (s *Supervisor) Machine() Machine {
 	return s.machine
 }
 
-// SendEvent sends the provided event the the supervisors main event loop
-func (s *Supervisor) SendEvent(evt *Event) {
-	EventsCounter.Inc(1)
-	s.el.Send(&commonEvent{data: evt, sv: s})
+// SendTask sends the provided event the the supervisors main event loop
+func (s *Supervisor) SendTask(evt *Task) {
+	TasksCounter.Inc(1)
+	s.el.Send(&commonTask{data: evt, sv: s})
 }
 
 func (s *Supervisor) exitHandler() {
 	for p := range s.monitor.Exits() {
-		e := NewEvent(ExitEventType)
+		e := NewTask(ExitTaskType)
 		e.Process = p
-		s.SendEvent(e)
+		s.SendTask(e)
 	}
 }
 
@@ -215,9 +225,9 @@ func (s *Supervisor) restore() error {
 			// exit events
 			sort.Sort(&processSorter{exitedProcesses})
 			for _, p := range exitedProcesses {
-				e := NewEvent(ExitEventType)
+				e := NewTask(ExitTaskType)
 				e.Process = p
-				s.SendEvent(e)
+				s.SendTask(e)
 			}
 		}
 	}

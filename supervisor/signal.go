@@ -1,10 +1,10 @@
 package supervisor
 
-type SignalEvent struct {
+type SignalTask struct {
 	s *Supervisor
 }
 
-func (h *SignalEvent) Handle(e *Event) error {
+func (h *SignalTask) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound

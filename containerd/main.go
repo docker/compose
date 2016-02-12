@@ -39,11 +39,6 @@ var daemonFlags = []cli.Flag{
 		Value: "/run/containerd",
 		Usage: "runtime state directory",
 	},
-	cli.IntFlag{
-		Name:  "c,concurrency",
-		Value: 10,
-		Usage: "set the concurrency level for tasks",
-	},
 	cli.DurationFlag{
 		Name:  "metrics-interval",
 		Value: 120 * time.Second,
@@ -86,7 +81,7 @@ func main() {
 		if err := daemon(
 			context.String("listen"),
 			context.String("state-dir"),
-			context.Int("concurrency"),
+			10,
 			context.Bool("oom-notify"),
 		); err != nil {
 			logrus.Fatal(err)
@@ -171,8 +166,7 @@ func daemon(address, stateDir string, concurrency int, oom bool) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	go reapProcesses()
-	tasks := make(chan *supervisor.StartTask, concurrency*100)
-	sv, err := supervisor.New(stateDir, tasks, oom)
+	sv, err := supervisor.New(stateDir, oom)
 	if err != nil {
 		return err
 	}

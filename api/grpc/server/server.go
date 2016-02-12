@@ -32,7 +32,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if c.BundlePath == "" {
 		return nil, errors.New("empty bundle path")
 	}
-	e := supervisor.NewEvent(supervisor.StartContainerEventType)
+	e := supervisor.NewTask(supervisor.StartContainerTaskType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
 	e.Stdin = c.Stdin
@@ -45,7 +45,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 			Name: c.Checkpoint,
 		}
 	}
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -60,11 +60,11 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
-	e := supervisor.NewEvent(supervisor.SignalEventType)
+	e := supervisor.NewTask(supervisor.SignalTaskType)
 	e.ID = r.Id
 	e.Pid = r.Pid
 	e.Signal = syscall.Signal(int(r.Signal))
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	if r.Pid == "" {
 		return nil, fmt.Errorf("process id cannot be empty")
 	}
-	e := supervisor.NewEvent(supervisor.AddProcessEventType)
+	e := supervisor.NewTask(supervisor.AddProcessTaskType)
 	e.ID = r.Id
 	e.Pid = r.Pid
 	e.ProcessSpec = process
@@ -97,7 +97,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	e.Stdout = r.Stdout
 	e.Stderr = r.Stderr
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
-	e := supervisor.NewEvent(supervisor.CreateCheckpointEventType)
+	e := supervisor.NewTask(supervisor.CreateCheckpointTaskType)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        r.Checkpoint.Name,
@@ -115,7 +115,7 @@ func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpo
 		UnixSockets: r.Checkpoint.UnixSockets,
 		Shell:       r.Checkpoint.Shell,
 	}
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -126,12 +126,12 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 	if r.Name == "" {
 		return nil, errors.New("checkpoint name cannot be empty")
 	}
-	e := supervisor.NewEvent(supervisor.DeleteCheckpointEventType)
+	e := supervisor.NewTask(supervisor.DeleteCheckpointTaskType)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name: r.Name,
 	}
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -139,8 +139,8 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 }
 
 func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointRequest) (*types.ListCheckpointResponse, error) {
-	e := supervisor.NewEvent(supervisor.GetContainerEventType)
-	s.sv.SendEvent(e)
+	e := supervisor.NewTask(supervisor.GetContainerTaskType)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -173,9 +173,9 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 }
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
-	e := supervisor.NewEvent(supervisor.GetContainerEventType)
+	e := supervisor.NewTask(supervisor.GetContainerTaskType)
 	e.ID = r.Id
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -245,10 +245,10 @@ func toUint32(its []int) []uint32 {
 }
 
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
-	e := supervisor.NewEvent(supervisor.UpdateContainerEventType)
+	e := supervisor.NewTask(supervisor.UpdateContainerTaskType)
 	e.ID = r.Id
 	e.State = runtime.State(r.Status)
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -256,13 +256,13 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 }
 
 func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessRequest) (*types.UpdateProcessResponse, error) {
-	e := supervisor.NewEvent(supervisor.UpdateProcessEventType)
+	e := supervisor.NewTask(supervisor.UpdateProcessTaskType)
 	e.ID = r.Id
 	e.Pid = r.Pid
 	e.Height = int(r.Height)
 	e.Width = int(r.Width)
 	e.CloseStdin = r.CloseStdin
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -272,37 +272,25 @@ func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessReq
 func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
 	events := s.sv.Events()
 	defer s.sv.Unsubscribe(events)
-	for evt := range events {
-		var ev *types.Event
-		switch evt.Type {
-		case supervisor.ExitEventType, supervisor.ExecExitEventType:
-			ev = &types.Event{
-				Type:   "exit",
-				Id:     evt.ID,
-				Pid:    evt.Pid,
-				Status: uint32(evt.Status),
-			}
-		case supervisor.OOMEventType:
-			ev = &types.Event{
-				Type: "oom",
-				Id:   evt.ID,
-			}
+	for e := range events {
+		if err := stream.Send(&types.Event{
+			Id:        e.ID,
+			Type:      e.Type,
+			Timestamp: uint64(e.Timestamp.Unix()),
+			Pid:       e.Pid,
+			Status:    uint32(e.Status),
+		}); err != nil {
+			return err
 		}
-		if ev != nil {
-			if err := stream.Send(ev); err != nil {
-				return err
-			}
-		}
-
 	}
 	return nil
 }
 
 func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.StatsResponse, error) {
-	e := supervisor.NewEvent(supervisor.StatsEventType)
+	e := supervisor.NewTask(supervisor.StatsTaskType)
 	e.ID = r.Id
 	e.Stat = make(chan *runtime.Stat, 1)
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}

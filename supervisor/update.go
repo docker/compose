@@ -1,12 +1,16 @@
 package supervisor
 
-import "github.com/docker/containerd/runtime"
+import (
+	"time"
 
-type UpdateEvent struct {
+	"github.com/docker/containerd/runtime"
+)
+
+type UpdateTask struct {
 	s *Supervisor
 }
 
-func (h *UpdateEvent) Handle(e *Event) error {
+func (h *UpdateTask) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -18,10 +22,20 @@ func (h *UpdateEvent) Handle(e *Event) error {
 			if err := container.Resume(); err != nil {
 				return ErrUnknownContainerStatus
 			}
+			h.s.notifySubscribers(Event{
+				ID:        e.ID,
+				Type:      "resume",
+				Timestamp: time.Now(),
+			})
 		case runtime.Paused:
 			if err := container.Pause(); err != nil {
 				return ErrUnknownContainerStatus
 			}
+			h.s.notifySubscribers(Event{
+				ID:        e.ID,
+				Type:      "pause",
+				Timestamp: time.Now(),
+			})
 		default:
 			return ErrUnknownContainerStatus
 		}
@@ -29,11 +43,11 @@ func (h *UpdateEvent) Handle(e *Event) error {
 	return nil
 }
 
-type UpdateProcessEvent struct {
+type UpdateProcessTask struct {
 	s *Supervisor
 }
 
-func (h *UpdateProcessEvent) Handle(e *Event) error {
+func (h *UpdateProcessTask) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound

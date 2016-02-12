@@ -163,12 +163,8 @@ message Event {
 	string type = 1;
 	string id = 2;
 	uint32 status = 3;
-	string bundlePath = 4;
-	string pid = 5;
-	uint32 signal = 7;
-	Process process = 8;
-	repeated Container containers = 9;
-	Checkpoint checkpoint = 10;
+	string pid = 4;
+    uint64 timestamp = 5;
 }
 
 message NetworkStats {

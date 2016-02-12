@@ -7,11 +7,11 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
-type ExitEvent struct {
+type ExitTask struct {
 	s *Supervisor
 }
 
-func (h *ExitEvent) Handle(e *Event) error {
+func (h *ExitTask) Handle(e *Task) error {
 	start := time.Now()
 	proc := e.Process
 	status, err := proc.ExitStatus()
@@ -23,37 +23,43 @@ func (h *ExitEvent) Handle(e *Event) error {
 	// if the process is the the init process of the container then
 	// fire a separate event for this process
 	if proc.ID() != runtime.InitProcessID {
-		ne := NewEvent(ExecExitEventType)
+		ne := NewTask(ExecExitTaskType)
 		ne.ID = proc.Container().ID()
 		ne.Pid = proc.ID()
 		ne.Status = status
 		ne.Process = proc
-		h.s.SendEvent(ne)
+		h.s.SendTask(ne)
 
 		return nil
 	}
 	container := proc.Container()
-	ne := NewEvent(DeleteEventType)
+	ne := NewTask(DeleteTaskType)
 	ne.ID = container.ID()
 	ne.Status = status
 	ne.Pid = proc.ID()
-	h.s.SendEvent(ne)
+	h.s.SendTask(ne)
 
 	ExitProcessTimer.UpdateSince(start)
 
 	return nil
 }
 
-type ExecExitEvent struct {
+type ExecExitTask struct {
 	s *Supervisor
 }
 
-func (h *ExecExitEvent) Handle(e *Event) error {
+func (h *ExecExitTask) Handle(e *Task) error {
 	container := e.Process.Container()
 	// exec process: we remove this process without notifying the main event loop
 	if err := container.RemoveProcess(e.Pid); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
-	h.s.notifySubscribers(e)
+	h.s.notifySubscribers(Event{
+		Timestamp: time.Now(),
+		ID:        e.ID,
+		Type:      "exit",
+		Pid:       e.Pid,
+		Status:    e.Status,
+	})
 	return nil
 }

@@ -6,11 +6,11 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
-type StartEvent struct {
+type StartTask struct {
 	s *Supervisor
 }
 
-func (h *StartEvent) Handle(e *Event) error {
+func (h *StartTask) Handle(e *Task) error {
 	start := time.Now()
 	container, err := runtime.New(h.s.stateDir, e.ID, e.BundlePath, e.Labels)
 	if err != nil {
@@ -20,7 +20,7 @@ func (h *StartEvent) Handle(e *Event) error {
 		container: container,
 	}
 	ContainersCounter.Inc(1)
-	task := &StartTask{
+	task := &startTask{
 		Err:           e.Err,
 		Container:     container,
 		StartResponse: e.StartResponse,

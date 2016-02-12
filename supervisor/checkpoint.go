@@ -1,10 +1,10 @@
 package supervisor
 
-type CreateCheckpointEvent struct {
+type CreateCheckpointTask struct {
 	s *Supervisor
 }
 
-func (h *CreateCheckpointEvent) Handle(e *Event) error {
+func (h *CreateCheckpointTask) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -12,11 +12,11 @@ func (h *CreateCheckpointEvent) Handle(e *Event) error {
 	return i.container.Checkpoint(*e.Checkpoint)
 }
 
-type DeleteCheckpointEvent struct {
+type DeleteCheckpointTask struct {
 	s *Supervisor
 }
 
-func (h *DeleteCheckpointEvent) Handle(e *Event) error {
+func (h *DeleteCheckpointTask) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound

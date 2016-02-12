@@ -6,13 +6,13 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
-type AddProcessEvent struct {
+type AddProcessTask struct {
 	s *Supervisor
 }
 
 // TODO: add this to worker for concurrent starts???  maybe not because of races where the container
 // could be stopped and removed...
-func (h *AddProcessEvent) Handle(e *Event) error {
+func (h *AddProcessTask) Handle(e *Task) error {
 	start := time.Now()
 	ci, ok := h.s.containers[e.ID]
 	if !ok {
@@ -27,5 +27,11 @@ func (h *AddProcessEvent) Handle(e *Event) error {
 	}
 	ExecProcessTimer.UpdateSince(start)
 	e.StartResponse <- StartResponse{}
+	h.s.notifySubscribers(Event{
+		Timestamp: time.Now(),
+		Type:      "start-process",
+		Pid:       e.Pid,
+		ID:        e.ID,
+	})
 	return nil
 }
