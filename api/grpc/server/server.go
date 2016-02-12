@@ -271,7 +271,11 @@ func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessReq
 }
 
 func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
-	events := s.sv.Events(time.Unix(int64(r.Timestamp), 0))
+	t := time.Time{}
+	if r.Timestamp != 0 {
+		t = time.Unix(int64(r.Timestamp), 0)
+	}
+	events := s.sv.Events(t)
 	defer s.sv.Unsubscribe(events)
 	for e := range events {
 		if err := stream.Send(&types.Event{
