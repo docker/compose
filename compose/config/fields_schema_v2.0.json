@@ -78,7 +78,7 @@
         "driver_opts": {
           "type": "object",
           "patternProperties": {
-            "^.+$": {"type": ["string", "number"]}
+            "^.+$": {"type": "string"}
           }
         },
         "external": {
