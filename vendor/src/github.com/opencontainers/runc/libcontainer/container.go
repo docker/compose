@@ -6,6 +6,7 @@ package libcontainer
 
 import (
 	"os"
+	"time"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
@@ -14,8 +15,11 @@ import (
 type Status int
 
 const (
+	// The container exists but has not been run yet
+	Created Status = iota
+
 	// The container exists and is running.
-	Running Status = iota + 1
+	Running
 
 	// The container exists, it is in the process of being paused.
 	Pausing
@@ -32,6 +36,8 @@ const (
 
 func (s Status) String() string {
 	switch s {
+	case Created:
+		return "created"
 	case Running:
 		return "running"
 	case Pausing:
@@ -43,7 +49,7 @@ func (s Status) String() string {
 	case Destroyed:
 		return "destroyed"
 	default:
-		return "undefined"
+		return "unknown"
 	}
 }
 
@@ -56,8 +62,11 @@ type BaseState struct {
 	// InitProcessPid is the init process id in the parent namespace.
 	InitProcessPid int `json:"init_process_pid"`
 
-	// InitProcessStartTime is the init process start time.
+	// InitProcessStartTime is the init process start time in clock cycles since boot time.
 	InitProcessStartTime string `json:"init_process_start"`
+
+	// Created is the unix timestamp for the creation time of the container in UTC
+	Created time.Time `json:"created"`
 
 	// Config is the container's configuration.
 	Config configs.Config `json:"config"`

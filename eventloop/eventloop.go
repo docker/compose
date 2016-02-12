@@ -1,9 +1,6 @@
 package eventloop
 
-import (
-	"runtime"
-	"sync"
-)
+import "sync"
 
 // Event is receiving notification from loop with Handle() call.
 type Event interface {
@@ -35,8 +32,6 @@ func NewChanLoop(q int) EventLoop {
 // All calls after first is no-op.
 func (el *ChanLoop) Start() error {
 	go el.once.Do(func() {
-		// allocate whole OS thread, so nothing can get scheduled over eventloop
-		runtime.LockOSThread()
 		for ev := range el.events {
 			ev.Handle()
 		}

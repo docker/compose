@@ -2,15 +2,18 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/supervisor"
+	"github.com/opencontainers/runc/libcontainer"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/specs"
 	"golang.org/x/net/context"
 )
@@ -30,35 +33,39 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if c.BundlePath == "" {
 		return nil, errors.New("empty bundle path")
 	}
-	e := supervisor.NewEvent(supervisor.StartContainerEventType)
+	e := supervisor.NewTask(supervisor.StartContainerTaskType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
+	e.Stdin = c.Stdin
 	e.Stdout = c.Stdout
 	e.Stderr = c.Stderr
-	e.Stdin = c.Stdin
-	e.Console = c.Console
+	e.Labels = c.Labels
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
 			Name: c.Checkpoint,
 		}
 	}
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	sr := <-e.StartResponse
+	r := <-e.StartResponse
+	apiC, err := createAPIContainer(r.Container, false)
+	if err != nil {
+		return nil, err
+	}
 	return &types.CreateContainerResponse{
-		Pid: uint32(sr.Pid),
+		Container: apiC,
 	}, nil
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
-	e := supervisor.NewEvent(supervisor.SignalEventType)
+	e := supervisor.NewTask(supervisor.SignalTaskType)
 	e.ID = r.Id
-	e.Pid = int(r.Pid)
+	e.Pid = r.Pid
 	e.Signal = syscall.Signal(int(r.Signal))
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -77,22 +84,30 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 			AdditionalGids: r.User.AdditionalGids,
 		},
 	}
-	e := supervisor.NewEvent(supervisor.AddProcessEventType)
+	if r.Id == "" {
+		return nil, fmt.Errorf("container id cannot be empty")
+	}
+	if r.Pid == "" {
+		return nil, fmt.Errorf("process id cannot be empty")
+	}
+	e := supervisor.NewTask(supervisor.AddProcessTaskType)
 	e.ID = r.Id
-	e.Process = process
-	e.Console = r.Console
+	e.Pid = r.Pid
+	e.ProcessSpec = process
 	e.Stdin = r.Stdin
 	e.Stdout = r.Stdout
 	e.Stderr = r.Stderr
-	s.sv.SendEvent(e)
+	e.StartResponse = make(chan supervisor.StartResponse, 1)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
-	return &types.AddProcessResponse{Pid: uint32(e.Pid)}, nil
+	<-e.StartResponse
+	return &types.AddProcessResponse{}, nil
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
-	e := supervisor.NewEvent(supervisor.CreateCheckpointEventType)
+	e := supervisor.NewTask(supervisor.CreateCheckpointTaskType)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        r.Checkpoint.Name,
@@ -101,7 +116,7 @@ func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpo
 		UnixSockets: r.Checkpoint.UnixSockets,
 		Shell:       r.Checkpoint.Shell,
 	}
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -112,12 +127,12 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 	if r.Name == "" {
 		return nil, errors.New("checkpoint name cannot be empty")
 	}
-	e := supervisor.NewEvent(supervisor.DeleteCheckpointEventType)
+	e := supervisor.NewTask(supervisor.DeleteCheckpointTaskType)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name: r.Name,
 	}
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -125,8 +140,8 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 }
 
 func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointRequest) (*types.ListCheckpointResponse, error) {
-	e := supervisor.NewEvent(supervisor.GetContainerEventType)
-	s.sv.SendEvent(e)
+	e := supervisor.NewTask(supervisor.GetContainerTaskType)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
@@ -140,11 +155,11 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 	if container == nil {
 		return nil, grpc.Errorf(codes.NotFound, "no such containers")
 	}
+	var out []*types.Checkpoint
 	checkpoints, err := container.Checkpoints()
 	if err != nil {
 		return nil, err
 	}
-	var out []*types.Checkpoint
 	for _, c := range checkpoints {
 		out = append(out, &types.Checkpoint{
 			Name:        c.Name,
@@ -159,129 +174,206 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 }
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
-	e := supervisor.NewEvent(supervisor.GetContainerEventType)
-	s.sv.SendEvent(e)
+	e := supervisor.NewTask(supervisor.GetContainerTaskType)
+	e.ID = r.Id
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
 	m := s.sv.Machine()
 	state := &types.StateResponse{
 		Machine: &types.Machine{
-			Id:     m.ID,
 			Cpus:   uint32(m.Cpus),
-			Memory: uint64(m.Cpus),
+			Memory: uint64(m.Memory),
 		},
 	}
 	for _, c := range e.Containers {
-		processes, err := c.Processes()
+		apiC, err := createAPIContainer(c, true)
 		if err != nil {
-			return nil, grpc.Errorf(codes.Internal, "get processes for container")
+			return nil, err
 		}
-		var procs []*types.Process
-		for _, p := range processes {
-			pid, err := p.Pid()
-			if err != nil {
-				logrus.WithField("error", err).Error("get process pid")
-			}
-			oldProc := p.Spec()
-			procs = append(procs, &types.Process{
-				Pid:      uint32(pid),
-				Terminal: oldProc.Terminal,
-				Args:     oldProc.Args,
-				Env:      oldProc.Env,
-				Cwd:      oldProc.Cwd,
-				User: &types.User{
-					Uid:            oldProc.User.UID,
-					Gid:            oldProc.User.GID,
-					AdditionalGids: oldProc.User.AdditionalGids,
-				},
-			})
-		}
-		state.Containers = append(state.Containers, &types.Container{
-			Id:         c.ID(),
-			BundlePath: c.Path(),
-			Processes:  procs,
-			Status:     string(c.State()),
-		})
+		state.Containers = append(state.Containers, apiC)
 	}
 	return state, nil
 }
 
-func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
-	e := supervisor.NewEvent(supervisor.UpdateContainerEventType)
-	e.ID = r.Id
-	if r.Signal != 0 {
-		e.Signal = syscall.Signal(r.Signal)
+func createAPIContainer(c runtime.Container, getPids bool) (*types.Container, error) {
+	processes, err := c.Processes()
+	if err != nil {
+		return nil, grpc.Errorf(codes.Internal, "get processes for container")
 	}
+	var procs []*types.Process
+	for _, p := range processes {
+		oldProc := p.Spec()
+		stdio := p.Stdio()
+		procs = append(procs, &types.Process{
+			Pid:       p.ID(),
+			SystemPid: uint32(p.SystemPid()),
+			Terminal:  oldProc.Terminal,
+			Args:      oldProc.Args,
+			Env:       oldProc.Env,
+			Cwd:       oldProc.Cwd,
+			Stdin:     stdio.Stdin,
+			Stdout:    stdio.Stdout,
+			Stderr:    stdio.Stderr,
+			User: &types.User{
+				Uid:            oldProc.User.UID,
+				Gid:            oldProc.User.GID,
+				AdditionalGids: oldProc.User.AdditionalGids,
+			},
+		})
+	}
+	var pids []int
+	if getPids {
+		if pids, err = c.Pids(); err != nil {
+			return nil, grpc.Errorf(codes.Internal, "get all pids for container")
+		}
+	}
+	return &types.Container{
+		Id:         c.ID(),
+		BundlePath: c.Path(),
+		Processes:  procs,
+		Labels:     c.Labels(),
+		Status:     string(c.State()),
+		Pids:       toUint32(pids),
+	}, nil
+}
+
+func toUint32(its []int) []uint32 {
+	o := []uint32{}
+	for _, i := range its {
+		o = append(o, uint32(i))
+	}
+	return o
+}
+
+func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
+	e := supervisor.NewTask(supervisor.UpdateContainerTaskType)
+	e.ID = r.Id
 	e.State = runtime.State(r.Status)
-	s.sv.SendEvent(e)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
 	}
 	return &types.UpdateContainerResponse{}, nil
 }
 
-func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
-	events := s.sv.Events()
-	defer s.sv.Unsubscribe(events)
-	for evt := range events {
-		var ev *types.Event
-		switch evt.Type {
-		case supervisor.ExitEventType, supervisor.ExecExitEventType:
-			ev = &types.Event{
-				Type:   "exit",
-				Id:     evt.ID,
-				Pid:    uint32(evt.Pid),
-				Status: uint32(evt.Status),
-			}
-		case supervisor.OOMEventType:
-			ev = &types.Event{
-				Type: "oom",
-				Id:   evt.ID,
-			}
-		}
-		if ev != nil {
-			if err := stream.Send(ev); err != nil {
-				return err
-			}
-		}
+func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessRequest) (*types.UpdateProcessResponse, error) {
+	e := supervisor.NewTask(supervisor.UpdateProcessTaskType)
+	e.ID = r.Id
+	e.Pid = r.Pid
+	e.Height = int(r.Height)
+	e.Width = int(r.Width)
+	e.CloseStdin = r.CloseStdin
+	s.sv.SendTask(e)
+	if err := <-e.Err; err != nil {
+		return nil, err
+	}
+	return &types.UpdateProcessResponse{}, nil
+}
 
+func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
+	t := time.Time{}
+	if r.Timestamp != 0 {
+		t = time.Unix(int64(r.Timestamp), 0)
+	}
+	events := s.sv.Events(t)
+	defer s.sv.Unsubscribe(events)
+	for e := range events {
+		if err := stream.Send(&types.Event{
+			Id:        e.ID,
+			Type:      e.Type,
+			Timestamp: uint64(e.Timestamp.Unix()),
+			Pid:       e.Pid,
+			Status:    uint32(e.Status),
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (s *apiServer) GetStats(r *types.StatsRequest, stream types.API_GetStatsServer) error {
-	e := supervisor.NewEvent(supervisor.StatsEventType)
+func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.StatsResponse, error) {
+	e := supervisor.NewTask(supervisor.StatsTaskType)
 	e.ID = r.Id
-	s.sv.SendEvent(e)
+	e.Stat = make(chan *runtime.Stat, 1)
+	s.sv.SendTask(e)
 	if err := <-e.Err; err != nil {
-		if err == supervisor.ErrContainerNotFound {
-			return grpc.Errorf(codes.NotFound, err.Error())
-		}
-		return err
+		return nil, err
 	}
-	defer func() {
-		ue := supervisor.NewEvent(supervisor.UnsubscribeStatsEventType)
-		ue.ID = e.ID
-		ue.Stats = e.Stats
-		s.sv.SendEvent(ue)
-		if err := <-ue.Err; err != nil {
-			logrus.Errorf("Error unsubscribing %s: %v", r.Id, err)
-		}
-	}()
-	for {
-		select {
-		case st := <-e.Stats:
-			pbSt, ok := st.(*types.Stats)
-			if !ok {
-				panic("invalid stats type from collector")
-			}
-			if err := stream.Send(pbSt); err != nil {
-				return err
-			}
-		case <-stream.Context().Done():
-			return nil
+	stats := <-e.Stat
+	t := convertToPb(stats)
+	return t, nil
+}
+
+func convertToPb(st *runtime.Stat) *types.StatsResponse {
+	pbSt := &types.StatsResponse{
+		Timestamp:   uint64(st.Timestamp.Unix()),
+		CgroupStats: &types.CgroupStats{},
+	}
+	lcSt, ok := st.Data.(*libcontainer.Stats)
+	if !ok {
+		return pbSt
+	}
+	cpuSt := lcSt.CgroupStats.CpuStats
+	pbSt.CgroupStats.CpuStats = &types.CpuStats{
+		CpuUsage: &types.CpuUsage{
+			TotalUsage:        cpuSt.CpuUsage.TotalUsage,
+			PercpuUsage:       cpuSt.CpuUsage.PercpuUsage,
+			UsageInKernelmode: cpuSt.CpuUsage.UsageInKernelmode,
+			UsageInUsermode:   cpuSt.CpuUsage.UsageInUsermode,
+		},
+		ThrottlingData: &types.ThrottlingData{
+			Periods:          cpuSt.ThrottlingData.Periods,
+			ThrottledPeriods: cpuSt.ThrottlingData.ThrottledPeriods,
+			ThrottledTime:    cpuSt.ThrottlingData.ThrottledTime,
+		},
+	}
+	memSt := lcSt.CgroupStats.MemoryStats
+	pbSt.CgroupStats.MemoryStats = &types.MemoryStats{
+		Cache: memSt.Cache,
+		Usage: &types.MemoryData{
+			Usage:    memSt.Usage.Usage,
+			MaxUsage: memSt.Usage.MaxUsage,
+			Failcnt:  memSt.Usage.Failcnt,
+		},
+		SwapUsage: &types.MemoryData{
+			Usage:    memSt.SwapUsage.Usage,
+			MaxUsage: memSt.SwapUsage.MaxUsage,
+			Failcnt:  memSt.SwapUsage.Failcnt,
+		},
+	}
+	blkSt := lcSt.CgroupStats.BlkioStats
+	pbSt.CgroupStats.BlkioStats = &types.BlkioStats{
+		IoServiceBytesRecursive: convertBlkioEntryToPb(blkSt.IoServiceBytesRecursive),
+		IoServicedRecursive:     convertBlkioEntryToPb(blkSt.IoServicedRecursive),
+		IoQueuedRecursive:       convertBlkioEntryToPb(blkSt.IoQueuedRecursive),
+		IoServiceTimeRecursive:  convertBlkioEntryToPb(blkSt.IoServiceTimeRecursive),
+		IoWaitTimeRecursive:     convertBlkioEntryToPb(blkSt.IoWaitTimeRecursive),
+		IoMergedRecursive:       convertBlkioEntryToPb(blkSt.IoMergedRecursive),
+		IoTimeRecursive:         convertBlkioEntryToPb(blkSt.IoTimeRecursive),
+		SectorsRecursive:        convertBlkioEntryToPb(blkSt.SectorsRecursive),
+	}
+	pbSt.CgroupStats.HugetlbStats = make(map[string]*types.HugetlbStats)
+	for k, st := range lcSt.CgroupStats.HugetlbStats {
+		pbSt.CgroupStats.HugetlbStats[k] = &types.HugetlbStats{
+			Usage:    st.Usage,
+			MaxUsage: st.MaxUsage,
+			Failcnt:  st.Failcnt,
 		}
 	}
-	return nil
+	return pbSt
+}
+
+func convertBlkioEntryToPb(b []cgroups.BlkioStatEntry) []*types.BlkioStatsEntry {
+	var pbEs []*types.BlkioStatsEntry
+	for _, e := range b {
+		pbEs = append(pbEs, &types.BlkioStatsEntry{
+			Major: e.Major,
+			Minor: e.Minor,
+			Op:    e.Op,
+			Value: e.Value,
+		})
+	}
+	return pbEs
 }

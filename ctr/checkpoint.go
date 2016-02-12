@@ -16,6 +16,7 @@ var checkpointCommand = cli.Command{
 	Subcommands: []cli.Command{
 		listCheckpointCommand,
 		createCheckpointCommand,
+		deleteCheckpointCommand,
 	},
 	Action: listCheckpoints,
 }
@@ -86,7 +87,11 @@ var createCheckpointCommand = cli.Command{
 		if _, err := c.CreateCheckpoint(netcontext.Background(), &types.CreateCheckpointRequest{
 			Id: containerID,
 			Checkpoint: &types.Checkpoint{
-				Name: name,
+				Name:        name,
+				Exit:        context.Bool("exit"),
+				Tcp:         context.Bool("tcp"),
+				Shell:       context.Bool("shell"),
+				UnixSockets: context.Bool("unix-sockets"),
 			},
 		}); err != nil {
 			fatal(err.Error(), 1)

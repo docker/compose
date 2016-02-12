@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
 	"syscall"
@@ -29,11 +30,6 @@ const (
 )
 
 var daemonFlags = []cli.Flag{
-	cli.StringFlag{
-		Name:  "id",
-		Value: getDefaultID(),
-		Usage: "unique containerd id to identify the instance",
-	},
 	cli.BoolFlag{
 		Name:  "debug",
 		Usage: "enable debug output in the logs",
@@ -43,14 +39,9 @@ var daemonFlags = []cli.Flag{
 		Value: "/run/containerd",
 		Usage: "runtime state directory",
 	},
-	cli.IntFlag{
-		Name:  "c,concurrency",
-		Value: 10,
-		Usage: "set the concurrency level for tasks",
-	},
 	cli.DurationFlag{
 		Name:  "metrics-interval",
-		Value: 60 * time.Second,
+		Value: 120 * time.Second,
 		Usage: "interval for flushing metrics to the store",
 	},
 	cli.StringFlag{
@@ -88,10 +79,9 @@ func main() {
 	}
 	app.Action = func(context *cli.Context) {
 		if err := daemon(
-			context.String("id"),
 			context.String("listen"),
 			context.String("state-dir"),
-			context.Int("concurrency"),
+			10,
 			context.Bool("oom-notify"),
 		); err != nil {
 			logrus.Fatal(err)
@@ -111,7 +101,7 @@ func checkLimits() error {
 		logrus.WithFields(logrus.Fields{
 			"current": l.Cur,
 			"max":     l.Max,
-		}).Warn("low RLIMIT_NOFILE changing to max")
+		}).Warn("containerd: low RLIMIT_NOFILE changing to max")
 		l.Cur = l.Max
 		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
 	}
@@ -130,7 +120,6 @@ func debugMetrics(interval time.Duration, graphiteAddr string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Debugf("Sending metrics to Graphite server on %s", graphiteAddr)
 		go graphite.Graphite(metrics.DefaultRegistry, 10e9, "metrics", addr)
 	} else {
 		l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
@@ -154,13 +143,13 @@ func processMetrics() {
 		// collect the number of open fds
 		fds, err := util.GetOpenFds(os.Getpid())
 		if err != nil {
-			logrus.WithField("error", err).Error("get open fd count")
+			logrus.WithField("error", err).Error("containerd: get open fd count")
 		}
 		fg.Update(int64(fds))
 		// get the memory used
 		m := sigar.ProcMem{}
 		if err := m.Get(os.Getpid()); err != nil {
-			logrus.WithField("error", err).Error("get pid memory information")
+			logrus.WithField("error", err).Error("containerd: get pid memory information")
 		}
 		memg.Update(int64(m.Size))
 	}
@@ -172,9 +161,11 @@ func processMetrics() {
 	}()
 }
 
-func daemon(id, address, stateDir string, concurrency int, oom bool) error {
-	tasks := make(chan *supervisor.StartTask, concurrency*100)
-	sv, err := supervisor.New(id, stateDir, tasks, oom)
+func daemon(address, stateDir string, concurrency int, oom bool) error {
+	// setup a standard reaper so that we don't leave any zombies if we are still alive
+	// this is just good practice because we are spawning new processes
+	go reapProcesses()
+	sv, err := supervisor.New(stateDir, oom)
 	if err != nil {
 		return err
 	}
@@ -184,17 +175,6 @@ func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 		w := supervisor.NewWorker(sv, wg)
 		go w.Start()
 	}
-	// only set containerd as the subreaper if it is not an init process
-	if pid := os.Getpid(); pid != 1 {
-		logrus.WithFields(logrus.Fields{
-			"pid": pid,
-		}).Debug("containerd is not init, set as subreaper")
-		if err := setSubReaper(); err != nil {
-			return err
-		}
-	}
-	// start the signal handler in the background.
-	go startSignalHandler(sv)
 	if err := sv.Start(); err != nil {
 		return err
 	}
@@ -207,8 +187,21 @@ func daemon(id, address, stateDir string, concurrency int, oom bool) error {
 	}
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(sv))
-	logrus.Debugf("GRPC API listen on %s", address)
+	logrus.Debugf("containerd: grpc api on %s", address)
 	return s.Serve(l)
+}
+
+func reapProcesses() {
+	s := make(chan os.Signal, 2048)
+	signal.Notify(s, syscall.SIGCHLD)
+	if err := util.SetSubreaper(1); err != nil {
+		logrus.WithField("error", err).Error("containerd: set subpreaper")
+	}
+	for range s {
+		if _, err := util.Reap(); err != nil {
+			logrus.WithField("error", err).Error("containerd: reap child processes")
+		}
+	}
 }
 
 // getDefaultID returns the hostname for the instance host

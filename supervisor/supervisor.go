@@ -1,144 +1,156 @@
 package supervisor
 
 import (
+	"encoding/json"
+	"io"
+	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
+	"sort"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/chanotify"
 	"github.com/docker/containerd/eventloop"
 	"github.com/docker/containerd/runtime"
-	"github.com/opencontainers/runc/libcontainer"
 )
 
 const (
-	statsInterval     = 1 * time.Second
 	defaultBufferSize = 2048 // size of queue in eventloop
 )
 
 // New returns an initialized Process supervisor.
-func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, error) {
+func New(stateDir string, oom bool) (*Supervisor, error) {
+	tasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
 	}
-	// register counters
-	r, err := newRuntime(filepath.Join(stateDir, id))
+	machine, err := CollectMachineInformation()
 	if err != nil {
 		return nil, err
 	}
-	machine, err := CollectMachineInformation(id)
+	monitor, err := NewMonitor()
 	if err != nil {
 		return nil, err
 	}
 	s := &Supervisor{
-		stateDir:       stateDir,
-		containers:     make(map[string]*containerInfo),
-		processes:      make(map[int]*containerInfo),
-		runtime:        r,
-		tasks:          tasks,
-		machine:        machine,
-		subscribers:    make(map[chan *Event]struct{}),
-		statsCollector: newStatsCollector(statsInterval),
-		el:             eventloop.NewChanLoop(defaultBufferSize),
+		stateDir:    stateDir,
+		containers:  make(map[string]*containerInfo),
+		tasks:       tasks,
+		machine:     machine,
+		subscribers: make(map[chan Event]struct{}),
+		el:          eventloop.NewChanLoop(defaultBufferSize),
+		monitor:     monitor,
+	}
+	if err := setupEventLog(s); err != nil {
+		return nil, err
 	}
 	if oom {
 		s.notifier = chanotify.New()
 		go func() {
 			for id := range s.notifier.Chan() {
-				e := NewEvent(OOMEventType)
+				e := NewTask(OOMTaskType)
 				e.ID = id.(string)
-				s.SendEvent(e)
+				s.SendTask(e)
 			}
 		}()
 	}
 	// register default event handlers
-	s.handlers = map[EventType]Handler{
-		ExecExitEventType:         &ExecExitEvent{s},
-		ExitEventType:             &ExitEvent{s},
-		StartContainerEventType:   &StartEvent{s},
-		DeleteEventType:           &DeleteEvent{s},
-		GetContainerEventType:     &GetContainersEvent{s},
-		SignalEventType:           &SignalEvent{s},
-		AddProcessEventType:       &AddProcessEvent{s},
-		UpdateContainerEventType:  &UpdateEvent{s},
-		CreateCheckpointEventType: &CreateCheckpointEvent{s},
-		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
-		StatsEventType:            &StatsEvent{s},
-		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
-		StopStatsEventType:        &StopStatsEvent{s},
+	s.handlers = map[TaskType]Handler{
+		ExecExitTaskType:         &ExecExitTask{s},
+		ExitTaskType:             &ExitTask{s},
+		StartContainerTaskType:   &StartTask{s},
+		DeleteTaskType:           &DeleteTask{s},
+		GetContainerTaskType:     &GetContainersTask{s},
+		SignalTaskType:           &SignalTask{s},
+		AddProcessTaskType:       &AddProcessTask{s},
+		UpdateContainerTaskType:  &UpdateTask{s},
+		CreateCheckpointTaskType: &CreateCheckpointTask{s},
+		DeleteCheckpointTaskType: &DeleteCheckpointTask{s},
+		StatsTaskType:            &StatsTask{s},
+		UpdateProcessTaskType:    &UpdateProcessTask{s},
 	}
-	// start the container workers for concurrent container starts
+	go s.exitHandler()
+	if err := s.restore(); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
 type containerInfo struct {
 	container runtime.Container
-	copier    *copier
+}
+
+func setupEventLog(s *Supervisor) error {
+	if err := readEventLog(s); err != nil {
+		return err
+	}
+	logrus.WithField("count", len(s.eventLog)).Debug("containerd: read past events")
+	events := s.Events(time.Time{})
+	f, err := os.OpenFile(filepath.Join(s.stateDir, "events.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(f)
+	go func() {
+		for e := range events {
+			s.eventLog = append(s.eventLog, e)
+			if err := enc.Encode(e); err != nil {
+				logrus.WithField("error", err).Error("containerd: write event to journal")
+			}
+		}
+	}()
+	return nil
+}
+
+func readEventLog(s *Supervisor) error {
+	f, err := os.Open(filepath.Join(s.stateDir, "events.log"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer f.Close()
+	dec := json.NewDecoder(f)
+	for {
+		var e Event
+		if err := dec.Decode(&e); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		s.eventLog = append(s.eventLog, e)
+	}
+	return nil
 }
 
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir   string
 	containers map[string]*containerInfo
-	processes  map[int]*containerInfo
-	handlers   map[EventType]Handler
-	runtime    runtime.Runtime
-	events     chan *Event
-	tasks      chan *StartTask
+	handlers   map[TaskType]Handler
+	events     chan *Task
+	tasks      chan *startTask
 	// we need a lock around the subscribers map only because additions and deletions from
 	// the map are via the API so we cannot really control the concurrency
 	subscriberLock sync.RWMutex
-	subscribers    map[chan *Event]struct{}
+	subscribers    map[chan Event]struct{}
 	machine        Machine
-	containerGroup sync.WaitGroup
-	statsCollector *statsCollector
 	notifier       *chanotify.Notifier
 	el             eventloop.EventLoop
+	monitor        *Monitor
+	eventLog       []Event
 }
 
 // Stop closes all tasks and sends a SIGTERM to each container's pid1 then waits for they to
 // terminate.  After it has handled all the SIGCHILD events it will close the signals chan
 // and exit.  Stop is a non-blocking call and will return after the containers have been signaled
-func (s *Supervisor) Stop(sig chan os.Signal) {
+func (s *Supervisor) Stop() {
 	// Close the tasks channel so that no new containers get started
 	close(s.tasks)
-	// send a SIGTERM to all containers
-	for id, i := range s.containers {
-		c := i.container
-		logrus.WithField("id", id).Debug("sending TERM to container processes")
-		procs, err := c.Processes()
-		if err != nil {
-			logrus.WithField("id", id).Warn("get container processes")
-			continue
-		}
-		if len(procs) == 0 {
-			continue
-		}
-		mainProc := procs[0]
-		if err := mainProc.Signal(syscall.SIGTERM); err != nil {
-			pid, _ := mainProc.Pid()
-			logrus.WithFields(logrus.Fields{
-				"id":    id,
-				"pid":   pid,
-				"error": err,
-			}).Error("send SIGTERM to process")
-		}
-	}
-	go func() {
-		logrus.Debug("waiting for containers to exit")
-		s.containerGroup.Wait()
-		logrus.Debug("all containers exited")
-		if s.notifier != nil {
-			s.notifier.Close()
-		}
-		// stop receiving signals and close the channel
-		signal.Stop(sig)
-		close(sig)
-	}()
 }
 
 // Close closes any open files in the supervisor but expects that Stop has been
@@ -147,19 +159,35 @@ func (s *Supervisor) Close() error {
 	return nil
 }
 
+type Event struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	Pid       string    `json:"pid,omitempty"`
+	Status    int       `json:"status,omitempty"`
+}
+
 // Events returns an event channel that external consumers can use to receive updates
 // on container events
-func (s *Supervisor) Events() chan *Event {
+func (s *Supervisor) Events(from time.Time) chan Event {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
-	c := make(chan *Event, defaultBufferSize)
+	c := make(chan Event, defaultBufferSize)
 	EventSubscriberCounter.Inc(1)
 	s.subscribers[c] = struct{}{}
+	if !from.IsZero() {
+		// replay old event
+		for _, e := range s.eventLog {
+			if e.Timestamp.After(from) {
+				c <- e
+			}
+		}
+	}
 	return c
 }
 
 // Unsubscribe removes the provided channel from receiving any more events
-func (s *Supervisor) Unsubscribe(sub chan *Event) {
+func (s *Supervisor) Unsubscribe(sub chan Event) {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
 	delete(s.subscribers, sub)
@@ -169,7 +197,7 @@ func (s *Supervisor) Unsubscribe(sub chan *Event) {
 
 // notifySubscribers will send the provided event to the external subscribers
 // of the events channel
-func (s *Supervisor) notifySubscribers(e *Event) {
+func (s *Supervisor) notifySubscribers(e Event) {
 	s.subscriberLock.RLock()
 	defer s.subscriberLock.RUnlock()
 	for sub := range s.subscribers {
@@ -177,7 +205,7 @@ func (s *Supervisor) notifySubscribers(e *Event) {
 		select {
 		case sub <- e:
 		default:
-			logrus.WithField("event", e.Type).Warn("event not sent to subscriber")
+			logrus.WithField("event", e.Type).Warn("containerd: event not sent to subscriber")
 		}
 	}
 }
@@ -189,10 +217,7 @@ func (s *Supervisor) notifySubscribers(e *Event) {
 // therefore it is save to do operations in the handlers that modify state of the system or
 // state of the Supervisor
 func (s *Supervisor) Start() error {
-	logrus.WithFields(logrus.Fields{
-		"runtime":  s.runtime.Type(),
-		"stateDir": s.stateDir,
-	}).Debug("Supervisor started")
+	logrus.WithField("stateDir", s.stateDir).Debug("containerd: supervisor running")
 	return s.el.Start()
 }
 
@@ -202,45 +227,83 @@ func (s *Supervisor) Machine() Machine {
 	return s.machine
 }
 
-// getContainerForPid returns the container where the provided pid is the pid1 or main
-// process in the container
-func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
-	for _, i := range s.containers {
-		container := i.container
-		cpid, err := container.Pid()
+// SendTask sends the provided event the the supervisors main event loop
+func (s *Supervisor) SendTask(evt *Task) {
+	TasksCounter.Inc(1)
+	s.el.Send(&commonTask{data: evt, sv: s})
+}
+
+func (s *Supervisor) exitHandler() {
+	for p := range s.monitor.Exits() {
+		e := NewTask(ExitTaskType)
+		e.Process = p
+		s.SendTask(e)
+	}
+}
+
+func (s *Supervisor) monitorProcess(p runtime.Process) error {
+	return s.monitor.Monitor(p)
+}
+
+func (s *Supervisor) restore() error {
+	dirs, err := ioutil.ReadDir(s.stateDir)
+	if err != nil {
+		return err
+	}
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		id := d.Name()
+		container, err := runtime.Load(s.stateDir, id)
 		if err != nil {
-			if lerr, ok := err.(libcontainer.Error); ok {
-				if lerr.Code() == libcontainer.ProcessNotExecuted {
-					continue
+			return err
+		}
+		processes, err := container.Processes()
+		if err != nil {
+			return err
+		}
+		ContainersCounter.Inc(1)
+		s.containers[id] = &containerInfo{
+			container: container,
+		}
+		logrus.WithField("id", id).Debug("containerd: container restored")
+		var exitedProcesses []runtime.Process
+		for _, p := range processes {
+			if _, err := p.ExitStatus(); err == nil {
+				exitedProcesses = append(exitedProcesses, p)
+			} else {
+				if err := s.monitorProcess(p); err != nil {
+					return err
 				}
 			}
-			logrus.WithField("error", err).Error("containerd: get container pid")
 		}
-		if pid == cpid {
-			return container, nil
+		if len(exitedProcesses) > 0 {
+			// sort processes so that init is fired last because that is how the kernel sends the
+			// exit events
+			sort.Sort(&processSorter{exitedProcesses})
+			for _, p := range exitedProcesses {
+				e := NewTask(ExitTaskType)
+				e.Process = p
+				s.SendTask(e)
+			}
 		}
 	}
-	return nil, errNoContainerForPid
+	return nil
 }
 
-// SendEvent sends the provided event the the supervisors main event loop
-func (s *Supervisor) SendEvent(evt *Event) {
-	EventsCounter.Inc(1)
-	s.el.Send(&commonEvent{data: evt, sv: s})
+type processSorter struct {
+	processes []runtime.Process
 }
 
-func (s *Supervisor) copyIO(stdin, stdout, stderr string, i *runtime.IO) (*copier, error) {
-	config := &ioConfig{
-		Stdin:      i.Stdin,
-		Stdout:     i.Stdout,
-		Stderr:     i.Stderr,
-		StdoutPath: stdout,
-		StderrPath: stderr,
-		StdinPath:  stdin,
-	}
-	l, err := newCopier(config)
-	if err != nil {
-		return nil, err
-	}
-	return l, nil
+func (s *processSorter) Len() int {
+	return len(s.processes)
+}
+
+func (s *processSorter) Swap(i, j int) {
+	s.processes[i], s.processes[j] = s.processes[j], s.processes[i]
+}
+
+func (s *processSorter) Less(i, j int) bool {
+	return s.processes[j].ID() == "init"
 }

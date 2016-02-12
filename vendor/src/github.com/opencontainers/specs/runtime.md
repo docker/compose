@@ -38,8 +38,8 @@ This is provided so that consumers can find the container's configuration and ro
 The lifecycle describes the timeline of events that happen from when a container is created to when it ceases to exist.
 
 1. OCI compliant runtime is invoked by passing the bundle path as argument.
-2. The container's runtime environment is created according to the configuration in `config.json` and `runtime.json`.
-   Any updates to `config.json` or `runtime.json` after container is running do not affect the container.
+2. The container's runtime environment is created according to the configuration in [`config.json`](config.md).
+   Any updates to `config.json` after container is running do not affect the container.
 3. The container's state.json file is written to the filesystem.
 4. The prestart hooks are invoked by the runtime.
    If any prestart hook fails, then the container is stopped and the lifecycle continues at step 8.
@@ -56,4 +56,4 @@ Note: The lifecycle is a WIP and it will evolve as we have more use cases and mo
 
 ## Hooks
 
-See [runtime configuration for hooks](./runtime-config.md)
+See [runtime configuration for hooks](./config.md#hooks)

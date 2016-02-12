@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -15,14 +18,16 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/term"
-	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/specs"
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/grpclog"
 )
 
 // TODO: parse flags and pass opts
 func getClient(ctx *cli.Context) types.APIClient {
+	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
+	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
@@ -49,6 +54,25 @@ var containersCommand = cli.Command{
 	Action: listContainers,
 }
 
+var stateCommand = cli.Command{
+	Name:  "state",
+	Usage: "get a raw dump of the containerd state",
+	Action: func(context *cli.Context) {
+		c := getClient(context)
+		resp, err := c.State(netcontext.Background(), &types.StateRequest{
+			Id: context.Args().First(),
+		})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		data, err := json.Marshal(resp)
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		fmt.Print(string(data))
+	},
+}
+
 var listCommand = cli.Command{
 	Name:   "list",
 	Usage:  "list all running containers",
@@ -57,14 +81,20 @@ var listCommand = cli.Command{
 
 func listContainers(context *cli.Context) {
 	c := getClient(context)
-	resp, err := c.State(netcontext.Background(), &types.StateRequest{})
+	resp, err := c.State(netcontext.Background(), &types.StateRequest{
+		Id: context.Args().First(),
+	})
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
-	fmt.Fprint(w, "ID\tPATH\tSTATUS\tPID1\n")
+	fmt.Fprint(w, "ID\tPATH\tSTATUS\tPROCESSES\n")
 	for _, c := range resp.Containers {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", c.Id, c.BundlePath, c.Status, c.Processes[0].Pid)
+		procs := []string{}
+		for _, p := range c.Processes {
+			procs = append(procs, p.Pid)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", c.Id, c.BundlePath, c.Status, strings.Join(procs, ","))
 	}
 	if err := w.Flush(); err != nil {
 		fatal(err.Error(), 1)
@@ -84,6 +114,11 @@ var startCommand = cli.Command{
 			Name:  "attach,a",
 			Usage: "connect to the stdio of the container",
 		},
+		cli.StringSliceFlag{
+			Name:  "label,l",
+			Value: &cli.StringSlice{},
+			Usage: "set labels for the container",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -100,33 +135,45 @@ var startCommand = cli.Command{
 		if err != nil {
 			fatal(fmt.Sprintf("cannot get the absolute path of the bundle: %v", err), 1)
 		}
-		c := getClient(context)
-		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
+		s, err := createStdio()
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
-		r := &types.CreateContainerRequest{
-			Id:         id,
-			BundlePath: bpath,
-			Checkpoint: context.String("checkpoint"),
-		}
+		var (
+			tty bool
+			c   = getClient(context)
+			r   = &types.CreateContainerRequest{
+				Id:         id,
+				BundlePath: bpath,
+				Checkpoint: context.String("checkpoint"),
+				Stdin:      s.stdin,
+				Stdout:     s.stdout,
+				Stderr:     s.stderr,
+				Labels:     context.StringSlice("label"),
+			}
+		)
 		if context.Bool("attach") {
 			mkterm, err := readTermSetting(bpath)
 			if err != nil {
 				fatal(err.Error(), 1)
 			}
+			tty = mkterm
 			if mkterm {
-				if err := attachTty(&r.Console); err != nil {
+				s, err := term.SetRawTerminal(os.Stdin.Fd())
+				if err != nil {
 					fatal(err.Error(), 1)
 				}
-			} else {
-				if err := attachStdio(&r.Stdin, &r.Stdout, &r.Stderr); err != nil {
-					fatal(err.Error(), 1)
-				}
+				state = s
+			}
+			if err := attachStdio(s); err != nil {
+				fatal(err.Error(), 1)
 			}
 		}
-		resp, err := c.CreateContainer(netcontext.Background(), r)
+		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
 		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
@@ -138,23 +185,48 @@ var startCommand = cli.Command{
 			}
 			go func() {
 				io.Copy(stdin, os.Stdin)
-				restoreAndCloseStdin()
-			}()
-			for {
-				e, err := events.Recv()
-				if err != nil {
-					restoreAndCloseStdin()
+				if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
+					Id:         id,
+					Pid:        "init",
+					CloseStdin: true,
+				}); err != nil {
 					fatal(err.Error(), 1)
 				}
-				if e.Id == id && e.Type == "exit" {
-					restoreAndCloseStdin()
-					os.Exit(int(e.Status))
-				}
+				restoreAndCloseStdin()
+			}()
+			if tty {
+				resize(id, "init", c)
+				go func() {
+					s := make(chan os.Signal, 64)
+					signal.Notify(s, syscall.SIGWINCH)
+					for range s {
+						if err := resize(id, "init", c); err != nil {
+							log.Println(err)
+						}
+					}
+				}()
 			}
-		} else {
-			fmt.Println(resp.Pid)
+			if err := waitForExit(c, events, id, "init", restoreAndCloseStdin); err != nil {
+				fatal(err.Error(), 1)
+			}
 		}
 	},
+}
+
+func resize(id, pid string, c types.APIClient) error {
+	ws, err := term.GetWinsize(os.Stdin.Fd())
+	if err != nil {
+		return err
+	}
+	if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
+		Id:     id,
+		Pid:    "init",
+		Width:  uint32(ws.Width),
+		Height: uint32(ws.Height),
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 var (
@@ -177,69 +249,23 @@ func readTermSetting(path string) (bool, error) {
 	return spec.Process.Terminal, nil
 }
 
-func attachTty(consolePath *string) error {
-	console, err := libcontainer.NewConsole(os.Getuid(), os.Getgid())
+func attachStdio(s stdio) error {
+	stdinf, err := os.OpenFile(s.stdin, syscall.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
-	*consolePath = console.Path()
-	stdin = console
-	go func() {
-		io.Copy(os.Stdout, console)
-		console.Close()
-	}()
-	s, err := term.SetRawTerminal(os.Stdin.Fd())
+	// FIXME: assign to global
+	stdin = stdinf
+	stdoutf, err := os.OpenFile(s.stdout, syscall.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
-	state = s
-	return nil
-}
-
-func attachStdio(stdins, stdout, stderr *string) error {
-	dir, err := ioutil.TempDir("", "ctr-")
+	go io.Copy(os.Stdout, stdoutf)
+	stderrf, err := os.OpenFile(s.stderr, syscall.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
-	for _, p := range []struct {
-		path string
-		flag int
-		done func(f *os.File)
-	}{
-		{
-			path: filepath.Join(dir, "stdin"),
-			flag: syscall.O_RDWR,
-			done: func(f *os.File) {
-				*stdins = filepath.Join(dir, "stdin")
-				stdin = f
-			},
-		},
-		{
-			path: filepath.Join(dir, "stdout"),
-			flag: syscall.O_RDWR,
-			done: func(f *os.File) {
-				*stdout = filepath.Join(dir, "stdout")
-				go io.Copy(os.Stdout, f)
-			},
-		},
-		{
-			path: filepath.Join(dir, "stderr"),
-			flag: syscall.O_RDWR,
-			done: func(f *os.File) {
-				*stderr = filepath.Join(dir, "stderr")
-				go io.Copy(os.Stderr, f)
-			},
-		},
-	} {
-		if err := syscall.Mkfifo(p.path, 0755); err != nil {
-			return fmt.Errorf("mkfifo: %s %v", p.path, err)
-		}
-		f, err := os.OpenFile(p.path, p.flag, 0)
-		if err != nil {
-			return fmt.Errorf("open: %s %v", p.path, err)
-		}
-		p.done(f)
-	}
+	go io.Copy(os.Stderr, stderrf)
 	return nil
 }
 
@@ -247,8 +273,9 @@ var killCommand = cli.Command{
 	Name:  "kill",
 	Usage: "send a signal to a container or its processes",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		cli.StringFlag{
 			Name:  "pid,p",
+			Value: "init",
 			Usage: "pid of the process to signal within the container",
 		},
 		cli.IntFlag{
@@ -265,7 +292,7 @@ var killCommand = cli.Command{
 		c := getClient(context)
 		if _, err := c.Signal(netcontext.Background(), &types.SignalRequest{
 			Id:     id,
-			Pid:    uint32(context.Int("pid")),
+			Pid:    context.String("pid"),
 			Signal: uint32(context.Int("signal")),
 		}); err != nil {
 			fatal(err.Error(), 1)
@@ -280,6 +307,10 @@ var execCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "id",
 			Usage: "container id to add the process to",
+		},
+		cli.StringFlag{
+			Name:  "pid",
+			Usage: "process id for the new process",
 		},
 		cli.BoolFlag{
 			Name:  "attach,a",
@@ -309,52 +340,76 @@ var execCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) {
 		p := &types.AddProcessRequest{
+			Id:       context.String("id"),
+			Pid:      context.String("pid"),
 			Args:     context.Args(),
 			Cwd:      context.String("cwd"),
 			Terminal: context.Bool("tty"),
-			Id:       context.String("id"),
 			Env:      context.StringSlice("env"),
 			User: &types.User{
 				Uid: uint32(context.Int("uid")),
 				Gid: uint32(context.Int("gid")),
 			},
 		}
+		s, err := createStdio()
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		p.Stdin = s.stdin
+		p.Stdout = s.stdout
+		p.Stderr = s.stderr
+		if context.Bool("attach") {
+			if context.Bool("tty") {
+				s, err := term.SetRawTerminal(os.Stdin.Fd())
+				if err != nil {
+					fatal(err.Error(), 1)
+				}
+				state = s
+			}
+			if err := attachStdio(s); err != nil {
+				fatal(err.Error(), 1)
+			}
+		}
 		c := getClient(context)
 		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
-		if context.Bool("attach") {
-			if p.Terminal {
-				if err := attachTty(&p.Console); err != nil {
-					fatal(err.Error(), 1)
-				}
-			} else {
-				if err := attachStdio(&p.Stdin, &p.Stdout, &p.Stderr); err != nil {
-					fatal(err.Error(), 1)
-				}
-			}
-		}
-		r, err := c.AddProcess(netcontext.Background(), p)
-		if err != nil {
+		if _, err := c.AddProcess(netcontext.Background(), p); err != nil {
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
-			go func() {
-				io.Copy(stdin, os.Stdin)
+			restoreAndCloseStdin := func() {
 				if state != nil {
 					term.RestoreTerminal(os.Stdin.Fd(), state)
 				}
 				stdin.Close()
+			}
+			go func() {
+				io.Copy(stdin, os.Stdin)
+				if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
+					Id:         p.Id,
+					Pid:        p.Pid,
+					CloseStdin: true,
+				}); err != nil {
+					log.Println(err)
+				}
+				restoreAndCloseStdin()
 			}()
-			for {
-				e, err := events.Recv()
-				if err != nil {
-					fatal(err.Error(), 1)
-				}
-				if e.Pid == r.Pid && e.Type == "exit" {
-					os.Exit(int(e.Status))
-				}
+			if context.Bool("tty") {
+				resize(p.Id, p.Pid, c)
+				go func() {
+					s := make(chan os.Signal, 64)
+					signal.Notify(s, syscall.SIGWINCH)
+					for range s {
+						if err := resize(p.Id, p.Pid, c); err != nil {
+							log.Println(err)
+						}
+					}
+				}()
+			}
+			if err := waitForExit(c, events, context.String("id"), context.String("pid"), restoreAndCloseStdin); err != nil {
+				fatal(err.Error(), 1)
 			}
 		}
 	},
@@ -368,16 +423,56 @@ var statsCommand = cli.Command{
 			Id: context.Args().First(),
 		}
 		c := getClient(context)
-		stream, err := c.GetStats(netcontext.Background(), req)
+		stats, err := c.Stats(netcontext.Background(), req)
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
-		for {
-			stats, err := stream.Recv()
-			if err != nil {
-				fatal(err.Error(), 1)
-			}
-			fmt.Println(stats)
+		data, err := json.Marshal(stats)
+		if err != nil {
+			fatal(err.Error(), 1)
 		}
+		fmt.Print(string(data))
 	},
+}
+
+func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid string, closer func()) error {
+	for {
+		e, err := events.Recv()
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{})
+			continue
+		}
+		if e.Id == id && e.Type == "exit" && e.Pid == pid {
+			closer()
+			os.Exit(int(e.Status))
+		}
+	}
+	return nil
+}
+
+type stdio struct {
+	stdin  string
+	stdout string
+	stderr string
+}
+
+func createStdio() (s stdio, err error) {
+	tmp, err := ioutil.TempDir("", "ctr-")
+	if err != nil {
+		return s, err
+	}
+	// create fifo's for the process
+	for name, fd := range map[string]*string{
+		"stdin":  &s.stdin,
+		"stdout": &s.stdout,
+		"stderr": &s.stderr,
+	} {
+		path := filepath.Join(tmp, name)
+		if err := syscall.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+			return s, err
+		}
+		*fd = path
+	}
+	return s, nil
 }

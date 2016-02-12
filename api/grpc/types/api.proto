@@ -6,32 +6,44 @@ service API {
 	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
 	rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse) {}
 	rpc Signal(SignalRequest) returns (SignalResponse) {}
+    rpc UpdateProcess(UpdateProcessRequest) returns (UpdateProcessResponse) {}
 	rpc AddProcess(AddProcessRequest) returns (AddProcessResponse) {}
 	rpc CreateCheckpoint(CreateCheckpointRequest) returns (CreateCheckpointResponse) {}
 	rpc DeleteCheckpoint(DeleteCheckpointRequest) returns (DeleteCheckpointResponse) {}
 	rpc ListCheckpoint(ListCheckpointRequest) returns (ListCheckpointResponse) {}
 	rpc State(StateRequest) returns (StateResponse) {}
 	rpc Events(EventsRequest) returns (stream Event) {}
-	rpc GetStats(StatsRequest) returns (stream Stats) {}
+	rpc Stats(StatsRequest) returns (StatsResponse) {}
+}
+
+message UpdateProcessRequest {
+    string id = 1; 
+    string pid = 2;
+    bool closeStdin = 3; // Close stdin of the container
+    uint32 width = 4;
+    uint32 height = 5;
+}
+
+message UpdateProcessResponse {
 }
 
 message CreateContainerRequest {
 	string id = 1; // ID of container
 	string bundlePath = 2; // path to OCI bundle
-	string stdin = 3; // path to the file where stdin will be read (optional)
-	string stdout = 4; // path to file where stdout will be written (optional)
-	string stderr = 5; // path to file where stderr will be written (optional)
-	string console = 6; // path to the console for a container (optional)
-	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
+	string checkpoint = 3; // checkpoint name if you want to create immediate checkpoint (optional)
+    string stdin = 4; // path to the file where stdin will be read (optional)
+	string stdout = 5; // path to file where stdout will be written (optional)
+	string stderr = 6; // path to file where stderr will be written (optional)
+    repeated string labels = 7;
 }
 
 message CreateContainerResponse {
-	uint32 pid = 1; // PID of the containers main process
+    Container container = 1;
 }
 
 message SignalRequest {
 	string id = 1; // ID of container
-	uint32 pid = 2; // PID of process inside container
+	string pid = 2; // PID of process inside container
 	uint32 signal = 3; // Signal which will be sent, you can find value in "man 7 signal"
 }
 
@@ -45,11 +57,11 @@ message AddProcessRequest {
 	repeated string args = 4; // Arguments for process, first is binary path itself
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
-	string stdin = 7; // path to the file where stdin will be read (optional)
-	string stdout = 8; // path to file where stdout will be written (optional)
-	string stderr = 9; // path to file where stderr will be written (optional)
-	string console = 10; // path to the console for a container (optional)
-};
+    string pid = 7; // Process ID 
+    string stdin = 8; // path to the file where stdin will be read (optional)
+	string stdout = 9; // path to file where stdout will be written (optional)
+	string stderr = 10; // path to file where stderr will be written (optional)
+}
 
 message User {
 	uint32 uid = 1; // UID of user
@@ -58,7 +70,6 @@ message User {
 }
 
 message AddProcessResponse {
-	uint32 pid = 1; // PID of process is returned in case of success
 }
 
 message CreateCheckpointRequest {
@@ -94,6 +105,7 @@ message ListCheckpointResponse {
 }
 
 message StateRequest {
+    string id = 1; // container id for a single container
 }
 
 message ContainerState {
@@ -101,27 +113,31 @@ message ContainerState {
 }
 
 message Process {
-	uint32 pid = 1;
+	string pid = 1;
 	bool terminal = 2; // Use tty for container stdio
 	User user = 3; // User under which process will be run
 	repeated string args = 4; // Arguments for process, first is binary path itself
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
+    uint32 systemPid = 7;
+    string stdin = 8; // path to the file where stdin will be read (optional)
+	string stdout = 9; // path to file where stdout will be written (optional)
+	string stderr = 10; // path to file where stderr will be written (optional)
 }
 
 message Container {
 	string id = 1; // ID of container
-	string name = 2; // Name of container (???)
-	string bundlePath = 3; // Path to OCI bundle
-	repeated Process processes = 4; // List of processes which run in container
-	string status = 5; // Container status ("running", "paused", etc.)
+	string bundlePath = 2; // Path to OCI bundle
+	repeated Process processes = 3; // List of processes which run in container
+	string status = 4; // Container status ("running", "paused", etc.)
+    repeated string labels = 5;
+    repeated uint32 pids = 6;
 }
 
 // Machine is information about machine on which containerd is run
 message Machine {
-	string id = 1; // ID of machine
-	uint32 cpus = 2; // number of cpus
-	uint64 memory = 3; // amount of memory
+	uint32 cpus = 1; // number of cpus
+	uint64 memory = 2; // amount of memory
 }
 
 // StateResponse is information about containerd daemon
@@ -132,7 +148,7 @@ message StateResponse {
 
 message UpdateContainerRequest {
 	string id = 1; // ID of container
-	uint32 signal = 2; // Signal
+    string pid = 2;
 	string status = 3; // Status to whcih containerd will try to change
 }
 
@@ -140,18 +156,15 @@ message UpdateContainerResponse {
 }
 
 message EventsRequest {
+    uint64 timestamp = 1;
 }
 
 message Event {
 	string type = 1;
 	string id = 2;
 	uint32 status = 3;
-	string bundlePath = 4;
-	uint32 pid = 5;
-	uint32 signal = 7;
-	Process process = 8;
-	repeated Container containers = 9;
-	Checkpoint checkpoint = 10;
+	string pid = 4;
+    uint64 timestamp = 5;
 }
 
 message NetworkStats {
@@ -229,7 +242,7 @@ message CgroupStats {
 	map<string, HugetlbStats> hugetlb_stats = 4; // the map is in the format "size of hugepage: stats of the hugepage"
 }
 
-message Stats {
+message StatsResponse {
 	repeated NetworkStats network_stats = 1;
 	CgroupStats cgroup_stats = 2;
 	uint64 timestamp = 3;

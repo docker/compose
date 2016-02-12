@@ -1,40 +1,27 @@
 package supervisor
 
-type StatsEvent struct {
+import "time"
+
+type StatsTask struct {
 	s *Supervisor
 }
 
-type UnsubscribeStatsEvent struct {
-	s *Supervisor
-}
-
-type StopStatsEvent struct {
-	s *Supervisor
-}
-
-func (h *StatsEvent) Handle(e *Event) error {
+func (h *StatsTask) Handle(e *Task) error {
+	start := time.Now()
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	e.Stats = h.s.statsCollector.collect(i.container)
-	return nil
-}
-
-func (h *UnsubscribeStatsEvent) Handle(e *Event) error {
-	i, ok := h.s.containers[e.ID]
-	if !ok {
-		return ErrContainerNotFound
-	}
-	h.s.statsCollector.unsubscribe(i.container, e.Stats)
-	return nil
-}
-
-func (h *StopStatsEvent) Handle(e *Event) error {
-	i, ok := h.s.containers[e.ID]
-	if !ok {
-		return ErrContainerNotFound
-	}
-	h.s.statsCollector.stopCollection(i.container)
-	return nil
+	// TODO: use workers for this
+	go func() {
+		s, err := i.container.Stats()
+		if err != nil {
+			e.Err <- err
+			return
+		}
+		e.Err <- nil
+		e.Stat <- s
+		ContainerStatsTimer.UpdateSince(start)
+	}()
+	return errDeferedResponse
 }

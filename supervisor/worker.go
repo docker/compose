@@ -12,10 +12,9 @@ type Worker interface {
 	Start()
 }
 
-type StartTask struct {
+type startTask struct {
 	Container     runtime.Container
 	Checkpoint    string
-	IO            *runtime.IO
 	Stdin         string
 	Stdout        string
 	Stderr        string
@@ -39,48 +38,36 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.tasks {
 		started := time.Now()
-		l, err := w.s.copyIO(t.Stdin, t.Stdout, t.Stderr, t.IO)
+		process, err := t.Container.Start(t.Checkpoint, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
-			evt := NewEvent(DeleteEventType)
+			evt := NewTask(DeleteTaskType)
 			evt.ID = t.Container.ID()
-			w.s.SendEvent(evt)
+			w.s.SendTask(evt)
 			t.Err <- err
 			continue
 		}
-		w.s.containers[t.Container.ID()].copier = l
-		if t.Checkpoint != "" {
-			if err := t.Container.Restore(t.Checkpoint); err != nil {
-				evt := NewEvent(DeleteEventType)
-				evt.ID = t.Container.ID()
-				w.s.SendEvent(evt)
-				t.Err <- err
-				continue
-			}
-		} else {
-			if err := t.Container.Start(); err != nil {
-				evt := NewEvent(DeleteEventType)
-				evt.ID = t.Container.ID()
-				w.s.SendEvent(evt)
-				t.Err <- err
-				continue
-			}
-		}
-		pid, err := t.Container.Pid()
-		if err != nil {
-			logrus.WithField("error", err).Error("containerd: get container main pid")
-		}
-		if w.s.notifier != nil {
-			n, err := t.Container.OOM()
-			if err != nil {
-				logrus.WithField("error", err).Error("containerd: notify OOM events")
-			} else {
-				w.s.notifier.Add(t.Container.ID(), n)
-			}
+		/*
+		   if w.s.notifier != nil {
+		       n, err := t.Container.OOM()
+		       if err != nil {
+		           logrus.WithField("error", err).Error("containerd: notify OOM events")
+		       } else {
+		           w.s.notifier.Add(n, t.Container.ID())
+		       }
+		   }
+		*/
+		if err := w.s.monitorProcess(process); err != nil {
+			logrus.WithField("error", err).Error("containerd: add process to monitor")
 		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
 		t.StartResponse <- StartResponse{
-			Pid: pid,
+			Container: t.Container,
 		}
+		w.s.notifySubscribers(Event{
+			Timestamp: time.Now(),
+			ID:        t.Container.ID(),
+			Type:      "start-container",
+		})
 	}
 }

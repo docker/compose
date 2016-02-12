@@ -15,12 +15,14 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/criurpc"
+	"github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/vishvananda/netlink/nl"
 )
 
@@ -38,6 +40,7 @@ type linuxContainer struct {
 	m             sync.Mutex
 	criuVersion   int
 	state         containerState
+	created       time.Time
 }
 
 // State represents a running container's state
@@ -104,6 +107,12 @@ type Container interface {
 	// errors:
 	// Systemerror - System error.
 	NotifyOOM() (<-chan struct{}, error)
+
+	// NotifyMemoryPressure returns a read-only channel signaling when the container reaches a given pressure level
+	//
+	// errors:
+	// Systemerror - System error.
+	NotifyMemoryPressure(level PressureLevel) (<-chan struct{}, error)
 }
 
 // ID returns the container's unique ID
@@ -129,7 +138,7 @@ func (c *linuxContainer) State() (*State, error) {
 }
 
 func (c *linuxContainer) Processes() ([]int, error) {
-	pids, err := c.cgroupManager.GetPids()
+	pids, err := c.cgroupManager.GetAllPids()
 	if err != nil {
 		return nil, newSystemError(err)
 	}
@@ -183,29 +192,30 @@ func (c *linuxContainer) Start(process *Process) error {
 		}
 		return newSystemError(err)
 	}
+	// generate a timestamp indicating when the container was started
+	c.created = time.Now().UTC()
+
+	c.state = &runningState{
+		c: c,
+	}
 	if doInit {
 		if err := c.updateState(parent); err != nil {
 			return err
 		}
-	} else {
-		c.state.transition(&nullState{
-			c: c,
-			s: Running,
-		})
-	}
-	if c.config.Hooks != nil {
-		s := configs.HookState{
-			Version: c.config.Version,
-			ID:      c.id,
-			Pid:     parent.pid(),
-			Root:    c.config.Rootfs,
-		}
-		for _, hook := range c.config.Hooks.Poststart {
-			if err := hook.Run(s); err != nil {
-				if err := parent.terminate(); err != nil {
-					logrus.Warn(err)
+		if c.config.Hooks != nil {
+			s := configs.HookState{
+				Version: c.config.Version,
+				ID:      c.id,
+				Pid:     parent.pid(),
+				Root:    c.config.Rootfs,
+			}
+			for _, hook := range c.config.Hooks.Poststart {
+				if err := hook.Run(s); err != nil {
+					if err := parent.terminate(); err != nil {
+						logrus.Warn(err)
+					}
+					return newSystemError(err)
 				}
-				return newSystemError(err)
 			}
 		}
 	}
@@ -258,7 +268,7 @@ func (c *linuxContainer) commandTemplate(p *Process, childPipe *os.File) (*exec.
 }
 
 func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, childPipe *os.File) (*initProcess, error) {
-	t := "_LIBCONTAINER_INITTYPE=standard"
+	t := "_LIBCONTAINER_INITTYPE=" + string(initStandard)
 	cloneFlags := c.config.Namespaces.CloneFlags()
 	if cloneFlags&syscall.CLONE_NEWUSER != 0 {
 		if err := c.addUidGidMappings(cmd.SysProcAttr); err != nil {
@@ -285,7 +295,7 @@ func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, c
 }
 
 func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, parentPipe, childPipe *os.File) (*setnsProcess, error) {
-	cmd.Env = append(cmd.Env, "_LIBCONTAINER_INITTYPE=setns")
+	cmd.Env = append(cmd.Env, "_LIBCONTAINER_INITTYPE="+string(initSetns))
 	// for setns process, we dont have to set cloneflags as the process namespaces
 	// will only be set via setns syscall
 	data, err := c.bootstrapData(0, c.initProcess.pid(), p.consolePath)
@@ -334,6 +344,13 @@ func (c *linuxContainer) Destroy() error {
 func (c *linuxContainer) Pause() error {
 	c.m.Lock()
 	defer c.m.Unlock()
+	status, err := c.currentStatus()
+	if err != nil {
+		return err
+	}
+	if status != Running {
+		return newGenericError(fmt.Errorf("container not running"), ContainerNotRunning)
+	}
 	if err := c.cgroupManager.Freeze(configs.Frozen); err != nil {
 		return err
 	}
@@ -345,6 +362,13 @@ func (c *linuxContainer) Pause() error {
 func (c *linuxContainer) Resume() error {
 	c.m.Lock()
 	defer c.m.Unlock()
+	status, err := c.currentStatus()
+	if err != nil {
+		return err
+	}
+	if status != Paused {
+		return newGenericError(fmt.Errorf("container not paused"), ContainerNotPaused)
+	}
 	if err := c.cgroupManager.Freeze(configs.Thawed); err != nil {
 		return err
 	}
@@ -355,6 +379,10 @@ func (c *linuxContainer) Resume() error {
 
 func (c *linuxContainer) NotifyOOM() (<-chan struct{}, error) {
 	return notifyOnOOM(c.cgroupManager.GetPaths())
+}
+
+func (c *linuxContainer) NotifyMemoryPressure(level PressureLevel) (<-chan struct{}, error) {
+	return notifyMemoryPressure(c.cgroupManager.GetPaths(), level)
 }
 
 // XXX debug support, remove when debugging done.
@@ -929,9 +957,6 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 
 func (c *linuxContainer) updateState(process parentProcess) error {
 	c.initProcess = process
-	if err := c.refreshState(); err != nil {
-		return err
-	}
 	state, err := c.currentState()
 	if err != nil {
 		return err
@@ -945,7 +970,7 @@ func (c *linuxContainer) saveState(s *State) error {
 		return err
 	}
 	defer f.Close()
-	return json.NewEncoder(f).Encode(s)
+	return utils.WriteJSON(f, s)
 }
 
 func (c *linuxContainer) deleteState() error {
@@ -1007,35 +1032,37 @@ func (c *linuxContainer) isPaused() (bool, error) {
 }
 
 func (c *linuxContainer) currentState() (*State, error) {
-	status, err := c.currentStatus()
-	if err != nil {
-		return nil, err
-	}
-	if status == Destroyed {
-		return nil, newGenericError(fmt.Errorf("container destroyed"), ContainerNotExists)
-	}
-	startTime, err := c.initProcess.startTime()
-	if err != nil {
-		return nil, newSystemError(err)
+	var (
+		startTime           string
+		externalDescriptors []string
+		pid                 = -1
+	)
+	if c.initProcess != nil {
+		pid = c.initProcess.pid()
+		startTime, _ = c.initProcess.startTime()
+		externalDescriptors = c.initProcess.externalDescriptors()
 	}
 	state := &State{
 		BaseState: BaseState{
 			ID:                   c.ID(),
 			Config:               *c.config,
-			InitProcessPid:       c.initProcess.pid(),
+			InitProcessPid:       pid,
 			InitProcessStartTime: startTime,
+			Created:              c.created,
 		},
 		CgroupPaths:         c.cgroupManager.GetPaths(),
 		NamespacePaths:      make(map[configs.NamespaceType]string),
-		ExternalDescriptors: c.initProcess.externalDescriptors(),
+		ExternalDescriptors: externalDescriptors,
 	}
-	for _, ns := range c.config.Namespaces {
-		state.NamespacePaths[ns.Type] = ns.GetPath(c.initProcess.pid())
-	}
-	for _, nsType := range configs.NamespaceTypes() {
-		if _, ok := state.NamespacePaths[nsType]; !ok {
-			ns := configs.Namespace{Type: nsType}
-			state.NamespacePaths[ns.Type] = ns.GetPath(c.initProcess.pid())
+	if pid > 0 {
+		for _, ns := range c.config.Namespaces {
+			state.NamespacePaths[ns.Type] = ns.GetPath(pid)
+		}
+		for _, nsType := range configs.NamespaceTypes() {
+			if _, ok := state.NamespacePaths[nsType]; !ok {
+				ns := configs.Namespace{Type: nsType}
+				state.NamespacePaths[ns.Type] = ns.GetPath(pid)
+			}
 		}
 	}
 	return state, nil

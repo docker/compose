@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
+	"github.com/opencontainers/runc/libcontainer/keys"
 	"github.com/opencontainers/runc/libcontainer/label"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runc/libcontainer/system"
@@ -18,6 +19,10 @@ type linuxSetnsInit struct {
 }
 
 func (l *linuxSetnsInit) Init() error {
+	// do not inherit the parent's session keyring
+	if _, err := keyctl.JoinSessionKeyring("_ses"); err != nil {
+		return err
+	}
 	if err := setupRlimits(l.config.Config); err != nil {
 		return err
 	}

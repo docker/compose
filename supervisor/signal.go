@@ -1,10 +1,10 @@
 package supervisor
 
-type SignalEvent struct {
+type SignalTask struct {
 	s *Supervisor
 }
 
-func (h *SignalEvent) Handle(e *Event) error {
+func (h *SignalTask) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -14,7 +14,7 @@ func (h *SignalEvent) Handle(e *Event) error {
 		return err
 	}
 	for _, p := range processes {
-		if pid, err := p.Pid(); err == nil && pid == e.Pid {
+		if p.ID() == e.Pid {
 			return p.Signal(e.Signal)
 		}
 	}

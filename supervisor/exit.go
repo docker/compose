@@ -4,61 +4,62 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/runtime"
 )
 
-type ExitEvent struct {
+type ExitTask struct {
 	s *Supervisor
 }
 
-func (h *ExitEvent) Handle(e *Event) error {
+func (h *ExitTask) Handle(e *Task) error {
 	start := time.Now()
-	logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
-		Debug("containerd: process exited")
-	// is it the child process of a container
-	if info, ok := h.s.processes[e.Pid]; ok {
-		ne := NewEvent(ExecExitEventType)
-		ne.ID = info.container.ID()
-		ne.Pid = e.Pid
-		ne.Status = e.Status
-		h.s.SendEvent(ne)
-		return nil
-	}
-	// is it the main container's process
-	container, err := h.s.getContainerForPid(e.Pid)
+	proc := e.Process
+	status, err := proc.ExitStatus()
 	if err != nil {
-		if err != errNoContainerForPid {
-			logrus.WithField("error", err).Error("containerd: find containers main pid")
-		}
+		logrus.WithField("error", err).Error("containerd: get exit status")
+	}
+	logrus.WithFields(logrus.Fields{"pid": proc.ID(), "status": status}).Debug("containerd: process exited")
+
+	// if the process is the the init process of the container then
+	// fire a separate event for this process
+	if proc.ID() != runtime.InitProcessID {
+		ne := NewTask(ExecExitTaskType)
+		ne.ID = proc.Container().ID()
+		ne.Pid = proc.ID()
+		ne.Status = status
+		ne.Process = proc
+		h.s.SendTask(ne)
+
 		return nil
 	}
-	container.SetExited(e.Status)
-	ne := NewEvent(DeleteEventType)
+	container := proc.Container()
+	ne := NewTask(DeleteTaskType)
 	ne.ID = container.ID()
-	ne.Pid = e.Pid
-	ne.Status = e.Status
-	h.s.SendEvent(ne)
+	ne.Status = status
+	ne.Pid = proc.ID()
+	h.s.SendTask(ne)
 
-	stopCollect := NewEvent(StopStatsEventType)
-	stopCollect.ID = container.ID()
-	h.s.SendEvent(stopCollect)
 	ExitProcessTimer.UpdateSince(start)
+
 	return nil
 }
 
-type ExecExitEvent struct {
+type ExecExitTask struct {
 	s *Supervisor
 }
 
-func (h *ExecExitEvent) Handle(e *Event) error {
+func (h *ExecExitTask) Handle(e *Task) error {
+	container := e.Process.Container()
 	// exec process: we remove this process without notifying the main event loop
-	info := h.s.processes[e.Pid]
-	if err := info.container.RemoveProcess(e.Pid); err != nil {
+	if err := container.RemoveProcess(e.Pid); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
-	if err := info.copier.Close(); err != nil {
-		logrus.WithField("error", err).Error("containerd: close process IO")
-	}
-	delete(h.s.processes, e.Pid)
-	h.s.notifySubscribers(e)
+	h.s.notifySubscribers(Event{
+		Timestamp: time.Now(),
+		ID:        e.ID,
+		Type:      "exit",
+		Pid:       e.Pid,
+		Status:    e.Status,
+	})
 	return nil
 }

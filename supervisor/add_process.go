@@ -3,40 +3,35 @@ package supervisor
 import (
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/runtime"
 )
 
-type AddProcessEvent struct {
+type AddProcessTask struct {
 	s *Supervisor
 }
 
 // TODO: add this to worker for concurrent starts???  maybe not because of races where the container
 // could be stopped and removed...
-func (h *AddProcessEvent) Handle(e *Event) error {
+func (h *AddProcessTask) Handle(e *Task) error {
 	start := time.Now()
 	ci, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	p, io, err := h.s.runtime.StartProcess(ci.container, *e.Process, e.Console)
+	process, err := ci.container.Exec(e.Pid, *e.ProcessSpec, runtime.NewStdio(e.Stdin, e.Stdout, e.Stderr))
 	if err != nil {
 		return err
 	}
-	if e.Pid, err = p.Pid(); err != nil {
+	if err := h.s.monitorProcess(process); err != nil {
 		return err
 	}
-	h.s.processes[e.Pid] = &containerInfo{
-		container: ci.container,
-	}
-	l, err := h.s.copyIO(e.Stdin, e.Stdout, e.Stderr, io)
-	if err != nil {
-		// log the error but continue with the other commands
-		logrus.WithFields(logrus.Fields{
-			"error": err,
-			"id":    e.ID,
-		}).Error("log stdio")
-	}
-	h.s.processes[e.Pid].copier = l
 	ExecProcessTimer.UpdateSince(start)
+	e.StartResponse <- StartResponse{}
+	h.s.notifySubscribers(Event{
+		Timestamp: time.Now(),
+		Type:      "start-process",
+		Pid:       e.Pid,
+		ID:        e.ID,
+	})
 	return nil
 }

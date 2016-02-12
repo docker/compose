@@ -7,35 +7,30 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
-type DeleteEvent struct {
+type DeleteTask struct {
 	s *Supervisor
 }
 
-func (h *DeleteEvent) Handle(e *Event) error {
+func (h *DeleteTask) Handle(e *Task) error {
 	if i, ok := h.s.containers[e.ID]; ok {
 		start := time.Now()
 		if err := h.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
-		if i.copier != nil {
-			if err := i.copier.Close(); err != nil {
-				logrus.WithField("error", err).Error("containerd: close container copier")
-			}
-		}
-		h.s.notifySubscribers(&Event{
-			Type:   ExitEventType,
-			ID:     e.ID,
-			Status: e.Status,
-			Pid:    e.Pid,
+		h.s.notifySubscribers(Event{
+			Type:      "exit",
+			Timestamp: time.Now(),
+			ID:        e.ID,
+			Status:    e.Status,
+			Pid:       e.Pid,
 		})
 		ContainersCounter.Dec(1)
-		h.s.containerGroup.Done()
 		ContainerDeleteTimer.UpdateSince(start)
 	}
 	return nil
 }
 
-func (h *DeleteEvent) deleteContainer(container runtime.Container) error {
+func (h *DeleteTask) deleteContainer(container runtime.Container) error {
 	delete(h.s.containers, container.ID())
 	return container.Delete()
 }
