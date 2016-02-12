@@ -127,12 +127,11 @@ message Process {
 
 message Container {
 	string id = 1; // ID of container
-	string name = 2; // Name of container (???)
-	string bundlePath = 3; // Path to OCI bundle
-	repeated Process processes = 4; // List of processes which run in container
-	string status = 5; // Container status ("running", "paused", etc.)
-    repeated string labels = 6;
-    repeated uint32 pids = 7;
+	string bundlePath = 2; // Path to OCI bundle
+	repeated Process processes = 3; // List of processes which run in container
+	string status = 4; // Container status ("running", "paused", etc.)
+    repeated string labels = 5;
+    repeated uint32 pids = 6;
 }
 
 // Machine is information about machine on which containerd is run
