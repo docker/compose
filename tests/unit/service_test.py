@@ -631,6 +631,24 @@ class NetTestCase(unittest.TestCase):
         self.assertEqual(network_mode.mode, None)
         self.assertEqual(network_mode.service_name, service_name)
 
+    def test_network_mode_service_multiple_containers(self):
+        service_name = 'web'
+        mock_client = mock.create_autospec(docker.Client)
+        mock_client.containers.return_value = [
+            {'Id': 'a', 'Name': 'a', 'Image': 'abcd'},
+            {'Id': 'b', 'Name': 'b', 'Image': 'abcd'},
+            {'Id': 'c', 'Name': 'c', 'Image': 'abcd'},
+        ]
+
+        service = Service(name=service_name, client=mock_client)
+        network_mode = ServiceNetworkMode(service)
+
+        self.assertEqual(network_mode.mode, 'container:a')
+        self.assertEqual(network_mode.for_number(1), 'container:a')
+        self.assertEqual(network_mode.for_number(2), 'container:b')
+        self.assertEqual(network_mode.for_number(3), 'container:c')
+        self.assertEqual(network_mode.for_number(4), 'container:a')
+
 
 def build_mount(destination, source, mode='rw'):
     return {'Source': source, 'Destination': destination, 'Mode': mode}
