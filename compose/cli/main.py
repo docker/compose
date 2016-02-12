@@ -703,7 +703,7 @@ def image_type_from_opt(flag, value):
 
 def run_one_off_container(container_options, project, service, options):
     if not options['--no-deps']:
-        deps = service.get_linked_service_names()
+        deps = service.get_dependency_names()
         if deps:
             project.up(
                 service_names=deps,
