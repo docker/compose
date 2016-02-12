@@ -231,6 +231,20 @@ class ConfigTest(unittest.TestCase):
         assert volumes['simple'] == {}
         assert volumes['other'] == {}
 
+    def test_volume_invalid_driver_opt(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': {
+                'simple': {'driver_opts': {'size': 42}},
+            }
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert 'driver_opts.size contains an invalid type' in exc.exconly()
+
     def test_load_service_with_name_version(self):
         with mock.patch('compose.config.config.log') as mock_logging:
             config_data = config.load(
