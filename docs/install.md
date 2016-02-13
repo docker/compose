@@ -80,6 +80,8 @@ To install compose as a container run:
     $ curl -L https://github.com/docker/compose/releases/download/1.5.2/run.sh > /usr/local/bin/docker-compose
     $ chmod +x /usr/local/bin/docker-compose
 
+> **Note:** [variable substitution](compose-file.md#variable-substitution) from environment does not work for container-based install.  You can use `COMPOSE_OPTIONS="-e POSTGRES_VERSION=9.5" docker-compose` though.
+
 ## Master builds
 
 If you're interested in trying out a pre-release build you can download a
