@@ -120,9 +120,16 @@
         "network_mode": {"type": "string"},
 
         "networks": {
-          "type": "array",
-          "items": {"type": "string"},
-          "uniqueItems": true
+          "$ref": "#/definitions/list_of_strings"
+        },
+        "network_aliases": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9._-]+$": {
+              "$ref": "#/definitions/list_of_strings"
+            }
+          },
+          "additionalProperties": false
         },
 
         "pid": {"type": ["string", "null"]},

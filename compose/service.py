@@ -124,7 +124,7 @@ class Service(object):
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.network_mode = network_mode or NetworkMode(None)
-        self.networks = networks or []
+        self.networks = networks or {}
         self.options = options
 
     def containers(self, stopped=False, one_off=False, filters={}):
@@ -432,14 +432,14 @@ class Service(object):
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network in self.networks:
+        for network, aliases in self.networks.items():
             if network in connected_networks:
                 self.client.disconnect_container_from_network(
                     container.id, network)
 
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=self._get_aliases(container),
+                aliases=list(self._get_aliases(container).union(aliases)),
                 links=self._get_links(False),
             )
 
@@ -473,7 +473,7 @@ class Service(object):
             'image_id': self.image()['Id'],
             'links': self.get_link_names(),
             'net': self.network_mode.id,
-            'networks': self.networks,
+            'networks': self.networks.keys(),
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
@@ -514,9 +514,9 @@ class Service(object):
 
     def _get_aliases(self, container):
         if container.labels.get(LABEL_ONE_OFF) == "True":
-            return []
+            return set()
 
-        return [self.name, container.short_id]
+        return set([self.name, container.short_id])
 
     def _get_links(self, link_to_self):
         links = {}

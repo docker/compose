@@ -91,6 +91,19 @@ def match_named_volumes(service_dict, project_volumes):
             )
 
 
+def match_network_aliases(service_dict):
+    networks = service_dict.get('networks', [])
+    aliased_networks = service_dict.get('network_aliases', {}).keys()
+    for n in aliased_networks:
+        if n not in networks:
+            raise ConfigurationError(
+                'Network "{0}" is referenced in network_aliases, but is not'
+                'declared in the networks list for service "{1}"'.format(
+                    n, service_dict.get('name')
+                )
+            )
+
+
 def validate_top_level_service_objects(filename, service_dicts):
     """Perform some high level validation of the service name and value.
 

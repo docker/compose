@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 ipam=None, external_name=None):
+                 ipam=None, external_name=None, aliases=None):
         self.client = client
         self.project = project
         self.name = name
@@ -23,6 +23,7 @@ class Network(object):
         self.driver_opts = driver_opts
         self.ipam = create_ipam_config_from_dict(ipam)
         self.external_name = external_name
+        self.aliases = aliases or []
 
     def ensure(self):
         if self.external_name:
@@ -166,14 +167,18 @@ def get_network_names_for_service(service_dict):
 
 
 def get_networks(service_dict, network_definitions):
-    networks = []
+    networks = {}
+    aliases = service_dict.get('network_aliases', {})
     for name in get_network_names_for_service(service_dict):
+        log.debug(name)
         network = network_definitions.get(name)
         if network:
-            networks.append(network.full_name)
+            log.debug(aliases)
+            networks[network.full_name] = aliases.get(name, [])
         else:
             raise ConfigurationError(
                 'Service "{}" uses an undefined network "{}"'
                 .format(service_dict['name'], name))
 
+    log.debug(networks)
     return networks
