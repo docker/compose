@@ -47,9 +47,10 @@ fi
 
 # Only allocate tty if we detect one
 if [ -t 1 ]; then
-    DOCKER_RUN_OPTIONS="-ti"
-else
-    DOCKER_RUN_OPTIONS="-i"
+    DOCKER_RUN_OPTIONS="-t"
+fi
+if [ -t 0 ]; then
+    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
 fi
 
 exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE $@
