@@ -97,7 +97,7 @@ def match_network_aliases(service_dict):
     for n in aliased_networks:
         if n not in networks:
             raise ConfigurationError(
-                'Network "{0}" is referenced in network_aliases, but is not'
+                'Network "{0}" is referenced in network_aliases, but is not '
                 'declared in the networks list for service "{1}"'.format(
                     n, service_dict.get('name')
                 )

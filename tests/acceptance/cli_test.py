@@ -445,6 +445,33 @@ class CLITestCase(DockerClientTestCase):
 
         assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
 
+    def test_up_with_network_aliases(self):
+        filename = 'network-aliases.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+        back_name = '{}_back'.format(self.project.name)
+        front_name = '{}_front'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # Two networks were created: back and front
+        assert sorted(n['Name'] for n in networks) == [back_name, front_name]
+        web_container = self.project.get_service('web').containers()[0]
+
+        back_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(back_name)
+        )
+        assert 'web' in back_aliases
+        front_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(front_name)
+        )
+        assert 'web' in front_aliases
+        assert 'forward_facing' in front_aliases
+        assert 'ahead' in front_aliases
+
     @v2_only()
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'
