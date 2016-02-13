@@ -451,9 +451,27 @@ id.
     net: "none"
     net: "container:[service name or container name/id]"
 
+### network_aliases
+
+> [Version 2 file format](#version-2) only.
+
+Alias names for this service on each joined network. All networks referenced
+here must also appear under the `networks` key.
+
+    networks:
+      - some-network
+      - other-network
+    network_aliases:
+      some-network:
+        - alias1
+        - alias3
+      other-network:
+        - alias2
+        - alias4
+
 ### network_mode
 
-> [Version 2 file format](#version-1) only. In version 1, use [net](#net).
+> [Version 2 file format](#version-2) only. In version 1, use [net](#net).
 
 Network mode. Use the same values as the docker client `--net` parameter, plus
 the special form `service:[service name]`.
