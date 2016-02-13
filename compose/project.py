@@ -73,7 +73,9 @@ class Project(object):
 
             service_dict.pop('networks', None)
             links = project.get_links(service_dict)
-            network_mode = project.get_network_mode(service_dict, service_networks.keys())
+            network_mode = project.get_network_mode(
+                service_dict, list(service_networks.keys())
+            )
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version != V1:

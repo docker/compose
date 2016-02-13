@@ -543,6 +543,27 @@ class ConfigTest(unittest.TestCase):
         assert services[1]['name'] == 'db'
         assert services[2]['name'] == 'web'
 
+    def test_invalid_network_alias(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'networks': ['hello'],
+                    'network_aliases': {
+                        'world': ['planet', 'universe']
+                    }
+                }
+            },
+            'networks': {
+                'hello': {},
+                'world': {}
+            }
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert 'not declared in the networks list' in exc.exconly()
+
     def test_config_build_configuration(self):
         service = config.load(
             build_config_details(

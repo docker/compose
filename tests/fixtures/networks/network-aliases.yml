@@ -1,0 +1,18 @@
+version: "2"
+
+services:
+  web:
+    image: busybox
+    command: top
+    networks:
+      - front
+      - back
+
+    network_aliases:
+      front:
+        - forward_facing
+        - ahead
+
+networks:
+  front: {}
+  back: {}
