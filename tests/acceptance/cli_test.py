@@ -445,6 +445,7 @@ class CLITestCase(DockerClientTestCase):
 
         assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
 
+    @v2_only()
     def test_up_with_network_aliases(self):
         filename = 'network-aliases.yml'
         self.base_dir = 'tests/fixtures/networks'
