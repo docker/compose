@@ -41,19 +41,21 @@ and WordPress.
 Next you'll create a `docker-compose.yml` file that will start your web service
 and a separate MySQL instance:
 
-    web:
-      build: .
-      command: php -S 0.0.0.0:8000 -t /code
-      ports:
-        - "8000:8000"
-      links:
-        - db
-      volumes:
-        - .:/code
-    db:
-      image: orchardup/mysql
-      environment:
-        MYSQL_DATABASE: wordpress
+    version: '2'
+    services:
+      web:
+        build: .
+        command: php -S 0.0.0.0:8000 -t /code
+        ports:
+          - "8000:8000"
+        depends_on:
+          - db
+        volumes:
+          - .:/code
+      db:
+        image: orchardup/mysql
+        environment:
+          MYSQL_DATABASE: wordpress
 
 A supporting file is needed to get this working. `wp-config.php` is
 the standard WordPress config file with a single change to point the database
