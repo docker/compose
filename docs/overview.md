@@ -24,11 +24,14 @@ CI workflows. You can learn more about each case in
 
 Using Compose is basically a three-step process.
 
-1. Define your app's environment with a `Dockerfile` so it can be
-reproduced anywhere.
-2. Define the services that make up your app in `docker-compose.yml` so
-they can be run together in an isolated environment.
-3. Lastly, run `docker-compose up` and Compose will start and run your entire app.
+1. Define your app's environment with a `Dockerfile` so it can be reproduced
+anywhere.
+
+2. Define the services that make up your app in `docker-compose.yml`
+so they can be run together in an isolated environment.
+
+3. Lastly, run
+`docker-compose up` and Compose will start and run your entire app.
 
 A `docker-compose.yml` looks like this:
 
@@ -37,16 +40,16 @@ A `docker-compose.yml` looks like this:
       web:
         build: .
         ports:
-         - "5000:5000"
+        - "5000:5000"
         volumes:
-         - .:/code
-         - logvolume01:/var/log
+        - .:/code
+        - logvolume01:/var/log
         links:
-         - redis
-      redis:
-        image: redis
-    volumes:
-      logvolume01: {}
+        - redis
+        redis:
+          image: redis
+        volumes:
+          logvolume01: {}
 
 For more information about the Compose file, see the
 [Compose file reference](compose-file.md)
@@ -80,14 +83,12 @@ The features of Compose that make it effective are:
 
 ### Multiple isolated environments on a single host
 
-Compose uses a project name to isolate environments from each other. You can use
-this project name to:
+Compose uses a project name to isolate environments from each other. You can make use of this project name in several different contexts:
 
-* on a dev host, to create multiple copies of a single environment (ex: you want
-  to run a stable copy for each feature branch of a project)
+* on a dev host, to create multiple copies of a single environment (e.g., you want to run a stable copy for each feature branch of a project)
 * on a CI server, to keep builds from interfering with each other, you can set
   the project name to a unique build number
-* on a shared host or dev host, to prevent different projects which may use the
+* on a shared host or dev host, to prevent different projects, which may use the
   same service names, from interfering with each other
 
 The default project name is the basename of the project directory. You can set
@@ -148,9 +149,7 @@ started guide" to a single machine readable Compose file and a few commands.
 An important part of any Continuous Deployment or Continuous Integration process
 is the automated test suite. Automated end-to-end testing requires an
 environment in which to run tests. Compose provides a convenient way to create
-and destroy isolated testing environments for your test suite. By defining the full
-environment in a [Compose file](compose-file.md) you can create and destroy these
-environments in just a few commands:
+and destroy isolated testing environments for your test suite. By defining the full environment in a [Compose file](compose-file.md) you can create and destroy these environments in just a few commands:
 
     $ docker-compose up -d
     $ ./run_tests
@@ -159,9 +158,7 @@ environments in just a few commands:
 ### Single host deployments
 
 Compose has traditionally been focused on development and testing workflows,
-but with each release we're making progress on more production-oriented features.
-You can use Compose to deploy to a remote Docker Engine. The Docker Engine may
-be a single instance provisioned with
+but with each release we're making progress on more production-oriented features. You can use Compose to deploy to a remote Docker Engine. The Docker Engine may be a single instance provisioned with
 [Docker Machine](https://docs.docker.com/machine/) or an entire
 [Docker Swarm](https://docs.docker.com/swarm/) cluster.
 
