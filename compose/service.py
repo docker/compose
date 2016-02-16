@@ -927,7 +927,7 @@ def get_container_data_volumes(container, volumes_option):
             continue
 
         # Copy existing volume from old container
-        volume = volume._replace(external=mount['Source'])
+        volume = volume._replace(external=mount['Name'])
         volumes.append(volume)
 
     return volumes

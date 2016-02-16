@@ -731,8 +731,8 @@ class ServiceVolumesTest(unittest.TestCase):
         }, has_been_inspected=True)
 
         expected = [
-            VolumeSpec.parse('/var/lib/docker/aaaaaaaa:/existing/volume:rw'),
-            VolumeSpec.parse('/var/lib/docker/cccccccc:/mnt/image/data:rw'),
+            VolumeSpec.parse('existingvolume:/existing/volume:rw'),
+            VolumeSpec.parse('imagedata:/mnt/image/data:rw'),
         ]
 
         volumes = get_container_data_volumes(container, options)
@@ -765,7 +765,7 @@ class ServiceVolumesTest(unittest.TestCase):
         expected = [
             '/host/volume:/host/volume:ro',
             '/host/rw/volume:/host/rw/volume:rw',
-            '/var/lib/docker/aaaaaaaa:/existing/volume:rw',
+            'existingvolume:/existing/volume:rw',
         ]
 
         binds, affinity = merge_volume_bindings(options, previous_container)
@@ -803,13 +803,14 @@ class ServiceVolumesTest(unittest.TestCase):
             ]),
         )
 
-    def test_different_host_path_in_container_json(self):
+    def test_get_container_create_options_with_different_host_path_in_container_json(self):
         service = Service(
             'web',
             image='busybox',
             volumes=[VolumeSpec.parse('/host/path:/data')],
             client=self.mock_client,
         )
+        volume_name = 'abcdefff1234'
 
         self.mock_client.inspect_image.return_value = {
             'Id': 'ababab',
@@ -830,7 +831,7 @@ class ServiceVolumesTest(unittest.TestCase):
                     'Mode': '',
                     'RW': True,
                     'Driver': 'local',
-                    'Name': 'abcdefff1234'
+                    'Name': volume_name,
                 },
             ]
         }
@@ -841,9 +842,9 @@ class ServiceVolumesTest(unittest.TestCase):
             previous_container=Container(self.mock_client, {'Id': '123123123'}),
         )
 
-        self.assertEqual(
-            self.mock_client.create_host_config.call_args[1]['binds'],
-            ['/mnt/sda1/host/path:/data:rw'],
+        assert (
+            self.mock_client.create_host_config.call_args[1]['binds'] ==
+            ['{}:/data:rw'.format(volume_name)]
         )
 
     def test_warn_on_masked_volume_no_warning_when_no_container_volumes(self):
