@@ -33,11 +33,11 @@ from .types import VolumeSpec
 from .validation import match_named_volumes
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
+from .validation import validate_config_section
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_network_mode
 from .validation import validate_top_level_object
-from .validation import validate_top_level_service_objects
 from .validation import validate_ulimits
 
 
@@ -387,22 +387,31 @@ def load_services(working_dir, config_file, service_configs):
     return build_services(service_config)
 
 
-def process_config_file(config_file, service_name=None):
-    service_dicts = config_file.get_service_dicts()
-    validate_top_level_service_objects(config_file.filename, service_dicts)
+def interpolate_config_section(filename, config, section):
+    validate_config_section(filename, config, section)
+    return interpolate_environment_variables(config, section)
 
-    interpolated_config = interpolate_environment_variables(service_dicts, 'service')
+
+def process_config_file(config_file, service_name=None):
+    services = interpolate_config_section(
+        config_file.filename,
+        config_file.get_service_dicts(),
+        'service')
 
     if config_file.version == V2_0:
         processed_config = dict(config_file.config)
-        processed_config['services'] = services = interpolated_config
-        processed_config['volumes'] = interpolate_environment_variables(
-            config_file.get_volumes(), 'volume')
-        processed_config['networks'] = interpolate_environment_variables(
-            config_file.get_networks(), 'network')
+        processed_config['services'] = services
+        processed_config['volumes'] = interpolate_config_section(
+            config_file.filename,
+            config_file.get_volumes(),
+            'volume')
+        processed_config['networks'] = interpolate_config_section(
+            config_file.filename,
+            config_file.get_networks(),
+            'network')
 
     if config_file.version == V1:
-        processed_config = services = interpolated_config
+        processed_config = services
 
     config_file = config_file._replace(config=processed_config)
     validate_against_fields_schema(config_file)

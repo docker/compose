@@ -91,29 +91,50 @@ def match_named_volumes(service_dict, project_volumes):
             )
 
 
-def validate_top_level_service_objects(filename, service_dicts):
-    """Perform some high level validation of the service name and value.
+def python_type_to_yaml_type(type_):
+    type_name = type(type_).__name__
+    return {
+        'dict': 'mapping',
+        'list': 'array',
+        'int': 'number',
+        'float': 'number',
+        'bool': 'boolean',
+        'unicode': 'string',
+        'str': 'string',
+        'bytes': 'string',
+    }.get(type_name, type_name)
 
-    This validation must happen before interpolation, which must happen
-    before the rest of validation, which is why it's separate from the
-    rest of the service validation.
+
+def validate_config_section(filename, config, section):
+    """Validate the structure of a configuration section. This must be done
+    before interpolation so it's separate from schema validation.
     """
-    for service_name, service_dict in service_dicts.items():
-        if not isinstance(service_name, six.string_types):
-            raise ConfigurationError(
-                "In file '{}' service name: {} needs to be a string, eg '{}'".format(
-                    filename,
-                    service_name,
-                    service_name))
+    if not isinstance(config, dict):
+        raise ConfigurationError(
+            "In file '{filename}' {section} must be a mapping, not "
+            "'{type}'.".format(
+                filename=filename,
+                section=section,
+                type=python_type_to_yaml_type(config)))
 
-        if not isinstance(service_dict, dict):
+    for key, value in config.items():
+        if not isinstance(key, six.string_types):
             raise ConfigurationError(
-                "In file '{}' service '{}' doesn\'t have any configuration options. "
-                "All top level keys in your docker-compose.yml must map "
-                "to a dictionary of configuration options.".format(
-                    filename, service_name
-                )
-            )
+                "In file '{filename}' {section} name {name} needs to be a "
+                "string, eg '{name}'".format(
+                    filename=filename,
+                    section=section,
+                    name=key))
+
+        if not isinstance(value, (dict, type(None))):
+            raise ConfigurationError(
+                "In file '{filename}' {section} '{name}' is the wrong type. "
+                "It should be a mapping of configuration options, it is a "
+                "'{type}'.".format(
+                    filename=filename,
+                    section=section,
+                    name=key,
+                    type=python_type_to_yaml_type(value)))
 
 
 def validate_top_level_object(config_file):
