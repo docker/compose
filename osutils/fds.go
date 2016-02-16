@@ -1,6 +1,6 @@
 // +build !windows,!darwin
 
-package util
+package osutils
 
 import (
 	"io/ioutil"

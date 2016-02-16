@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/util"
+	"github.com/docker/containerd/osutils"
 	"github.com/docker/docker/pkg/term"
 )
 
@@ -32,7 +32,7 @@ func main() {
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals)
 	// set the shim as the subreaper for all orphaned processes created by the container
-	if err := util.SetSubreaper(1); err != nil {
+	if err := osutils.SetSubreaper(1); err != nil {
 		logrus.WithField("error", err).Fatal("shim: set as subreaper")
 	}
 	// open the exit pipe
@@ -82,7 +82,7 @@ func main() {
 		logrus.WithField("signal", s).Debug("shim: received signal")
 		switch s {
 		case syscall.SIGCHLD:
-			exits, err := util.Reap()
+			exits, err := osutils.Reap()
 			if err != nil {
 				logrus.WithField("error", err).Error("shim: reaping child processes")
 			}

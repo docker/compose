@@ -1,4 +1,4 @@
-package util
+package osutils
 
 import (
 	"syscall"
