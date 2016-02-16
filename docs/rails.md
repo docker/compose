@@ -43,17 +43,19 @@ You'll need an empty `Gemfile.lock` in order to build our `Dockerfile`.
 
 Finally, `docker-compose.yml` is where the magic happens. This file describes the services that comprise your app (a database and a web app), how to get each one's Docker image (the database just runs on a pre-made PostgreSQL image, and the web app is built from the current directory), and the configuration needed to link them together and expose the web app's port.
 
-    db:
-      image: postgres
-    web:
-      build: .
-      command: bundle exec rails s -p 3000 -b '0.0.0.0'
-      volumes:
-        - .:/myapp
-      ports:
-        - "3000:3000"
-      links:
-        - db
+    version: '2'
+    services:
+      db:
+        image: postgres
+      web:
+        build: .
+        command: bundle exec rails s -p 3000 -b '0.0.0.0'
+        volumes:
+          - .:/myapp
+        ports:
+          - "3000:3000"
+        depends_on:
+          - db
 
 ### Build the project
 
