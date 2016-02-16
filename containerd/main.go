@@ -19,8 +19,8 @@ import (
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
-	"github.com/docker/containerd/util"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -141,7 +141,7 @@ func processMetrics() {
 		// update number of goroutines
 		g.Update(int64(runtime.NumGoroutine()))
 		// collect the number of open fds
-		fds, err := util.GetOpenFds(os.Getpid())
+		fds, err := osutils.GetOpenFds(os.Getpid())
 		if err != nil {
 			logrus.WithField("error", err).Error("containerd: get open fd count")
 		}
@@ -194,11 +194,11 @@ func daemon(address, stateDir string, concurrency int, oom bool) error {
 func reapProcesses() {
 	s := make(chan os.Signal, 2048)
 	signal.Notify(s, syscall.SIGCHLD)
-	if err := util.SetSubreaper(1); err != nil {
+	if err := osutils.SetSubreaper(1); err != nil {
 		logrus.WithField("error", err).Error("containerd: set subpreaper")
 	}
 	for range s {
-		if _, err := util.Reap(); err != nil {
+		if _, err := osutils.Reap(); err != nil {
 			logrus.WithField("error", err).Error("containerd: reap child processes")
 		}
 	}
