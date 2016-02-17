@@ -8,12 +8,13 @@ import (
 )
 
 type ExitTask struct {
-	s *Supervisor
+	baseTask
+	Process runtime.Process
 }
 
-func (h *ExitTask) Handle(e *Task) error {
+func (s *Supervisor) exit(t *ExitTask) error {
 	start := time.Now()
-	proc := e.Process
+	proc := t.Process
 	status, err := proc.ExitStatus()
 	if err != nil {
 		logrus.WithField("error", err).Error("containerd: get exit status")
@@ -23,21 +24,22 @@ func (h *ExitTask) Handle(e *Task) error {
 	// if the process is the the init process of the container then
 	// fire a separate event for this process
 	if proc.ID() != runtime.InitProcessID {
-		ne := NewTask(ExecExitTaskType)
-		ne.ID = proc.Container().ID()
-		ne.Pid = proc.ID()
-		ne.Status = status
-		ne.Process = proc
-		h.s.SendTask(ne)
-
+		ne := &ExecExitTask{
+			ID:      proc.Container().ID(),
+			PID:     proc.ID(),
+			Status:  status,
+			Process: proc,
+		}
+		s.SendTask(ne)
 		return nil
 	}
 	container := proc.Container()
-	ne := NewTask(DeleteTaskType)
-	ne.ID = container.ID()
-	ne.Status = status
-	ne.Pid = proc.ID()
-	h.s.SendTask(ne)
+	ne := &DeleteTask{
+		ID:     container.ID(),
+		Status: status,
+		PID:    proc.ID(),
+	}
+	s.SendTask(ne)
 
 	ExitProcessTimer.UpdateSince(start)
 
@@ -45,21 +47,25 @@ func (h *ExitTask) Handle(e *Task) error {
 }
 
 type ExecExitTask struct {
-	s *Supervisor
+	baseTask
+	ID      string
+	PID     string
+	Status  int
+	Process runtime.Process
 }
 
-func (h *ExecExitTask) Handle(e *Task) error {
-	container := e.Process.Container()
+func (s *Supervisor) execExit(t *ExecExitTask) error {
+	container := t.Process.Container()
 	// exec process: we remove this process without notifying the main event loop
-	if err := container.RemoveProcess(e.Pid); err != nil {
+	if err := container.RemoveProcess(t.PID); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
-	h.s.notifySubscribers(Event{
+	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
-		ID:        e.ID,
+		ID:        t.ID,
 		Type:      "exit",
-		Pid:       e.Pid,
-		Status:    e.Status,
+		PID:       t.PID,
+		Status:    t.Status,
 	})
 	return nil
 }

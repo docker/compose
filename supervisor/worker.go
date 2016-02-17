@@ -36,12 +36,13 @@ type worker struct {
 
 func (w *worker) Start() {
 	defer w.wg.Done()
-	for t := range w.s.tasks {
+	for t := range w.s.startTasks {
 		started := time.Now()
 		process, err := t.Container.Start(t.Checkpoint, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
-			evt := NewTask(DeleteTaskType)
-			evt.ID = t.Container.ID()
+			evt := &DeleteTask{
+				ID: t.Container.ID(),
+			}
 			w.s.SendTask(evt)
 			t.Err <- err
 			continue

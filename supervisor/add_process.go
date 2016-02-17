@@ -4,34 +4,40 @@ import (
 	"time"
 
 	"github.com/docker/containerd/runtime"
+	"github.com/opencontainers/specs"
 )
 
 type AddProcessTask struct {
-	s *Supervisor
+	baseTask
+	ID            string
+	PID           string
+	Stdout        string
+	Stderr        string
+	Stdin         string
+	ProcessSpec   *specs.Process
+	StartResponse chan StartResponse
 }
 
-// TODO: add this to worker for concurrent starts???  maybe not because of races where the container
-// could be stopped and removed...
-func (h *AddProcessTask) Handle(e *Task) error {
+func (s *Supervisor) addProcess(t *AddProcessTask) error {
 	start := time.Now()
-	ci, ok := h.s.containers[e.ID]
+	ci, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
-	process, err := ci.container.Exec(e.Pid, *e.ProcessSpec, runtime.NewStdio(e.Stdin, e.Stdout, e.Stderr))
+	process, err := ci.container.Exec(t.PID, *t.ProcessSpec, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 	if err != nil {
 		return err
 	}
-	if err := h.s.monitorProcess(process); err != nil {
+	if err := s.monitorProcess(process); err != nil {
 		return err
 	}
 	ExecProcessTimer.UpdateSince(start)
-	e.StartResponse <- StartResponse{}
-	h.s.notifySubscribers(Event{
+	t.StartResponse <- StartResponse{}
+	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
 		Type:      "start-process",
-		Pid:       e.Pid,
-		ID:        e.ID,
+		PID:       t.PID,
+		ID:        t.ID,
 	})
 	return nil
 }
