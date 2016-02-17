@@ -231,7 +231,7 @@ class ConfigTest(unittest.TestCase):
         assert volumes['simple'] == {}
         assert volumes['other'] == {}
 
-    def test_volume_invalid_driver_opt(self):
+    def test_volume_numeric_driver_opt(self):
         config_details = build_config_details({
             'version': '2',
             'services': {
@@ -239,6 +239,19 @@ class ConfigTest(unittest.TestCase):
             },
             'volumes': {
                 'simple': {'driver_opts': {'size': 42}},
+            }
+        })
+        cfg = config.load(config_details)
+        assert cfg.volumes['simple']['driver_opts']['size'] == '42'
+
+    def test_volume_invalid_driver_opt(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': {
+                'simple': {'driver_opts': {'size': True}},
             }
         })
         with pytest.raises(ConfigurationError) as exc:
@@ -607,6 +620,34 @@ class ConfigTest(unittest.TestCase):
         ).services
         self.assertTrue('context' in service[0]['build'])
         self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
+
+    def test_load_with_buildargs(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'opt1': 42,
+                                    'opt2': 'foobar'
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'opt1' in service['build']['args']
+        assert isinstance(service['build']['args']['opt1'], str)
+        assert service['build']['args']['opt1'] == '42'
+        assert service['build']['args']['opt2'] == 'foobar'
 
     def test_load_with_multiple_files_v2(self):
         base_file = config.ConfigFile(

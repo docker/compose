@@ -16,6 +16,7 @@ from cached_property import cached_property
 
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
+from ..utils import build_string_dict
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
@@ -292,7 +293,7 @@ def load(config_details):
     config_details = config_details._replace(config_files=processed_files)
 
     main_file = config_details.config_files[0]
-    volumes = load_mapping(config_details.config_files, 'get_volumes', 'Volume')
+    volumes = load_volumes(config_details.config_files)
     networks = load_mapping(config_details.config_files, 'get_networks', 'Network')
     service_dicts = load_services(
         config_details.working_dir,
@@ -334,6 +335,14 @@ def load_mapping(config_files, get_func, entity_type):
             mapping[name] = config
 
     return mapping
+
+
+def load_volumes(config_files):
+    volumes = load_mapping(config_files, 'get_volumes', 'Volume')
+    for volume_name, volume in volumes.items():
+        if 'driver_opts' in volume:
+            volume['driver_opts'] = build_string_dict(volume['driver_opts'])
+    return volumes
 
 
 def load_services(working_dir, config_file, service_configs):
@@ -851,7 +860,7 @@ def normalize_build(service_dict, working_dir):
         else:
             build.update(service_dict['build'])
             if 'args' in build:
-                build['args'] = resolve_build_args(build)
+                build['args'] = build_string_dict(resolve_build_args(build))
 
         service_dict['build'] = build
 
