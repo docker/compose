@@ -231,7 +231,7 @@ class ConfigTest(unittest.TestCase):
         assert volumes['simple'] == {}
         assert volumes['other'] == {}
 
-    def test_volume_invalid_driver_opt(self):
+    def test_volume_numeric_driver_opt(self):
         config_details = build_config_details({
             'version': '2',
             'services': {
@@ -239,6 +239,19 @@ class ConfigTest(unittest.TestCase):
             },
             'volumes': {
                 'simple': {'driver_opts': {'size': 42}},
+            }
+        })
+        cfg = config.load(config_details)
+        assert cfg.volumes['simple']['driver_opts']['size'] == '42'
+
+    def test_volume_invalid_driver_opt(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': {
+                'simple': {'driver_opts': {'size': True}},
             }
         })
         with pytest.raises(ConfigurationError) as exc:
