@@ -33,7 +33,7 @@ def migrate(content):
 
     services = {name: data.pop(name) for name in data.keys()}
 
-    data['version'] = 2
+    data['version'] = "2"
     data['services'] = services
     create_volumes_section(data)
 
