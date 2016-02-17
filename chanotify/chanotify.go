@@ -1,6 +1,7 @@
 package chanotify
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -33,23 +34,33 @@ func (n *Notifier) Chan() <-chan interface{} {
 	return n.c
 }
 
+// Add adds new notification channel to Notifier.
+func (n *Notifier) Add(id interface{}, ch <-chan struct{}) error {
+	n.m.Lock()
+	defer n.m.Unlock()
+
+	if n.closed {
+		return errors.New("notifier closed; cannot add the channel on the notifier")
+	}
+	if _, ok := n.doneCh[id]; ok {
+		return errors.New("cannot register duplicate key")
+	}
+
+	done := make(chan struct{})
+	n.doneCh[id] = done
+
+	n.startWorker(ch, id, done)
+	return nil
+}
+
 func (n *Notifier) killWorker(id interface{}, done chan struct{}) {
 	n.m.Lock()
 	delete(n.doneCh, id)
 	n.m.Unlock()
 }
 
-// Add adds new notification channel to Notifier.
-func (n *Notifier) Add(id interface{}, ch <-chan struct{}) {
-	done := make(chan struct{})
-	n.m.Lock()
-	if n.closed {
-		panic("notifier closed; cannot add the channel")
-	}
-	n.doneCh[id] = done
-	n.m.Unlock()
-
-	go func(ch <-chan struct{}, id interface{}, done chan struct{}) {
+func (n *Notifier) startWorker(ch <-chan struct{}, id interface{}, done chan struct{}) {
+	go func() {
 		for {
 			select {
 			case _, ok := <-ch:
@@ -66,7 +77,7 @@ func (n *Notifier) Add(id interface{}, ch <-chan struct{}) {
 				return
 			}
 		}
-	}(ch, id, done)
+	}()
 }
 
 // Close closes the notifier and releases its underlying resources.
