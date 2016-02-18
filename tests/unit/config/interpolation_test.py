@@ -67,3 +67,25 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         'other': {},
     }
     assert interpolate_environment_variables(volumes, 'volume') == expected
+
+
+def test_interpolate_environment_variables_in_keys(mock_env):
+    volumes = {
+        'data': {
+            '$FOO': 'foo',
+            'driver_opts': {
+                'max': 2,
+                '${USER}_baz': 'bar'
+            }
+        }
+    }
+    expected = {
+        'data': {
+            'bar': 'foo',
+            'driver_opts': {
+                'max': 2,
+                'jenny_baz': 'bar'
+            }
+        }
+    }
+    assert interpolate_environment_variables(volumes, 'volume') == expected
