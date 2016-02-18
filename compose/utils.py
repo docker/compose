@@ -95,4 +95,4 @@ def microseconds_from_time_nano(time_nano):
 
 
 def build_string_dict(source_dict):
-    return dict([(k, str(v)) for k, v in source_dict.items()])
+    return dict((k, str(v)) for k, v in source_dict.items())
