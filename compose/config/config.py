@@ -10,8 +10,8 @@ import string
 import sys
 from collections import namedtuple
 
+import ruamel.yaml
 import six
-import yaml
 from cached_property import cached_property
 
 from ..const import COMPOSEFILE_V1 as V1
@@ -208,7 +208,7 @@ def find(base_dir, filenames):
     if filenames == ['-']:
         return ConfigDetails(
             os.getcwd(),
-            [ConfigFile(None, yaml.safe_load(sys.stdin))])
+            [ConfigFile(None, ruamel.yaml.load(sys.stdin, Loader=SafeLoader_1_2))])
 
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
@@ -957,10 +957,28 @@ def has_uppercase(name):
     return any(char in string.ascii_uppercase for char in name)
 
 
+# this is a combination of the SafeConstructor (i.e. only primatives, list and dict)
+# and the VersionedResolver (defaulting to YAML 1.2: no sexagesimals, octals such as 012
+# and Yes/No/On/Off always as string
+class SafeLoader_1_2(ruamel.yaml.loader.Reader,
+                     ruamel.yaml.loader.Scanner,
+                     ruamel.yaml.loader.Parser,
+                     ruamel.yaml.loader.Composer,
+                     ruamel.yaml.loader.SafeConstructor,
+                     ruamel.yaml.loader.VersionedResolver):
+    def __init__(self, stream, version=None):
+        ruamel.yaml.loader.Reader.__init__(self, stream)
+        ruamel.yaml.loader.Scanner.__init__(self)
+        ruamel.yaml.loader.Parser.__init__(self)
+        ruamel.yaml.loader.Composer.__init__(self)
+        ruamel.yaml.loader.SafeConstructor.__init__(self)
+        ruamel.yaml.loader.VersionedResolver.__init__(self, version)
+
+
 def load_yaml(filename):
     try:
         with open(filename, 'r') as fh:
-            return yaml.safe_load(fh)
-    except (IOError, yaml.YAMLError) as e:
+            return ruamel.yaml.load(fh, Loader=SafeLoader_1_2)
+    except (IOError, ruamel.yaml.YAMLError) as e:
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
         raise ConfigurationError(u"{}: {}".format(error_name, e))

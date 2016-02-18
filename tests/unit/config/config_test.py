@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import os
 import shutil
 import tempfile
+import textwrap
 from operator import itemgetter
 
 import py
@@ -820,7 +821,8 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {'build': '.', 'devices': ['/dev/foo:/dev/foo', '/dev/foo:/dev/foo']}
+                        'web': {'build': '.', 'devices': ['/dev/foo:/dev/foo',
+                                                          '/dev/foo:/dev/foo']}
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -1015,6 +1017,21 @@ class ConfigTest(unittest.TestCase):
             config.load_yaml(str(invalid_yaml_file))
 
         assert 'line 3, column 32' in exc.exconly()
+
+    def test_load_yaml_with_1_1_constructs(self):
+        tmpdir = py.test.ensuretemp('yaml_1_1_test')
+        self.addCleanup(tmpdir.remove)
+        yaml_file = tmpdir.join('docker-compose.yml')
+        yaml_file.write(textwrap.dedent("""
+        ports:
+        - 25:25       # sexagesimal in 1.1, string in 1.2
+        build: yes    # boolean in 1.1, string in 1.2
+        value: 012    # octal in 1.1, decimal in 1.2
+        """))
+        data = config.load_yaml(str(yaml_file))
+        assert data['ports'][0] == '25:25'
+        assert data['build'] == 'yes'
+        assert data['value'] == 12
 
     def test_validate_extra_hosts_invalid(self):
         with pytest.raises(ConfigurationError) as exc:
@@ -1510,41 +1527,51 @@ class VolumeConfigTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['~:/container/path']}, working_dir='.')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['~:/container/path']},
+                              working_dir='.')
         self.assertEqual(d['volumes'], ['/home/user:/container/path'])
 
     def test_name_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['mydatavolume:/data']}, working_dir='.')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['mydatavolume:/data']},
+                              working_dir='.')
         self.assertEqual(d['volumes'], ['mydatavolume:/data'])
 
     def test_absolute_posix_path_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['/var/lib/data:/data']}, working_dir='.')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['/var/lib/data:/data']},
+                              working_dir='.')
         self.assertEqual(d['volumes'], ['/var/lib/data:/data'])
 
     def test_absolute_windows_path_does_not_expand(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['c:\\data:/data']}, working_dir='.')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['c:\\data:/data']},
+                              working_dir='.')
         self.assertEqual(d['volumes'], ['c:\\data:/data'])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     def test_relative_path_does_expand_posix(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']},
+                              working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/myproject/data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']},
+                              working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']},
+                              working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/otherproject:/data'])
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
     def test_relative_path_does_expand_windows(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']},
+                              working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject\\data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']},
+                              working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']},
+                              working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\otherproject:/data'])
 
     @mock.patch.dict(os.environ)
@@ -1968,7 +1995,8 @@ class ExtendsTest(unittest.TestCase):
         ]))
 
     def test_merging_env_labels_ulimits(self):
-        service_dicts = load_from_filename('tests/fixtures/extends/common-env-labels-ulimits.yml')
+        service_dicts = load_from_filename('tests/fixtures/extends/'
+                                           'common-env-labels-ulimits.yml')
 
         self.assertEqual(service_sort(service_dicts), service_sort([
             {
@@ -2128,7 +2156,8 @@ class ExtendsTest(unittest.TestCase):
         service = config.load(
             build_config_details(
                 {
-                    'web': {'image': 'busybox', 'extends': {'service': 'web', 'file': 'common.yml'}},
+                    'web': {'image': 'busybox', 'extends': {'service': 'web',
+                                                            'file': 'common.yml'}},
                 },
                 'tests/fixtures/extends',
                 'common.yml'
@@ -2148,7 +2177,8 @@ class ExtendsTest(unittest.TestCase):
         )
 
     def test_extended_service_with_valid_config(self):
-        service = load_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')
+        service = load_from_filename('tests/fixtures/extends/'
+                                     'service-with-valid-composite-extends.yml')
         self.assertEquals(service[0]['command'], "top")
 
     def test_extends_file_defaults_to_self(self):
@@ -2427,7 +2457,8 @@ class VolumePathTest(unittest.TestCase):
 
     @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_split_path_mapping_with_windows_path(self):
-        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:/opt/connect/config:ro"
+        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:" \
+            "/opt/connect/config:ro"
         expected_mapping = (
             "/opt/connect/config:ro",
             "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
@@ -2474,7 +2505,8 @@ class BuildPathTest(unittest.TestCase):
 
     def test_from_file(self):
         service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
-        self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
+        self.assertEquals(service_dict, [{'name': 'foo',
+                                          'build': {'context': self.abs_context_path}}])
 
     def test_valid_url_in_build_path(self):
         valid_urls = [
