@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 ipam=None, external_name=None, aliases=None):
+                 ipam=None, external_name=None):
         self.client = client
         self.project = project
         self.name = name
@@ -23,7 +23,6 @@ class Network(object):
         self.driver_opts = driver_opts
         self.ipam = create_ipam_config_from_dict(ipam)
         self.external_name = external_name
-        self.aliases = aliases or []
 
     def ensure(self):
         if self.external_name:
@@ -160,25 +159,32 @@ class ProjectNetworks(object):
             network.ensure()
 
 
-def get_network_names_for_service(service_dict):
+def get_network_aliases_for_service(service_dict):
     if 'network_mode' in service_dict:
-        return []
-    return service_dict.get('networks', ['default'])
+        return {}
+    networks = service_dict.get('networks', ['default'])
+    if isinstance(networks, list):
+        return dict((net, []) for net in networks)
+
+    return dict(
+        (net, (config or {}).get('aliases', []))
+        for net, config in networks.items()
+    )
+
+
+def get_network_names_for_service(service_dict):
+    return get_network_aliases_for_service(service_dict).keys()
 
 
 def get_networks(service_dict, network_definitions):
     networks = {}
-    aliases = service_dict.get('network_aliases', {})
-    for name in get_network_names_for_service(service_dict):
-        log.debug(name)
+    for name, aliases in get_network_aliases_for_service(service_dict).items():
         network = network_definitions.get(name)
         if network:
-            log.debug(aliases)
-            networks[network.full_name] = aliases.get(name, [])
+            networks[network.full_name] = aliases
         else:
             raise ConfigurationError(
                 'Service "{}" uses an undefined network "{}"'
                 .format(service_dict['name'], name))
 
-    log.debug(networks)
     return networks

@@ -30,7 +30,6 @@ from .types import ServiceLink
 from .types import VolumeFromSpec
 from .types import VolumeSpec
 from .validation import match_named_volumes
-from .validation import match_network_aliases
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
 from .validation import validate_depends_on
@@ -535,8 +534,6 @@ def validate_service(service_config, service_names, version):
     validate_ulimits(service_config)
     validate_network_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
-
-    match_network_aliases(service_config.config)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(
