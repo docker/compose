@@ -746,6 +746,7 @@ class CLITestCase(DockerClientTestCase):
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
+    @v2_only()
     def test_up_handles_abort_on_container_exit(self):
         self.base_dir = 'tests/fixtures/sleeps-composefile'
         start_process(

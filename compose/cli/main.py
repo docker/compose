@@ -774,6 +774,9 @@ def up_shutdown_context(project, service_names, timeout, detached):
         except signals.ShutdownException:
             print("Gracefully stopping... (press Ctrl+C again to force)")
             project.stop(service_names=service_names, timeout=timeout)
+        except signals.CascadeStopException:
+            print("Aborting on container exit... (press Ctrl+C to force)")
+            project.stop(service_names=service_names, timeout=timeout)
     except signals.ShutdownException:
         project.kill(service_names=service_names)
         sys.exit(2)
