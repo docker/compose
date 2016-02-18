@@ -293,8 +293,12 @@ def load(config_details):
     config_details = config_details._replace(config_files=processed_files)
 
     main_file = config_details.config_files[0]
-    volumes = load_volumes(config_details.config_files)
-    networks = load_mapping(config_details.config_files, 'get_networks', 'Network')
+    volumes = load_mapping(
+        config_details.config_files, 'get_volumes', 'Volume'
+    )
+    networks = load_mapping(
+        config_details.config_files, 'get_networks', 'Network'
+    )
     service_dicts = load_services(
         config_details.working_dir,
         main_file,
@@ -334,15 +338,12 @@ def load_mapping(config_files, get_func, entity_type):
 
             mapping[name] = config
 
+            if 'driver_opts' in config:
+                config['driver_opts'] = build_string_dict(
+                    config['driver_opts']
+                )
+
     return mapping
-
-
-def load_volumes(config_files):
-    volumes = load_mapping(config_files, 'get_volumes', 'Volume')
-    for volume_name, volume in volumes.items():
-        if 'driver_opts' in volume:
-            volume['driver_opts'] = build_string_dict(volume['driver_opts'])
-    return volumes
 
 
 def load_services(working_dir, config_file, service_configs):
