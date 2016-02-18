@@ -516,7 +516,7 @@ class Service(object):
         if container.labels.get(LABEL_ONE_OFF) == "True":
             return set()
 
-        return set([self.name, container.short_id])
+        return {self.name, container.short_id}
 
     def _get_links(self, link_to_self):
         links = {}
