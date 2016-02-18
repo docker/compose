@@ -18,7 +18,7 @@ def interpolate_environment_variables(config, section):
         return recursive_interpolate(config, mapping)
     except InvalidInterpolation as e:
         raise ConfigurationError(
-            'Invalid interpolation format for "{string}" in {section}'.format(
+            'Invalid interpolation format ("{string}") in "{section}"'.format(
                 section=section,
                 string=e.string))
 
