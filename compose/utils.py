@@ -92,3 +92,7 @@ def json_hash(obj):
 
 def microseconds_from_time_nano(time_nano):
     return int(time_nano % 1000000000 / 1000)
+
+
+def build_string_dict(source_dict):
+    return dict((k, str(v)) for k, v in source_dict.items())
