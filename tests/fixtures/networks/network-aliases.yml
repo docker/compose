@@ -5,13 +5,11 @@ services:
     image: busybox
     command: top
     networks:
-      - front
-      - back
-
-    network_aliases:
       front:
-        - forward_facing
-        - ahead
+        aliases:
+          - forward_facing
+          - ahead
+      back:
 
 networks:
   front: {}

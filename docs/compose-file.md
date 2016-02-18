@@ -451,24 +451,6 @@ id.
     net: "none"
     net: "container:[service name or container name/id]"
 
-### network_aliases
-
-> [Version 2 file format](#version-2) only.
-
-Alias names for this service on each joined network. All networks referenced
-here must also appear under the `networks` key.
-
-    networks:
-      - some-network
-      - other-network
-    network_aliases:
-      some-network:
-        - alias1
-        - alias3
-      other-network:
-        - alias2
-        - alias4
-
 ### network_mode
 
 > [Version 2 file format](#version-2) only. In version 1, use [net](#net).
@@ -492,6 +474,19 @@ Networks to join, referencing entries under the
     networks:
       - some-network
       - other-network
+
+#### aliases
+
+Alias names for this service on the specified network.
+
+    networks:
+      some-network:
+        aliases:
+          - alias1
+          - alias3
+      other-network:
+        aliases:
+          - alias2
 
 ### pid
 

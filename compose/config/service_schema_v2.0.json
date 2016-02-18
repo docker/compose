@@ -120,18 +120,28 @@
         "network_mode": {"type": "string"},
 
         "networks": {
-          "$ref": "#/definitions/list_of_strings"
-        },
-        "network_aliases": {
-          "type": "object",
-          "patternProperties": {
-            "^[a-zA-Z0-9._-]+$": {
-              "$ref": "#/definitions/list_of_strings"
+          "oneOf": [
+            {"$ref": "#/definitions/list_of_strings"},
+            {
+              "type": "object",
+              "patternProperties": {
+                "^[a-zA-Z0-9._-]+$": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "aliases": {"$ref": "#/definitions/list_of_strings"}
+                      },
+                      "additionalProperties": false
+                    },
+                    {"type": "null"}
+                  ]
+                }
+              },
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false
+          ]
         },
-
         "pid": {"type": ["string", "null"]},
 
         "ports": {
