@@ -162,10 +162,7 @@ class ProjectNetworks(object):
 def get_network_aliases_for_service(service_dict):
     if 'network_mode' in service_dict:
         return {}
-    networks = service_dict.get('networks', ['default'])
-    if isinstance(networks, list):
-        return dict((net, []) for net in networks)
-
+    networks = service_dict.get('networks', {'default': None})
     return dict(
         (net, (config or {}).get('aliases', []))
         for net, config in networks.items()

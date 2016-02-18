@@ -601,6 +601,9 @@ def finalize_service(service_config, service_names, version):
         else:
             service_dict['network_mode'] = network_mode
 
+    if 'networks' in service_dict:
+        service_dict['networks'] = parse_networks(service_dict['networks'])
+
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
 
@@ -690,6 +693,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('environment', parse_environment)
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('ulimits', parse_ulimits)
+    md.merge_mapping('networks', parse_networks)
     md.merge_sequence('links', ServiceLink.parse)
 
     for field in ['volumes', 'devices']:
@@ -699,7 +703,6 @@ def merge_service_dicts(base, override, version):
         'depends_on',
         'expose',
         'external_links',
-        'networks',
         'ports',
         'volumes_from',
     ]:
@@ -787,6 +790,7 @@ def parse_dict_or_list(split_func, type_name, arguments):
 parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
 parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
 parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
+parse_networks = functools.partial(parse_dict_or_list, lambda k: (k, None), 'networks')
 
 
 def parse_ulimits(ulimits):

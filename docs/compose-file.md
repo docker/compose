@@ -477,7 +477,15 @@ Networks to join, referencing entries under the
 
 #### aliases
 
-Alias names for this service on the specified network.
+Aliases (alternative hostnames) for this service on the network. Other servers
+on the network can use either the service name or this alias to connect to
+this service.  Since `alias` is network-scoped:
+
+  * the same service can have different aliases when connected to another
+    network.
+  * it is allowable to configure the same alias name to multiple containers
+    (services) on the same network.
+
 
     networks:
       some-network:

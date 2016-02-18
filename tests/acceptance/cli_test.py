@@ -185,7 +185,7 @@ class CLITestCase(DockerClientTestCase):
                     'build': {
                         'context': os.path.abspath(self.base_dir),
                     },
-                    'networks': ['front', 'default'],
+                    'networks': {'front': None, 'default': None},
                     'volumes_from': ['service:other:rw'],
                 },
                 'other': {

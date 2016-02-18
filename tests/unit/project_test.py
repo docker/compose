@@ -438,7 +438,7 @@ class ProjectTest(unittest.TestCase):
                     {
                         'name': 'foo',
                         'image': 'busybox:latest',
-                        'networks': ['custom']
+                        'networks': {'custom': None}
                     },
                 ],
                 networks={'custom': {}},

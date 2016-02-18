@@ -608,6 +608,70 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue('context' in service[0]['build'])
         self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
 
+    def test_load_with_buildargs(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'opt1': 42,
+                                    'opt2': 'foobar'
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'opt1' in service['build']['args']
+        assert isinstance(service['build']['args']['opt1'], str)
+        assert service['build']['args']['opt1'] == '42'
+        assert service['build']['args']['opt2'] == 'foobar'
+
+    def test_load_with_multiple_files_mismatched_networks_format(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'networks': {
+                            'foobar': {'aliases': ['foo', 'bar']}
+                        }
+                    }
+                },
+                'networks': {'foobar': {}, 'baz': {}}
+            }
+        )
+
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'networks': ['baz']
+                    }
+                }
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file, override_file])
+        web_service = config.load(details).services[0]
+        assert web_service['networks'] == {
+            'foobar': {'aliases': ['foo', 'bar']},
+            'baz': None
+        }
+
     def test_load_with_multiple_files_v2(self):
         base_file = config.ConfigFile(
             'base.yaml',
