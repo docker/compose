@@ -14,27 +14,11 @@ log = logging.getLogger(__name__)
 def interpolate_environment_variables(config, section):
     mapping = BlankDefaultDict(os.environ)
 
-    def process_item(name, config_dict):
-        return dict(
-            (key, interpolate_value(name, key, val, section, mapping))
-            for key, val in (config_dict or {}).items()
-        )
-
-    return dict(
-        (name, process_item(name, config_dict))
-        for name, config_dict in config.items()
-    )
-
-
-def interpolate_value(name, config_key, value, section, mapping):
     try:
-        return recursive_interpolate(value, mapping)
+        return recursive_interpolate(config, mapping)
     except InvalidInterpolation as e:
         raise ConfigurationError(
-            'Invalid interpolation format for "{config_key}" option '
-            'in {section} "{name}": "{string}"'.format(
-                config_key=config_key,
-                name=name,
+            'Invalid interpolation format for "{string}" in {section}'.format(
                 section=section,
                 string=e.string))
 
@@ -44,7 +28,7 @@ def recursive_interpolate(obj, mapping):
         return interpolate(obj, mapping)
     elif isinstance(obj, dict):
         return dict(
-            (key, recursive_interpolate(val, mapping))
+            (interpolate(key, mapping), recursive_interpolate(val, mapping))
             for (key, val) in obj.items()
         )
     elif isinstance(obj, list):
