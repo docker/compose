@@ -592,20 +592,19 @@ class Service(object):
                     ports.append(port)
             container_options['ports'] = ports
 
-        override_options['binds'] = merge_volume_bindings(
-            container_options.get('volumes') or [],
-            previous_container)
-
-        if 'volumes' in container_options:
-            container_options['volumes'] = dict(
-                (v.internal, {}) for v in container_options['volumes'])
-
         container_options['environment'] = merge_environment(
             self.options.get('environment'),
             override_options.get('environment'))
 
-        if previous_container:
-            container_options['environment']['affinity:container'] = ('=' + previous_container.id)
+        binds, affinity = merge_volume_bindings(
+            container_options.get('volumes') or [],
+            previous_container)
+        override_options['binds'] = binds
+        container_options['environment'].update(affinity)
+
+        if 'volumes' in container_options:
+            container_options['volumes'] = dict(
+                (v.internal, {}) for v in container_options['volumes'])
 
         container_options['image'] = self.image_name
 
@@ -877,18 +876,23 @@ def merge_volume_bindings(volumes, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
+    affinity = {}
+
     volume_bindings = dict(
         build_volume_binding(volume)
         for volume in volumes
         if volume.external)
 
     if previous_container:
-        data_volumes = get_container_data_volumes(previous_container, volumes)
-        warn_on_masked_volume(volumes, data_volumes, previous_container.service)
+        old_volumes = get_container_data_volumes(previous_container, volumes)
+        warn_on_masked_volume(volumes, old_volumes, previous_container.service)
         volume_bindings.update(
-            build_volume_binding(volume) for volume in data_volumes)
+            build_volume_binding(volume) for volume in old_volumes)
 
-    return list(volume_bindings.values())
+        if old_volumes:
+            affinity = {'affinity:container': '=' + previous_container.id}
+
+    return list(volume_bindings.values()), affinity
 
 
 def get_container_data_volumes(container, volumes_option):
