@@ -8,6 +8,10 @@ class ShutdownException(Exception):
     pass
 
 
+class CascadeStopException(Exception):
+    pass
+
+
 def shutdown(signal, frame):
     raise ShutdownException()
 
