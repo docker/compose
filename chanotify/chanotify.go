@@ -19,7 +19,8 @@ type Notifier struct {
 	closed bool
 }
 
-// New returns a new *Notifier.
+// New returns a new notifier. A notifier must be closed by
+// calling, (*Notifier).Close, once it is no longer in use.
 func New() *Notifier {
 	s := &Notifier{
 		c:      make(chan interface{}),
@@ -34,7 +35,8 @@ func (n *Notifier) Chan() <-chan interface{} {
 	return n.c
 }
 
-// Add adds new notification channel to Notifier.
+// Add adds new notification channel to the notifier.
+// Multiple registrations of the same ID is not allowed.
 func (n *Notifier) Add(id interface{}, ch <-chan struct{}) error {
 	n.m.Lock()
 	defer n.m.Unlock()
