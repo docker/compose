@@ -1542,10 +1542,8 @@ class InterpolationTest(unittest.TestCase):
                 )
             )
 
-        self.assertIn('Invalid', cm.exception.msg)
-        self.assertIn('for "image" option', cm.exception.msg)
-        self.assertIn('in service "web"', cm.exception.msg)
-        self.assertIn('"${"', cm.exception.msg)
+        self.assertIn('Invalid interpolation format ("${") in "service"',
+                      cm.exception.msg)
 
     def test_empty_environment_key_allowed(self):
         service_dict = config.load(
