@@ -394,6 +394,27 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         assert "service 'web' must be a mapping not a string." in exc.exconly()
 
+    def test_load_with_empty_build_args(self):
+        config_details = build_config_details(
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'build': {
+                            'context': '.',
+                            'args': None,
+                        },
+                    },
+                },
+            }
+        )
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert (
+            "services.web.build.args contains an invalid type, it should be an "
+            "array, or an object" in exc.exconly()
+        )
+
     def test_config_integer_service_name_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
