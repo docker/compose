@@ -21,7 +21,7 @@ def interpolate_environment_variables(config, section):
         )
 
     return dict(
-        (name, process_item(name, config_dict))
+        (name, process_item(name, config_dict or {}))
         for name, config_dict in config.items()
     )
 
