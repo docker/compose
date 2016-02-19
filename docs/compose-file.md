@@ -453,7 +453,7 @@ id.
 
 ### network_mode
 
-> [Version 2 file format](#version-1) only. In version 1, use [net](#net).
+> [Version 2 file format](#version-2) only. In version 1, use [net](#net).
 
 Network mode. Use the same values as the docker client `--net` parameter, plus
 the special form `service:[service name]`.
@@ -474,6 +474,27 @@ Networks to join, referencing entries under the
     networks:
       - some-network
       - other-network
+
+#### aliases
+
+Aliases (alternative hostnames) for this service on the network. Other servers
+on the network can use either the service name or this alias to connect to
+this service.  Since `alias` is network-scoped:
+
+  * the same service can have different aliases when connected to another
+    network.
+  * it is allowable to configure the same alias name to multiple containers
+    (services) on the same network.
+
+
+    networks:
+      some-network:
+        aliases:
+          - alias1
+          - alias3
+      other-network:
+        aliases:
+          - alias2
 
 ### pid
 
