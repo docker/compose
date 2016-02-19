@@ -111,30 +111,29 @@ def validate_config_section(filename, config, section):
     """
     if not isinstance(config, dict):
         raise ConfigurationError(
-            "In file '{filename}' {section} must be a mapping, not "
-            "'{type}'.".format(
+            "In file '{filename}', {section} must be a mapping, not "
+            "{type}.".format(
                 filename=filename,
                 section=section,
-                type=python_type_to_yaml_type(config)))
+                type=anglicize_json_type(python_type_to_yaml_type(config))))
 
     for key, value in config.items():
         if not isinstance(key, six.string_types):
             raise ConfigurationError(
-                "In file '{filename}' {section} name {name} needs to be a "
-                "string, eg '{name}'".format(
+                "In file '{filename}', the {section} name {name} must be a "
+                "quoted string, i.e. '{name}'.".format(
                     filename=filename,
                     section=section,
                     name=key))
 
         if not isinstance(value, (dict, type(None))):
             raise ConfigurationError(
-                "In file '{filename}' {section} '{name}' is the wrong type. "
-                "It should be a mapping of configuration options, it is a "
-                "'{type}'.".format(
+                "In file '{filename}', {section} '{name}' must be a mapping not "
+                "{type}.".format(
                     filename=filename,
                     section=section,
                     name=key,
-                    type=python_type_to_yaml_type(value)))
+                    type=anglicize_json_type(python_type_to_yaml_type(value))))
 
 
 def validate_top_level_object(config_file):
@@ -203,10 +202,10 @@ def get_unsupported_config_msg(path, error_key):
     return msg
 
 
-def anglicize_validator(validator):
-    if validator in ["array", "object"]:
-        return 'an ' + validator
-    return 'a ' + validator
+def anglicize_json_type(json_type):
+    if json_type.startswith(('a', 'e', 'i', 'o', 'u')):
+        return 'an ' + json_type
+    return 'a ' + json_type
 
 
 def is_service_dict_schema(schema_id):
@@ -314,14 +313,14 @@ def _parse_valid_types_from_validator(validator):
     a valid type. Parse the valid types and prefix with the correct article.
     """
     if not isinstance(validator, list):
-        return anglicize_validator(validator)
+        return anglicize_json_type(validator)
 
     if len(validator) == 1:
-        return anglicize_validator(validator[0])
+        return anglicize_json_type(validator[0])
 
     return "{}, or {}".format(
-        ", ".join([anglicize_validator(validator[0])] + validator[1:-1]),
-        anglicize_validator(validator[-1]))
+        ", ".join([anglicize_json_type(validator[0])] + validator[1:-1]),
+        anglicize_json_type(validator[-1]))
 
 
 def _parse_oneof_validator(error):

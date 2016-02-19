@@ -159,7 +159,7 @@ class CLITestCase(DockerClientTestCase):
             '-f', 'tests/fixtures/invalid-composefile/invalid.yml',
             'config', '-q'
         ], returncode=1)
-        assert "'notaservice' is the wrong type" in result.stderr
+        assert "'notaservice' must be a mapping" in result.stderr
 
     # TODO: this shouldn't be v2-dependent
     @v2_only()

@@ -268,7 +268,7 @@ class ConfigTest(unittest.TestCase):
         })
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        assert "volume must be a mapping, not 'array'" in exc.exconly()
+        assert "volume must be a mapping, not an array" in exc.exconly()
 
     def test_networks_invalid_type_list(self):
         config_details = build_config_details({
@@ -280,7 +280,7 @@ class ConfigTest(unittest.TestCase):
         })
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        assert "network must be a mapping, not 'array'" in exc.exconly()
+        assert "network must be a mapping, not an array" in exc.exconly()
 
     def test_load_service_with_name_version(self):
         with mock.patch('compose.config.config.log') as mock_logging:
@@ -392,8 +392,7 @@ class ConfigTest(unittest.TestCase):
             'filename.yml')
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        error_msg = "service 'web' is the wrong type"
-        assert error_msg in exc.exconly()
+        assert "service 'web' must be a mapping not a string." in exc.exconly()
 
     def test_config_integer_service_name_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -405,8 +404,10 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "In file 'filename.yml' service name 1 needs to be a string, eg '1'" \
-            in excinfo.exconly()
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'" in
+            excinfo.exconly()
+        )
 
     def test_config_integer_service_name_raise_validation_error_v2(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -421,8 +422,10 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "In file 'filename.yml' service name 1 needs to be a string, eg '1'" \
-            in excinfo.exconly()
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
+            excinfo.exconly()
+        )
 
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
@@ -556,7 +559,7 @@ class ConfigTest(unittest.TestCase):
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
-        assert "service 'bogus' is the wrong type" in exc.exconly()
+        assert "service 'bogus' must be a mapping not a string." in exc.exconly()
         assert "In file 'override.yaml'" in exc.exconly()
 
     def test_load_sorts_in_dependency_order(self):
