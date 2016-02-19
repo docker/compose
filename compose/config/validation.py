@@ -332,6 +332,10 @@ def _parse_oneof_validator(error):
     types = []
     for context in error.context:
 
+        if context.validator == 'oneOf':
+            _, error_msg = _parse_oneof_validator(context)
+            return path_string(context.path), error_msg
+
         if context.validator == 'required':
             return (None, context.message)
 
