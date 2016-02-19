@@ -746,14 +746,11 @@ class CLITestCase(DockerClientTestCase):
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
-    @v2_only()
     def test_up_handles_abort_on_container_exit(self):
-        self.base_dir = 'tests/fixtures/sleeps-composefile'
-        start_process(
-            self.base_dir,
-            ['-f', 'one-exits.yml', 'up', '-t', '200', '--abort-on-container-exit'])
+        start_process(self.base_dir, ['up', '--abort-on-container-exit'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
-        wait_on_condition(ContainerCountCondition(self.project, 0), timeout=1)
+        self.project.stop(['simple'])
+        wait_on_condition(ContainerCountCondition(self.project, 0))
 
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'

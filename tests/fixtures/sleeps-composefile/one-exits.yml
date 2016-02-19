@@ -1,6 +1,0 @@
-simple:
-  image: busybox:latest
-  command: sleep 200
-another:
-  image: busybox:latest
-  command: sleep 0.5
