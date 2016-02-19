@@ -582,10 +582,11 @@ limit as an integer or soft/hard limits as a mapping.
 ### volumes, volume\_driver
 
 Mount paths or named volumes, optionally specifying a path on the host machine
-(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`). Named volumes can
-be specified with the
-[top-level `volumes` key](#volume-configuration-reference), but this is
-optional - the Docker Engine will create the volume if it doesn't exist.
+(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
+For [version 2 files](#version-2), named volumes need to be specified with the
+[top-level `volumes` key](#volume-configuration-reference).
+When using [version 1](#version-1), the Docker Engine will create the named
+volume automatically if it doesn't exist.
 
 You can mount a relative path on the host, which will expand relative to
 the directory of the Compose configuration file being used. Relative paths
@@ -607,10 +608,15 @@ should always begin with `.` or `..`.
       # Named volume
       - datavolume:/var/lib/mysql
 
-If you use a volume name (instead of a volume path), you may also specify
-a `volume_driver`.
+If you do not use a host path, you may specify a `volume_driver`.
 
     volume_driver: mydriver
+
+Note that for [version 2 files](#version-2), this driver
+will not apply to named volumes (you should use the `driver` option when
+[declaring the volume](#volume-configuration-reference) instead).
+For [version 1](#version-1), both named volumes and container volumes will
+use the specified driver.
 
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
