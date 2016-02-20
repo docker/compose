@@ -1143,7 +1143,7 @@ class ConfigTest(unittest.TestCase):
         assert actual.services == [
             {
                 'name': 'web',
-                'image': 'alipine',
+                'image': 'alpine',
                 'tmpfs': ['/run'],
             }
         ]
