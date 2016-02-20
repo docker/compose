@@ -3,7 +3,7 @@ cached-property==1.2.0
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4
-git+https://github.com/docker/docker-py.git@d8be3e0fce60fbe25be088b64bccbcee83effdb1#egg=docker-py
+git+https://github.com/docker/docker-py.git@8c4546f8c8f52bb2923834783a17beb5bb89a724#egg=docker-py
 jsonschema==2.5.1
 requests==2.7.0
 six==1.7.3
