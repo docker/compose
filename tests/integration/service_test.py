@@ -871,6 +871,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])
 
+    def test_tmpfs(self):
+        service = self.create_service('web', tmpfs=['/run'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.Tmpfs'), {'/run': ''})
+
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container()
