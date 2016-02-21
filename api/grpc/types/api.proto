@@ -17,7 +17,7 @@ service API {
 }
 
 message UpdateProcessRequest {
-    string id = 1; 
+    string id = 1;
     string pid = 2;
     bool closeStdin = 3; // Close stdin of the container
     uint32 width = 4;
@@ -57,7 +57,7 @@ message AddProcessRequest {
 	repeated string args = 4; // Arguments for process, first is binary path itself
 	repeated string env = 5; // List of environment variables for process
 	string cwd = 6; // Workind directory of process
-    string pid = 7; // Process ID 
+    string pid = 7; // Process ID
     string stdin = 8; // path to the file where stdin will be read (optional)
 	string stdout = 9; // path to file where stdout will be written (optional)
 	string stderr = 10; // path to file where stderr will be written (optional)
@@ -195,6 +195,7 @@ message ThrottlingData {
 message CpuStats {
 	CpuUsage cpu_usage = 1;
 	ThrottlingData throttling_data = 2;
+	uint64 system_usage = 3;
 }
 
 message MemoryData {
