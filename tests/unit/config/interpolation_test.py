@@ -8,6 +8,7 @@ import pytest
 
 from compose.config.interpolation import interpolate_environment_variables
 from compose.config.validation import load_jsonschema
+from compose.const import COMPOSEFILE_V2_0 as V2_0
 
 
 @pytest.yield_fixture
@@ -55,7 +56,7 @@ def test_interpolate_environment_variables_in_services(mock_env):
             }
         }
     }
-    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
+    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', V2_0)) == expected
 
 
 def test_interpolate_environment_variables_arrays_in_services(mock_env):
@@ -73,7 +74,7 @@ def test_interpolate_environment_variables_arrays_in_services(mock_env):
             'cpu_shares': 512,
             }
         }
-    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
+    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', V2_0)) == expected
 
 
 def test_interpolate_environment_variables_array_element_in_services(mock_env):
@@ -91,7 +92,7 @@ def test_interpolate_environment_variables_array_element_in_services(mock_env):
             'cpu_shares': 512,
             }
         }
-    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
+    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', V2_0)) == expected
 
 
 def test_interpolate_environment_variables_array_numbers_in_services(mock_env):
@@ -107,7 +108,7 @@ def test_interpolate_environment_variables_array_numbers_in_services(mock_env):
             'ports': [8080, 8787]
             }
         }
-    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', 2)) == expected
+    assert interpolate_environment_variables(services, 'service', load_jsonschema('service', V2_0)) == expected
 
 
 def test_interpolate_environment_variables_in_volumes(mock_env):
@@ -131,4 +132,4 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    assert interpolate_environment_variables(volumes, 'volume', load_jsonschema('service', 2)) == expected
+    assert interpolate_environment_variables(volumes, 'volume', load_jsonschema('service', V2_0)) == expected
