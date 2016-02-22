@@ -231,7 +231,7 @@ class ConfigTest(unittest.TestCase):
         assert volumes['simple'] == {}
         assert volumes['other'] == {}
 
-    def test_volume_numeric_driver_opt(self):
+    def test_named_volume_numeric_driver_opt(self):
         config_details = build_config_details({
             'version': '2',
             'services': {
@@ -257,6 +257,30 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
         assert 'driver_opts.size contains an invalid type' in exc.exconly()
+
+    def test_named_volume_invalid_type_list(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': []
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "volume must be a mapping, not an array" in exc.exconly()
+
+    def test_networks_invalid_type_list(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'networks': []
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "network must be a mapping, not an array" in exc.exconly()
 
     def test_load_service_with_name_version(self):
         with mock.patch('compose.config.config.log') as mock_logging:
@@ -368,8 +392,28 @@ class ConfigTest(unittest.TestCase):
             'filename.yml')
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        error_msg = "service 'web' doesn't have any configuration options"
-        assert error_msg in exc.exconly()
+        assert "service 'web' must be a mapping not a string." in exc.exconly()
+
+    def test_load_with_empty_build_args(self):
+        config_details = build_config_details(
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'build': {
+                            'context': '.',
+                            'args': None,
+                        },
+                    },
+                },
+            }
+        )
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert (
+            "services.web.build.args contains an invalid type, it should be an "
+            "array, or an object" in exc.exconly()
+        )
 
     def test_config_integer_service_name_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -381,8 +425,10 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "In file 'filename.yml' service name: 1 needs to be a string, eg '1'" \
-            in excinfo.exconly()
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'" in
+            excinfo.exconly()
+        )
 
     def test_config_integer_service_name_raise_validation_error_v2(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -397,8 +443,10 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "In file 'filename.yml' service name: 1 needs to be a string, eg '1'" \
-            in excinfo.exconly()
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
+            excinfo.exconly()
+        )
 
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
@@ -532,7 +580,7 @@ class ConfigTest(unittest.TestCase):
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
-        assert "service 'bogus' doesn't have any configuration" in exc.exconly()
+        assert "service 'bogus' must be a mapping not a string." in exc.exconly()
         assert "In file 'override.yaml'" in exc.exconly()
 
     def test_load_sorts_in_dependency_order(self):

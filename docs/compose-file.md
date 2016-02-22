@@ -486,15 +486,13 @@ Networks to join, referencing entries under the
 
 #### aliases
 
-Aliases (alternative hostnames) for this service on the network. Other servers
-on the network can use either the service name or this alias to connect to
-this service.  Since `alias` is network-scoped:
+Aliases (alternative hostnames) for this service on the network. Other containers on the same network can use either the service name or this alias to connect to one of the service's containers.
 
-  * the same service can have different aliases when connected to another
-    network.
-  * it is allowable to configure the same alias name to multiple containers
-    (services) on the same network.
+Since `aliases` is network-scoped, the same service can have different aliases on different networks.
 
+> **Note**: A network-wide alias can be shared by multiple containers, and even by multiple services. If it is, then exactly which container the name will resolve to is not guaranteed.
+
+The general format is shown here.
 
     networks:
       some-network:
@@ -504,6 +502,35 @@ this service.  Since `alias` is network-scoped:
       other-network:
         aliases:
           - alias2
+
+In the example below, three services are provided (`web`, `worker`, and `db`), along with two networks (`new` and `legacy`). The `db` service is reachable at the hostname `db` or `database` on the `new` network, and at `db` or `mysql` on the `legacy` network.
+
+    version: 2
+
+    services:
+      web:
+        build: ./web
+        networks:
+          - new
+
+      worker:
+        build: ./worker
+        networks:
+        - legacy
+
+      db:
+        image: mysql
+        networks:
+          new:
+            aliases:
+              - database
+          legacy:
+            aliases:
+              - mysql
+
+    networks:
+      new:
+      legacy:
 
 ### pid
 

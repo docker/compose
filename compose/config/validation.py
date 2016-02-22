@@ -91,29 +91,49 @@ def match_named_volumes(service_dict, project_volumes):
             )
 
 
-def validate_top_level_service_objects(filename, service_dicts):
-    """Perform some high level validation of the service name and value.
+def python_type_to_yaml_type(type_):
+    type_name = type(type_).__name__
+    return {
+        'dict': 'mapping',
+        'list': 'array',
+        'int': 'number',
+        'float': 'number',
+        'bool': 'boolean',
+        'unicode': 'string',
+        'str': 'string',
+        'bytes': 'string',
+    }.get(type_name, type_name)
 
-    This validation must happen before interpolation, which must happen
-    before the rest of validation, which is why it's separate from the
-    rest of the service validation.
+
+def validate_config_section(filename, config, section):
+    """Validate the structure of a configuration section. This must be done
+    before interpolation so it's separate from schema validation.
     """
-    for service_name, service_dict in service_dicts.items():
-        if not isinstance(service_name, six.string_types):
-            raise ConfigurationError(
-                "In file '{}' service name: {} needs to be a string, eg '{}'".format(
-                    filename,
-                    service_name,
-                    service_name))
+    if not isinstance(config, dict):
+        raise ConfigurationError(
+            "In file '{filename}', {section} must be a mapping, not "
+            "{type}.".format(
+                filename=filename,
+                section=section,
+                type=anglicize_json_type(python_type_to_yaml_type(config))))
 
-        if not isinstance(service_dict, dict):
+    for key, value in config.items():
+        if not isinstance(key, six.string_types):
             raise ConfigurationError(
-                "In file '{}' service '{}' doesn\'t have any configuration options. "
-                "All top level keys in your docker-compose.yml must map "
-                "to a dictionary of configuration options.".format(
-                    filename, service_name
-                )
-            )
+                "In file '{filename}', the {section} name {name} must be a "
+                "quoted string, i.e. '{name}'.".format(
+                    filename=filename,
+                    section=section,
+                    name=key))
+
+        if not isinstance(value, (dict, type(None))):
+            raise ConfigurationError(
+                "In file '{filename}', {section} '{name}' must be a mapping not "
+                "{type}.".format(
+                    filename=filename,
+                    section=section,
+                    name=key,
+                    type=anglicize_json_type(python_type_to_yaml_type(value))))
 
 
 def validate_top_level_object(config_file):
@@ -182,10 +202,10 @@ def get_unsupported_config_msg(path, error_key):
     return msg
 
 
-def anglicize_validator(validator):
-    if validator in ["array", "object"]:
-        return 'an ' + validator
-    return 'a ' + validator
+def anglicize_json_type(json_type):
+    if json_type.startswith(('a', 'e', 'i', 'o', 'u')):
+        return 'an ' + json_type
+    return 'a ' + json_type
 
 
 def is_service_dict_schema(schema_id):
@@ -293,14 +313,14 @@ def _parse_valid_types_from_validator(validator):
     a valid type. Parse the valid types and prefix with the correct article.
     """
     if not isinstance(validator, list):
-        return anglicize_validator(validator)
+        return anglicize_json_type(validator)
 
     if len(validator) == 1:
-        return anglicize_validator(validator[0])
+        return anglicize_json_type(validator[0])
 
     return "{}, or {}".format(
-        ", ".join([anglicize_validator(validator[0])] + validator[1:-1]),
-        anglicize_validator(validator[-1]))
+        ", ".join([anglicize_json_type(validator[0])] + validator[1:-1]),
+        anglicize_json_type(validator[-1]))
 
 
 def _parse_oneof_validator(error):
@@ -311,6 +331,10 @@ def _parse_oneof_validator(error):
     """
     types = []
     for context in error.context:
+
+        if context.validator == 'oneOf':
+            _, error_msg = _parse_oneof_validator(context)
+            return path_string(context.path), error_msg
 
         if context.validator == 'required':
             return (None, context.message)
