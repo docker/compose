@@ -1,20 +1,24 @@
 package supervisor
 
+import "github.com/docker/containerd/runtime"
+
 type GetContainersTask struct {
-	s *Supervisor
+	baseTask
+	ID         string
+	Containers []runtime.Container
 }
 
-func (h *GetContainersTask) Handle(e *Task) error {
-	if e.ID != "" {
-		ci := h.s.containers[e.ID]
+func (s *Supervisor) getContainers(t *GetContainersTask) error {
+	if t.ID != "" {
+		ci := s.containers[t.ID]
 		if ci == nil {
 			return ErrContainerNotFound
 		}
-		e.Containers = append(e.Containers, ci.container)
+		t.Containers = append(t.Containers, ci.container)
 		return nil
 	}
-	for _, i := range h.s.containers {
-		e.Containers = append(e.Containers, i.container)
+	for _, i := range s.containers {
+		t.Containers = append(t.Containers, i.container)
 	}
 	return nil
 }

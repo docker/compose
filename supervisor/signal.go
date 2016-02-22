@@ -1,11 +1,16 @@
 package supervisor
 
+import "os"
+
 type SignalTask struct {
-	s *Supervisor
+	baseTask
+	ID     string
+	PID    string
+	Signal os.Signal
 }
 
-func (h *SignalTask) Handle(e *Task) error {
-	i, ok := h.s.containers[e.ID]
+func (s *Supervisor) signal(t *SignalTask) error {
+	i, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
@@ -14,8 +19,8 @@ func (h *SignalTask) Handle(e *Task) error {
 		return err
 	}
 	for _, p := range processes {
-		if p.ID() == e.Pid {
-			return p.Signal(e.Signal)
+		if p.ID() == t.PID {
+			return p.Signal(t.Signal)
 		}
 	}
 	return ErrProcessNotFound

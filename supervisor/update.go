@@ -7,23 +7,25 @@ import (
 )
 
 type UpdateTask struct {
-	s *Supervisor
+	baseTask
+	ID    string
+	State runtime.State
 }
 
-func (h *UpdateTask) Handle(e *Task) error {
-	i, ok := h.s.containers[e.ID]
+func (s *Supervisor) updateContainer(t *UpdateTask) error {
+	i, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
 	container := i.container
-	if e.State != "" {
-		switch e.State {
+	if t.State != "" {
+		switch t.State {
 		case runtime.Running:
 			if err := container.Resume(); err != nil {
 				return ErrUnknownContainerStatus
 			}
-			h.s.notifySubscribers(Event{
-				ID:        e.ID,
+			s.notifySubscribers(Event{
+				ID:        t.ID,
 				Type:      "resume",
 				Timestamp: time.Now(),
 			})
@@ -31,8 +33,8 @@ func (h *UpdateTask) Handle(e *Task) error {
 			if err := container.Pause(); err != nil {
 				return ErrUnknownContainerStatus
 			}
-			h.s.notifySubscribers(Event{
-				ID:        e.ID,
+			s.notifySubscribers(Event{
+				ID:        t.ID,
 				Type:      "pause",
 				Timestamp: time.Now(),
 			})
@@ -44,11 +46,16 @@ func (h *UpdateTask) Handle(e *Task) error {
 }
 
 type UpdateProcessTask struct {
-	s *Supervisor
+	baseTask
+	ID         string
+	PID        string
+	CloseStdin bool
+	Width      int
+	Height     int
 }
 
-func (h *UpdateProcessTask) Handle(e *Task) error {
-	i, ok := h.s.containers[e.ID]
+func (s *Supervisor) updateProcess(t *UpdateProcessTask) error {
+	i, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
@@ -58,7 +65,7 @@ func (h *UpdateProcessTask) Handle(e *Task) error {
 	}
 	var process runtime.Process
 	for _, p := range processes {
-		if p.ID() == e.Pid {
+		if p.ID() == t.PID {
 			process = p
 			break
 		}
@@ -66,13 +73,13 @@ func (h *UpdateProcessTask) Handle(e *Task) error {
 	if process == nil {
 		return ErrProcessNotFound
 	}
-	if e.CloseStdin {
+	if t.CloseStdin {
 		if err := process.CloseStdin(); err != nil {
 			return err
 		}
 	}
-	if e.Width > 0 || e.Height > 0 {
-		if err := process.Resize(e.Width, e.Height); err != nil {
+	if t.Width > 0 || t.Height > 0 {
+		if err := process.Resize(t.Width, t.Height); err != nil {
 			return err
 		}
 	}

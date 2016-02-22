@@ -1,14 +1,21 @@
 package supervisor
 
-import "time"
+import (
+	"time"
+
+	"github.com/docker/containerd/runtime"
+)
 
 type StatsTask struct {
-	s *Supervisor
+	baseTask
+	ID   string
+	Stat chan *runtime.Stat
+	Err  chan error
 }
 
-func (h *StatsTask) Handle(e *Task) error {
+func (s *Supervisor) stats(t *StatsTask) error {
 	start := time.Now()
-	i, ok := h.s.containers[e.ID]
+	i, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
 	}
@@ -16,12 +23,12 @@ func (h *StatsTask) Handle(e *Task) error {
 	go func() {
 		s, err := i.container.Stats()
 		if err != nil {
-			e.Err <- err
+			t.Err <- err
 			return
 		}
-		e.Err <- nil
-		e.Stat <- s
+		t.Err <- nil
+		t.Stat <- s
 		ContainerStatsTimer.UpdateSince(start)
 	}()
-	return errDeferedResponse
+	return nil
 }
