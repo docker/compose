@@ -64,16 +64,16 @@ def format_expose(instance):
 
 @FormatChecker.cls_checks(format="bool-value-in-mapping")
 def format_boolean_in_environment(instance):
-    """
-    Check if there is a boolean in the environment and display a warning.
+    """Check if there is a boolean in the mapping sections and display a warning.
     Always return True here so the validation won't raise an error.
     """
     if isinstance(instance, bool):
         log.warn(
-            "There is a boolean value in the 'environment' key.\n"
-            "Environment variables can only be strings.\n"
-            "Please add quotes to any boolean values to make them string "
-            "(eg, 'True', 'yes', 'N').\n"
+            "There is a boolean value in the 'environment', 'labels', or "
+            "'extra_hosts' field of a service.\n"
+            "These sections only support string values.\n"
+            "Please add quotes to any boolean values to make them strings "
+            "(eg, 'True', 'false', 'yes', 'N', 'on', 'Off').\n"
             "This warning will become an error in a future release. \r\n"
         )
     return True

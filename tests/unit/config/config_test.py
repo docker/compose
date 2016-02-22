@@ -1100,7 +1100,7 @@ class ConfigTest(unittest.TestCase):
 
     @mock.patch('compose.config.validation.log')
     def test_logs_warning_for_boolean_in_environment(self, mock_logging):
-        expected_warning_msg = "There is a boolean value in the 'environment' key."
+        expected_warning_msg = "There is a boolean value in the 'environment'"
         config.load(
             build_config_details(
                 {'web': {
