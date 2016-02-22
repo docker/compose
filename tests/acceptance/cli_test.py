@@ -969,6 +969,24 @@ class CLITestCase(DockerClientTestCase):
         container, = service.containers(stopped=True, one_off=True)
         self.assertEqual(container.name, name)
 
+    def test_run_service_with_workdir_overridden(self):
+        self.base_dir = 'tests/fixtures/run-workdir'
+        name = 'service'
+        workdir = '/var'
+        self.dispatch(['run', '--workdir={workdir}'.format(workdir=workdir), name])
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(workdir, container.get('Config.WorkingDir'))
+
+    def test_run_service_with_workdir_overridden_short_form(self):
+        self.base_dir = 'tests/fixtures/run-workdir'
+        name = 'service'
+        workdir = '/var'
+        self.dispatch(['run', '-w', workdir, name])
+        service = self.project.get_service(name)
+        container = service.containers(stopped=True, one_off=True)[0]
+        self.assertEqual(workdir, container.get('Config.WorkingDir'))
+
     @v2_only()
     def test_run_interactive_connects_to_network(self):
         self.base_dir = 'tests/fixtures/networks'
