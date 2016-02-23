@@ -202,6 +202,7 @@ message MemoryData {
 	uint64 usage = 1;
 	uint64 max_usage = 2;
 	uint64 failcnt = 3;
+	uint64 limit = 4;
 }
 
 message MemoryStats {
@@ -234,6 +235,7 @@ message HugetlbStats {
 	uint64 usage = 1;
 	uint64 max_usage = 2;
 	uint64 failcnt = 3;
+	uint64 limit = 4;
 }
 
 message CgroupStats {
