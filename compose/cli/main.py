@@ -662,6 +662,10 @@ class TopLevelCommand(DocoptCommand):
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
+            if cascade_stop:
+                print("Aborting on container exit...")
+                project.stop(service_names=service_names, timeout=timeout)
+
     def version(self, project, options):
         """
         Show version informations
