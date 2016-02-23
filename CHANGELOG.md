@@ -1,6 +1,12 @@
 Change log
 ==========
 
+1.6.2 (2016-02-23)
+------------------
+
+-   Fixed a bug where connecting to a TLS-enabled Docker Engine would fail with
+    a certificate verification error.
+
 1.6.1 (2016-02-23)
 ------------------
 
