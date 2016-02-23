@@ -1,8 +1,12 @@
 package server
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +18,7 @@ import (
 	"github.com/docker/containerd/supervisor"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/specs"
 	"golang.org/x/net/context"
 )
@@ -316,6 +321,7 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 		return pbSt
 	}
 	cpuSt := lcSt.CgroupStats.CpuStats
+	systemUsage, _ := getSystemCPUUsage()
 	pbSt.CgroupStats.CpuStats = &types.CpuStats{
 		CpuUsage: &types.CpuUsage{
 			TotalUsage:        cpuSt.CpuUsage.TotalUsage,
@@ -328,6 +334,7 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 			ThrottledPeriods: cpuSt.ThrottlingData.ThrottledPeriods,
 			ThrottledTime:    cpuSt.ThrottlingData.ThrottledTime,
 		},
+		SystemUsage: systemUsage,
 	}
 	memSt := lcSt.CgroupStats.MemoryStats
 	pbSt.CgroupStats.MemoryStats = &types.MemoryStats{
@@ -376,4 +383,55 @@ func convertBlkioEntryToPb(b []cgroups.BlkioStatEntry) []*types.BlkioStatsEntry 
 		})
 	}
 	return pbEs
+}
+
+const nanoSecondsPerSecond = 1e9
+
+var clockTicksPerSecond = uint64(system.GetClockTicks())
+
+// getSystemCPUUsage returns the host system's cpu usage in
+// nanoseconds. An error is returned if the format of the underlying
+// file does not match.
+//
+// Uses /proc/stat defined by POSIX. Looks for the cpu
+// statistics line and then sums up the first seven fields
+// provided. See `man 5 proc` for details on specific field
+// information.
+func getSystemCPUUsage() (uint64, error) {
+	var line string
+	f, err := os.Open("/proc/stat")
+	if err != nil {
+		return 0, err
+	}
+	bufReader := bufio.NewReaderSize(nil, 128)
+	defer func() {
+		bufReader.Reset(nil)
+		f.Close()
+	}()
+	bufReader.Reset(f)
+	err = nil
+	for err == nil {
+		line, err = bufReader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		parts := strings.Fields(line)
+		switch parts[0] {
+		case "cpu":
+			if len(parts) < 8 {
+				return 0, fmt.Errorf("bad format of cpu stats")
+			}
+			var totalClockTicks uint64
+			for _, i := range parts[1:8] {
+				v, err := strconv.ParseUint(i, 10, 64)
+				if err != nil {
+					return 0, fmt.Errorf("error parsing cpu stats")
+				}
+				totalClockTicks += v
+			}
+			return (totalClockTicks * nanoSecondsPerSecond) /
+				clockTicksPerSecond, nil
+		}
+	}
+	return 0, fmt.Errorf("bad stats format")
 }
