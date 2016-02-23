@@ -9,9 +9,9 @@ weight=5
 +++
 <![end-metadata]-->
 
-## Quickstart: Compose and Rails
+## Quickstart: Docker Compose and Rails
 
-This Quickstart guide will show you how to use Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
+This Quickstart guide will show you how to use Docker Compose to set up and run a Rails/PostgreSQL app. Before starting, you'll need to have [Compose installed](install.md).
 
 ### Define the project
 
