@@ -477,7 +477,7 @@ Networks to join, referencing entries under the
 
 #### aliases
 
-Aliases (alternative hostnames) for this service on the network. Other containers on the same network can use either the service name or this alias to connect to one of the service's containers.  
+Aliases (alternative hostnames) for this service on the network. Other containers on the same network can use either the service name or this alias to connect to one of the service's containers.
 
 Since `aliases` is network-scoped, the same service can have different aliases on different networks.
 
