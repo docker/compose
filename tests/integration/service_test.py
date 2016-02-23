@@ -266,6 +266,30 @@ class ServiceTest(DockerClientTestCase):
                           self.client.inspect_container,
                           old_container.id)
 
+    def test_execute_convergence_plan_recreate_twice(self):
+        service = self.create_service(
+            'db',
+            volumes=[VolumeSpec.parse('/etc')],
+            entrypoint=['top'],
+            command=['-d', '1'])
+
+        orig_container = service.create_container()
+        service.start_container(orig_container)
+
+        orig_container.inspect()  # reload volume data
+        volume_path = orig_container.get_mount('/etc')['Source']
+
+        # Do this twice to reproduce the bug
+        for _ in range(2):
+            new_container, = service.execute_convergence_plan(
+                ConvergencePlan('recreate', [orig_container]))
+
+            assert new_container.get_mount('/etc')['Source'] == volume_path
+            assert ('affinity:container==%s' % orig_container.id in
+                    new_container.get('Config.Env'))
+
+            orig_container = new_container
+
     def test_execute_convergence_plan_when_containers_are_stopped(self):
         service = self.create_service(
             'db',
@@ -885,7 +909,7 @@ class ServiceTest(DockerClientTestCase):
             'FILE_DEF': 'F1',
             'FILE_DEF_EMPTY': '',
             'ENV_DEF': 'E3',
-            'NO_DEF': ''
+            'NO_DEF': None
         }.items():
             self.assertEqual(env[k], v)
 

@@ -565,7 +565,7 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top',
-                'networks': ['foo', 'bar', 'baz'],
+                'networks': {'foo': None, 'bar': None, 'baz': None},
             }],
             volumes={},
             networks={
@@ -598,7 +598,7 @@ class ProjectTest(DockerClientTestCase):
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
-                'networks': ['front'],
+                'networks': {'front': None},
             }],
             volumes={},
             networks={

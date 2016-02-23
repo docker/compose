@@ -33,7 +33,7 @@ def migrate(content):
 
     services = {name: data.pop(name) for name in data.keys()}
 
-    data['version'] = 2
+    data['version'] = "2"
     data['services'] = services
     create_volumes_section(data)
 
@@ -155,7 +155,7 @@ def parse_opts(args):
 
 
 def main(args):
-    logging.basicConfig(format='\033[33m%(levelname)s:\033[37m %(message)s\n')
+    logging.basicConfig(format='\033[33m%(levelname)s:\033[37m %(message)s\033[0m\n')
 
     opts = parse_opts(args)
 

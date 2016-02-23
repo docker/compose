@@ -453,7 +453,7 @@ id.
 
 ### network_mode
 
-> [Version 2 file format](#version-1) only. In version 1, use [net](#net).
+> [Version 2 file format](#version-2) only. In version 1, use [net](#net).
 
 Network mode. Use the same values as the docker client `--net` parameter, plus
 the special form `service:[service name]`.
@@ -474,6 +474,54 @@ Networks to join, referencing entries under the
     networks:
       - some-network
       - other-network
+
+#### aliases
+
+Aliases (alternative hostnames) for this service on the network. Other containers on the same network can use either the service name or this alias to connect to one of the service's containers.
+
+Since `aliases` is network-scoped, the same service can have different aliases on different networks.
+
+> **Note**: A network-wide alias can be shared by multiple containers, and even by multiple services. If it is, then exactly which container the name will resolve to is not guaranteed.
+
+The general format is shown here.
+
+    networks:
+      some-network:
+        aliases:
+          - alias1
+          - alias3
+      other-network:
+        aliases:
+          - alias2
+
+In the example below, three services are provided (`web`, `worker`, and `db`), along with two networks (`new` and `legacy`). The `db` service is reachable at the hostname `db` or `database` on the `new` network, and at `db` or `mysql` on the `legacy` network.
+
+    version: 2
+
+    services:
+      web:
+        build: ./web
+        networks:
+          - new
+
+      worker:
+        build: ./worker
+        networks:
+        - legacy
+
+      db:
+        image: mysql
+        networks:
+          new:
+            aliases:
+              - database
+          legacy:
+            aliases:
+              - mysql
+
+    networks:
+      new:
+      legacy:
 
 ### pid
 
@@ -534,10 +582,11 @@ limit as an integer or soft/hard limits as a mapping.
 ### volumes, volume\_driver
 
 Mount paths or named volumes, optionally specifying a path on the host machine
-(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`). Named volumes can
-be specified with the
-[top-level `volumes` key](#volume-configuration-reference), but this is
-optional - the Docker Engine will create the volume if it doesn't exist.
+(`HOST:CONTAINER`), or an access mode (`HOST:CONTAINER:ro`).
+For [version 2 files](#version-2), named volumes need to be specified with the
+[top-level `volumes` key](#volume-configuration-reference).
+When using [version 1](#version-1), the Docker Engine will create the named
+volume automatically if it doesn't exist.
 
 You can mount a relative path on the host, which will expand relative to
 the directory of the Compose configuration file being used. Relative paths
@@ -559,10 +608,15 @@ should always begin with `.` or `..`.
       # Named volume
       - datavolume:/var/lib/mysql
 
-If you use a volume name (instead of a volume path), you may also specify
-a `volume_driver`.
+If you do not use a host path, you may specify a `volume_driver`.
 
     volume_driver: mydriver
+
+Note that for [version 2 files](#version-2), this driver
+will not apply to named volumes (you should use the `driver` option when
+[declaring the volume](#volume-configuration-reference) instead).
+For [version 1](#version-1), both named volumes and container volumes will
+use the specified driver.
 
 > Note: No path expansion will be done if you have also specified a
 > `volume_driver`.
@@ -625,7 +679,7 @@ While it is possible to declare volumes on the fly as part of the service
 declaration, this section allows you to create named volumes that can be
 reused across multiple services (without relying on `volumes_from`), and are
 easily retrieved and inspected using the docker command line or API.
-See the [docker volume](http://docs.docker.com/reference/commandline/volume/)
+See the [docker volume](/engine/reference/commandline/volume_create.md)
 subcommand documentation for more information.
 
 ### driver
@@ -761,14 +815,14 @@ service's containers to it.
         networks:
           - default
 
-    networks
+    networks:
       outside:
         external: true
 
 You can also specify the name of the network separately from the name used to
 refer to it within the Compose file:
 
-    networks
+    networks:
       outside:
         external:
           name: actual-name-of-network

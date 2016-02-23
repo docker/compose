@@ -231,6 +231,57 @@ class ConfigTest(unittest.TestCase):
         assert volumes['simple'] == {}
         assert volumes['other'] == {}
 
+    def test_named_volume_numeric_driver_opt(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': {
+                'simple': {'driver_opts': {'size': 42}},
+            }
+        })
+        cfg = config.load(config_details)
+        assert cfg.volumes['simple']['driver_opts']['size'] == '42'
+
+    def test_volume_invalid_driver_opt(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': {
+                'simple': {'driver_opts': {'size': True}},
+            }
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert 'driver_opts.size contains an invalid type' in exc.exconly()
+
+    def test_named_volume_invalid_type_list(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'volumes': []
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "volume must be a mapping, not an array" in exc.exconly()
+
+    def test_networks_invalid_type_list(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'simple': {'image': 'busybox'}
+            },
+            'networks': []
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "network must be a mapping, not an array" in exc.exconly()
+
     def test_load_service_with_name_version(self):
         with mock.patch('compose.config.config.log') as mock_logging:
             config_data = config.load(
@@ -341,8 +392,28 @@ class ConfigTest(unittest.TestCase):
             'filename.yml')
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        error_msg = "service 'web' doesn't have any configuration options"
-        assert error_msg in exc.exconly()
+        assert "service 'web' must be a mapping not a string." in exc.exconly()
+
+    def test_load_with_empty_build_args(self):
+        config_details = build_config_details(
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'build': {
+                            'context': '.',
+                            'args': None,
+                        },
+                    },
+                },
+            }
+        )
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert (
+            "services.web.build.args contains an invalid type, it should be an "
+            "array, or an object" in exc.exconly()
+        )
 
     def test_config_integer_service_name_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -354,8 +425,10 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "In file 'filename.yml' service name: 1 needs to be a string, eg '1'" \
-            in excinfo.exconly()
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'" in
+            excinfo.exconly()
+        )
 
     def test_config_integer_service_name_raise_validation_error_v2(self):
         with pytest.raises(ConfigurationError) as excinfo:
@@ -370,8 +443,10 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert "In file 'filename.yml' service name: 1 needs to be a string, eg '1'" \
-            in excinfo.exconly()
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
+            excinfo.exconly()
+        )
 
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
@@ -505,7 +580,7 @@ class ConfigTest(unittest.TestCase):
 
         with pytest.raises(ConfigurationError) as exc:
             config.load(details)
-        assert "service 'bogus' doesn't have any configuration" in exc.exconly()
+        assert "service 'bogus' must be a mapping not a string." in exc.exconly()
         assert "In file 'override.yaml'" in exc.exconly()
 
     def test_load_sorts_in_dependency_order(self):
@@ -593,6 +668,70 @@ class ConfigTest(unittest.TestCase):
         ).services
         self.assertTrue('context' in service[0]['build'])
         self.assertEqual(service[0]['build']['dockerfile'], 'Dockerfile-alt')
+
+    def test_load_with_buildargs(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'opt1': 42,
+                                    'opt2': 'foobar'
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'opt1' in service['build']['args']
+        assert isinstance(service['build']['args']['opt1'], str)
+        assert service['build']['args']['opt1'] == '42'
+        assert service['build']['args']['opt2'] == 'foobar'
+
+    def test_load_with_multiple_files_mismatched_networks_format(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'networks': {
+                            'foobar': {'aliases': ['foo', 'bar']}
+                        }
+                    }
+                },
+                'networks': {'foobar': {}, 'baz': {}}
+            }
+        )
+
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'networks': ['baz']
+                    }
+                }
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file, override_file])
+        web_service = config.load(details).services[0]
+        assert web_service['networks'] == {
+            'foobar': {'aliases': ['foo', 'bar']},
+            'baz': None
+        }
 
     def test_load_with_multiple_files_v2(self):
         base_file = config.ConfigFile(
@@ -961,7 +1100,7 @@ class ConfigTest(unittest.TestCase):
 
     @mock.patch('compose.config.validation.log')
     def test_logs_warning_for_boolean_in_environment(self, mock_logging):
-        expected_warning_msg = "There is a boolean value in the 'environment' key."
+        expected_warning_msg = "There is a boolean value in the 'environment'"
         config.load(
             build_config_details(
                 {'web': {
@@ -1079,6 +1218,39 @@ class ConfigTest(unittest.TestCase):
             'extends': {'service': 'foo'}
         }
 
+    def test_merge_build_args(self):
+        base = {
+            'build': {
+                'context': '.',
+                'args': {
+                    'ONE': '1',
+                    'TWO': '2',
+                },
+            }
+        }
+        override = {
+            'build': {
+                'args': {
+                    'TWO': 'dos',
+                    'THREE': '3',
+                },
+            }
+        }
+        actual = config.merge_service_dicts(
+            base,
+            override,
+            DEFAULT_VERSION)
+        assert actual == {
+            'build': {
+                'context': '.',
+                'args': {
+                    'ONE': '1',
+                    'TWO': 'dos',
+                    'THREE': '3',
+                },
+            }
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -1135,6 +1307,17 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
         assert "Service 'one' depends on service 'three'" in exc.exconly()
+
+    def test_load_dockerfile_without_context(self):
+        config_details = build_config_details({
+            'version': '2',
+            'services': {
+                'one': {'build': {'dockerfile': 'Dockerfile.foo'}},
+            },
+        })
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert 'one.build is invalid, context is required.' in exc.exconly()
 
 
 class NetworkModeTest(unittest.TestCase):
@@ -1506,57 +1689,54 @@ class VolumeConfigTest(unittest.TestCase):
 
 
 class MergePathMappingTest(object):
-    def config_name(self):
-        return ""
+    config_name = ""
 
     def test_empty(self):
         service_dict = config.merge_service_dicts({}, {}, DEFAULT_VERSION)
-        assert self.config_name() not in service_dict
+        assert self.config_name not in service_dict
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/data']},
+            {self.config_name: ['/foo:/code', '/data']},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/foo:/code', '/data'])
+        assert set(service_dict[self.config_name]) == set(['/foo:/code', '/data'])
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {self.config_name(): ['/bar:/code']},
+            {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code'])
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/data']},
-            {self.config_name(): ['/bar:/code']},
+            {self.config_name: ['/foo:/code', '/data']},
+            {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/data']},
-            {self.config_name(): ['/bar:/code', '/quux:/data']},
+            {self.config_name: ['/foo:/code', '/data']},
+            {self.config_name: ['/bar:/code', '/quux:/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/quux:/data'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/quux:/data'])
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
-            {self.config_name(): ['/foo:/code', '/quux:/data']},
-            {self.config_name(): ['/bar:/code', '/data']},
+            {self.config_name: ['/foo:/code', '/quux:/data']},
+            {self.config_name: ['/bar:/code', '/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name()]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
 
 
 class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
-    def config_name(self):
-        return 'volumes'
+    config_name = 'volumes'
 
 
 class MergeDevicesTest(unittest.TestCase, MergePathMappingTest):
-    def config_name(self):
-        return 'devices'
+    config_name = 'devices'
 
 
 class BuildOrImageMergeTest(unittest.TestCase):
@@ -1594,30 +1774,49 @@ class BuildOrImageMergeTest(unittest.TestCase):
         )
 
 
-class MergeListsTest(unittest.TestCase):
+class MergeListsTest(object):
+    config_name = ""
+    base_config = []
+    override_config = []
+
+    def merged_config(self):
+        return set(self.base_config) | set(self.override_config)
+
     def test_empty(self):
-        assert 'ports' not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
+        assert self.config_name not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
 
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
-            {'ports': ['10:8000', '9000']},
+            {self.config_name: self.base_config},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict['ports']) == set(['10:8000', '9000'])
+        assert set(service_dict[self.config_name]) == set(self.base_config)
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
-            {'ports': ['10:8000', '9000']},
+            {self.config_name: self.base_config},
             DEFAULT_VERSION)
-        assert set(service_dict['ports']) == set(['10:8000', '9000'])
+        assert set(service_dict[self.config_name]) == set(self.base_config)
 
     def test_add_item(self):
         service_dict = config.merge_service_dicts(
-            {'ports': ['10:8000', '9000']},
-            {'ports': ['20:8000']},
+            {self.config_name: self.base_config},
+            {self.config_name: self.override_config},
             DEFAULT_VERSION)
-        assert set(service_dict['ports']) == set(['10:8000', '9000', '20:8000'])
+        assert set(service_dict[self.config_name]) == set(self.merged_config())
+
+
+class MergePortsTest(unittest.TestCase, MergeListsTest):
+    config_name = 'ports'
+    base_config = ['10:8000', '9000']
+    override_config = ['20:8000']
+
+
+class MergeNetworksTest(unittest.TestCase, MergeListsTest):
+    config_name = 'networks'
+    base_config = ['frontend', 'backend']
+    override_config = ['monitoring']
 
 
 class MergeStringsOrListsTest(unittest.TestCase):
@@ -1776,7 +1975,7 @@ class EnvTest(unittest.TestCase):
         }
         self.assertEqual(
             resolve_environment(service_dict),
-            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': ''},
+            {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': None},
         )
 
     def test_resolve_environment_from_env_file(self):
@@ -1817,7 +2016,7 @@ class EnvTest(unittest.TestCase):
                 'FILE_DEF': u'bär',
                 'FILE_DEF_EMPTY': '',
                 'ENV_DEF': 'E3',
-                'NO_DEF': ''
+                'NO_DEF': None
             },
         )
 
@@ -1836,7 +2035,7 @@ class EnvTest(unittest.TestCase):
         }
         self.assertEqual(
             resolve_build_args(build),
-            {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': ''},
+            {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')

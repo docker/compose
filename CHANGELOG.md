@@ -1,6 +1,61 @@
 Change log
 ==========
 
+1.6.1 (2016-02-23)
+------------------
+
+Bug Fixes
+
+-   Fixed a bug where recreating a container multiple times would cause the
+    new container to be started without the previous volumes.
+
+-   Fixed a bug where Compose would set the value of unset environment variables
+    to an empty string, instead of a key without a value.
+
+-   Provide a better error message when Compose requires a more recent version
+    of the Docker API.
+
+-   Add a missing config field `network.aliases` which allows setting a network
+    scoped alias for a service.
+
+-   Fixed a bug where `run` would not start services listed in `depends_on`.
+
+-   Fixed a bug where `networks` and `network_mode` where not merged when using
+    extends or multiple Compose files.
+
+-   Fixed a bug with service aliases where the short container id alias was
+    only contained 10 characters, instead of the 12 characters used in previous
+    versions.
+
+-   Added a missing log message when creating a new named volume.
+
+-   Fixed a bug where `build.args` was not merged when using `extends` or
+    multiple Compose files.
+
+-   Fixed some bugs with config validation when null values or incorrect types
+    were used instead of a mapping.
+
+-   Fixed a bug where a `build` section without a `context` would show a stack
+    trace instead of a helpful validation message.
+
+-   Improved compatibility with swarm by only setting a container affinity to
+    the previous instance of a services' container when the service uses an
+    anonymous container volume. Previously the affinity was always set on all
+    containers.
+
+-   Fixed the validation of some `driver_opts` would cause an error if a number
+    was used instead of a string.
+
+-   Some improvements to the `run.sh` script used by the Compose container install
+    option.
+
+-   Fixed a bug with `up --abort-on-container-exit` where Compose would exit,
+    but would not stop other containers.
+
+-   Corrected the warning message that is printed when a boolean value is used
+    as a value in a mapping.
+
+
 1.6.0 (2016-01-15)
 ------------------
 
@@ -14,7 +69,7 @@ Major Features:
     1.6 exactly as they do today.
 
     Check the upgrade guide for full details:
-    https://docs.docker.com/compose/compose-file/upgrading
+    https://docs.docker.com/compose/compose-file#upgrading
 
 -   Support for networking has exited experimental status and is the recommended
     way to enable communication between containers.

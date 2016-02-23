@@ -72,17 +72,19 @@ and a `docker-compose.yml` file.
 
 9. Add the following configuration to the file.
 
-        db:
-          image: postgres
-        web:
-          build: .
-          command: python manage.py runserver 0.0.0.0:8000
-          volumes:
-            - .:/code
-          ports:
-            - "8000:8000"
-          links:
-            - db
+        version: '2'
+        services:
+          db:
+            image: postgres
+          web:
+            build: .
+            command: python manage.py runserver 0.0.0.0:8000
+            volumes:
+              - .:/code
+            ports:
+              - "8000:8000"
+            depends_on:
+              - db
 
     This file defines two services: The `db` service and the `web` service.
 
@@ -129,7 +131,7 @@ In this step, you create a Django started project by building the image from the
 
 In this section, you set up the database connection for Django.
 
-1. In your project dirctory, edit the `composeexample/settings.py` file.
+1. In your project directory, edit the `composeexample/settings.py` file.
 
 2. Replace the `DATABASES = ...` with the following:
 

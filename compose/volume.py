@@ -64,12 +64,13 @@ class ProjectVolumes(object):
         config_volumes = config_data.volumes or {}
         volumes = {
             vol_name: Volume(
-                    client=client,
-                    project=name,
-                    name=vol_name,
-                    driver=data.get('driver'),
-                    driver_opts=data.get('driver_opts'),
-                    external_name=data.get('external_name'))
+                client=client,
+                project=name,
+                name=vol_name,
+                driver=data.get('driver'),
+                driver_opts=data.get('driver_opts'),
+                external_name=data.get('external_name')
+            )
             for vol_name, data in config_volumes.items()
         }
         return cls(volumes)
@@ -96,6 +97,11 @@ class ProjectVolumes(object):
                             )
                         )
                     continue
+                log.info(
+                    'Creating volume "{0}" with {1} driver'.format(
+                        volume.full_name, volume.driver or 'default'
+                    )
+                )
                 volume.create()
         except NotFound:
             raise ConfigurationError(

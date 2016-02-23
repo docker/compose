@@ -23,7 +23,20 @@
               "properties": {
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
-                "args": {"$ref": "#/definitions/list_or_dict"}
+                "args": {
+                  "oneOf": [
+                    {"$ref": "#/definitions/list_of_strings"},
+                    {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.+$": {
+                          "type": ["string", "number"]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
               },
               "additionalProperties": false
             }
@@ -107,11 +120,28 @@
         "network_mode": {"type": "string"},
 
         "networks": {
-          "type": "array",
-          "items": {"type": "string"},
-          "uniqueItems": true
+          "oneOf": [
+            {"$ref": "#/definitions/list_of_strings"},
+            {
+              "type": "object",
+              "patternProperties": {
+                "^[a-zA-Z0-9._-]+$": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "aliases": {"$ref": "#/definitions/list_of_strings"}
+                      },
+                      "additionalProperties": false
+                    },
+                    {"type": "null"}
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
         },
-
         "pid": {"type": ["string", "null"]},
 
         "ports": {
@@ -195,7 +225,12 @@
       "anyOf": [
           {"required": ["build"]},
           {"required": ["image"]}
-      ]
+      ],
+      "properties": {
+        "build": {
+          "required": ["context"]
+        }
+      }
     }
   }
 }

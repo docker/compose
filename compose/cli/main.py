@@ -19,6 +19,7 @@ from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.serialize import serialize_config
+from ..const import API_VERSION_TO_ENGINE_VERSION
 from ..const import DEFAULT_TIMEOUT
 from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -64,7 +65,7 @@ def main():
         log.error("No such command: %s\n\n%s", e.command, commands)
         sys.exit(1)
     except APIError as e:
-        log.error(e.explanation)
+        log_api_error(e)
         sys.exit(1)
     except BuildError as e:
         log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
@@ -82,6 +83,22 @@ def main():
             "COMPOSE_HTTP_TIMEOUT to a higher value (current value: %s)." % HTTP_TIMEOUT
         )
         sys.exit(1)
+
+
+def log_api_error(e):
+    if 'client is newer than server' in e.explanation:
+        # we need JSON formatted errors. In the meantime...
+        # TODO: fix this by refactoring project dispatch
+        # http://github.com/docker/compose/pull/2832#commitcomment-15923800
+        client_version = e.explanation.split('client API version: ')[1].split(',')[0]
+        log.error(
+            "The engine version is lesser than the minimum required by "
+            "compose. Your current project requires a Docker Engine of "
+            "version {version} or superior.".format(
+                version=API_VERSION_TO_ENGINE_VERSION[client_version]
+            ))
+    else:
+        log.error(e.explanation)
 
 
 def setup_logging():
@@ -645,6 +662,10 @@ class TopLevelCommand(DocoptCommand):
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
+            if cascade_stop:
+                print("Aborting on container exit...")
+                project.stop(service_names=service_names, timeout=timeout)
+
     def version(self, project, options):
         """
         Show version informations
@@ -686,7 +707,7 @@ def image_type_from_opt(flag, value):
 
 def run_one_off_container(container_options, project, service, options):
     if not options['--no-deps']:
-        deps = service.get_linked_service_names()
+        deps = service.get_dependency_names()
         if deps:
             project.up(
                 service_names=deps,

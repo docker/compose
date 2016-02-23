@@ -123,7 +123,7 @@ class Service(object):
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.network_mode = network_mode or NetworkMode(None)
-        self.networks = networks or []
+        self.networks = networks or {}
         self.options = options
 
     def containers(self, stopped=False, one_off=False, filters={}):
@@ -431,14 +431,14 @@ class Service(object):
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network in self.networks:
+        for network, aliases in self.networks.items():
             if network in connected_networks:
                 self.client.disconnect_container_from_network(
                     container.id, network)
 
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=self._get_aliases(container),
+                aliases=list(self._get_aliases(container).union(aliases)),
                 links=self._get_links(False),
             )
 
@@ -472,7 +472,7 @@ class Service(object):
             'image_id': self.image()['Id'],
             'links': self.get_link_names(),
             'net': self.network_mode.id,
-            'networks': self.networks,
+            'networks': list(self.networks.keys()),
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
@@ -513,9 +513,9 @@ class Service(object):
 
     def _get_aliases(self, container):
         if container.labels.get(LABEL_ONE_OFF) == "True":
-            return []
+            return set()
 
-        return [self.name, container.short_id]
+        return {self.name, container.short_id}
 
     def _get_links(self, link_to_self):
         links = {}
@@ -591,20 +591,19 @@ class Service(object):
                     ports.append(port)
             container_options['ports'] = ports
 
-        override_options['binds'] = merge_volume_bindings(
-            container_options.get('volumes') or [],
-            previous_container)
-
-        if 'volumes' in container_options:
-            container_options['volumes'] = dict(
-                (v.internal, {}) for v in container_options['volumes'])
-
         container_options['environment'] = merge_environment(
             self.options.get('environment'),
             override_options.get('environment'))
 
-        if previous_container:
-            container_options['environment']['affinity:container'] = ('=' + previous_container.id)
+        binds, affinity = merge_volume_bindings(
+            container_options.get('volumes') or [],
+            previous_container)
+        override_options['binds'] = binds
+        container_options['environment'].update(affinity)
+
+        if 'volumes' in container_options:
+            container_options['volumes'] = dict(
+                (v.internal, {}) for v in container_options['volumes'])
 
         container_options['image'] = self.image_name
 
@@ -622,6 +621,8 @@ class Service(object):
             override_options,
             one_off=one_off)
 
+        container_options['environment'] = format_environment(
+            container_options['environment'])
         return container_options
 
     def _get_container_host_config(self, override_options, one_off=False):
@@ -875,18 +876,23 @@ def merge_volume_bindings(volumes, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
+    affinity = {}
+
     volume_bindings = dict(
         build_volume_binding(volume)
         for volume in volumes
         if volume.external)
 
     if previous_container:
-        data_volumes = get_container_data_volumes(previous_container, volumes)
-        warn_on_masked_volume(volumes, data_volumes, previous_container.service)
+        old_volumes = get_container_data_volumes(previous_container, volumes)
+        warn_on_masked_volume(volumes, old_volumes, previous_container.service)
         volume_bindings.update(
-            build_volume_binding(volume) for volume in data_volumes)
+            build_volume_binding(volume) for volume in old_volumes)
 
-    return list(volume_bindings.values())
+        if old_volumes:
+            affinity = {'affinity:container': '=' + previous_container.id}
+
+    return list(volume_bindings.values()), affinity
 
 
 def get_container_data_volumes(container, volumes_option):
@@ -923,7 +929,7 @@ def get_container_data_volumes(container, volumes_option):
             continue
 
         # Copy existing volume from old container
-        volume = volume._replace(external=mount['Source'])
+        volume = volume._replace(external=mount['Name'])
         volumes.append(volume)
 
     return volumes
@@ -1014,3 +1020,12 @@ def get_log_config(logging_dict):
         type=log_driver,
         config=log_options
     )
+
+
+# TODO: remove once fix is available in docker-py
+def format_environment(environment):
+    def format_env(key, value):
+        if value is None:
+            return key
+        return '{key}={value}'.format(key=key, value=value)
+    return [format_env(*item) for item in environment.items()]

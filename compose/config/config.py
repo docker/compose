@@ -16,6 +16,7 @@ from cached_property import cached_property
 
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
+from ..utils import build_string_dict
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
@@ -32,11 +33,11 @@ from .types import VolumeSpec
 from .validation import match_named_volumes
 from .validation import validate_against_fields_schema
 from .validation import validate_against_service_schema
+from .validation import validate_config_section
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_network_mode
 from .validation import validate_top_level_object
-from .validation import validate_top_level_service_objects
 from .validation import validate_ulimits
 
 
@@ -87,6 +88,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'container_name',
     'dockerfile',
     'logging',
+    'network_mode',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -290,8 +292,12 @@ def load(config_details):
     config_details = config_details._replace(config_files=processed_files)
 
     main_file = config_details.config_files[0]
-    volumes = load_mapping(config_details.config_files, 'get_volumes', 'Volume')
-    networks = load_mapping(config_details.config_files, 'get_networks', 'Network')
+    volumes = load_mapping(
+        config_details.config_files, 'get_volumes', 'Volume'
+    )
+    networks = load_mapping(
+        config_details.config_files, 'get_networks', 'Network'
+    )
     service_dicts = load_services(
         config_details.working_dir,
         main_file,
@@ -330,6 +336,11 @@ def load_mapping(config_files, get_func, entity_type):
                     config['external_name'] = name
 
             mapping[name] = config
+
+            if 'driver_opts' in config:
+                config['driver_opts'] = build_string_dict(
+                    config['driver_opts']
+                )
 
     return mapping
 
@@ -376,22 +387,31 @@ def load_services(working_dir, config_file, service_configs):
     return build_services(service_config)
 
 
-def process_config_file(config_file, service_name=None):
-    service_dicts = config_file.get_service_dicts()
-    validate_top_level_service_objects(config_file.filename, service_dicts)
+def interpolate_config_section(filename, config, section):
+    validate_config_section(filename, config, section)
+    return interpolate_environment_variables(config, section)
 
-    interpolated_config = interpolate_environment_variables(service_dicts, 'service')
+
+def process_config_file(config_file, service_name=None):
+    services = interpolate_config_section(
+        config_file.filename,
+        config_file.get_service_dicts(),
+        'service')
 
     if config_file.version == V2_0:
         processed_config = dict(config_file.config)
-        processed_config['services'] = services = interpolated_config
-        processed_config['volumes'] = interpolate_environment_variables(
-            config_file.get_volumes(), 'volume')
-        processed_config['networks'] = interpolate_environment_variables(
-            config_file.get_networks(), 'network')
+        processed_config['services'] = services
+        processed_config['volumes'] = interpolate_config_section(
+            config_file.filename,
+            config_file.get_volumes(),
+            'volume')
+        processed_config['networks'] = interpolate_config_section(
+            config_file.filename,
+            config_file.get_networks(),
+            'network')
 
     if config_file.version == V1:
-        processed_config = services = interpolated_config
+        processed_config = services
 
     config_file = config_file._replace(config=processed_config)
     validate_against_fields_schema(config_file)
@@ -600,6 +620,9 @@ def finalize_service(service_config, service_names, version):
         else:
             service_dict['network_mode'] = network_mode
 
+    if 'networks' in service_dict:
+        service_dict['networks'] = parse_networks(service_dict['networks'])
+
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
 
@@ -689,6 +712,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('environment', parse_environment)
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('ulimits', parse_ulimits)
+    md.merge_mapping('networks', parse_networks)
     md.merge_sequence('links', ServiceLink.parse)
 
     for field in ['volumes', 'devices']:
@@ -711,29 +735,24 @@ def merge_service_dicts(base, override, version):
 
     if version == V1:
         legacy_v1_merge_image_or_build(md, base, override)
-    else:
-        merge_build(md, base, override)
+    elif md.needs_merge('build'):
+        md['build'] = merge_build(md, base, override)
 
     return dict(md)
 
 
 def merge_build(output, base, override):
-    build = {}
+    def to_dict(service):
+        build_config = service.get('build', {})
+        if isinstance(build_config, six.string_types):
+            return {'context': build_config}
+        return build_config
 
-    if 'build' in base:
-        if isinstance(base['build'], six.string_types):
-            build['context'] = base['build']
-        else:
-            build.update(base['build'])
-
-    if 'build' in override:
-        if isinstance(override['build'], six.string_types):
-            build['context'] = override['build']
-        else:
-            build.update(override['build'])
-
-    if build:
-        output['build'] = build
+    md = MergeDict(to_dict(base), to_dict(override))
+    md.merge_scalar('context')
+    md.merge_scalar('dockerfile')
+    md.merge_mapping('args', parse_build_arguments)
+    return dict(md)
 
 
 def legacy_v1_merge_image_or_build(output, base, override):
@@ -790,6 +809,7 @@ def parse_dict_or_list(split_func, type_name, arguments):
 parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
 parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
 parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
+parse_networks = functools.partial(parse_dict_or_list, lambda k: (k, None), 'networks')
 
 
 def parse_ulimits(ulimits):
@@ -806,7 +826,7 @@ def resolve_env_var(key, val):
     elif key in os.environ:
         return key, os.environ[key]
     else:
-        return key, ''
+        return key, None
 
 
 def env_vars_from_file(filename):
@@ -853,7 +873,7 @@ def normalize_build(service_dict, working_dir):
         else:
             build.update(service_dict['build'])
             if 'args' in build:
-                build['args'] = resolve_build_args(build)
+                build['args'] = build_string_dict(resolve_build_args(build))
 
         service_dict['build'] = build
 
@@ -876,6 +896,9 @@ def validate_paths(service_dict):
             build_path = build
         elif isinstance(build, dict) and 'context' in build:
             build_path = build['context']
+        else:
+            # We have a build section but no context, so nothing to validate
+            return
 
         if (
             not is_url(build_path) and

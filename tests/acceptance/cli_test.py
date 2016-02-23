@@ -159,7 +159,7 @@ class CLITestCase(DockerClientTestCase):
             '-f', 'tests/fixtures/invalid-composefile/invalid.yml',
             'config', '-q'
         ], returncode=1)
-        assert "'notaservice' doesn't have any configuration" in result.stderr
+        assert "'notaservice' must be a mapping" in result.stderr
 
     # TODO: this shouldn't be v2-dependent
     @v2_only()
@@ -185,7 +185,7 @@ class CLITestCase(DockerClientTestCase):
                     'build': {
                         'context': os.path.abspath(self.base_dir),
                     },
-                    'networks': ['front', 'default'],
+                    'networks': {'front': None, 'default': None},
                     'volumes_from': ['service:other:rw'],
                 },
                 'other': {
@@ -444,6 +444,34 @@ class CLITestCase(DockerClientTestCase):
         networks = self.client.networks(names=[network_name])
 
         assert networks[0]['Options']['com.docker.network.bridge.enable_icc'] == 'false'
+
+    @v2_only()
+    def test_up_with_network_aliases(self):
+        filename = 'network-aliases.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+        back_name = '{}_back'.format(self.project.name)
+        front_name = '{}_front'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # Two networks were created: back and front
+        assert sorted(n['Name'] for n in networks) == [back_name, front_name]
+        web_container = self.project.get_service('web').containers()[0]
+
+        back_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(back_name)
+        )
+        assert 'web' in back_aliases
+        front_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(front_name)
+        )
+        assert 'web' in front_aliases
+        assert 'forward_facing' in front_aliases
+        assert 'ahead' in front_aliases
 
     @v2_only()
     def test_up_with_networks(self):
@@ -718,6 +746,12 @@ class CLITestCase(DockerClientTestCase):
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
+    def test_up_handles_abort_on_container_exit(self):
+        start_process(self.base_dir, ['up', '--abort-on-container-exit'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+        self.project.stop(['simple'])
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['run', 'console', '/bin/true'])
@@ -732,6 +766,15 @@ class CLITestCase(DockerClientTestCase):
 
     def test_run_service_with_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['run', 'web', '/bin/true'], None)
+        db = self.project.get_service('db')
+        console = self.project.get_service('console')
+        self.assertEqual(len(db.containers()), 1)
+        self.assertEqual(len(console.containers()), 0)
+
+    @v2_only()
+    def test_run_service_with_dependencies(self):
+        self.base_dir = 'tests/fixtures/v2-dependencies'
         self.dispatch(['run', 'web', '/bin/true'], None)
         db = self.project.get_service('db')
         console = self.project.get_service('console')

@@ -95,16 +95,19 @@ Define a set of services using `docker-compose.yml`:
 1. Create a file called docker-compose.yml in your project directory and add
    the following:
 
-        web:
-          build: .
-          ports:
-           - "5000:5000"
-          volumes:
-           - .:/code
-          links:
-           - redis
-        redis:
-          image: redis
+
+        version: '2'
+        services:
+          web:
+            build: .
+            ports:
+             - "5000:5000"
+            volumes:
+             - .:/code
+            depends_on:
+             - redis
+          redis:
+            image: redis
 
 This Compose file defines two services, `web` and `redis`. The web service:
 
