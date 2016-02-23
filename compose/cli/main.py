@@ -662,6 +662,10 @@ class TopLevelCommand(DocoptCommand):
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
+            if cascade_stop:
+                print("Aborting on container exit...")
+                project.stop(service_names=service_names, timeout=timeout)
+
     def version(self, project, options):
         """
         Show version informations
@@ -773,9 +777,6 @@ def up_shutdown_context(project, service_names, timeout, detached):
             yield
         except signals.ShutdownException:
             print("Gracefully stopping... (press Ctrl+C again to force)")
-            project.stop(service_names=service_names, timeout=timeout)
-        except signals.CascadeStopException:
-            print("Aborting on container exit... (press Ctrl+C to force)")
             project.stop(service_names=service_names, timeout=timeout)
     except signals.ShutdownException:
         project.kill(service_names=service_names)

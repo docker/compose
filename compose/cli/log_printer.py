@@ -5,7 +5,6 @@ import sys
 from itertools import cycle
 
 from . import colors
-from . import signals
 from .multiplexer import Multiplexer
 from compose import utils
 from compose.utils import split_buffer
@@ -42,7 +41,7 @@ class LogPrinter(object):
         for color_func, container in zip(color_funcs, self.containers):
             generator_func = get_log_generator(container)
             prefix = color_func(build_log_prefix(container, prefix_width))
-            yield generator_func(container, prefix, color_func, self.cascade_stop)
+            yield generator_func(container, prefix, color_func)
 
 
 def build_log_prefix(container, prefix_width):
@@ -65,7 +64,7 @@ def get_log_generator(container):
     return build_no_log_generator
 
 
-def build_no_log_generator(container, prefix, color_func, cascade_stop):
+def build_no_log_generator(container, prefix, color_func):
     """Return a generator that prints a warning about logs and waits for
     container to exit.
     """
@@ -73,11 +72,9 @@ def build_no_log_generator(container, prefix, color_func, cascade_stop):
         prefix,
         container.log_driver)
     yield color_func(wait_on_exit(container))
-    if cascade_stop:
-        raise signals.CascadeStopException()
 
 
-def build_log_generator(container, prefix, color_func, cascade_stop):
+def build_log_generator(container, prefix, color_func):
     # if the container doesn't have a log_stream we need to attach to container
     # before log printer starts running
     if container.log_stream is None:
@@ -89,8 +86,6 @@ def build_log_generator(container, prefix, color_func, cascade_stop):
     for line in line_generator:
         yield prefix + line
     yield color_func(wait_on_exit(container))
-    if cascade_stop:
-        raise signals.CascadeStopException()
 
 
 def wait_on_exit(container):
