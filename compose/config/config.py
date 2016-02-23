@@ -826,7 +826,7 @@ def resolve_env_var(key, val):
     elif key in os.environ:
         return key, os.environ[key]
     else:
-        return key, ''
+        return key, None
 
 
 def env_vars_from_file(filename):

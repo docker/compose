@@ -621,6 +621,8 @@ class Service(object):
             override_options,
             one_off=one_off)
 
+        container_options['environment'] = format_environment(
+            container_options['environment'])
         return container_options
 
     def _get_container_host_config(self, override_options, one_off=False):
@@ -1018,3 +1020,12 @@ def get_log_config(logging_dict):
         type=log_driver,
         config=log_options
     )
+
+
+# TODO: remove once fix is available in docker-py
+def format_environment(environment):
+    def format_env(key, value):
+        if value is None:
+            return key
+        return '{key}={value}'.format(key=key, value=value)
+    return [format_env(*item) for item in environment.items()]
