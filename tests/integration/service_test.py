@@ -909,6 +909,7 @@ class ServiceTest(DockerClientTestCase):
             'FILE_DEF': 'F1',
             'FILE_DEF_EMPTY': '',
             'ENV_DEF': 'E3',
+            'NO_DEF': ''
         }.items():
             self.assertEqual(env[k], v)
 
