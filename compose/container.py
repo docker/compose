@@ -134,7 +134,11 @@ class Container(object):
 
     @property
     def environment(self):
-        return dict(var.split("=", 1) for var in self.get('Config.Env') or [])
+        def parse_env(var):
+            if '=' in var:
+                return var.split("=", 1)
+            return var, None
+        return dict(parse_env(var) for var in self.get('Config.Env') or [])
 
     @property
     def exit_code(self):
