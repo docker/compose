@@ -10,10 +10,9 @@ weight=4
 <![end-metadata]-->
 
 
-# Quickstart: Compose and Django
+# Quickstart: Docker Compose and Django
 
-This quick-start guide demonstrates how to use Compose to set up and run a
-simple Django/PostgreSQL app. Before starting, you'll need to have
+This quick-start guide demonstrates how to use Docker Compose to set up and run a simple Django/PostgreSQL app. Before starting, you'll need to have
 [Compose installed](install.md).
 
 ## Define the project components
