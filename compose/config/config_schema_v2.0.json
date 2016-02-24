@@ -152,7 +152,9 @@
                     {
                       "type": "object",
                       "properties": {
-                        "aliases": {"$ref": "#/definitions/list_of_strings"}
+                        "aliases": {"$ref": "#/definitions/list_of_strings"},
+                        "ipv4_address": {"type": "string"},
+                        "ipv6_address": {"type": "string"}
                       },
                       "additionalProperties": false
                     },

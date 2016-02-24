@@ -476,6 +476,30 @@ class CLITestCase(DockerClientTestCase):
         assert 'ahead' in front_aliases
 
     @v2_only()
+    def test_up_with_network_static_addresses(self):
+        filename = 'network-static-addresses.yml'
+        ipv4_address = '172.16.100.100'
+        ipv6_address = 'fe80::1001:100'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+        static_net = '{}_static_test'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # One networks was created: front
+        assert sorted(n['Name'] for n in networks) == [static_net]
+        web_container = self.project.get_service('web').containers()[0]
+
+        ipam_config = web_container.get(
+            'NetworkSettings.Networks.{}.IPAMConfig'.format(static_net)
+        )
+        assert ipv4_address in ipam_config.values()
+        assert ipv6_address in ipam_config.values()
+
+    @v2_only()
     def test_up_with_networks(self):
         self.base_dir = 'tests/fixtures/networks'
         self.dispatch(['up', '-d'], None)

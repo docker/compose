@@ -451,7 +451,10 @@ class Service(object):
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network, aliases in self.networks.items():
+        for network, netdefs in self.networks.items():
+            aliases = netdefs.get('aliases', [])
+            ipv4_address = netdefs.get('ipv4_address', None)
+            ipv6_address = netdefs.get('ipv6_address', None)
             if network in connected_networks:
                 self.client.disconnect_container_from_network(
                     container.id, network)
@@ -459,7 +462,9 @@ class Service(object):
             self.client.connect_container_to_network(
                 container.id, network,
                 aliases=list(self._get_aliases(container).union(aliases)),
-                links=self._get_links(False),
+                ipv4_address=ipv4_address,
+                ipv6_address=ipv6_address,
+                links=self._get_links(False)
             )
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
