@@ -48,8 +48,11 @@ var containersCommand = cli.Command{
 		execCommand,
 		killCommand,
 		listCommand,
+		pauseCommand,
+		resumeCommand,
 		startCommand,
 		statsCommand,
+		watchCommand,
 	},
 	Action: listContainers,
 }
@@ -267,6 +270,84 @@ func attachStdio(s stdio) error {
 	}
 	go io.Copy(os.Stderr, stderrf)
 	return nil
+}
+
+var watchCommand = cli.Command{
+	Name:  "watch",
+	Usage: "print container events",
+	Action: func(context *cli.Context) {
+		c := getClient(context)
+		id := context.Args().First()
+		if id != "" {
+			resp, err := c.State(netcontext.Background(), &types.StateRequest{Id: id})
+			if err != nil {
+				fatal(err.Error(), 1)
+			}
+			for _, c := range resp.Containers {
+				if c.Id == id {
+					break
+				}
+			}
+			if id == "" {
+				fatal("Invalid container id", 1)
+			}
+		}
+		events, reqErr := c.Events(netcontext.Background(), &types.EventsRequest{})
+		if reqErr != nil {
+			fatal(reqErr.Error(), 1)
+		}
+
+		for {
+			e, err := events.Recv()
+			if err != nil {
+				fatal(err.Error(), 1)
+			}
+
+			if id == "" || e.Id == id {
+				fmt.Printf("%#v\n", e)
+			}
+		}
+	},
+}
+
+var pauseCommand = cli.Command{
+	Name:  "pause",
+	Usage: "pause a container",
+	Action: func(context *cli.Context) {
+		id := context.Args().First()
+		if id == "" {
+			fatal("container id cannot be empty", 1)
+		}
+		c := getClient(context)
+		_, err := c.UpdateContainer(netcontext.Background(), &types.UpdateContainerRequest{
+			Id:     id,
+			Pid:    "init",
+			Status: "paused",
+		})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+	},
+}
+
+var resumeCommand = cli.Command{
+	Name:  "resume",
+	Usage: "resume a paused container",
+	Action: func(context *cli.Context) {
+		id := context.Args().First()
+		if id == "" {
+			fatal("container id cannot be empty", 1)
+		}
+		c := getClient(context)
+		_, err := c.UpdateContainer(netcontext.Background(), &types.UpdateContainerRequest{
+			Id:     id,
+			Pid:    "init",
+			Status: "running",
+		})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+	},
 }
 
 var killCommand = cli.Command{
