@@ -10,7 +10,6 @@ type StatsTask struct {
 	baseTask
 	ID   string
 	Stat chan *runtime.Stat
-	Err  chan error
 }
 
 func (s *Supervisor) stats(t *StatsTask) error {
@@ -23,12 +22,12 @@ func (s *Supervisor) stats(t *StatsTask) error {
 	go func() {
 		s, err := i.container.Stats()
 		if err != nil {
-			t.Err <- err
+			t.ErrorCh() <- err
 			return
 		}
-		t.Err <- nil
+		t.ErrorCh() <- nil
 		t.Stat <- s
 		ContainerStatsTimer.UpdateSince(start)
 	}()
-	return nil
+	return errDeferedResponse
 }
