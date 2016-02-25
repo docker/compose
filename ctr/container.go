@@ -49,6 +49,7 @@ var containersCommand = cli.Command{
 		killCommand,
 		listCommand,
 		pauseCommand,
+		resumeCommand,
 		startCommand,
 		statsCommand,
 	},
@@ -283,6 +284,26 @@ var pauseCommand = cli.Command{
 			Id:     id,
 			Pid:    "init",
 			Status: "paused",
+		})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+	},
+}
+
+var resumeCommand = cli.Command{
+	Name:  "resume",
+	Usage: "resume a paused container",
+	Action: func(context *cli.Context) {
+		id := context.Args().First()
+		if id == "" {
+			fatal("container id cannot be empty", 1)
+		}
+		c := getClient(context)
+		_, err := c.UpdateContainer(netcontext.Background(), &types.UpdateContainerRequest{
+			Id:     id,
+			Pid:    "init",
+			Status: "running",
 		})
 		if err != nil {
 			fatal(err.Error(), 1)
