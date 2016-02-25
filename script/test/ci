@@ -1,0 +1,25 @@
+#!/bin/bash
+# This should be run inside a container built from the Dockerfile
+# at the root of the repo:
+#
+# $ TAG="docker-compose:$(git rev-parse --short HEAD)"
+# $ docker build -t "$TAG" .
+# $ docker run --rm \
+#    --volume="/var/run/docker.sock:/var/run/docker.sock" \
+#    --volume="$(pwd)/.git:/code/.git" \
+#    -e "TAG=$TAG" \
+#    --entrypoint="script/test/ci" "$TAG"
+
+set -ex
+
+docker version
+
+export DOCKER_VERSIONS=all
+STORAGE_DRIVER=${STORAGE_DRIVER:-overlay}
+export DOCKER_DAEMON_ARGS="--storage-driver=$STORAGE_DRIVER"
+
+GIT_VOLUME="--volumes-from=$(hostname)"
+. script/test/all
+
+>&2 echo "Building Linux binary"
+. script/build/linux-entrypoint

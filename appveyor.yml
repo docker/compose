@@ -11,7 +11,7 @@ build: false
 
 test_script:
   - "tox -e py27,py34 -- tests/unit"
-  - ps: ".\\script\\build-windows.ps1"
+  - ps: ".\\script\\build\\windows.ps1"
 
 artifacts:
   - path: .\dist\docker-compose-Windows-x86_64.exe

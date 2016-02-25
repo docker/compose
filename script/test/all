@@ -14,7 +14,7 @@ docker run --rm \
 get_versions="docker run --rm
     --entrypoint=/code/.tox/py27/bin/python
     $TAG
-    /code/script/versions.py docker/docker"
+    /code/script/test/versions.py docker/docker"
 
 if [ "$DOCKER_VERSIONS" == "" ]; then
   DOCKER_VERSIONS="$($get_versions default)"

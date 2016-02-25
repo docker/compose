@@ -9,7 +9,7 @@ mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist
 
 $VENV/bin/pip install -q -r requirements-build.txt
-./script/write-git-sha
+./script/build/write-git-sha
 su -c "$VENV/bin/pyinstaller docker-compose.spec" user
 mv dist/docker-compose $TARGET
 $TARGET version

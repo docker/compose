@@ -7,7 +7,7 @@ set -ex
 TAG="docker-compose"
 docker build -t "$TAG" . | tail -n 200
 docker run \
-    --rm --entrypoint="script/build-linux-inner" \
+    --rm --entrypoint="script/build/linux-entrypoint" \
     -v $(pwd)/dist:/code/dist \
     -v $(pwd)/.git:/code/.git \
     "$TAG"

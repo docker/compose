@@ -65,10 +65,10 @@ git config "branch.${BRANCH}.release" $VERSION
 
 editor=${EDITOR:-vim}
 
-echo "Update versions in docs/install.md, compose/__init__.py, script/run.sh"
+echo "Update versions in docs/install.md, compose/__init__.py, script/run/run.sh"
 $editor docs/install.md
 $editor compose/__init__.py
-$editor script/run.sh
+$editor script/run/run.sh
 
 
 echo "Write release notes in CHANGELOG.md"
