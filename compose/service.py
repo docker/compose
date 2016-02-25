@@ -657,6 +657,7 @@ class Service(object):
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
+            tmpfs=options.get('tmpfs'),
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):

@@ -76,6 +76,7 @@ DOCKER_CONFIG_KEYS = [
     'shm_size',
     'stdin_open',
     'stop_signal',
+    'tmpfs',
     'tty',
     'user',
     'volume_driver',
@@ -589,6 +590,9 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
+    if 'tmpfs' in service_dict:
+        service_dict['tmpfs'] = to_list(service_dict['tmpfs'])
+
     for field in ['dns', 'dns_search']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
@@ -725,6 +729,7 @@ def merge_service_dicts(base, override, version):
         'external_links',
         'ports',
         'volumes_from',
+        'tmpfs',
     ]:
         md.merge_field(field, operator.add, default=[])
 
