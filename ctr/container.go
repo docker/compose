@@ -52,6 +52,7 @@ var containersCommand = cli.Command{
 		resumeCommand,
 		startCommand,
 		statsCommand,
+		watchCommand,
 	},
 	Action: listContainers,
 }
@@ -269,6 +270,44 @@ func attachStdio(s stdio) error {
 	}
 	go io.Copy(os.Stderr, stderrf)
 	return nil
+}
+
+var watchCommand = cli.Command{
+	Name:  "watch",
+	Usage: "print container events",
+	Action: func(context *cli.Context) {
+		c := getClient(context)
+		id := context.Args().First()
+		if id != "" {
+			resp, err := c.State(netcontext.Background(), &types.StateRequest{Id: id})
+			if err != nil {
+				fatal(err.Error(), 1)
+			}
+			for _, c := range resp.Containers {
+				if c.Id == id {
+					break
+				}
+			}
+			if id == "" {
+				fatal("Invalid container id", 1)
+			}
+		}
+		events, reqErr := c.Events(netcontext.Background(), &types.EventsRequest{})
+		if reqErr != nil {
+			fatal(reqErr.Error(), 1)
+		}
+
+		for {
+			e, err := events.Recv()
+			if err != nil {
+				fatal(err.Error(), 1)
+			}
+
+			if id == "" || e.Id == id {
+				fmt.Printf("%#v\n", e)
+			}
+		}
+	},
 }
 
 var pauseCommand = cli.Command{
