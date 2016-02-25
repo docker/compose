@@ -2,6 +2,11 @@
 
 set -ex
 
+# Only build the binary once per platform
+if [[ "$BUILD_BINARY" != "true" ]]; then
+    exit
+fi
+
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
     script/build-linux
     # TODO: requires auth to push, so disable for now
