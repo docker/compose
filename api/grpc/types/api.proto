@@ -132,6 +132,7 @@ message Container {
 	string status = 4; // Container status ("running", "paused", etc.)
     repeated string labels = 5;
     repeated uint32 pids = 6;
+    string runtime = 7; // runtime used to execute the container
 }
 
 // Machine is information about machine on which containerd is run

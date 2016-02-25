@@ -17,9 +17,19 @@ func (s *Supervisor) exit(t *ExitTask) error {
 	proc := t.Process
 	status, err := proc.ExitStatus()
 	if err != nil {
-		logrus.WithField("error", err).Error("containerd: get exit status")
+		logrus.WithFields(logrus.Fields{
+			"error":     err,
+			"pid":       proc.ID(),
+			"id":        proc.Container().ID(),
+			"systemPid": proc.SystemPid(),
+		}).Error("containerd: get exit status")
 	}
-	logrus.WithFields(logrus.Fields{"pid": proc.ID(), "status": status}).Debug("containerd: process exited")
+	logrus.WithFields(logrus.Fields{
+		"pid":       proc.ID(),
+		"status":    status,
+		"id":        proc.Container().ID(),
+		"systemPid": proc.SystemPid(),
+	}).Debug("containerd: process exited")
 
 	// if the process is the the init process of the container then
 	// fire a separate event for this process

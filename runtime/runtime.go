@@ -14,7 +14,9 @@ var (
 	ErrTerminalsNotSupported = errors.New("containerd: terminals are not supported for runtime")
 	ErrProcessNotExited      = errors.New("containerd: process has not exited")
 	ErrProcessExited         = errors.New("containerd: process has exited")
+	ErrContainerNotStarted   = errors.New("containerd: container not started")
 
+	errNoPidFile      = errors.New("containerd: no process pid file found")
 	errNotImplemented = errors.New("containerd: not implemented")
 )
 
@@ -30,15 +32,17 @@ type State string
 
 const (
 	Paused  = State("paused")
+	Stopped = State("stopped")
 	Running = State("running")
 )
 
 type state struct {
-	Bundle string   `json:"bundle"`
-	Labels []string `json:"labels"`
-	Stdin  string   `json:"stdin"`
-	Stdout string   `json:"stdout"`
-	Stderr string   `json:"stderr"`
+	Bundle  string   `json:"bundle"`
+	Labels  []string `json:"labels"`
+	Stdin   string   `json:"stdin"`
+	Stdout  string   `json:"stdout"`
+	Stderr  string   `json:"stderr"`
+	Runtime string   `json:"runtime"`
 }
 
 type ProcessState struct {

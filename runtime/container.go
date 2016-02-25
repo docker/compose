@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -42,6 +43,8 @@ type Container interface {
 	Pids() ([]int, error)
 	// Stats returns realtime container stats and resource information
 	Stats() (*Stat, error)
+	// Name or path of the OCI compliant runtime used to execute the container
+	Runtime() string
 	// OOM signals the channel if the container received an OOM notification
 	// OOM() (<-chan struct{}, error)
 }
@@ -68,13 +71,14 @@ func NewStdio(stdin, stdout, stderr string) Stdio {
 }
 
 // New returns a new container
-func New(root, id, bundle string, labels []string) (Container, error) {
+func New(root, id, bundle, runtimeName string, labels []string) (Container, error) {
 	c := &container{
 		root:      root,
 		id:        id,
 		bundle:    bundle,
 		labels:    labels,
 		processes: make(map[string]*process),
+		runtime:   runtimeName,
 	}
 	if err := os.Mkdir(filepath.Join(root, id), 0755); err != nil {
 		return nil, err
@@ -85,8 +89,9 @@ func New(root, id, bundle string, labels []string) (Container, error) {
 	}
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(state{
-		Bundle: bundle,
-		Labels: labels,
+		Bundle:  bundle,
+		Labels:  labels,
+		Runtime: runtimeName,
 	}); err != nil {
 		return nil, err
 	}
@@ -108,6 +113,7 @@ func Load(root, id string) (Container, error) {
 		id:        id,
 		bundle:    s.Bundle,
 		labels:    s.Labels,
+		runtime:   s.Runtime,
 		processes: make(map[string]*process),
 	}
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
@@ -151,6 +157,7 @@ type container struct {
 	root      string
 	id        string
 	bundle    string
+	runtime   string
 	processes map[string]*process
 	stdio     Stdio
 	labels    []string
@@ -182,6 +189,14 @@ func (c *container) readSpec() (*PlatformSpec, error) {
 }
 
 func (c *container) State() State {
+	proc := c.processes["init"]
+	if proc == nil || proc.pid == 0 {
+		return Stopped
+	}
+	err := syscall.Kill(proc.pid, 0)
+	if err != nil && err == syscall.ESRCH {
+		return Stopped
+	}
 	return Running
 }
 
