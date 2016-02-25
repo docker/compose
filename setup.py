@@ -30,7 +30,7 @@ def find_version(*file_paths):
 install_requires = [
     'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 0.7',
-    'PyYAML >= 3.10, < 4',
+    'ruamel.yaml >= 0.11, < 1',
     'requests >= 2.6.1, < 2.8',
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.32.0, < 1.0',

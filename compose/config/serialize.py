@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import ruamel.yaml
 import six
-import yaml
 
 from compose.config import types
 
@@ -12,8 +12,8 @@ def serialize_config_type(dumper, data):
     return representer(data.repr())
 
 
-yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
-yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
+ruamel.yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
+ruamel.yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
 
 
 def serialize_config(config):
@@ -23,7 +23,7 @@ def serialize_config(config):
         'networks': config.networks,
         'volumes': config.volumes,
     }
-    return yaml.safe_dump(
+    return ruamel.yaml.safe_dump(
         output,
         default_flow_style=False,
         indent=2,

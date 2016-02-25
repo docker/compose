@@ -8,6 +8,7 @@ import ssl
 import subprocess
 
 import docker
+import ruamel.yaml
 from six.moves import input
 
 import compose
@@ -68,13 +69,15 @@ def get_version_info(scope):
             "{}\n"
             "docker-py version: {}\n"
             "{} version: {}\n"
-            "OpenSSL version: {}"
+            "OpenSSL version: {}\n"
+            "ruamel.yaml version: {}"
         ).format(
             versioninfo,
             docker.version,
             platform.python_implementation(),
             platform.python_version(),
-            ssl.OPENSSL_VERSION)
+            ssl.OPENSSL_VERSION,
+            ruamel.yaml.__version__)
 
     raise ValueError("{} is not a valid version scope".format(scope))
 

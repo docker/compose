@@ -11,7 +11,7 @@ import time
 from collections import namedtuple
 from operator import attrgetter
 
-import yaml
+import ruamel.yaml
 from docker import errors
 
 from .. import mock
@@ -175,7 +175,7 @@ class CLITestCase(DockerClientTestCase):
         # assert there are no python objects encoded in the output
         assert '!!' not in result.stdout
 
-        output = yaml.load(result.stdout)
+        output = ruamel.yaml.load(result.stdout)
         expected = {
             'version': '2.0',
             'volumes': {'data': {'driver': 'local'}},
@@ -501,10 +501,12 @@ class CLITestCase(DockerClientTestCase):
             assert '{}:database'.format(db_container.name) in links
 
         # db and app joined the back network
-        assert sorted(back_network['Containers']) == sorted([db_container.id, app_container.id])
+        assert sorted(back_network['Containers']) == sorted([db_container.id,
+                                                             app_container.id])
 
         # web and app joined the front network
-        assert sorted(front_network['Containers']) == sorted([web_container.id, app_container.id])
+        assert sorted(front_network['Containers']) == sorted([web_container.id,
+                                                              app_container.id])
 
         # web can see app but not db
         assert self.lookup(web_container, "app")
@@ -528,7 +530,8 @@ class CLITestCase(DockerClientTestCase):
 
     @v2_only()
     def test_up_with_network_mode(self):
-        c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
+        c = self.client.create_container('busybox', 'top',
+                                         name='composetest_network_mode_container')
         self.addCleanup(self.client.remove_container, c, force=True)
         self.client.start(c)
         container_mode_source = 'container:{}'.format(c['Id'])
@@ -930,7 +933,8 @@ class CLITestCase(DockerClientTestCase):
     def test_run_service_with_explicitly_maped_ip_ports(self):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
-        self.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish', '127.0.0.1:30001:3001', 'simple'], None)
+        self.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish',
+                       '127.0.0.1:30001:3001', 'simple'], None)
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information
@@ -1245,7 +1249,8 @@ class CLITestCase(DockerClientTestCase):
             if index is None:
                 result = self.dispatch(['port', 'simple', str(number)])
             else:
-                result = self.dispatch(['port', '--index=' + str(index), 'simple', str(number)])
+                result = self.dispatch(['port', '--index=' + str(index),
+                                        'simple', str(number)])
             return result.stdout.rstrip()
 
         self.assertEqual(get_port(3000), containers[0].get_local_port(3000))
