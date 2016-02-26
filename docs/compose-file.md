@@ -95,13 +95,13 @@ specified.
 
 > **Note**: In the [version 1 file format](#version-1), `dockerfile` is
 > different in two ways:
->
-> -   It appears alongside `build`, not as a sub-option:
->
->         build: .
->         dockerfile: Dockerfile-alternate
-> -   Using `dockerfile` together with `image` is not allowed. Attempting to do
->     so results in an error.
+
+  * It appears alongside `build`, not as a sub-option:
+
+        build: .
+        dockerfile: Dockerfile-alternate
+
+  * Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
 #### args
 
