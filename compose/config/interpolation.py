@@ -66,17 +66,22 @@ class BlankDefaultDict(dict):
         self.missing_keys = []
 
     def __getitem__(self, key):
-        try:
-            return super(BlankDefaultDict, self).__getitem__(key)
-        except KeyError:
-            if key not in self.missing_keys:
-                log.warn(
-                    "The {} variable is not set. Defaulting to a blank string."
-                    .format(key)
-                )
-                self.missing_keys.append(key)
+        if key == "RANDOM":
+            from random import randint
+            rand = (randint(2, 9999))
+            return rand
+        else:
+            try:
+                return super(BlankDefaultDict, self).__getitem__(key)
+            except KeyError:
+                if key not in self.missing_keys:
+                    log.warn(
+                        "The {} variable is not set. Defaulting to a blank string."
+                        .format(key)
+                    )
+                    self.missing_keys.append(key)
 
-            return ""
+                return ""
 
 
 class InvalidInterpolation(Exception):
