@@ -1,3 +1,5 @@
+// +build !windows
+
 package supervisor
 
 import "github.com/docker/containerd/runtime"
