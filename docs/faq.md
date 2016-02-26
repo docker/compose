@@ -15,7 +15,7 @@ weight=90
 If you don’t see your question here, feel free to drop by `#docker-compose` on
 freenode IRC and ask the community.
 
-## Why do my services take 10 seconds to stop?
+## Why do my services take 10 seconds to recreate or stop?
 
 Compose stop attempts to stop a container by sending a `SIGTERM`. It then waits
 for a [default timeout of 10 seconds](./reference/stop.md).  After the timeout,
@@ -39,6 +39,12 @@ in your Dockerfile.
 
 * If you are able, modify the application that you're running to
 add an explicit signal handler for `SIGTERM`.
+
+* Set the `stop_signal` to a signal which the application knows how to handle:
+
+      web:
+        build: .
+        stop_signal: SIGINT
 
 * If you can't modify the application, wrap the application in a lightweight init
 system (like [s6](http://skarnet.org/software/s6/)) or a signal proxy (like
