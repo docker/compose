@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
+import pytest
 from docker.errors import APIError
 
 from .. import mock
@@ -15,6 +16,7 @@ from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
+from compose.service import BuildAction
 from compose.service import ContainerNetworkMode
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
@@ -427,7 +429,12 @@ class ServiceTest(unittest.TestCase):
             '{"stream": "Successfully built abcd"}',
         ]
 
-        service.create_container(do_build=True)
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            service.create_container(do_build=BuildAction.none)
+            assert mock_log.warn.called
+            _, args, _ = mock_log.warn.mock_calls[0]
+            assert 'was build because it was not found' in args[0]
+
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',
             dockerfile=None,
@@ -444,14 +451,37 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
 
-        service.create_container(do_build=False)
+        service.create_container(do_build=BuildAction.skip)
         self.assertFalse(self.mock_client.build.called)
 
     def test_create_container_no_build_but_needs_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = NoSuchImageError
-        with self.assertRaises(NeedsBuildError):
-            service.create_container(do_build=False)
+        with pytest.raises(NeedsBuildError):
+            service.create_container(do_build=BuildAction.skip)
+
+    def test_create_container_force_build(self):
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
+        self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
+        self.mock_client.build.return_value = [
+            '{"stream": "Successfully built abcd"}',
+        ]
+
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            service.create_container(do_build=BuildAction.force)
+
+        assert not mock_log.warn.called
+        self.mock_client.build.assert_called_once_with(
+            tag='default_foo',
+            dockerfile=None,
+            stream=True,
+            path='.',
+            pull=False,
+            forcerm=False,
+            nocache=False,
+            rm=True,
+            buildargs=None,
+        )
 
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [

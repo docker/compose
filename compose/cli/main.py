@@ -25,6 +25,7 @@ from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
+from ..service import BuildAction
 from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
@@ -249,14 +250,15 @@ class TopLevelCommand(DocoptCommand):
                                    image haven't changed. Incompatible with --no-recreate.
             --no-recreate          If containers already exist, don't recreate them.
                                    Incompatible with --force-recreate.
-            --no-build             Don't build an image, even if it's missing
+            --no-build             Don't build an image, even if it's missing.
+            --build                Build images before creating containers.
         """
         service_names = options['SERVICE']
 
         project.create(
             service_names=service_names,
             strategy=convergence_strategy_from_opts(options),
-            do_build=not options['--no-build']
+            do_build=build_action_from_opts(options),
         )
 
     def down(self, project, options):
@@ -699,7 +701,8 @@ class TopLevelCommand(DocoptCommand):
                                        Incompatible with --no-recreate.
             --no-recreate              If containers already exist, don't recreate them.
                                        Incompatible with --force-recreate.
-            --no-build                 Don't build an image, even if it's missing
+            --no-build                 Don't build an image, even if it's missing.
+            --build                    Build images before starting containers.
             --abort-on-container-exit  Stops all containers if any container was stopped.
                                        Incompatible with -d.
             -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
@@ -721,7 +724,7 @@ class TopLevelCommand(DocoptCommand):
                 service_names=service_names,
                 start_deps=start_deps,
                 strategy=convergence_strategy_from_opts(options),
-                do_build=not options['--no-build'],
+                do_build=build_action_from_opts(options),
                 timeout=timeout,
                 detached=detached)
 
@@ -773,6 +776,19 @@ def image_type_from_opt(flag, value):
         return ImageType[value]
     except KeyError:
         raise UserError("%s flag must be one of: all, local" % flag)
+
+
+def build_action_from_opts(options):
+    if options['--build'] and options['--no-build']:
+        raise UserError("--build and --no-build can not be combined.")
+
+    if options['--build']:
+        return BuildAction.force
+
+    if options['--no-build']:
+        return BuildAction.skip
+
+    return BuildAction.none
 
 
 def run_one_off_container(container_options, project, service, options):

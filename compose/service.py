@@ -104,6 +104,14 @@ class ImageType(enum.Enum):
     all = 2
 
 
+@enum.unique
+class BuildAction(enum.Enum):
+    """Enumeration for the possible build actions."""
+    none = 0
+    force = 1
+    skip = 2
+
+
 class Service(object):
     def __init__(
         self,
@@ -243,7 +251,7 @@ class Service(object):
 
     def create_container(self,
                          one_off=False,
-                         do_build=True,
+                         do_build=BuildAction.none,
                          previous_container=None,
                          number=None,
                          quiet=False,
@@ -266,20 +274,29 @@ class Service(object):
 
         return Container.create(self.client, **container_options)
 
-    def ensure_image_exists(self, do_build=True):
+    def ensure_image_exists(self, do_build=BuildAction.none):
+        if self.can_be_built() and do_build == BuildAction.force:
+            self.build()
+            return
+
         try:
             self.image()
             return
         except NoSuchImageError:
             pass
 
-        if self.can_be_built():
-            if do_build:
-                self.build()
-            else:
-                raise NeedsBuildError(self)
-        else:
+        if not self.can_be_built():
             self.pull()
+            return
+
+        if do_build == BuildAction.skip:
+            raise NeedsBuildError(self)
+
+        self.build()
+        log.warn(
+            "Image for service {} was build because it was not found. To "
+            "rebuild this image you must use the `build` command or the "
+            "--build flag.".format(self.name))
 
     def image(self):
         try:
@@ -343,7 +360,7 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 do_build=True,
+                                 do_build=BuildAction.none,
                                  timeout=DEFAULT_TIMEOUT,
                                  detached=False,
                                  start=True):
@@ -392,7 +409,7 @@ class Service(object):
     def recreate_container(
             self,
             container,
-            do_build=False,
+            do_build=BuildAction.none,
             timeout=DEFAULT_TIMEOUT,
             attach_logs=False,
             start_new_container=True):
