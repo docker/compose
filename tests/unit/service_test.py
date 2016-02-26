@@ -433,7 +433,7 @@ class ServiceTest(unittest.TestCase):
             service.create_container(do_build=BuildAction.none)
             assert mock_log.warn.called
             _, args, _ = mock_log.warn.mock_calls[0]
-            assert 'was build because it was not found' in args[0]
+            assert 'was built because it did not already exist' in args[0]
 
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',

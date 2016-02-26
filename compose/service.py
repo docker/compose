@@ -294,9 +294,9 @@ class Service(object):
 
         self.build()
         log.warn(
-            "Image for service {} was build because it was not found. To "
-            "rebuild this image you must use the `build` command or the "
-            "--build flag.".format(self.name))
+            "Image for service {} was built because it did not already exist. To "
+            "rebuild this image you must use `docker-compose build` or "
+            "`docker-compose up --build`.".format(self.name))
 
     def image(self):
         try:
