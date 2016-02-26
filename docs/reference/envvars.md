@@ -27,10 +27,15 @@ defaults to the `basename` of the project directory. See also the `-p`
 
 ## COMPOSE\_FILE
 
-Specify the file containing the compose configuration. If not provided,
-Compose looks for a file named  `docker-compose.yml` in the current directory
-and then each parent directory in succession until a file by that name is
-found. See also the `-f` [command-line option](overview.md).
+Specify the path to a Compose file. If not provided, Compose looks for a file named
+`docker-compose.yml` in the current directory and then each parent directory in
+succession until a file by that name is found.
+
+This variable supports multiple compose files separate by a path separator (on
+Linux and OSX the path separator is `:`, on Windows it is `;`). For example:
+`COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`
+
+See also the `-f` [command-line option](overview.md).
 
 ## COMPOSE\_API\_VERSION
 
