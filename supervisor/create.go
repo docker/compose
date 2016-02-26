@@ -8,13 +8,13 @@ import (
 
 type StartTask struct {
 	baseTask
+	platformStartTask
 	ID            string
 	BundlePath    string
 	Stdout        string
 	Stderr        string
 	Stdin         string
 	StartResponse chan StartResponse
-	Checkpoint    *runtime.Checkpoint
 	Labels        []string
 }
 
@@ -36,9 +36,8 @@ func (s *Supervisor) start(t *StartTask) error {
 		Stdout:        t.Stdout,
 		Stderr:        t.Stderr,
 	}
-	if t.Checkpoint != nil {
-		task.Checkpoint = t.Checkpoint.Name
-	}
+	task.setTaskCheckpoint(t)
+
 	s.startTasks <- task
 	ContainerCreateTimer.UpdateSince(start)
 	return errDeferedResponse
