@@ -78,9 +78,11 @@ def main():
         sys.exit(1)
     except ReadTimeout as e:
         log.error(
-            "An HTTP request took too long to complete. Retry with --verbose to obtain debug information.\n"
-            "If you encounter this issue regularly because of slow network conditions, consider setting "
-            "COMPOSE_HTTP_TIMEOUT to a higher value (current value: %s)." % HTTP_TIMEOUT
+            "An HTTP request took too long to complete. Retry with --verbose to "
+            "obtain debug information.\n"
+            "If you encounter this issue regularly because of slow network "
+            "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
+            "value (current value: %s)." % HTTP_TIMEOUT
         )
         sys.exit(1)
 

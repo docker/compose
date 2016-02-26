@@ -930,7 +930,12 @@ class CLITestCase(DockerClientTestCase):
     def test_run_service_with_explicitly_maped_ip_ports(self):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
-        self.dispatch(['run', '-d', '-p', '127.0.0.1:30000:3000', '--publish', '127.0.0.1:30001:3001', 'simple'], None)
+        self.dispatch([
+            'run', '-d',
+            '-p', '127.0.0.1:30000:3000',
+            '--publish', '127.0.0.1:30001:3001',
+            'simple'
+        ])
         container = self.project.get_service('simple').containers(one_off=True)[0]
 
         # get port information

@@ -1649,24 +1649,42 @@ class VolumeConfigTest(unittest.TestCase):
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     def test_relative_path_does_expand_posix(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['./data:/data']},
+            working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/myproject/data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['.:/data']},
+            working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['../otherproject:/data']},
+            working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/otherproject:/data'])
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
     def test_relative_path_does_expand_windows(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['./data:/data']},
+            working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject\\data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['.:/data']},
+            working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['../otherproject:/data']},
+            working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\otherproject:/data'])
 
     @mock.patch.dict(os.environ)
@@ -2550,14 +2568,11 @@ class VolumePathTest(unittest.TestCase):
 
     @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_split_path_mapping_with_windows_path(self):
-        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:/opt/connect/config:ro"
-        expected_mapping = (
-            "/opt/connect/config:ro",
-            "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
-        )
+        host_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
+        windows_volume_path = host_path + ":/opt/connect/config:ro"
+        expected_mapping = ("/opt/connect/config:ro", host_path)
 
         mapping = config.split_path_mapping(windows_volume_path)
-
         self.assertEqual(mapping, expected_mapping)
 
 

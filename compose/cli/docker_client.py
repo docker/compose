@@ -20,14 +20,16 @@ def docker_client(version=None):
     according to the same logic as the official Docker client.
     """
     if 'DOCKER_CLIENT_TIMEOUT' in os.environ:
-        log.warn('The DOCKER_CLIENT_TIMEOUT environment variable is deprecated. Please use COMPOSE_HTTP_TIMEOUT instead.')
+        log.warn("The DOCKER_CLIENT_TIMEOUT environment variable is deprecated.  "
+                 "Please use COMPOSE_HTTP_TIMEOUT instead.")
 
     try:
         kwargs = kwargs_from_env(assert_hostname=False)
     except TLSParameterError:
         raise UserError(
-            'TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY and DOCKER_CERT_PATH are set correctly.\n'
-            'You might need to run `eval "$(docker-machine env default)"`')
+            "TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY "
+            "and DOCKER_CERT_PATH are set correctly.\n"
+            "You might need to run `eval \"$(docker-machine env default)\"`")
 
     if version:
         kwargs['version'] = version
