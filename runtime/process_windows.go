@@ -17,3 +17,13 @@ func getControlPipe(path string) (*os.File, error) {
 func (p *process) Signal(s os.Signal) error {
 	return nil
 }
+
+func populateProcessStateForEncoding(config *processConfig, uid int, gid int) ProcessState {
+	return ProcessState{
+		ProcessSpec: config.processSpec,
+		Exec:        config.exec,
+		Stdin:       config.stdio.Stdin,
+		Stdout:      config.stdio.Stdout,
+		Stderr:      config.stdio.Stderr,
+	}
+}

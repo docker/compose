@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/docker/containerd/runtime"
-	"github.com/opencontainers/specs"
 )
 
 type AddProcessTask struct {
@@ -14,7 +13,7 @@ type AddProcessTask struct {
 	Stdout        string
 	Stderr        string
 	Stdin         string
-	ProcessSpec   *specs.Process
+	ProcessSpec   *runtime.ProcessSpec
 	StartResponse chan StartResponse
 }
 

@@ -78,7 +78,7 @@ func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.
 }
 
 func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) (*types.AddProcessResponse, error) {
-	process := &specs.Process{
+	process := &runtime.ProcessSpec{
 		Terminal: r.Terminal,
 		Args:     r.Args,
 		Env:      r.Env,

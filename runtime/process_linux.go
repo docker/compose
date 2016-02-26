@@ -25,3 +25,18 @@ func getControlPipe(path string) (*os.File, error) {
 func (p *process) Signal(s os.Signal) error {
 	return syscall.Kill(p.pid, s.(syscall.Signal))
 }
+
+func populateProcessStateForEncoding(config *processConfig, uid int, gid int) ProcessState {
+	return ProcessState{
+		ProcessSpec: config.processSpec,
+		Exec:        config.exec,
+		PlatformProcessState: PlatformProcessState{
+			Checkpoint: config.checkpoint,
+			RootUID:    uid,
+			RootGID:    gid,
+		},
+		Stdin:  config.stdio.Stdin,
+		Stdout: config.stdio.Stdout,
+		Stderr: config.stdio.Stderr,
+	}
+}
