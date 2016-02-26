@@ -4,10 +4,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
@@ -92,22 +90,6 @@ func main() {
 	}
 }
 
-func checkLimits() error {
-	var l syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &l); err != nil {
-		return err
-	}
-	if l.Cur <= minRlimit {
-		logrus.WithFields(logrus.Fields{
-			"current": l.Cur,
-			"max":     l.Max,
-		}).Warn("containerd: low RLIMIT_NOFILE changing to max")
-		l.Cur = l.Max
-		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
-	}
-	return nil
-}
-
 func debugMetrics(interval time.Duration, graphiteAddr string) error {
 	for name, m := range supervisor.Metrics() {
 		if err := metrics.DefaultRegistry.Register(name, m); err != nil {
@@ -189,19 +171,6 @@ func daemon(address, stateDir string, concurrency int, oom bool) error {
 	types.RegisterAPIServer(s, server.NewServer(sv))
 	logrus.Debugf("containerd: grpc api on %s", address)
 	return s.Serve(l)
-}
-
-func reapProcesses() {
-	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGCHLD)
-	if err := osutils.SetSubreaper(1); err != nil {
-		logrus.WithField("error", err).Error("containerd: set subpreaper")
-	}
-	for range s {
-		if _, err := osutils.Reap(); err != nil {
-			logrus.WithField("error", err).Error("containerd: reap child processes")
-		}
-	}
 }
 
 // getDefaultID returns the hostname for the instance host
