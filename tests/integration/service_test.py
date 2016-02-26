@@ -782,7 +782,7 @@ class ServiceTest(DockerClientTestCase):
         results in warning output.
         """
         service = self.create_service('app', container_name='custom-container')
-        self.assertEqual(service.custom_container_name(), 'custom-container')
+        self.assertEqual(service.custom_container_name, 'custom-container')
 
         service.scale(3)
 
@@ -963,7 +963,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_custom_container_name(self):
         service = self.create_service('web', container_name='my-web-container')
-        self.assertEqual(service.custom_container_name(), 'my-web-container')
+        self.assertEqual(service.custom_container_name, 'my-web-container')
 
         container = create_and_start_container(service)
         self.assertEqual(container.name, 'my-web-container')
