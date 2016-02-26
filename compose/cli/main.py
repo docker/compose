@@ -483,48 +483,18 @@ class TopLevelCommand(DocoptCommand):
                 "Please pass the -d flag when using `docker-compose run`."
             )
 
-        if options['COMMAND']:
-            command = [options['COMMAND']] + options['ARGS']
-        else:
-            command = service.options.get('command')
-
-        container_options = {
-            'command': command,
-            'tty': not (detach or options['-T'] or not sys.stdin.isatty()),
-            'stdin_open': not detach,
-            'detach': detach,
-        }
-
-        if options['-e']:
-            container_options['environment'] = parse_environment(options['-e'])
-
-        if options['--entrypoint']:
-            container_options['entrypoint'] = options.get('--entrypoint')
-
-        if options['--rm']:
-            container_options['restart'] = None
-
-        if options['--user']:
-            container_options['user'] = options.get('--user')
-
-        if not options['--service-ports']:
-            container_options['ports'] = []
-
-        if options['--publish']:
-            container_options['ports'] = options.get('--publish')
-
         if options['--publish'] and options['--service-ports']:
             raise UserError(
                 'Service port mapping and manual port mapping '
                 'can not be used togather'
             )
 
-        if options['--name']:
-            container_options['name'] = options['--name']
+        if options['COMMAND']:
+            command = [options['COMMAND']] + options['ARGS']
+        else:
+            command = service.options.get('command')
 
-        if options['--workdir']:
-            container_options['working_dir'] = options['--workdir']
-
+        container_options = build_container_options(options, detach, command)
         run_one_off_container(container_options, project, service, options)
 
     def scale(self, project, options):
@@ -703,6 +673,41 @@ def image_type_from_opt(flag, value):
         return ImageType[value]
     except KeyError:
         raise UserError("%s flag must be one of: all, local" % flag)
+
+
+def build_container_options(options, detach, command):
+    container_options = {
+        'command': command,
+        'tty': not (detach or options['-T'] or not sys.stdin.isatty()),
+        'stdin_open': not detach,
+        'detach': detach,
+    }
+
+    if options['-e']:
+        container_options['environment'] = parse_environment(options['-e'])
+
+    if options['--entrypoint']:
+        container_options['entrypoint'] = options.get('--entrypoint')
+
+    if options['--rm']:
+        container_options['restart'] = None
+
+    if options['--user']:
+        container_options['user'] = options.get('--user')
+
+    if not options['--service-ports']:
+        container_options['ports'] = []
+
+    if options['--publish']:
+        container_options['ports'] = options.get('--publish')
+
+    if options['--name']:
+        container_options['name'] = options['--name']
+
+    if options['--workdir']:
+        container_options['working_dir'] = options['--workdir']
+
+    return container_options
 
 
 def run_one_off_container(container_options, project, service, options):
