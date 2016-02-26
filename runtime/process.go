@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-
-	"github.com/opencontainers/specs"
 )
 
 type Process interface {
@@ -28,7 +26,7 @@ type Process interface {
 	// has not exited
 	ExitStatus() (int, error)
 	// Spec returns the process spec that created the process
-	Spec() specs.Process
+	Spec() ProcessSpec
 	// Signal sends the provided signal to the process
 	Signal(os.Signal) error
 	// Container returns the container that the process belongs to
@@ -42,8 +40,8 @@ type Process interface {
 type processConfig struct {
 	id          string
 	root        string
-	processSpec specs.Process
-	spec        *platformSpec
+	processSpec ProcessSpec
+	spec        *PlatformSpec
 	c           *container
 	stdio       Stdio
 	exec        bool
@@ -67,16 +65,9 @@ func newProcess(config *processConfig) (*process, error) {
 		return nil, err
 	}
 	defer f.Close()
-	if err := json.NewEncoder(f).Encode(ProcessState{
-		Process:    config.processSpec,
-		Exec:       config.exec,
-		Checkpoint: config.checkpoint,
-		RootUID:    uid,
-		RootGID:    gid,
-		Stdin:      config.stdio.Stdin,
-		Stdout:     config.stdio.Stdout,
-		Stderr:     config.stdio.Stderr,
-	}); err != nil {
+
+	ps := populateProcessStateForEncoding(config, uid, gid)
+	if err := json.NewEncoder(f).Encode(ps); err != nil {
 		return nil, err
 	}
 	exit, err := getExitPipe(filepath.Join(config.root, ExitFile))
@@ -97,7 +88,7 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 		root:      root,
 		id:        id,
 		container: c,
-		spec:      s.Process,
+		spec:      s.ProcessSpec,
 		stdio: Stdio{
 			Stdin:  s.Stdin,
 			Stdout: s.Stdout,
@@ -128,7 +119,7 @@ type process struct {
 	exitPipe    *os.File
 	controlPipe *os.File
 	container   *container
-	spec        specs.Process
+	spec        ProcessSpec
 	stdio       Stdio
 }
 
@@ -173,7 +164,7 @@ func (p *process) ExitStatus() (int, error) {
 	return strconv.Atoi(string(data))
 }
 
-func (p *process) Spec() specs.Process {
+func (p *process) Spec() ProcessSpec {
 	return p.spec
 }
 

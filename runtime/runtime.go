@@ -3,8 +3,6 @@ package runtime
 import (
 	"errors"
 	"time"
-
-	"github.com/opencontainers/specs"
 )
 
 var (
@@ -44,14 +42,13 @@ type state struct {
 }
 
 type ProcessState struct {
-	specs.Process
-	Exec       bool   `json:"exec"`
-	Checkpoint string `json:"checkpoint"`
-	RootUID    int    `json:"rootUID"`
-	RootGID    int    `json:"rootGID"`
-	Stdin      string `json:"containerdStdin"`
-	Stdout     string `json:"containerdStdout"`
-	Stderr     string `json:"containerdStderr"`
+	ProcessSpec
+	Exec   bool   `json:"exec"`
+	Stdin  string `json:"containerdStdin"`
+	Stdout string `json:"containerdStdout"`
+	Stderr string `json:"containerdStderr"`
+
+	PlatformProcessState
 }
 
 type Stat struct {
@@ -62,19 +59,4 @@ type Stat struct {
 	// we will have or what the structure should look like at the moment os the containers
 	// can return what they want and we could marshal to json or whatever.
 	Data interface{}
-}
-
-type Checkpoint struct {
-	// Timestamp is the time that checkpoint happened
-	Created time.Time `json:"created"`
-	// Name is the name of the checkpoint
-	Name string `json:"name"`
-	// Tcp checkpoints open tcp connections
-	Tcp bool `json:"tcp"`
-	// UnixSockets persists unix sockets in the checkpoint
-	UnixSockets bool `json:"unixSockets"`
-	// Shell persists tty sessions in the checkpoint
-	Shell bool `json:"shell"`
-	// Exit exits the container after the checkpoint is finished
-	Exit bool `json:"exit"`
 }
