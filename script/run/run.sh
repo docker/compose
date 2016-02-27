@@ -34,10 +34,22 @@ fi
 if [ "$(pwd)" != '/' ]; then
     VOLUMES="-v $(pwd):$(pwd)"
 fi
+ARGS="$@"
+while (( $# > 0 )); do
+    if [[ "$1" =~ ^-f || "$1" =~ ^--file ]]; then
+        if [[ "$1" =~ = ]]; then
+            COMPOSE_FILE="${1#*=}"
+        else
+            COMPOSE_FILE="$2"
+        fi
+        break
+    fi
+    shift
+done
+set -- "$ARGS"
 if [ -n "$COMPOSE_FILE" ]; then
     compose_dir=$(dirname $COMPOSE_FILE)
 fi
-# TODO: also check --file argument
 if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
 fi
