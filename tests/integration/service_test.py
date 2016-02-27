@@ -735,7 +735,7 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
-        self.assertIn("ERROR: for 2  Boom", mock_stderr.getvalue())
+        self.assertIn("ERROR: for composetest_web_2  Boom", mock_stderr.getvalue())
 
     def test_scale_with_unexpected_exception(self):
         """Test that when scaling if the API returns an error, that is not of type
