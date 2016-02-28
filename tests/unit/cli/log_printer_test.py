@@ -39,7 +39,7 @@ def mock_container():
 class TestLogPrinter(object):
 
     def test_single_container(self, output_stream, mock_container):
-        LogPrinter([mock_container], output=output_stream, follow=True).run()
+        LogPrinter([mock_container], output=output_stream, log_args={'follow': True}).run()
 
         output = output_stream.getvalue()
         assert 'hello' in output
@@ -48,7 +48,7 @@ class TestLogPrinter(object):
         assert output_stream.flush.call_count == 3
 
     def test_single_container_without_stream(self, output_stream, mock_container):
-        LogPrinter([mock_container], output=output_stream, follow=False).run()
+        LogPrinter([mock_container], output=output_stream).run()
 
         output = output_stream.getvalue()
         assert 'hello' in output

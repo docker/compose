@@ -18,17 +18,13 @@ class LogPrinter(object):
                  output=sys.stdout,
                  monochrome=False,
                  cascade_stop=False,
-                 follow=False,
-                 timestamps=False,
-                 tail="all"):
-
+                 log_args=None):
+        log_args = log_args or {}
         self.containers = containers
         self.output = utils.get_output_stream(output)
         self.monochrome = monochrome
         self.cascade_stop = cascade_stop
-        self.follow = follow
-        self.timestamps = timestamps
-        self.tail = tail
+        self.log_args = log_args
 
     def run(self):
         if not self.containers:
@@ -52,7 +48,7 @@ class LogPrinter(object):
         for color_func, container in zip(color_funcs, self.containers):
             generator_func = get_log_generator(container)
             prefix = color_func(build_log_prefix(container, prefix_width))
-            yield generator_func(container, prefix, color_func, self.follow, self.timestamps, self.tail)
+            yield generator_func(container, prefix, color_func, self.log_args)
 
 
 def build_log_prefix(container, prefix_width):
@@ -75,30 +71,29 @@ def get_log_generator(container):
     return build_no_log_generator
 
 
-def build_no_log_generator(container, prefix, color_func, follow, timestamps, tail):
+def build_no_log_generator(container, prefix, color_func, log_args):
     """Return a generator that prints a warning about logs and waits for
     container to exit.
     """
     yield "{} WARNING: no logs are available with the '{}' log driver\n".format(
         prefix,
         container.log_driver)
-    if follow:
+    if log_args.get('follow'):
         yield color_func(wait_on_exit(container))
 
 
-def build_log_generator(container, prefix, color_func, follow, timestamps, tail):
+def build_log_generator(container, prefix, color_func, log_args):
     # if the container doesn't have a log_stream we need to attach to container
     # before log printer starts running
     if container.log_stream is None:
-        stream = container.logs(stdout=True, stderr=True, stream=True,
-                                follow=follow, timestamps=timestamps, tail=tail)
+        stream = container.logs(stdout=True, stderr=True, stream=True, **log_args)
         line_generator = split_buffer(stream)
     else:
         line_generator = split_buffer(container.log_stream)
 
     for line in line_generator:
         yield prefix + line
-    if follow:
+    if log_args.get('follow'):
         yield color_func(wait_on_exit(container))
 
 
