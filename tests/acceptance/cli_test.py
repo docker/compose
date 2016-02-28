@@ -1171,6 +1171,14 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertRegexpMatches(result.stdout, '(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})')
 
+    def test_logs_tail(self):
+        self.base_dir = 'tests/fixtures/logs-tail-composefile'
+        self.dispatch(['up'], None)
+
+        result = self.dispatch(['logs', '--tail', '2'], None)
+
+        assert result.stdout.count('\n') == 3
+
     def test_kill(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')

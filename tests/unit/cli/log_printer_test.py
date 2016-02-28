@@ -47,7 +47,7 @@ class TestLogPrinter(object):
         # Call count is 2 lines + "container exited line"
         assert output_stream.flush.call_count == 3
 
-    def test_single_container_without_follow(self, output_stream, mock_container):
+    def test_single_container_without_stream(self, output_stream, mock_container):
         LogPrinter([mock_container], output=output_stream, follow=False).run()
 
         output = output_stream.getvalue()

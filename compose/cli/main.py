@@ -329,16 +329,24 @@ class TopLevelCommand(DocoptCommand):
 
         Options:
             --no-color          Produce monochrome output.
-            -f, --follow        Follow log output
-            -t, --timestamps    Show timestamps
+            -f, --follow        Follow log output.
+            -t, --timestamps    Show timestamps.
+            --tail="all"        Number of lines to show from the end of the logs
+                                for each container.
         """
         containers = project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
         follow = options['--follow']
         timestamps = options['--timestamps']
+        tail = options['--tail']
+        if tail is not None:
+            if tail.isdigit():
+                tail = int(tail)
+            elif tail != 'all':
+                raise UserError("tail flag must be all or a number")
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, monochrome=monochrome, follow=follow, timestamps=timestamps).run()
+        LogPrinter(containers, monochrome=monochrome, follow=follow, timestamps=timestamps, tail=tail).run()
 
     def pause(self, project, options):
         """
