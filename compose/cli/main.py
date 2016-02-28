@@ -328,15 +328,17 @@ class TopLevelCommand(DocoptCommand):
         Usage: logs [options] [SERVICE...]
 
         Options:
-            --no-color      Produce monochrome output.
-            -f, --follow    Follow log output
+            --no-color          Produce monochrome output.
+            -f, --follow        Follow log output
+            -t, --timestamps    Show timestamps
         """
         containers = project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
         follow = options['--follow']
+        timestamps = options['--timestamps']
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, monochrome=monochrome, follow=follow).run()
+        LogPrinter(containers, monochrome=monochrome, follow=follow, timestamps=timestamps).run()
 
     def pause(self, project, options):
         """

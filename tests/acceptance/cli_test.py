@@ -1163,6 +1163,14 @@ class CLITestCase(DockerClientTestCase):
         assert result.stdout.count('\n') >= 1
         assert 'exited with code 0' not in result.stdout
 
+    def test_logs_timestamps(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        self.dispatch(['up', '-d'], None)
+
+        result = self.dispatch(['logs', '-f', '-t'], None)
+
+        self.assertRegexpMatches(result.stdout, '(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})')
+
     def test_kill(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')

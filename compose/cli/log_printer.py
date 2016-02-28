@@ -13,13 +13,19 @@ from compose.utils import split_buffer
 class LogPrinter(object):
     """Print logs from many containers to a single output stream."""
 
-    def __init__(self, containers, output=sys.stdout, monochrome=False,
-                 cascade_stop=False, follow=False):
+    def __init__(self,
+                 containers,
+                 output=sys.stdout,
+                 monochrome=False,
+                 cascade_stop=False,
+                 follow=False,
+                 timestamps=False):
         self.containers = containers
         self.output = utils.get_output_stream(output)
         self.monochrome = monochrome
         self.cascade_stop = cascade_stop
         self.follow = follow
+        self.timestamps = timestamps
 
     def run(self):
         if not self.containers:
@@ -43,7 +49,7 @@ class LogPrinter(object):
         for color_func, container in zip(color_funcs, self.containers):
             generator_func = get_log_generator(container)
             prefix = color_func(build_log_prefix(container, prefix_width))
-            yield generator_func(container, prefix, color_func, self.follow)
+            yield generator_func(container, prefix, color_func, self.follow, self.timestamps)
 
 
 def build_log_prefix(container, prefix_width):
@@ -66,7 +72,7 @@ def get_log_generator(container):
     return build_no_log_generator
 
 
-def build_no_log_generator(container, prefix, color_func, follow):
+def build_no_log_generator(container, prefix, color_func, follow, timestamps):
     """Return a generator that prints a warning about logs and waits for
     container to exit.
     """
@@ -77,12 +83,12 @@ def build_no_log_generator(container, prefix, color_func, follow):
         yield color_func(wait_on_exit(container))
 
 
-def build_log_generator(container, prefix, color_func, follow):
+def build_log_generator(container, prefix, color_func, follow, timestamps):
     # if the container doesn't have a log_stream we need to attach to container
     # before log printer starts running
     if container.log_stream is None:
         stream = container.logs(stdout=True, stderr=True, stream=True,
-                                follow=follow)
+                                follow=follow, timestamps=timestamps)
         line_generator = split_buffer(stream)
     else:
         line_generator = split_buffer(container.log_stream)

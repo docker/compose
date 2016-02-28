@@ -15,8 +15,9 @@ parent = "smn_compose_cli"
 Usage: logs [options] [SERVICE...]
 
 Options:
---no-color  Produce monochrome output.
--f, --follow    Follow log output
+--no-color          Produce monochrome output.
+-f, --follow        Follow log output
+-t, --timestamps    Show timestamps
 ```
 
 Displays log output from services.
