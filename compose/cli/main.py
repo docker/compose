@@ -43,7 +43,7 @@ from .utils import yesno
 
 
 if not IS_WINDOWS_PLATFORM:
-    from dockerpty.pty import PseudoTerminal, RunOperation
+    from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
@@ -152,6 +152,7 @@ class TopLevelCommand(DocoptCommand):
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
       events             Receive real time events from containers
+      exec               Execute a command in a running container
       help               Get help on a command
       kill               Kill containers
       logs               View output from containers
@@ -297,6 +298,57 @@ class TopLevelCommand(DocoptCommand):
             formatter = json_format_event if options['--json'] else format_event
             print(formatter(event))
             sys.stdout.flush()
+
+    def exec_command(self, project, options):
+        """
+        Execute a command in a running container
+
+        Usage: exec [options] SERVICE COMMAND [ARGS...]
+
+        Options:
+            -d                Detached mode: Run command in the background.
+            --privileged      Give extended privileges to the process.
+            --user USER       Run the command as this user.
+            -T                Disable pseudo-tty allocation. By default `docker-compose exec`
+                              allocates a TTY.
+            --index=index     index of the container if there are multiple
+                              instances of a service [default: 1]
+        """
+        index = int(options.get('--index'))
+        service = project.get_service(options['SERVICE'])
+        try:
+            container = service.get_container(number=index)
+        except ValueError as e:
+            raise UserError(str(e))
+        command = [options['COMMAND']] + options['ARGS']
+        tty = not options["-T"]
+
+        create_exec_options = {
+            "privileged": options["--privileged"],
+            "user": options["--user"],
+            "tty": tty,
+            "stdin": tty,
+        }
+
+        exec_id = container.create_exec(command, **create_exec_options)
+
+        if options['-d']:
+            container.start_exec(exec_id, tty=tty)
+            return
+
+        signals.set_signal_handler_to_shutdown()
+        try:
+            operation = ExecOperation(
+                    project.client,
+                    exec_id,
+                    interactive=tty,
+            )
+            pty = PseudoTerminal(project.client, operation)
+            pty.start()
+        except signals.ShutdownException:
+            log.info("received shutdown exception: closing")
+        exit_code = project.client.exec_inspect(exec_id).get("ExitCode")
+        sys.exit(exit_code)
 
     def help(self, project, options):
         """
