@@ -3,6 +3,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import contextlib
+import functools
 import json
 import logging
 import re
@@ -33,7 +34,8 @@ from ..service import NeedsBuildError
 from .command import friendly_error_message
 from .command import get_config_path_from_options
 from .command import project_from_options
-from .docopt_command import DocoptCommand
+from .docopt_command import DocoptDispatcher
+from .docopt_command import get_handler
 from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import ConsoleWarningFormatter
@@ -52,18 +54,15 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 def main():
     setup_logging()
+    command = dispatch()
+
     try:
-        command = TopLevelCommand()
-        command.sys_dispatch()
+        command()
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
     except (UserError, NoSuchService, ConfigurationError) as e:
         log.error(e.msg)
-        sys.exit(1)
-    except NoSuchCommand as e:
-        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
-        log.error("No such command: %s\n\n%s", e.command, commands)
         sys.exit(1)
     except APIError as e:
         log_api_error(e)
@@ -86,6 +85,40 @@ def main():
             "value (current value: %s)." % HTTP_TIMEOUT
         )
         sys.exit(1)
+
+
+def dispatch():
+    dispatcher = DocoptDispatcher(
+        TopLevelCommand,
+        {'options_first': True, 'version': get_version_info('compose')})
+
+    try:
+        options, handler, command_options = dispatcher.parse(sys.argv[1:])
+    except NoSuchCommand as e:
+        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
+        log.error("No such command: %s\n\n%s", e.command, commands)
+        sys.exit(1)
+
+    setup_console_handler(console_handler, options.get('--verbose'))
+    return functools.partial(perform_command, options, handler, command_options)
+
+
+def perform_command(options, handler, command_options):
+    if options['COMMAND'] in ('help', 'version'):
+        # Skip looking up the compose file.
+        handler(command_options)
+        return
+
+    if options['COMMAND'] == 'config':
+        command = TopLevelCommand(None)
+        handler(command, options, command_options)
+        return
+
+    project = project_from_options('.', options)
+    command = TopLevelCommand(project)
+    with friendly_error_message():
+        # TODO: use self.project
+        handler(command, project, command_options)
 
 
 def log_api_error(e):
@@ -134,7 +167,7 @@ def parse_doc_section(name, source):
     return [s.strip() for s in pattern.findall(source)]
 
 
-class TopLevelCommand(DocoptCommand):
+class TopLevelCommand(object):
     """Define and run multi-container applications with Docker.
 
     Usage:
@@ -173,26 +206,8 @@ class TopLevelCommand(DocoptCommand):
     """
     base_dir = '.'
 
-    def docopt_options(self):
-        options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = get_version_info('compose')
-        return options
-
-    def perform_command(self, options, handler, command_options):
-        setup_console_handler(console_handler, options.get('--verbose'))
-
-        if options['COMMAND'] in ('help', 'version'):
-            # Skip looking up the compose file.
-            handler(None, command_options)
-            return
-
-        if options['COMMAND'] == 'config':
-            handler(options, command_options)
-            return
-
-        project = project_from_options(self.base_dir, options)
-        with friendly_error_message():
-            handler(project, command_options)
+    def __init__(self, project):
+        self.project = project
 
     def build(self, project, options):
         """
@@ -352,13 +367,14 @@ class TopLevelCommand(DocoptCommand):
         exit_code = project.client.exec_inspect(exec_id).get("ExitCode")
         sys.exit(exit_code)
 
-    def help(self, project, options):
+    @classmethod
+    def help(cls, options):
         """
         Get help on a command.
 
         Usage: help COMMAND
         """
-        handler = self.get_handler(options['COMMAND'])
+        handler = get_handler(cls, options['COMMAND'])
         raise SystemExit(getdoc(handler))
 
     def kill(self, project, options):
@@ -739,7 +755,8 @@ class TopLevelCommand(DocoptCommand):
                 print("Aborting on container exit...")
                 project.stop(service_names=service_names, timeout=timeout)
 
-    def version(self, project, options):
+    @classmethod
+    def version(cls, options):
         """
         Show version informations
 
