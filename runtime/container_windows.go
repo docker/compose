@@ -1,9 +1,18 @@
 package runtime
 
-import "errors"
+import (
+	"errors"
 
-func getRootIDs(s *PlatformSpec) (int, int, error) {
+	"github.com/docker/containerd/specs"
+)
+
+func getRootIDs(s *specs.PlatformSpec) (int, int, error) {
 	return 0, 0, nil
+}
+
+// TODO Windows: This will have a different implementation
+func (c *container) State() State {
+	return Running // HACK HACK HACK
 }
 
 func (c *container) Runtime() string {
@@ -38,7 +47,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 
 // TODO Windows: Implement me.
 // This will have a very different implementation on Windows.
-func (c *container) Exec(pid string, spec ProcessSpec, s Stdio) (Process, error) {
+func (c *container) Exec(pid string, spec specs.ProcessSpec, s Stdio) (Process, error) {
 	return nil, errors.New("Exec not yet implemented on Windows")
 }
 

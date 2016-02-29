@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/docker/containerd/specs"
 )
 
 type Process interface {
@@ -25,7 +27,7 @@ type Process interface {
 	// has not exited
 	ExitStatus() (int, error)
 	// Spec returns the process spec that created the process
-	Spec() ProcessSpec
+	Spec() specs.ProcessSpec
 	// Signal sends the provided signal to the process
 	Signal(os.Signal) error
 	// Container returns the container that the process belongs to
@@ -39,8 +41,8 @@ type Process interface {
 type processConfig struct {
 	id          string
 	root        string
-	processSpec ProcessSpec
-	spec        *PlatformSpec
+	processSpec specs.ProcessSpec
+	spec        *specs.PlatformSpec
 	c           *container
 	stdio       Stdio
 	exec        bool
@@ -118,7 +120,7 @@ type process struct {
 	exitPipe    *os.File
 	controlPipe *os.File
 	container   *container
-	spec        ProcessSpec
+	spec        specs.ProcessSpec
 	stdio       Stdio
 }
 
@@ -163,7 +165,7 @@ func (p *process) ExitStatus() (int, error) {
 	return strconv.Atoi(string(data))
 }
 
-func (p *process) Spec() ProcessSpec {
+func (p *process) Spec() specs.ProcessSpec {
 	return p.spec
 }
 

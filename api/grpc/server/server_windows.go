@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/docker/containerd/api/grpc/types"
-	"github.com/docker/containerd/runtime"
+	"github.com/docker/containerd/specs"
 	"github.com/docker/containerd/supervisor"
 	"golang.org/x/net/context"
 )
@@ -32,8 +32,8 @@ func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.St
 	return nil, errors.New("Stats() not supported on Windows")
 }
 
-func setUserFieldsInProcess(p *types.Process, oldProc runtime.ProcessSpec) {
+func setUserFieldsInProcess(p *types.Process, oldProc specs.ProcessSpec) {
 }
 
-func setPlatformRuntimeProcessSpecUserFields(r *types.User, process *runtime.ProcessSpec) {
+func setPlatformRuntimeProcessSpecUserFields(r *types.User, process *specs.ProcessSpec) {
 }

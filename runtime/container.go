@@ -5,9 +5,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/specs"
 )
 
 type Container interface {
@@ -18,7 +18,7 @@ type Container interface {
 	// Start starts the init process of the container
 	Start(checkpoint string, s Stdio) (Process, error)
 	// Exec starts another process in an existing container
-	Exec(string, ProcessSpec, Stdio) (Process, error)
+	Exec(string, specs.ProcessSpec, Stdio) (Process, error)
 	// Delete removes the container's state and any resources
 	Delete() error
 	// Processes returns all the containers processes that have been added
@@ -175,8 +175,8 @@ func (c *container) Labels() []string {
 	return c.labels
 }
 
-func (c *container) readSpec() (*PlatformSpec, error) {
-	var spec PlatformSpec
+func (c *container) readSpec() (*specs.PlatformSpec, error) {
+	var spec specs.PlatformSpec
 	f, err := os.Open(filepath.Join(c.bundle, "config.json"))
 	if err != nil {
 		return nil, err
@@ -186,18 +186,6 @@ func (c *container) readSpec() (*PlatformSpec, error) {
 		return nil, err
 	}
 	return &spec, nil
-}
-
-func (c *container) State() State {
-	proc := c.processes["init"]
-	if proc == nil || proc.pid == 0 {
-		return Stopped
-	}
-	err := syscall.Kill(proc.pid, 0)
-	if err != nil && err == syscall.ESRCH {
-		return Stopped
-	}
-	return Running
 }
 
 func (c *container) Delete() error {

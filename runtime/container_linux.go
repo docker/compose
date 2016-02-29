@@ -9,17 +9,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/containerd/specs"
 	"github.com/opencontainers/runc/libcontainer"
-	"github.com/opencontainers/specs"
+	ocs "github.com/opencontainers/specs"
 )
 
-func getRootIDs(s *PlatformSpec) (int, int, error) {
+func getRootIDs(s *specs.PlatformSpec) (int, int, error) {
 	if s == nil {
 		return 0, 0, nil
 	}
 	var hasUserns bool
 	for _, ns := range s.Linux.Namespaces {
-		if ns.Type == specs.UserNamespace {
+		if ns.Type == ocs.UserNamespace {
 			hasUserns = true
 			break
 		}
@@ -30,6 +31,18 @@ func getRootIDs(s *PlatformSpec) (int, int, error) {
 	uid := hostIDFromMap(0, s.Linux.UIDMappings)
 	gid := hostIDFromMap(0, s.Linux.GIDMappings)
 	return uid, gid, nil
+}
+
+func (c *container) State() State {
+	proc := c.processes["init"]
+	if proc == nil || proc.pid == 0 {
+		return Stopped
+	}
+	err := syscall.Kill(proc.pid, 0)
+	if err != nil && err == syscall.ESRCH {
+		return Stopped
+	}
+	return Running
 }
 
 func (c *container) Runtime() string {
@@ -136,7 +149,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 		c:           c,
 		stdio:       s,
 		spec:        spec,
-		processSpec: ProcessSpec(spec.Process),
+		processSpec: specs.ProcessSpec(spec.Process),
 	}
 	p, err := newProcess(config)
 	if err != nil {
@@ -152,7 +165,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	return p, nil
 }
 
-func (c *container) Exec(pid string, spec ProcessSpec, s Stdio) (Process, error) {
+func (c *container) Exec(pid string, spec specs.ProcessSpec, s Stdio) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, pid)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
@@ -187,14 +200,14 @@ func (c *container) Exec(pid string, spec ProcessSpec, s Stdio) (Process, error)
 }
 
 func (c *container) getLibctContainer() (libcontainer.Container, error) {
-	f, err := libcontainer.New(specs.LinuxStateDirectory, libcontainer.Cgroupfs)
+	f, err := libcontainer.New(ocs.LinuxStateDirectory, libcontainer.Cgroupfs)
 	if err != nil {
 		return nil, err
 	}
 	return f.Load(c.id)
 }
 
-func hostIDFromMap(id uint32, mp []specs.IDMapping) int {
+func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
 	for _, m := range mp {
 		if (id >= m.ContainerID) && (id <= (m.ContainerID + m.Size - 1)) {
 			return int(m.HostID + (id - m.ContainerID))

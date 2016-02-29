@@ -1,5 +1,13 @@
 package specs
 
+// Temporary Windows version of the spec in lieu of opencontainers/specs having
+// Windows support currently.
+
+type (
+	PlatformSpec WindowsSpec
+	ProcessSpec  Process
+)
+
 // This is a temporary module in lieu of opencontainers/specs being compatible
 // currently on Windows.
 
