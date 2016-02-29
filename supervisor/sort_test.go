@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd/runtime"
+	"github.com/docker/containerd/specs"
 )
 
 type testProcess struct {
@@ -44,8 +45,8 @@ func (p *testProcess) Container() runtime.Container {
 	return nil
 }
 
-func (p *testProcess) Spec() runtime.ProcessSpec {
-	return runtime.ProcessSpec{}
+func (p *testProcess) Spec() specs.ProcessSpec {
+	return specs.ProcessSpec{}
 }
 
 func (p *testProcess) Signal(os.Signal) error {

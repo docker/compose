@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
+	"github.com/docker/containerd/specs"
 	"github.com/docker/containerd/supervisor"
 	"golang.org/x/net/context"
 )
@@ -66,7 +67,7 @@ func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.
 }
 
 func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) (*types.AddProcessResponse, error) {
-	process := &runtime.ProcessSpec{
+	process := &specs.ProcessSpec{
 		Terminal: r.Terminal,
 		Args:     r.Args,
 		Env:      r.Env,

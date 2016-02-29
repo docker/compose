@@ -3,6 +3,8 @@ package runtime
 import (
 	"errors"
 	"time"
+
+	"github.com/docker/containerd/specs"
 )
 
 var (
@@ -46,7 +48,7 @@ type state struct {
 }
 
 type ProcessState struct {
-	ProcessSpec
+	specs.ProcessSpec
 	Exec   bool   `json:"exec"`
 	Stdin  string `json:"containerdStdin"`
 	Stdout string `json:"containerdStdout"`

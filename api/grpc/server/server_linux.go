@@ -10,11 +10,12 @@ import (
 
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
+	"github.com/docker/containerd/specs"
 	"github.com/docker/containerd/supervisor"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/system"
-	"github.com/opencontainers/specs"
+	ocs "github.com/opencontainers/specs"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -241,7 +242,7 @@ func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.St
 	return t, nil
 }
 
-func setUserFieldsInProcess(p *types.Process, oldProc runtime.ProcessSpec) {
+func setUserFieldsInProcess(p *types.Process, oldProc specs.ProcessSpec) {
 	p.User = &types.User{
 		Uid:            oldProc.User.UID,
 		Gid:            oldProc.User.GID,
@@ -249,8 +250,8 @@ func setUserFieldsInProcess(p *types.Process, oldProc runtime.ProcessSpec) {
 	}
 }
 
-func setPlatformRuntimeProcessSpecUserFields(r *types.User, process *runtime.ProcessSpec) {
-	process.User = specs.User{
+func setPlatformRuntimeProcessSpecUserFields(r *types.User, process *specs.ProcessSpec) {
+	process.User = ocs.User{
 		UID:            r.Uid,
 		GID:            r.Gid,
 		AdditionalGids: r.AdditionalGids,
