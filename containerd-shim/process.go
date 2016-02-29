@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,12 +26,14 @@ type process struct {
 	console      libcontainer.Console
 	consolePath  string
 	state        *runtime.ProcessState
+	runtime      string
 }
 
-func newProcess(id, bundle string) (*process, error) {
+func newProcess(id, bundle, runtimeName string) (*process, error) {
 	p := &process{
-		id:     id,
-		bundle: bundle,
+		id:      id,
+		bundle:  bundle,
+		runtime: runtimeName,
 	}
 	s, err := loadProcess()
 	if err != nil {
@@ -81,7 +84,7 @@ func (p *process) start() error {
 	if err != nil {
 		return err
 	}
-	args := []string{}
+	args := []string{"--log", runtimeLog}
 	if p.state.Exec {
 		args = append(args, "exec",
 			"--process", filepath.Join(cwd, "process.json"),
@@ -114,7 +117,7 @@ func (p *process) start() error {
 		"--pid-file", filepath.Join(cwd, "pid"),
 		p.id,
 	)
-	cmd := exec.Command("runc", args...)
+	cmd := exec.Command(p.runtime, args...)
 	cmd.Dir = p.bundle
 	cmd.Stdin = p.stdio.stdin
 	cmd.Stdout = p.stdio.stdout
@@ -146,7 +149,10 @@ func (p *process) pid() int {
 
 func (p *process) delete() error {
 	if !p.state.Exec {
-		return exec.Command("runc", "delete", p.id).Run()
+		out, err := exec.Command(p.runtime, "delete", p.id).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s: %v", out, err)
+		}
 	}
 	return nil
 }

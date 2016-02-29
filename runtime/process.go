@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 )
 
 type Process interface {
@@ -95,7 +94,7 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 			Stderr: s.Stderr,
 		},
 	}
-	if _, err := p.getPid(); err != nil {
+	if _, err := p.getPidFromFile(); err != nil {
 		return nil, err
 	}
 	if _, err := p.ExitStatus(); err != nil {
@@ -177,22 +176,15 @@ func (p *process) Close() error {
 	return p.exitPipe.Close()
 }
 
-func (p *process) getPid() (int, error) {
-	for i := 0; i < 20; i++ {
-		data, err := ioutil.ReadFile(filepath.Join(p.root, "pid"))
-		if err != nil {
-			if os.IsNotExist(err) {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			return -1, err
-		}
-		i, err := strconv.Atoi(string(data))
-		if err != nil {
-			return -1, err
-		}
-		p.pid = i
-		return i, nil
+func (p *process) getPidFromFile() (int, error) {
+	data, err := ioutil.ReadFile(filepath.Join(p.root, "pid"))
+	if err != nil {
+		return -1, err
 	}
-	return -1, fmt.Errorf("containerd: cannot read pid file")
+	i, err := strconv.Atoi(string(data))
+	if err != nil {
+		return -1, err
+	}
+	p.pid = i
+	return i, nil
 }

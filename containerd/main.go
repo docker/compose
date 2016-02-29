@@ -41,6 +41,11 @@ var daemonFlags = []cli.Flag{
 		Value: defaultGRPCEndpoint,
 		Usage: "Address on which GRPC API will listen",
 	},
+	cli.StringFlag{
+		Name:  "runtime,r",
+		Value: "runc",
+		Usage: "name of the OCI compliant runtime to use when executing containers",
+	},
 }
 
 func main() {
@@ -58,6 +63,7 @@ func main() {
 			context.String("state-dir"),
 			10,
 			context.Bool("oom-notify"), // TODO Windows: Remove oom-notify
+			context.String("runtime"),
 		); err != nil {
 			logrus.Fatal(err)
 		}
@@ -67,11 +73,11 @@ func main() {
 	}
 }
 
-func daemon(address, stateDir string, concurrency int, oom bool) error {
+func daemon(address, stateDir string, concurrency int, oom bool, runtimeName string) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	go reapProcesses()
-	sv, err := supervisor.New(stateDir, oom)
+	sv, err := supervisor.New(stateDir, oom, runtimeName)
 	if err != nil {
 		return err
 	}

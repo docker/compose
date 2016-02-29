@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 
@@ -20,7 +19,7 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, oom bool) (*Supervisor, error) {
+func New(stateDir string, oom bool, runtimeName string) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
@@ -41,6 +40,7 @@ func New(stateDir string, oom bool) (*Supervisor, error) {
 		subscribers: make(map[chan Event]struct{}),
 		tasks:       make(chan Task, defaultBufferSize),
 		monitor:     monitor,
+		runtime:     runtimeName,
 	}
 	if err := setupEventLog(s); err != nil {
 		return nil, err
@@ -116,7 +116,9 @@ func readEventLog(s *Supervisor) error {
 
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
-	stateDir   string
+	stateDir string
+	// name of the OCI compatible runtime used to execute containers
+	runtime    string
 	containers map[string]*containerInfo
 	startTasks chan *startTask
 	// we need a lock around the subscribers map only because additions and deletions from
@@ -207,7 +209,12 @@ func (s *Supervisor) notifySubscribers(e Event) {
 // therefore it is save to do operations in the handlers that modify state of the system or
 // state of the Supervisor
 func (s *Supervisor) Start() error {
-	logrus.WithField("stateDir", s.stateDir).Debug("containerd: supervisor running")
+	logrus.WithFields(logrus.Fields{
+		"stateDir": s.stateDir,
+		"runtime":  s.runtime,
+		"memory":   s.machine.Memory,
+		"cpus":     s.machine.Cpus,
+	}).Debug("containerd: supervisor running")
 	go func() {
 		for i := range s.tasks {
 			s.handleTask(i)
@@ -277,7 +284,7 @@ func (s *Supervisor) restore() error {
 		if len(exitedProcesses) > 0 {
 			// sort processes so that init is fired last because that is how the kernel sends the
 			// exit events
-			sort.Sort(&processSorter{exitedProcesses})
+			sortProcesses(exitedProcesses)
 			for _, p := range exitedProcesses {
 				e := &ExitTask{
 					Process: p,
@@ -287,20 +294,4 @@ func (s *Supervisor) restore() error {
 		}
 	}
 	return nil
-}
-
-type processSorter struct {
-	processes []runtime.Process
-}
-
-func (s *processSorter) Len() int {
-	return len(s.processes)
-}
-
-func (s *processSorter) Swap(i, j int) {
-	s.processes[i], s.processes[j] = s.processes[j], s.processes[i]
-}
-
-func (s *processSorter) Less(i, j int) bool {
-	return s.processes[j].ID() == "init"
 }

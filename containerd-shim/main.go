@@ -12,15 +12,18 @@ import (
 	"github.com/docker/docker/pkg/term"
 )
 
+var runtimeLog string
+
 func setupLogger() {
 	f, err := os.OpenFile("/tmp/shim.log", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
 		panic(err)
 	}
 	logrus.SetOutput(f)
+	runtimeLog = "/tmp/runtime.log"
 }
 
-// containerd-shim is a small shim that sits in front of a runc implementation
+// containerd-shim is a small shim that sits in front of a runtime implementation
 // that allows it to be repartented to init and handle reattach from the caller.
 //
 // the cwd of the shim should be the bundle for the container.  Arg1 should be the path
@@ -28,31 +31,43 @@ func setupLogger() {
 func main() {
 	flag.Parse()
 	// start handling signals as soon as possible so that things are properly reaped
-	// or if runc exits before we hit the handler
+	// or if runtime exits before we hit the handler
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals)
 	// set the shim as the subreaper for all orphaned processes created by the container
 	if err := osutils.SetSubreaper(1); err != nil {
-		logrus.WithField("error", err).Fatal("shim: set as subreaper")
+		logrus.WithField("error", err).Error("shim: set as subreaper")
+		return
 	}
 	// open the exit pipe
 	f, err := os.OpenFile("exit", syscall.O_WRONLY, 0)
 	if err != nil {
-		logrus.WithField("error", err).Fatal("shim: open exit pipe")
+		logrus.WithField("error", err).Error("shim: open exit pipe")
+		return
 	}
 	defer f.Close()
 	control, err := os.OpenFile("control", syscall.O_RDWR, 0)
 	if err != nil {
-		logrus.WithField("error", err).Fatal("shim: open control pipe")
+		logrus.WithField("error", err).Error("shim: open control pipe")
+		return
 	}
 	defer control.Close()
-	p, err := newProcess(flag.Arg(0), flag.Arg(1))
+	p, err := newProcess(flag.Arg(0), flag.Arg(1), flag.Arg(2))
 	if err != nil {
-		logrus.WithField("error", err).Fatal("shim: create new process")
+		logrus.WithField("error", err).Error("shim: create new process")
+		return
 	}
+	defer func() {
+		if err := p.Close(); err != nil {
+			logrus.WithField("error", err).Error("shim: close stdio")
+		}
+		if err := p.delete(); err != nil {
+			logrus.WithField("error", err).Error("shim: delete runtime state")
+		}
+	}()
 	if err := p.start(); err != nil {
-		p.delete()
-		logrus.WithField("error", err).Fatal("shim: start process")
+		logrus.WithField("error", err).Error("shim: start process")
+		return
 	}
 	go func() {
 		for {
@@ -87,13 +102,13 @@ func main() {
 				logrus.WithField("error", err).Error("shim: reaping child processes")
 			}
 			for _, e := range exits {
-				// check to see if runc is one of the processes that has exited
+				// check to see if runtime is one of the processes that has exited
 				if e.Pid == p.pid() {
 					exitShim = true
 					logrus.WithFields(logrus.Fields{
 						"pid":    e.Pid,
 						"status": e.Status,
-					}).Info("shim: runc exited")
+					}).Info("shim: runtime exited")
 					if err := writeInt("exitStatus", e.Status); err != nil {
 						logrus.WithFields(logrus.Fields{
 							"error":  err,
@@ -103,14 +118,8 @@ func main() {
 				}
 			}
 		}
-		// runc has exited so the shim can also exit
+		// runtime has exited so the shim can also exit
 		if exitShim {
-			if err := p.Close(); err != nil {
-				logrus.WithField("error", err).Error("shim: close stdio")
-			}
-			if err := p.delete(); err != nil {
-				logrus.WithField("error", err).Error("shim: delete runc state")
-			}
 			return
 		}
 	}

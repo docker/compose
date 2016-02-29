@@ -92,6 +92,7 @@ func listContainers(context *cli.Context) {
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprint(w, "ID\tPATH\tSTATUS\tPROCESSES\n")
+	sortContainers(resp.Containers)
 	for _, c := range resp.Containers {
 		procs := []string{}
 		for _, p := range c.Processes {

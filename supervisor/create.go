@@ -20,7 +20,7 @@ type StartTask struct {
 
 func (s *Supervisor) start(t *StartTask) error {
 	start := time.Now()
-	container, err := runtime.New(s.stateDir, t.ID, t.BundlePath, t.Labels)
+	container, err := runtime.New(s.stateDir, t.ID, t.BundlePath, s.runtime, t.Labels)
 	if err != nil {
 		return err
 	}

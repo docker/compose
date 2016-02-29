@@ -6,6 +6,10 @@ func getRootIDs(s *PlatformSpec) (int, int, error) {
 	return 0, 0, nil
 }
 
+func (c *container) Runtime() string {
+	return "windows"
+}
+
 func (c *container) Pause() error {
 	return errors.New("Pause not supported on Windows")
 }

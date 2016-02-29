@@ -40,11 +40,15 @@ func (w *worker) Start() {
 		started := time.Now()
 		process, err := t.Container.Start(t.Checkpoint, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"error": err,
+				"id":    t.Container.ID(),
+			}).Error("containerd: start container")
+			t.Err <- err
 			evt := &DeleteTask{
 				ID: t.Container.ID(),
 			}
 			w.s.SendTask(evt)
-			t.Err <- err
 			continue
 		}
 		/*

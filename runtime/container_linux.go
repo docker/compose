@@ -32,6 +32,10 @@ func getRootIDs(s *PlatformSpec) (int, int, error) {
 	return uid, gid, nil
 }
 
+func (c *container) Runtime() string {
+	return c.runtime
+}
+
 func (c *container) Pause() error {
 	return exec.Command("runc", "pause", c.id).Run()
 }
@@ -115,7 +119,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 		return nil, err
 	}
 	cmd := exec.Command("containerd-shim",
-		c.id, c.bundle,
+		c.id, c.bundle, c.runtime,
 	)
 	cmd.Dir = processRoot
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -141,8 +145,8 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	if _, err := p.getPid(); err != nil {
-		return p, nil
+	if err := waitForStart(p, cmd); err != nil {
+		return nil, err
 	}
 	c.processes[InitProcessID] = p
 	return p, nil
@@ -154,7 +158,7 @@ func (c *container) Exec(pid string, spec ProcessSpec, s Stdio) (Process, error)
 		return nil, err
 	}
 	cmd := exec.Command("containerd-shim",
-		c.id, c.bundle,
+		c.id, c.bundle, c.runtime,
 	)
 	cmd.Dir = processRoot
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -175,8 +179,8 @@ func (c *container) Exec(pid string, spec ProcessSpec, s Stdio) (Process, error)
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	if _, err := p.getPid(); err != nil {
-		return p, nil
+	if err := waitForStart(p, cmd); err != nil {
+		return nil, err
 	}
 	c.processes[pid] = p
 	return p, nil
@@ -221,4 +225,35 @@ func (c *container) Stats() (*Stat, error) {
 		Timestamp: now,
 		Data:      stats,
 	}, nil
+}
+
+func waitForStart(p *process, cmd *exec.Cmd) error {
+	for i := 0; i < 50; i++ {
+		if _, err := p.getPidFromFile(); err != nil {
+			if os.IsNotExist(err) {
+				alive, err := isAlive(cmd)
+				if err != nil {
+					return err
+				}
+				if !alive {
+					return ErrContainerNotStarted
+				}
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			return err
+		}
+		return nil
+	}
+	return errNoPidFile
+}
+
+func isAlive(cmd *exec.Cmd) (bool, error) {
+	if err := syscall.Kill(cmd.Process.Pid, 0); err != nil {
+		if err == syscall.ESRCH {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
