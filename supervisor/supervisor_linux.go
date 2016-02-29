@@ -27,6 +27,8 @@ func (s *Supervisor) handleTask(i Task) {
 		err = s.updateContainer(t)
 	case *UpdateProcessTask:
 		err = s.updateProcess(t)
+	case *OOMTask:
+		err = s.oom(t)
 	default:
 		err = ErrUnknownTask
 	}

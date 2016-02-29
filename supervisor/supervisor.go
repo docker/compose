@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/chanotify"
 	"github.com/docker/containerd/runtime"
 )
 
@@ -45,20 +44,8 @@ func New(stateDir string, oom bool, runtimeName string) (*Supervisor, error) {
 	if err := setupEventLog(s); err != nil {
 		return nil, err
 	}
-	if oom {
-		s.notifier = chanotify.New()
-
-		/*
-			go func() {
-				for id := range s.notifier.Chan() {
-						e := NewTask(OOMTaskType)
-						e.ID = id.(string)
-						s.SendTask(e)
-				}
-			}()
-		*/
-	}
 	go s.exitHandler()
+	go s.oomHandler()
 	if err := s.restore(); err != nil {
 		return nil, err
 	}
@@ -126,7 +113,6 @@ type Supervisor struct {
 	subscriberLock sync.RWMutex
 	subscribers    map[chan Event]struct{}
 	machine        Machine
-	notifier       *chanotify.Notifier
 	tasks          chan Task
 	monitor        *Monitor
 	eventLog       []Event
@@ -244,6 +230,15 @@ func (s *Supervisor) exitHandler() {
 	}
 }
 
+func (s *Supervisor) oomHandler() {
+	for id := range s.monitor.OOMs() {
+		e := &OOMTask{
+			ID: id,
+		}
+		s.SendTask(e)
+	}
+}
+
 func (s *Supervisor) monitorProcess(p runtime.Process) error {
 	return s.monitor.Monitor(p)
 }
@@ -266,9 +261,13 @@ func (s *Supervisor) restore() error {
 		if err != nil {
 			return err
 		}
+
 		ContainersCounter.Inc(1)
 		s.containers[id] = &containerInfo{
 			container: container,
+		}
+		if err := s.monitor.MonitorOOM(container); err != nil && err != runtime.ErrContainerExited {
+			logrus.WithField("error", err).Error("containerd: notify OOM events")
 		}
 		logrus.WithField("id", id).Debug("containerd: container restored")
 		var exitedProcesses []runtime.Process

@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -240,6 +241,59 @@ func (c *container) Stats() (*Stat, error) {
 	}, nil
 }
 
+func (c *container) OOM() (OOM, error) {
+	container, err := c.getLibctContainer()
+	if err != nil {
+		if lerr, ok := err.(libcontainer.Error); ok {
+			// with oom registration sometimes the container can run, exit, and be destroyed
+			// faster than we can get the state back so we can just ignore this
+			if lerr.Code() == libcontainer.ContainerNotExists {
+				return nil, ErrContainerExited
+			}
+		}
+		return nil, err
+	}
+	state, err := container.State()
+	if err != nil {
+		return nil, err
+	}
+	memoryPath := state.CgroupPaths["memory"]
+	return c.getMemeoryEventFD(memoryPath)
+}
+
+func (c *container) getMemeoryEventFD(root string) (*oom, error) {
+	f, err := os.Open(filepath.Join(root, "memory.oom_control"))
+	if err != nil {
+		return nil, err
+	}
+	fd, _, serr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, syscall.FD_CLOEXEC, 0)
+	if serr != 0 {
+		f.Close()
+		return nil, serr
+	}
+	if err := c.writeEventFD(root, int(f.Fd()), int(fd)); err != nil {
+		syscall.Close(int(fd))
+		f.Close()
+		return nil, err
+	}
+	return &oom{
+		root:    root,
+		id:      c.id,
+		eventfd: int(fd),
+		control: f,
+	}, nil
+}
+
+func (c *container) writeEventFD(root string, cfd, efd int) error {
+	f, err := os.OpenFile(filepath.Join(root, "cgroup.event_control"), os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(fmt.Sprintf("%d %d", efd, cfd))
+	return err
+}
+
 func waitForStart(p *process, cmd *exec.Cmd) error {
 	for i := 0; i < 50; i++ {
 		if _, err := p.getPidFromFile(); err != nil {
@@ -269,4 +323,37 @@ func isAlive(cmd *exec.Cmd) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+type oom struct {
+	id      string
+	root    string
+	control *os.File
+	eventfd int
+}
+
+func (o *oom) ContainerID() string {
+	return o.id
+}
+
+func (o *oom) FD() int {
+	return o.eventfd
+}
+
+func (o *oom) Flush() {
+	buf := make([]byte, 8)
+	syscall.Read(o.eventfd, buf)
+}
+
+func (o *oom) Removed() bool {
+	_, err := os.Lstat(filepath.Join(o.root, "cgroup.event_control"))
+	return os.IsNotExist(err)
+}
+
+func (o *oom) Close() error {
+	err := syscall.Close(o.eventfd)
+	if cerr := o.control.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
