@@ -50,6 +50,7 @@
       "type": "object",
 
       "properties": {
+        "auto_up": {"type": "boolean"},
         "build": {
           "oneOf": [
             {"type": "string"},

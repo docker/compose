@@ -18,6 +18,7 @@
       "type": "object",
 
       "properties": {
+        "auto_up": {"type": "boolean"},
         "build": {"type": "string"},
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
