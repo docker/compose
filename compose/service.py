@@ -223,7 +223,7 @@ class Service(object):
             parallel_execute(
                 container_numbers,
                 lambda n: create_and_start(service=self, number=n),
-                lambda n: n,
+                lambda n: self.get_container_name(n),
                 "Creating and starting"
             )
 
