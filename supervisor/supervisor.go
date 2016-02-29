@@ -169,11 +169,11 @@ func (s *Supervisor) Events(from time.Time) chan Event {
 				c <- e
 			}
 		}
-	}
-	// Notify the client that from now on it's live events
-	c <- Event{
-		Type:      "live",
-		Timestamp: time.Now(),
+		// Notify the client that from now on it's live events
+		c <- Event{
+			Type:      "live",
+			Timestamp: time.Now(),
+		}
 	}
 	return c
 }
