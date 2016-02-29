@@ -203,6 +203,11 @@ Simple example:
       db:
         image: postgres
 
+> **Note:** `depends_on` will not wait for `db` and `redis` to be "ready" before
+> starting `web` - only until they have been started. If you need to wait
+> for a service to be ready, see [Controlling startup order](startup-order.md)
+> for more on this problem and strategies for solving it.
+
 ### dns
 
 Custom DNS servers. Can be a single value or a list.
