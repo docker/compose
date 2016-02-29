@@ -3,3 +3,4 @@ containerd-shim/containerd-shim
 bin/
 ctr/ctr
 hack/benchmark
+*.exe

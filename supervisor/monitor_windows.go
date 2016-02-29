@@ -11,7 +11,8 @@ import (
 // Linux implementation. @crosbymichael - Help needed.
 
 func NewMonitor() (*Monitor, error) {
-	return nil, errors.New("NewMonitor not implemented on Windows")
+	// During Windows bring-up, don't error out other binary bombs immediately.
+	return &Monitor{}, nil
 }
 
 type Monitor struct {
