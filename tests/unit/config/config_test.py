@@ -1095,22 +1095,18 @@ class ConfigTest(unittest.TestCase):
             ).services
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
-    @mock.patch('compose.config.validation.log')
-    def test_logs_warning_for_boolean_in_environment(self, mock_logging):
-        expected_warning_msg = "There is a boolean value in the 'environment'"
-        config.load(
-            build_config_details(
-                {'web': {
-                    'image': 'busybox',
-                    'environment': {'SHOW_STUFF': True}
-                }},
-                'working_dir',
-                'filename.yml'
-            )
-        )
+    def test_logs_warning_for_boolean_in_environment(self):
+        config_details = build_config_details({
+            'web': {
+                'image': 'busybox',
+                'environment': {'SHOW_STUFF': True}
+            }
+        })
 
-        assert mock_logging.warn.called
-        assert expected_warning_msg in mock_logging.warn.call_args[0][0]
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+
+        assert "contains true, which is an invalid type" in exc.exconly()
 
     def test_config_valid_environment_dict_key_contains_dashes(self):
         services = config.load(

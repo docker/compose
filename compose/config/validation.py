@@ -63,23 +63,6 @@ def format_expose(instance):
     return True
 
 
-@FormatChecker.cls_checks(format="bool-value-in-mapping")
-def format_boolean_in_environment(instance):
-    """Check if there is a boolean in the mapping sections and display a warning.
-    Always return True here so the validation won't raise an error.
-    """
-    if isinstance(instance, bool):
-        log.warn(
-            "There is a boolean value in the 'environment', 'labels', or "
-            "'extra_hosts' field of a service.\n"
-            "These sections only support string values.\n"
-            "Please add quotes to any boolean values to make them strings "
-            "(eg, 'True', 'false', 'yes', 'N', 'on', 'Off').\n"
-            "This warning will become an error in a future release. \r\n"
-        )
-    return True
-
-
 def match_named_volumes(service_dict, project_volumes):
     service_volumes = service_dict.get('volumes', [])
     for volume_spec in service_volumes:
@@ -370,7 +353,7 @@ def process_config_schema_errors(error):
 
 def validate_against_config_schema(config_file):
     schema = load_jsonschema(config_file.version)
-    format_checker = FormatChecker(["ports", "expose", "bool-value-in-mapping"])
+    format_checker = FormatChecker(["ports", "expose"])
     validator = Draft4Validator(
         schema,
         resolver=RefResolver(get_resolver_path(), schema),
