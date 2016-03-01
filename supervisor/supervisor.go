@@ -18,7 +18,7 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, oom bool, runtimeName string) (*Supervisor, error) {
+func New(stateDir string, runtimeName string) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err

@@ -25,10 +25,6 @@ const (
 )
 
 func appendPlatformFlags() {
-	daemonFlags = append(daemonFlags, cli.BoolFlag{
-		Name:  "oom-notify",
-		Usage: "enable oom notifications for containers",
-	})
 	daemonFlags = append(daemonFlags, cli.StringFlag{
 		Name:  "graphite-address",
 		Usage: "Address of graphite server",

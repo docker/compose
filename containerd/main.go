@@ -62,7 +62,6 @@ func main() {
 			context.String("listen"),
 			context.String("state-dir"),
 			10,
-			context.Bool("oom-notify"), // TODO Windows: Remove oom-notify
 			context.String("runtime"),
 		); err != nil {
 			logrus.Fatal(err)
@@ -73,11 +72,11 @@ func main() {
 	}
 }
 
-func daemon(address, stateDir string, concurrency int, oom bool, runtimeName string) error {
+func daemon(address, stateDir string, concurrency int, runtimeName string) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	go reapProcesses()
-	sv, err := supervisor.New(stateDir, oom, runtimeName)
+	sv, err := supervisor.New(stateDir, runtimeName)
 	if err != nil {
 		return err
 	}
