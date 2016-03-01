@@ -33,7 +33,7 @@ var daemonFlags = []cli.Flag{
 	},
 	cli.DurationFlag{
 		Name:  "metrics-interval",
-		Value: 120 * time.Second,
+		Value: 5 * time.Minute,
 		Usage: "interval for flushing metrics to the store",
 	},
 	cli.StringFlag{
