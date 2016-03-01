@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 def project_from_options(project_dir, options):
     return get_project(
         project_dir,
-        get_config_path_from_options(options),
+        get_config_path_from_options(project_dir, options),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         host=options.get('--host'),
@@ -29,12 +29,13 @@ def project_from_options(project_dir, options):
     )
 
 
-def get_config_path_from_options(options):
+def get_config_path_from_options(base_dir, options):
     file_option = options.get('--file')
     if file_option:
         return file_option
 
-    config_files = os.environ.get('COMPOSE_FILE')
+    environment = config.environment.get_instance(base_dir)
+    config_files = environment.get('COMPOSE_FILE')
     if config_files:
         return config_files.split(os.pathsep)
     return None
@@ -57,8 +58,9 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     config_details = config.find(project_dir, config_path)
     project_name = get_project_name(config_details.working_dir, project_name)
     config_data = config.load(config_details)
+    environment = config.environment.get_instance(project_dir)
 
-    api_version = os.environ.get(
+    api_version = environment.get(
         'COMPOSE_API_VERSION',
         API_VERSIONS[config_data.version])
     client = get_client(
@@ -73,7 +75,8 @@ def get_project_name(working_dir, project_name=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME')
+    environment = config.environment.get_instance(working_dir)
+    project_name = project_name or environment.get('COMPOSE_PROJECT_NAME')
     if project_name:
         return normalize_name(project_name)
 

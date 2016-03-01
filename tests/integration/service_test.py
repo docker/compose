@@ -12,6 +12,7 @@ from six import StringIO
 from six import text_type
 
 from .. import mock
+from ..helpers import clear_environment
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import pull_busybox
@@ -912,7 +913,7 @@ class ServiceTest(DockerClientTestCase):
         }.items():
             self.assertEqual(env[k], v)
 
-    @mock.patch.dict(os.environ)
+    @clear_environment
     def test_resolve_env(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'

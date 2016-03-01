@@ -6,12 +6,14 @@ import os
 import mock
 import pytest
 
+from compose.config.environment import Environment
 from compose.config.interpolation import interpolate_environment_variables
 
 
 @pytest.yield_fixture
 def mock_env():
     with mock.patch.dict(os.environ):
+        Environment.reset()
         os.environ['USER'] = 'jenny'
         os.environ['FOO'] = 'bar'
         yield

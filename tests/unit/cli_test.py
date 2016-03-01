@@ -11,6 +11,7 @@ import pytest
 from .. import mock
 from .. import unittest
 from ..helpers import build_config
+from ..helpers import clear_environment
 from compose.cli.command import get_project
 from compose.cli.command import get_project_name
 from compose.cli.docopt_command import NoSuchCommand
@@ -43,11 +44,11 @@ class CLITestCase(unittest.TestCase):
         project_name = get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
+    @clear_environment
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
-        with mock.patch.dict(os.environ):
-            os.environ['COMPOSE_PROJECT_NAME'] = name
-            project_name = get_project_name(None)
+        os.environ['COMPOSE_PROJECT_NAME'] = name
+        project_name = get_project_name(None)
         self.assertEquals(project_name, name)
 
     def test_project_name_with_empty_environment_var(self):
