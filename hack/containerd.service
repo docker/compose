@@ -1,0 +1,11 @@
+[Unit]
+Description=containerd
+Documentation=https://containerd.tools
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/containerd
+Delegate=yes
+
+[Install]
+WantedBy=multi-user.target
