@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -46,7 +47,15 @@ type Container interface {
 	// Name or path of the OCI compliant runtime used to execute the container
 	Runtime() string
 	// OOM signals the channel if the container received an OOM notification
-	// OOM() (<-chan struct{}, error)
+	OOM() (OOM, error)
+}
+
+type OOM interface {
+	io.Closer
+	FD() int
+	ContainerID() string
+	Flush()
+	Removed() bool
 }
 
 type Stdio struct {
@@ -159,8 +168,8 @@ type container struct {
 	bundle    string
 	runtime   string
 	processes map[string]*process
-	stdio     Stdio
 	labels    []string
+	oomFds    []int
 }
 
 func (c *container) ID() string {

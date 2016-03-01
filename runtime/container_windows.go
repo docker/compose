@@ -60,3 +60,7 @@ func (c *container) Pids() ([]int, error) {
 func (c *container) Stats() (*Stat, error) {
 	return nil, errors.New("Stats not yet implemented on Windows")
 }
+
+func (c *container) OOM() (OOM, error) {
+	return nil, errors.New("OOM not yet implemented on Windows")
+}
