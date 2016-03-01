@@ -222,7 +222,7 @@ class TopLevelCommand(object):
             --services      Print the service names, one per line.
 
         """
-        config_path = get_config_path_from_options(config_options)
+        config_path = get_config_path_from_options(self.project_dir, config_options)
         compose_config = config.load(config.find(self.project_dir, config_path))
 
         if options['--quiet']:

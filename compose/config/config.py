@@ -17,6 +17,7 @@ from cached_property import cached_property
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..utils import build_string_dict
+from .environment import Environment
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
@@ -211,7 +212,8 @@ def find(base_dir, filenames):
     if filenames == ['-']:
         return ConfigDetails(
             os.getcwd(),
-            [ConfigFile(None, yaml.safe_load(sys.stdin))])
+            [ConfigFile(None, yaml.safe_load(sys.stdin))],
+        )
 
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
@@ -221,7 +223,8 @@ def find(base_dir, filenames):
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
         os.path.dirname(filenames[0]),
-        [ConfigFile.from_filename(f) for f in filenames])
+        [ConfigFile.from_filename(f) for f in filenames],
+    )
 
 
 def validate_config_version(config_files):
@@ -288,6 +291,10 @@ def load(config_details):
     """
     validate_config_version(config_details.config_files)
 
+    # load environment in working dir for later use in interpolation
+    # it is done here to avoid having to pass down working_dir
+    Environment.get_instance(config_details.working_dir)
+
     processed_files = [
         process_config_file(config_file)
         for config_file in config_details.config_files
@@ -302,9 +309,8 @@ def load(config_details):
         config_details.config_files, 'get_networks', 'Network'
     )
     service_dicts = load_services(
-        config_details.working_dir,
-        main_file,
-        [file.get_service_dicts() for file in config_details.config_files])
+        config_details, main_file,
+    )
 
     if main_file.version != V1:
         for service_dict in service_dicts:
@@ -348,14 +354,16 @@ def load_mapping(config_files, get_func, entity_type):
     return mapping
 
 
-def load_services(working_dir, config_file, service_configs):
+def load_services(config_details, config_file):
     def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
-            working_dir,
+            config_details.working_dir,
             config_file.filename,
             service_name,
             service_dict)
-        resolver = ServiceExtendsResolver(service_config, config_file)
+        resolver = ServiceExtendsResolver(
+            service_config, config_file
+        )
         service_dict = process_service(resolver.run())
 
         service_config = service_config._replace(config=service_dict)
@@ -382,6 +390,10 @@ def load_services(working_dir, config_file, service_configs):
                 config_file.version)
             for name in all_service_names
         }
+
+    service_configs = [
+        file.get_service_dicts() for file in config_details.config_files
+    ]
 
     service_config = service_configs[0]
     for next_config in service_configs[1:]:
@@ -462,8 +474,8 @@ class ServiceExtendsResolver(object):
         extends_file = ConfigFile.from_filename(config_path)
         validate_config_version([self.config_file, extends_file])
         extended_file = process_config_file(
-            extends_file,
-            service_name=service_name)
+            extends_file, service_name=service_name
+        )
         service_config = extended_file.get_service(service_name)
 
         return config_path, service_config, service_name
@@ -476,7 +488,8 @@ class ServiceExtendsResolver(object):
                 service_name,
                 service_dict),
             self.config_file,
-            already_seen=self.already_seen + [self.signature])
+            already_seen=self.already_seen + [self.signature],
+        )
 
         service_config = resolver.run()
         other_service_dict = process_service(service_config)
@@ -824,10 +837,11 @@ def parse_ulimits(ulimits):
 
 
 def resolve_env_var(key, val):
+    environment = Environment.get_instance()
     if val is not None:
         return key, val
-    elif key in os.environ:
-        return key, os.environ[key]
+    elif key in environment:
+        return key, environment[key]
     else:
         return key, None
 

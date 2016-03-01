@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import unittest
 
-from compose.config.interpolation import BlankDefaultDict as bddict
+from compose.config.environment import BlankDefaultDict as bddict
 from compose.config.interpolation import interpolate
 from compose.config.interpolation import InvalidInterpolation
 
