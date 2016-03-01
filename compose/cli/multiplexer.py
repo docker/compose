@@ -10,6 +10,7 @@ try:
 except ImportError:
     from queue import Queue, Empty  # Python 3.x
 
+from compose.cli.signals import ShutdownException
 
 STOP = object()
 
@@ -47,7 +48,7 @@ class Multiplexer(object):
                 pass
             # See https://github.com/docker/compose/issues/189
             except thread.error:
-                raise KeyboardInterrupt()
+                raise ShutdownException()
 
     def _init_readers(self):
         for iterator in self.iterators:

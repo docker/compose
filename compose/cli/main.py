@@ -54,7 +54,7 @@ def main():
     try:
         command = TopLevelCommand()
         command.sys_dispatch()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
     except (UserError, NoSuchService, ConfigurationError) as e:
