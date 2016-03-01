@@ -309,7 +309,8 @@ class Project(object):
                 'attributes': {
                     'name': container.name,
                     'image': event['from'],
-                }
+                },
+                'container': container,
             }
 
         service_names = set(self.service_names)

@@ -307,6 +307,7 @@ class ProjectTest(unittest.TestCase):
                     'image': 'example/image',
                 },
                 'time': dt_with_microseconds(1420092061, 2),
+                'container': Container(None, {'Id': 'abcde'}),
             },
             {
                 'type': 'container',
@@ -318,6 +319,7 @@ class ProjectTest(unittest.TestCase):
                     'image': 'example/image',
                 },
                 'time': dt_with_microseconds(1420092061, 3),
+                'container': Container(None, {'Id': 'abcde'}),
             },
             {
                 'type': 'container',
@@ -329,6 +331,7 @@ class ProjectTest(unittest.TestCase):
                     'image': 'example/db',
                 },
                 'time': dt_with_microseconds(1420092061, 4),
+                'container': Container(None, {'Id': 'ababa'}),
             },
         ]
 

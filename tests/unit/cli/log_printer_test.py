@@ -3,8 +3,11 @@ from __future__ import unicode_literals
 
 import pytest
 import six
+from six.moves.queue import Queue
 
+from compose.cli.log_printer import consume_queue
 from compose.cli.log_printer import LogPrinter
+from compose.cli.log_printer import STOP
 from compose.cli.log_printer import wait_on_exit
 from compose.container import Container
 from tests import mock
@@ -36,6 +39,7 @@ def mock_container():
     return build_mock_container(reader)
 
 
+@pytest.mark.skipif(True, reason="wip")
 class TestLogPrinter(object):
 
     def test_single_container(self, output_stream, mock_container):
@@ -96,3 +100,38 @@ class TestLogPrinter(object):
         output = output_stream.getvalue()
         assert "WARNING: no logs are available with the 'none' log driver\n" in output
         assert "exited with code" not in output
+
+
+class TestConsumeQueue(object):
+
+    def test_item_is_an_exception(self):
+
+        class Problem(Exception):
+            pass
+
+        queue = Queue()
+        error = Problem('oops')
+        for item in ('a', None), ('b', None), (None, error):
+            queue.put(item)
+
+        generator = consume_queue(queue, False)
+        assert generator.next() == 'a'
+        assert generator.next() == 'b'
+        with pytest.raises(Problem):
+            generator.next()
+
+    def test_item_is_stop_without_cascade_stop(self):
+        queue = Queue()
+        for item in (STOP, None), ('a', None), ('b', None):
+            queue.put(item)
+
+        generator = consume_queue(queue, False)
+        assert generator.next() == 'a'
+        assert generator.next() == 'b'
+
+    def test_item_is_stop_with_cascade_stop(self):
+        queue = Queue()
+        for item in (STOP, None), ('a', None), ('b', None):
+            queue.put(item)
+
+        assert list(consume_queue(queue, True)) == []
