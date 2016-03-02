@@ -16,12 +16,12 @@ If you don’t see your question here, feel free to drop by `#docker-compose` on
 freenode IRC and ask the community.
 
 
-## Can I control service startup order?
+### Can I control service startup order?
 
 Yes - see [Controlling startup order](startup-order.md).
 
 
-## Why do my services take 10 seconds to recreate or stop?
+### Why do my services take 10 seconds to recreate or stop?
 
 Compose stop attempts to stop a container by sending a `SIGTERM`. It then waits
 for a [default timeout of 10 seconds](./reference/stop.md).  After the timeout,
@@ -48,9 +48,9 @@ add an explicit signal handler for `SIGTERM`.
 
 * Set the `stop_signal` to a signal which the application knows how to handle:
 
-      web:
-        build: .
-        stop_signal: SIGINT
+        web:
+          build: .
+          stop_signal: SIGINT
 
 * If you can't modify the application, wrap the application in a lightweight init
 system (like [s6](http://skarnet.org/software/s6/)) or a signal proxy (like
@@ -58,7 +58,7 @@ system (like [s6](http://skarnet.org/software/s6/)) or a signal proxy (like
 [tini](https://github.com/krallin/tini)).  Either of these wrappers take care of
 handling `SIGTERM` properly.
 
-## How do I run multiple copies of a Compose file on the same host?
+### How do I run multiple copies of a Compose file on the same host?
 
 Compose uses the project name to create unique identifiers for all of a
 project's  containers and other resources. To run multiple copies of a project,
@@ -66,7 +66,7 @@ set a custom project name using the [`-p` command line
 option](./reference/overview.md) or the [`COMPOSE_PROJECT_NAME`
 environment variable](./reference/envvars.md#compose-project-name).
 
-## What's the difference between `up`, `run`, and `start`?
+### What's the difference between 'up', 'run', and 'start'?
 
 Typically, you want `docker-compose up`. Use `up` to start or restart all the
 services defined in a `docker-compose.yml`. In the default "attached"
@@ -86,17 +86,17 @@ The `docker-compose start` command is useful only to restart containers
 that were previously created, but were stopped. It never creates new
 containers.
 
-## Can I use json instead of yaml for my Compose file?
+### Can I use JSON instead of YAML for my Compose file?
 
-Yes. [Yaml is a superset of json](http://stackoverflow.com/a/1729545/444646) so
-any JSON file should be valid Yaml.  To use a JSON file with Compose,
+Yes. [YAML is a superset of json](http://stackoverflow.com/a/1729545/444646) so
+any JSON file should be valid YAML.  To use a JSON file with Compose,
 specify the filename to use, for example:
 
 ```bash
 docker-compose -f docker-compose.json up
 ```
 
-## Should I include my code with `COPY`/`ADD` or a volume?
+### Should I include my code with COPY/ADD, or with a volume?
 
 You can add your code to the image using `COPY` or `ADD` directive in a
 `Dockerfile`.  This is useful if you need to relocate your code along with the
@@ -112,13 +112,13 @@ include the code using a `COPY`, and use a `volume` in your Compose file to
 include the code from the host during development. The volume overrides
 the directory contents of the image.
 
-## Where can I find example compose files?
+### Where can I find example Compose files?
 
 There are [many examples of Compose files on
 github](https://github.com/search?q=in%3Apath+docker-compose.yml+extension%3Ayml&type=Code).
 
 
-## Compose documentation
+### Compose documentation
 
 - [Installing Compose](install.md)
 - [Get started with Django](django.md)
