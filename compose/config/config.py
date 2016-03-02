@@ -88,6 +88,8 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
     'container_name',
     'dockerfile',
+    'log_driver',
+    'log_opt',
     'logging',
     'network_mode',
 ]
