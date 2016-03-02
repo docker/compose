@@ -1,7 +1,7 @@
 {
     "package": {
         "name": "${TRAVIS_OS_NAME}",
-        "repo": "master",
+        "repo": "${TRAVIS_BRANCH}",
         "subject": "docker-compose",
         "desc": "Automated build of master branch from travis ci.",
         "website_url": "https://github.com/docker/compose",
@@ -11,8 +11,8 @@
     },
 
     "version": {
-        "name": "master",
-        "desc": "Automated build of the master branch.",
+        "name": "${TRAVIS_BRANCH}",
+        "desc": "Automated build of the ${TRAVIS_BRANCH} branch.",
         "released": "${DATE}",
         "vcs_tag": "master"
     },
