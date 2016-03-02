@@ -105,6 +105,7 @@ class CLITestCase(unittest.TestCase):
                 '--publish': [],
                 '--rm': None,
                 '--name': None,
+                '--workdir': None,
             })
 
         _, _, call_kwargs = mock_run_operation.mock_calls[0]
@@ -135,6 +136,7 @@ class CLITestCase(unittest.TestCase):
             '--publish': [],
             '--rm': None,
             '--name': None,
+            '--workdir': None,
         })
 
         _, _, call_kwargs = mock_client.create_container.mock_calls[0]
@@ -165,6 +167,7 @@ class CLITestCase(unittest.TestCase):
             '--publish': [],
             '--rm': None,
             '--name': None,
+            '--workdir': None,
         })
 
         self.assertEquals(
@@ -193,6 +196,7 @@ class CLITestCase(unittest.TestCase):
             '--publish': [],
             '--rm': True,
             '--name': None,
+            '--workdir': None,
         })
 
         self.assertFalse(
