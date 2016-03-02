@@ -380,13 +380,28 @@ class TopLevelCommand(DocoptCommand):
         Usage: logs [options] [SERVICE...]
 
         Options:
-            --no-color  Produce monochrome output.
+            --no-color          Produce monochrome output.
+            -f, --follow        Follow log output.
+            -t, --timestamps    Show timestamps.
+            --tail="all"        Number of lines to show from the end of the logs
+                                for each container.
         """
         containers = project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
+        tail = options['--tail']
+        if tail is not None:
+            if tail.isdigit():
+                tail = int(tail)
+            elif tail != 'all':
+                raise UserError("tail flag must be all or a number")
+        log_args = {
+            'follow': options['--follow'],
+            'tail': tail,
+            'timestamps': options['--timestamps']
+        }
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, monochrome=monochrome).run()
+        LogPrinter(containers, monochrome=monochrome, log_args=log_args).run()
 
     def pause(self, project, options):
         """
@@ -712,7 +727,8 @@ class TopLevelCommand(DocoptCommand):
 
             if detached:
                 return
-            log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop)
+            log_args = {'follow': True}
+            log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop, log_args)
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
@@ -810,13 +826,13 @@ def run_one_off_container(container_options, project, service, options):
     sys.exit(exit_code)
 
 
-def build_log_printer(containers, service_names, monochrome, cascade_stop):
+def build_log_printer(containers, service_names, monochrome, cascade_stop, log_args):
     if service_names:
         containers = [
             container
             for container in containers if container.service in service_names
         ]
-    return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop)
+    return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop, log_args=log_args)
 
 
 @contextlib.contextmanager

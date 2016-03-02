@@ -17,7 +17,7 @@ def build_mock_container(reader):
         name_without_project='web_1',
         has_api_logs=True,
         log_stream=None,
-        attach=reader,
+        logs=reader,
         wait=mock.Mock(return_value=0),
     )
 
@@ -39,13 +39,22 @@ def mock_container():
 class TestLogPrinter(object):
 
     def test_single_container(self, output_stream, mock_container):
-        LogPrinter([mock_container], output=output_stream).run()
+        LogPrinter([mock_container], output=output_stream, log_args={'follow': True}).run()
 
         output = output_stream.getvalue()
         assert 'hello' in output
         assert 'world' in output
         # Call count is 2 lines + "container exited line"
         assert output_stream.flush.call_count == 3
+
+    def test_single_container_without_stream(self, output_stream, mock_container):
+        LogPrinter([mock_container], output=output_stream).run()
+
+        output = output_stream.getvalue()
+        assert 'hello' in output
+        assert 'world' in output
+        # Call count is 2 lines
+        assert output_stream.flush.call_count == 2
 
     def test_monochrome(self, output_stream, mock_container):
         LogPrinter([mock_container], output=output_stream, monochrome=True).run()
@@ -86,3 +95,4 @@ class TestLogPrinter(object):
 
         output = output_stream.getvalue()
         assert "WARNING: no logs are available with the 'none' log driver\n" in output
+        assert "exited with code" not in output
