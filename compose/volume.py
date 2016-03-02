@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker.errors import APIError
 from docker.errors import NotFound
 
 from .config import ConfigurationError
@@ -82,12 +81,13 @@ class ProjectVolumes(object):
     def initialize(self):
         try:
             for volume in self.volumes.values():
+                volume_exists = volume.exists()
                 if volume.external:
                     log.debug(
                         'Volume {0} declared as external. No new '
                         'volume will be created.'.format(volume.name)
                     )
-                    if not volume.exists():
+                    if not volume_exists:
                         raise ConfigurationError(
                             'Volume {name} declared as external, but could'
                             ' not be found. Please create the volume manually'
@@ -97,28 +97,32 @@ class ProjectVolumes(object):
                             )
                         )
                     continue
-                log.info(
-                    'Creating volume "{0}" with {1} driver'.format(
-                        volume.full_name, volume.driver or 'default'
+
+                if not volume_exists:
+                    log.info(
+                        'Creating volume "{0}" with {1} driver'.format(
+                            volume.full_name, volume.driver or 'default'
+                        )
                     )
-                )
-                volume.create()
+                    volume.create()
+                else:
+                    driver = volume.inspect()['Driver']
+                    if driver != volume.driver:
+                        raise ConfigurationError(
+                            'Configuration for volume {0} specifies driver '
+                            '{1}, but a volume with the same name uses a '
+                            'different driver ({3}). If you wish to use the '
+                            'new configuration, please remove the existing '
+                            'volume "{2}" first:\n'
+                            '$ docker volume rm {2}'.format(
+                                volume.name, volume.driver, volume.full_name,
+                                volume.inspect()['Driver']
+                            )
+                        )
         except NotFound:
             raise ConfigurationError(
                 'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
             )
-        except APIError as e:
-            if 'Choose a different volume name' in str(e):
-                raise ConfigurationError(
-                    'Configuration for volume {0} specifies driver {1}, but '
-                    'a volume with the same name uses a different driver '
-                    '({3}). If you wish to use the new configuration, please '
-                    'remove the existing volume "{2}" first:\n'
-                    '$ docker volume rm {2}'.format(
-                        volume.name, volume.driver, volume.full_name,
-                        volume.inspect()['Driver']
-                    )
-                )
 
     def namespace_spec(self, volume_spec):
         if not volume_spec.is_named_volume:
