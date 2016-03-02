@@ -8,8 +8,8 @@ import pytest
 from compose import container
 from compose.cli.errors import UserError
 from compose.cli.formatter import ConsoleWarningFormatter
-from compose.cli.main import build_log_printer
 from compose.cli.main import convergence_strategy_from_opts
+from compose.cli.main import filter_containers_to_service_names
 from compose.cli.main import setup_console_handler
 from compose.service import ConvergenceStrategy
 from tests import mock
@@ -32,7 +32,7 @@ def logging_handler():
 
 class TestCLIMainTestCase(object):
 
-    def test_build_log_printer(self):
+    def test_filter_containers_to_service_names(self):
         containers = [
             mock_container('web', 1),
             mock_container('web', 2),
@@ -41,18 +41,18 @@ class TestCLIMainTestCase(object):
             mock_container('another', 1),
         ]
         service_names = ['web', 'db']
-        log_printer = build_log_printer(containers, service_names, True, False, {'follow': True})
-        assert log_printer.containers == containers[:3]
+        actual = filter_containers_to_service_names(containers, service_names)
+        assert actual == containers[:3]
 
-    def test_build_log_printer_all_services(self):
+    def test_filter_containers_to_service_names_all(self):
         containers = [
             mock_container('web', 1),
             mock_container('db', 1),
             mock_container('other', 1),
         ]
         service_names = []
-        log_printer = build_log_printer(containers, service_names, True, False, {'follow': True})
-        assert log_printer.containers == containers
+        actual = filter_containers_to_service_names(containers, service_names)
+        assert actual == containers
 
 
 class TestSetupConsoleHandlerTestCase(object):

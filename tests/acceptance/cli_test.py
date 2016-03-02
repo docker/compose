@@ -1188,7 +1188,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_logs_follow(self):
         self.base_dir = 'tests/fixtures/echo-services'
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'])
 
         result = self.dispatch(['logs', '-f'])
 
@@ -1197,29 +1197,43 @@ class CLITestCase(DockerClientTestCase):
         assert 'another' in result.stdout
         assert 'exited with code 0' in result.stdout
 
-    def test_logs_unfollow(self):
+    def test_logs_follow_logs_from_new_containers(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d', 'simple'])
+
+        proc = start_process(self.base_dir, ['logs', '-f'])
+
+        self.dispatch(['up', '-d', 'another'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'logscomposefile_another_1',
+            running=False))
+
+        os.kill(proc.pid, signal.SIGINT)
+        result = wait_on_process(proc, returncode=1)
+        assert 'test' in result.stdout
+
+    def test_logs_default(self):
+        self.base_dir = 'tests/fixtures/logs-composefile'
+        self.dispatch(['up', '-d'])
 
         result = self.dispatch(['logs'])
-
-        assert result.stdout.count('\n') >= 1
-        assert 'exited with code 0' not in result.stdout
+        assert 'hello' in result.stdout
+        assert 'test' in result.stdout
+        assert 'exited with' not in result.stdout
 
     def test_logs_timestamps(self):
         self.base_dir = 'tests/fixtures/echo-services'
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'])
 
-        result = self.dispatch(['logs', '-f', '-t'], None)
-
+        result = self.dispatch(['logs', '-f', '-t'])
         self.assertRegexpMatches(result.stdout, '(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})')
 
     def test_logs_tail(self):
         self.base_dir = 'tests/fixtures/logs-tail-composefile'
-        self.dispatch(['up'], None)
+        self.dispatch(['up'])
 
-        result = self.dispatch(['logs', '--tail', '2'], None)
-
+        result = self.dispatch(['logs', '--tail', '2'])
         assert result.stdout.count('\n') == 3
 
     def test_kill(self):

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import sys
+from collections import namedtuple
 from itertools import cycle
 from threading import Thread
 
@@ -13,9 +14,6 @@ from . import colors
 from compose import utils
 from compose.cli.signals import ShutdownException
 from compose.utils import split_buffer
-
-
-STOP = object()
 
 
 class LogPresenter(object):
@@ -79,35 +77,59 @@ class LogPrinter(object):
         queue = Queue()
         thread_args = queue, self.log_args
         thread_map = build_thread_map(self.containers, self.presenters, thread_args)
-        start_producer_thread(
+        start_producer_thread((
             thread_map,
             self.event_stream,
             self.presenters,
-            thread_args)
+            thread_args))
 
         for line in consume_queue(queue, self.cascade_stop):
+            remove_stopped_threads(thread_map)
+
+            if not line:
+                if not thread_map:
+                    return
+                continue
+
             self.output.write(line)
             self.output.flush()
 
-            # TODO: this needs more logic
-            # TODO: does consume_queue need to yield Nones to get to this point?
-            if not thread_map:
-                return
+
+def remove_stopped_threads(thread_map):
+    for container_id, tailer_thread in list(thread_map.items()):
+        if not tailer_thread.is_alive():
+            thread_map.pop(container_id, None)
+
+
+def build_thread(container, presenter, queue, log_args):
+    tailer = Thread(
+        target=tail_container_logs,
+        args=(container, presenter, queue, log_args))
+    tailer.daemon = True
+    tailer.start()
+    return tailer
 
 
 def build_thread_map(initial_containers, presenters, thread_args):
-    def build_thread(container):
-        tailer = Thread(
-            target=tail_container_logs,
-            args=(container, presenters.next()) + thread_args)
-        tailer.daemon = True
-        tailer.start()
-        return tailer
-
     return {
-        container.id: build_thread(container)
+        container.id: build_thread(container, presenters.next(), *thread_args)
         for container in initial_containers
     }
+
+
+class QueueItem(namedtuple('_QueueItem', 'item is_stop exc')):
+
+    @classmethod
+    def new(cls, item):
+        return cls(item, None, None)
+
+    @classmethod
+    def exception(cls, exc):
+        return cls(None, None, exc)
+
+    @classmethod
+    def stop(cls):
+        return cls(None, True, None)
 
 
 def tail_container_logs(container, presenter, queue, log_args):
@@ -115,15 +137,14 @@ def tail_container_logs(container, presenter, queue, log_args):
 
     try:
         for item in generator(container, log_args):
-            queue.put((item, None))
-
-        if log_args.get('follow'):
-            yield presenter.color_func(wait_on_exit(container))
-
-        queue.put((STOP, None))
-
+            queue.put(QueueItem.new(presenter.present(container, item)))
     except Exception as e:
-        queue.put((None, e))
+        queue.put(QueueItem.exception(e))
+        return
+
+    if log_args.get('follow'):
+        queue.put(QueueItem.new(presenter.color_func(wait_on_exit(container))))
+    queue.put(QueueItem.stop())
 
 
 def get_log_generator(container):
@@ -156,37 +177,48 @@ def wait_on_exit(container):
     return "%s exited with code %s\n" % (container.name, exit_code)
 
 
-def start_producer_thread(thread_map, event_stream, presenters, thread_args):
-    queue, log_args = thread_args
-
-    def watch_events():
-        for event in event_stream:
-            # TODO: handle start and stop events
-            pass
-
-    producer = Thread(target=watch_events)
+def start_producer_thread(thread_args):
+    producer = Thread(target=watch_events, args=thread_args)
     producer.daemon = True
     producer.start()
+
+
+def watch_events(thread_map, event_stream, presenters, thread_args):
+    for event in event_stream:
+        if event['action'] != 'start':
+            continue
+
+        if event['id'] in thread_map:
+            if thread_map[event['id']].is_alive():
+                continue
+            # Container was stopped and started, we need a new thread
+            thread_map.pop(event['id'], None)
+
+        thread_map[event['id']] = build_thread(
+            event['container'],
+            presenters.next(),
+            *thread_args)
 
 
 def consume_queue(queue, cascade_stop):
     """Consume the queue by reading lines off of it and yielding them."""
     while True:
         try:
-            item, exception = queue.get(timeout=0.1)
+            item = queue.get(timeout=0.1)
         except Empty:
-            pass
+            yield None
+            continue
         # See https://github.com/docker/compose/issues/189
         except thread.error:
             raise ShutdownException()
 
-        if exception:
-            raise exception
+        if item.exc:
+            raise item.exc
 
-        if item is STOP:
+        if item.is_stop:
             if cascade_stop:
                 raise StopIteration
             else:
                 continue
 
-        yield item
+        yield item.item
