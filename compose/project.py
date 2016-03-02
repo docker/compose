@@ -21,6 +21,7 @@ from .container import Container
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks
+from .service import BuildAction
 from .service import ContainerNetworkMode
 from .service import ConvergenceStrategy
 from .service import NetworkMode
@@ -249,7 +250,12 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def create(self, service_names=None, strategy=ConvergenceStrategy.changed, do_build=True):
+    def create(
+        self,
+        service_names=None,
+        strategy=ConvergenceStrategy.changed,
+        do_build=BuildAction.none,
+    ):
         services = self.get_services_without_duplicate(service_names, include_deps=True)
 
         plans = self._get_convergence_plans(services, strategy)
@@ -298,7 +304,7 @@ class Project(object):
            service_names=None,
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
-           do_build=True,
+           do_build=BuildAction.none,
            timeout=DEFAULT_TIMEOUT,
            detached=False):
 
