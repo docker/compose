@@ -59,6 +59,14 @@ optionally [dockerfile](#dockerfile) and [args](#args).
       args:
         buildno: 1
 
+If you specify `image` as well as `build`, then Compose tags the built image
+with the tag specified in `image`:
+
+    build: ./dir
+    image: webapp
+
+This will result in an image tagged `webapp`, built from `./dir`.
+
 > **Note**: In the [version 1 file format](#version-1), `build` is different in
 > two ways:
 >
@@ -95,13 +103,13 @@ specified.
 
 > **Note**: In the [version 1 file format](#version-1), `dockerfile` is
 > different in two ways:
->
-> -   It appears alongside `build`, not as a sub-option:
->
->         build: .
->         dockerfile: Dockerfile-alternate
-> -   Using `dockerfile` together with `image` is not allowed. Attempting to do
->     so results in an error.
+
+  * It appears alongside `build`, not as a sub-option:
+
+        build: .
+        dockerfile: Dockerfile-alternate
+
+  * Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
 #### args
 
@@ -194,6 +202,11 @@ Simple example:
         image: redis
       db:
         image: postgres
+
+> **Note:** `depends_on` will not wait for `db` and `redis` to be "ready" before
+> starting `web` - only until they have been started. If you need to wait
+> for a service to be ready, see [Controlling startup order](startup-order.md)
+> for more on this problem and strategies for solving it.
 
 ### dns
 
@@ -340,12 +353,21 @@ An entry with the ip address and hostname will be created in `/etc/hosts` inside
 
 ### image
 
-Tag or partial image ID. Can be local or remote - Compose will attempt to
-pull if it doesn't exist locally.
+Specify the image to start the container from. Can either be a repository/tag or
+a partial image ID.
 
-    image: ubuntu
-    image: orchardup/postgresql
+    image: redis
+    image: ubuntu:14.04
+    image: tutum/influxdb
+    image: example-registry.com:4000/postgresql
     image: a4bc65fd
+
+If the image does not exist, Compose attempts to pull it, unless you have also
+specified [build](#build), in which case it builds it using the specified
+options and tags it with the specified tag.
+
+> **Note**: In the [version 1 file format](#version-1), using `build` together
+> with `image` is not allowed. Attempting to do so results in an error.
 
 ### labels
 
