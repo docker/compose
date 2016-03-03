@@ -20,12 +20,12 @@ class DocoptCommand(object):
         return {'options_first': True}
 
     def sys_dispatch(self):
-        self.dispatch(sys.argv[1:], None)
+        self.dispatch(sys.argv[1:])
 
-    def dispatch(self, argv, global_options):
-        self.perform_command(*self.parse(argv, global_options))
+    def dispatch(self, argv):
+        self.perform_command(*self.parse(argv))
 
-    def parse(self, argv, global_options):
+    def parse(self, argv):
         options = docopt_full_help(getdoc(self), argv, **self.docopt_options())
         command = options['COMMAND']
 

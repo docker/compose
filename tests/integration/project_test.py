@@ -7,6 +7,7 @@ import py
 import pytest
 from docker.errors import NotFound
 
+from ..helpers import build_config
 from .testcases import DockerClientTestCase
 from compose.config import config
 from compose.config import ConfigurationError
@@ -18,13 +19,6 @@ from compose.container import Container
 from compose.project import Project
 from compose.service import ConvergenceStrategy
 from tests.integration.testcases import v2_only
-
-
-def build_service_dicts(service_config):
-    return config.load(
-        config.ConfigDetails(
-            'working_dir',
-            [config.ConfigFile(None, service_config)]))
 
 
 class ProjectTest(DockerClientTestCase):
@@ -67,19 +61,18 @@ class ProjectTest(DockerClientTestCase):
         )
 
     def test_volumes_from_service(self):
-        service_dicts = build_service_dicts({
-            'data': {
-                'image': 'busybox:latest',
-                'volumes': ['/var/data'],
-            },
-            'db': {
-                'image': 'busybox:latest',
-                'volumes_from': ['data'],
-            },
-        })
         project = Project.from_config(
             name='composetest',
-            config_data=service_dicts,
+            config_data=build_config({
+                'data': {
+                    'image': 'busybox:latest',
+                    'volumes': ['/var/data'],
+                },
+                'db': {
+                    'image': 'busybox:latest',
+                    'volumes_from': ['data'],
+                },
+            }),
             client=self.client,
         )
         db = project.get_service('db')
@@ -96,7 +89,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project = Project.from_config(
             name='composetest',
-            config_data=build_service_dicts({
+            config_data=build_config({
                 'db': {
                     'image': 'busybox:latest',
                     'volumes_from': ['composetest_data_container'],
@@ -112,7 +105,7 @@ class ProjectTest(DockerClientTestCase):
         project = Project.from_config(
             name='composetest',
             client=self.client,
-            config_data=build_service_dicts({
+            config_data=build_config({
                 'version': V2_0,
                 'services': {
                     'net': {
@@ -139,7 +132,7 @@ class ProjectTest(DockerClientTestCase):
         def get_project():
             return Project.from_config(
                 name='composetest',
-                config_data=build_service_dicts({
+                config_data=build_config({
                     'version': V2_0,
                     'services': {
                         'web': {
@@ -174,7 +167,7 @@ class ProjectTest(DockerClientTestCase):
     def test_net_from_service_v1(self):
         project = Project.from_config(
             name='composetest',
-            config_data=build_service_dicts({
+            config_data=build_config({
                 'net': {
                     'image': 'busybox:latest',
                     'command': ["top"]
@@ -198,7 +191,7 @@ class ProjectTest(DockerClientTestCase):
         def get_project():
             return Project.from_config(
                 name='composetest',
-                config_data=build_service_dicts({
+                config_data=build_config({
                     'web': {
                         'image': 'busybox:latest',
                         'net': 'container:composetest_net_container'
@@ -469,7 +462,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_starts_depends(self):
         project = Project.from_config(
             name='composetest',
-            config_data=build_service_dicts({
+            config_data=build_config({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],
@@ -504,7 +497,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_with_no_deps(self):
         project = Project.from_config(
             name='composetest',
-            config_data=build_service_dicts({
+            config_data=build_config({
                 'console': {
                     'image': 'busybox:latest',
                     'command': ["top"],

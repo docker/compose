@@ -11,6 +11,7 @@ from operator import itemgetter
 import py
 import pytest
 
+from ...helpers import build_config_details
 from compose.config import config
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
@@ -41,12 +42,6 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
 
 def service_sort(services):
     return sorted(services, key=itemgetter('name'))
-
-
-def build_config_details(contents, working_dir='working_dir', filename='filename.yml'):
-    return config.ConfigDetails(
-        working_dir,
-        [config.ConfigFile(filename, contents)])
 
 
 class ConfigTest(unittest.TestCase):
