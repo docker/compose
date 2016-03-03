@@ -58,8 +58,10 @@ def get_config_path_from_options(options):
     if file_option:
         return file_option
 
-    config_file = os.environ.get('COMPOSE_FILE')
-    return [config_file] if config_file else None
+    config_files = os.environ.get('COMPOSE_FILE')
+    if config_files:
+        return config_files.split(os.pathsep)
+    return None
 
 
 def get_client(verbose=False, version=None):
