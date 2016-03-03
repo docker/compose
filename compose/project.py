@@ -324,8 +324,11 @@ class Project(object):
                 continue
 
             # TODO: get labels from the API v1.22 , see github issue 2618
-            # TODO: this can fail if the conatiner is removed, wrap in try/except
-            container = Container.from_id(self.client, event['id'])
+            try:
+                # this can fail if the conatiner has been removed
+                container = Container.from_id(self.client, event['id'])
+            except APIError:
+                continue
             if container.service not in service_names:
                 continue
             yield build_container_event(event, container)
