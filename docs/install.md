@@ -30,23 +30,24 @@ To install Compose, do the following:
 
 3. Go to the <a href="https://github.com/docker/compose/releases" target="_blank">Compose repository release page on GitHub</a>.
 
-4. Follow the instructions from the release page and run the `curl` command,
+4. Follow the instructions from the release page and run the `wget` or `curl` command below,
 which the release page specifies, in your terminal.
-
-     > Note: If you get a "Permission denied" error, your `/usr/local/bin` directory
-     probably isn't writable and you'll need to install Compose as the superuser. Run
-     `sudo -i`, then the two commands below, then `exit`.
 
      The following is an example command illustrating the format:
 
-        curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        $ sudo wget https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` -O /usr/local/bin/docker-compose
 
-     If you have problems installing with `curl`, see
+     OR
+
+        $ sudo curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+
+
+     If you have problems installing with `wget` or `curl`, see
      [Alternative Install Options](#alternative-install-options).
 
 5. Apply executable permissions to the binary:
 
-        $ chmod +x /usr/local/bin/docker-compose
+        $ sudo chmod +x /usr/local/bin/docker-compose
 
 6.  Optionally, install [command completion](completion.md) for the
 `bash` and `zsh` shell.
@@ -77,8 +78,8 @@ to get started.
 Compose can also be run inside a container, from a small bash script wrapper.
 To install compose as a container run:
 
-    $ curl -L https://github.com/docker/compose/releases/download/1.6.2/run.sh > /usr/local/bin/docker-compose
-    $ chmod +x /usr/local/bin/docker-compose
+    $ sudo curl -L https://github.com/docker/compose/releases/download/1.6.2/run.sh -o /usr/local/bin/docker-compose
+    $ sudo chmod +x /usr/local/bin/docker-compose
 
 ## Master builds
 
@@ -110,9 +111,9 @@ Compose will just create new ones.
 
 ## Uninstallation
 
-To uninstall Docker Compose if you installed using `curl`:
+To uninstall Docker Compose if you installed using `wget` or `curl`:
 
-    $ rm /usr/local/bin/docker-compose
+    $ sudo rm -f /usr/local/bin/docker-compose
 
 
 To uninstall Docker Compose if you installed using `pip`:
