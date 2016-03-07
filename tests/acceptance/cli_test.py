@@ -78,21 +78,20 @@ class ContainerCountCondition(object):
 
 class ContainerStateCondition(object):
 
-    def __init__(self, client, name, running):
+    def __init__(self, client, name, status):
         self.client = client
         self.name = name
-        self.running = running
+        self.status = status
 
     def __call__(self):
         try:
             container = self.client.inspect_container(self.name)
-            return container['State']['Running'] == self.running
+            return container['State']['Status'] == self.status
         except errors.APIError:
             return False
 
     def __str__(self):
-        state = 'running' if self.running else 'stopped'
-        return "waiting for container to be %s" % state
+        return "waiting for container to be %s" % self.status
 
 
 class CLITestCase(DockerClientTestCase):
@@ -1073,26 +1072,26 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=True))
+            'running'))
 
         os.kill(proc.pid, signal.SIGINT)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=False))
+            'exited'))
 
     def test_run_handles_sigterm(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=True))
+            'running'))
 
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=False))
+            'exited'))
 
     def test_rm(self):
         service = self.project.get_service('simple')
@@ -1207,7 +1206,7 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'logscomposefile_another_1',
-            running=False))
+            'exited'))
 
         os.kill(proc.pid, signal.SIGINT)
         result = wait_on_process(proc, returncode=1)
