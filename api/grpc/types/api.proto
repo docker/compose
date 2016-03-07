@@ -61,6 +61,10 @@ message AddProcessRequest {
     string stdin = 8; // path to the file where stdin will be read (optional)
 	string stdout = 9; // path to file where stdout will be written (optional)
 	string stderr = 10; // path to file where stderr will be written (optional)
+    repeated string capabilities = 11;
+    string apparmorProfile = 12;
+    string selinuxLabel = 13;
+    bool noNewPrivileges = 14;
 }
 
 message User {
@@ -123,6 +127,10 @@ message Process {
     string stdin = 8; // path to the file where stdin will be read (optional)
 	string stdout = 9; // path to file where stdout will be written (optional)
 	string stderr = 10; // path to file where stderr will be written (optional)
+repeated string capabilities = 11;
+    string apparmorProfile = 12;
+    string selinuxLabel = 13;
+    bool noNewPrivileges = 14;
 }
 
 message Container {

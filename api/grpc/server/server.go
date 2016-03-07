@@ -73,7 +73,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 		Env:      r.Env,
 		Cwd:      r.Cwd,
 	}
-	setPlatformRuntimeProcessSpecUserFields(r.User, process)
+	setPlatformRuntimeProcessSpecUserFields(r, process)
 
 	if r.Id == "" {
 		return nil, fmt.Errorf("container id cannot be empty")
