@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import itertools
+
 import pytest
 import six
 from six.moves.queue import Queue
@@ -11,20 +13,9 @@ from compose.cli.log_printer import build_no_log_generator
 from compose.cli.log_printer import consume_queue
 from compose.cli.log_printer import QueueItem
 from compose.cli.log_printer import wait_on_exit
+from compose.cli.log_printer import watch_events
 from compose.container import Container
 from tests import mock
-
-
-def build_mock_container(reader):
-    return mock.Mock(
-        spec=Container,
-        name='myapp_web_1',
-        name_without_project='web_1',
-        has_api_logs=True,
-        log_stream=None,
-        logs=reader,
-        wait=mock.Mock(return_value=0),
-    )
 
 
 @pytest.fixture
@@ -103,6 +94,47 @@ class TestBuildLogGenerator(object):
 
         generator = build_log_generator(mock_container, {})
         assert next(generator) == glyph
+
+
+@pytest.fixture
+def thread_map():
+    return {'cid': mock.Mock()}
+
+
+@pytest.fixture
+def mock_presenters():
+    return itertools.cycle([mock.Mock()])
+
+
+class TestWatchEvents(object):
+
+    def test_stop_event(self, thread_map, mock_presenters):
+        event_stream = [{'action': 'stop', 'id': 'cid'}]
+        watch_events(thread_map, event_stream, mock_presenters, ())
+        assert not thread_map
+
+    def test_start_event(self, thread_map, mock_presenters):
+        container_id = 'abcd'
+        event = {'action': 'start', 'id': container_id, 'container': mock.Mock()}
+        event_stream = [event]
+        thread_args = 'foo', 'bar'
+
+        with mock.patch(
+            'compose.cli.log_printer.build_thread',
+            autospec=True
+        ) as mock_build_thread:
+            watch_events(thread_map, event_stream, mock_presenters, thread_args)
+            mock_build_thread.assert_called_once_with(
+                event['container'],
+                next(mock_presenters),
+                *thread_args)
+        assert container_id in thread_map
+
+    def test_other_event(self, thread_map, mock_presenters):
+        container_id = 'abcd'
+        event_stream = [{'action': 'create', 'id': container_id}]
+        watch_events(thread_map, event_stream, mock_presenters, ())
+        assert container_id not in thread_map
 
 
 class TestConsumeQueue(object):

@@ -185,6 +185,9 @@ def start_producer_thread(thread_args):
 
 def watch_events(thread_map, event_stream, presenters, thread_args):
     for event in event_stream:
+        if event['action'] == 'stop':
+            thread_map.pop(event['id'], None)
+
         if event['action'] != 'start':
             continue
 
