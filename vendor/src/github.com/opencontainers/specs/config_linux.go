@@ -14,8 +14,6 @@ type LinuxSpec struct {
 
 // Linux contains platform specific configuration for linux based containers.
 type Linux struct {
-	// Capabilities are linux capabilities that are kept for the container.
-	Capabilities []string `json:"capabilities"`
 	// UIDMapping specifies user mappings for supporting user namespaces on linux.
 	UIDMappings []IDMapping `json:"uidMappings,omitempty"`
 	// GIDMapping specifies group mappings for supporting user namespaces on linux.
@@ -35,16 +33,10 @@ type Linux struct {
 	Namespaces []Namespace `json:"namespaces"`
 	// Devices are a list of device nodes that are created for the container
 	Devices []Device `json:"devices"`
-	// ApparmorProfile specified the apparmor profile for the container.
-	ApparmorProfile string `json:"apparmorProfile"`
-	// SelinuxProcessLabel specifies the selinux context that the container process is run as.
-	SelinuxProcessLabel string `json:"selinuxProcessLabel"`
 	// Seccomp specifies the seccomp security settings for the container.
 	Seccomp Seccomp `json:"seccomp"`
 	// RootfsPropagation is the rootfs mount propagation mode for the container.
 	RootfsPropagation string `json:"rootfsPropagation,omitempty"`
-	// NoNewPrivileges controls whether additional privileges could be gained by processes in the container.
-	NoNewPrivileges bool `json:"noNewPrivileges,omitempty"`
 }
 
 // User specifies linux specific user and group information for the container's
@@ -238,7 +230,7 @@ type Device struct {
 	// Path to the device.
 	Path string `json:"path"`
 	// Device type, block, char, etc.
-	Type rune `json:"type"`
+	Type string `json:"type"`
 	// Major is the device's major number.
 	Major int64 `json:"major"`
 	// Minor is the device's minor number.
@@ -256,7 +248,7 @@ type DeviceCgroup struct {
 	// Allow or deny
 	Allow bool `json:"allow"`
 	// Device type, block, char, etc.
-	Type *rune `json:"type,omitempty"`
+	Type *string `json:"type,omitempty"`
 	// Major is the device's major number.
 	Major *int64 `json:"major,omitempty"`
 	// Minor is the device's minor number.

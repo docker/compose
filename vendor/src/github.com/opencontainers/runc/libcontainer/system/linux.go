@@ -112,3 +112,11 @@ func RunningInUserNS() bool {
 	}
 	return true
 }
+
+func Prctl(option int, arg2, arg3, arg4, arg5 uintptr) (err error) {
+	_, _, e1 := syscall.Syscall6(syscall.SYS_PRCTL, uintptr(option), arg2, arg3, arg4, arg5, 0)
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}

@@ -3,19 +3,6 @@
 The Linux container specification uses various kernel features like namespaces, cgroups, capabilities, LSM, and file system jails to fulfill the spec.
 Additional information is needed for Linux over the [default spec configuration](config.md) in order to configure these various kernel features.
 
-## Capabilities
-
-Capabilities is an array that specifies Linux capabilities that can be provided to the process inside the container.
-Valid values are the strings for capabilities defined in [the man page](http://man7.org/linux/man-pages/man7/capabilities.7.html)
-
-```json
-   "capabilities": [
-        "CAP_AUDIT_WRITE",
-        "CAP_KILL",
-        "CAP_NET_BIND_SERVICE"
-    ]
-```
-
 ## Default File Systems
 
 The Linux ABI includes both syscalls and several special file paths.
@@ -112,7 +99,7 @@ The runtime may supply them however it likes (with [mknod][mknod.2], by bind mou
 
 The following parameters can be specified:
 
-* **`type`** *(char, required)* - type of device: `c`, `b`, `u` or `p`.
+* **`type`** *(string, required)* - type of device: `c`, `b`, `u` or `p`.
   More info in [mknod(1)][mknod.1].
 * **`path`** *(string, required)* - full path to device inside container.
 * **`major, minor`** *(int64, required unless **`type`** is `p`)* - [major, minor numbers][devices] for the device.
@@ -130,7 +117,7 @@ The following parameters can be specified:
             "type": "c",
             "major": 10,
             "minor": 229,
-            "fileMode": 0666,
+            "fileMode": 438,
             "uid": 0,
             "gid": 0
         },
@@ -139,7 +126,7 @@ The following parameters can be specified:
             "type": "b",
             "major": 8,
             "minor": 0,
-            "fileMode": 0660,
+            "fileMode": 432,
             "uid": 0,
             "gid": 0
         }
@@ -194,7 +181,7 @@ The runtime MUST apply entries in the listed order.
 The following parameters can be specified:
 
 * **`allow`** *(boolean, required)* - whether the entry is allowed or denied.
-* **`type`** *(char, optional)* - type of device: `a` (all), `c` (char), or `b` (block).
+* **`type`** *(string, optional)* - type of device: `a` (all), `c` (char), or `b` (block).
   `null` or unset values mean "all", mapping to `a`.
 * **`major, minor`** *(int64, optional)* - [major, minor numbers][devices] for the device.
   `null` or unset values mean "all", mapping to [`*` in the filesystem API][cgroup-v1-devices].
@@ -486,28 +473,6 @@ The kernel enforces the `soft` limit for a resource while the `hard` limit acts 
    ]
 ```
 
-## SELinux process label
-
-SELinux process label specifies the label with which the processes in a container are run.
-For more information about SELinux, see  [Selinux documentation](http://selinuxproject.org/page/Main_Page)
-
-###### Example
-
-```json
-   "selinuxProcessLabel": "system_u:system_r:svirt_lxc_net_t:s0:c124,c675"
-```
-
-## Apparmor profile
-
-Apparmor profile specifies the name of the apparmor profile that will be used for the container.
-For more information about Apparmor, see [Apparmor documentation](https://wiki.ubuntu.com/AppArmor)
-
-###### Example
-
-```json
-   "apparmorProfile": "acme_secure_profile"
-```
-
 ## seccomp
 
 Seccomp provides application sandboxing mechanism in the Linux kernel.
@@ -572,17 +537,6 @@ Its value is either slave, private, or shared.
 
 ```json
     "rootfsPropagation": "slave",
-```
-
-## No new privileges
-
-Setting `noNewPrivileges` to true prevents the processes in the container from gaining additional privileges.
-[The kernel doc](https://www.kernel.org/doc/Documentation/prctl/no_new_privs.txt) has more information on how this is achieved using a prctl system call.
-
-###### Example
-
-```json
-    "noNewPrivileges": true,
 ```
 
 [cgroup-v1]: https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt

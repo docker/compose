@@ -3,6 +3,7 @@
 package libcontainer
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"syscall"
@@ -21,32 +22,45 @@ type linuxStandardInit struct {
 	config    *initConfig
 }
 
+func (l *linuxStandardInit) getSessionRingParams() (string, uint32, uint32) {
+	var newperms uint32
+
+	if l.config.Config.Namespaces.Contains(configs.NEWUSER) {
+		// with user ns we need 'other' search permissions
+		newperms = 0x8
+	} else {
+		// without user ns we need 'UID' search permissions
+		newperms = 0x80000
+	}
+
+	// create a unique per session container name that we can
+	// join in setns; however, other containers can also join it
+	return fmt.Sprintf("_ses.%s", l.config.ContainerId), 0xffffffff, newperms
+}
+
+// PR_SET_NO_NEW_PRIVS isn't exposed in Golang so we define it ourselves copying the value
+// the kernel
+const PR_SET_NO_NEW_PRIVS = 0x26
+
 func (l *linuxStandardInit) Init() error {
+	ringname, keepperms, newperms := l.getSessionRingParams()
+
 	// do not inherit the parent's session keyring
-	sessKeyId, err := keyctl.JoinSessionKeyring("")
+	sessKeyId, err := keyctl.JoinSessionKeyring(ringname)
 	if err != nil {
 		return err
 	}
 	// make session keyring searcheable
-	// without user ns we need 'UID' search permissions
-	// with user ns we need 'other' search permissions
-	if err := keyctl.ModKeyringPerm(sessKeyId, 0xffffffff, 0x080008); err != nil {
+	if err := keyctl.ModKeyringPerm(sessKeyId, keepperms, newperms); err != nil {
 		return err
 	}
 
-	// join any namespaces via a path to the namespace fd if provided
-	if err := joinExistingNamespaces(l.config.Config.Namespaces); err != nil {
-		return err
-	}
 	var console *linuxConsole
 	if l.config.Console != "" {
 		console = newConsoleFromPath(l.config.Console)
 		if err := console.dupStdio(); err != nil {
 			return err
 		}
-	}
-	if _, err := syscall.Setsid(); err != nil {
-		return err
 	}
 	if console != nil {
 		if err := system.Setctty(); err != nil {
@@ -62,13 +76,11 @@ func (l *linuxStandardInit) Init() error {
 	if err := setupRlimits(l.config.Config); err != nil {
 		return err
 	}
-	if err := setOomScoreAdj(l.config.Config.OomScoreAdj); err != nil {
-		return err
-	}
+
 	label.Init()
 	// InitializeMountNamespace() can be executed only for a new mount namespace
 	if l.config.Config.Namespaces.Contains(configs.NEWNS) {
-		if err := setupRootfs(l.config.Config, console); err != nil {
+		if err := setupRootfs(l.config.Config, console, l.pipe); err != nil {
 			return err
 		}
 	}
@@ -77,10 +89,10 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
-	if err := apparmor.ApplyProfile(l.config.Config.AppArmorProfile); err != nil {
+	if err := apparmor.ApplyProfile(l.config.AppArmorProfile); err != nil {
 		return err
 	}
-	if err := label.SetProcessLabel(l.config.Config.ProcessLabel); err != nil {
+	if err := label.SetProcessLabel(l.config.ProcessLabel); err != nil {
 		return err
 	}
 
@@ -102,6 +114,11 @@ func (l *linuxStandardInit) Init() error {
 	pdeath, err := system.GetParentDeathSignal()
 	if err != nil {
 		return err
+	}
+	if l.config.NoNewPrivileges {
+		if err := system.Prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+			return err
+		}
 	}
 	// Tell our parent that we're ready to Execv. This must be done before the
 	// Seccomp rules have been applied, because we need to be able to read and
@@ -128,5 +145,6 @@ func (l *linuxStandardInit) Init() error {
 	if syscall.Getppid() != l.parentPid {
 		return syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 	}
+
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
 }

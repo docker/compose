@@ -63,6 +63,11 @@ func WriteJSON(w io.Writer, v interface{}) error {
 // be a subdirectory of the prefixed path. This is all done lexically, so paths
 // that include symlinks won't be safe as a result of using CleanPath.
 func CleanPath(path string) string {
+	// Deal with empty strings nicely.
+	if path == "" {
+		return ""
+	}
+
 	// Ensure that all paths are cleaned (especially problematic ones like
 	// "/../../../../../" which can cause lots of issues).
 	path = filepath.Clean(path)
