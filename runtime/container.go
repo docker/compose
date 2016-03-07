@@ -48,6 +48,8 @@ type Container interface {
 	Runtime() string
 	// OOM signals the channel if the container received an OOM notification
 	OOM() (OOM, error)
+	// UpdateResource updates the containers resources to new values
+	UpdateResources(*Resource) error
 }
 
 type OOM interface {
@@ -212,4 +214,23 @@ func (c *container) Processes() ([]Process, error) {
 func (c *container) RemoveProcess(pid string) error {
 	delete(c.processes, pid)
 	return os.RemoveAll(filepath.Join(c.root, c.id, pid))
+}
+
+func (c *container) UpdateResources(r *Resource) error {
+	container, err := c.getLibctContainer()
+	if err != nil {
+		return err
+	}
+	config := container.Config()
+	config.Cgroups.Resources.CpuShares = r.CPUShares
+	config.Cgroups.Resources.BlkioWeight = r.BlkioWeight
+	config.Cgroups.Resources.CpuPeriod = r.CPUPeriod
+	config.Cgroups.Resources.CpuQuota = r.CPUQuota
+	config.Cgroups.Resources.CpusetCpus = r.CpusetCpus
+	config.Cgroups.Resources.CpusetMems = r.CpusetMems
+	config.Cgroups.Resources.KernelMemory = r.KernelMemory
+	config.Cgroups.Resources.Memory = r.Memory
+	config.Cgroups.Resources.MemoryReservation = r.MemoryReservation
+	config.Cgroups.Resources.MemorySwap = r.MemorySwap
+	return container.Set(config)
 }

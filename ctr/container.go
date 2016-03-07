@@ -53,6 +53,7 @@ var containersCommand = cli.Command{
 		startCommand,
 		statsCommand,
 		watchCommand,
+		updateCommand,
 	},
 	Action: listContainers,
 }
@@ -514,6 +515,59 @@ var statsCommand = cli.Command{
 			fatal(err.Error(), 1)
 		}
 		fmt.Print(string(data))
+	},
+}
+
+var updateCommand = cli.Command{
+	Name:  "update",
+	Usage: "update a containers resources",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name: "memory-limit",
+		},
+		cli.IntFlag{
+			Name: "memory-reservation",
+		},
+		cli.IntFlag{
+			Name: "memory-swap",
+		},
+		cli.IntFlag{
+			Name: "cpu-quota",
+		},
+		cli.IntFlag{
+			Name: "cpu-period",
+		},
+		cli.IntFlag{
+			Name: "kernel-limit",
+		},
+		cli.IntFlag{
+			Name: "blkio-weight",
+		},
+		cli.StringFlag{
+			Name: "cpuset-cpus",
+		},
+		cli.StringFlag{
+			Name: "cpuset-mems",
+		},
+	},
+	Action: func(context *cli.Context) {
+		req := &types.UpdateContainerRequest{
+			Id: context.Args().First(),
+		}
+		req.Resources = &types.UpdateResource{}
+		req.Resources.MemoryLimit = uint32(context.Int("memory-limit"))
+		req.Resources.MemoryReservation = uint32(context.Int("memory-reservation"))
+		req.Resources.MemorySwap = uint32(context.Int("memory-swap"))
+		req.Resources.BlkioWeight = uint32(context.Int("blkio-weight"))
+		req.Resources.CpuPeriod = uint32(context.Int("cpu-period"))
+		req.Resources.CpuQuota = uint32(context.Int("cpu-quota"))
+		req.Resources.CpuShares = uint32(context.Int("cpu-shares"))
+		req.Resources.CpusetCpus = context.String("cpuset-cpus")
+		req.Resources.CpusetMems = context.String("cpuset-mems")
+		c := getClient(context)
+		if _, err := c.UpdateContainer(netcontext.Background(), req); err != nil {
+			fatal(err.Error(), 1)
+		}
 	},
 }
 
