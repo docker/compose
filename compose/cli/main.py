@@ -709,7 +709,7 @@ class TopLevelCommand(object):
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             # start the event stream first so we don't lose any events
-            event_stream = project.events()
+            event_stream = project.events(service_names=service_names)
 
             to_attach = project.up(
                 service_names=service_names,

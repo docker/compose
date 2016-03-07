@@ -295,7 +295,7 @@ class Project(object):
                 detached=True,
                 start=False)
 
-    def events(self):
+    def events(self, service_names=None):
         def build_container_event(event, container):
             time = datetime.datetime.fromtimestamp(event['time'])
             time = time.replace(
@@ -313,7 +313,7 @@ class Project(object):
                 'container': container,
             }
 
-        service_names = set(self.service_names)
+        service_names = set(service_names or self.service_names)
         for event in self.client.events(
             filters={'label': self.labels()},
             decode=True
