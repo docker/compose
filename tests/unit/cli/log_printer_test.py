@@ -43,13 +43,13 @@ class TestLogPresenter(object):
 
     def test_monochrome(self, mock_container):
         presenters = build_log_presenters(['foo', 'bar'], True)
-        presenter = presenters.next()
+        presenter = next(presenters)
         actual = presenter.present(mock_container, "this line")
         assert actual == "web_1  | this line"
 
     def test_polychrome(self, mock_container):
         presenters = build_log_presenters(['foo', 'bar'], False)
-        presenter = presenters.next()
+        presenter = next(presenters)
         actual = presenter.present(mock_container, "this line")
         assert '\033[' in actual
 
@@ -81,8 +81,8 @@ class TestBuildLogGenerator(object):
         log_args = {'follow': True}
 
         generator = build_log_generator(mock_container, log_args)
-        assert generator.next() == "hello\n"
-        assert generator.next() == "world"
+        assert next(generator) == "hello\n"
+        assert next(generator) == "world"
         mock_container.logs.assert_called_once_with(
             stdout=True,
             stderr=True,
@@ -94,15 +94,15 @@ class TestBuildLogGenerator(object):
         log_args = {'follow': True}
 
         generator = build_log_generator(mock_container, log_args)
-        assert generator.next() == "hello\n"
-        assert generator.next() == "world"
+        assert next(generator) == "hello\n"
+        assert next(generator) == "world"
 
     def test_unicode(self, output_stream):
         glyph = u'\u2022\n'
         mock_container.log_stream = iter([glyph.encode('utf-8')])
 
         generator = build_log_generator(mock_container, {})
-        assert generator.next() == glyph
+        assert next(generator) == glyph
 
 
 class TestConsumeQueue(object):
@@ -118,10 +118,10 @@ class TestConsumeQueue(object):
             queue.put(item)
 
         generator = consume_queue(queue, False)
-        assert generator.next() == 'a'
-        assert generator.next() == 'b'
+        assert next(generator) == 'a'
+        assert next(generator) == 'b'
         with pytest.raises(Problem):
-            generator.next()
+            next(generator)
 
     def test_item_is_stop_without_cascade_stop(self):
         queue = Queue()
@@ -129,8 +129,8 @@ class TestConsumeQueue(object):
             queue.put(item)
 
         generator = consume_queue(queue, False)
-        assert generator.next() == 'a'
-        assert generator.next() == 'b'
+        assert next(generator) == 'a'
+        assert next(generator) == 'b'
 
     def test_item_is_stop_with_cascade_stop(self):
         queue = Queue()
@@ -142,4 +142,4 @@ class TestConsumeQueue(object):
     def test_item_is_none_when_timeout_is_hit(self):
         queue = Queue()
         generator = consume_queue(queue, False)
-        assert generator.next() is None
+        assert next(generator) is None

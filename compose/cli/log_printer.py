@@ -112,7 +112,7 @@ def build_thread(container, presenter, queue, log_args):
 
 def build_thread_map(initial_containers, presenters, thread_args):
     return {
-        container.id: build_thread(container, presenters.next(), *thread_args)
+        container.id: build_thread(container, next(presenters), *thread_args)
         for container in initial_containers
     }
 
@@ -196,7 +196,7 @@ def watch_events(thread_map, event_stream, presenters, thread_args):
 
         thread_map[event['id']] = build_thread(
             event['container'],
-            presenters.next(),
+            next(presenters),
             *thread_args)
 
 
