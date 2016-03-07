@@ -88,7 +88,10 @@ class LogPrinter(object):
 
             if not line:
                 if not thread_map:
+                    # There are no running containers left to tail, so exit
                     return
+                # We got an empty line because of a timeout, but there are still
+                # active containers to tail, so continue
                 continue
 
             self.output.write(line)

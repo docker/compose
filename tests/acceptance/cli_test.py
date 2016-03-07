@@ -396,8 +396,8 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/echo-services'
         result = self.dispatch(['up', '--no-color'])
 
-        assert 'simple_1  | simple' in result.stdout
-        assert 'another_1 | another' in result.stdout
+        assert 'simple_1   | simple' in result.stdout
+        assert 'another_1  | another' in result.stdout
         assert 'simple_1 exited with code 0' in result.stdout
         assert 'another_1 exited with code 0' in result.stdout
 

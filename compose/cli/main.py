@@ -389,7 +389,7 @@ class TopLevelCommand(object):
         }
         print("Attaching to", list_containers(containers))
         log_printer_from_project(
-            project,
+            self.project,
             containers,
             options['--no-color'],
             log_args).run()
@@ -708,10 +708,7 @@ class TopLevelCommand(object):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
-            # start the event stream first so we don't lose any events
-            event_stream = project.events(service_names=service_names)
-
-            to_attach = project.up(
+            to_attach = self.project.up(
                 service_names=service_names,
                 start_deps=start_deps,
                 strategy=convergence_strategy_from_opts(options),
@@ -723,12 +720,12 @@ class TopLevelCommand(object):
                 return
 
             log_printer = log_printer_from_project(
-                project,
+                self.project,
                 filter_containers_to_service_names(to_attach, service_names),
                 options['--no-color'],
                 {'follow': True},
                 cascade_stop,
-                event_stream=event_stream)
+                event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
