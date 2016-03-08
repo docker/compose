@@ -114,13 +114,23 @@ DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
 log = logging.getLogger(__name__)
 
 
-class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files')):
+class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files environment')):
     """
     :param working_dir: the directory to use for relative paths in the config
     :type  working_dir: string
     :param config_files: list of configuration files to load
     :type  config_files: list of :class:`ConfigFile`
+    :param environment: computed environment values for this project
+    :type  environment: :class:`environment.Environment`
      """
+
+    def __new__(cls, working_dir, config_files):
+        return super(ConfigDetails, cls).__new__(
+            cls,
+            working_dir,
+            config_files,
+            Environment(working_dir),
+        )
 
 
 class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
@@ -291,12 +301,8 @@ def load(config_details):
     """
     validate_config_version(config_details.config_files)
 
-    # load environment in working dir for later use in interpolation
-    # it is done here to avoid having to pass down working_dir
-    Environment.get_instance(config_details.working_dir)
-
     processed_files = [
-        process_config_file(config_file)
+        process_config_file(config_file, config_details.environment)
         for config_file in config_details.config_files
     ]
     config_details = config_details._replace(config_files=processed_files)
@@ -362,7 +368,7 @@ def load_services(config_details, config_file):
             service_name,
             service_dict)
         resolver = ServiceExtendsResolver(
-            service_config, config_file
+            service_config, config_file, environment=config_details.environment
         )
         service_dict = process_service(resolver.run())
 
@@ -371,7 +377,8 @@ def load_services(config_details, config_file):
         service_dict = finalize_service(
             service_config,
             service_names,
-            config_file.version)
+            config_file.version,
+            config_details.environment)
         return service_dict
 
     def build_services(service_config):
@@ -402,16 +409,17 @@ def load_services(config_details, config_file):
     return build_services(service_config)
 
 
-def interpolate_config_section(filename, config, section):
+def interpolate_config_section(filename, config, section, environment):
     validate_config_section(filename, config, section)
-    return interpolate_environment_variables(config, section)
+    return interpolate_environment_variables(config, section, environment)
 
 
-def process_config_file(config_file, service_name=None):
+def process_config_file(config_file, environment, service_name=None):
     services = interpolate_config_section(
         config_file.filename,
         config_file.get_service_dicts(),
-        'service')
+        'service',
+        environment,)
 
     if config_file.version == V2_0:
         processed_config = dict(config_file.config)
@@ -419,11 +427,13 @@ def process_config_file(config_file, service_name=None):
         processed_config['volumes'] = interpolate_config_section(
             config_file.filename,
             config_file.get_volumes(),
-            'volume')
+            'volume',
+            environment,)
         processed_config['networks'] = interpolate_config_section(
             config_file.filename,
             config_file.get_networks(),
-            'network')
+            'network',
+            environment,)
 
     if config_file.version == V1:
         processed_config = services
@@ -440,11 +450,12 @@ def process_config_file(config_file, service_name=None):
 
 
 class ServiceExtendsResolver(object):
-    def __init__(self, service_config, config_file, already_seen=None):
+    def __init__(self, service_config, config_file, environment=None, already_seen=None):
         self.service_config = service_config
         self.working_dir = service_config.working_dir
         self.already_seen = already_seen or []
         self.config_file = config_file
+        self.environment = environment or Environment(None)
 
     @property
     def signature(self):
@@ -474,7 +485,7 @@ class ServiceExtendsResolver(object):
         extends_file = ConfigFile.from_filename(config_path)
         validate_config_version([self.config_file, extends_file])
         extended_file = process_config_file(
-            extends_file, service_name=service_name
+            extends_file, self.environment, service_name=service_name
         )
         service_config = extended_file.get_service(service_name)
 
@@ -489,6 +500,7 @@ class ServiceExtendsResolver(object):
                 service_dict),
             self.config_file,
             already_seen=self.already_seen + [self.signature],
+            environment=self.environment
         )
 
         service_config = resolver.run()
@@ -518,7 +530,7 @@ class ServiceExtendsResolver(object):
         return filename
 
 
-def resolve_environment(service_dict):
+def resolve_environment(service_dict, environment=None):
     """Unpack any environment variables from an env_file, if set.
     Interpolate environment values if set.
     """
@@ -527,12 +539,12 @@ def resolve_environment(service_dict):
         env.update(env_vars_from_file(env_file))
 
     env.update(parse_environment(service_dict.get('environment')))
-    return dict(resolve_env_var(k, v) for k, v in six.iteritems(env))
+    return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))
 
 
-def resolve_build_args(build):
+def resolve_build_args(build, environment):
     args = parse_build_arguments(build.get('args'))
-    return dict(resolve_env_var(k, v) for k, v in six.iteritems(args))
+    return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(args))
 
 
 def validate_extended_service_dict(service_dict, filename, service):
@@ -611,11 +623,11 @@ def process_service(service_config):
     return service_dict
 
 
-def finalize_service(service_config, service_names, version):
+def finalize_service(service_config, service_names, version, environment):
     service_dict = dict(service_config.config)
 
     if 'environment' in service_dict or 'env_file' in service_dict:
-        service_dict['environment'] = resolve_environment(service_dict)
+        service_dict['environment'] = resolve_environment(service_dict, environment)
         service_dict.pop('env_file', None)
 
     if 'volumes_from' in service_dict:
@@ -642,7 +654,7 @@ def finalize_service(service_config, service_names, version):
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
 
-    normalize_build(service_dict, service_config.working_dir)
+    normalize_build(service_dict, service_config.working_dir, environment)
 
     service_dict['name'] = service_config.name
     return normalize_v1_service_format(service_dict)
@@ -836,11 +848,10 @@ def parse_ulimits(ulimits):
         return dict(ulimits)
 
 
-def resolve_env_var(key, val):
-    environment = Environment.get_instance()
+def resolve_env_var(key, val, environment):
     if val is not None:
         return key, val
-    elif key in environment:
+    elif environment and key in environment:
         return key, environment[key]
     else:
         return key, None
@@ -880,7 +891,7 @@ def resolve_volume_path(working_dir, volume):
         return container_path
 
 
-def normalize_build(service_dict, working_dir):
+def normalize_build(service_dict, working_dir, environment):
 
     if 'build' in service_dict:
         build = {}
@@ -890,7 +901,9 @@ def normalize_build(service_dict, working_dir):
         else:
             build.update(service_dict['build'])
             if 'args' in build:
-                build['args'] = build_string_dict(resolve_build_args(build))
+                build['args'] = build_string_dict(
+                    resolve_build_args(build, environment)
+                )
 
         service_dict['build'] = build
 
