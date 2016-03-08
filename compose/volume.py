@@ -107,7 +107,7 @@ class ProjectVolumes(object):
                     volume.create()
                 else:
                     driver = volume.inspect()['Driver']
-                    if driver != volume.driver:
+                    if volume.driver is not None and driver != volume.driver:
                         raise ConfigurationError(
                             'Configuration for volume {0} specifies driver '
                             '{1}, but a volume with the same name uses a '

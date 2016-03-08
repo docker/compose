@@ -840,6 +840,44 @@ class ProjectTest(DockerClientTestCase):
         ) in str(e.exception)
 
     @v2_only()
+    def test_initialize_volumes_updated_blank_driver(self):
+        vol_name = '{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
+
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }],
+            volumes={vol_name: {'driver': 'local'}},
+            networks={},
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.volumes.initialize()
+
+        volume_data = self.client.inspect_volume(full_vol_name)
+        self.assertEqual(volume_data['Name'], full_vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+        config_data = config_data._replace(
+            volumes={vol_name: {}}
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data,
+            client=self.client
+        )
+        project.volumes.initialize()
+        volume_data = self.client.inspect_volume(full_vol_name)
+        self.assertEqual(volume_data['Name'], full_vol_name)
+        self.assertEqual(volume_data['Driver'], 'local')
+
+    @v2_only()
     def test_initialize_volumes_external_volumes(self):
         # Use composetest_ prefix so it gets garbage-collected in tearDown()
         vol_name = 'composetest_{0:x}'.format(random.getrandbits(32))
