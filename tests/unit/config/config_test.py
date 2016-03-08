@@ -17,13 +17,13 @@ from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
-from tests.helpers import clear_environment
 
 DEFAULT_VERSION = V2_0
 
@@ -1582,7 +1582,7 @@ class PortsTest(unittest.TestCase):
 
 
 class InterpolationTest(unittest.TestCase):
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
         os.environ.update(
             IMAGE="busybox",
@@ -1605,7 +1605,7 @@ class InterpolationTest(unittest.TestCase):
             }
         ])
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_unset_variable_produces_warning(self):
         os.environ.pop('FOO', None)
         os.environ.pop('BAR', None)
@@ -1621,7 +1621,7 @@ class InterpolationTest(unittest.TestCase):
             None,
         )
 
-        with mock.patch('compose.config.interpolation.log') as log:
+        with mock.patch('compose.config.environment.log') as log:
             config.load(config_details)
 
             self.assertEqual(2, log.warn.call_count)
@@ -1629,7 +1629,7 @@ class InterpolationTest(unittest.TestCase):
             self.assertIn('BAR', warnings[0])
             self.assertIn('FOO', warnings[1])
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_invalid_interpolation(self):
         with self.assertRaises(config.ConfigurationError) as cm:
             config.load(
@@ -1668,7 +1668,7 @@ class VolumeConfigTest(unittest.TestCase):
         d = make_service_dict('foo', {'build': '.', 'volumes': ['/data']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/data'])
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_volume_binding_with_environment_variable(self):
         os.environ['VOLUME_PATH'] = '/host/path'
 
@@ -1682,7 +1682,7 @@ class VolumeConfigTest(unittest.TestCase):
         self.assertEqual(d['volumes'], [VolumeSpec.parse('/host/path:/container/path')])
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_volume_binding_with_home(self):
         os.environ['HOME'] = '/home/user'
         d = make_service_dict('foo', {'build': '.', 'volumes': ['~:/container/path']}, working_dir='.')
@@ -1740,7 +1740,7 @@ class VolumeConfigTest(unittest.TestCase):
             working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\otherproject:/data'])
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_home_directory_with_driver_does_not_expand(self):
         os.environ['NAME'] = 'surprise!'
         d = make_service_dict('foo', {
@@ -2026,7 +2026,7 @@ class EnvTest(unittest.TestCase):
     def test_parse_environment_empty(self):
         self.assertEqual(config.parse_environment(None), {})
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_resolve_environment(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
@@ -2042,7 +2042,7 @@ class EnvTest(unittest.TestCase):
             },
         }
         self.assertEqual(
-            resolve_environment(service_dict),
+            resolve_environment(service_dict, Environment(None)),
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': None},
         )
 
@@ -2073,13 +2073,15 @@ class EnvTest(unittest.TestCase):
         assert 'Couldn\'t find env file' in exc.exconly()
         assert 'nonexistent.env' in exc.exconly()
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_resolve_environment_from_env_file_with_empty_values(self):
         os.environ['FILE_DEF'] = 'E1'
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
         self.assertEqual(
-            resolve_environment({'env_file': ['tests/fixtures/env/resolve.env']}),
+            resolve_environment(
+                {'env_file': ['tests/fixtures/env/resolve.env']}, Environment(None)
+            ),
             {
                 'FILE_DEF': u'bär',
                 'FILE_DEF_EMPTY': '',
@@ -2088,7 +2090,7 @@ class EnvTest(unittest.TestCase):
             },
         )
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_resolve_build_args(self):
         os.environ['env_arg'] = 'value2'
 
@@ -2102,12 +2104,12 @@ class EnvTest(unittest.TestCase):
             }
         }
         self.assertEqual(
-            resolve_build_args(build),
+            resolve_build_args(build, Environment(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_resolve_path(self):
         os.environ['HOSTENV'] = '/tmp'
         os.environ['CONTAINERENV'] = '/host/tmp'
@@ -2394,7 +2396,7 @@ class ExtendsTest(unittest.TestCase):
         assert 'net: container' in excinfo.exconly()
         assert 'cannot be extended' in excinfo.exconly()
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_load_config_runs_interpolation_in_extended_service(self):
         os.environ.update(HOSTNAME_VALUE="penguin")
         expected_interpolated_value = "host-penguin"
@@ -2466,7 +2468,7 @@ class ExtendsTest(unittest.TestCase):
             },
         ]))
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_extends_with_environment_and_env_files(self):
         tmpdir = py.test.ensuretemp('test_extends_with_environment')
         self.addCleanup(tmpdir.remove)

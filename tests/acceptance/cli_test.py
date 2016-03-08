@@ -15,7 +15,7 @@ from operator import attrgetter
 import yaml
 from docker import errors
 
-from ..helpers import clear_environment
+from .. import mock
 from compose.cli.command import get_project
 from compose.container import Container
 from compose.project import OneOffFilter
@@ -1452,7 +1452,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 1)
         self.assertIn("FOO=1", containers[0].get('Config.Env'))
 
-    @clear_environment
+    @mock.patch.dict(os.environ)
     def test_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
         os.environ['HOME'] = '/tmp/home-dir'

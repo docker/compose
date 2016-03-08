@@ -13,7 +13,6 @@ from compose.config.interpolation import interpolate_environment_variables
 @pytest.yield_fixture
 def mock_env():
     with mock.patch.dict(os.environ):
-        Environment.reset()
         os.environ['USER'] = 'jenny'
         os.environ['FOO'] = 'bar'
         yield
@@ -44,7 +43,9 @@ def test_interpolate_environment_variables_in_services(mock_env):
             }
         }
     }
-    assert interpolate_environment_variables(services, 'service') == expected
+    assert interpolate_environment_variables(
+        services, 'service', Environment(None)
+    ) == expected
 
 
 def test_interpolate_environment_variables_in_volumes(mock_env):
@@ -68,4 +69,6 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    assert interpolate_environment_variables(volumes, 'volume') == expected
+    assert interpolate_environment_variables(
+        volumes, 'volume', Environment(None)
+    ) == expected

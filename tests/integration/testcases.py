@@ -12,6 +12,7 @@ from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.environment import Environment
 from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
@@ -89,7 +90,7 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        kwargs['environment'] = resolve_environment(kwargs)
+        kwargs['environment'] = resolve_environment(kwargs, Environment(None))
         labels = dict(kwargs.setdefault('labels', {}))
         labels['com.docker.compose.test-name'] = self.id()
 
