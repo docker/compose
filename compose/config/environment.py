@@ -29,24 +29,10 @@ class BlankDefaultDict(dict):
 
 
 class Environment(BlankDefaultDict):
-    __instance = None
-
-    @classmethod
-    def get_instance(cls, base_dir='.'):
-        if cls.__instance:
-            return cls.__instance
-
-        instance = cls(base_dir)
-        cls.__instance = instance
-        return instance
-
-    @classmethod
-    def reset(cls):
-        cls.__instance = None
-
     def __init__(self, base_dir):
         super(Environment, self).__init__()
-        self.load_environment_file(os.path.join(base_dir, '.env'))
+        if base_dir:
+            self.load_environment_file(os.path.join(base_dir, '.env'))
         self.update(os.environ)
 
     def load_environment_file(self, path):
@@ -63,7 +49,3 @@ class Environment(BlankDefaultDict):
                     )
                 mapping.__setitem__(*line.split('=', 1))
         self.update(mapping)
-
-
-def get_instance(base_dir=None):
-    return Environment.get_instance(base_dir)

@@ -6,17 +6,15 @@ from string import Template
 
 import six
 
-from .environment import Environment
 from .errors import ConfigurationError
 log = logging.getLogger(__name__)
 
 
-def interpolate_environment_variables(config, section):
-    mapping = Environment.get_instance()
+def interpolate_environment_variables(config, section, environment):
 
     def process_item(name, config_dict):
         return dict(
-            (key, interpolate_value(name, key, val, section, mapping))
+            (key, interpolate_value(name, key, val, section, environment))
             for key, val in (config_dict or {}).items()
         )
 
