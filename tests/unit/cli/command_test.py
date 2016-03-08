@@ -4,26 +4,10 @@ from __future__ import unicode_literals
 import os
 
 import pytest
-from requests.exceptions import ConnectionError
 
-from compose.cli import errors
-from compose.cli.command import friendly_error_message
 from compose.cli.command import get_config_path_from_options
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
-
-
-class TestFriendlyErrorMessage(object):
-
-    def test_dispatch_generic_connection_error(self):
-        with pytest.raises(errors.ConnectionErrorGeneric):
-            with mock.patch(
-                'compose.cli.command.call_silently',
-                autospec=True,
-                side_effect=[0, 1]
-            ):
-                with friendly_error_message():
-                    raise ConnectionError()
 
 
 class TestGetConfigPathFromOptions(object):

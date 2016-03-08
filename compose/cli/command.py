@@ -1,52 +1,25 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import contextlib
 import logging
 import os
 import re
 
 import six
-from requests.exceptions import ConnectionError
-from requests.exceptions import SSLError
 
-from . import errors
 from . import verbose_proxy
 from .. import config
 from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
-from .utils import call_silently
 from .utils import get_version_info
-from .utils import is_mac
-from .utils import is_ubuntu
 
 log = logging.getLogger(__name__)
 
 
-@contextlib.contextmanager
-def friendly_error_message():
-    try:
-        yield
-    except SSLError as e:
-        raise errors.UserError('SSL error: %s' % e)
-    except ConnectionError:
-        if call_silently(['which', 'docker']) != 0:
-            if is_mac():
-                raise errors.DockerNotFoundMac()
-            elif is_ubuntu():
-                raise errors.DockerNotFoundUbuntu()
-            else:
-                raise errors.DockerNotFoundGeneric()
-        elif call_silently(['which', 'docker-machine']) == 0:
-            raise errors.ConnectionErrorDockerMachine()
-        else:
-            raise errors.ConnectionErrorGeneric(get_client().base_url)
-
-
-def project_from_options(base_dir, options):
+def project_from_options(project_dir, options):
     return get_project(
-        base_dir,
+        project_dir,
         get_config_path_from_options(options),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
@@ -76,8 +49,8 @@ def get_client(verbose=False, version=None):
     return client
 
 
-def get_project(base_dir, config_path=None, project_name=None, verbose=False):
-    config_details = config.find(base_dir, config_path)
+def get_project(project_dir, config_path=None, project_name=None, verbose=False):
+    config_details = config.find(project_dir, config_path)
     project_name = get_project_name(config_details.working_dir, project_name)
     config_data = config.load(config_details)
 

@@ -11,18 +11,14 @@ import sys
 from inspect import getdoc
 from operator import attrgetter
 
-from docker.errors import APIError
-from requests.exceptions import ReadTimeout
-
+from . import errors
 from . import signals
 from .. import __version__
 from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.serialize import serialize_config
-from ..const import API_VERSION_TO_ENGINE_VERSION
 from ..const import DEFAULT_TIMEOUT
-from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
@@ -31,7 +27,6 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
-from .command import friendly_error_message
 from .command import get_config_path_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
@@ -53,7 +48,6 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():
-    setup_logging()
     command = dispatch()
 
     try:
@@ -64,9 +58,6 @@ def main():
     except (UserError, NoSuchService, ConfigurationError) as e:
         log.error(e.msg)
         sys.exit(1)
-    except APIError as e:
-        log_api_error(e)
-        sys.exit(1)
     except BuildError as e:
         log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
         sys.exit(1)
@@ -76,18 +67,12 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
-    except ReadTimeout as e:
-        log.error(
-            "An HTTP request took too long to complete. Retry with --verbose to "
-            "obtain debug information.\n"
-            "If you encounter this issue regularly because of slow network "
-            "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
-            "value (current value: %s)." % HTTP_TIMEOUT
-        )
+    except errors.ConnectionError:
         sys.exit(1)
 
 
 def dispatch():
+    setup_logging()
     dispatcher = DocoptDispatcher(
         TopLevelCommand,
         {'options_first': True, 'version': get_version_info('compose')})
@@ -116,24 +101,8 @@ def perform_command(options, handler, command_options):
 
     project = project_from_options('.', options)
     command = TopLevelCommand(project)
-    with friendly_error_message():
+    with errors.handle_connection_errors(project.client):
         handler(command, command_options)
-
-
-def log_api_error(e):
-    if 'client is newer than server' in e.explanation:
-        # we need JSON formatted errors. In the meantime...
-        # TODO: fix this by refactoring project dispatch
-        # http://github.com/docker/compose/pull/2832#commitcomment-15923800
-        client_version = e.explanation.split('client API version: ')[1].split(',')[0]
-        log.error(
-            "The engine version is lesser than the minimum required by "
-            "compose. Your current project requires a Docker Engine of "
-            "version {version} or superior.".format(
-                version=API_VERSION_TO_ENGINE_VERSION[client_version]
-            ))
-    else:
-        log.error(e.explanation)
 
 
 def setup_logging():
