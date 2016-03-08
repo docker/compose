@@ -33,6 +33,14 @@ type Process struct {
 	// Cwd is the current working directory for the process and must be
 	// relative to the container's root.
 	Cwd string `json:"cwd"`
+	// Capabilities are linux capabilities that are kept for the container.
+	Capabilities []string `json:"capabilities,omitempty"`
+	// ApparmorProfile specified the apparmor profile for the container.
+	ApparmorProfile string `json:"apparmorProfile,omitempty"`
+	// SelinuxProcessLabel specifies the selinux context that the container process is run as.
+	SelinuxLabel string `json:"selinuxLabel,omitempty"`
+	// NoNewPrivileges controls whether additional privileges could be gained by processes in the container.
+	NoNewPrivileges bool `json:"noNewPrivileges,omitempty"`
 }
 
 // Root contains information about the container's root filesystem on the host.

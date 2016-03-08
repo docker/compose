@@ -14,8 +14,9 @@ type syncType uint8
 const (
 	procReady syncType = iota
 	procError
-	procStart
 	procRun
+	procHooks
+	procResume
 )
 
 type syncT struct {

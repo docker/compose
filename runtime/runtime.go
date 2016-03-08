@@ -32,6 +32,19 @@ const (
 
 type State string
 
+type Resource struct {
+	CPUShares         int64
+	BlkioWeight       uint16
+	CPUPeriod         int64
+	CPUQuota          int64
+	CpusetCpus        string
+	CpusetMems        string
+	KernelMemory      int64
+	Memory            int64
+	MemoryReservation int64
+	MemorySwap        int64
+}
+
 const (
 	Paused  = State("paused")
 	Stopped = State("stopped")

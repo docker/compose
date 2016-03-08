@@ -248,12 +248,20 @@ func setUserFieldsInProcess(p *types.Process, oldProc specs.ProcessSpec) {
 		Gid:            oldProc.User.GID,
 		AdditionalGids: oldProc.User.AdditionalGids,
 	}
+	p.Capabilities = oldProc.Capabilities
+	p.ApparmorProfile = oldProc.ApparmorProfile
+	p.SelinuxLabel = oldProc.SelinuxLabel
+	p.NoNewPrivileges = oldProc.NoNewPrivileges
 }
 
-func setPlatformRuntimeProcessSpecUserFields(r *types.User, process *specs.ProcessSpec) {
+func setPlatformRuntimeProcessSpecUserFields(r *types.AddProcessRequest, process *specs.ProcessSpec) {
 	process.User = ocs.User{
-		UID:            r.Uid,
-		GID:            r.Gid,
-		AdditionalGids: r.AdditionalGids,
+		UID:            r.User.Uid,
+		GID:            r.User.Gid,
+		AdditionalGids: r.User.AdditionalGids,
 	}
+	process.Capabilities = r.Capabilities
+	process.ApparmorProfile = r.ApparmorProfile
+	process.SelinuxLabel = r.SelinuxLabel
+	process.NoNewPrivileges = r.NoNewPrivileges
 }

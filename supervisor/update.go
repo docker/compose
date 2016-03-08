@@ -8,8 +8,9 @@ import (
 
 type UpdateTask struct {
 	baseTask
-	ID    string
-	State runtime.State
+	ID        string
+	State     runtime.State
+	Resources *runtime.Resource
 }
 
 func (s *Supervisor) updateContainer(t *UpdateTask) error {
@@ -41,6 +42,10 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 		default:
 			return ErrUnknownContainerStatus
 		}
+		return nil
+	}
+	if t.Resources != nil {
+		return container.UpdateResources(t.Resources)
 	}
 	return nil
 }

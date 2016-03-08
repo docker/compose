@@ -90,6 +90,17 @@ See links for details about [mountvol](http://ss64.com/nt/mountvol.html) and [Se
 * **`env`** (array of strings, optional) contains a list of variables that will be set in the process's environment prior to execution. Elements in the array are specified as Strings in the form "KEY=value". The left hand side must consist solely of letters, digits, and underscores `_` as outlined in [IEEE Std 1003.1-2001](http://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap08.html).
 * **`args`** (string, required) executable to launch and any flags as an array. The executable is the first element and must be available at the given path inside of the rootfs. If the executable path is not an absolute path then the search $PATH is interpreted to find the executable.
 
+For Linux-based systemd the process structure supports the following process specific fields:
+
+* **`capabilities`** (array of strings, optional) capabilities is an array that specifies Linux capabilities that can be provided to the process inside the container.
+Valid values are the strings for capabilities defined in [the man page](http://man7.org/linux/man-pages/man7/capabilities.7.html)
+* **`apparmorProfile`** (string, optional) apparmor profile specifies the name of the apparmor profile that will be used for the container.
+For more information about Apparmor, see [Apparmor documentation](https://wiki.ubuntu.com/AppArmor)
+* **`selinuxLabel`** (string, optional) SELinux process label specifies the label with which the processes in a container are run.
+For more information about SELinux, see  [Selinux documentation](http://selinuxproject.org/page/Main_Page)
+* **`noNewPrivileges`** (bool, optional) setting `noNewPrivileges` to true prevents the processes in the container from gaining additional privileges.
+[The kernel doc](https://www.kernel.org/doc/Documentation/prctl/no_new_privs.txt) has more information on how this is achieved using a prctl system call.
+
 The user for the process is a platform-specific structure that allows specific control over which user the process runs as.
 For Linux-based systems the user structure has the following fields:
 
@@ -114,6 +125,14 @@ For Linux-based systems the user structure has the following fields:
     "cwd": "/root",
     "args": [
         "sh"
+    ],
+    "apparmorProfile": "acme_secure_profile",
+    "selinuxLabel": "system_u:system_r:svirt_lxc_net_t:s0:c124,c675",
+    "noNewPrivileges": true,
+    "capabilities": [
+        "CAP_AUDIT_WRITE",
+        "CAP_KILL",
+        "CAP_NET_BIND_SERVICE"
     ]
 }
 ```

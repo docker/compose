@@ -73,7 +73,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 		Env:      r.Env,
 		Cwd:      r.Cwd,
 	}
-	setPlatformRuntimeProcessSpecUserFields(r.User, process)
+	setPlatformRuntimeProcessSpecUserFields(r, process)
 
 	if r.Id == "" {
 		return nil, fmt.Errorf("container id cannot be empty")
@@ -174,6 +174,40 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 	e := &supervisor.UpdateTask{}
 	e.ID = r.Id
 	e.State = runtime.State(r.Status)
+	if r.Resources != nil {
+		rs := r.Resources
+		e.Resources = &runtime.Resource{}
+		if rs.CpuShares != 0 {
+			e.Resources.CPUShares = int64(rs.CpuShares)
+		}
+		if rs.BlkioWeight != 0 {
+			e.Resources.BlkioWeight = uint16(rs.BlkioWeight)
+		}
+		if rs.CpuPeriod != 0 {
+			e.Resources.CPUPeriod = int64(rs.CpuPeriod)
+		}
+		if rs.CpuQuota != 0 {
+			e.Resources.CPUQuota = int64(rs.CpuQuota)
+		}
+		if rs.CpusetCpus != "" {
+			e.Resources.CpusetCpus = rs.CpusetCpus
+		}
+		if rs.CpusetMems != "" {
+			e.Resources.CpusetMems = rs.CpusetMems
+		}
+		if rs.KernelMemoryLimit != 0 {
+			e.Resources.KernelMemory = int64(rs.KernelMemoryLimit)
+		}
+		if rs.MemoryLimit != 0 {
+			e.Resources.Memory = int64(rs.MemoryLimit)
+		}
+		if rs.MemoryReservation != 0 {
+			e.Resources.MemoryReservation = int64(rs.MemoryReservation)
+		}
+		if rs.MemorySwap != 0 {
+			e.Resources.MemorySwap = int64(rs.MemorySwap)
+		}
+	}
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err

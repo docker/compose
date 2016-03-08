@@ -14,6 +14,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 )
 
 var (
@@ -30,6 +31,7 @@ var (
 		&NetPrioGroup{},
 		&PerfEventGroup{},
 		&FreezerGroup{},
+		&NameGroup{GroupName: "name=systemd", Join: true},
 	}
 	CgroupProcesses  = "cgroup.procs"
 	HugePageSizes, _ = cgroups.GetHugePageSize()
@@ -128,12 +130,9 @@ func (m *Manager) Apply(pid int) (err error) {
 		return cgroups.EnterPid(m.Paths, pid)
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	paths := make(map[string]string)
-	defer func() {
-		if err != nil {
-			cgroups.RemovePaths(paths)
-		}
-	}()
 	for _, sys := range subsystems {
 		if err := sys.Apply(d); err != nil {
 			return err
@@ -276,14 +275,19 @@ func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
 		return nil, fmt.Errorf("cgroup: either Path or Name and Parent should be used")
 	}
 
-	innerPath := c.Path
+	// XXX: Do not remove this code. Path safety is important! -- cyphar
+	cgPath := libcontainerUtils.CleanPath(c.Path)
+	cgParent := libcontainerUtils.CleanPath(c.Parent)
+	cgName := libcontainerUtils.CleanPath(c.Name)
+
+	innerPath := cgPath
 	if innerPath == "" {
-		innerPath = filepath.Join(c.Parent, c.Name)
+		innerPath = filepath.Join(cgParent, cgName)
 	}
 
 	return &cgroupData{
 		root:      root,
-		innerPath: c.Path,
+		innerPath: innerPath,
 		config:    c,
 		pid:       pid,
 	}, nil
