@@ -518,7 +518,7 @@ The general format is shown here.
 
 In the example below, three services are provided (`web`, `worker`, and `db`), along with two networks (`new` and `legacy`). The `db` service is reachable at the hostname `db` or `database` on the `new` network, and at `db` or `mysql` on the `legacy` network.
 
-    version: 2
+    version: '2'
 
     services:
       web:
