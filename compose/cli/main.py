@@ -117,8 +117,7 @@ def perform_command(options, handler, command_options):
     project = project_from_options('.', options)
     command = TopLevelCommand(project)
     with friendly_error_message():
-        # TODO: use self.project
-        handler(command, project, command_options)
+        handler(command, command_options)
 
 
 def log_api_error(e):
@@ -204,12 +203,12 @@ class TopLevelCommand(object):
       up                 Create and start containers
       version            Show the Docker-Compose version information
     """
-    base_dir = '.'
 
-    def __init__(self, project):
+    def __init__(self, project, project_dir='.'):
         self.project = project
+        self.project_dir = '.'
 
-    def build(self, project, options):
+    def build(self, options):
         """
         Build or rebuild services.
 
@@ -224,7 +223,7 @@ class TopLevelCommand(object):
             --no-cache  Do not use cache when building the image.
             --pull      Always attempt to pull a newer version of the image.
         """
-        project.build(
+        self.project.build(
             service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
@@ -243,7 +242,7 @@ class TopLevelCommand(object):
 
         """
         config_path = get_config_path_from_options(config_options)
-        compose_config = config.load(config.find(self.base_dir, config_path))
+        compose_config = config.load(config.find(self.project_dir, config_path))
 
         if options['--quiet']:
             return
@@ -254,7 +253,7 @@ class TopLevelCommand(object):
 
         print(serialize_config(compose_config))
 
-    def create(self, project, options):
+    def create(self, options):
         """
         Creates containers for a service.
 
@@ -270,13 +269,13 @@ class TopLevelCommand(object):
         """
         service_names = options['SERVICE']
 
-        project.create(
+        self.project.create(
             service_names=service_names,
             strategy=convergence_strategy_from_opts(options),
             do_build=build_action_from_opts(options),
         )
 
-    def down(self, project, options):
+    def down(self, options):
         """
         Stop containers and remove containers, networks, volumes, and images
         created by `up`. Only containers and networks are removed by default.
@@ -290,9 +289,9 @@ class TopLevelCommand(object):
             -v, --volumes   Remove data volumes
         """
         image_type = image_type_from_opt('--rmi', options['--rmi'])
-        project.down(image_type, options['--volumes'])
+        self.project.down(image_type, options['--volumes'])
 
-    def events(self, project, options):
+    def events(self, options):
         """
         Receive real time events from containers.
 
@@ -311,12 +310,12 @@ class TopLevelCommand(object):
             event['time'] = event['time'].isoformat()
             return json.dumps(event)
 
-        for event in project.events():
+        for event in self.project.events():
             formatter = json_format_event if options['--json'] else format_event
             print(formatter(event))
             sys.stdout.flush()
 
-    def exec_command(self, project, options):
+    def exec_command(self, options):
         """
         Execute a command in a running container
 
@@ -332,7 +331,7 @@ class TopLevelCommand(object):
                               instances of a service [default: 1]
         """
         index = int(options.get('--index'))
-        service = project.get_service(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -356,15 +355,15 @@ class TopLevelCommand(object):
         signals.set_signal_handler_to_shutdown()
         try:
             operation = ExecOperation(
-                    project.client,
+                    self.project.client,
                     exec_id,
                     interactive=tty,
             )
-            pty = PseudoTerminal(project.client, operation)
+            pty = PseudoTerminal(self.project.client, operation)
             pty.start()
         except signals.ShutdownException:
             log.info("received shutdown exception: closing")
-        exit_code = project.client.exec_inspect(exec_id).get("ExitCode")
+        exit_code = self.project.client.exec_inspect(exec_id).get("ExitCode")
         sys.exit(exit_code)
 
     @classmethod
@@ -377,7 +376,7 @@ class TopLevelCommand(object):
         handler = get_handler(cls, options['COMMAND'])
         raise SystemExit(getdoc(handler))
 
-    def kill(self, project, options):
+    def kill(self, options):
         """
         Force stop service containers.
 
@@ -389,9 +388,9 @@ class TopLevelCommand(object):
         """
         signal = options.get('-s', 'SIGKILL')
 
-        project.kill(service_names=options['SERVICE'], signal=signal)
+        self.project.kill(service_names=options['SERVICE'], signal=signal)
 
-    def logs(self, project, options):
+    def logs(self, options):
         """
         View output from containers.
 
@@ -404,7 +403,7 @@ class TopLevelCommand(object):
             --tail="all"        Number of lines to show from the end of the logs
                                 for each container.
         """
-        containers = project.containers(service_names=options['SERVICE'], stopped=True)
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
         tail = options['--tail']
@@ -421,16 +420,16 @@ class TopLevelCommand(object):
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, monochrome=monochrome, log_args=log_args).run()
 
-    def pause(self, project, options):
+    def pause(self, options):
         """
         Pause services.
 
         Usage: pause [SERVICE...]
         """
-        containers = project.pause(service_names=options['SERVICE'])
+        containers = self.project.pause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to pause', 1)
 
-    def port(self, project, options):
+    def port(self, options):
         """
         Print the public port for a port binding.
 
@@ -442,7 +441,7 @@ class TopLevelCommand(object):
                               instances of a service [default: 1]
         """
         index = int(options.get('--index'))
-        service = project.get_service(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -451,7 +450,7 @@ class TopLevelCommand(object):
             options['PRIVATE_PORT'],
             protocol=options.get('--protocol') or 'tcp') or '')
 
-    def ps(self, project, options):
+    def ps(self, options):
         """
         List containers.
 
@@ -461,8 +460,8 @@ class TopLevelCommand(object):
             -q    Only display IDs
         """
         containers = sorted(
-            project.containers(service_names=options['SERVICE'], stopped=True) +
-            project.containers(service_names=options['SERVICE'], one_off=True),
+            self.project.containers(service_names=options['SERVICE'], stopped=True) +
+            self.project.containers(service_names=options['SERVICE'], one_off=True),
             key=attrgetter('name'))
 
         if options['-q']:
@@ -488,7 +487,7 @@ class TopLevelCommand(object):
                 ])
             print(Formatter().table(headers, rows))
 
-    def pull(self, project, options):
+    def pull(self, options):
         """
         Pulls images for services.
 
@@ -497,12 +496,12 @@ class TopLevelCommand(object):
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
         """
-        project.pull(
+        self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures')
         )
 
-    def rm(self, project, options):
+    def rm(self, options):
         """
         Remove stopped service containers.
 
@@ -517,21 +516,21 @@ class TopLevelCommand(object):
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
         """
-        all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
+        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
             if options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
-                project.remove_stopped(
+                self.project.remove_stopped(
                     service_names=options['SERVICE'],
                     v=options.get('-v', False)
                 )
         else:
             print("No stopped containers")
 
-    def run(self, project, options):
+    def run(self, options):
         """
         Run a one-off command on a service.
 
@@ -560,7 +559,7 @@ class TopLevelCommand(object):
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
         """
-        service = project.get_service(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
 
         if IS_WINDOWS_PLATFORM and not detach:
@@ -608,9 +607,9 @@ class TopLevelCommand(object):
         if options['--name']:
             container_options['name'] = options['--name']
 
-        run_one_off_container(container_options, project, service, options)
+        run_one_off_container(container_options, self.project, service, options)
 
-    def scale(self, project, options):
+    def scale(self, options):
         """
         Set number of containers to run for a service.
 
@@ -636,18 +635,18 @@ class TopLevelCommand(object):
             except ValueError:
                 raise UserError('Number of containers for service "%s" is not a '
                                 'number' % service_name)
-            project.get_service(service_name).scale(num, timeout=timeout)
+            self.project.get_service(service_name).scale(num, timeout=timeout)
 
-    def start(self, project, options):
+    def start(self, options):
         """
         Start existing containers.
 
         Usage: start [SERVICE...]
         """
-        containers = project.start(service_names=options['SERVICE'])
+        containers = self.project.start(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to start', 1)
 
-    def stop(self, project, options):
+    def stop(self, options):
         """
         Stop running containers without removing them.
 
@@ -660,9 +659,9 @@ class TopLevelCommand(object):
                                      (default: 10)
         """
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
-        project.stop(service_names=options['SERVICE'], timeout=timeout)
+        self.project.stop(service_names=options['SERVICE'], timeout=timeout)
 
-    def restart(self, project, options):
+    def restart(self, options):
         """
         Restart running containers.
 
@@ -673,19 +672,19 @@ class TopLevelCommand(object):
                                      (default: 10)
         """
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
-        containers = project.restart(service_names=options['SERVICE'], timeout=timeout)
+        containers = self.project.restart(service_names=options['SERVICE'], timeout=timeout)
         exit_if(not containers, 'No containers to restart', 1)
 
-    def unpause(self, project, options):
+    def unpause(self, options):
         """
         Unpause services.
 
         Usage: unpause [SERVICE...]
         """
-        containers = project.unpause(service_names=options['SERVICE'])
+        containers = self.project.unpause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to unpause', 1)
 
-    def up(self, project, options):
+    def up(self, options):
         """
         Builds, (re)creates, starts, and attaches to containers for a service.
 
@@ -735,8 +734,8 @@ class TopLevelCommand(object):
         if detached and cascade_stop:
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        with up_shutdown_context(project, service_names, timeout, detached):
-            to_attach = project.up(
+        with up_shutdown_context(self.project, service_names, timeout, detached):
+            to_attach = self.project.up(
                 service_names=service_names,
                 start_deps=start_deps,
                 strategy=convergence_strategy_from_opts(options),
@@ -753,7 +752,7 @@ class TopLevelCommand(object):
 
             if cascade_stop:
                 print("Aborting on container exit...")
-                project.stop(service_names=service_names, timeout=timeout)
+                self.project.stop(service_names=service_names, timeout=timeout)
 
     @classmethod
     def version(cls, options):

@@ -89,7 +89,7 @@ class CLITestCase(unittest.TestCase):
         command = TopLevelCommand(project)
 
         with pytest.raises(SystemExit):
-            command.run(project, {
+            command.run({
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
@@ -122,7 +122,7 @@ class CLITestCase(unittest.TestCase):
         )
 
         command = TopLevelCommand(project)
-        command.run(project, {
+        command.run({
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
@@ -143,7 +143,7 @@ class CLITestCase(unittest.TestCase):
         )
 
         command = TopLevelCommand(project)
-        command.run(project, {
+        command.run({
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
@@ -173,7 +173,7 @@ class CLITestCase(unittest.TestCase):
         command = TopLevelCommand(project)
 
         with self.assertRaises(UserError):
-            command.run(project, {
+            command.run({
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
