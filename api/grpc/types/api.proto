@@ -221,6 +221,10 @@ message CpuStats {
 	uint64 system_usage = 3;
 }
 
+message PidsStats {
+	uint64 current = 1;
+}
+
 message MemoryData {
 	uint64 usage = 1;
 	uint64 max_usage = 2;
@@ -266,6 +270,7 @@ message CgroupStats {
 	MemoryStats memory_stats  = 2;
 	BlkioStats blkio_stats = 3;
 	map<string, HugetlbStats> hugetlb_stats = 4; // the map is in the format "size of hugepage: stats of the hugepage"
+	PidsStats pids_stats = 5;
 }
 
 message StatsResponse {

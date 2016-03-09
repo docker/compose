@@ -162,6 +162,9 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 			Failcnt:  st.Failcnt,
 		}
 	}
+	pbSt.CgroupStats.PidsStats = &types.PidsStats{
+		Current: lcSt.CgroupStats.PidsStats.Current,
+	}
 	return pbSt
 }
 
