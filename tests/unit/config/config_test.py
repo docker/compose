@@ -1583,6 +1583,19 @@ class PortsTest(unittest.TestCase):
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
+    def test_config_file_with_environment_file(self):
+        service_dicts = config.load(
+            config.find('tests/fixtures/default-env-file', None)
+        ).services
+
+        self.assertEqual(service_dicts[0], {
+            'name': 'web',
+            'image': 'alpine:latest',
+            'ports': ['5643', '9999'],
+            'command': 'true'
+        })
+
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
         os.environ.update(
             IMAGE="busybox",
