@@ -44,7 +44,7 @@ def test_interpolate_environment_variables_in_services(mock_env):
         }
     }
     assert interpolate_environment_variables(
-        services, 'service', Environment(None)
+        services, 'service', Environment()
     ) == expected
 
 
@@ -70,5 +70,5 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         'other': {},
     }
     assert interpolate_environment_variables(
-        volumes, 'volume', Environment(None)
+        volumes, 'volume', Environment()
     ) == expected

@@ -2042,7 +2042,7 @@ class EnvTest(unittest.TestCase):
             },
         }
         self.assertEqual(
-            resolve_environment(service_dict, Environment(None)),
+            resolve_environment(service_dict, Environment()),
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': None},
         )
 
@@ -2080,7 +2080,7 @@ class EnvTest(unittest.TestCase):
         os.environ['ENV_DEF'] = 'E3'
         self.assertEqual(
             resolve_environment(
-                {'env_file': ['tests/fixtures/env/resolve.env']}, Environment(None)
+                {'env_file': ['tests/fixtures/env/resolve.env']}, Environment()
             ),
             {
                 'FILE_DEF': u'bär',
@@ -2104,7 +2104,7 @@ class EnvTest(unittest.TestCase):
             }
         }
         self.assertEqual(
-            resolve_build_args(build, Environment(build['context'])),
+            resolve_build_args(build, Environment.from_env_file(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
 
