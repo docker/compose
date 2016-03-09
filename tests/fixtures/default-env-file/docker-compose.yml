@@ -1,0 +1,6 @@
+web:
+    image: ${IMAGE}
+    command: ${COMMAND}
+    ports:
+        - $PORT1
+        - $PORT2
