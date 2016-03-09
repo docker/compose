@@ -404,7 +404,7 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         assert (
             "services.web.build.args contains an invalid type, it should be an "
-            "array, or an object" in exc.exconly()
+            "object, or an array" in exc.exconly()
         )
 
     def test_config_integer_service_name_raise_validation_error(self):
@@ -688,6 +688,31 @@ class ConfigTest(unittest.TestCase):
         assert isinstance(service['build']['args']['opt1'], str)
         assert service['build']['args']['opt1'] == '42'
         assert service['build']['args']['opt2'] == 'foobar'
+
+    def test_build_args_allow_empty_properties(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'foo': None
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'foo' in service['build']['args']
+        assert service['build']['args']['foo'] == 'None'
 
     def test_load_with_multiple_files_mismatched_networks_format(self):
         base_file = config.ConfigFile(

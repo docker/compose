@@ -58,20 +58,7 @@
               "properties": {
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
-                "args": {
-                  "oneOf": [
-                    {"$ref": "#/definitions/list_of_strings"},
-                    {
-                      "type": "object",
-                      "patternProperties": {
-                        "^.+$": {
-                          "type": ["string", "number"]
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  ]
-                }
+                "args": {"$ref": "#/definitions/list_or_dict"}
               },
               "additionalProperties": false
             }
