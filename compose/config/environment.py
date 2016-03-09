@@ -49,7 +49,7 @@ class Environment(dict):
             return result
         env_file_path = os.path.join(base_dir, '.env')
         try:
-            result.update(env_vars_from_file(env_file_path))
+            return cls(env_vars_from_file(env_file_path))
         except ConfigurationError:
             pass
         return result
