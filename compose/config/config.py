@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import codecs
 import functools
 import logging
 import operator
@@ -17,7 +16,9 @@ from cached_property import cached_property
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..utils import build_string_dict
+from .environment import env_vars_from_file
 from .environment import Environment
+from .environment import split_env
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
@@ -129,7 +130,7 @@ class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files envir
             cls,
             working_dir,
             config_files,
-            Environment(working_dir),
+            Environment.from_env_file(working_dir),
         )
 
 
@@ -314,9 +315,7 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
-    service_dicts = load_services(
-        config_details, main_file,
-    )
+    service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
@@ -455,7 +454,7 @@ class ServiceExtendsResolver(object):
         self.working_dir = service_config.working_dir
         self.already_seen = already_seen or []
         self.config_file = config_file
-        self.environment = environment or Environment(None)
+        self.environment = environment or Environment()
 
     @property
     def signature(self):
@@ -802,15 +801,6 @@ def merge_environment(base, override):
     return env
 
 
-def split_env(env):
-    if isinstance(env, six.binary_type):
-        env = env.decode('utf-8', 'replace')
-    if '=' in env:
-        return env.split('=', 1)
-    else:
-        return env, None
-
-
 def split_label(label):
     if '=' in label:
         return label.split('=', 1)
@@ -855,21 +845,6 @@ def resolve_env_var(key, val, environment):
         return key, environment[key]
     else:
         return key, None
-
-
-def env_vars_from_file(filename):
-    """
-    Read in a line delimited file of environment variables.
-    """
-    if not os.path.exists(filename):
-        raise ConfigurationError("Couldn't find env file: %s" % filename)
-    env = {}
-    for line in codecs.open(filename, 'r', 'utf-8'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            k, v = split_env(line)
-            env[k] = v
-    return env
 
 
 def resolve_volume_paths(working_dir, service_dict):

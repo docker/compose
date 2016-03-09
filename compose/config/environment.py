@@ -1,22 +1,62 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import codecs
 import logging
 import os
+
+import six
 
 from .errors import ConfigurationError
 
 log = logging.getLogger(__name__)
 
 
-class BlankDefaultDict(dict):
+def split_env(env):
+    if isinstance(env, six.binary_type):
+        env = env.decode('utf-8', 'replace')
+    if '=' in env:
+        return env.split('=', 1)
+    else:
+        return env, None
+
+
+def env_vars_from_file(filename):
+    """
+    Read in a line delimited file of environment variables.
+    """
+    if not os.path.exists(filename):
+        raise ConfigurationError("Couldn't find env file: %s" % filename)
+    env = {}
+    for line in codecs.open(filename, 'r', 'utf-8'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            k, v = split_env(line)
+            env[k] = v
+    return env
+
+
+class Environment(dict):
     def __init__(self, *args, **kwargs):
-        super(BlankDefaultDict, self).__init__(*args, **kwargs)
+        super(Environment, self).__init__(*args, **kwargs)
         self.missing_keys = []
+        self.update(os.environ)
+
+    @classmethod
+    def from_env_file(cls, base_dir):
+        result = cls()
+        if base_dir is None:
+            return result
+        env_file_path = os.path.join(base_dir, '.env')
+        try:
+            result.update(env_vars_from_file(env_file_path))
+        except ConfigurationError:
+            pass
+        return result
 
     def __getitem__(self, key):
         try:
-            return super(BlankDefaultDict, self).__getitem__(key)
+            return super(Environment, self).__getitem__(key)
         except KeyError:
             if key not in self.missing_keys:
                 log.warn(
@@ -26,26 +66,3 @@ class BlankDefaultDict(dict):
                 self.missing_keys.append(key)
 
             return ""
-
-
-class Environment(BlankDefaultDict):
-    def __init__(self, base_dir):
-        super(Environment, self).__init__()
-        if base_dir:
-            self.load_environment_file(os.path.join(base_dir, '.env'))
-        self.update(os.environ)
-
-    def load_environment_file(self, path):
-        if not os.path.exists(path):
-            return
-        mapping = {}
-        with open(path, 'r') as f:
-            for line in f.readlines():
-                line = line.strip()
-                if '=' not in line:
-                    raise ConfigurationError(
-                        'Invalid environment variable mapping in env file. '
-                        'Missing "=" in "{0}"'.format(line)
-                    )
-                mapping.__setitem__(*line.split('=', 1))
-        self.update(mapping)
