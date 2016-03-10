@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import datetime
 import logging
+import operator
 from functools import reduce
 
 from docker.errors import APIError
@@ -200,13 +201,40 @@ class Project(object):
 
     def start(self, service_names=None, **options):
         containers = []
-        for service in self.get_services(service_names):
-            service_containers = service.start(**options)
+
+        def start_service(service):
+            service_containers = service.start(quiet=True, **options)
             containers.extend(service_containers)
+
+        services = self.get_services(service_names)
+
+        def get_deps(service):
+            return {self.get_service(dep) for dep in service.get_dependency_names()}
+
+        parallel.parallel_execute(
+            services,
+            start_service,
+            operator.attrgetter('name'),
+            'Starting',
+            get_deps)
+
         return containers
 
     def stop(self, service_names=None, **options):
-        parallel.parallel_stop(self.containers(service_names), options)
+        containers = self.containers(service_names)
+
+        def get_deps(container):
+            # actually returning inversed dependencies
+            return {other for other in containers
+                    if container.service in
+                    self.get_service(other.service).get_dependency_names()}
+
+        parallel.parallel_execute(
+            containers,
+            operator.methodcaller('stop', **options),
+            operator.attrgetter('name'),
+            'Stopping',
+            get_deps)
 
     def pause(self, service_names=None, **options):
         containers = self.containers(service_names)
@@ -314,15 +342,33 @@ class Project(object):
             include_deps=start_deps)
 
         plans = self._get_convergence_plans(services, strategy)
-        return [
-            container
-            for service in services
-            for container in service.execute_convergence_plan(
+
+        for svc in services:
+            svc.ensure_image_exists(do_build=do_build)
+
+        def do(service):
+            return service.execute_convergence_plan(
                 plans[service.name],
                 do_build=do_build,
                 timeout=timeout,
                 detached=detached
             )
+
+        def get_deps(service):
+            return {self.get_service(dep) for dep in service.get_dependency_names()}
+
+        results = parallel.parallel_execute(
+            services,
+            do,
+            operator.attrgetter('name'),
+            None,
+            get_deps
+        )
+        return [
+            container
+            for svc_containers in results
+            if svc_containers is not None
+            for container in svc_containers
         ]
 
     def initialize(self):

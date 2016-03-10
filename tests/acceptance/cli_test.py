@@ -8,6 +8,7 @@ import shlex
 import signal
 import subprocess
 import time
+from collections import Counter
 from collections import namedtuple
 from operator import attrgetter
 
@@ -1346,7 +1347,7 @@ class CLITestCase(DockerClientTestCase):
         os.kill(events_proc.pid, signal.SIGINT)
         result = wait_on_process(events_proc, returncode=1)
         lines = [json.loads(line) for line in result.stdout.rstrip().split('\n')]
-        assert [e['action'] for e in lines] == ['create', 'start', 'create', 'start']
+        assert Counter(e['action'] for e in lines) == {'create': 2, 'start': 2}
 
     def test_events_human_readable(self):
         events_proc = start_process(self.base_dir, ['events'])
