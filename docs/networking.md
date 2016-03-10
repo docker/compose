@@ -116,6 +116,30 @@ Here's an example Compose file defining two custom networks. The `proxy` service
           foo: "1"
           bar: "2"
 
+Networks can be configured with static IP addresses by setting the ipv4_address and/or ipv6_address for each attached network. The corresponding `network` section must have an `ipam` config entry with subnet and gateway configurations for each static address. If IPv6 addressing is desired, the `com.docker.network.enable_ipv6` driver option must be set to `true`. An example:
+
+    version: '2'
+
+    services:
+      app:
+        networks:
+          app_net:
+            ipv4_address: 172.16.238.10
+            ipv6_address: 2001:3984:3989::10
+
+    networks:
+      app_net:
+        driver: bridge
+        driver_opts:
+          com.docker.network.enable_ipv6: "true"
+        ipam:
+          driver: default
+          config:
+          - subnet: 172.16.238.0/24
+            gateway: 172.16.238.1
+          - subnet: 2001:3984:3989::/64
+            gateway: 2001:3984:3989::1
+
 For full details of the network configuration options available, see the following references:
 
 - [Top-level `networks` key](compose-file.md#network-configuration-reference)
