@@ -32,6 +32,8 @@ Options:
     -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
                                when attached or when containers are already
                                running. (default: 10)
+    --remove-orphans           Remove containers for services not defined in
+                               the Compose file
 
 ```
 
