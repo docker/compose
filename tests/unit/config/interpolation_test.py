@@ -1,21 +1,28 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import os
-
-import mock
 import pytest
 
 from compose.config.environment import Environment
 from compose.config.interpolation import interpolate_environment_variables
+from compose.config.interpolation import Interpolator
+from compose.config.interpolation import InvalidInterpolation
+from compose.config.interpolation import TemplateWithDefaults
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def mock_env():
-    with mock.patch.dict(os.environ):
-        os.environ['USER'] = 'jenny'
-        os.environ['FOO'] = 'bar'
-        yield
+    return Environment({'USER': 'jenny', 'FOO': 'bar'})
+
+
+@pytest.fixture
+def variable_mapping():
+    return Environment({'FOO': 'first', 'BAR': ''})
+
+
+@pytest.fixture
+def defaults_interpolator(variable_mapping):
+    return Interpolator(TemplateWithDefaults, variable_mapping).interpolate
 
 
 def test_interpolate_environment_variables_in_services(mock_env):
@@ -43,9 +50,8 @@ def test_interpolate_environment_variables_in_services(mock_env):
             }
         }
     }
-    assert interpolate_environment_variables(
-        services, 'service', Environment.from_env_file(None)
-    ) == expected
+    value = interpolate_environment_variables("2.0", services, 'service', mock_env)
+    assert value == expected
 
 
 def test_interpolate_environment_variables_in_volumes(mock_env):
@@ -69,6 +75,46 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    assert interpolate_environment_variables(
-        volumes, 'volume', Environment.from_env_file(None)
-    ) == expected
+    value = interpolate_environment_variables("2.0",  volumes, 'volume', mock_env)
+    assert value == expected
+
+
+def test_escaped_interpolation(defaults_interpolator):
+    assert defaults_interpolator('$${foo}') == '${foo}'
+
+
+def test_invalid_interpolation(defaults_interpolator):
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('$}')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${}')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${ }')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${ foo}')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${foo }')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${foo!}')
+
+
+def test_interpolate_missing_no_default(defaults_interpolator):
+    assert defaults_interpolator("This ${missing} var") == "This  var"
+    assert defaults_interpolator("This ${BAR} var") == "This  var"
+
+
+def test_interpolate_with_value(defaults_interpolator):
+    assert defaults_interpolator("This $FOO var") == "This first var"
+    assert defaults_interpolator("This ${FOO} var") == "This first var"
+
+
+def test_interpolate_missing_with_default(defaults_interpolator):
+    assert defaults_interpolator("ok ${missing:-def}") == "ok def"
+    assert defaults_interpolator("ok ${missing-def}") == "ok def"
+
+
+def test_interpolate_with_empty_and_default_value(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
+    assert defaults_interpolator("ok ${BAR-def}") == "ok "
