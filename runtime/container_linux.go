@@ -2,7 +2,9 @@ package runtime
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -308,6 +310,20 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 					return err
 				}
 				if !alive {
+					// runc could have failed to run the container so lets get the error
+					// out of the logs
+					messages, err := readLogMessages(filepath.Join(p.root, "log.json"))
+					if err != nil {
+						if os.IsNotExist(err) {
+							return ErrContainerNotStarted
+						}
+						return err
+					}
+					for _, m := range messages {
+						if m.Level == "error" {
+							return errors.New(m.Msg)
+						}
+					}
 					return ErrContainerNotStarted
 				}
 				time.Sleep(100 * time.Millisecond)
@@ -361,4 +377,30 @@ func (o *oom) Close() error {
 		err = cerr
 	}
 	return err
+}
+
+type message struct {
+	Level string `json:"level"`
+	Msg   string `json:"msg"`
+}
+
+func readLogMessages(path string) ([]message, error) {
+	var out []message
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	dec := json.NewDecoder(f)
+	for {
+		var m message
+		if err := dec.Decode(&m); err != nil {
+			if err == io.EOF {
+				return out, nil
+			}
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, nil
 }
