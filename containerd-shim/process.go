@@ -84,7 +84,11 @@ func (p *process) start() error {
 	if err != nil {
 		return err
 	}
-	args := []string{"--log", runtimeLog}
+	logPath := filepath.Join(cwd, "log.json")
+	args := []string{
+		"--log", logPath,
+		"--log-format", "json",
+	}
 	if p.state.Exec {
 		args = append(args, "exec",
 			"--process", filepath.Join(cwd, "process.json"),
@@ -140,7 +144,6 @@ func (p *process) start() error {
 	}
 	p.containerPid = pid
 	return nil
-
 }
 
 func (p *process) pid() int {
