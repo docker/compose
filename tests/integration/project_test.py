@@ -5,7 +5,6 @@ import random
 
 import py
 import pytest
-from docker.errors import APIError
 from docker.errors import NotFound
 
 from ..helpers import build_config
@@ -738,8 +737,7 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data,
         )
 
-        with self.assertRaises(APIError):
-            project.up()
+        assert len(project.up()) == 0
 
     @v2_only()
     def test_project_up_volumes(self):
