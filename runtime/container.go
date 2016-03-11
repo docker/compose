@@ -193,7 +193,7 @@ func (c *container) readSpec() (*specs.PlatformSpec, error) {
 		return nil, err
 	}
 	defer f.Close()
-	if err := json.NewDecoder(f).Decode(&spec.Spec); err != nil {
+	if err := json.NewDecoder(f).Decode(&spec); err != nil {
 		return nil, err
 	}
 	return &spec, nil
