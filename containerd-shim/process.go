@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 
 	"github.com/docker/containerd/runtime"
@@ -16,6 +17,7 @@ import (
 )
 
 type process struct {
+	sync.WaitGroup
 	id           string
 	bundle       string
 	stdio        *stdio
@@ -131,7 +133,12 @@ func (p *process) start() error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Pdeathsig: syscall.SIGKILL,
 	}
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	p.stdio.stdout.Close()
+	p.stdio.stderr.Close()
+	if err := cmd.Wait(); err != nil {
 		return err
 	}
 	data, err := ioutil.ReadFile("pid")
@@ -184,9 +191,11 @@ func (p *process) openIO() error {
 		if err != nil {
 			return err
 		}
+		p.Add(1)
 		go func() {
 			io.Copy(stdout, console)
 			console.Close()
+			p.Done()
 		}()
 		return nil
 	}
@@ -201,10 +210,18 @@ func (p *process) openIO() error {
 			go io.Copy(i.Stdin, f)
 		},
 		p.state.Stdout: func(f *os.File) {
-			go io.Copy(f, i.Stdout)
+			p.Add(1)
+			go func() {
+				io.Copy(f, i.Stdout)
+				p.Done()
+			}()
 		},
 		p.state.Stderr: func(f *os.File) {
-			go io.Copy(f, i.Stderr)
+			p.Add(1)
+			go func() {
+				io.Copy(f, i.Stderr)
+				p.Done()
+			}()
 		},
 	} {
 		f, err := os.OpenFile(name, syscall.O_RDWR, 0)

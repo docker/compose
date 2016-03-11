@@ -117,6 +117,7 @@ func main() {
 		}
 		// runtime has exited so the shim can also exit
 		if exitShim {
+			p.Wait()
 			return
 		}
 	}
