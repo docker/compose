@@ -166,7 +166,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	return p, nil
 }
 
-func (c *container) Exec(pid string, spec specs.ProcessSpec, s Stdio) (Process, error) {
+func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, pid)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
@@ -178,12 +178,17 @@ func (c *container) Exec(pid string, spec specs.ProcessSpec, s Stdio) (Process, 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
+	spec, err := c.readSpec()
+	if err != nil {
+		return nil, err
+	}
 	config := &processConfig{
 		exec:        true,
 		id:          pid,
 		root:        processRoot,
 		c:           c,
-		processSpec: spec,
+		processSpec: pspec,
+		spec:        spec,
 		stdio:       s,
 	}
 	p, err := newProcess(config)
