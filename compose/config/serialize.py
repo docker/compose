@@ -23,6 +23,10 @@ def serialize_config(config):
         'networks': config.networks,
         'volumes': config.volumes,
     }
+
+    if config.project_name:
+        output['project_name'] = config.project_name
+
     return yaml.safe_dump(
         output,
         default_flow_style=False,

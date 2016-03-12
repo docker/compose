@@ -936,6 +936,18 @@ Example:
     redis:
       image: redis
 
+## Project name
+
+The default project name is the basename of the project directory. 
+But you can set it in `docker-compose.yml`, to make sure that all of your team members 
+will use the same project name by default.
+
+This property is setting default project name, so you can override it by using the
+[`-p` command line option](./reference/overview.md) or the
+[`COMPOSE_PROJECT_NAME` environment variable](./reference/envvars.md#compose-project-name).
+
+> **Note:** The `project_name` is only supported in the
+> [version 2 file format](#version-2).
 
 ### Version 2
 
@@ -963,9 +975,10 @@ Simple example:
       redis:
         image: redis
 
-A more extended example, defining volumes and networks:
+A more extended example, defining project name, volumes and networks:
 
     version: '2'
+    project_name: "myapp"
     services:
       web:
         build: .
@@ -990,7 +1003,6 @@ A more extended example, defining volumes and networks:
         driver: bridge
       back-tier:
         driver: bridge
-
 
 ### Upgrading
 

@@ -1,6 +1,8 @@
 
 version: "2"
 
+project_name: example
+
 volumes:
   data:
     driver: local

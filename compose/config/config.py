@@ -167,6 +167,26 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
         return version
 
+    @cached_property
+    def project_name(self):
+        if 'project_name' not in self.config:
+            return None
+
+        project_name = self.config['project_name']
+
+        if isinstance(project_name, dict):
+            log.warn('Unexpected type for "project_name" key in "{}". Assuming '
+                     '"project_name" is the name of a service, and defaulting to '
+                     'Compose file version 1.'.format(self.filename))
+            return None
+
+        if not isinstance(project_name, six.string_types):
+            raise ConfigurationError(
+                'Project name in "{}" is invalid - it should be a string.'
+                .format(self.filename))
+
+        return self.config['project_name']
+
     def get_service(self, name):
         return self.get_service_dicts()[name]
 
@@ -191,6 +211,24 @@ class Config(namedtuple('_Config', 'version services volumes networks')):
     :param networks: Dictionary mapping network names to description dictionaries
     :type  networks: :class:`dict`
     """
+
+    project_name = None
+
+    @classmethod
+    def with_project_name(cls, version, project_name, services, volumes, networks):
+        if not project_name:
+            raise ValueError("No project name for Config")
+
+        config = cls(
+            version,
+            services,
+            volumes,
+            networks
+        )
+
+        config.project_name = project_name
+
+        return config
 
 
 class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name config')):
@@ -309,6 +347,15 @@ def load(config_details):
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
+
+    if main_file.project_name:
+        return Config.with_project_name(
+            main_file.version,
+            main_file.project_name,
+            service_dicts,
+            volumes,
+            networks
+        )
 
     return Config(main_file.version, service_dicts, volumes, networks)
 

@@ -93,8 +93,9 @@ Compose uses a project name to isolate environments from each other. You can mak
 
 The default project name is the basename of the project directory. You can set
 a custom project name by using the
-[`-p` command line option](./reference/overview.md) or the
-[`COMPOSE_PROJECT_NAME` environment variable](./reference/envvars.md#compose-project-name).
+[`-p` command line option](./reference/overview.md), the
+[`COMPOSE_PROJECT_NAME` environment variable](./reference/envvars.md#compose-project-name)
+or specify it in [docker-compose.yml](./compose-file.md#project-name). 
 
 ### Preserve volume data when containers are created
 

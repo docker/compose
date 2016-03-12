@@ -8,6 +8,10 @@
       "type": "string"
     },
 
+    "project_name": {
+      "type": "string"
+    },
+
     "services": {
       "id": "#/properties/services",
       "type": "object",
