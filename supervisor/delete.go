@@ -9,9 +9,10 @@ import (
 
 type DeleteTask struct {
 	baseTask
-	ID     string
-	Status int
-	PID    string
+	ID      string
+	Status  int
+	PID     string
+	NoEvent bool
 }
 
 func (s *Supervisor) delete(t *DeleteTask) error {
@@ -20,13 +21,15 @@ func (s *Supervisor) delete(t *DeleteTask) error {
 		if err := s.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
-		s.notifySubscribers(Event{
-			Type:      "exit",
-			Timestamp: time.Now(),
-			ID:        t.ID,
-			Status:    t.Status,
-			PID:       t.PID,
-		})
+		if !t.NoEvent {
+			s.notifySubscribers(Event{
+				Type:      "exit",
+				Timestamp: time.Now(),
+				ID:        t.ID,
+				Status:    t.Status,
+				PID:       t.PID,
+			})
+		}
 		ContainersCounter.Dec(1)
 		ContainerDeleteTimer.UpdateSince(start)
 	}

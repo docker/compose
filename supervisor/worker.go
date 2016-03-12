@@ -46,7 +46,8 @@ func (w *worker) Start() {
 			}).Error("containerd: start container")
 			t.Err <- err
 			evt := &DeleteTask{
-				ID: t.Container.ID(),
+				ID:      t.Container.ID(),
+				NoEvent: true,
 			}
 			w.s.SendTask(evt)
 			continue
