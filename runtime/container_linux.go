@@ -208,7 +208,7 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (Process,
 }
 
 func (c *container) getLibctContainer() (libcontainer.Container, error) {
-	f, err := libcontainer.New(ocs.LinuxStateDirectory, libcontainer.Cgroupfs)
+	f, err := libcontainer.New("/run/runc", libcontainer.Cgroupfs)
 	if err != nil {
 		return nil, err
 	}
