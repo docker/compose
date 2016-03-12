@@ -50,6 +50,18 @@ class CLITestCase(unittest.TestCase):
             project_name = get_project_name(None)
         self.assertEquals(project_name, name)
 
+    def test_project_name_from_environment_new_var_over_config(self):
+        name = 'namefromenv'
+        with mock.patch.dict(os.environ):
+            os.environ['COMPOSE_PROJECT_NAME'] = name
+            project_name = get_project_name(None, None, 'name-from-config')
+        self.assertEquals(project_name, name)
+
+    def test_project_name_from_config(self):
+        default_project_name = 'defaultname'
+        project_name = get_project_name(None, project_name=None, default_project_name='default name')
+        self.assertEquals(project_name, default_project_name)
+
     def test_project_name_with_empty_environment_var(self):
         base_dir = 'tests/fixtures/simple-composefile'
         with mock.patch.dict(os.environ):
