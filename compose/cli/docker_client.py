@@ -14,32 +14,7 @@ from .errors import UserError
 log = logging.getLogger(__name__)
 
 
-def tls_config_from_options(options):
-    tls = options.get('--tls', False)
-    ca_cert = options.get('--tlscacert')
-    cert = options.get('--tlscert')
-    key = options.get('--tlskey')
-    verify = options.get('--tlsverify')
-    skip_hostname_check = options.get('--skip-hostname-check', False)
-
-    advanced_opts = any([ca_cert, cert, key, verify])
-
-    if tls is True and not advanced_opts:
-        return True
-    elif advanced_opts:  # --tls is a noop
-        client_cert = None
-        if cert or key:
-            client_cert = (cert, key)
-
-        return TLSConfig(
-            client_cert=client_cert, verify=verify, ca_cert=ca_cert,
-            assert_hostname=False if skip_hostname_check else None
-        )
-
-    return None
-
-
-def docker_client(environment, version=None, tls_config=None, host=None):
+def docker_client(version=None, tls_version=None):
     """
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
@@ -49,7 +24,7 @@ def docker_client(environment, version=None, tls_config=None, host=None):
                  "Please use COMPOSE_HTTP_TIMEOUT instead.")
 
     try:
-        kwargs = kwargs_from_env(environment=environment)
+        kwargs = kwargs_from_env(assert_hostname=False, ssl_version=tls_version)
     except TLSParameterError:
         raise UserError(
             "TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY "
