@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 
 	"github.com/docker/containerd/specs"
 )
@@ -36,6 +37,8 @@ type Process interface {
 	Stdio() Stdio
 	// SystemPid is the pid on the system
 	SystemPid() int
+	// State returns if the process is running or not
+	State() State
 }
 
 type processConfig struct {
@@ -176,6 +179,17 @@ func (p *process) Stdio() Stdio {
 // Close closes any open files and/or resouces on the process
 func (p *process) Close() error {
 	return p.exitPipe.Close()
+}
+
+func (p *process) State() State {
+	if p.pid == 0 {
+		return Stopped
+	}
+	err := syscall.Kill(p.pid, 0)
+	if err != nil && err == syscall.ESRCH {
+		return Stopped
+	}
+	return Running
 }
 
 func (p *process) getPidFromFile() (int, error) {

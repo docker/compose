@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
@@ -200,7 +201,9 @@ func (c *container) readSpec() (*specs.PlatformSpec, error) {
 }
 
 func (c *container) Delete() error {
-	return os.RemoveAll(filepath.Join(c.root, c.id))
+	err := os.RemoveAll(filepath.Join(c.root, c.id))
+	exec.Command(c.runtime, "delete", c.id).Run()
+	return err
 }
 
 func (c *container) Processes() ([]Process, error) {
