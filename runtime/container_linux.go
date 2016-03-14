@@ -164,11 +164,16 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	return p, nil
 }
 
-func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (Process, error) {
+func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Process, err error) {
 	processRoot := filepath.Join(c.root, c.id, pid)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			c.RemoveProcess(pid)
+		}
+	}()
 	cmd := exec.Command("containerd-shim",
 		c.id, c.bundle, c.runtime,
 	)
