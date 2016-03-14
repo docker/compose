@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
+import ssl
 
 import six
 
@@ -37,8 +38,8 @@ def get_config_path_from_options(options):
     return None
 
 
-def get_client(verbose=False, version=None):
-    client = docker_client(version=version)
+def get_client(verbose=False, version=None, tls_version=None):
+    client = docker_client(version=version, tls_version=tls_version)
     if verbose:
         version_info = six.iteritems(client.version())
         log.info(get_version_info('full'))
@@ -57,7 +58,15 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False)
     api_version = os.environ.get(
         'COMPOSE_API_VERSION',
         API_VERSIONS[config_data.version])
-    client = get_client(verbose=verbose, version=api_version)
+    compose_tls_version = os.environ.get(
+        'COMPOSE_TLS_VERSION',
+        None)
+
+    tls_version = None
+    if compose_tls_version:
+        tls_version = ssl.getattr("PROTOCOL_{}".format(compose_tls_version))
+
+    client = get_client(verbose=verbose, version=api_version, tls_version=tls_version)
 
     return Project.from_config(project_name, config_data, client)
 
