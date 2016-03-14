@@ -57,6 +57,10 @@ func (p *testProcess) Close() error {
 	return nil
 }
 
+func (p *testProcess) State() runtime.State {
+	return runtime.Running
+}
+
 func TestSortProcesses(t *testing.T) {
 	p := []runtime.Process{
 		&testProcess{"ls"},

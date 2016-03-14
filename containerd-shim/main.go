@@ -58,11 +58,9 @@ func main() {
 		if err := p.Close(); err != nil {
 			logrus.WithField("error", err).Error("shim: close stdio")
 		}
-		if err := p.delete(); err != nil {
-			logrus.WithField("error", err).Error("shim: delete runtime state")
-		}
 	}()
 	if err := p.start(); err != nil {
+		p.delete()
 		logrus.WithField("error", err).Error("shim: start process")
 		return
 	}
@@ -117,6 +115,7 @@ func main() {
 		}
 		// runtime has exited so the shim can also exit
 		if exitShim {
+			p.delete()
 			p.Wait()
 			return
 		}
