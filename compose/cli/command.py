@@ -9,6 +9,7 @@ import six
 
 from . import verbose_proxy
 from .. import config
+from ..config.environment import Environment
 from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
@@ -34,7 +35,7 @@ def get_config_path_from_options(base_dir, options):
     if file_option:
         return file_option
 
-    environment = config.environment.Environment.from_env_file(base_dir)
+    environment = Environment.from_env_file(base_dir)
     config_files = environment.get('COMPOSE_FILE')
     if config_files:
         return config_files.split(os.pathsep)
@@ -58,7 +59,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     config_details = config.find(project_dir, config_path)
     project_name = get_project_name(config_details.working_dir, project_name)
     config_data = config.load(config_details)
-    environment = config.environment.Environment.from_env_file(project_dir)
+    environment = Environment.from_env_file(project_dir)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',
@@ -75,7 +76,7 @@ def get_project_name(working_dir, project_name=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    environment = config.environment.Environment.from_env_file(working_dir)
+    environment = Environment.from_env_file(working_dir)
     project_name = project_name or environment.get('COMPOSE_PROJECT_NAME')
     if project_name:
         return normalize_name(project_name)
