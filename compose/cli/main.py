@@ -3,6 +3,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import contextlib
+import functools
 import json
 import logging
 import re
@@ -10,18 +11,14 @@ import sys
 from inspect import getdoc
 from operator import attrgetter
 
-from docker.errors import APIError
-from requests.exceptions import ReadTimeout
-
+from . import errors
 from . import signals
 from .. import __version__
 from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.serialize import serialize_config
-from ..const import API_VERSION_TO_ENGINE_VERSION
 from ..const import DEFAULT_TIMEOUT
-from ..const import HTTP_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
@@ -30,10 +27,10 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
-from .command import friendly_error_message
 from .command import get_config_path_from_options
 from .command import project_from_options
-from .docopt_command import DocoptCommand
+from .docopt_command import DocoptDispatcher
+from .docopt_command import get_handler
 from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import ConsoleWarningFormatter
@@ -51,22 +48,15 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():
-    setup_logging()
+    command = dispatch()
+
     try:
-        command = TopLevelCommand()
-        command.sys_dispatch()
+        command()
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
     except (UserError, NoSuchService, ConfigurationError) as e:
         log.error(e.msg)
-        sys.exit(1)
-    except NoSuchCommand as e:
-        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
-        log.error("No such command: %s\n\n%s", e.command, commands)
-        sys.exit(1)
-    except APIError as e:
-        log_api_error(e)
         sys.exit(1)
     except BuildError as e:
         log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
@@ -77,31 +67,42 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
-    except ReadTimeout as e:
-        log.error(
-            "An HTTP request took too long to complete. Retry with --verbose to "
-            "obtain debug information.\n"
-            "If you encounter this issue regularly because of slow network "
-            "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
-            "value (current value: %s)." % HTTP_TIMEOUT
-        )
+    except errors.ConnectionError:
         sys.exit(1)
 
 
-def log_api_error(e):
-    if 'client is newer than server' in e.explanation:
-        # we need JSON formatted errors. In the meantime...
-        # TODO: fix this by refactoring project dispatch
-        # http://github.com/docker/compose/pull/2832#commitcomment-15923800
-        client_version = e.explanation.split('client API version: ')[1].split(',')[0]
-        log.error(
-            "The engine version is lesser than the minimum required by "
-            "compose. Your current project requires a Docker Engine of "
-            "version {version} or superior.".format(
-                version=API_VERSION_TO_ENGINE_VERSION[client_version]
-            ))
-    else:
-        log.error(e.explanation)
+def dispatch():
+    setup_logging()
+    dispatcher = DocoptDispatcher(
+        TopLevelCommand,
+        {'options_first': True, 'version': get_version_info('compose')})
+
+    try:
+        options, handler, command_options = dispatcher.parse(sys.argv[1:])
+    except NoSuchCommand as e:
+        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
+        log.error("No such command: %s\n\n%s", e.command, commands)
+        sys.exit(1)
+
+    setup_console_handler(console_handler, options.get('--verbose'))
+    return functools.partial(perform_command, options, handler, command_options)
+
+
+def perform_command(options, handler, command_options):
+    if options['COMMAND'] in ('help', 'version'):
+        # Skip looking up the compose file.
+        handler(command_options)
+        return
+
+    if options['COMMAND'] == 'config':
+        command = TopLevelCommand(None)
+        handler(command, options, command_options)
+        return
+
+    project = project_from_options('.', options)
+    command = TopLevelCommand(project)
+    with errors.handle_connection_errors(project.client):
+        handler(command, command_options)
 
 
 def setup_logging():
@@ -134,7 +135,7 @@ def parse_doc_section(name, source):
     return [s.strip() for s in pattern.findall(source)]
 
 
-class TopLevelCommand(DocoptCommand):
+class TopLevelCommand(object):
     """Define and run multi-container applications with Docker.
 
     Usage:
@@ -171,30 +172,12 @@ class TopLevelCommand(DocoptCommand):
       up                 Create and start containers
       version            Show the Docker-Compose version information
     """
-    base_dir = '.'
 
-    def docopt_options(self):
-        options = super(TopLevelCommand, self).docopt_options()
-        options['version'] = get_version_info('compose')
-        return options
+    def __init__(self, project, project_dir='.'):
+        self.project = project
+        self.project_dir = '.'
 
-    def perform_command(self, options, handler, command_options):
-        setup_console_handler(console_handler, options.get('--verbose'))
-
-        if options['COMMAND'] in ('help', 'version'):
-            # Skip looking up the compose file.
-            handler(None, command_options)
-            return
-
-        if options['COMMAND'] == 'config':
-            handler(options, command_options)
-            return
-
-        project = project_from_options(self.base_dir, options)
-        with friendly_error_message():
-            handler(project, command_options)
-
-    def build(self, project, options):
+    def build(self, options):
         """
         Build or rebuild services.
 
@@ -209,7 +192,7 @@ class TopLevelCommand(DocoptCommand):
             --no-cache  Do not use cache when building the image.
             --pull      Always attempt to pull a newer version of the image.
         """
-        project.build(
+        self.project.build(
             service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
@@ -228,7 +211,7 @@ class TopLevelCommand(DocoptCommand):
 
         """
         config_path = get_config_path_from_options(config_options)
-        compose_config = config.load(config.find(self.base_dir, config_path))
+        compose_config = config.load(config.find(self.project_dir, config_path))
 
         if options['--quiet']:
             return
@@ -239,7 +222,7 @@ class TopLevelCommand(DocoptCommand):
 
         print(serialize_config(compose_config))
 
-    def create(self, project, options):
+    def create(self, options):
         """
         Creates containers for a service.
 
@@ -255,13 +238,13 @@ class TopLevelCommand(DocoptCommand):
         """
         service_names = options['SERVICE']
 
-        project.create(
+        self.project.create(
             service_names=service_names,
             strategy=convergence_strategy_from_opts(options),
             do_build=build_action_from_opts(options),
         )
 
-    def down(self, project, options):
+    def down(self, options):
         """
         Stop containers and remove containers, networks, volumes, and images
         created by `up`. Only containers and networks are removed by default.
@@ -275,9 +258,9 @@ class TopLevelCommand(DocoptCommand):
             -v, --volumes   Remove data volumes
         """
         image_type = image_type_from_opt('--rmi', options['--rmi'])
-        project.down(image_type, options['--volumes'])
+        self.project.down(image_type, options['--volumes'])
 
-    def events(self, project, options):
+    def events(self, options):
         """
         Receive real time events from containers.
 
@@ -296,12 +279,12 @@ class TopLevelCommand(DocoptCommand):
             event['time'] = event['time'].isoformat()
             return json.dumps(event)
 
-        for event in project.events():
+        for event in self.project.events():
             formatter = json_format_event if options['--json'] else format_event
             print(formatter(event))
             sys.stdout.flush()
 
-    def exec_command(self, project, options):
+    def exec_command(self, options):
         """
         Execute a command in a running container
 
@@ -317,7 +300,7 @@ class TopLevelCommand(DocoptCommand):
                               instances of a service [default: 1]
         """
         index = int(options.get('--index'))
-        service = project.get_service(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -341,27 +324,28 @@ class TopLevelCommand(DocoptCommand):
         signals.set_signal_handler_to_shutdown()
         try:
             operation = ExecOperation(
-                    project.client,
+                    self.project.client,
                     exec_id,
                     interactive=tty,
             )
-            pty = PseudoTerminal(project.client, operation)
+            pty = PseudoTerminal(self.project.client, operation)
             pty.start()
         except signals.ShutdownException:
             log.info("received shutdown exception: closing")
-        exit_code = project.client.exec_inspect(exec_id).get("ExitCode")
+        exit_code = self.project.client.exec_inspect(exec_id).get("ExitCode")
         sys.exit(exit_code)
 
-    def help(self, project, options):
+    @classmethod
+    def help(cls, options):
         """
         Get help on a command.
 
         Usage: help COMMAND
         """
-        handler = self.get_handler(options['COMMAND'])
+        handler = get_handler(cls, options['COMMAND'])
         raise SystemExit(getdoc(handler))
 
-    def kill(self, project, options):
+    def kill(self, options):
         """
         Force stop service containers.
 
@@ -373,9 +357,9 @@ class TopLevelCommand(DocoptCommand):
         """
         signal = options.get('-s', 'SIGKILL')
 
-        project.kill(service_names=options['SERVICE'], signal=signal)
+        self.project.kill(service_names=options['SERVICE'], signal=signal)
 
-    def logs(self, project, options):
+    def logs(self, options):
         """
         View output from containers.
 
@@ -388,7 +372,7 @@ class TopLevelCommand(DocoptCommand):
             --tail="all"        Number of lines to show from the end of the logs
                                 for each container.
         """
-        containers = project.containers(service_names=options['SERVICE'], stopped=True)
+        containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
         monochrome = options['--no-color']
         tail = options['--tail']
@@ -405,16 +389,16 @@ class TopLevelCommand(DocoptCommand):
         print("Attaching to", list_containers(containers))
         LogPrinter(containers, monochrome=monochrome, log_args=log_args).run()
 
-    def pause(self, project, options):
+    def pause(self, options):
         """
         Pause services.
 
         Usage: pause [SERVICE...]
         """
-        containers = project.pause(service_names=options['SERVICE'])
+        containers = self.project.pause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to pause', 1)
 
-    def port(self, project, options):
+    def port(self, options):
         """
         Print the public port for a port binding.
 
@@ -426,7 +410,7 @@ class TopLevelCommand(DocoptCommand):
                               instances of a service [default: 1]
         """
         index = int(options.get('--index'))
-        service = project.get_service(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -435,7 +419,7 @@ class TopLevelCommand(DocoptCommand):
             options['PRIVATE_PORT'],
             protocol=options.get('--protocol') or 'tcp') or '')
 
-    def ps(self, project, options):
+    def ps(self, options):
         """
         List containers.
 
@@ -445,8 +429,8 @@ class TopLevelCommand(DocoptCommand):
             -q    Only display IDs
         """
         containers = sorted(
-            project.containers(service_names=options['SERVICE'], stopped=True) +
-            project.containers(service_names=options['SERVICE'], one_off=True),
+            self.project.containers(service_names=options['SERVICE'], stopped=True) +
+            self.project.containers(service_names=options['SERVICE'], one_off=True),
             key=attrgetter('name'))
 
         if options['-q']:
@@ -472,7 +456,7 @@ class TopLevelCommand(DocoptCommand):
                 ])
             print(Formatter().table(headers, rows))
 
-    def pull(self, project, options):
+    def pull(self, options):
         """
         Pulls images for services.
 
@@ -481,12 +465,12 @@ class TopLevelCommand(DocoptCommand):
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
         """
-        project.pull(
+        self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures')
         )
 
-    def rm(self, project, options):
+    def rm(self, options):
         """
         Remove stopped service containers.
 
@@ -501,21 +485,21 @@ class TopLevelCommand(DocoptCommand):
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
         """
-        all_containers = project.containers(service_names=options['SERVICE'], stopped=True)
+        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
             if options.get('--force') \
                     or yesno("Are you sure? [yN] ", default=False):
-                project.remove_stopped(
+                self.project.remove_stopped(
                     service_names=options['SERVICE'],
                     v=options.get('-v', False)
                 )
         else:
             print("No stopped containers")
 
-    def run(self, project, options):
+    def run(self, options):
         """
         Run a one-off command on a service.
 
@@ -544,7 +528,7 @@ class TopLevelCommand(DocoptCommand):
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
         """
-        service = project.get_service(options['SERVICE'])
+        service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
 
         if IS_WINDOWS_PLATFORM and not detach:
@@ -592,9 +576,9 @@ class TopLevelCommand(DocoptCommand):
         if options['--name']:
             container_options['name'] = options['--name']
 
-        run_one_off_container(container_options, project, service, options)
+        run_one_off_container(container_options, self.project, service, options)
 
-    def scale(self, project, options):
+    def scale(self, options):
         """
         Set number of containers to run for a service.
 
@@ -620,18 +604,18 @@ class TopLevelCommand(DocoptCommand):
             except ValueError:
                 raise UserError('Number of containers for service "%s" is not a '
                                 'number' % service_name)
-            project.get_service(service_name).scale(num, timeout=timeout)
+            self.project.get_service(service_name).scale(num, timeout=timeout)
 
-    def start(self, project, options):
+    def start(self, options):
         """
         Start existing containers.
 
         Usage: start [SERVICE...]
         """
-        containers = project.start(service_names=options['SERVICE'])
+        containers = self.project.start(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to start', 1)
 
-    def stop(self, project, options):
+    def stop(self, options):
         """
         Stop running containers without removing them.
 
@@ -644,9 +628,9 @@ class TopLevelCommand(DocoptCommand):
                                      (default: 10)
         """
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
-        project.stop(service_names=options['SERVICE'], timeout=timeout)
+        self.project.stop(service_names=options['SERVICE'], timeout=timeout)
 
-    def restart(self, project, options):
+    def restart(self, options):
         """
         Restart running containers.
 
@@ -657,19 +641,19 @@ class TopLevelCommand(DocoptCommand):
                                      (default: 10)
         """
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
-        containers = project.restart(service_names=options['SERVICE'], timeout=timeout)
+        containers = self.project.restart(service_names=options['SERVICE'], timeout=timeout)
         exit_if(not containers, 'No containers to restart', 1)
 
-    def unpause(self, project, options):
+    def unpause(self, options):
         """
         Unpause services.
 
         Usage: unpause [SERVICE...]
         """
-        containers = project.unpause(service_names=options['SERVICE'])
+        containers = self.project.unpause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to unpause', 1)
 
-    def up(self, project, options):
+    def up(self, options):
         """
         Builds, (re)creates, starts, and attaches to containers for a service.
 
@@ -719,8 +703,8 @@ class TopLevelCommand(DocoptCommand):
         if detached and cascade_stop:
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        with up_shutdown_context(project, service_names, timeout, detached):
-            to_attach = project.up(
+        with up_shutdown_context(self.project, service_names, timeout, detached):
+            to_attach = self.project.up(
                 service_names=service_names,
                 start_deps=start_deps,
                 strategy=convergence_strategy_from_opts(options),
@@ -737,9 +721,10 @@ class TopLevelCommand(DocoptCommand):
 
             if cascade_stop:
                 print("Aborting on container exit...")
-                project.stop(service_names=service_names, timeout=timeout)
+                self.project.stop(service_names=service_names, timeout=timeout)
 
-    def version(self, project, options):
+    @classmethod
+    def version(cls, options):
         """
         Show version informations
 

@@ -64,26 +64,20 @@ class CLITestCase(unittest.TestCase):
         self.assertTrue(project.client)
         self.assertTrue(project.services)
 
-    def test_help(self):
-        command = TopLevelCommand()
-        with self.assertRaises(SystemExit):
-            command.dispatch(['-h'])
-
     def test_command_help(self):
-        with self.assertRaises(SystemExit) as ctx:
-            TopLevelCommand().dispatch(['help', 'up'])
+        with pytest.raises(SystemExit) as exc:
+            TopLevelCommand.help({'COMMAND': 'up'})
 
-        self.assertIn('Usage: up', str(ctx.exception))
+        assert 'Usage: up' in exc.exconly()
 
     def test_command_help_nonexistent(self):
-        with self.assertRaises(NoSuchCommand):
-            TopLevelCommand().dispatch(['help', 'nonexistent'])
+        with pytest.raises(NoSuchCommand):
+            TopLevelCommand.help({'COMMAND': 'nonexistent'})
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
     @mock.patch('compose.cli.main.RunOperation', autospec=True)
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
     def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
-        command = TopLevelCommand()
         mock_client = mock.create_autospec(docker.Client)
         project = Project.from_config(
             name='composetest',
@@ -92,9 +86,10 @@ class CLITestCase(unittest.TestCase):
                 'service': {'image': 'busybox'}
             }),
         )
+        command = TopLevelCommand(project)
 
         with pytest.raises(SystemExit):
-            command.run(project, {
+            command.run({
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
@@ -126,8 +121,8 @@ class CLITestCase(unittest.TestCase):
             }),
         )
 
-        command = TopLevelCommand()
-        command.run(project, {
+        command = TopLevelCommand(project)
+        command.run({
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
@@ -147,8 +142,8 @@ class CLITestCase(unittest.TestCase):
             'always'
         )
 
-        command = TopLevelCommand()
-        command.run(project, {
+        command = TopLevelCommand(project)
+        command.run({
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
@@ -168,7 +163,6 @@ class CLITestCase(unittest.TestCase):
         )
 
     def test_command_manula_and_service_ports_together(self):
-        command = TopLevelCommand()
         project = Project.from_config(
             name='composetest',
             client=None,
@@ -176,9 +170,10 @@ class CLITestCase(unittest.TestCase):
                 'service': {'image': 'busybox'},
             }),
         )
+        command = TopLevelCommand(project)
 
         with self.assertRaises(UserError):
-            command.run(project, {
+            command.run({
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
