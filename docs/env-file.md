@@ -20,7 +20,8 @@ Compose expects each line in an env file to be in `VAR=VAL` format. Lines
 beginning with `#` (i.e. comments) are ignored, as are blank lines.
 
 > Note: Values present in the environment at runtime will always override
-> those defined inside the `.env` file.
+> those defined inside the `.env` file. Similarly, values passed via
+> command-line arguments take precedence as well.
 
 Those environment variables will be used for
 [variable substitution](compose-file.md#variable-substitution) in your Compose
