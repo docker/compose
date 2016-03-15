@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import datetime
 
 import docker
+from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
@@ -12,6 +13,7 @@ from compose.config.types import VolumeFromSpec
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
+from compose.service import ImageType
 from compose.service import Service
 
 
@@ -476,3 +478,23 @@ class ProjectTest(unittest.TestCase):
             ),
         )
         self.assertEqual([c.id for c in project.containers()], ['1'])
+
+    def test_down_with_no_resources(self):
+        project = Project.from_config(
+            name='test',
+            client=self.mock_client,
+            config_data=Config(
+                version='2',
+                services=[{
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                }],
+                networks={'default': {}},
+                volumes={'data': {}},
+            ),
+        )
+        self.mock_client.remove_network.side_effect = NotFound(None, None, 'oops')
+        self.mock_client.remove_volume.side_effect = NotFound(None, None, 'oops')
+
+        project.down(ImageType.all, True)
+        self.mock_client.remove_image.assert_called_once_with("busybox:latest")

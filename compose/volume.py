@@ -76,7 +76,10 @@ class ProjectVolumes(object):
 
     def remove(self):
         for volume in self.volumes.values():
-            volume.remove()
+            try:
+                volume.remove()
+            except NotFound:
+                log.warn("Volume %s not found.", volume.full_name)
 
     def initialize(self):
         try:
