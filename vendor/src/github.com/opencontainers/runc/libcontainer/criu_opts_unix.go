@@ -33,4 +33,5 @@ type CriuOpts struct {
 	PageServer              CriuPageServerInfo // allow to dump to criu page server
 	VethPairs               []VethPairName     // pass the veth to criu when restore
 	ManageCgroupsMode       cg_mode            // dump or restore cgroup mode
+	EmptyNs                 uint32             // don't c/r properties for namespace from this mask
 }

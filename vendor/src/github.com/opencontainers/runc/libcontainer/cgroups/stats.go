@@ -54,6 +54,8 @@ type MemoryStats struct {
 type PidsStats struct {
 	// number of pids in the cgroup
 	Current uint64 `json:"current,omitempty"`
+	// active pids hard limit
+	Max uint64 `json:"max,omitempty"`
 }
 
 type BlkioStatEntry struct {

@@ -28,7 +28,7 @@ func (l *linuxSetnsInit) Init() error {
 	if _, err := keyctl.JoinSessionKeyring(l.getSessionRingName()); err != nil {
 		return err
 	}
-	if err := setupRlimits(l.config.Config); err != nil {
+	if err := setupRlimits(l.config.Rlimits); err != nil {
 		return err
 	}
 	if l.config.NoNewPrivileges {

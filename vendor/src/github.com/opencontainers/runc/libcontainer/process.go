@@ -5,6 +5,8 @@ import (
 	"io"
 	"math"
 	"os"
+
+	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
 type processOperations interface {
@@ -57,6 +59,10 @@ type Process struct {
 
 	// NoNewPrivileges controls whether processes can gain additional privileges.
 	NoNewPrivileges *bool
+
+	// Rlimits specifies the resource limits, such as max open files, to set in the container
+	// If Rlimits are not set, the container will inherit rlimits from the parent process
+	Rlimits []configs.Rlimit
 
 	ops processOperations
 }

@@ -44,19 +44,20 @@ type network struct {
 
 // initConfig is used for transferring parameters from Exec() to Init()
 type initConfig struct {
-	Args             []string        `json:"args"`
-	Env              []string        `json:"env"`
-	Cwd              string          `json:"cwd"`
-	Capabilities     []string        `json:"capabilities"`
-	ProcessLabel     string          `json:"process_label"`
-	AppArmorProfile  string          `json:"apparmor_profile"`
-	NoNewPrivileges  bool            `json:"no_new_privileges"`
-	User             string          `json:"user"`
-	Config           *configs.Config `json:"config"`
-	Console          string          `json:"console"`
-	Networks         []*network      `json:"network"`
-	PassedFilesCount int             `json:"passed_files_count"`
-	ContainerId      string          `json:"containerid"`
+	Args             []string         `json:"args"`
+	Env              []string         `json:"env"`
+	Cwd              string           `json:"cwd"`
+	Capabilities     []string         `json:"capabilities"`
+	ProcessLabel     string           `json:"process_label"`
+	AppArmorProfile  string           `json:"apparmor_profile"`
+	NoNewPrivileges  bool             `json:"no_new_privileges"`
+	User             string           `json:"user"`
+	Config           *configs.Config  `json:"config"`
+	Console          string           `json:"console"`
+	Networks         []*network       `json:"network"`
+	PassedFilesCount int              `json:"passed_files_count"`
+	ContainerId      string           `json:"containerid"`
+	Rlimits          []configs.Rlimit `json:"rlimits"`
 }
 
 type initer interface {
@@ -315,8 +316,8 @@ func setupRoute(config *configs.Config) error {
 	return nil
 }
 
-func setupRlimits(config *configs.Config) error {
-	for _, rlimit := range config.Rlimits {
+func setupRlimits(limits []configs.Rlimit) error {
+	for _, rlimit := range limits {
 		l := &syscall.Rlimit{Max: rlimit.Hard, Cur: rlimit.Soft}
 		if err := syscall.Setrlimit(rlimit.Type, l); err != nil {
 			return fmt.Errorf("error setting rlimit type %v: %v", rlimit.Type, err)

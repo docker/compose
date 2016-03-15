@@ -47,11 +47,17 @@ func (s *PidsGroup) Remove(d *cgroupData) error {
 }
 
 func (s *PidsGroup) GetStats(path string, stats *cgroups.Stats) error {
-	value, err := getCgroupParamUint(path, "pids.current")
+	current, err := getCgroupParamUint(path, "pids.current")
 	if err != nil {
 		return fmt.Errorf("failed to parse pids.current - %s", err)
 	}
 
-	stats.PidsStats.Current = value
+	max, err := getCgroupParamUint(path, "pids.max")
+	if err != nil {
+		return fmt.Errorf("failed to parse pids.max - %s", err)
+	}
+
+	stats.PidsStats.Current = current
+	stats.PidsStats.Max = max
 	return nil
 }

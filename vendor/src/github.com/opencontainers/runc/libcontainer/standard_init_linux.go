@@ -73,7 +73,7 @@ func (l *linuxStandardInit) Init() error {
 	if err := setupRoute(l.config.Config); err != nil {
 		return err
 	}
-	if err := setupRlimits(l.config.Config); err != nil {
+	if err := setupRlimits(l.config.Rlimits); err != nil {
 		return err
 	}
 
