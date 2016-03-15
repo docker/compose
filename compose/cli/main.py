@@ -149,6 +149,13 @@ class TopLevelCommand(object):
       -p, --project-name NAME   Specify an alternate project name (default: directory name)
       --verbose                 Show more output
       -v, --version             Print version and exit
+      -H, --host HOST           Daemon socket to connect to
+
+      --tls                     Use TLS; implied by --tlsverify
+      --tlsacert                Trust certs signed only by this CA
+      --tlscert                 Path to TLS certificate file
+      --tlskey                  Path to TLS key file
+      --tlsverify               Use TLS and verify the remote
 
     Commands:
       build              Build or rebuild services
