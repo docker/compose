@@ -1,9 +1,8 @@
 package specs
 
-import ocs "github.com/opencontainers/specs"
+import ocs "github.com/opencontainers/specs/specs-go"
 
 type (
-	PlatformSpec ocs.LinuxSpec
-	ProcessSpec  ocs.Process
-	Spec         ocs.Spec
+	ProcessSpec ocs.Process
+	Spec        ocs.Spec
 )

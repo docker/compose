@@ -1,6 +1,6 @@
 package specs
 
-// Temporary Windows version of the spec in lieu of opencontainers/specs having
+// Temporary Windows version of the spec in lieu of opencontainers/specs/specs-go having
 // Windows support currently.
 
 type (
@@ -8,7 +8,7 @@ type (
 	ProcessSpec  Process
 )
 
-// This is a temporary module in lieu of opencontainers/specs being compatible
+// This is a temporary module in lieu of opencontainers/specs/specs-go being compatible
 // currently on Windows.
 
 // Process contains information to start a specific application inside the container.

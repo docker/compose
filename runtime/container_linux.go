@@ -14,10 +14,10 @@ import (
 
 	"github.com/docker/containerd/specs"
 	"github.com/opencontainers/runc/libcontainer"
-	ocs "github.com/opencontainers/specs"
+	ocs "github.com/opencontainers/specs/specs-go"
 )
 
-func getRootIDs(s *specs.PlatformSpec) (int, int, error) {
+func getRootIDs(s *specs.Spec) (int, int, error) {
 	if s == nil {
 		return 0, 0, nil
 	}
