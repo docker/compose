@@ -255,6 +255,13 @@ func setUserFieldsInProcess(p *types.Process, oldProc specs.ProcessSpec) {
 	p.ApparmorProfile = oldProc.ApparmorProfile
 	p.SelinuxLabel = oldProc.SelinuxLabel
 	p.NoNewPrivileges = oldProc.NoNewPrivileges
+	for _, rl := range oldProc.Rlimits {
+		p.Rlimits = append(p.Rlimits, &types.Rlimit{
+			Type: rl.Type,
+			Soft: rl.Soft,
+			Hard: rl.Hard,
+		})
+	}
 }
 
 func setPlatformRuntimeProcessSpecUserFields(r *types.AddProcessRequest, process *specs.ProcessSpec) {
@@ -267,4 +274,11 @@ func setPlatformRuntimeProcessSpecUserFields(r *types.AddProcessRequest, process
 	process.ApparmorProfile = r.ApparmorProfile
 	process.SelinuxLabel = r.SelinuxLabel
 	process.NoNewPrivileges = r.NoNewPrivileges
+	for _, rl := range r.Rlimits {
+		process.Rlimits = append(process.Rlimits, ocs.Rlimit{
+			Type: rl.Type,
+			Soft: rl.Soft,
+			Hard: rl.Hard,
+		})
+	}
 }
