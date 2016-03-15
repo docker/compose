@@ -14,10 +14,10 @@ import (
 
 	"github.com/docker/containerd/specs"
 	"github.com/opencontainers/runc/libcontainer"
-	ocs "github.com/opencontainers/specs"
+	ocs "github.com/opencontainers/specs/specs-go"
 )
 
-func getRootIDs(s *specs.PlatformSpec) (int, int, error) {
+func getRootIDs(s *specs.Spec) (int, int, error) {
 	if s == nil {
 		return 0, 0, nil
 	}
@@ -38,14 +38,10 @@ func getRootIDs(s *specs.PlatformSpec) (int, int, error) {
 
 func (c *container) State() State {
 	proc := c.processes["init"]
-	if proc == nil || proc.pid == 0 {
+	if proc == nil {
 		return Stopped
 	}
-	err := syscall.Kill(proc.pid, 0)
-	if err != nil && err == syscall.ESRCH {
-		return Stopped
-	}
-	return Running
+	return proc.State()
 }
 
 func (c *container) Runtime() string {
@@ -53,11 +49,11 @@ func (c *container) Runtime() string {
 }
 
 func (c *container) Pause() error {
-	return exec.Command("runc", "pause", c.id).Run()
+	return exec.Command(c.runtime, "pause", c.id).Run()
 }
 
 func (c *container) Resume() error {
-	return exec.Command("runc", "resume", c.id).Run()
+	return exec.Command(c.runtime, "resume", c.id).Run()
 }
 
 func (c *container) Checkpoints() ([]Checkpoint, error) {
@@ -168,11 +164,16 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	return p, nil
 }
 
-func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (Process, error) {
+func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Process, err error) {
 	processRoot := filepath.Join(c.root, c.id, pid)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			c.RemoveProcess(pid)
+		}
+	}()
 	cmd := exec.Command("containerd-shim",
 		c.id, c.bundle, c.runtime,
 	)
@@ -336,6 +337,7 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 	return errNoPidFile
 }
 
+// isAlive checks if the shim that launched the container is still alive
 func isAlive(cmd *exec.Cmd) (bool, error) {
 	if err := syscall.Kill(cmd.Process.Pid, 0); err != nil {
 		if err == syscall.ESRCH {

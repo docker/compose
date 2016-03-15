@@ -272,12 +272,12 @@ func (s *Supervisor) restore() error {
 		logrus.WithField("id", id).Debug("containerd: container restored")
 		var exitedProcesses []runtime.Process
 		for _, p := range processes {
-			if _, err := p.ExitStatus(); err == nil {
-				exitedProcesses = append(exitedProcesses, p)
-			} else {
+			if p.State() == runtime.Running {
 				if err := s.monitorProcess(p); err != nil {
 					return err
 				}
+			} else {
+				exitedProcesses = append(exitedProcesses, p)
 			}
 		}
 		if len(exitedProcesses) > 0 {

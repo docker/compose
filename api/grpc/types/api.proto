@@ -65,6 +65,13 @@ message AddProcessRequest {
     string apparmorProfile = 12;
     string selinuxLabel = 13;
     bool noNewPrivileges = 14;
+    repeated Rlimit rlimits = 15;
+}
+
+message Rlimit {
+    string type = 1;
+    uint64 soft = 2;
+    uint64 hard = 3;
 }
 
 message User {
@@ -131,6 +138,7 @@ repeated string capabilities = 11;
     string apparmorProfile = 12;
     string selinuxLabel = 13;
     bool noNewPrivileges = 14;
+    repeated Rlimit rlimits = 15;
 }
 
 message Container {

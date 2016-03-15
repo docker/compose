@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
@@ -186,8 +187,8 @@ func (c *container) Labels() []string {
 	return c.labels
 }
 
-func (c *container) readSpec() (*specs.PlatformSpec, error) {
-	var spec specs.PlatformSpec
+func (c *container) readSpec() (*specs.Spec, error) {
+	var spec specs.Spec
 	f, err := os.Open(filepath.Join(c.bundle, "config.json"))
 	if err != nil {
 		return nil, err
@@ -200,7 +201,9 @@ func (c *container) readSpec() (*specs.PlatformSpec, error) {
 }
 
 func (c *container) Delete() error {
-	return os.RemoveAll(filepath.Join(c.root, c.id))
+	err := os.RemoveAll(filepath.Join(c.root, c.id))
+	exec.Command(c.runtime, "delete", c.id).Run()
+	return err
 }
 
 func (c *container) Processes() ([]Process, error) {
