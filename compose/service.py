@@ -436,9 +436,10 @@ class Service(object):
         container.remove()
         return new_container
 
-    def start_container_if_stopped(self, container, attach_logs=False):
+    def start_container_if_stopped(self, container, attach_logs=False, quiet=False):
         if not container.is_running:
-            log.info("Starting %s" % container.name)
+            if not quiet:
+                log.info("Starting %s" % container.name)
             if attach_logs:
                 container.attach_log_stream()
             return self.start_container(container)
