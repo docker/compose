@@ -498,7 +498,7 @@ class Service(object):
             'image_id': self.image()['Id'],
             'links': self.get_link_names(),
             'net': self.network_mode.id,
-            'networks': list(self.networks.keys()),
+            'networks': self.networks,
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)

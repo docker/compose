@@ -285,7 +285,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(
             opts['labels'][LABEL_CONFIG_HASH],
-            'f8bfa1058ad1f4231372a0b1639f0dfdb574dafff4e8d7938049ae993f7cf1fc')
+            '2524a06fcb3d781aa2c981fc40bcfa08013bb318e4273bfa388df22023e6f2aa')
         assert opts['environment'] == ['also=real']
 
     def test_get_container_create_options_sets_affinity_with_binds(self):
@@ -501,6 +501,7 @@ class ServiceTest(unittest.TestCase):
             image='example.com/foo',
             client=self.mock_client,
             network_mode=ServiceNetworkMode(Service('other')),
+            networks={'default': None},
             links=[(Service('one'), 'one')],
             volumes_from=[VolumeFromSpec(Service('two'), 'rw', 'service')])
 
@@ -510,7 +511,7 @@ class ServiceTest(unittest.TestCase):
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
-            'networks': [],
+            'networks': {'default': None},
             'volumes_from': [('two', 'rw')],
         }
         assert config_dict == expected
@@ -531,7 +532,7 @@ class ServiceTest(unittest.TestCase):
             'image_id': 'abcd',
             'options': {'image': 'example.com/foo'},
             'links': [],
-            'networks': [],
+            'networks': {},
             'net': 'aaabbb',
             'volumes_from': [],
         }
