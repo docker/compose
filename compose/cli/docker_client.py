@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import logging
 import os
-from collections import namedtuple
 
 from docker import Client
 from docker.errors import TLSParameterError
@@ -16,24 +15,27 @@ from .errors import UserError
 log = logging.getLogger(__name__)
 
 
-class TLSArgs(namedtuple('_TLSArgs', 'tls cert key ca_cert verify')):
-    @classmethod
-    def from_options(cls, options):
-        return cls(
-            tls=options.get('--tls', False),
-            ca_cert=options.get('--tlscacert'),
-            cert=options.get('--tlscert'),
-            key=options.get('--tlskey'),
-            verify=options.get('--tlsverify')
+def tls_config_from_options(options):
+    tls = options.get('--tls', False)
+    ca_cert = options.get('--tlscacert')
+    cert = options.get('--tlscert')
+    key = options.get('--tlskey')
+    verify = options.get('--tlsverify')
+
+    if tls is True:
+        return True
+    elif any([ca_cert, cert, key, verify]):
+        client_cert = None
+        if cert or key:
+            client_cert = (cert, key)
+        return TLSConfig(
+            client_cert=client_cert, verify=verify, ca_cert=ca_cert
         )
-
-    # def has_config(self):
-    #     return (
-    #         self.tls or self.ca_cert or self.cert or self.key or self.verify
-    #     )
+    else:
+        return None
 
 
-def docker_client(version=None, tls_args=None, host=None):
+def docker_client(version=None, tls_config=None, host=None):
     """
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
@@ -52,23 +54,8 @@ def docker_client(version=None, tls_args=None, host=None):
 
     if host:
         kwargs['base_url'] = host
-    if tls_args and any(tls_args):
-        if tls_args.tls is True:
-            kwargs['tls'] = True
-        else:
-            client_cert = None
-            if tls_args.cert or tls_args.key:
-                client_cert = (tls_args.cert, tls_args.key)
-            try:
-                kwargs['tls'] = TLSConfig(
-                    client_cert=client_cert, verify=tls_args.verify,
-                    ca_cert=tls_args.ca_cert
-                )
-            except TLSParameterError as e:
-                raise UserError(
-                    "TLS configuration is invalid. Please double-check the "
-                    "TLS command-line arguments. ({0})".format(e)
-                )
+    if tls_config:
+        kwargs['tls'] = tls_config
 
     if version:
         kwargs['version'] = version

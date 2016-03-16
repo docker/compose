@@ -12,7 +12,7 @@ from .. import config
 from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
-from .docker_client import TLSArgs
+from .docker_client import tls_config_from_options
 from .utils import get_version_info
 
 log = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def project_from_options(project_dir, options):
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         host=options.get('--host'),
-        tls_args=TLSArgs.from_options(options),
+        tls_config=tls_config_from_options(options),
     )
 
 
@@ -40,8 +40,8 @@ def get_config_path_from_options(options):
     return None
 
 
-def get_client(verbose=False, version=None, tls_args=None, host=None):
-    client = docker_client(version=version, tls_args=tls_args, host=host)
+def get_client(verbose=False, version=None, tls_config=None, host=None):
+    client = docker_client(version=version, tls_config=tls_config, host=host)
     if verbose:
         version_info = six.iteritems(client.version())
         log.info(get_version_info('full'))
@@ -53,7 +53,7 @@ def get_client(verbose=False, version=None, tls_args=None, host=None):
 
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_args=None):
+                host=None, tls_config=None):
     config_details = config.find(project_dir, config_path)
     project_name = get_project_name(config_details.working_dir, project_name)
     config_data = config.load(config_details)
@@ -62,7 +62,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         'COMPOSE_API_VERSION',
         API_VERSIONS[config_data.version])
     client = get_client(
-        verbose=verbose, version=api_version, tls_args=tls_args,
+        verbose=verbose, version=api_version, tls_config=tls_config,
         host=host
     )
 

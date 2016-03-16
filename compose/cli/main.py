@@ -145,17 +145,17 @@ class TopLevelCommand(object):
       docker-compose -h|--help
 
     Options:
-      -f, --file FILE           Specify an alternate compose file (default: docker-compose.yml)
-      -p, --project-name NAME   Specify an alternate project name (default: directory name)
-      --verbose                 Show more output
-      -v, --version             Print version and exit
-      -H, --host HOST           Daemon socket to connect to
+      -f, --file FILE             Specify an alternate compose file (default: docker-compose.yml)
+      -p, --project-name NAME     Specify an alternate project name (default: directory name)
+      --verbose                   Show more output
+      -v, --version               Print version and exit
+      -H, --host HOST             Daemon socket to connect to
 
-      --tls                     Use TLS; implied by --tlsverify
-      --tlsacert                Trust certs signed only by this CA
-      --tlscert                 Path to TLS certificate file
-      --tlskey                  Path to TLS key file
-      --tlsverify               Use TLS and verify the remote
+      --tls                       Use TLS; implied by --tlsverify
+      --tlscacert CA_PATH         Trust certs signed only by this CA
+      --tlscert CLIENT_CERT_PATH  Path to TLS certificate file
+      --tlskey TLS_KEY_PATH       Path to TLS key file
+      --tlsverify                 Use TLS and verify the remote
 
     Commands:
       build              Build or rebuild services
