@@ -78,21 +78,20 @@ class ContainerCountCondition(object):
 
 class ContainerStateCondition(object):
 
-    def __init__(self, client, name, running):
+    def __init__(self, client, name, status):
         self.client = client
         self.name = name
-        self.running = running
+        self.status = status
 
     def __call__(self):
         try:
             container = self.client.inspect_container(self.name)
-            return container['State']['Running'] == self.running
+            return container['State']['Status'] == self.status
         except errors.APIError:
             return False
 
     def __str__(self):
-        state = 'running' if self.running else 'stopped'
-        return "waiting for container to be %s" % state
+        return "waiting for container to be %s" % self.status
 
 
 class CLITestCase(DockerClientTestCase):
@@ -397,8 +396,8 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/echo-services'
         result = self.dispatch(['up', '--no-color'])
 
-        assert 'simple_1  | simple' in result.stdout
-        assert 'another_1 | another' in result.stdout
+        assert 'simple_1   | simple' in result.stdout
+        assert 'another_1  | another' in result.stdout
         assert 'simple_1 exited with code 0' in result.stdout
         assert 'another_1 exited with code 0' in result.stdout
 
@@ -1091,26 +1090,26 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=True))
+            'running'))
 
         os.kill(proc.pid, signal.SIGINT)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=False))
+            'exited'))
 
     def test_run_handles_sigterm(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=True))
+            'running'))
 
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',
-            running=False))
+            'exited'))
 
     def test_rm(self):
         service = self.project.get_service('simple')
@@ -1206,7 +1205,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_logs_follow(self):
         self.base_dir = 'tests/fixtures/echo-services'
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'])
 
         result = self.dispatch(['logs', '-f'])
 
@@ -1215,29 +1214,52 @@ class CLITestCase(DockerClientTestCase):
         assert 'another' in result.stdout
         assert 'exited with code 0' in result.stdout
 
-    def test_logs_unfollow(self):
+    def test_logs_follow_logs_from_new_containers(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d', 'simple'])
+
+        proc = start_process(self.base_dir, ['logs', '-f'])
+
+        self.dispatch(['up', '-d', 'another'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'logscomposefile_another_1',
+            'exited'))
+
+        os.kill(proc.pid, signal.SIGINT)
+        result = wait_on_process(proc, returncode=1)
+        assert 'test' in result.stdout
+
+    def test_logs_default(self):
+        self.base_dir = 'tests/fixtures/logs-composefile'
+        self.dispatch(['up', '-d'])
 
         result = self.dispatch(['logs'])
+        assert 'hello' in result.stdout
+        assert 'test' in result.stdout
+        assert 'exited with' not in result.stdout
 
-        assert result.stdout.count('\n') >= 1
-        assert 'exited with code 0' not in result.stdout
+    def test_logs_on_stopped_containers_exits(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        self.dispatch(['up'])
+
+        result = self.dispatch(['logs'])
+        assert 'simple' in result.stdout
+        assert 'another' in result.stdout
+        assert 'exited with' not in result.stdout
 
     def test_logs_timestamps(self):
         self.base_dir = 'tests/fixtures/echo-services'
-        self.dispatch(['up', '-d'], None)
+        self.dispatch(['up', '-d'])
 
-        result = self.dispatch(['logs', '-f', '-t'], None)
-
+        result = self.dispatch(['logs', '-f', '-t'])
         self.assertRegexpMatches(result.stdout, '(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})')
 
     def test_logs_tail(self):
         self.base_dir = 'tests/fixtures/logs-tail-composefile'
-        self.dispatch(['up'], None)
+        self.dispatch(['up'])
 
-        result = self.dispatch(['logs', '--tail', '2'], None)
-
+        result = self.dispatch(['logs', '--tail', '2'])
         assert result.stdout.count('\n') == 3
 
     def test_kill(self):

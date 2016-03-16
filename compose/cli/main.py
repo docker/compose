@@ -35,6 +35,7 @@ from .docopt_command import NoSuchCommand
 from .errors import UserError
 from .formatter import ConsoleWarningFormatter
 from .formatter import Formatter
+from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
@@ -279,6 +280,7 @@ class TopLevelCommand(object):
 
         def json_format_event(event):
             event['time'] = event['time'].isoformat()
+            event.pop('container')
             return json.dumps(event)
 
         for event in self.project.events():
@@ -376,7 +378,6 @@ class TopLevelCommand(object):
         """
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
-        monochrome = options['--no-color']
         tail = options['--tail']
         if tail is not None:
             if tail.isdigit():
@@ -389,7 +390,11 @@ class TopLevelCommand(object):
             'timestamps': options['--timestamps']
         }
         print("Attaching to", list_containers(containers))
-        LogPrinter(containers, monochrome=monochrome, log_args=log_args).run()
+        log_printer_from_project(
+            self.project,
+            containers,
+            options['--no-color'],
+            log_args).run()
 
     def pause(self, options):
         """
@@ -671,7 +676,6 @@ class TopLevelCommand(object):
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
         """
-        monochrome = options['--no-color']
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
@@ -694,8 +698,14 @@ class TopLevelCommand(object):
 
             if detached:
                 return
-            log_args = {'follow': True}
-            log_printer = build_log_printer(to_attach, service_names, monochrome, cascade_stop, log_args)
+
+            log_printer = log_printer_from_project(
+                self.project,
+                filter_containers_to_service_names(to_attach, service_names),
+                options['--no-color'],
+                {'follow': True},
+                cascade_stop,
+                event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))
             log_printer.run()
 
@@ -842,13 +852,30 @@ def run_one_off_container(container_options, project, service, options):
     sys.exit(exit_code)
 
 
-def build_log_printer(containers, service_names, monochrome, cascade_stop, log_args):
-    if service_names:
-        containers = [
-            container
-            for container in containers if container.service in service_names
-        ]
-    return LogPrinter(containers, monochrome=monochrome, cascade_stop=cascade_stop, log_args=log_args)
+def log_printer_from_project(
+    project,
+    containers,
+    monochrome,
+    log_args,
+    cascade_stop=False,
+    event_stream=None,
+):
+    return LogPrinter(
+        containers,
+        build_log_presenters(project.service_names, monochrome),
+        event_stream or project.events(),
+        cascade_stop=cascade_stop,
+        log_args=log_args)
+
+
+def filter_containers_to_service_names(containers, service_names):
+    if not service_names:
+        return containers
+
+    return [
+        container
+        for container in containers if container.service in service_names
+    ]
 
 
 @contextlib.contextmanager

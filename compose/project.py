@@ -297,7 +297,7 @@ class Project(object):
                 detached=True,
                 start=False)
 
-    def events(self):
+    def events(self, service_names=None):
         def build_container_event(event, container):
             time = datetime.datetime.fromtimestamp(event['time'])
             time = time.replace(
@@ -311,10 +311,11 @@ class Project(object):
                 'attributes': {
                     'name': container.name,
                     'image': event['from'],
-                }
+                },
+                'container': container,
             }
 
-        service_names = set(self.service_names)
+        service_names = set(service_names or self.service_names)
         for event in self.client.events(
             filters={'label': self.labels()},
             decode=True
@@ -325,7 +326,11 @@ class Project(object):
                 continue
 
             # TODO: get labels from the API v1.22 , see github issue 2618
-            container = Container.from_id(self.client, event['id'])
+            try:
+                # this can fail if the conatiner has been removed
+                container = Container.from_id(self.client, event['id'])
+            except APIError:
+                continue
             if container.service not in service_names:
                 continue
             yield build_container_event(event, container)
