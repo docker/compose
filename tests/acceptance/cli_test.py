@@ -1125,6 +1125,28 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
 
+    def test_rm_all(self):
+        service = self.project.get_service('simple')
+        service.create_container(one_off=False)
+        service.create_container(one_off=True)
+        kill_service(service)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 1)
+        self.dispatch(['rm', '-f'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 0)
+        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 1)
+        self.dispatch(['rm', '-f', '-a'], None)
+        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 0)
+
+        service.create_container(one_off=False)
+        service.create_container(one_off=True)
+        kill_service(service)
+        self.assertEqual(len(service.containers(stopped=True)), 1)
+        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 1)
+        self.dispatch(['rm', '-f', '--all'], None)
+        self.assertEqual(len(service.containers(stopped=True)), 0)
+        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 0)
+
     def test_stop(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')

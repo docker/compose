@@ -47,10 +47,12 @@ class Project(object):
         self.networks = networks or ProjectNetworks({}, False)
 
     def labels(self, one_off=False):
-        return [
-            '{0}={1}'.format(LABEL_PROJECT, self.name),
-            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
-        ]
+        labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
+        if one_off is not None:
+            labels.append(
+                '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
+            )
+        return labels
 
     @classmethod
     def from_config(cls, name, config_data, client):
@@ -249,8 +251,10 @@ class Project(object):
     def kill(self, service_names=None, **options):
         parallel.parallel_kill(self.containers(service_names), options)
 
-    def remove_stopped(self, service_names=None, **options):
-        parallel.parallel_remove(self.containers(service_names, stopped=True), options)
+    def remove_stopped(self, service_names=None, one_off=False, **options):
+        parallel.parallel_remove(self.containers(
+            service_names, stopped=True, one_off=(None if one_off else False)
+        ), options)
 
     def down(self, remove_image_type, include_volumes, remove_orphans=False):
         self.stop()
