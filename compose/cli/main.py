@@ -491,8 +491,12 @@ class TopLevelCommand(object):
         Options:
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
+            -a, --all     Also remove one-off containers
         """
-        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        all_containers = self.project.containers(
+            service_names=options['SERVICE'], stopped=True,
+            one_off=(None if options.get('--all') else False)
+        )
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
@@ -501,7 +505,8 @@ class TopLevelCommand(object):
                     or yesno("Are you sure? [yN] ", default=False):
                 self.project.remove_stopped(
                     service_names=options['SERVICE'],
-                    v=options.get('-v', False)
+                    v=options.get('-v', False),
+                    one_off=options.get('--all')
                 )
         else:
             print("No stopped containers")

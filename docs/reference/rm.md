@@ -17,6 +17,7 @@ Usage: rm [options] [SERVICE...]
 Options:
 -f, --force   Don't ask to confirm removal
 -v            Remove volumes associated with containers
+-a, --all     Also remove one-off containers
 ```
 
 Removes stopped service containers.
