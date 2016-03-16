@@ -11,9 +11,16 @@ endif
 DOCKER_IMAGE := containerd-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
 DOCKER_RUN := docker run --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
-export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
+export GO15VENDOREXPERIMENT:=1
+GOLANG_VERSION:=$(shell go version | cut -d ' ' -f3 | cut -c 3-)
 
-all: client daemon shim
+
+all: check_version client daemon shim
+
+check_version:
+ifneq ($(shell /bin/echo -e "1.5\n${GOLANG_VERSION}" | sort -V | head -n1),1.5)
+	$(error "Golang 1.5+ required to build containerd. Current version: ${GOLANG_VERSION}")
+endif
 
 bin:
 	mkdir -p bin/
