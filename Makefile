@@ -11,7 +11,7 @@ endif
 DOCKER_IMAGE := containerd-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
 DOCKER_RUN := docker run --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
-export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
+export GO15VENDOREXPERIMENT:=1
 
 all: client daemon shim
 
