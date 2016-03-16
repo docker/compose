@@ -252,9 +252,11 @@ class Project(object):
     def remove_stopped(self, service_names=None, **options):
         parallel.parallel_remove(self.containers(service_names, stopped=True), options)
 
-    def down(self, remove_image_type, include_volumes):
+    def down(self, remove_image_type, include_volumes, remove_orphans=False):
         self.stop()
+        self.find_orphan_containers(remove_orphans)
         self.remove_stopped(v=include_volumes)
+
         self.networks.remove()
 
         if include_volumes:
@@ -334,7 +336,8 @@ class Project(object):
            strategy=ConvergenceStrategy.changed,
            do_build=BuildAction.none,
            timeout=DEFAULT_TIMEOUT,
-           detached=False):
+           detached=False,
+           remove_orphans=False):
 
         self.initialize()
         services = self.get_services_without_duplicate(
@@ -345,6 +348,8 @@ class Project(object):
 
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
+
+        self.find_orphan_containers(remove_orphans)
 
         def do(service):
             return service.execute_convergence_plan(
@@ -402,22 +407,51 @@ class Project(object):
         for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
+    def _labeled_containers(self, stopped=False, one_off=False):
+        return list(filter(None, [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})])
+        )
+
     def containers(self, service_names=None, stopped=False, one_off=False):
         if service_names:
             self.validate_service_names(service_names)
         else:
             service_names = self.service_names
 
-        containers = list(filter(None, [
-            Container.from_ps(self.client, container)
-            for container in self.client.containers(
-                all=stopped,
-                filters={'label': self.labels(one_off=one_off)})]))
+        containers = self._labeled_containers(stopped, one_off)
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names
 
         return [c for c in containers if matches_service_names(c)]
+
+    def find_orphan_containers(self, remove_orphans):
+        def _find():
+            containers = self._labeled_containers()
+            for ctnr in containers:
+                service_name = ctnr.labels.get(LABEL_SERVICE)
+                if service_name not in self.service_names:
+                    yield ctnr
+        orphans = list(_find())
+        if not orphans:
+            return
+        if remove_orphans:
+            for ctnr in orphans:
+                log.info('Removing orphan container "{0}"'.format(ctnr.name))
+                ctnr.kill()
+                ctnr.remove(force=True)
+        else:
+            log.warning(
+                'Found orphan containers ({0}) for this project. If '
+                'you removed or renamed this service in your compose '
+                'file, you can run this command with the '
+                '--remove-orphans flag to clean it up.'.format(
+                    ', '.join(["{}".format(ctnr.name) for ctnr in orphans])
+                )
+            )
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()

@@ -252,13 +252,15 @@ class TopLevelCommand(object):
         Usage: down [options]
 
         Options:
-            --rmi type      Remove images, type may be one of: 'all' to remove
-                            all images, or 'local' to remove only images that
-                            don't have an custom name set by the `image` field
-            -v, --volumes   Remove data volumes
+            --rmi type          Remove images, type may be one of: 'all' to remove
+                                all images, or 'local' to remove only images that
+                                don't have an custom name set by the `image` field
+            -v, --volumes       Remove data volumes
+            --remove-orphans    Remove containers for services not defined in
+                                the Compose file
         """
         image_type = image_type_from_opt('--rmi', options['--rmi'])
-        self.project.down(image_type, options['--volumes'])
+        self.project.down(image_type, options['--volumes'], options['--remove-orphans'])
 
     def events(self, options):
         """
@@ -324,9 +326,9 @@ class TopLevelCommand(object):
         signals.set_signal_handler_to_shutdown()
         try:
             operation = ExecOperation(
-                    self.project.client,
-                    exec_id,
-                    interactive=tty,
+                self.project.client,
+                exec_id,
+                interactive=tty,
             )
             pty = PseudoTerminal(self.project.client, operation)
             pty.start()
@@ -666,12 +668,15 @@ class TopLevelCommand(object):
             -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
                                        when attached or when containers are already
                                        running. (default: 10)
+            --remove-orphans           Remove containers for services not
+                                       defined in the Compose file
         """
         monochrome = options['--no-color']
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
         timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
 
         if detached and cascade_stop:
@@ -684,7 +689,8 @@ class TopLevelCommand(object):
                 strategy=convergence_strategy_from_opts(options),
                 do_build=build_action_from_opts(options),
                 timeout=timeout,
-                detached=detached)
+                detached=detached,
+                remove_orphans=remove_orphans)
 
             if detached:
                 return

@@ -7,6 +7,7 @@ import py
 import pytest
 from docker.errors import NotFound
 
+from .. import mock
 from ..helpers import build_config
 from .testcases import DockerClientTestCase
 from compose.config import config
@@ -15,6 +16,7 @@ from compose.config.config import V2_0
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
+from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
 from compose.service import ConvergenceStrategy
@@ -1055,3 +1057,40 @@ class ProjectTest(DockerClientTestCase):
         container = service.get_container()
         assert [mount['Name'] for mount in container.get('Mounts')] == [full_vol_name]
         assert next((v for v in engine_volumes if v['Name'] == vol_name), None) is None
+
+    def test_project_up_orphans(self):
+        config_dict = {
+            'service1': {
+                'image': 'busybox:latest',
+                'command': 'top',
+            }
+        }
+
+        config_data = build_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        config_dict['service2'] = config_dict['service1']
+        del config_dict['service1']
+
+        config_data = build_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with mock.patch('compose.project.log') as mock_log:
+            project.up()
+
+        mock_log.warning.assert_called_once_with(mock.ANY)
+
+        assert len([
+            ctnr for ctnr in project._labeled_containers()
+            if ctnr.labels.get(LABEL_SERVICE) == 'service1'
+        ]) == 1
+
+        project.up(remove_orphans=True)
+
+        assert len([
+            ctnr for ctnr in project._labeled_containers()
+            if ctnr.labels.get(LABEL_SERVICE) == 'service1'
+        ]) == 0
