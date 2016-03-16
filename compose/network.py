@@ -149,7 +149,10 @@ class ProjectNetworks(object):
         if not self.use_networking:
             return
         for network in self.networks.values():
-            network.remove()
+            try:
+                network.remove()
+            except NotFound:
+                log.warn("Network %s not found.", network.full_name)
 
     def initialize(self):
         if not self.use_networking:
