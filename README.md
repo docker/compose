@@ -19,10 +19,10 @@ For more documentation on various subjects refer to the `/docs` directory in thi
 
 ## Building
 
-You will need to make sure that you have Go 1.5+ installed on your system and the containerd repository is cloned
+You will need to make sure that you have Go installed on your system and the containerd repository is cloned
 in your `$GOPATH`.  You will also need to make sure that you have all the dependencies cloned as well.
 Currently, contributing to containerd is not for the first time devs as many dependencies are not vendored and 
-work is being completed at a high rate.
+work is being completed at a high rate.  
 
 After that just run `make` and the binaries for the daemon and client will be localed in the `bin/` directory.
 
