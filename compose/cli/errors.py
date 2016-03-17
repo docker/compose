@@ -66,7 +66,7 @@ def handle_connection_errors(client):
 
 
 def log_api_error(e, client_version):
-    if 'client is newer than server' not in e.explanation:
+    if b'client is newer than server' not in e.explanation:
         log.error(e.explanation)
         return
 
