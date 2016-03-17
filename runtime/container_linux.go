@@ -320,8 +320,18 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 				}
 				if !alive {
 					// runc could have failed to run the container so lets get the error
-					// out of the logs
-					messages, err := readLogMessages(filepath.Join(p.root, "log.json"))
+					// out of the logs or the shim could have encountered an error
+					messages, err := readLogMessages(filepath.Join(p.root, "shim-log.json"))
+					if err != nil {
+						return err
+					}
+					for _, m := range messages {
+						if m.Level == "error" {
+							return errors.New(m.Msg)
+						}
+					}
+					// no errors reported back from shim, check for runc/runtime errors
+					messages, err = readLogMessages(filepath.Join(p.root, "log.json"))
 					if err != nil {
 						if os.IsNotExist(err) {
 							return ErrContainerNotStarted

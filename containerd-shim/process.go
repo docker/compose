@@ -134,6 +134,11 @@ func (p *process) start() error {
 		Pdeathsig: syscall.SIGKILL,
 	}
 	if err := cmd.Start(); err != nil {
+		if exErr, ok := err.(*exec.Error); ok {
+			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
+				return fmt.Errorf("runc not installed on system")
+			}
+		}
 		return err
 	}
 	p.stdio.stdout.Close()
