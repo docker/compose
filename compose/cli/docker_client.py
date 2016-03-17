@@ -22,14 +22,17 @@ def tls_config_from_options(options):
     key = options.get('--tlskey')
     verify = options.get('--tlsverify')
 
-    if tls is True:
+    advanced_opts = any([ca_cert, cert, key, verify])
+
+    if tls is True and not advanced_opts:
         return True
-    elif any([ca_cert, cert, key, verify]):
+    elif advanced_opts:
         client_cert = None
         if cert or key:
             client_cert = (cert, key)
         return TLSConfig(
-            client_cert=client_cert, verify=verify, ca_cert=ca_cert
+            client_cert=client_cert, verify=verify, ca_cert=ca_cert,
+            assert_hostname=options.get('--skip-hostname-check')
         )
     else:
         return None

@@ -156,6 +156,9 @@ class TopLevelCommand(object):
       --tlscert CLIENT_CERT_PATH  Path to TLS certificate file
       --tlskey TLS_KEY_PATH       Path to TLS key file
       --tlsverify                 Use TLS and verify the remote
+      --skip-hostname-check       Don't check the daemon's hostname against the name specified
+                                  in the client certificate (for example if your docker host
+                                  is an IP address)
 
     Commands:
       build              Build or rebuild services
