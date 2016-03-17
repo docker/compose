@@ -154,13 +154,9 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
+	if err := c.startCmd(InitProcessID, cmd, p); err != nil {
 		return nil, err
 	}
-	if err := waitForStart(p, cmd); err != nil {
-		return nil, err
-	}
-	c.processes[InitProcessID] = p
 	return p, nil
 }
 
@@ -198,14 +194,26 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
+	if err := c.startCmd(pid, cmd, p); err != nil {
 		return nil, err
+	}
+	return p, nil
+}
+
+func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
+	if err := cmd.Start(); err != nil {
+		if exErr, ok := err.(*exec.Error); ok {
+			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
+				return fmt.Errorf("containerd-shim not installed on system")
+			}
+		}
+		return err
 	}
 	if err := waitForStart(p, cmd); err != nil {
-		return nil, err
+		return err
 	}
 	c.processes[pid] = p
-	return p, nil
+	return nil
 }
 
 func (c *container) getLibctContainer() (libcontainer.Container, error) {
@@ -312,8 +320,18 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 				}
 				if !alive {
 					// runc could have failed to run the container so lets get the error
-					// out of the logs
-					messages, err := readLogMessages(filepath.Join(p.root, "log.json"))
+					// out of the logs or the shim could have encountered an error
+					messages, err := readLogMessages(filepath.Join(p.root, "shim-log.json"))
+					if err != nil {
+						return err
+					}
+					for _, m := range messages {
+						if m.Level == "error" {
+							return errors.New(m.Msg)
+						}
+					}
+					// no errors reported back from shim, check for runc/runtime errors
+					messages, err = readLogMessages(filepath.Join(p.root, "log.json"))
 					if err != nil {
 						if os.IsNotExist(err) {
 							return ErrContainerNotStarted
