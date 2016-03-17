@@ -1,0 +1,112 @@
+#!/bin/bash
+
+set -e
+
+RUNC=$PWD/runc
+DIR=/tmp/runc_test
+
+rm -rf $DIR
+mkdir -p $DIR/rootfs
+
+cd $DIR
+
+docker pull busybox
+docker create --name tmpbusybox busybox
+docker export tmpbusybox | tar -C $DIR/rootfs -xf-
+docker rm -f tmpbusybox
+
+# Make sure we can generate a config.json file
+################################################################
+rm -f config.json
+$RUNC spec
+if [ ! -e config.json ]; then
+	echo NO config.json file generated
+	exit 1
+fi
+echo "PASS: runc spec"
+
+# Simple start test
+################################################################
+rm -f config.json && $RUNC spec  # reset things
+sed -i 's/"sh"/"echo","-n","hi"/' config.json
+set +e
+$RUNC start c1 >out 2>err
+rc=$?
+if [[ $rc != 0 || -s err ]]; then
+	echo Error while running start
+	echo Exit code: $rc
+	echo Error: $(cat err)
+	echo Output: $(cat out)
+	exit 1
+fi
+if [[ "$(cat out)" != "hi" ]]; then
+	echo -e Incorrect output: $(cat out)\nExpected: hi
+	exit 1
+fi
+echo "PASS: runc start"
+
+# Test exec
+################################################################
+set -ex
+rm config.json && $RUNC spec  # reset things
+sed -i 's/"sh"/"sleep","6"/' config.json
+$RUNC start -d --console /dev/ptmx c1 >out 2>&1
+rc=$?
+if [[ $rc != 0 || -s out ]]; then
+	echo Error while running start
+	echo Exit code: $rc
+	echo Output: $(cat out)
+	exit 1
+fi
+sleep 1
+$RUNC exec c1 echo from exec >out 2>err
+rc=$?
+if [[ $rc != 0 || -s err ]]; then
+	echo Error while running exec
+	echo Exit code: $rc
+	echo Error: $(cat err)
+	echo Output: $(cat out)
+	exit 1
+fi
+$RUNC kill c1
+rm -rf /run/opencontainer/containers/c1
+echo "PASS: runc exec"
+
+# Test pause/resume
+################################################################
+rm config.json && $RUNC spec  # reset things
+sed -i 's/"sh"/"sleep","6"/' config.json
+$RUNC start -d --console /dev/ptmx c1 >out 2>&1
+rc=$?
+if [[ $rc != 0 || -s out ]]; then
+	echo Error while running start
+	echo Exit code: $rc
+	echo Output: $(cat out)
+	exit 1
+fi
+sleep 1
+$RUNC pause c1 >out 2>&1
+rc=$?
+if [[ $rc != 0 || -s out ]]; then
+	echo Error while running pause
+	echo Exit code: $rc
+	echo Output: $(cat out)
+	exit 1
+fi
+$RUNC resume c1 >out 2>&1
+rc=$?
+if [[ $? != 0 || -s out ]]; then
+	echo Error while running pause
+	echo Exit code: $rc
+	echo Output: $(cat out)
+	exit 1
+fi
+
+$RUNC kill c1
+rm -rf /run/opencontainer/containers/c1
+echo "PASS: runc pause/resume"
+
+# give it a sec before we erase the dir
+sleep 5
+cd ..
+rm -rf $DIR
