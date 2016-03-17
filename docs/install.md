@@ -18,13 +18,13 @@ To install Compose, do the following:
 
 1. Install Docker Engine:
 
-     * <a href="https://docs.docker.com/engine/installation/mac/" target="_blank">Mac OS X installation</a>
+     * <a href="/engine/installation/mac/" target="_blank">Mac OS X installation</a>
 
-     * <a href="https://docs.docker.com/engine/installation/windows/" target="_blank">Windows installation</a>
+     * <a href="/engine/installation/windows/" target="_blank">Windows installation</a>
 
-     * <a href="https://docs.docker.com/engine/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
+     * <a href="/engine/installation/ubuntulinux/" target="_blank">Ubuntu installation</a>
 
-     * <a href="https://docs.docker.com/engine/installation/" target="_blank">other system installations</a>
+     * <a href="/engine/installation/" target="_blank">other system installations</a>
 
 2. The Docker Toolbox installation includes both Engine and Compose, so Mac and Windows users are done installing. Others should continue to the next step.
 
