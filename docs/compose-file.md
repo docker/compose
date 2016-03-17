@@ -545,6 +545,38 @@ In the example below, three services are provided (`web`, `worker`, and `db`), a
       new:
       legacy:
 
+#### ipv4_address, ipv6_address
+
+Specify a static IP address for containers for this service when joining the network.
+
+The corresponding network configuration in the [top-level networks section](#network-configuration-reference) must have an `ipam` block with subnet and gateway configurations covering each static address. If IPv6 addressing is desired, the `com.docker.network.enable_ipv6` driver option must be set to `true`.
+
+An example:
+
+    version: '2'
+
+    services:
+      app:
+        image: busybox
+        command: ifconfig
+        networks:
+          app_net:
+            ipv4_address: 172.16.238.10
+            ipv6_address: 2001:3984:3989::10
+
+    networks:
+      app_net:
+        driver: bridge
+        driver_opts:
+          com.docker.network.enable_ipv6: "true"
+        ipam:
+          driver: default
+          config:
+          - subnet: 172.16.238.0/24
+            gateway: 172.16.238.1
+          - subnet: 2001:3984:3989::/64
+            gateway: 2001:3984:3989::1
+
 ### pid
 
     pid: "host"
