@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +16,8 @@ import (
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 )
+
+var errRuntime = errors.New("shim: runtime execution error")
 
 type process struct {
 	sync.WaitGroup
@@ -144,6 +147,9 @@ func (p *process) start() error {
 	p.stdio.stdout.Close()
 	p.stdio.stderr.Close()
 	if err := cmd.Wait(); err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			return errRuntime
+		}
 		return err
 	}
 	data, err := ioutil.ReadFile("pid")
