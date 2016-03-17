@@ -31,6 +31,13 @@ func main() {
 	logrus.SetOutput(f)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	if err := start(); err != nil {
+		// this means that the runtime failed starting the container and will have the
+		// proper error messages in the runtime log so we should to treat this as a
+		// shim failure because the sim executed properly
+		if err == errRuntime {
+			f.Close()
+			return
+		}
 		// log the error instead of writing to stderr because the shim will have
 		// /dev/null as it's stdio because it is supposed to be reparented to system
 		// init and will not have anyone to read from it
