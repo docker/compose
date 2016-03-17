@@ -303,7 +303,7 @@ func (c *container) writeEventFD(root string, cfd, efd int) error {
 }
 
 func waitForStart(p *process, cmd *exec.Cmd) error {
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 300; i++ {
 		if _, err := p.getPidFromFile(); err != nil {
 			if os.IsNotExist(err) {
 				alive, err := isAlive(cmd)
@@ -327,7 +327,7 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 					}
 					return ErrContainerNotStarted
 				}
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 				continue
 			}
 			return err
