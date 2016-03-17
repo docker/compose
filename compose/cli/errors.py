@@ -88,9 +88,9 @@ def exit_with_error(msg):
 
 
 docker_not_found_mac = """
-    Couldn't connect to Docker daemon. You might need to install docker-osx:
+    Couldn't connect to Docker daemon. You might need to install Docker:
 
-    https://github.com/noplay/docker-osx
+    https://docs.docker.com/engine/installation/mac/
 """
 
 
