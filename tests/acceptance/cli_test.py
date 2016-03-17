@@ -18,6 +18,7 @@ from docker import errors
 from .. import mock
 from compose.cli.command import get_project
 from compose.container import Container
+from compose.project import OneOffFilter
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
@@ -105,7 +106,7 @@ class CLITestCase(DockerClientTestCase):
             self.project.kill()
             self.project.remove_stopped()
 
-            for container in self.project.containers(stopped=True, one_off=True):
+            for container in self.project.containers(stopped=True, one_off=OneOffFilter.only):
                 container.remove(force=True)
 
             networks = self.client.networks()
@@ -802,7 +803,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(self.project.containers()), 0)
 
         # Ensure stdin/out was open
-        container = self.project.containers(stopped=True, one_off=True)[0]
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
         config = container.inspect()['Config']
         self.assertTrue(config['AttachStderr'])
         self.assertTrue(config['AttachStdout'])
@@ -852,7 +853,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['run', 'implicit'])
         service = self.project.get_service('implicit')
-        containers = service.containers(stopped=True, one_off=True)
+        containers = service.containers(stopped=True, one_off=OneOffFilter.only)
         self.assertEqual(
             [c.human_readable_command for c in containers],
             [u'/bin/sh -c echo "success"'],
@@ -860,7 +861,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.dispatch(['run', 'explicit'])
         service = self.project.get_service('explicit')
-        containers = service.containers(stopped=True, one_off=True)
+        containers = service.containers(stopped=True, one_off=OneOffFilter.only)
         self.assertEqual(
             [c.human_readable_command for c in containers],
             [u'/bin/true'],
@@ -871,7 +872,7 @@ class CLITestCase(DockerClientTestCase):
         name = 'service'
         self.dispatch(['run', '--entrypoint', '/bin/echo', name, 'helloworld'])
         service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=True)[0]
+        container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
         self.assertEqual(
             shlex.split(container.human_readable_command),
             [u'/bin/echo', u'helloworld'],
@@ -883,7 +884,7 @@ class CLITestCase(DockerClientTestCase):
         user = 'sshd'
         self.dispatch(['run', '--user={user}'.format(user=user), name], returncode=1)
         service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=True)[0]
+        container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
         self.assertEqual(user, container.get('Config.User'))
 
     def test_run_service_with_user_overridden_short_form(self):
@@ -892,7 +893,7 @@ class CLITestCase(DockerClientTestCase):
         user = 'sshd'
         self.dispatch(['run', '-u', user, name], returncode=1)
         service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=True)[0]
+        container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
         self.assertEqual(user, container.get('Config.User'))
 
     def test_run_service_with_environement_overridden(self):
@@ -906,7 +907,7 @@ class CLITestCase(DockerClientTestCase):
             '/bin/true',
         ])
         service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=True)[0]
+        container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
         # env overriden
         self.assertEqual('notbar', container.environment['foo'])
         # keep environement from yaml
@@ -920,7 +921,7 @@ class CLITestCase(DockerClientTestCase):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
         self.dispatch(['run', '-d', 'simple'])
-        container = self.project.get_service('simple').containers(one_off=True)[0]
+        container = self.project.get_service('simple').containers(one_off=OneOffFilter.only)[0]
 
         # get port information
         port_random = container.get_local_port(3000)
@@ -937,7 +938,7 @@ class CLITestCase(DockerClientTestCase):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
         self.dispatch(['run', '-d', '--service-ports', 'simple'])
-        container = self.project.get_service('simple').containers(one_off=True)[0]
+        container = self.project.get_service('simple').containers(one_off=OneOffFilter.only)[0]
 
         # get port information
         port_random = container.get_local_port(3000)
@@ -958,7 +959,7 @@ class CLITestCase(DockerClientTestCase):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
         self.dispatch(['run', '-d', '-p', '30000:3000', '--publish', '30001:3001', 'simple'])
-        container = self.project.get_service('simple').containers(one_off=True)[0]
+        container = self.project.get_service('simple').containers(one_off=OneOffFilter.only)[0]
 
         # get port information
         port_short = container.get_local_port(3000)
@@ -980,7 +981,7 @@ class CLITestCase(DockerClientTestCase):
             '--publish', '127.0.0.1:30001:3001',
             'simple'
         ])
-        container = self.project.get_service('simple').containers(one_off=True)[0]
+        container = self.project.get_service('simple').containers(one_off=OneOffFilter.only)[0]
 
         # get port information
         port_short = container.get_local_port(3000)
@@ -997,7 +998,7 @@ class CLITestCase(DockerClientTestCase):
         # create one off container
         self.base_dir = 'tests/fixtures/expose-composefile'
         self.dispatch(['run', '-d', '--service-ports', 'simple'])
-        container = self.project.get_service('simple').containers(one_off=True)[0]
+        container = self.project.get_service('simple').containers(one_off=OneOffFilter.only)[0]
 
         ports = container.ports
         self.assertEqual(len(ports), 9)
@@ -1021,7 +1022,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['run', '--name', name, 'service', '/bin/true'])
 
         service = self.project.get_service('service')
-        container, = service.containers(stopped=True, one_off=True)
+        container, = service.containers(stopped=True, one_off=OneOffFilter.only)
         self.assertEqual(container.name, name)
 
     def test_run_service_with_workdir_overridden(self):
@@ -1051,7 +1052,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['run', 'app', 'nslookup', 'db'])
 
         containers = self.project.get_service('app').containers(
-            stopped=True, one_off=True)
+            stopped=True, one_off=OneOffFilter.only)
         assert len(containers) == 2
 
         for container in containers:
@@ -1071,7 +1072,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         self.dispatch(['run', '-d', 'app', 'top'])
 
-        container = self.project.get_service('app').containers(one_off=True)[0]
+        container = self.project.get_service('app').containers(one_off=OneOffFilter.only)[0]
         networks = container.get('NetworkSettings.Networks')
 
         assert sorted(list(networks)) == [
@@ -1131,21 +1132,21 @@ class CLITestCase(DockerClientTestCase):
         service.create_container(one_off=True)
         kill_service(service)
         self.assertEqual(len(service.containers(stopped=True)), 1)
-        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 1)
+        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
-        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 1)
+        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
         self.dispatch(['rm', '-f', '-a'], None)
-        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 0)
+        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 0)
 
         service.create_container(one_off=False)
         service.create_container(one_off=True)
         kill_service(service)
         self.assertEqual(len(service.containers(stopped=True)), 1)
-        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 1)
+        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
         self.dispatch(['rm', '-f', '--all'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
-        self.assertEqual(len(service.containers(stopped=True, one_off=True)), 0)
+        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 0)
 
     def test_stop(self):
         self.dispatch(['up', '-d'], None)

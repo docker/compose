@@ -6,6 +6,7 @@ import logging
 import operator
 from functools import reduce
 
+import enum
 from docker.errors import APIError
 
 from . import parallel
@@ -35,6 +36,20 @@ from .volume import ProjectVolumes
 log = logging.getLogger(__name__)
 
 
+@enum.unique
+class OneOffFilter(enum.Enum):
+    include = 0
+    exclude = 1
+    only = 2
+
+    @classmethod
+    def update_labels(cls, value, labels):
+        if value == cls.only:
+            labels.append('{0}={1}'.format(LABEL_ONE_OFF, "True"))
+        elif value == cls.exclude or value is False:
+            labels.append('{0}={1}'.format(LABEL_ONE_OFF, "False"))
+
+
 class Project(object):
     """
     A collection of services.
@@ -48,10 +63,8 @@ class Project(object):
 
     def labels(self, one_off=False):
         labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
-        if one_off is not None:
-            labels.append(
-                '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
-            )
+
+        OneOffFilter.update_labels(one_off, labels)
         return labels
 
     @classmethod
@@ -253,7 +266,7 @@ class Project(object):
 
     def remove_stopped(self, service_names=None, one_off=False, **options):
         parallel.parallel_remove(self.containers(
-            service_names, stopped=True, one_off=(None if one_off else False)
+            service_names, stopped=True, one_off=one_off
         ), options)
 
     def down(self, remove_image_type, include_volumes, remove_orphans=False):
