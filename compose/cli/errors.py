@@ -3,12 +3,14 @@ from __future__ import unicode_literals
 
 import contextlib
 import logging
+import socket
 from textwrap import dedent
 
 from docker.errors import APIError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
 from requests.exceptions import SSLError
+from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
 from ..const import HTTP_TIMEOUT
@@ -42,7 +44,11 @@ def handle_connection_errors(client):
     except SSLError as e:
         log.error('SSL error: %s' % e)
         raise ConnectionError()
-    except RequestsConnectionError:
+    except RequestsConnectionError as e:
+        if e.args and isinstance(e.args[0], ReadTimeoutError):
+            log_timeout_error()
+            raise ConnectionError()
+
         if call_silently(['which', 'docker']) != 0:
             if is_mac():
                 exit_with_error(docker_not_found_mac)
@@ -55,14 +61,18 @@ def handle_connection_errors(client):
     except APIError as e:
         log_api_error(e, client.api_version)
         raise ConnectionError()
-    except ReadTimeout as e:
-        log.error(
-            "An HTTP request took too long to complete. Retry with --verbose to "
-            "obtain debug information.\n"
-            "If you encounter this issue regularly because of slow network "
-            "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
-            "value (current value: %s)." % HTTP_TIMEOUT)
+    except (ReadTimeout, socket.timeout) as e:
+        log_timeout_error()
         raise ConnectionError()
+
+
+def log_timeout_error():
+    log.error(
+        "An HTTP request took too long to complete. Retry with --verbose to "
+        "obtain debug information.\n"
+        "If you encounter this issue regularly because of slow network "
+        "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
+        "value (current value: %s)." % HTTP_TIMEOUT)
 
 
 def log_api_error(e, client_version):
