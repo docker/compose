@@ -1,5 +1,9 @@
 BUILDTAGS=
 
+GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
+
+LDFLAGS := "-X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}"
+
 # if this session isn't interactive, then we don't want to allocate a
 # TTY, which would fail, but if it is interactive, we do want to attach
 # so that the user can send e.g. ^C through.
@@ -22,10 +26,10 @@ clean:
 	rm -rf bin
 
 client: bin
-	cd ctr && go build -o ../bin/ctr
+	cd ctr && go build -ldflags ${LDFLAGS} -o ../bin/ctr
 
 daemon: bin
-	cd containerd && go build -tags "$(BUILDTAGS)" -o ../bin/containerd
+	cd containerd && go build -ldflags ${LDFLAGS}  -tags "$(BUILDTAGS)" -o ../bin/containerd
 
 shim: bin
 	cd containerd-shim && go build -tags "$(BUILDTAGS)" -o ../bin/containerd-shim

@@ -14,7 +14,11 @@ const usage = `High performance container daemon cli`
 func main() {
 	app := cli.NewApp()
 	app.Name = "ctr"
-	app.Version = containerd.Version
+	if containerd.GitCommit != "" {
+		app.Version = fmt.Sprintf("%s commit: %s", containerd.Version, containerd.GitCommit)
+	} else {
+		app.Version = containerd.Version
+	}
 	app.Usage = usage
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
