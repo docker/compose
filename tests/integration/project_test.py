@@ -659,6 +659,7 @@ class ProjectTest(DockerClientTestCase):
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
+                'command': 'top',
                 'networks': {
                     'static_test': {
                         'ipv4_address': '172.16.100.100',
@@ -690,7 +691,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data,
         )
-        project.up()
+        project.up(detached=True)
 
         network = self.client.networks(names=['static_test'])[0]
         service_container = project.get_service('web').containers()[0]
