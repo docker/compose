@@ -145,15 +145,11 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
         assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_quiet_with_error(self):
         self.base_dir = None
         result = self.dispatch([
@@ -162,14 +158,10 @@ class CLITestCase(DockerClientTestCase):
         ], returncode=1)
         assert "'notaservice' must be a mapping" in result.stderr
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '-q']).stdout == ''
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
