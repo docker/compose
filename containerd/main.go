@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -52,7 +53,11 @@ func main() {
 	appendPlatformFlags()
 	app := cli.NewApp()
 	app.Name = "containerd"
-	app.Version = containerd.Version
+	if containerd.GitCommit != "" {
+		app.Version = fmt.Sprintf("%s commit: %s", containerd.Version, containerd.GitCommit)
+	} else {
+		app.Version = containerd.Version
+	}
 	app.Usage = usage
 	app.Flags = daemonFlags
 	setAppBefore(app)
