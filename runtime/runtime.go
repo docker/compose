@@ -19,6 +19,7 @@ var (
 	ErrContainerNotStarted   = errors.New("containerd: container not started")
 
 	errNoPidFile      = errors.New("containerd: no process pid file found")
+	errInvalidPidInt  = errors.New("containerd: process pid is invalid")
 	errNotImplemented = errors.New("containerd: not implemented")
 )
 

@@ -199,7 +199,7 @@ func (p *process) getPidFromFile() (int, error) {
 	}
 	i, err := strconv.Atoi(string(data))
 	if err != nil {
-		return -1, err
+		return -1, errInvalidPidInt
 	}
 	p.pid = i
 	return i, nil
