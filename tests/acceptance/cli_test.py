@@ -675,9 +675,7 @@ class CLITestCase(DockerClientTestCase):
             ['-f', 'v2-invalid.yml', 'up', '-d'],
             returncode=1)
 
-        # TODO: fix validation error messages for v2 files
-        # assert "Unsupported config option for service 'web': 'net'" in exc.exconly()
-        assert "Unsupported config option" in result.stderr
+        assert "Unsupported config option for services.bar: 'net'" in result.stderr
 
     def test_up_with_net_v1(self):
         self.base_dir = 'tests/fixtures/net-container'
