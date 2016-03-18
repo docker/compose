@@ -190,6 +190,31 @@ class CLITestCase(DockerClientTestCase):
         }
         assert output == expected
 
+    def test_config_v1(self):
+        self.base_dir = 'tests/fixtures/v1-config'
+        result = self.dispatch(['config'])
+        assert yaml.load(result.stdout) == {
+            'version': '2.0',
+            'services': {
+                'net': {
+                    'image': 'busybox',
+                    'network_mode': 'bridge',
+                },
+                'volume': {
+                    'image': 'busybox',
+                    'volumes': ['/data:rw'],
+                    'network_mode': 'bridge',
+                },
+                'app': {
+                    'image': 'busybox',
+                    'volumes_from': ['service:volume:rw'],
+                    'network_mode': 'service:net',
+                },
+            },
+            'networks': {},
+            'volumes': {},
+        }
+
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
