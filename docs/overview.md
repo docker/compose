@@ -91,11 +91,11 @@ Compose uses a project name to isolate environments from each other. You can mak
 * on a shared host or dev host, to prevent different projects, which may use the
   same service names, from interfering with each other
 
-The default project name is the basename of the project directory. You can set
-a custom project name by using the
-[`-p` command line option](./reference/overview.md), the
-[`COMPOSE_PROJECT_NAME` environment variable](./reference/envvars.md#compose-project-name)
-or specify it in [docker-compose.yml](./compose-file.md#project-name). 
+You can provide the default project name in [your docker-compose.yml](./compose-file.md#default_name).
+If it doesn't specified, then the basename of the project directory will be used
+as default project name. You can set a custom project name by using the
+[`-p` command line option](./reference/overview.md) or
+[`COMPOSE_PROJECT_NAME` environment variable](./reference/envvars.md#compose-project-name).
 
 ### Preserve volume data when containers are created
 

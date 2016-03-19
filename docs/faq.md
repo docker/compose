@@ -63,9 +63,13 @@ handling `SIGTERM` properly.
 Compose uses the project name to create unique identifiers for all of a
 project's  containers and other resources. To run multiple copies of a project,
 set a custom project name using the [`-p` command line
-option](./reference/overview.md), the [`COMPOSE_PROJECT_NAME`
-environment variable](./reference/envvars.md#compose-project-name)
-or specify it in [docker-compose.yml](./compose-file.md#project-name).
+option](./reference/overview.md) or the [`COMPOSE_PROJECT_NAME`
+environment variable](./reference/envvars.md#compose-project-name).
+
+If no custom project name provided, docker-compose will use default project name.
+You can provide it in [your docker-compose.yml](./compose-file.md#default_name).
+If it doesn't specified, then the basename of the project directory will be used
+as default project name.
 
 ## What's the difference between `up`, `run`, and `start`?
 
