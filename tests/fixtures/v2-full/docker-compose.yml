@@ -1,7 +1,8 @@
 
 version: "2"
 
-project_name: example
+project:
+    default_name: v2fullexample
 
 volumes:
   data:

@@ -167,25 +167,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
         return version
 
-    @cached_property
-    def project_name(self):
-        if 'project_name' not in self.config:
-            return None
+    def get_project_option(self, name):
+        return self.get_project_options_dict()[name]
 
-        project_name = self.config['project_name']
-
-        if isinstance(project_name, dict):
-            log.warn('Unexpected type for "project_name" key in "{}". Assuming '
-                     '"project_name" is the name of a service, and defaulting to '
-                     'Compose file version 1.'.format(self.filename))
-            return None
-
-        if not isinstance(project_name, six.string_types):
-            raise ConfigurationError(
-                'Project name in "{}" is invalid - it should be a string.'
-                .format(self.filename))
-
-        return self.config['project_name']
+    def get_project_options_dict(self):
+        return {} if self.version == V1 else self.config.get('project', {})
 
     def get_service(self, name):
         return self.get_service_dicts()[name]
@@ -212,21 +198,22 @@ class Config(namedtuple('_Config', 'version services volumes networks')):
     :type  networks: :class:`dict`
     """
 
-    project_name = None
-
     @classmethod
-    def with_project_name(cls, version, project_name, services, volumes, networks):
-        if not project_name:
-            raise ValueError("No project name for Config")
-
-        config = cls(
-            version,
-            services,
-            volumes,
-            networks
-        )
-
-        config.project_name = project_name
+    def with_project_info(cls, version, project, services, volumes, networks):
+        """
+        :param version: configuration version
+        :type  version: int
+        :param project: Dictionary mapping project specific options
+        :type  project: :class:`dict`
+        :param services: List of service description dictionaries
+        :type  services: :class:`list`
+        :param volumes: Dictionary mapping volume names to description dictionaries
+        :type  volumes: :class:`dict`
+        :param networks: Dictionary mapping network names to description dictionaries
+        :type  networks: :class:`dict`
+        """
+        config = cls(version, services, volumes, networks)
+        config.project = project
 
         return config
 
@@ -344,20 +331,13 @@ def load(config_details):
         main_file,
         [file.get_service_dicts() for file in config_details.config_files])
 
+    project_options = main_file.get_project_options_dict()
+
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    if main_file.project_name:
-        return Config.with_project_name(
-            main_file.version,
-            main_file.project_name,
-            service_dicts,
-            volumes,
-            networks
-        )
-
-    return Config(main_file.version, service_dicts, volumes, networks)
+    return Config.with_project_info(main_file.version, project_options, service_dicts, volumes, networks)
 
 
 def load_mapping(config_files, get_func, entity_type):

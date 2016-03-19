@@ -58,9 +58,9 @@ class CLITestCase(unittest.TestCase):
         self.assertEquals(project_name, name)
 
     def test_project_name_from_config(self):
-        name = 'namefromconfig'
-        project_name = get_project_name(None, project_name=None, config_project_name='name-from-config')
-        self.assertEquals(project_name, name)
+        default_project_name = 'defaultname'
+        project_name = get_project_name(None, project_name=None, default_project_name='default name')
+        self.assertEquals(project_name, default_project_name)
 
     def test_project_name_with_empty_environment_var(self):
         base_dir = 'tests/fixtures/simple-composefile'

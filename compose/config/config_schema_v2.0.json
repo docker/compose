@@ -8,8 +8,13 @@
       "type": "string"
     },
 
-    "project_name": {
-      "type": "string"
+    "project": {
+      "id": "#/properties/project",
+      "type": "object",
+      "properties": {
+        "default_name": {"type": "string"}
+      },
+      "additionalProperties": false
     },
 
     "services": {

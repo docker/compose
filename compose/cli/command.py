@@ -52,7 +52,8 @@ def get_client(verbose=False, version=None):
 def get_project(project_dir, config_path=None, project_name=None, verbose=False):
     config_details = config.find(project_dir, config_path)
     config_data = config.load(config_details)
-    project_name = get_project_name(config_details.working_dir, project_name, config_data.project_name)
+    default_project_name = config_data.project.get('default_name', None)
+    project_name = get_project_name(config_details.working_dir, project_name, default_project_name)
 
     api_version = os.environ.get(
         'COMPOSE_API_VERSION',
@@ -62,11 +63,11 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False)
     return Project.from_config(project_name, config_data, client)
 
 
-def get_project_name(working_dir, project_name=None, config_project_name=None):
+def get_project_name(working_dir, project_name=None, default_project_name=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME') or config_project_name
+    project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME') or default_project_name
     if project_name:
         return normalize_name(project_name)
 
