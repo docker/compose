@@ -39,14 +39,16 @@ which the release page specifies, in your terminal.
 
      The following is an example command illustrating the format:
 
-        curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        $ sudo su
+        $ curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        $ exit
 
      If you have problems installing with `curl`, see
      [Alternative Install Options](#alternative-install-options).
 
 5. Apply executable permissions to the binary:
 
-        $ chmod +x /usr/local/bin/docker-compose
+        $ sudo chmod +x /usr/local/bin/docker-compose
 
 6.  Optionally, install [command completion](completion.md) for the
 `bash` and `zsh` shell.
