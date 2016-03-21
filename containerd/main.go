@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
@@ -14,6 +16,7 @@ import (
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
 )
 
@@ -80,7 +83,11 @@ func main() {
 func daemon(address, stateDir string, concurrency int, runtimeName string) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
-	go reapProcesses()
+	s := make(chan os.Signal, 2048)
+	signal.Notify(s, syscall.SIGCHLD, syscall.SIGTERM, syscall.SIGINT)
+	if err := osutils.SetSubreaper(1); err != nil {
+		logrus.WithField("error", err).Error("containerd: set subpreaper")
+	}
 	sv, err := supervisor.New(stateDir, runtimeName)
 	if err != nil {
 		return err
@@ -94,17 +101,42 @@ func daemon(address, stateDir string, concurrency int, runtimeName string) error
 	if err := sv.Start(); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(address); err != nil {
-		return err
-	}
-	l, err := net.Listen(defaultListenType, address)
+	server, err := startServer(address, sv)
 	if err != nil {
 		return err
 	}
+	for ss := range s {
+		switch ss {
+		case syscall.SIGCHLD:
+			if _, err := osutils.Reap(); err != nil {
+				logrus.WithField("error", err).Warn("containerd: reap child processes")
+			}
+		default:
+			logrus.Infof("stopping containerd after receiving %s", ss)
+			server.Stop()
+			os.Exit(0)
+		}
+	}
+	return nil
+}
+
+func startServer(address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
+	if err := os.RemoveAll(address); err != nil {
+		return nil, err
+	}
+	l, err := net.Listen(defaultListenType, address)
+	if err != nil {
+		return nil, err
+	}
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(sv))
-	logrus.Debugf("containerd: grpc api on %s", address)
-	return s.Serve(l)
+	go func() {
+		logrus.Debugf("containerd: grpc api on %s", address)
+		if err := s.Serve(l); err != nil {
+			logrus.WithField("error", err).Fatal("containerd: serve grpc")
+		}
+	}()
+	return s, nil
 }
 
 // getDefaultID returns the hostname for the instance host

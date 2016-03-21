@@ -1,17 +1,8 @@
 # containerd
 
 Containerd is a daemon to control runC, built for performance and density. 
-Containerd leverages runC advanced features such as seccomp and user namespace support as well
+Containerd leverages runC's advanced features such as seccomp and user namespace support as well
 as checkpoint and restore for cloning and live migration of containers.
-
-#### Status 
-
-*alpha*
-
-What does alpha, beta, etc mean?
-* alpha - not feature complete
-* beta - feature complete but needs testing
-* prod ready - ready for production
 
 ## Docs
 
@@ -348,7 +339,7 @@ commit automatically with `git commit -s`.
 
 ## Copyright and license
 
-Copyright © 2015 Docker, Inc. All rights reserved, except as follows. Code
+Copyright © 2016 Docker, Inc. All rights reserved, except as follows. Code
 is released under the Apache 2.0 license. The README.md file, and files in the
 "docs" folder are licensed under the Creative Commons Attribution 4.0
 International License under the terms and conditions set forth in the file

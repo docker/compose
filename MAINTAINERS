@@ -9,10 +9,12 @@
 # This file is compiled into the MAINTAINERS file in docker/opensource.
 #
 [Org]
-	[Org."Core maintainers"]
-		people = [
-			"crosbymichael",
-		]
+    [Org."Core maintainers"]
+        people = [
+            "crosbymichael",
+            "tonistiigi",
+            "mlaventure",
+        ]
 
 [people]
 
@@ -22,7 +24,18 @@
 
 	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
 
-	[people.crosbymichael]
-	Name = "Michael Crosby"
-	Email = "crosbymichael@gmail.com"
-	GitHub = "crosbymichael"
+    [people.crosbymichael]
+    Name = "Michael Crosby"
+    Email = "crosbymichael@gmail.com"
+    GitHub = "crosbymichael"
+
+    [people.tonistiigi]
+    Name = "Tõnis Tiigi"
+    Email = "tonis@docker.com"
+    GitHub = "tonistiigi"
+
+    [people.mlaventure]
+    Name = "Kenfe-Mickaël Laventure"
+    Email = "mickael.laventure@docker.com"
+    GitHub = "mlaventure"
+
