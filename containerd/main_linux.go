@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
@@ -60,19 +59,6 @@ func checkLimits() error {
 		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
 	}
 	return nil
-}
-
-func reapProcesses() {
-	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGCHLD)
-	if err := osutils.SetSubreaper(1); err != nil {
-		logrus.WithField("error", err).Error("containerd: set subpreaper")
-	}
-	for range s {
-		if _, err := osutils.Reap(); err != nil {
-			logrus.WithField("error", err).Error("containerd: reap child processes")
-		}
-	}
 }
 
 func processMetrics() {
