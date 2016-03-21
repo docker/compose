@@ -8,6 +8,7 @@ from docker import Client
 from docker.errors import TLSParameterError
 from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
+from requests.utils import urlparse
 
 from ..const import HTTP_TIMEOUT
 from .errors import UserError
@@ -21,6 +22,7 @@ def tls_config_from_options(options):
     cert = options.get('--tlscert')
     key = options.get('--tlskey')
     verify = options.get('--tlsverify')
+    hostname = urlparse(options.get('--host', '')).hostname
 
     advanced_opts = any([ca_cert, cert, key, verify])
 
@@ -32,7 +34,9 @@ def tls_config_from_options(options):
             client_cert = (cert, key)
         return TLSConfig(
             client_cert=client_cert, verify=verify, ca_cert=ca_cert,
-            assert_hostname=options.get('--skip-hostname-check')
+            assert_hostname=(
+                hostname or not options.get('--skip-hostname-check', False)
+            )
         )
     else:
         return None
