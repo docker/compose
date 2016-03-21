@@ -167,6 +167,12 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
         return version
 
+    def get_project_option(self, name):
+        return self.get_project_options_dict()[name]
+
+    def get_project_options_dict(self):
+        return {} if self.version == V1 else self.config.get('project', {})
+
     def get_service(self, name):
         return self.get_service_dicts()[name]
 
@@ -191,6 +197,25 @@ class Config(namedtuple('_Config', 'version services volumes networks')):
     :param networks: Dictionary mapping network names to description dictionaries
     :type  networks: :class:`dict`
     """
+
+    @classmethod
+    def with_project_info(cls, version, project, services, volumes, networks):
+        """
+        :param version: configuration version
+        :type  version: int
+        :param project: Dictionary mapping project specific options
+        :type  project: :class:`dict`
+        :param services: List of service description dictionaries
+        :type  services: :class:`list`
+        :param volumes: Dictionary mapping volume names to description dictionaries
+        :type  volumes: :class:`dict`
+        :param networks: Dictionary mapping network names to description dictionaries
+        :type  networks: :class:`dict`
+        """
+        config = cls(version, services, volumes, networks)
+        config.project = project
+
+        return config
 
 
 class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name config')):
@@ -306,11 +331,13 @@ def load(config_details):
         main_file,
         [file.get_service_dicts() for file in config_details.config_files])
 
+    project_options = main_file.get_project_options_dict()
+
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    return Config(main_file.version, service_dicts, volumes, networks)
+    return Config.with_project_info(main_file.version, project_options, service_dicts, volumes, networks)
 
 
 def load_mapping(config_files, get_func, entity_type):

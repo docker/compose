@@ -178,6 +178,9 @@ class CLITestCase(DockerClientTestCase):
         output = yaml.load(result.stdout)
         expected = {
             'version': '2.0',
+            'project': {
+                'default_name': 'v2fullexample'
+            },
             'volumes': {'data': {'driver': 'local'}},
             'networks': {'front': {}},
             'services': {
@@ -369,15 +372,15 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerCountCondition(self.project, 2))
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
-        assert 'Stopping v2full_web_1' in result.stderr
-        assert 'Stopping v2full_other_1' in result.stderr
-        assert 'Removing v2full_web_1' in result.stderr
-        assert 'Removing v2full_other_1' in result.stderr
-        assert 'Removing volume v2full_data' in result.stderr
-        assert 'Removing image v2full_web' in result.stderr
+        assert 'Stopping v2fullexample_web_1' in result.stderr
+        assert 'Stopping v2fullexample_other_1' in result.stderr
+        assert 'Removing v2fullexample_web_1' in result.stderr
+        assert 'Removing v2fullexample_other_1' in result.stderr
+        assert 'Removing volume v2fullexample_data' in result.stderr
+        assert 'Removing image v2fullexample_web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
-        assert 'Removing network v2full_default' in result.stderr
-        assert 'Removing network v2full_front' in result.stderr
+        assert 'Removing network v2fullexample_default' in result.stderr
+        assert 'Removing network v2fullexample_front' in result.stderr
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])

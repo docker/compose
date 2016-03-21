@@ -1,6 +1,9 @@
 
 version: "2"
 
+project:
+    default_name: v2fullexample
+
 volumes:
   data:
     driver: local

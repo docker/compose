@@ -76,6 +76,9 @@ class ConfigTest(unittest.TestCase):
         config_data = config.load(
             build_config_details({
                 'version': '2',
+                'project': {
+                    'default_name': 'example'
+                },
                 'services': {
                     'foo': {'image': 'busybox'},
                     'bar': {'image': 'busybox', 'environment': ['FOO=1']},
