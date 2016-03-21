@@ -495,7 +495,14 @@ class TopLevelCommand(object):
             -a, --all     Also remove one-off containers created by
                           docker-compose run
         """
-        one_off = OneOffFilter.include if options.get('--all') else OneOffFilter.exclude
+        if options.get('--all'):
+            one_off = OneOffFilter.include
+        else:
+            log.warn(
+                'Not including one-off containers created by `docker-compose run`.\n'
+                'To include them, use `docker-compose rm --all`.\n'
+                'This will be the default behavior in the next version of Compose.\n')
+            one_off = OneOffFilter.exclude
 
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off
