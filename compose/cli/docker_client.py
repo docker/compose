@@ -22,7 +22,7 @@ def tls_config_from_options(options):
     cert = options.get('--tlscert')
     key = options.get('--tlskey')
     verify = options.get('--tlsverify')
-    hostname = urlparse(options.get('--host', '')).hostname
+    hostname = urlparse(options.get('--host') or '').hostname
 
     advanced_opts = any([ca_cert, cert, key, verify])
 
