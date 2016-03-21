@@ -302,8 +302,8 @@ replaces the old value.
 > This is because `build` and `image` cannot be used together in a version 1
 > file.
 
-For the **multi-value options** `ports`, `expose`, `external_links`, `dns` and
-`dns_search`, Compose concatenates both sets of values:
+For the **multi-value options** `ports`, `expose`, `external_links`, `dns`,
+`dns_search`, and `tmpfs`, Compose concatenates both sets of values:
 
     # original service
     expose:

@@ -226,6 +226,15 @@ Custom DNS search domains. Can be a single value or a list.
       - dc1.example.com
       - dc2.example.com
 
+### tmpfs
+
+Mount a temporary file system inside the container. Can be a single value or a list.
+
+    tmpfs: /run
+    tmpfs:
+      - /run
+      - /tmp
+
 ### entrypoint
 
 Override the default entrypoint.

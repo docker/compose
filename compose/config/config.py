@@ -591,7 +591,7 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
-    for field in ['dns', 'dns_search']:
+    for field in ['dns', 'dns_search', 'tmpfs']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
@@ -730,7 +730,7 @@ def merge_service_dicts(base, override, version):
     ]:
         md.merge_field(field, operator.add, default=[])
 
-    for field in ['dns', 'dns_search', 'env_file']:
+    for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
 
     for field in set(ALLOWED_KEYS) - set(md):
