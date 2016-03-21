@@ -124,13 +124,11 @@ class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files envir
     :param environment: computed environment values for this project
     :type  environment: :class:`environment.Environment`
      """
-
-    def __new__(cls, working_dir, config_files):
+    def __new__(cls, working_dir, config_files, environment=None):
+        if environment is None:
+            environment = Environment.from_env_file(working_dir)
         return super(ConfigDetails, cls).__new__(
-            cls,
-            working_dir,
-            config_files,
-            Environment.from_env_file(working_dir),
+            cls, working_dir, config_files, environment
         )
 
 
@@ -219,11 +217,12 @@ class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name conf
             config)
 
 
-def find(base_dir, filenames):
+def find(base_dir, filenames, environment):
     if filenames == ['-']:
         return ConfigDetails(
             os.getcwd(),
             [ConfigFile(None, yaml.safe_load(sys.stdin))],
+            environment
         )
 
     if filenames:
@@ -235,6 +234,7 @@ def find(base_dir, filenames):
     return ConfigDetails(
         os.path.dirname(filenames[0]),
         [ConfigFile.from_filename(f) for f in filenames],
+        environment
     )
 
 

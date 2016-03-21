@@ -20,22 +20,23 @@ log = logging.getLogger(__name__)
 
 
 def project_from_options(project_dir, options):
+    environment = Environment.from_env_file(project_dir)
     return get_project(
         project_dir,
-        get_config_path_from_options(project_dir, options),
+        get_config_path_from_options(project_dir, options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         host=options.get('--host'),
         tls_config=tls_config_from_options(options),
+        environment=environment
     )
 
 
-def get_config_path_from_options(base_dir, options):
+def get_config_path_from_options(base_dir, options, environment):
     file_option = options.get('--file')
     if file_option:
         return file_option
 
-    environment = Environment.from_env_file(base_dir)
     config_files = environment.get('COMPOSE_FILE')
     if config_files:
         return config_files.split(os.pathsep)
@@ -55,11 +56,14 @@ def get_client(verbose=False, version=None, tls_config=None, host=None):
 
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_config=None):
-    config_details = config.find(project_dir, config_path)
-    project_name = get_project_name(config_details.working_dir, project_name)
+                host=None, tls_config=None, environment=None):
+    if not environment:
+        environment = Environment.from_env_file(project_dir)
+    config_details = config.find(project_dir, config_path, environment)
+    project_name = get_project_name(
+        config_details.working_dir, project_name, environment
+    )
     config_data = config.load(config_details)
-    environment = Environment.from_env_file(project_dir)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',
@@ -72,11 +76,12 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     return Project.from_config(project_name, config_data, client)
 
 
-def get_project_name(working_dir, project_name=None):
+def get_project_name(working_dir, project_name=None, environment=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    environment = Environment.from_env_file(working_dir)
+    if not environment:
+        environment = Environment.from_env_file(working_dir)
     project_name = project_name or environment.get('COMPOSE_PROJECT_NAME')
     if project_name:
         return normalize_name(project_name)

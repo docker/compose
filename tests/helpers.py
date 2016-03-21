@@ -13,4 +13,5 @@ def build_config(contents, **kwargs):
 def build_config_details(contents, working_dir='working_dir', filename='filename.yml'):
     return ConfigDetails(
         working_dir,
-        [ConfigFile(filename, contents)])
+        [ConfigFile(filename, contents)],
+    )

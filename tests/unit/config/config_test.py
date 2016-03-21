@@ -1584,8 +1584,11 @@ class PortsTest(unittest.TestCase):
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
     def test_config_file_with_environment_file(self):
+        project_dir = 'tests/fixtures/default-env-file'
         service_dicts = config.load(
-            config.find('tests/fixtures/default-env-file', None)
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
         ).services
 
         self.assertEqual(service_dicts[0], {
@@ -1597,6 +1600,7 @@ class InterpolationTest(unittest.TestCase):
 
     @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
+        project_dir = 'tests/fixtures/environment-interpolation'
         os.environ.update(
             IMAGE="busybox",
             HOST_PORT="80",
@@ -1604,7 +1608,9 @@ class InterpolationTest(unittest.TestCase):
         )
 
         service_dicts = config.load(
-            config.find('tests/fixtures/environment-interpolation', None),
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
         ).services
 
         self.assertEqual(service_dicts, [
@@ -2149,7 +2155,9 @@ class EnvTest(unittest.TestCase):
 
 
 def load_from_filename(filename):
-    return config.load(config.find('.', [filename])).services
+    return config.load(
+        config.find('.', [filename], Environment.from_env_file('.'))
+    ).services
 
 
 class ExtendsTest(unittest.TestCase):
