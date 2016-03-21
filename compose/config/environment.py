@@ -7,6 +7,7 @@ import os
 
 import six
 
+from ..const import IS_WINDOWS_PLATFORM
 from .errors import ConfigurationError
 
 log = logging.getLogger(__name__)
@@ -58,6 +59,11 @@ class Environment(dict):
         try:
             return super(Environment, self).__getitem__(key)
         except KeyError:
+            if IS_WINDOWS_PLATFORM:
+                try:
+                    return super(Environment, self).__getitem__(key.upper())
+                except KeyError:
+                    pass
             if key not in self.missing_keys:
                 log.warn(
                     "The {} variable is not set. Defaulting to a blank string."
