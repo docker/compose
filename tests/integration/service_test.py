@@ -28,6 +28,7 @@ from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import Service
+from tests.integration.testcases import v2_only
 
 
 def create_and_start_container(service, **override_options):
@@ -875,6 +876,7 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])
 
+    @v2_only()
     def test_tmpfs(self):
         service = self.create_service('web', tmpfs=['/run'])
         container = create_and_start_container(service)

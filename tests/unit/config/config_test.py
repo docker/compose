@@ -1196,9 +1196,12 @@ class ConfigTest(unittest.TestCase):
 
     def test_tmpfs_option(self):
         actual = config.load(build_config_details({
-            'web': {
-                'image': 'alpine',
-                'tmpfs': '/run',
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'tmpfs': '/run',
+                }
             }
         }))
         assert actual.services == [
