@@ -276,7 +276,7 @@ class Project(object):
     def down(self, remove_image_type, include_volumes, remove_orphans=False):
         self.stop()
         self.find_orphan_containers(remove_orphans)
-        self.remove_stopped(v=include_volumes)
+        self.remove_stopped(v=include_volumes, one_off=OneOffFilter.include)
 
         self.networks.remove()
 

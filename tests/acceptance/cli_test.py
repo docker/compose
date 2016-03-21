@@ -366,14 +366,19 @@ class CLITestCase(DockerClientTestCase):
     @v2_only()
     def test_down(self):
         self.base_dir = 'tests/fixtures/v2-full'
+
         self.dispatch(['up', '-d'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        self.dispatch(['run', 'web', 'true'])
+        assert len(self.project.containers(one_off=OneOffFilter.only, stopped=True)) == 1
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
         assert 'Stopping v2full_web_1' in result.stderr
         assert 'Stopping v2full_other_1' in result.stderr
         assert 'Removing v2full_web_1' in result.stderr
         assert 'Removing v2full_other_1' in result.stderr
+        assert 'Removing v2full_web_run_1' in result.stderr
         assert 'Removing volume v2full_data' in result.stderr
         assert 'Removing image v2full_web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
