@@ -1,5 +1,7 @@
 BUILDTAGS=
 
+PROJECT=github.com/docker/containerd
+
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
@@ -13,8 +15,12 @@ ifeq ($(INTERACTIVE), 1)
 	DOCKER_FLAGS += -t
 endif
 
+TEST_ARTIFACTS_DIR := integration-test/test-artifacts
+BUNDLE_ARCHIVES_DIR := $(TEST_ARTIFACTS_DIR)/archives
+
 DOCKER_IMAGE := containerd-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
-DOCKER_RUN := docker run --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
+DOCKER_RUN := docker run --privileged --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
+
 
 export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
 
@@ -46,7 +52,13 @@ shim: bin
 shim-static:
 	cd containerd-shim && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
 
-dbuild:
+$(BUNDLE_ARCHIVES_DIR)/busybox.tar:
+	@mkdir -p $(BUNDLE_ARCHIVES_DIR)
+	curl -sSL 'https://github.com/jpetazzo/docker-busybox/raw/buildroot-2014.11/rootfs.tar' -o $(BUNDLE_ARCHIVES_DIR)/busybox.tar
+
+bundles-rootfs: $(BUNDLE_ARCHIVES_DIR)/busybox.tar
+
+dbuild: $(BUNDLE_ARCHIVES_DIR)/busybox.tar
 	@docker build --rm --force-rm -t "$(DOCKER_IMAGE)" .
 
 dtest: dbuild
@@ -68,7 +80,12 @@ shell: dbuild
 	$(DOCKER_RUN) bash
 
 test: all validate
-	go test -v $(shell go list ./... | grep -v /vendor)
+	go test -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
+ifneq ($(wildcard /.dockerenv), )
+	$(MAKE) install bundles-rootfs
+	cd integration-test ; \
+	go test -check.v $(TESTFLAGS) github.com/docker/containerd/integration-test
+endif
 
 validate: fmt
 
