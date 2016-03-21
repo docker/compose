@@ -46,8 +46,12 @@ class OneOffFilter(enum.Enum):
     def update_labels(cls, value, labels):
         if value == cls.only:
             labels.append('{0}={1}'.format(LABEL_ONE_OFF, "True"))
-        elif value == cls.exclude or value is False:
+        elif value == cls.exclude:
             labels.append('{0}={1}'.format(LABEL_ONE_OFF, "False"))
+        elif value == cls.include:
+            pass
+        else:
+            raise ValueError("Invalid value for one_off: {}".format(repr(value)))
 
 
 class Project(object):
@@ -61,7 +65,7 @@ class Project(object):
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
 
-    def labels(self, one_off=False):
+    def labels(self, one_off=OneOffFilter.exclude):
         labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
 
         OneOffFilter.update_labels(one_off, labels)
@@ -264,7 +268,7 @@ class Project(object):
     def kill(self, service_names=None, **options):
         parallel.parallel_kill(self.containers(service_names), options)
 
-    def remove_stopped(self, service_names=None, one_off=False, **options):
+    def remove_stopped(self, service_names=None, one_off=OneOffFilter.exclude, **options):
         parallel.parallel_remove(self.containers(
             service_names, stopped=True, one_off=one_off
         ), options)
@@ -429,7 +433,7 @@ class Project(object):
         for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
-    def _labeled_containers(self, stopped=False, one_off=False):
+    def _labeled_containers(self, stopped=False, one_off=OneOffFilter.exclude):
         return list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
@@ -437,7 +441,7 @@ class Project(object):
                 filters={'label': self.labels(one_off=one_off)})])
         )
 
-    def containers(self, service_names=None, stopped=False, one_off=False):
+    def containers(self, service_names=None, stopped=False, one_off=OneOffFilter.exclude):
         if service_names:
             self.validate_service_names(service_names)
         else:
