@@ -1,5 +1,5 @@
 package containerd
 
-const Version = "0.0.5"
+const Version = "0.1.0"
 
 var GitCommit = ""
