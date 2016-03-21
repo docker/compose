@@ -1,6 +1,7 @@
 BUILDTAGS=
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
 LDFLAGS := -X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
 
