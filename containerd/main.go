@@ -112,6 +112,7 @@ func daemon(address, stateDir string, concurrency int, runtimeName string) error
 				logrus.WithField("error", err).Warn("containerd: reap child processes")
 			}
 		default:
+			logrus.Infof("stopping containerd after receiving %s", ss)
 			server.Stop()
 			os.Exit(0)
 		}
