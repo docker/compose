@@ -104,7 +104,6 @@
         "shm_size": {"type": ["number", "string"]},
         "stdin_open": {"type": "boolean"},
         "stop_signal": {"type": "string"},
-        "tmpfs": {"$ref": "#/definitions/string_or_list"},
         "tty": {"type": "boolean"},
         "ulimits": {
           "type": "object",
