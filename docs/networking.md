@@ -15,7 +15,7 @@ weight=21
 > **Note:** This document only applies if you're using [version 2 of the Compose file format](compose-file.md#versioning). Networking features are not supported for version 1 (legacy) Compose files.
 
 By default Compose sets up a single
-[network](/engine/reference/commandline/network_create.md) for your app. Each
+[network](https://docs.docker.com/engine/reference/commandline/network_create/) for your app. Each
 container for a service joins the default network and is both *reachable* by
 other containers on that network, and *discoverable* by them at a hostname
 identical to the container name.
@@ -78,11 +78,11 @@ See the [links reference](compose-file.md#links) for more information.
 
 When [deploying a Compose application to a Swarm cluster](swarm.md), you can make use of the built-in `overlay` driver to enable multi-host communication between containers with no changes to your Compose file or application code.
 
-Consult the [Getting started with multi-host networking](/engine/userguide/networking/get-started-overlay.md) to see how to set up a Swarm cluster. The cluster will use the `overlay` driver by default, but you can specify it explicitly if you prefer - see below for how to do this.
+Consult the [Getting started with multi-host networking](https://docs.docker.com/engine/userguide/networking/get-started-overlay/) to see how to set up a Swarm cluster. The cluster will use the `overlay` driver by default, but you can specify it explicitly if you prefer - see below for how to do this.
 
 ## Specifying custom networks
 
-Instead of just using the default app network, you can specify your own networks with the top-level `networks` key. This lets you create more complex topologies and specify [custom network drivers](/engine/extend/plugins_network.md) and options. You can also use it to connect services to externally-created networks which aren't managed by Compose.
+Instead of just using the default app network, you can specify your own networks with the top-level `networks` key. This lets you create more complex topologies and specify [custom network drivers](https://docs.docker.com/engine/extend/plugins_network/) and options. You can also use it to connect services to externally-created networks which aren't managed by Compose.
 
 Each service can specify what networks to connect to with the *service-level* `networks` key, which is a list of names referencing entries under the *top-level* `networks` key.
 
