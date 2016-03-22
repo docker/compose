@@ -211,9 +211,7 @@ var startCommand = cli.Command{
 					}
 				}()
 			}
-			if err := waitForExit(c, events, id, "init", restoreAndCloseStdin); err != nil {
-				fatal(err.Error(), 1)
-			}
+			waitForExit(c, events, id, "init", restoreAndCloseStdin)
 		}
 	},
 }
@@ -491,9 +489,7 @@ var execCommand = cli.Command{
 					}
 				}()
 			}
-			if err := waitForExit(c, events, context.String("id"), context.String("pid"), restoreAndCloseStdin); err != nil {
-				fatal(err.Error(), 1)
-			}
+			waitForExit(c, events, context.String("id"), context.String("pid"), restoreAndCloseStdin)
 		}
 	},
 }
@@ -571,7 +567,7 @@ var updateCommand = cli.Command{
 	},
 }
 
-func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid string, closer func()) error {
+func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid string, closer func()) {
 	for {
 		e, err := events.Recv()
 		if err != nil {
@@ -584,7 +580,6 @@ func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid strin
 			os.Exit(int(e.Status))
 		}
 	}
-	return nil
 }
 
 type stdio struct {

@@ -416,7 +416,7 @@ func readLogMessages(path string) ([]message, error) {
 		var m message
 		if err := dec.Decode(&m); err != nil {
 			if err == io.EOF {
-				return out, nil
+				break
 			}
 			return nil, err
 		}
