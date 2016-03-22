@@ -72,3 +72,19 @@ class Environment(dict):
                 self.missing_keys.append(key)
 
             return ""
+
+    def __contains__(self, key):
+        result = super(Environment, self).__contains__(key)
+        if IS_WINDOWS_PLATFORM:
+            return (
+                result or super(Environment, self).__contains__(key.upper())
+            )
+        return result
+
+    def get(self, key, *args, **kwargs):
+        if IS_WINDOWS_PLATFORM:
+            return super(Environment, self).get(
+                key,
+                super(Environment, self).get(key.upper(), *args, **kwargs)
+            )
+        return super(Environment, self).get(key, *args, **kwargs)
