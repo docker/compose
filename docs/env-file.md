@@ -28,9 +28,13 @@ Those environment variables will be used for
 file, but can also be used to define the following
 [CLI variables](reference/envvars.md):
 
-- `COMPOSE_PROJECT_NAME`
-- `COMPOSE_FILE`
 - `COMPOSE_API_VERSION`
+- `COMPOSE_FILE`
+- `COMPOSE_HTTP_TIMEOUT`
+- `COMPOSE_PROJECT_NAME`
+- `DOCKER_CERT_PATH`
+- `DOCKER_HOST`
+- `DOCKER_TLS_VERIFY`
 
 ## More Compose documentation
 
