@@ -38,8 +38,8 @@ class BasicProjectTest(ProjectTestCase):
         super(BasicProjectTest, self).setUp()
 
         self.cfg = {
-            'db': {'image': 'busybox:latest'},
-            'web': {'image': 'busybox:latest'},
+            'db': {'image': 'busybox:latest', 'command': 'top'},
+            'web': {'image': 'busybox:latest', 'command': 'top'},
         }
 
     def test_no_change(self):
