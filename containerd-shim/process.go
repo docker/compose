@@ -139,7 +139,7 @@ func (p *process) start() error {
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
 			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
-				return fmt.Errorf("runc not installed on system")
+				return fmt.Errorf("%s not installed on system", p.runtime)
 			}
 		}
 		return err

@@ -120,7 +120,7 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 		add("--ext-unix-sk")
 	}
 	add(c.id)
-	return exec.Command("runc", args...).Run()
+	return exec.Command(c.runtime, args...).Run()
 }
 
 func (c *container) DeleteCheckpoint(name string) error {
