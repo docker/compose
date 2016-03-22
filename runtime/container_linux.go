@@ -17,6 +17,8 @@ import (
 	ocs "github.com/opencontainers/specs/specs-go"
 )
 
+var shimBinary = os.Args[0] + "-shim"
+
 func getRootIDs(s *specs.Spec) (int, int, error) {
 	if s == nil {
 		return 0, 0, nil
@@ -130,7 +132,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("containerd-shim",
+	cmd := exec.Command(shimBinary,
 		c.id, c.bundle, c.runtime,
 	)
 	cmd.Dir = processRoot
@@ -170,7 +172,7 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 			c.RemoveProcess(pid)
 		}
 	}()
-	cmd := exec.Command("containerd-shim",
+	cmd := exec.Command(shimBinary,
 		c.id, c.bundle, c.runtime,
 	)
 	cmd.Dir = processRoot
@@ -204,7 +206,7 @@ func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
 			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
-				return fmt.Errorf("containerd-shim not installed on system")
+				return fmt.Errorf("%s not installed on system", shimBinary)
 			}
 		}
 		return err
