@@ -41,19 +41,22 @@ class Environment(dict):
     def __init__(self, *args, **kwargs):
         super(Environment, self).__init__(*args, **kwargs)
         self.missing_keys = []
-        self.update(os.environ)
 
     @classmethod
     def from_env_file(cls, base_dir):
-        result = cls()
-        if base_dir is None:
+        def _initialize():
+            result = cls()
+            if base_dir is None:
+                return result
+            env_file_path = os.path.join(base_dir, '.env')
+            try:
+                return cls(env_vars_from_file(env_file_path))
+            except ConfigurationError:
+                pass
             return result
-        env_file_path = os.path.join(base_dir, '.env')
-        try:
-            return cls(env_vars_from_file(env_file_path))
-        except ConfigurationError:
-            pass
-        return result
+        instance = _initialize()
+        instance.update(os.environ)
+        return instance
 
     def __getitem__(self, key):
         try:

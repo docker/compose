@@ -37,7 +37,9 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
             filename=filename,
             name=name,
             config=service_dict),
-        config.ConfigFile(filename=filename, config={}))
+        config.ConfigFile(filename=filename, config={}),
+        environment=Environment.from_env_file(working_dir)
+    )
     return config.process_service(resolver.run())
 
 
@@ -2061,7 +2063,9 @@ class EnvTest(unittest.TestCase):
             },
         }
         self.assertEqual(
-            resolve_environment(service_dict, Environment()),
+            resolve_environment(
+                service_dict, Environment.from_env_file(None)
+            ),
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': None},
         )
 
@@ -2099,7 +2103,8 @@ class EnvTest(unittest.TestCase):
         os.environ['ENV_DEF'] = 'E3'
         self.assertEqual(
             resolve_environment(
-                {'env_file': ['tests/fixtures/env/resolve.env']}, Environment()
+                {'env_file': ['tests/fixtures/env/resolve.env']},
+                Environment.from_env_file(None)
             ),
             {
                 'FILE_DEF': u'bär',

@@ -449,12 +449,12 @@ def process_config_file(config_file, environment, service_name=None):
 
 
 class ServiceExtendsResolver(object):
-    def __init__(self, service_config, config_file, environment=None, already_seen=None):
+    def __init__(self, service_config, config_file, environment, already_seen=None):
         self.service_config = service_config
         self.working_dir = service_config.working_dir
         self.already_seen = already_seen or []
         self.config_file = config_file
-        self.environment = environment or Environment()
+        self.environment = environment
 
     @property
     def signature(self):

@@ -90,7 +90,9 @@ class DockerClientTestCase(unittest.TestCase):
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]
 
-        kwargs['environment'] = resolve_environment(kwargs, Environment())
+        kwargs['environment'] = resolve_environment(
+            kwargs, Environment.from_env_file(None)
+        )
         labels = dict(kwargs.setdefault('labels', {}))
         labels['com.docker.compose.test-name'] = self.id()
 
