@@ -18,15 +18,15 @@ message CreateContainerRequest {
 	string stdin = 3; // path to the file where stdin will be read (optional)
 	string stdout = 4; // path to file where stdout will be written (optional)
 	string stderr = 5; // path to file where stderr will be written (optional)
-    string console = 6; // path to the console for a container (optional)
+	string console = 6; // path to the console for a container (optional)
 	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
 }
 ```
 
 ## Attach
 
-In order to have attach like functionality for your containers you use the same API request but named pipes or `fifo`s can be be used to achieve this type of functionality.
-The default CLI for containerd does this if you specify the `--attach` flag on `create`.
+In order to have attach like functionality for your containers you use the same API request but named pipes or `fifo`s can be used to achieve this type of functionality.
+The default CLI for containerd does this if you specify the `--attach` flag on `create` or `start`.
 It will create fifos for each of the containers stdio which the CLI can read and write to.
 This can be used to create an interactive session with the container, `bash` for example, or to have a blocking way to collect the container's STDIO and forward it to your logging facilities.
 
