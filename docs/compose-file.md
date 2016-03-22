@@ -744,7 +744,7 @@ While it is possible to declare volumes on the fly as part of the service
 declaration, this section allows you to create named volumes that can be
 reused across multiple services (without relying on `volumes_from`), and are
 easily retrieved and inspected using the docker command line or API.
-See the [docker volume](/engine/reference/commandline/volume_create.md)
+See the [docker volume](https://docs.docker.com/engine/reference/commandline/volume_create/)
 subcommand documentation for more information.
 
 ### driver
