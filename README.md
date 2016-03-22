@@ -86,25 +86,20 @@ USAGE:
    containerd [global options] command [command options] [arguments...]
 
 VERSION:
-   0.0.4
-
-AUTHOR(S): 
-   @crosbymichael <crosbymichael@gmail.com> 
+   0.1.0 commit: 54c213e8a719d734001beb2cb8f130c84cc3bd20
 
 COMMANDS:
-   help, h  Shows a list of commands or help for one command
-   
+   help, h      Shows a list of commands or help for one command
+
 GLOBAL OPTIONS:
-    --id "deathstar"                                     unique containerd id to identify the instance
-    --debug                                              enable debug output in the logs
-    --state-dir "/run/containerd"                        runtime state directory
-    -c, --concurrency "10"                               set the concurrency level for tasks
-    --metrics-interval "1m0s"                            interval for flushing metrics to the store
-    --listen, -l "/run/containerd/containerd.sock"       Address on which GRPC API will listen
-    --oom-notify                                         enable oom notifications for containers
-    --graphite-address                                   Address of graphite server
-    --help, -h                                           show help
-    --version, -v                                        print the version
+   --debug                                              enable debug output in the logs
+   --state-dir "/run/containerd"                        runtime state directory
+   --metrics-interval "5m0s"                            interval for flushing metrics to the store
+   --listen, -l "/run/containerd/containerd.sock"       Address on which GRPC API will listen
+   --runtime, -r "runc"                                 name of the OCI compliant runtime to use when executing containers
+   --graphite-address                                   Address of graphite server
+   --help, -h                                           show help
+   --version, -v                                        print the version
 ```
 
 # Roadmap 
@@ -127,37 +122,58 @@ There is a default cli named `ctr` based on the GRPC api.
 This cli will allow you to create and manage containers run with containerd.
 
 ```
+$ ctr -h
 NAME:
-   ctr - High performance container daemon controller
+   ctr - High performance container daemon cli
 
 USAGE:
    ctr [global options] command [command options] [arguments...]
 
 VERSION:
-   0.0.4
-
-AUTHOR(S): 
-   @crosbymichael <crosbymichael@gmail.com> 
+   0.1.0 commit: 54c213e8a719d734001beb2cb8f130c84cc3bd20
 
 COMMANDS:
    checkpoints  list all checkpoints
    containers   interact with running containers
-   events   receive events from the containerd daemon
-   help, h  Shows a list of commands or help for one command
-   
+   events       receive events from the containerd daemon
+   state        get a raw dump of the containerd state
+   help, h      Shows a list of commands or help for one command
+
 GLOBAL OPTIONS:
-   --debug                  enable debug output in the logs
+   --debug                                      enable debug output in the logs
    --address "/run/containerd/containerd.sock"  address of GRPC API
-   --help, -h                   show help
-   --version, -v                print the version
-   
+   --help, -h                                   show help
+   --version, -v                                print the version
 ```
+
+### Starting a container
+
+```
+$ ctr containers start -h
+NAME:
+   ctr containers start - start a container
+
+USAGE:
+   ctr containers start [command options] [arguments...]
+
+OPTIONS:
+   --checkpoint, -c                             checkpoint to start the container from
+   --attach, -a                                 connect to the stdio of the container
+   --label, -l [--label option --label option]  set labels for the container
+```
+
+```bash
+$ sudo ctr containers start redis /containers/redis
+```
+Note: `/containers/redis` is the path of bundle you have to prepare before
+running a contianer, see [bundle](docs/bundle.md) to get more information.
+
 
 ### Listing containers
 
 ```bash
 $ sudo ctr containers
-ID                  PATH                STATUS              PID1
+ID                  PATH                STATUS              PROCESSES
 1                   /containers/redis   running             14063
 19                  /containers/redis   running             14100
 14                  /containers/redis   running             14117
@@ -180,38 +196,18 @@ ID                  PATH                STATUS              PID1
 0                   /containers/redis   running             14006
 ```
 
-### Starting a container
-
-```
-$ ctr containers start -h
-NAME:
-   start - start a container
-
-USAGE:
-   command start [command options] [arguments...]
-
-OPTIONS:
-   --checkpoint, -c     checkpoint to start the container from
-   --attach, -a         connect to the stdio of the container
-
-```
-
-```bash
-$ sudo ctr containers start redis /containers/redis
-```
-
 ### Kill a container's process
 
 ```
 $ ctr containers kill -h
 NAME:
-   kill - send a signal to a container or its processes
+   ctr containers kill - send a signal to a container or its processes
 
 USAGE:
-   command kill [command options] [arguments...]
+   ctr containers kill [command options] [arguments...]
 
 OPTIONS:
-   --pid, -p "0"        pid of the process to signal within the container
+   --pid, -p "init"     pid of the process to signal within the container
    --signal, -s "15"    signal to send to the container
 ```
 
@@ -220,20 +216,20 @@ OPTIONS:
 ```
 $ ctr containers exec -h
 NAME:
-   exec - exec another process in an existing container
+   ctr containers exec - exec another process in an existing container
 
 USAGE:
-   command exec [command options] [arguments...]
+   ctr containers exec [command options] [arguments...]
 
 OPTIONS:
    --id                                         container id to add the process to
+   --pid                                        process id for the new process
    --attach, -a                                 connect to the stdio of the container
    --cwd                                        current working directory for the process
    --tty, -t                                    create a terminal for the process
    --env, -e [--env option --env option]        environment variables for the process
    --uid, -u "0"                                user id of the user for the process
    --gid, -g "0"                                group id of the user for the process
-
 ```
 
 ### Stats for a container
@@ -241,10 +237,10 @@ OPTIONS:
 ```
 $ ctr containers stats -h
 NAME:
-   stats - get stats for running container
+   ctr containers stats - get stats for running container
 
 USAGE:
-  command stats [arguments...]
+   ctr containers stats [arguments...]
 ```
 
 ### List checkpoints
@@ -261,17 +257,16 @@ test2               false               false               false
 ```
 $ ctr checkpoints create -h
 NAME:
-   create - create a new checkpoint for the container
+   ctr checkpoints create - create a new checkpoint for the container
 
 USAGE:
-   command create [command options] [arguments...]
+   ctr checkpoints create [command options] [arguments...]
 
 OPTIONS:
    --tcp                persist open tcp connections
    --unix-sockets       perist unix sockets
    --exit               exit the container after the checkpoint completes successfully
    --shell              checkpoint shell jobs
-
 ```
 
 ### Get events
