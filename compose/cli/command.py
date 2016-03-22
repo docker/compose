@@ -43,8 +43,11 @@ def get_config_path_from_options(base_dir, options, environment):
     return None
 
 
-def get_client(verbose=False, version=None, tls_config=None, host=None):
-    client = docker_client(version=version, tls_config=tls_config, host=host)
+def get_client(environment, verbose=False, version=None, tls_config=None, host=None):
+    client = docker_client(
+        version=version, tls_config=tls_config, host=host,
+        environment=environment
+    )
     if verbose:
         version_info = six.iteritems(client.version())
         log.info(get_version_info('full'))
@@ -70,7 +73,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         API_VERSIONS[config_data.version])
     client = get_client(
         verbose=verbose, version=api_version, tls_config=tls_config,
-        host=host
+        host=host, environment=environment
     )
 
     return Project.from_config(project_name, config_data, client)

@@ -61,7 +61,7 @@ class DockerClientTestCase(unittest.TestCase):
         else:
             version = API_VERSIONS[V2_0]
 
-        cls.client = docker_client(version)
+        cls.client = docker_client(Environment(), version)
 
     def tearDown(self):
         for c in self.client.containers(

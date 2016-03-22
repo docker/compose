@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
-import os
 
 from docker import Client
 from docker.errors import TLSParameterError
@@ -42,17 +41,17 @@ def tls_config_from_options(options):
         return None
 
 
-def docker_client(version=None, tls_config=None, host=None):
+def docker_client(environment, version=None, tls_config=None, host=None):
     """
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
     """
-    if 'DOCKER_CLIENT_TIMEOUT' in os.environ:
+    if 'DOCKER_CLIENT_TIMEOUT' in environment:
         log.warn("The DOCKER_CLIENT_TIMEOUT environment variable is deprecated.  "
                  "Please use COMPOSE_HTTP_TIMEOUT instead.")
 
     try:
-        kwargs = kwargs_from_env(assert_hostname=False)
+        kwargs = kwargs_from_env(assert_hostname=False, environment=environment)
     except TLSParameterError:
         raise UserError(
             "TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY "
@@ -67,6 +66,10 @@ def docker_client(version=None, tls_config=None, host=None):
     if version:
         kwargs['version'] = version
 
-    kwargs['timeout'] = HTTP_TIMEOUT
+    timeout = environment.get('COMPOSE_HTTP_TIMEOUT')
+    if timeout:
+        kwargs['timeout'] = int(timeout)
+    else:
+        kwargs['timeout'] = HTTP_TIMEOUT
 
     return Client(**kwargs)

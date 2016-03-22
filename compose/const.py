@@ -5,7 +5,7 @@ import os
 import sys
 
 DEFAULT_TIMEOUT = 10
-HTTP_TIMEOUT = int(os.environ.get('COMPOSE_HTTP_TIMEOUT', os.environ.get('DOCKER_CLIENT_TIMEOUT', 60)))
+HTTP_TIMEOUT = int(os.environ.get('DOCKER_CLIENT_TIMEOUT', 60))
 IMAGE_EVENTS = ['delete', 'import', 'pull', 'push', 'tag', 'untag']
 IS_WINDOWS_PLATFORM = (sys.platform == "win32")
 LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
