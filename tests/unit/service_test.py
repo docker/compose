@@ -14,6 +14,7 @@ from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.project import OneOffFilter
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction
@@ -256,7 +257,7 @@ class ServiceTest(unittest.TestCase):
         opts = service._get_container_create_options(
             {'name': name},
             1,
-            one_off=True)
+            one_off=OneOffFilter.only)
         self.assertEqual(opts['name'], name)
 
     def test_get_container_create_options_does_not_mutate_options(self):

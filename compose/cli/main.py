@@ -22,6 +22,7 @@ from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
+from ..project import OneOffFilter
 from ..service import BuildAction
 from ..service import BuildError
 from ..service import ConvergenceStrategy
@@ -437,7 +438,7 @@ class TopLevelCommand(object):
         """
         containers = sorted(
             self.project.containers(service_names=options['SERVICE'], stopped=True) +
-            self.project.containers(service_names=options['SERVICE'], one_off=True),
+            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
             key=attrgetter('name'))
 
         if options['-q']:
@@ -491,8 +492,21 @@ class TopLevelCommand(object):
         Options:
             -f, --force   Don't ask to confirm removal
             -v            Remove volumes associated with containers
+            -a, --all     Also remove one-off containers created by
+                          docker-compose run
         """
-        all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+        if options.get('--all'):
+            one_off = OneOffFilter.include
+        else:
+            log.warn(
+                'Not including one-off containers created by `docker-compose run`.\n'
+                'To include them, use `docker-compose rm --all`.\n'
+                'This will be the default behavior in the next version of Compose.\n')
+            one_off = OneOffFilter.exclude
+
+        all_containers = self.project.containers(
+            service_names=options['SERVICE'], stopped=True, one_off=one_off
+        )
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:
@@ -501,7 +515,8 @@ class TopLevelCommand(object):
                     or yesno("Are you sure? [yN] ", default=False):
                 self.project.remove_stopped(
                     service_names=options['SERVICE'],
-                    v=options.get('-v', False)
+                    v=options.get('-v', False),
+                    one_off=one_off
                 )
         else:
             print("No stopped containers")

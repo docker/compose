@@ -24,6 +24,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
+from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
@@ -61,7 +62,7 @@ class ServiceTest(DockerClientTestCase):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
         self.assertEqual(db.containers(stopped=True), [])
-        self.assertEqual(db.containers(one_off=True, stopped=True), [container])
+        self.assertEqual(db.containers(one_off=OneOffFilter.only, stopped=True), [container])
 
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
@@ -495,7 +496,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
         create_and_start_container(db)
 
-        c = create_and_start_container(db, one_off=True)
+        c = create_and_start_container(db, one_off=OneOffFilter.only)
 
         self.assertEqual(
             set(get_links(c)),
