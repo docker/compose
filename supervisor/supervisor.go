@@ -92,7 +92,7 @@ func readEventLog(s *Supervisor) error {
 		var e Event
 		if err := dec.Decode(&e); err != nil {
 			if err == io.EOF {
-				return nil
+				break
 			}
 			return err
 		}
