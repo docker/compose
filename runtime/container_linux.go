@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -329,7 +328,7 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 					}
 					for _, m := range messages {
 						if m.Level == "error" {
-							return errors.New(m.Msg)
+							return fmt.Errorf("shim error: %v", m.Msg)
 						}
 					}
 					// no errors reported back from shim, check for runc/runtime errors
@@ -342,7 +341,7 @@ func waitForStart(p *process, cmd *exec.Cmd) error {
 					}
 					for _, m := range messages {
 						if m.Level == "error" {
-							return errors.New(m.Msg)
+							return fmt.Errorf("oci runtime error: %v", m.Msg)
 						}
 					}
 					return ErrContainerNotStarted
