@@ -11,6 +11,19 @@ import (
 	"unsafe"
 )
 
+// If arg2 is nonzero, set the "child subreaper" attribute of the
+// calling process; if arg2 is zero, unset the attribute.  When a
+// process is marked as a child subreaper, all of the children
+// that it creates, and their descendants, will be marked as
+// having a subreaper.  In effect, a subreaper fulfills the role
+// of init(1) for its descendant processes.  Upon termination of
+// a process that is orphaned (i.e., its immediate parent has
+// already terminated) and marked as having a subreaper, the
+// nearest still living ancestor subreaper will receive a SIGCHLD
+// signal and be able to wait(2) on the process to discover its
+// termination status.
+const PR_SET_CHILD_SUBREAPER = 36
+
 type ParentDeathSignal int
 
 func (p ParentDeathSignal) Restore() error {
@@ -111,6 +124,11 @@ func RunningInUserNS() bool {
 		return false
 	}
 	return true
+}
+
+// SetSubreaper sets the value i as the subreaper setting for the calling process
+func SetSubreaper(i int) error {
+	return Prctl(PR_SET_CHILD_SUBREAPER, uintptr(i), 0, 0, 0)
 }
 
 func Prctl(option int, arg2, arg3, arg4, arg5 uintptr) (err error) {

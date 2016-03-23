@@ -346,11 +346,14 @@ func killCgroupProcesses(m cgroups.Manager) error {
 		return err
 	}
 	for _, pid := range pids {
-		if p, err := os.FindProcess(pid); err == nil {
-			procs = append(procs, p)
-			if err := p.Kill(); err != nil {
-				logrus.Warn(err)
-			}
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			logrus.Warn(err)
+			continue
+		}
+		procs = append(procs, p)
+		if err := p.Kill(); err != nil {
+			logrus.Warn(err)
 		}
 	}
 	if err := m.Freeze(configs.Thawed); err != nil {
