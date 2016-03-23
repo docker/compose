@@ -1257,6 +1257,10 @@ class CLITestCase(DockerClientTestCase):
             'logscomposefile_another_1',
             'exited'))
 
+        # sleep for a short period to allow the tailing thread to receive the
+        # event. This is not great, but there isn't an easy way to do this
+        # without being able to stream stdout from the process.
+        time.sleep(0.5)
         os.kill(proc.pid, signal.SIGINT)
         result = wait_on_process(proc, returncode=1)
         assert 'test' in result.stdout
