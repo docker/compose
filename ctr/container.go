@@ -145,9 +145,10 @@ var startCommand = cli.Command{
 			fatal(err.Error(), 1)
 		}
 		var (
-			tty bool
-			c   = getClient(context)
-			r   = &types.CreateContainerRequest{
+			restoreAndCloseStdin func()
+			tty                  bool
+			c                    = getClient(context)
+			r                    = &types.CreateContainerRequest{
 				Id:         id,
 				BundlePath: bpath,
 				Checkpoint: context.String("checkpoint"),
@@ -157,6 +158,15 @@ var startCommand = cli.Command{
 				Labels:     context.StringSlice("label"),
 			}
 		)
+		restoreAndCloseStdin = func() {
+			if state != nil {
+				term.RestoreTerminal(os.Stdin.Fd(), state)
+			}
+			if stdin != nil {
+				stdin.Close()
+			}
+		}
+		defer restoreAndCloseStdin()
 		if context.Bool("attach") {
 			mkterm, err := readTermSetting(bpath)
 			if err != nil {
@@ -182,12 +192,6 @@ var startCommand = cli.Command{
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
-			restoreAndCloseStdin := func() {
-				if state != nil {
-					term.RestoreTerminal(os.Stdin.Fd(), state)
-				}
-				stdin.Close()
-			}
 			go func() {
 				io.Copy(stdin, os.Stdin)
 				if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
@@ -420,6 +424,8 @@ var execCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) {
+		var restoreAndCloseStdin func()
+
 		p := &types.AddProcessRequest{
 			Id:       context.String("id"),
 			Pid:      context.String("pid"),
@@ -439,6 +445,15 @@ var execCommand = cli.Command{
 		p.Stdin = s.stdin
 		p.Stdout = s.stdout
 		p.Stderr = s.stderr
+		restoreAndCloseStdin = func() {
+			if state != nil {
+				term.RestoreTerminal(os.Stdin.Fd(), state)
+			}
+			if stdin != nil {
+				stdin.Close()
+			}
+		}
+		defer restoreAndCloseStdin()
 		if context.Bool("attach") {
 			if context.Bool("tty") {
 				s, err := term.SetRawTerminal(os.Stdin.Fd())
@@ -460,12 +475,6 @@ var execCommand = cli.Command{
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
-			restoreAndCloseStdin := func() {
-				if state != nil {
-					term.RestoreTerminal(os.Stdin.Fd(), state)
-				}
-				stdin.Close()
-			}
 			go func() {
 				io.Copy(stdin, os.Stdin)
 				if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{

@@ -11,7 +11,20 @@ import (
 
 const usage = `High performance container daemon cli`
 
+type Exit struct {
+	Code int
+}
+
 func main() {
+	// We want our defer functions to be run when calling fatal()
+	defer func() {
+		if e := recover(); e != nil {
+			if ex, ok := e.(Exit); ok == true {
+				os.Exit(ex.Code)
+			}
+			panic(e)
+		}
+	}()
 	app := cli.NewApp()
 	app.Name = "ctr"
 	if containerd.GitCommit != "" {
@@ -50,5 +63,5 @@ func main() {
 
 func fatal(err string, code int) {
 	fmt.Fprintf(os.Stderr, "[ctr] %s\n", err)
-	os.Exit(code)
+	panic(Exit{code})
 }
