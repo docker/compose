@@ -28,6 +28,7 @@ type process struct {
 	containerPid int
 	checkpoint   *runtime.Checkpoint
 	shimIO       *IO
+	stdinCloser  io.Closer
 	console      libcontainer.Console
 	consolePath  string
 	state        *runtime.ProcessState
@@ -186,6 +187,12 @@ func (p *process) openIO() error {
 		uid = p.state.RootUID
 		gid = p.state.RootGID
 	)
+	go func() {
+		if stdinCloser, err := os.OpenFile(p.state.Stdin, syscall.O_WRONLY, 0); err == nil {
+			p.stdinCloser = stdinCloser
+		}
+	}()
+
 	if p.state.Terminal {
 		console, err := libcontainer.NewConsole(uid, gid)
 		if err != nil {
@@ -193,7 +200,7 @@ func (p *process) openIO() error {
 		}
 		p.console = console
 		p.consolePath = console.Path()
-		stdin, err := os.OpenFile(p.state.Stdin, syscall.O_RDWR, 0)
+		stdin, err := os.OpenFile(p.state.Stdin, syscall.O_RDONLY, 0)
 		if err != nil {
 			return err
 		}
@@ -217,9 +224,6 @@ func (p *process) openIO() error {
 	p.shimIO = i
 	// non-tty
 	for name, dest := range map[string]func(f *os.File){
-		p.state.Stdin: func(f *os.File) {
-			go io.Copy(i.Stdin, f)
-		},
 		p.state.Stdout: func(f *os.File) {
 			p.Add(1)
 			go func() {
@@ -241,6 +245,16 @@ func (p *process) openIO() error {
 		}
 		dest(f)
 	}
+
+	f, err := os.OpenFile(p.state.Stdin, syscall.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	go func() {
+		io.Copy(i.Stdin, f)
+		i.Stdin.Close()
+	}()
+
 	return nil
 }
 
