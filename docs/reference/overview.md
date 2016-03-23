@@ -42,7 +42,7 @@ Commands:
   pause              Pause services
   port               Print the public port for a port binding
   ps                 List containers
-  pull               Pulls service images
+  pull               Pull service images
   restart            Restart services
   rm                 Remove stopped containers
   run                Run a one-off command
