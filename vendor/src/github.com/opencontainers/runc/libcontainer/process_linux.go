@@ -85,11 +85,11 @@ func (p *setnsProcess) start() (err error) {
 			return newSystemError(err)
 		}
 	}
-	if err := utils.WriteJSON(p.parentPipe, p.config); err != nil {
-		return newSystemError(err)
-	}
 	// set oom_score_adj
 	if err := setOomScoreAdj(p.config.Config.OomScoreAdj, p.pid()); err != nil {
+		return newSystemError(err)
+	}
+	if err := utils.WriteJSON(p.parentPipe, p.config); err != nil {
 		return newSystemError(err)
 	}
 

@@ -407,16 +407,6 @@ func (c *linuxContainer) NotifyMemoryPressure(level PressureLevel) (<-chan struc
 	return notifyMemoryPressure(c.cgroupManager.GetPaths(), level)
 }
 
-// XXX debug support, remove when debugging done.
-func addArgsFromEnv(evar string, args *[]string) {
-	if e := os.Getenv(evar); e != "" {
-		for _, f := range strings.Fields(e) {
-			*args = append(*args, f)
-		}
-	}
-	fmt.Printf(">>> criu %v\n", *args)
-}
-
 // check Criu version greater than or equal to min_version
 func (c *linuxContainer) checkCriuVersion(min_version string) error {
 	var x, y, z, versionReq int
@@ -881,7 +871,7 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 			if err != nil {
 				return err
 			}
-			n, err = criuClient.Write(data)
+			_, err = criuClient.Write(data)
 			if err != nil {
 				return err
 			}

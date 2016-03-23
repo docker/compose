@@ -81,6 +81,11 @@ func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 			return err
 		}
 	}
+	if cgroup.Resources.KernelMemoryTCP != 0 {
+		if err := writeFile(path, "memory.kmem.tcp.limit_in_bytes", strconv.FormatInt(cgroup.Resources.KernelMemoryTCP, 10)); err != nil {
+			return err
+		}
+	}
 	if cgroup.Resources.OomKillDisable {
 		if err := writeFile(path, "memory.oom_control", "1"); err != nil {
 			return err
@@ -139,6 +144,11 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 		return err
 	}
 	stats.MemoryStats.KernelUsage = kernelUsage
+	kernelTCPUsage, err := getMemoryData(path, "kmem.tcp")
+	if err != nil {
+		return err
+	}
+	stats.MemoryStats.KernelTCPUsage = kernelTCPUsage
 
 	return nil
 }
@@ -148,6 +158,7 @@ func memoryAssigned(cgroup *configs.Cgroup) bool {
 		cgroup.Resources.MemoryReservation != 0 ||
 		cgroup.Resources.MemorySwap > 0 ||
 		cgroup.Resources.KernelMemory > 0 ||
+		cgroup.Resources.KernelMemoryTCP > 0 ||
 		cgroup.Resources.OomKillDisable ||
 		(cgroup.Resources.MemorySwappiness != nil && *cgroup.Resources.MemorySwappiness != -1)
 }

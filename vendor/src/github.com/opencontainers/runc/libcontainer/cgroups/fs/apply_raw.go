@@ -351,7 +351,10 @@ func writeFile(dir, file, data string) error {
 	if dir == "" {
 		return fmt.Errorf("no such directory for %s.", file)
 	}
-	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
+	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700); err != nil {
+		return fmt.Errorf("failed to write %v to %v: %v", data, file, err)
+	}
+	return nil
 }
 
 func readFile(dir, file string) (string, error) {
