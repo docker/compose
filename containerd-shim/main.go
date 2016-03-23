@@ -89,7 +89,9 @@ func start() error {
 			switch msg {
 			case 0:
 				// close stdin
-				p.shimIO.Stdin.Close()
+				if p.stdinCloser != nil {
+					p.stdinCloser.Close()
+				}
 			case 1:
 				if p.console == nil {
 					continue
