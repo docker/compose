@@ -325,7 +325,7 @@ _docker_compose_restart() {
 _docker_compose_rm() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--force -f --help -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--all -a --force -f --help -v" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_stopped
