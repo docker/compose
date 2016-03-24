@@ -577,13 +577,15 @@ var updateCommand = cli.Command{
 }
 
 func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid string, closer func()) {
+	timestamp := uint64(time.Now().Unix())
 	for {
 		e, err := events.Recv()
 		if err != nil {
 			time.Sleep(1 * time.Second)
-			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{})
+			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{Timestamp: timestamp})
 			continue
 		}
+		timestamp = e.Timestamp
 		if e.Id == id && e.Type == "exit" && e.Pid == pid {
 			closer()
 			os.Exit(int(e.Status))
