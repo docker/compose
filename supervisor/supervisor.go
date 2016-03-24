@@ -18,7 +18,7 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, runtimeName string) (*Supervisor, error) {
+func New(stateDir string, runtimeName string, runtimeArgs []string) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
@@ -40,6 +40,7 @@ func New(stateDir string, runtimeName string) (*Supervisor, error) {
 		tasks:       make(chan Task, defaultBufferSize),
 		monitor:     monitor,
 		runtime:     runtimeName,
+		runtimeArgs: runtimeArgs,
 	}
 	if err := setupEventLog(s); err != nil {
 		return nil, err
@@ -105,9 +106,10 @@ type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir string
 	// name of the OCI compatible runtime used to execute containers
-	runtime    string
-	containers map[string]*containerInfo
-	startTasks chan *startTask
+	runtime     string
+	runtimeArgs []string
+	containers  map[string]*containerInfo
+	startTasks  chan *startTask
 	// we need a lock around the subscribers map only because additions and deletions from
 	// the map are via the API so we cannot really control the concurrency
 	subscriberLock sync.RWMutex
@@ -196,10 +198,11 @@ func (s *Supervisor) notifySubscribers(e Event) {
 // state of the Supervisor
 func (s *Supervisor) Start() error {
 	logrus.WithFields(logrus.Fields{
-		"stateDir": s.stateDir,
-		"runtime":  s.runtime,
-		"memory":   s.machine.Memory,
-		"cpus":     s.machine.Cpus,
+		"stateDir":    s.stateDir,
+		"runtime":     s.runtime,
+		"runtimeArgs": s.runtimeArgs,
+		"memory":      s.machine.Memory,
+		"cpus":        s.machine.Cpus,
 	}).Debug("containerd: supervisor running")
 	go func() {
 		for i := range s.tasks {
