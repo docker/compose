@@ -1,6 +1,82 @@
 Change log
 ==========
 
+1.7.0 (2016-03-23)
+------------------
+
+**Breaking Changes**
+
+-   `docker-compose logs` no longer follows log output by default. It now
+    matches the behaviour of `docker logs` and exits after the current logs
+    are printed. Use `-f` to get the old default behaviour.
+
+-   Booleans are no longer allows as keys for mappings in the Compose file
+    (for keys `environment`, `labels` and `extra_hosts`). Previously this
+    was a warning. Boolean values should be quoted so they become string values.
+
+New Features
+
+-   Add support for a `docker-compose.env` file to define default values for
+    any environment variables read by Compose.
+
+-   Add a new flag to both `docker-compose up` and `docker-compose down` to
+    remove containers for services that were removed from the Compose file.
+
+-   Add support for removing containers created by `docker-compose run` to
+    `docker-compose rm` and `down`.
+
+-   Add command line flags for tls options
+
+-   Add `tmpfs` option to the Compose file
+
+-   Add `--workdir` flag to `docker-compose run`
+
+-   `docker-compose logs` will now shows logs for new containers that are
+    started after the `logs` is started.
+
+-   Support multiple filenames in the `COMPOSE_FILE` env variable
+
+-   Add support for setting a static IP address in the Compose file
+
+-   Add the `shm_size` option to the Compose file
+
+-   Add `--follow`, `--timestamp`, and `--tail` flags to the `docker-compose logs`
+    command.
+
+-   `docker-compose up`, and `docker-compose start` will now start some containers
+    in parallel.
+
+-   `docker-compose stop` will now use reverse dependency order to stop containers
+    instead of stopping everything at once.
+
+-   Add the `--build` flag to `docker-compose up` to force building a new image,
+    and warn when an image is built when the flag is not used.
+
+-   Add `docker-compose exec` command for executing another process in a container.
+
+
+Bug Fixes
+
+-   Report a more appropriate error when a timeout is hit during `up` when
+    using a tty.
+
+-   Fixed a bug in `docker-compose down` where not all resources would be
+    removed if some raises were already removed.
+
+-   Fixed a bug where changes to network aliases would not trigger a service
+    to be recreated.
+
+-   Fix a bug where a log message was printed about creating a new volume
+    when a volume was not being created.
+
+-   Fixed a bug where interrupting `up` would not always shut down containers.
+
+-   Fixed a bug where `log_opt` and `log_driver` were not properly merged when
+    using the v1 Compose file format.
+
+-   Fixed a bug where empty value build args were failing Compose file validation.
+
+
 1.6.2 (2016-02-23)
 ------------------
 
