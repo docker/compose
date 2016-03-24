@@ -211,9 +211,15 @@ _docker_compose_kill() {
 
 
 _docker_compose_logs() {
+	case "$prev" in
+		--tail)
+			return
+			;;
+	esac
+
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --no-color" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--follow -f --help --no-color --tail --timestamps -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
