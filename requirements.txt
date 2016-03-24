@@ -1,9 +1,9 @@
 PyYAML==3.11
 cached-property==1.2.0
+docker-py==1.8.0rc2
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4
-git+https://github.com/docker/docker-py.git@5c1c42397cf0fdb74182df2d69822b82df8f2a6a#egg=docker-py
 jsonschema==2.5.1
 requests==2.7.0
 six==1.7.3
