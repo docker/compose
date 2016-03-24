@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from os import path
 
+import pytest
 from docker.errors import APIError
 from six import StringIO
 from six import text_type
@@ -985,6 +986,7 @@ class ServiceTest(DockerClientTestCase):
         one_off_container = service.create_container(one_off=True)
         self.assertNotEqual(one_off_container.name, 'my-web-container')
 
+    @pytest.mark.skipif(True, reason="Broken on 1.11.0rc1")
     def test_log_drive_invalid(self):
         service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
