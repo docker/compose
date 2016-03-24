@@ -186,6 +186,24 @@ _docker_compose_events() {
 }
 
 
+_docker_compose_exec() {
+	case "$prev" in
+		--index|--user)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "-d --help --index --privileged -T --user" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_running
+			;;
+	esac
+}
+
+
 _docker_compose_help() {
 	COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
 }
@@ -435,6 +453,7 @@ _docker_compose() {
 		create
 		down
 		events
+		exec
 		help
 		kill
 		logs
