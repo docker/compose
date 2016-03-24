@@ -128,18 +128,22 @@ _docker_compose_create() {
 
 _docker_compose_docker_compose() {
 	case "$prev" in
+		--tlscacert|--tlscert|--tlskey)
+			_filedir
+			return
+			;;
 		--file|-f)
 			_filedir "y?(a)ml"
 			return
 			;;
-		--project-name|-p)
+		$(__docker_compose_to_extglob "$daemon_options_with_args") )
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "$daemon_options_with_args --help -h --verbose --version -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "$daemon_boolean_options  $daemon_options_with_args --help -h --verbose --version -v" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -451,9 +455,18 @@ _docker_compose() {
 
 	# options for the docker daemon that have to be passed to secondary calls to
 	# docker-compose executed by this script
+	local daemon_boolean_options="
+		--skip-hostname-check
+		--tls
+		--tlsverify
+	"
 	local daemon_options_with_args="
 		--file -f
+		--host -H
 		--project-name -p
+		--tlscacert
+		--tlscert
+		--tlskey
 	"
 
 	COMPREPLY=()
@@ -468,6 +481,10 @@ _docker_compose() {
 
 	while [ $counter -lt $cword ]; do
 		case "${words[$counter]}" in
+			$(__docker_compose_to_extglob "$daemon_boolean_options") )
+				local opt=${words[counter]}
+				daemon_options+=($opt)
+				;;
 			$(__docker_compose_to_extglob "$daemon_options_with_args") )
 				local opt=${words[counter]}
 				local arg=${words[++counter]}
