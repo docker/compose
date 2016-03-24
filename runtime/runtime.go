@@ -53,20 +53,22 @@ const (
 )
 
 type state struct {
-	Bundle  string   `json:"bundle"`
-	Labels  []string `json:"labels"`
-	Stdin   string   `json:"stdin"`
-	Stdout  string   `json:"stdout"`
-	Stderr  string   `json:"stderr"`
-	Runtime string   `json:"runtime"`
+	Bundle      string   `json:"bundle"`
+	Labels      []string `json:"labels"`
+	Stdin       string   `json:"stdin"`
+	Stdout      string   `json:"stdout"`
+	Stderr      string   `json:"stderr"`
+	Runtime     string   `json:"runtime"`
+	RuntimeArgs []string `json:"runtimeArgs"`
 }
 
 type ProcessState struct {
 	specs.ProcessSpec
-	Exec   bool   `json:"exec"`
-	Stdin  string `json:"containerdStdin"`
-	Stdout string `json:"containerdStdout"`
-	Stderr string `json:"containerdStderr"`
+	Exec        bool     `json:"exec"`
+	Stdin       string   `json:"containerdStdin"`
+	Stdout      string   `json:"containerdStdout"`
+	Stderr      string   `json:"containerdStderr"`
+	RuntimeArgs []string `json:"runtimeArgs"`
 
 	PlatformProcessState
 }

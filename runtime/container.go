@@ -83,14 +83,15 @@ func NewStdio(stdin, stdout, stderr string) Stdio {
 }
 
 // New returns a new container
-func New(root, id, bundle, runtimeName string, labels []string) (Container, error) {
+func New(root, id, bundle, runtimeName string, runtimeArgs, labels []string) (Container, error) {
 	c := &container{
-		root:      root,
-		id:        id,
-		bundle:    bundle,
-		labels:    labels,
-		processes: make(map[string]*process),
-		runtime:   runtimeName,
+		root:        root,
+		id:          id,
+		bundle:      bundle,
+		labels:      labels,
+		processes:   make(map[string]*process),
+		runtime:     runtimeName,
+		runtimeArgs: runtimeArgs,
 	}
 	if err := os.Mkdir(filepath.Join(root, id), 0755); err != nil {
 		return nil, err
@@ -101,9 +102,10 @@ func New(root, id, bundle, runtimeName string, labels []string) (Container, erro
 	}
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(state{
-		Bundle:  bundle,
-		Labels:  labels,
-		Runtime: runtimeName,
+		Bundle:      bundle,
+		Labels:      labels,
+		Runtime:     runtimeName,
+		RuntimeArgs: runtimeArgs,
 	}); err != nil {
 		return nil, err
 	}
@@ -121,12 +123,13 @@ func Load(root, id string) (Container, error) {
 		return nil, err
 	}
 	c := &container{
-		root:      root,
-		id:        id,
-		bundle:    s.Bundle,
-		labels:    s.Labels,
-		runtime:   s.Runtime,
-		processes: make(map[string]*process),
+		root:        root,
+		id:          id,
+		bundle:      s.Bundle,
+		labels:      s.Labels,
+		runtime:     s.Runtime,
+		runtimeArgs: s.RuntimeArgs,
+		processes:   make(map[string]*process),
 	}
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
 	if err != nil {
@@ -166,13 +169,14 @@ func readProcessState(dir string) (*ProcessState, error) {
 
 type container struct {
 	// path to store runtime state information
-	root      string
-	id        string
-	bundle    string
-	runtime   string
-	processes map[string]*process
-	labels    []string
-	oomFds    []int
+	root        string
+	id          string
+	bundle      string
+	runtime     string
+	runtimeArgs []string
+	processes   map[string]*process
+	labels      []string
+	oomFds      []int
 }
 
 func (c *container) ID() string {
