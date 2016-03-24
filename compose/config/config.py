@@ -62,6 +62,7 @@ DOCKER_CONFIG_KEYS = [
     'image',
     'ipc',
     'labels',
+    'label_file',
     'links',
     'mac_address',
     'mem_limit',
@@ -522,6 +523,18 @@ def resolve_build_args(build):
     return dict(resolve_env_var(k, v) for k, v in six.iteritems(args))
 
 
+def resolve_labels(service_dict):
+    """Unpack any labels variables from an label_file, if set.
+    Interpolate labels values if set.
+    """
+    labels = {}
+    for label_file in service_dict.get('label_file', []):
+        labels.update(labels_from_file(label_file))
+
+    labels.update(parse_labels(service_dict.get('label_file')))
+    return dict(resolve_labels(k, v) for k, v in six.iteritems(labels))
+
+
 def validate_extended_service_dict(service_dict, filename, service):
     error_prefix = "Cannot extend service '%s' in %s:" % (service, filename)
 
@@ -604,6 +617,9 @@ def finalize_service(service_config, service_names, version):
     if 'environment' in service_dict or 'env_file' in service_dict:
         service_dict['environment'] = resolve_environment(service_dict)
         service_dict.pop('env_file', None)
+
+    if 'label_file' in service_dict:
+        service_dict['label_file'] = resolve_labels(service_dict)
 
     if 'volumes_from' in service_dict:
         service_dict['volumes_from'] = [
@@ -845,6 +861,37 @@ def env_vars_from_file(filename):
             k, v = split_env(line)
             env[k] = v
     return env
+
+
+def split_label(lbl):
+    if isinstance(lbl, six.binary_type):
+        lbl = lbl.decode('utf-8', 'replace')
+    if '=' in lbl:
+        return lbl.split('=', 1)
+    else:
+        return lbl, None
+
+
+def resolve_label(key, val):
+    if val is not None:
+        return key, val
+    else:
+        return key, ''
+
+
+def labels_from_file(filename):
+    """
+    Read in a line delimited file of docker labels.
+    """
+    if not os.path.exists(filename):
+        raise ConfigurationError("Couldn't find label file: %s" % filename)
+    labels = {}
+    for line in codecs.open(filename, 'r', 'utf-8'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            k, v = split_label(line)
+            labels[k] = v
+    return labels
 
 
 def resolve_volume_paths(working_dir, service_dict):

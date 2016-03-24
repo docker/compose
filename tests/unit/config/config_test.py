@@ -15,6 +15,7 @@ from ...helpers import build_config_details
 from compose.config import config
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
+from compose.config.config import resolve_labels
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.errors import ConfigurationError
@@ -2134,6 +2135,72 @@ class EnvTest(unittest.TestCase):
 
 def load_from_filename(filename):
     return config.load(config.find('.', [filename])).services
+
+
+class LabelsTest(unittest.TestCase):
+    def test_parse_labels_as_list(self):
+        labels = [
+            'com.example.description=Accounting web',
+            'com.example.test.is.equal=1=2',
+            'com.example.nothing=',
+        ]
+        self.assertEqual(
+            config.parse_labels(labels),
+            {'com.example.description': 'Accounting web',
+             'com.example.test.is.equal': '1=2',
+             'com.example.nothing': ''},
+        )
+
+    def test_parse_labels_as_dict(self):
+        labels = {
+            'com.example.description': 'Accounting web',
+            'com.example.test.is.equal': '1=2',
+            'com.example.nothing': '',
+        }
+        self.assertEqual(config.parse_labels(labels), labels)
+
+    def test_parse_labels_invalid(self):
+        with self.assertRaises(config.ConfigurationError):
+            config.parse_labels('a=b')
+
+    def test_parse_labels_empty(self):
+        self.assertEqual(config.parse_labels(None), {})
+
+    def test_labels_from_label_file(self):
+        service_dict = make_service_dict(
+            'redis',
+            {'label_file': 'labels-three.lbls'},
+            'tests/fixtures/label-file',
+        )
+        resolve_labels(service_dict)
+        self.assertEqual(
+            service_dict['labels'],
+            {'com.example.description': 'Accounting redis',
+             'com.example.department': 'Finance',
+             'com.example.label-with-empty-value': ''},
+        )
+
+    def test_labels_from_multiple_files(self):
+        service_dict = make_service_dict(
+            'redis',
+            {'label_file': ['labels-three.lbls', 'labels-two.lbls']},
+            'tests/fixtures/label-file',
+        )
+        resolve_labels(service_dict)
+        self.assertEqual(
+            service_dict['labels'],
+            {'com.example.description': 'Accounting redis',
+             'com.example.department': 'Finance',
+             'com.example.label-with-empty-value': '',
+             'com.example.priority': 'high'},
+        )
+
+    def test_labels_nonexistent_file(self):
+        options = {'label_file': 'nonexistent.labels'}
+        self.assertRaises(
+            config.ConfigurationError,
+            lambda: make_service_dict('redis', options, 'tests/fixtures/label-file'),
+        )
 
 
 class ExtendsTest(unittest.TestCase):

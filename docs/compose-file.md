@@ -394,6 +394,34 @@ It's recommended that you use reverse-DNS notation to prevent your labels from c
       - "com.example.department=Finance"
       - "com.example.label-with-empty-value"
 
+### label_file
+
+Add labels from a file. Can be a single value or a list.
+
+If you have specified a Compose file with `docker-compose -f FILE`, paths in
+`label_file` are relative to the directory that file is in.
+
+Labels specified in at run time override these values.
+
+```
+label_file: file.lbls
+
+label_file:
+  - ./common.lbls
+  - ./apps/web.lbls
+  - /opt/secrets.lbls
+```
+
+The content of a `label_file` should be similar to an environment file see
+the [environment variable reference](env.md) for details.
+
+```
+#Labels for service web
+com.example.description=Accounting webapp
+com.example.department=Finance
+com.example.label-with-empty-value
+```
+
 ### links
 
 Link to containers in another service. Either specify both the service name and
