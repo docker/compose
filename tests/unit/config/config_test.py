@@ -17,6 +17,7 @@ from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
@@ -36,7 +37,9 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
             filename=filename,
             name=name,
             config=service_dict),
-        config.ConfigFile(filename=filename, config={}))
+        config.ConfigFile(filename=filename, config={}),
+        environment=Environment.from_env_file(working_dir)
+    )
     return config.process_service(resolver.run())
 
 
@@ -1582,7 +1585,24 @@ class PortsTest(unittest.TestCase):
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
+    def test_config_file_with_environment_file(self):
+        project_dir = 'tests/fixtures/default-env-file'
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
+        ).services
+
+        self.assertEqual(service_dicts[0], {
+            'name': 'web',
+            'image': 'alpine:latest',
+            'ports': ['5643', '9999'],
+            'command': 'true'
+        })
+
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
+        project_dir = 'tests/fixtures/environment-interpolation'
         os.environ.update(
             IMAGE="busybox",
             HOST_PORT="80",
@@ -1590,7 +1610,9 @@ class InterpolationTest(unittest.TestCase):
         )
 
         service_dicts = config.load(
-            config.find('tests/fixtures/environment-interpolation', None),
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
         ).services
 
         self.assertEqual(service_dicts, [
@@ -1620,7 +1642,7 @@ class InterpolationTest(unittest.TestCase):
             None,
         )
 
-        with mock.patch('compose.config.interpolation.log') as log:
+        with mock.patch('compose.config.environment.log') as log:
             config.load(config_details)
 
             self.assertEqual(2, log.warn.call_count)
@@ -2041,7 +2063,9 @@ class EnvTest(unittest.TestCase):
             },
         }
         self.assertEqual(
-            resolve_environment(service_dict),
+            resolve_environment(
+                service_dict, Environment.from_env_file(None)
+            ),
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': None},
         )
 
@@ -2078,7 +2102,10 @@ class EnvTest(unittest.TestCase):
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
         self.assertEqual(
-            resolve_environment({'env_file': ['tests/fixtures/env/resolve.env']}),
+            resolve_environment(
+                {'env_file': ['tests/fixtures/env/resolve.env']},
+                Environment.from_env_file(None)
+            ),
             {
                 'FILE_DEF': u'bär',
                 'FILE_DEF_EMPTY': '',
@@ -2101,7 +2128,7 @@ class EnvTest(unittest.TestCase):
             }
         }
         self.assertEqual(
-            resolve_build_args(build),
+            resolve_build_args(build, Environment.from_env_file(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
 
@@ -2133,7 +2160,9 @@ class EnvTest(unittest.TestCase):
 
 
 def load_from_filename(filename):
-    return config.load(config.find('.', [filename])).services
+    return config.load(
+        config.find('.', [filename], Environment.from_env_file('.'))
+    ).services
 
 
 class ExtendsTest(unittest.TestCase):
@@ -2465,6 +2494,7 @@ class ExtendsTest(unittest.TestCase):
             },
         ]))
 
+    @mock.patch.dict(os.environ)
     def test_extends_with_environment_and_env_files(self):
         tmpdir = py.test.ensuretemp('test_extends_with_environment')
         self.addCleanup(tmpdir.remove)
@@ -2520,12 +2550,12 @@ class ExtendsTest(unittest.TestCase):
                 },
             },
         ]
-        with mock.patch.dict(os.environ):
-            os.environ['SECRET'] = 'secret'
-            os.environ['THING'] = 'thing'
-            os.environ['COMMON_ENV_FILE'] = 'secret'
-            os.environ['TOP_ENV_FILE'] = 'secret'
-            config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+
+        os.environ['SECRET'] = 'secret'
+        os.environ['THING'] = 'thing'
+        os.environ['COMMON_ENV_FILE'] = 'secret'
+        os.environ['TOP_ENV_FILE'] = 'secret'
+        config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
 
         assert config == expected
 

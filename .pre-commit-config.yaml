@@ -10,7 +10,7 @@
     - id: end-of-file-fixer
     - id: flake8
     - id: name-tests-test
-      exclude: 'tests/(helpers\.py|integration/testcases\.py)'
+      exclude: 'tests/(integration/testcases\.py|helpers\.py)'
     - id: requirements-txt-fixer
     - id: trailing-whitespace
 - repo: git://github.com/asottile/reorder_python_imports

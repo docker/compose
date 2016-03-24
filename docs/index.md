@@ -23,6 +23,7 @@ Compose is a tool for defining and running multi-container Docker applications. 
 - [Frequently asked questions](faq.md)
 - [Command line reference](./reference/index.md)
 - [Compose file reference](compose-file.md)
+- [Environment file](env-file.md)
 
 To see a detailed list of changes for past and current releases of Docker
 Compose, please refer to the

@@ -17,6 +17,7 @@ from .. import __version__
 from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -222,8 +223,13 @@ class TopLevelCommand(object):
             --services      Print the service names, one per line.
 
         """
-        config_path = get_config_path_from_options(config_options)
-        compose_config = config.load(config.find(self.project_dir, config_path))
+        environment = Environment.from_env_file(self.project_dir)
+        config_path = get_config_path_from_options(
+            self.project_dir, config_options, environment
+        )
+        compose_config = config.load(
+            config.find(self.project_dir, config_path, environment)
+        )
 
         if options['--quiet']:
             return
