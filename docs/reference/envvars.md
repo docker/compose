@@ -17,6 +17,9 @@ Several environment variables are available for you to configure the Docker Comp
 Variables starting with `DOCKER_` are the same as those used to configure the
 Docker command-line client. If you're using `docker-machine`, then the `eval "$(docker-machine env my-docker-vm)"` command should set them to their correct values. (In this example, `my-docker-vm` is the name of a machine you created.)
 
+> Note: Some of these variables can also be provided using an
+> [environment file](../env-file.md)
+
 ## COMPOSE\_PROJECT\_NAME
 
 Sets the project name. This value is prepended along with the service name to the container container on start up. For example, if you project name is `myapp` and it includes two services `db` and `web` then compose starts containers named  `myapp_db_1` and `myapp_web_1` respectively.
@@ -27,10 +30,15 @@ defaults to the `basename` of the project directory. See also the `-p`
 
 ## COMPOSE\_FILE
 
-Specify the file containing the compose configuration. If not provided,
-Compose looks for a file named  `docker-compose.yml` in the current directory
-and then each parent directory in succession until a file by that name is
-found. See also the `-f` [command-line option](overview.md).
+Specify the path to a Compose file. If not provided, Compose looks for a file named
+`docker-compose.yml` in the current directory and then each parent directory in
+succession until a file by that name is found.
+
+This variable supports multiple compose files separate by a path separator (on
+Linux and OSX the path separator is `:`, on Windows it is `;`). For example:
+`COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`
+
+See also the `-f` [command-line option](overview.md).
 
 ## COMPOSE\_API\_VERSION
 
@@ -76,3 +84,4 @@ it failed. Defaults to 60 seconds.
 - [User guide](../index.md)
 - [Installing Compose](../install.md)
 - [Compose file reference](../compose-file.md)
+- [Environment file](../env-file.md)

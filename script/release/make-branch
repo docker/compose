@@ -65,10 +65,10 @@ git config "branch.${BRANCH}.release" $VERSION
 
 editor=${EDITOR:-vim}
 
-echo "Update versions in docs/install.md, compose/__init__.py, script/run.sh"
+echo "Update versions in docs/install.md, compose/__init__.py, script/run/run.sh"
 $editor docs/install.md
 $editor compose/__init__.py
-$editor script/run.sh
+$editor script/run/run.sh
 
 
 echo "Write release notes in CHANGELOG.md"
@@ -82,20 +82,6 @@ $SHELL || true
 git commit -a -m "Bump $VERSION" --signoff --no-verify
 
 
-echo "Push branch to user remote"
-GITHUB_USER=$USER
-USER_REMOTE="$(find_remote $GITHUB_USER/compose)"
-if [ -z "$USER_REMOTE" ]; then
-    echo "$GITHUB_USER/compose not found"
-    read -r -p "Enter the name of your GitHub fork (username/repo): " GITHUB_REPO
-    # assumes there is already a user remote somewhere
-    USER_REMOTE=$(find_remote $GITHUB_REPO)
-fi
-if [ -z "$USER_REMOTE" ]; then
-    >&2 echo "No user remote found. You need to 'git push' your branch."
-    exit 2
-fi
-
-
-git push $USER_REMOTE
-browser https://github.com/$REPO/compare/docker:release...$GITHUB_USER:$BRANCH?expand=1
+echo "Push branch to docker remote"
+git push $REMOTE
+browser https://github.com/$REPO/compare/docker:release...$BRANCH?expand=1

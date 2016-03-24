@@ -6,66 +6,102 @@ import sys
 from threading import Thread
 
 from docker.errors import APIError
+from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
 
+from compose.cli.signals import ShutdownException
 from compose.utils import get_output_stream
 
 
-def perform_operation(func, arg, callback, index):
-    try:
-        callback((index, func(arg)))
-    except Exception as e:
-        callback((index, e))
+def parallel_execute(objects, func, get_name, msg, get_deps=None):
+    """Runs func on objects in parallel while ensuring that func is
+    ran on object only after it is ran on all its dependencies.
 
-
-def parallel_execute(objects, func, index_func, msg):
-    """For a given list of objects, call the callable passing in the first
-    object we give it.
+    get_deps called on object must return a collection with its dependencies.
+    get_name called on object must return its name.
     """
     objects = list(objects)
     stream = get_output_stream(sys.stderr)
+
     writer = ParallelStreamWriter(stream, msg)
-
     for obj in objects:
-        writer.initialize(index_func(obj))
+        writer.initialize(get_name(obj))
 
-    q = Queue()
-
-    # TODO: limit the number of threads #1828
-    for obj in objects:
-        t = Thread(
-            target=perform_operation,
-            args=(func, obj, q.put, index_func(obj)))
-        t.daemon = True
-        t.start()
+    q = setup_queue(objects, func, get_deps, get_name)
 
     done = 0
     errors = {}
+    results = []
+    error_to_reraise = None
 
     while done < len(objects):
         try:
-            msg_index, result = q.get(timeout=1)
+            obj, result, exception = q.get(timeout=1)
         except Empty:
             continue
+        # See https://github.com/docker/compose/issues/189
+        except thread.error:
+            raise ShutdownException()
 
-        if isinstance(result, APIError):
-            errors[msg_index] = "error", result.explanation
-            writer.write(msg_index, 'error')
-        elif isinstance(result, Exception):
-            errors[msg_index] = "unexpected_exception", result
+        if exception is None:
+            writer.write(get_name(obj), 'done')
+            results.append(result)
+        elif isinstance(exception, APIError):
+            errors[get_name(obj)] = exception.explanation
+            writer.write(get_name(obj), 'error')
         else:
-            writer.write(msg_index, 'done')
+            errors[get_name(obj)] = exception
+            error_to_reraise = exception
         done += 1
 
-    if not errors:
-        return
+    for obj_name, error in errors.items():
+        stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
 
-    stream.write("\n")
-    for msg_index, (result, error) in errors.items():
-        stream.write("ERROR: for {}  {} \n".format(msg_index, error))
-        if result == 'unexpected_exception':
-            raise error
+    if error_to_reraise:
+        raise error_to_reraise
+
+    return results
+
+
+def _no_deps(x):
+    return []
+
+
+def setup_queue(objects, func, get_deps, get_name):
+    if get_deps is None:
+        get_deps = _no_deps
+
+    results = Queue()
+    started = set()   # objects being processed
+    finished = set()  # objects which have been processed
+
+    def do_op(obj):
+        try:
+            result = func(obj)
+            results.put((obj, result, None))
+        except Exception as e:
+            results.put((obj, None, e))
+
+        finished.add(obj)
+        feed()
+
+    def ready(obj):
+        # Is object ready for performing operation
+        return obj not in started and all(
+            dep not in objects or dep in finished
+            for dep in get_deps(obj)
+        )
+
+    def feed():
+        for obj in filter(ready, objects):
+            started.add(obj)
+            t = Thread(target=do_op, args=(obj,))
+            t.daemon = True
+            t.start()
+
+    feed()
+    return results
 
 
 class ParallelStreamWriter(object):
@@ -81,11 +117,15 @@ class ParallelStreamWriter(object):
         self.lines = []
 
     def initialize(self, obj_index):
+        if self.msg is None:
+            return
         self.lines.append(obj_index)
         self.stream.write("{} {} ... \r\n".format(self.msg, obj_index))
         self.stream.flush()
 
     def write(self, obj_index, status):
+        if self.msg is None:
+            return
         position = self.lines.index(obj_index)
         diff = len(self.lines) - position
         # move up
@@ -109,10 +149,6 @@ def parallel_operation(containers, operation, options, message):
 def parallel_remove(containers, options):
     stopped_containers = [c for c in containers if not c.is_running]
     parallel_operation(stopped_containers, 'remove', options, 'Removing')
-
-
-def parallel_stop(containers, options):
-    parallel_operation(containers, 'stop', options, 'Stopping')
 
 
 def parallel_start(containers, options):

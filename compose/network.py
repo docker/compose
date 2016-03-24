@@ -149,7 +149,10 @@ class ProjectNetworks(object):
         if not self.use_networking:
             return
         for network in self.networks.values():
-            network.remove()
+            try:
+                network.remove()
+            except NotFound:
+                log.warn("Network %s not found.", network.full_name)
 
     def initialize(self):
         if not self.use_networking:
@@ -159,26 +162,26 @@ class ProjectNetworks(object):
             network.ensure()
 
 
-def get_network_aliases_for_service(service_dict):
+def get_network_defs_for_service(service_dict):
     if 'network_mode' in service_dict:
         return {}
     networks = service_dict.get('networks', {'default': None})
     return dict(
-        (net, (config or {}).get('aliases', []))
+        (net, (config or {}))
         for net, config in networks.items()
     )
 
 
 def get_network_names_for_service(service_dict):
-    return get_network_aliases_for_service(service_dict).keys()
+    return get_network_defs_for_service(service_dict).keys()
 
 
 def get_networks(service_dict, network_definitions):
     networks = {}
-    for name, aliases in get_network_aliases_for_service(service_dict).items():
+    for name, netdef in get_network_defs_for_service(service_dict).items():
         network = network_definitions.get(name)
         if network:
-            networks[network.full_name] = aliases
+            networks[network.full_name] = netdef
         else:
             raise ConfigurationError(
                 'Service "{}" uses an undefined network "{}"'

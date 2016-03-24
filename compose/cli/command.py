@@ -1,69 +1,53 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import contextlib
 import logging
 import os
 import re
 
 import six
-from requests.exceptions import ConnectionError
-from requests.exceptions import SSLError
 
-from . import errors
 from . import verbose_proxy
 from .. import config
+from ..config.environment import Environment
 from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
-from .utils import call_silently
+from .docker_client import tls_config_from_options
 from .utils import get_version_info
-from .utils import is_mac
-from .utils import is_ubuntu
 
 log = logging.getLogger(__name__)
 
 
-@contextlib.contextmanager
-def friendly_error_message():
-    try:
-        yield
-    except SSLError as e:
-        raise errors.UserError('SSL error: %s' % e)
-    except ConnectionError:
-        if call_silently(['which', 'docker']) != 0:
-            if is_mac():
-                raise errors.DockerNotFoundMac()
-            elif is_ubuntu():
-                raise errors.DockerNotFoundUbuntu()
-            else:
-                raise errors.DockerNotFoundGeneric()
-        elif call_silently(['which', 'docker-machine']) == 0:
-            raise errors.ConnectionErrorDockerMachine()
-        else:
-            raise errors.ConnectionErrorGeneric(get_client().base_url)
-
-
-def project_from_options(base_dir, options):
+def project_from_options(project_dir, options):
+    environment = Environment.from_env_file(project_dir)
     return get_project(
-        base_dir,
-        get_config_path_from_options(options),
+        project_dir,
+        get_config_path_from_options(project_dir, options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
+        host=options.get('--host'),
+        tls_config=tls_config_from_options(options),
+        environment=environment
     )
 
 
-def get_config_path_from_options(options):
+def get_config_path_from_options(base_dir, options, environment):
     file_option = options.get('--file')
     if file_option:
         return file_option
 
-    config_file = os.environ.get('COMPOSE_FILE')
-    return [config_file] if config_file else None
+    config_files = environment.get('COMPOSE_FILE')
+    if config_files:
+        return config_files.split(os.pathsep)
+    return None
 
 
-def get_client(verbose=False, version=None):
-    client = docker_client(version=version)
+def get_client(environment, verbose=False, version=None, tls_config=None, host=None):
+    client = docker_client(
+        version=version, tls_config=tls_config, host=host,
+        environment=environment
+    )
     if verbose:
         version_info = six.iteritems(client.version())
         log.info(get_version_info('full'))
@@ -74,24 +58,34 @@ def get_client(verbose=False, version=None):
     return client
 
 
-def get_project(base_dir, config_path=None, project_name=None, verbose=False):
-    config_details = config.find(base_dir, config_path)
-    project_name = get_project_name(config_details.working_dir, project_name)
+def get_project(project_dir, config_path=None, project_name=None, verbose=False,
+                host=None, tls_config=None, environment=None):
+    if not environment:
+        environment = Environment.from_env_file(project_dir)
+    config_details = config.find(project_dir, config_path, environment)
+    project_name = get_project_name(
+        config_details.working_dir, project_name, environment
+    )
     config_data = config.load(config_details)
 
-    api_version = os.environ.get(
+    api_version = environment.get(
         'COMPOSE_API_VERSION',
         API_VERSIONS[config_data.version])
-    client = get_client(verbose=verbose, version=api_version)
+    client = get_client(
+        verbose=verbose, version=api_version, tls_config=tls_config,
+        host=host, environment=environment
+    )
 
     return Project.from_config(project_name, config_data, client)
 
 
-def get_project_name(working_dir, project_name=None):
+def get_project_name(working_dir, project_name=None, environment=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    project_name = project_name or os.environ.get('COMPOSE_PROJECT_NAME')
+    if not environment:
+        environment = Environment.from_env_file(working_dir)
+    project_name = project_name or environment.get('COMPOSE_PROJECT_NAME')
     if project_name:
         return normalize_name(project_name)
 

@@ -1,13 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "service_schema_v2.0.json",
+  "id": "config_schema_v1.json",
 
   "type": "object",
 
-  "allOf": [
-    {"$ref": "#/definitions/service"},
-    {"$ref": "#/definitions/constraints"}
-  ],
+  "patternProperties": {
+    "^[a-zA-Z0-9._-]+$": {
+      "$ref": "#/definitions/service"
+    }
+  },
+
+  "additionalProperties": false,
 
   "definitions": {
     "service": {
@@ -15,33 +18,7 @@
       "type": "object",
 
       "properties": {
-        "build": {
-          "oneOf": [
-            {"type": "string"},
-            {
-              "type": "object",
-              "properties": {
-                "context": {"type": "string"},
-                "dockerfile": {"type": "string"},
-                "args": {
-                  "oneOf": [
-                    {"$ref": "#/definitions/list_of_strings"},
-                    {
-                      "type": "object",
-                      "patternProperties": {
-                        "^.+$": {
-                          "type": ["string", "number"]
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
+        "build": {"type": "string"},
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cgroup_parent": {"type": "string"},
@@ -55,10 +32,10 @@
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
-        "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
+        "dockerfile": {"type": "string"},
         "domainname": {"type": "string"},
         "entrypoint": {
           "oneOf": [
@@ -96,52 +73,19 @@
           ]
         },
 
-        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-
-        "logging": {
-            "type": "object",
-
-            "properties": {
-                "driver": {"type": "string"},
-                "options": {"type": "object"}
-            },
-            "additionalProperties": false
-        },
-
+        "log_driver": {"type": "string"},
+        "log_opt": {"type": "object"},
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
         "memswap_limit": {"type": ["number", "string"]},
-        "network_mode": {"type": "string"},
-
-        "networks": {
-          "oneOf": [
-            {"$ref": "#/definitions/list_of_strings"},
-            {
-              "type": "object",
-              "patternProperties": {
-                "^[a-zA-Z0-9._-]+$": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "aliases": {"$ref": "#/definitions/list_of_strings"}
-                      },
-                      "additionalProperties": false
-                    },
-                    {"type": "null"}
-                  ]
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
+        "net": {"type": "string"},
         "pid": {"type": ["string", "null"]},
 
         "ports": {
@@ -157,6 +101,7 @@
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "shm_size": {"type": ["number", "string"]},
         "stdin_open": {"type": "boolean"},
         "stop_signal": {"type": "string"},
         "tty": {"type": "boolean"},
@@ -211,8 +156,7 @@
           "type": "object",
           "patternProperties": {
             ".+": {
-              "type": ["string", "number", "boolean", "null"],
-              "format": "bool-value-in-mapping"
+              "type": ["string", "number", "null"]
             }
           },
           "additionalProperties": false
@@ -220,16 +164,23 @@
         {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
       ]
     },
+
     "constraints": {
-      "id": "#/definitions/constraints",
-      "anyOf": [
-          {"required": ["build"]},
-          {"required": ["image"]}
-      ],
-      "properties": {
-        "build": {
-          "required": ["context"]
-        }
+      "service": {
+        "id": "#/definitions/constraints/service",
+        "anyOf": [
+          {
+            "required": ["build"],
+            "not": {"required": ["image"]}
+          },
+          {
+            "required": ["image"],
+            "not": {"anyOf": [
+              {"required": ["build"]},
+              {"required": ["dockerfile"]}
+            ]}
+          }
+        ]
       }
     }
   }

@@ -50,22 +50,22 @@ See Docker's [basic contribution workflow](https://docs.docker.com/opensource/wo
 Use the test script to run linting checks and then the full test suite against
 different Python interpreters:
 
-    $ script/test
+    $ script/test/default
 
 Tests are run against a Docker daemon inside a container, so that we can test
 against multiple Docker versions. By default they'll run against only the latest
 Docker version - set the `DOCKER_VERSIONS` environment variable to "all" to run
 against all supported versions:
 
-    $ DOCKER_VERSIONS=all script/test
+    $ DOCKER_VERSIONS=all script/test/default
 
-Arguments to `script/test` are passed through to the `nosetests` executable, so
+Arguments to `script/test/default` are passed through to the `tox` executable, so
 you can specify a test directory, file, module, class or method:
 
-    $ script/test tests/unit
-    $ script/test tests/unit/cli_test.py
-    $ script/test tests/unit/config_test.py::ConfigTest
-    $ script/test tests/unit/config_test.py::ConfigTest::test_load
+    $ script/test/default tests/unit
+    $ script/test/default tests/unit/cli_test.py
+    $ script/test/default tests/unit/config_test.py::ConfigTest
+    $ script/test/default tests/unit/config_test.py::ConfigTest::test_load
 
 ## Finding things to work on
 

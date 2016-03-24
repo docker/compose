@@ -55,10 +55,10 @@ Check out the bump branch and run the `build-binaries` script
 
 When prompted build the non-linux binaries and test them.
 
-1.  Build the Mac binary in a Mountain Lion VM:
+1.  Download the osx binary from Bintray. Make sure that the latest build has
+    finished, otherwise you'll be downloading an old binary.
 
-        script/prepare-osx
-        script/build-osx
+    https://dl.bintray.com/docker-compose/$BRANCH_NAME/
 
 2.  Download the windows binary from AppVeyor
 
@@ -88,7 +88,7 @@ When prompted build the non-linux binaries and test them.
 
         ...release notes go here...
 
-5.  Attach the binaries and `script/run.sh`
+5.  Attach the binaries and `script/run/run.sh`
 
 6.  Add "Thanks" with a list of contributors. The contributor list can be generated
     by running `./script/release/contributors`.

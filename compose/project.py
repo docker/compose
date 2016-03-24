@@ -3,8 +3,10 @@ from __future__ import unicode_literals
 
 import datetime
 import logging
+import operator
 from functools import reduce
 
+import enum
 from docker.errors import APIError
 
 from . import parallel
@@ -21,6 +23,7 @@ from .container import Container
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks
+from .service import BuildAction
 from .service import ContainerNetworkMode
 from .service import ConvergenceStrategy
 from .service import NetworkMode
@@ -31,6 +34,24 @@ from .volume import ProjectVolumes
 
 
 log = logging.getLogger(__name__)
+
+
+@enum.unique
+class OneOffFilter(enum.Enum):
+    include = 0
+    exclude = 1
+    only = 2
+
+    @classmethod
+    def update_labels(cls, value, labels):
+        if value == cls.only:
+            labels.append('{0}={1}'.format(LABEL_ONE_OFF, "True"))
+        elif value == cls.exclude:
+            labels.append('{0}={1}'.format(LABEL_ONE_OFF, "False"))
+        elif value == cls.include:
+            pass
+        else:
+            raise ValueError("Invalid value for one_off: {}".format(repr(value)))
 
 
 class Project(object):
@@ -44,11 +65,11 @@ class Project(object):
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
 
-    def labels(self, one_off=False):
-        return [
-            '{0}={1}'.format(LABEL_PROJECT, self.name),
-            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
-        ]
+    def labels(self, one_off=OneOffFilter.exclude):
+        labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
+
+        OneOffFilter.update_labels(one_off, labels)
+        return labels
 
     @classmethod
     def from_config(cls, name, config_data, client):
@@ -199,13 +220,40 @@ class Project(object):
 
     def start(self, service_names=None, **options):
         containers = []
-        for service in self.get_services(service_names):
-            service_containers = service.start(**options)
+
+        def start_service(service):
+            service_containers = service.start(quiet=True, **options)
             containers.extend(service_containers)
+
+        services = self.get_services(service_names)
+
+        def get_deps(service):
+            return {self.get_service(dep) for dep in service.get_dependency_names()}
+
+        parallel.parallel_execute(
+            services,
+            start_service,
+            operator.attrgetter('name'),
+            'Starting',
+            get_deps)
+
         return containers
 
-    def stop(self, service_names=None, **options):
-        parallel.parallel_stop(self.containers(service_names), options)
+    def stop(self, service_names=None, one_off=OneOffFilter.exclude, **options):
+        containers = self.containers(service_names, one_off=one_off)
+
+        def get_deps(container):
+            # actually returning inversed dependencies
+            return {other for other in containers
+                    if container.service in
+                    self.get_service(other.service).get_dependency_names()}
+
+        parallel.parallel_execute(
+            containers,
+            operator.methodcaller('stop', **options),
+            operator.attrgetter('name'),
+            'Stopping',
+            get_deps)
 
     def pause(self, service_names=None, **options):
         containers = self.containers(service_names)
@@ -220,12 +268,16 @@ class Project(object):
     def kill(self, service_names=None, **options):
         parallel.parallel_kill(self.containers(service_names), options)
 
-    def remove_stopped(self, service_names=None, **options):
-        parallel.parallel_remove(self.containers(service_names, stopped=True), options)
+    def remove_stopped(self, service_names=None, one_off=OneOffFilter.exclude, **options):
+        parallel.parallel_remove(self.containers(
+            service_names, stopped=True, one_off=one_off
+        ), options)
 
-    def down(self, remove_image_type, include_volumes):
-        self.stop()
-        self.remove_stopped(v=include_volumes)
+    def down(self, remove_image_type, include_volumes, remove_orphans=False):
+        self.stop(one_off=OneOffFilter.include)
+        self.find_orphan_containers(remove_orphans)
+        self.remove_stopped(v=include_volumes, one_off=OneOffFilter.include)
+
         self.networks.remove()
 
         if include_volumes:
@@ -249,7 +301,12 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def create(self, service_names=None, strategy=ConvergenceStrategy.changed, do_build=True):
+    def create(
+        self,
+        service_names=None,
+        strategy=ConvergenceStrategy.changed,
+        do_build=BuildAction.none,
+    ):
         services = self.get_services_without_duplicate(service_names, include_deps=True)
 
         plans = self._get_convergence_plans(services, strategy)
@@ -261,7 +318,7 @@ class Project(object):
                 detached=True,
                 start=False)
 
-    def events(self):
+    def events(self, service_names=None):
         def build_container_event(event, container):
             time = datetime.datetime.fromtimestamp(event['time'])
             time = time.replace(
@@ -275,10 +332,11 @@ class Project(object):
                 'attributes': {
                     'name': container.name,
                     'image': event['from'],
-                }
+                },
+                'container': container,
             }
 
-        service_names = set(self.service_names)
+        service_names = set(service_names or self.service_names)
         for event in self.client.events(
             filters={'label': self.labels()},
             decode=True
@@ -289,7 +347,11 @@ class Project(object):
                 continue
 
             # TODO: get labels from the API v1.22 , see github issue 2618
-            container = Container.from_id(self.client, event['id'])
+            try:
+                # this can fail if the conatiner has been removed
+                container = Container.from_id(self.client, event['id'])
+            except APIError:
+                continue
             if container.service not in service_names:
                 continue
             yield build_container_event(event, container)
@@ -298,9 +360,10 @@ class Project(object):
            service_names=None,
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
-           do_build=True,
+           do_build=BuildAction.none,
            timeout=DEFAULT_TIMEOUT,
-           detached=False):
+           detached=False,
+           remove_orphans=False):
 
         self.initialize()
         services = self.get_services_without_duplicate(
@@ -308,15 +371,35 @@ class Project(object):
             include_deps=start_deps)
 
         plans = self._get_convergence_plans(services, strategy)
-        return [
-            container
-            for service in services
-            for container in service.execute_convergence_plan(
+
+        for svc in services:
+            svc.ensure_image_exists(do_build=do_build)
+
+        self.find_orphan_containers(remove_orphans)
+
+        def do(service):
+            return service.execute_convergence_plan(
                 plans[service.name],
                 do_build=do_build,
                 timeout=timeout,
                 detached=detached
             )
+
+        def get_deps(service):
+            return {self.get_service(dep) for dep in service.get_dependency_names()}
+
+        results = parallel.parallel_execute(
+            services,
+            do,
+            operator.attrgetter('name'),
+            None,
+            get_deps
+        )
+        return [
+            container
+            for svc_containers in results
+            if svc_containers is not None
+            for container in svc_containers
         ]
 
     def initialize(self):
@@ -350,22 +433,51 @@ class Project(object):
         for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
-    def containers(self, service_names=None, stopped=False, one_off=False):
+    def _labeled_containers(self, stopped=False, one_off=OneOffFilter.exclude):
+        return list(filter(None, [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off)})])
+        )
+
+    def containers(self, service_names=None, stopped=False, one_off=OneOffFilter.exclude):
         if service_names:
             self.validate_service_names(service_names)
         else:
             service_names = self.service_names
 
-        containers = list(filter(None, [
-            Container.from_ps(self.client, container)
-            for container in self.client.containers(
-                all=stopped,
-                filters={'label': self.labels(one_off=one_off)})]))
+        containers = self._labeled_containers(stopped, one_off)
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names
 
         return [c for c in containers if matches_service_names(c)]
+
+    def find_orphan_containers(self, remove_orphans):
+        def _find():
+            containers = self._labeled_containers()
+            for ctnr in containers:
+                service_name = ctnr.labels.get(LABEL_SERVICE)
+                if service_name not in self.service_names:
+                    yield ctnr
+        orphans = list(_find())
+        if not orphans:
+            return
+        if remove_orphans:
+            for ctnr in orphans:
+                log.info('Removing orphan container "{0}"'.format(ctnr.name))
+                ctnr.kill()
+                ctnr.remove(force=True)
+        else:
+            log.warning(
+                'Found orphan containers ({0}) for this project. If '
+                'you removed or renamed this service in your compose '
+                'file, you can run this command with the '
+                '--remove-orphans flag to clean it up.'.format(
+                    ', '.join(["{}".format(ctnr.name) for ctnr in orphans])
+                )
+            )
 
     def _inject_deps(self, acc, service):
         dep_names = service.get_dependency_names()
