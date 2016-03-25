@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -218,7 +219,17 @@ func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
 }
 
 func (c *container) getLibctContainer() (libcontainer.Container, error) {
-	f, err := libcontainer.New("/run/runc", libcontainer.Cgroupfs)
+	runtimeRoot := "/run/runc"
+
+	// Check that the root wasn't changed
+	for _, opt := range c.runtimeArgs {
+		if strings.HasPrefix(opt, "--root=") {
+			runtimeRoot = strings.TrimPrefix(opt, "--root=")
+			break
+		}
+	}
+
+	f, err := libcontainer.New(runtimeRoot, libcontainer.Cgroupfs)
 	if err != nil {
 		return nil, err
 	}
