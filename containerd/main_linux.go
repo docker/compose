@@ -34,8 +34,10 @@ func setAppBefore(app *cli.App) {
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
-			if err := debugMetrics(context.GlobalDuration("metrics-interval"), context.GlobalString("graphite-address")); err != nil {
-				return err
+			if context.GlobalDuration("metrics-interval") > 0 {
+				if err := debugMetrics(context.GlobalDuration("metrics-interval"), context.GlobalString("graphite-address")); err != nil {
+					return err
+				}
 			}
 		}
 		if err := checkLimits(); err != nil {
