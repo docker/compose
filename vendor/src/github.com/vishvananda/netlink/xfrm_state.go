@@ -29,7 +29,7 @@ func (e EncapType) String() string {
 	return "unknown"
 }
 
-// XfrmEncap represents the encapsulation to use for the ipsec encryption.
+// XfrmStateEncap represents the encapsulation to use for the ipsec encryption.
 type XfrmStateEncap struct {
 	Type            EncapType
 	SrcPort         int

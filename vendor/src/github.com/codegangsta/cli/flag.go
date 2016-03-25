@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +30,7 @@ var HelpFlag = BoolFlag{
 }
 
 // Flag is a common interface related to parsing flags in cli.
-// For more advanced flag parsing techniques, it is recomended that
+// For more advanced flag parsing techniques, it is recommended that
 // this interface be implemented.
 type Flag interface {
 	fmt.Stringer
@@ -73,7 +74,18 @@ type GenericFlag struct {
 // help text to the user (uses the String() method of the generic flag to show
 // the value)
 func (f GenericFlag) String() string {
-	return withEnvHint(f.EnvVar, fmt.Sprintf("%s%s \"%v\"\t%v", prefixFor(f.Name), f.Name, f.Value, f.Usage))
+	return withEnvHint(f.EnvVar, fmt.Sprintf("%s %v\t%v", prefixedNames(f.Name), f.FormatValueHelp(), f.Usage))
+}
+
+func (f GenericFlag) FormatValueHelp() string {
+	if f.Value == nil {
+		return ""
+	}
+	s := f.Value.String()
+	if len(s) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("\"%s\"", s)
 }
 
 // Apply takes the flagset and calls Set on the generic flag with the value
@@ -331,16 +343,15 @@ type StringFlag struct {
 
 // String returns the usage
 func (f StringFlag) String() string {
-	var fmtString string
-	fmtString = "%s %v\t%v"
+	return withEnvHint(f.EnvVar, fmt.Sprintf("%s %v\t%v", prefixedNames(f.Name), f.FormatValueHelp(), f.Usage))
+}
 
-	if len(f.Value) > 0 {
-		fmtString = "%s \"%v\"\t%v"
-	} else {
-		fmtString = "%s %v\t%v"
+func (f StringFlag) FormatValueHelp() string {
+	s := f.Value
+	if len(s) == 0 {
+		return ""
 	}
-
-	return withEnvHint(f.EnvVar, fmt.Sprintf(fmtString, prefixedNames(f.Name), f.Value, f.Usage))
+	return fmt.Sprintf("\"%s\"", s)
 }
 
 // Apply populates the flag given the flag set and environment
@@ -521,7 +532,15 @@ func prefixedNames(fullName string) (prefixed string) {
 func withEnvHint(envVar, str string) string {
 	envText := ""
 	if envVar != "" {
-		envText = fmt.Sprintf(" [$%s]", strings.Join(strings.Split(envVar, ","), ", $"))
+		prefix := "$"
+		suffix := ""
+		sep := ", $"
+		if runtime.GOOS == "windows" {
+			prefix = "%"
+			suffix = "%"
+			sep = "%, %"
+		}
+		envText = fmt.Sprintf(" [%s%s%s]", prefix, strings.Join(strings.Split(envVar, ","), sep), suffix)
 	}
 	return str + envText
 }

@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"runtime"
+	"runtime/pprof"
 	"time"
 )
 
@@ -39,6 +40,7 @@ var (
 		}
 		NumCgoCall   Gauge
 		NumGoroutine Gauge
+		NumThread    Gauge
 		ReadMemStats Timer
 	}
 	frees       uint64
@@ -46,6 +48,8 @@ var (
 	mallocs     uint64
 	numGC       uint32
 	numCgoCalls int64
+
+	threadCreateProfile = pprof.Lookup("threadcreate")
 )
 
 // Capture new values for the Go runtime statistics exported in
@@ -134,6 +138,8 @@ func CaptureRuntimeMemStatsOnce(r Registry) {
 	numCgoCalls = currentNumCgoCalls
 
 	runtimeMetrics.NumGoroutine.Update(int64(runtime.NumGoroutine()))
+
+	runtimeMetrics.NumThread.Update(int64(threadCreateProfile.Count()))
 }
 
 // Register runtimeMetrics for the Go runtime statistics exported in runtime and
@@ -169,6 +175,7 @@ func RegisterRuntimeMemStats(r Registry) {
 	runtimeMetrics.MemStats.TotalAlloc = NewGauge()
 	runtimeMetrics.NumCgoCall = NewGauge()
 	runtimeMetrics.NumGoroutine = NewGauge()
+	runtimeMetrics.NumThread = NewGauge()
 	runtimeMetrics.ReadMemStats = NewTimer()
 
 	r.Register("runtime.MemStats.Alloc", runtimeMetrics.MemStats.Alloc)
@@ -200,5 +207,6 @@ func RegisterRuntimeMemStats(r Registry) {
 	r.Register("runtime.MemStats.TotalAlloc", runtimeMetrics.MemStats.TotalAlloc)
 	r.Register("runtime.NumCgoCall", runtimeMetrics.NumCgoCall)
 	r.Register("runtime.NumGoroutine", runtimeMetrics.NumGoroutine)
+	r.Register("runtime.NumThread", runtimeMetrics.NumThread)
 	r.Register("runtime.ReadMemStats", runtimeMetrics.ReadMemStats)
 }

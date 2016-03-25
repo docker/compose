@@ -116,6 +116,7 @@ func routeHandle(route *Route, req *nl.NetlinkRequest, msg *nl.RtMsg) error {
 		msg.Type = uint8(route.Type)
 	}
 
+	msg.Flags = uint32(route.Flags)
 	msg.Scope = uint8(route.Scope)
 	msg.Family = uint8(family)
 	req.AddData(msg)

@@ -197,6 +197,11 @@ func (c *Context) Args() Args {
 	return args
 }
 
+// Returns the number of the command line arguments.
+func (c *Context) NArg() int {
+	return len(c.Args())
+}
+
 // Returns the nth argument, or else a blank string
 func (a Args) Get(n int) string {
 	if len(a) > n {
