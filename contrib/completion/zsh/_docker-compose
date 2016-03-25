@@ -274,15 +274,16 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '-d[Detached mode: Run container in the background, print new container name.]' \
-                '--name[Assign a name to the container]:name: ' \
-                '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
-                '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
+                '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
+                '--name[Assign a name to the container]:name: ' \
                 "--no-deps[Don't start linked services.]" \
+                '(-p --publish)'{-p,--publish=-}"[Run command with manually mapped container's port(s) to the host.]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
-                '(-p --publish)'{-p,--publish=-}"[Run command with manually mapped container's port(s) to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
+                '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
+                '(-w --workdir)'{-w=,--workdir=}'[Working directory inside the container]:workdir: ' \
                 '(-):services:__docker-compose_services' \
                 '(-):command: _command_names -e' \
                 '*::arguments: _normal' && ret=0
