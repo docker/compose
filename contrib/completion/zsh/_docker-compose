@@ -247,7 +247,10 @@ __docker-compose_subcommand() {
         (logs)
             _arguments \
                 $opts_help \
+                '(-f --follow)'{-f,--follow}'[Follow log output]' \
                 '--no-color[Produce monochrome output.]' \
+                '--tail=[Number of lines to show from the end of the logs for each container.]:number of lines: ' \
+                '(-t --timestamps)'{-t,--timestamps}'[Show timestamps]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (pause)
