@@ -266,6 +266,7 @@ __docker-compose_subcommand() {
         (rm)
             _arguments \
                 $opts_help \
+                '(-a --all)'{-a,--all}"[Also remove one-off containers]" \
                 '(-f --force)'{-f,--force}"[Don't ask to confirm removal]" \
                 '-v[Remove volumes associated with containers]' \
                 '*:stopped services:__docker-compose_stoppedservices' && ret=0
