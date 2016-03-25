@@ -52,6 +52,7 @@ clean() {
 	local packages=(
 		"${PROJECT}/containerd" # package main
 		"${PROJECT}/ctr" # package main
+		"${PROJECT}/integration-test" # package main
 	)
 	local platforms=( linux/amd64 linux/386 windows/amd64 windows/386 darwin/amd64 )
 	local buildTagCombos=(
@@ -77,8 +78,8 @@ clean() {
 
 	echo -n 'pruning unused packages, '
 	findArgs=(
-		# This directory contains only .c and .h files which are necessary
-		-path vendor/src/github.com/mattn/go-sqlite3/code
+		# for some reason go list doesn't detect this as a dependency
+		-path vendor/src/github.com/vdemeester/shakers
 	)
 	for import in "${imports[@]}"; do
 		[ "${#findArgs[@]}" -eq 0 ] || findArgs+=( -or )
