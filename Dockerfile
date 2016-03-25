@@ -21,9 +21,4 @@ RUN go get github.com/golang/lint/golint \
 
 COPY . /go/src/github.com/docker/containerd
 
-# get deps, until they are in vendor
-# TODO: remomve this when there is a dep tool
-RUN go get -d -v github.com/docker/containerd/ctr \
-	&& go get -d -v github.com/docker/containerd/containerd
-
 WORKDIR /go/src/github.com/docker/containerd

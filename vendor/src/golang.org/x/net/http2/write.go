@@ -7,8 +7,8 @@ package http2
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
-	"sort"
 	"time"
 
 	"golang.org/x/net/http2/hpack"
@@ -136,27 +136,31 @@ type writeResHeaders struct {
 	contentLength string
 }
 
+func encKV(enc *hpack.Encoder, k, v string) {
+	if VerboseLogs {
+		log.Printf("http2: server encoding header %q = %q", k, v)
+	}
+	enc.WriteField(hpack.HeaderField{Name: k, Value: v})
+}
+
 func (w *writeResHeaders) writeFrame(ctx writeContext) error {
 	enc, buf := ctx.HeaderEncoder()
 	buf.Reset()
 
 	if w.httpResCode != 0 {
-		enc.WriteField(hpack.HeaderField{
-			Name:  ":status",
-			Value: httpCodeString(w.httpResCode),
-		})
+		encKV(enc, ":status", httpCodeString(w.httpResCode))
 	}
 
 	encodeHeaders(enc, w.h, w.trailers)
 
 	if w.contentType != "" {
-		enc.WriteField(hpack.HeaderField{Name: "content-type", Value: w.contentType})
+		encKV(enc, "content-type", w.contentType)
 	}
 	if w.contentLength != "" {
-		enc.WriteField(hpack.HeaderField{Name: "content-length", Value: w.contentLength})
+		encKV(enc, "content-length", w.contentLength)
 	}
 	if w.date != "" {
-		enc.WriteField(hpack.HeaderField{Name: "date", Value: w.date})
+		encKV(enc, "date", w.date)
 	}
 
 	headerBlock := buf.Bytes()
@@ -206,7 +210,7 @@ type write100ContinueHeadersFrame struct {
 func (w write100ContinueHeadersFrame) writeFrame(ctx writeContext) error {
 	enc, buf := ctx.HeaderEncoder()
 	buf.Reset()
-	enc.WriteField(hpack.HeaderField{Name: ":status", Value: "100"})
+	encKV(enc, ":status", "100")
 	return ctx.Framer().WriteHeaders(HeadersFrameParam{
 		StreamID:      w.streamID,
 		BlockFragment: buf.Bytes(),
@@ -225,24 +229,34 @@ func (wu writeWindowUpdate) writeFrame(ctx writeContext) error {
 }
 
 func encodeHeaders(enc *hpack.Encoder, h http.Header, keys []string) {
-	// TODO: garbage. pool sorters like http1? hot path for 1 key?
 	if keys == nil {
-		keys = make([]string, 0, len(h))
-		for k := range h {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		sorter := sorterPool.Get().(*sorter)
+		// Using defer here, since the returned keys from the
+		// sorter.Keys method is only valid until the sorter
+		// is returned:
+		defer sorterPool.Put(sorter)
+		keys = sorter.Keys(h)
 	}
 	for _, k := range keys {
 		vv := h[k]
 		k = lowerHeader(k)
+		if !validHeaderFieldName(k) {
+			// TODO: return an error? golang.org/issue/14048
+			// For now just omit it.
+			continue
+		}
 		isTE := k == "transfer-encoding"
 		for _, v := range vv {
+			if !validHeaderFieldValue(v) {
+				// TODO: return an error? golang.org/issue/14048
+				// For now just omit it.
+				continue
+			}
 			// TODO: more of "8.1.2.2 Connection-Specific Header Fields"
 			if isTE && v != "trailers" {
 				continue
 			}
-			enc.WriteField(hpack.HeaderField{Name: k, Value: v})
+			encKV(enc, k, v)
 		}
 	}
 }

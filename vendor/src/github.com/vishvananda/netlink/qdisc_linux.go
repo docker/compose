@@ -334,9 +334,9 @@ const (
 )
 
 var (
-	tickInUsec  float64 = 0.0
-	clockFactor float64 = 0.0
-	hz          float64 = 0.0
+	tickInUsec  float64
+	clockFactor float64
+	hz          float64
 )
 
 func initClock() {

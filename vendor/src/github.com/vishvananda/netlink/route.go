@@ -59,8 +59,8 @@ type flagString struct {
 }
 
 var testFlags = []flagString{
-	flagString{f: FLAG_ONLINK, s: "onlink"},
-	flagString{f: FLAG_PERVASIVE, s: "pervasive"},
+	{f: FLAG_ONLINK, s: "onlink"},
+	{f: FLAG_PERVASIVE, s: "pervasive"},
 }
 
 func (r *Route) ListFlags() []string {

@@ -235,6 +235,7 @@ To create and play with a Test object:
 		test := &pb.Test{
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &pb.Test_OptionalGroup{
 				RequiredField: proto.String("good bye"),
 			},
@@ -887,3 +888,7 @@ func isProto3Zero(v reflect.Value) bool {
 	}
 	return false
 }
+
+// ProtoPackageIsVersion1 is referenced from generated protocol buffer files
+// to assert that that code is compatible with this version of the proto package.
+const ProtoPackageIsVersion1 = true

@@ -204,6 +204,7 @@ type Vxlan struct {
 	RSC          bool
 	L2miss       bool
 	L3miss       bool
+	UDPCSum      bool
 	NoAge        bool
 	GBP          bool
 	Age          int
@@ -424,7 +425,7 @@ const (
 	BOND_AD_SELECT_COUNT
 )
 
-// BondAdInfo
+// BondAdInfo represents ad info for bond
 type BondAdInfo struct {
 	AggregatorId int
 	NumPorts     int
@@ -525,7 +526,7 @@ func (bond *Bond) Type() string {
 	return "bond"
 }
 
-// GreTap devices must specify LocalIP and RemoteIP on create
+// Gretap devices must specify LocalIP and RemoteIP on create
 type Gretap struct {
 	LinkAttrs
 	IKey       uint32
