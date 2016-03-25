@@ -223,6 +223,18 @@ __docker-compose_subcommand() {
                 '--json[Output events as a stream of json objects.]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
+        (exec)
+            _arguments \
+                $opts_help \
+                '-d[Detached mode: Run command in the background.]' \
+                '--privileged[Give extended privileges to the process.]' \
+                '--user=[Run the command as this user.]:username:_users' \
+                '-T[Disable pseudo-tty allocation. By default `docker-compose exec` allocates a TTY.]' \
+                '--index=[Index of the container if there are multiple instances of a service (default: 1)]:index: ' \
+                '(-):running services:__docker-compose_runningservices' \
+                '(-):command: _command_names -e' \
+                '*::arguments: _normal' && ret=0
+            ;;
         (help)
             _arguments ':subcommand:__docker-compose_commands' && ret=0
             ;;
