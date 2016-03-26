@@ -55,6 +55,10 @@ var daemonFlags = []cli.Flag{
 		Value: &cli.StringSlice{},
 		Usage: "specify additional runtime args",
 	},
+	cli.StringFlag{
+		Name:  "pprof-address",
+		Usage: "http address to listen for pprof events",
+	},
 }
 
 func main() {

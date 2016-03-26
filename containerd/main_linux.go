@@ -12,6 +12,7 @@ import (
 	"github.com/cloudfoundry/gosigar"
 	"github.com/codegangsta/cli"
 	"github.com/cyberdelia/go-metrics-graphite"
+	"github.com/docker/containerd/api/http/pprof"
 	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
 	"github.com/rcrowley/go-metrics"
@@ -39,6 +40,10 @@ func setAppBefore(app *cli.App) {
 					return err
 				}
 			}
+
+		}
+		if p := context.GlobalString("pprof-address"); len(p) > 0 {
+			pprof.Enable(p)
 		}
 		if err := checkLimits(); err != nil {
 			return err
