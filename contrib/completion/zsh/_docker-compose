@@ -19,26 +19,13 @@
 #  * @felixr docker zsh completion script : https://github.com/felixr/docker-zsh-completion
 # -------------------------------------------------------------------------
 
-# For compatibility reasons, Compose and therefore its completion supports several
-# stack compositon files as listed here, in descending priority.
-# Support for these filenames might be dropped in some future version.
-__docker-compose_compose_file() {
-    local file
-    for file in docker-compose.y{,a}ml ; do
-        [ -e $file ] && {
-            echo $file
-            return
-        }
-    done
-    echo docker-compose.yml
-}
-
 # Extracts all service names from docker-compose.yml.
 ___docker-compose_all_services_in_compose_file() {
     local already_selected
     local -a services
     already_selected=$(echo $words | tr " " "|")
-    awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-$(__docker-compose_compose_file)}" 2>/dev/null | grep -Ev "$already_selected"
+    docker-compose config --services 2>/dev/null \
+        | grep -Ev "$already_selected"
 }
 
 # All services, even those without an existing container
@@ -57,7 +44,12 @@ ___docker-compose_services_with_key() {
     local -a buildable
     already_selected=$(echo $words | tr " " "|")
     # flatten sections to one line, then filter lines containing the key and return section name.
-    awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker-compose_compose_file)}" 2>/dev/null | awk -F: -v key=": +$1:" '$0 ~ key {print $1}' 2>/dev/null | grep -Ev "$already_selected"
+    docker-compose config 2>/dev/null \
+        | sed -n -e '/^services:/,/^[^ ]/p' \
+        | sed -n 's/^  //p' \
+        | awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
+        | awk -F: -v key=": +$1:" '$0 ~ key {print $1}' \
+        | grep -Ev "$already_selected"
 }
 
 # All services that are defined by a Dockerfile reference
