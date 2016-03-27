@@ -19,12 +19,16 @@
 #  * @felixr docker zsh completion script : https://github.com/felixr/docker-zsh-completion
 # -------------------------------------------------------------------------
 
+__docker-compose_q() {
+    docker-compose 2>/dev/null $compose_options "$@"
+}
+
 # Extracts all service names from docker-compose.yml.
 __docker-compose_all_services_in_compose_file() {
     local already_selected
     local -a services
     already_selected=$(echo $words | tr " " "|")
-    docker-compose config --services 2>/dev/null \
+    __docker-compose_q config --services \
         | grep -Ev "$already_selected"
 }
 
@@ -44,7 +48,7 @@ __docker-compose_services_with_key() {
     local -a buildable
     already_selected=$(echo $words | tr " " "|")
     # flatten sections to one line, then filter lines containing the key and return section name.
-    docker-compose config 2>/dev/null \
+    __docker-compose_q config \
         | sed -n -e '/^services:/,/^[^ ]/p' \
         | sed -n 's/^  //p' \
         | awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
@@ -88,7 +92,7 @@ __docker-compose_get_services() {
     shift
     [[ $kind =~ (stopped|all) ]] && args=($args -a)
 
-    lines=(${(f)"$(_call_program commands docker ps $args)"})
+    lines=(${(f)"$(_call_program commands docker $docker_options ps $args)"})
     services=(${(f)"$(_call_program commands docker-compose 2>/dev/null $compose_options ps -q)"})
 
     # Parse header line to find columns
@@ -375,9 +379,43 @@ _docker-compose() {
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 
-    local compose_file=${opt_args[-f]}${opt_args[--file]}
-    local compose_project=${opt_args[-p]}${opt_args[--project-name]}
-    local compose_options="${compose_file:+--file $compose_file} ${compose_project:+--project-name $compose_project}"
+    local -a relevant_compose_flags relevant_docker_flags compose_options docker_options
+
+    relevant_compose_flags=(
+        "--file" "-f"
+        "--host" "-H"
+        "--project-name" "-p"
+        "--tls"
+        "--tlscacert"
+        "--tlscert"
+        "--tlskey"
+        "--tlsverify"
+        "--skip-hostname-check"
+    )
+
+    relevant_docker_flags=(
+        "--host" "-H"
+        "--tls"
+        "--tlscacert"
+        "--tlscert"
+        "--tlskey"
+        "--tlsverify"
+    )
+
+    for k in "${(@k)opt_args}"; do
+        if [[ -n "${relevant_docker_flags[(r)$k]}" ]]; then
+            docker_options+=$k
+            if [[ -n "$opt_args[$k]" ]]; then
+                docker_options+=$opt_args[$k]
+            fi
+        fi
+        if [[ -n "${relevant_compose_flags[(r)$k]}" ]]; then
+            compose_options+=$k
+            if [[ -n "$opt_args[$k]" ]]; then
+                compose_options+=$opt_args[$k]
+            fi
+        fi
+    done
 
     case $state in
         (command)
