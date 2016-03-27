@@ -20,7 +20,7 @@
 # -------------------------------------------------------------------------
 
 # Extracts all service names from docker-compose.yml.
-___docker-compose_all_services_in_compose_file() {
+__docker-compose_all_services_in_compose_file() {
     local already_selected
     local -a services
     already_selected=$(echo $words | tr " " "|")
@@ -32,14 +32,14 @@ ___docker-compose_all_services_in_compose_file() {
 __docker-compose_services_all() {
     [[ $PREFIX = -* ]] && return 1
     integer ret=1
-    services=$(___docker-compose_all_services_in_compose_file)
+    services=$(__docker-compose_all_services_in_compose_file)
     _alternative "args:services:($services)" && ret=0
 
     return ret
 }
 
 # All services that have an entry with the given key in their docker-compose.yml section
-___docker-compose_services_with_key() {
+__docker-compose_services_with_key() {
     local already_selected
     local -a buildable
     already_selected=$(echo $words | tr " " "|")
@@ -56,7 +56,7 @@ ___docker-compose_services_with_key() {
 __docker-compose_services_from_build() {
     [[ $PREFIX = -* ]] && return 1
     integer ret=1
-    buildable=$(___docker-compose_services_with_key build)
+    buildable=$(__docker-compose_services_with_key build)
     _alternative "args:buildable services:($buildable)" && ret=0
 
    return ret
@@ -66,7 +66,7 @@ __docker-compose_services_from_build() {
 __docker-compose_services_from_image() {
     [[ $PREFIX = -* ]] && return 1
     integer ret=1
-    pullable=$(___docker-compose_services_with_key image)
+    pullable=$(__docker-compose_services_with_key image)
     _alternative "args:pullable services:($pullable)" && ret=0
 
     return ret
