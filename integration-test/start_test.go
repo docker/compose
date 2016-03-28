@@ -1,6 +1,9 @@
 package main
 
 import (
+	"time"
+
+	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/integration/checker"
 	"github.com/go-check/check"
 )
@@ -55,4 +58,41 @@ func (cs *ContainerdSuite) TestStartBusyboxTop(t *check.C) {
 
 	_, err := cs.StartContainer("top", "busybox-top")
 	t.Assert(err, checker.Equals, nil)
+}
+
+func (cs *ContainerdSuite) TestStartBusyboxLsEvents(t *check.C) {
+	if err := CreateBusyboxBundle("busybox-ls", []string{"ls"}); err != nil {
+		t.Fatal(err)
+	}
+
+	containerId := "ls-events"
+	c, err := cs.StartContainer(containerId, "busybox-ls")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "exit",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "init",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container took more than 2 seconds to terminate")
+		}
+	}
 }
