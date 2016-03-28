@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/docker/containerd/api/grpc/types"
@@ -52,12 +53,22 @@ func (cs *ContainerdSuite) TestStartBusyboxNoSuchFile(t *check.C) {
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxTop(t *check.C) {
-	if err := CreateBusyboxBundle("busybox-top", []string{"top"}); err != nil {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := cs.StartContainer("top", "busybox-top")
+	_, err := cs.StartContainer("top", bundleName)
 	t.Assert(err, checker.Equals, nil)
+
+	containers, err := cs.ListRunningContainers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Assert(len(containers), checker.Equals, 1)
+	t.Assert(containers[0].Id, checker.Equals, "top")
+	t.Assert(containers[0].Status, checker.Equals, "running")
+	t.Assert(containers[0].BundlePath, check.Equals, filepath.Join(cs.cwd, GetBundle(bundleName).Path))
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxLsEvents(t *check.C) {
