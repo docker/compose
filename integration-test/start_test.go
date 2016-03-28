@@ -40,11 +40,11 @@ var
 func (cs *ContainerdSuite) TestStartBusyboxNoSuchFile(t *check.C) {
 	expectedOutput := `oci runtime error: exec: \"NoSuchFile\": executable file not found in $PATH`
 
-	if err := CreateBusyboxBundle("busybox-NoSuchFile", []string{"NoSuchFile"}); err != nil {
+	if err := CreateBusyboxBundle("busybox-no-such-file", []string{"NoSuchFile"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := cs.RunContainer("NoSuchFile", "busybox-NoSuchFile")
+	_, err := cs.RunContainer("NoSuchFile", "busybox-no-such-file")
 	t.Assert(err.Error(), checker.Contains, expectedOutput)
 }
 
