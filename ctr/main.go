@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -42,6 +43,11 @@ func main() {
 			Name:  "address",
 			Value: "/run/containerd/containerd.sock",
 			Usage: "address of GRPC API",
+		},
+		cli.DurationFlag{
+			Name:  "conn-timeout",
+			Value: 1 * time.Second,
+			Usage: "GRPC connection timeout",
 		},
 	}
 	app.Commands = []cli.Command{

@@ -28,7 +28,7 @@ import (
 func getClient(ctx *cli.Context) types.APIClient {
 	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
-	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
+	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(ctx.GlobalDuration("conn-timeout"))}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
