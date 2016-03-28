@@ -17,6 +17,7 @@ var (
 	ErrProcessNotExited      = errors.New("containerd: process has not exited")
 	ErrProcessExited         = errors.New("containerd: process has exited")
 	ErrContainerNotStarted   = errors.New("containerd: container not started")
+	ErrContainerStartTimeout = errors.New("containerd: container did not start before the specified timeout")
 
 	errNoPidFile      = errors.New("containerd: no process pid file found")
 	errInvalidPidInt  = errors.New("containerd: process pid is invalid")
