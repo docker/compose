@@ -4,3 +4,4 @@ bin/
 ctr/ctr
 hack/benchmark
 *.exe
+integration-test/test-artifacts
