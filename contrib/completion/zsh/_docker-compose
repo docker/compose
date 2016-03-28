@@ -52,7 +52,8 @@ __docker-compose_services_with_key() {
         | sed -n -e '/^services:/,/^[^ ]/p' \
         | sed -n 's/^  //p' \
         | awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
-        | awk -F: -v key=": +$1:" '$0 ~ key {print $1}' \
+        | grep " \+$1:" \
+        | sed "s/:.*//g" \
         | grep -Ev "$already_selected"
 }
 
