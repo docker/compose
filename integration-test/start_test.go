@@ -96,3 +96,30 @@ func (cs *ContainerdSuite) TestStartBusyboxLsEvents(t *check.C) {
 		}
 	}
 }
+
+func (cs *ContainerdSuite) TestStartBusyboxSleep(t *check.C) {
+	if err := CreateBusyboxBundle("busybox-sleep-5", []string{"sleep", "5"}); err != nil {
+		t.Fatal(err)
+	}
+
+	ch := make(chan interface{})
+	filter := func(e *types.Event) {
+		if e.Type == "exit" && e.Pid == "init" {
+			ch <- nil
+		}
+	}
+
+	start := time.Now()
+	_, err := cs.StartContainerWithEventFilter("sleep5", "busybox-sleep-5", filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We add a generous 20% marge of error
+	select {
+	case <-ch:
+		t.Assert(uint64(time.Now().Sub(start)), checker.LessOrEqualThan, uint64(6*time.Second))
+	case <-time.After(6 * time.Second):
+		t.Fatal("Container took more than 6 seconds to exit")
+	}
+}
