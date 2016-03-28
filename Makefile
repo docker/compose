@@ -7,6 +7,9 @@ GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
 LDFLAGS := -X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
 
+TEST_TIMEOUT ?= 5m
+TEST_SUITE_TIMEOUT ?= 10m
+
 # if this session isn't interactive, then we don't want to allocate a
 # TTY, which would fail, but if it is interactive, we do want to attach
 # so that the user can send e.g. ^C through.
@@ -84,7 +87,7 @@ test: all validate
 ifneq ($(wildcard /.dockerenv), )
 	$(MAKE) install bundles-rootfs
 	cd integration-test ; \
-	go test -check.v $(TESTFLAGS) github.com/docker/containerd/integration-test
+	go test -check.v -check.timeout=$(TEST_TIMEOUT) timeout=$(TEST_SUITE_TIMEOUT) $(TESTFLAGS) github.com/docker/containerd/integration-test
 endif
 
 validate: fmt
