@@ -110,12 +110,21 @@ func (c *containerProcess) openIo() (err error) {
 	return nil
 }
 
+func (c *containerProcess) GetEventsChannel() chan *types.Event {
+	return c.eventsCh
+}
+
 func (c *containerProcess) GetNextEvent() *types.Event {
+	if c.hasExited {
+		return nil
+	}
+
 	e := <-c.eventsCh
 
 	if e.Type == "exit" && e.Pid == c.pid {
 		c.Cleanup()
 		c.hasExited = true
+		close(c.eventsCh)
 	}
 
 	return e

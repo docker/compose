@@ -223,6 +223,10 @@ func (cs *ContainerdSuite) TearDownTest(c *check.C) {
 			fmt.Fprintf(os.Stderr, "Failed to cleanup leftover test containers: %v", err)
 		}
 
-		<-ch
+		select {
+		case <-ch:
+		case <-time.After(3 * time.Second):
+			fmt.Fprintf(os.Stderr, "TearDownTest: Containerd %v didn't die after 3 seconds", ctr.Id)
+		}
 	}
 }
