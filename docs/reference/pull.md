@@ -1,7 +1,7 @@
 <!--[metadata]>
 +++
 title = "pull"
-description = "Pulls service images."
+description = "Pull service images."
 keywords = ["fig, composition, compose, docker, orchestration, cli,  pull"]
 [menu.main]
 identifier="pull.compose"
@@ -18,4 +18,4 @@ Options:
 --ignore-pull-failures  Pull what it can and ignores images with pull failures.
 ```
 
-Pulls service images.
+Pull service images.
