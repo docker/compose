@@ -21,24 +21,37 @@ def tls_config_from_options(options):
     cert = options.get('--tlscert')
     key = options.get('--tlskey')
     verify = options.get('--tlsverify')
-    hostname = urlparse(options.get('--host') or '').hostname
+    host = options.get('--host')
+    skip_hostname_check = options.get('--skip-hostname-check', False)
+
+    if not skip_hostname_check:
+        hostname = urlparse(host).hostname if host else None
+        # If the protocol is omitted, urlparse fails to extract the hostname.
+        # Make another attempt by appending a protocol.
+        if not hostname and host:
+            hostname = urlparse('tcp://{0}'.format(host)).hostname
 
     advanced_opts = any([ca_cert, cert, key, verify])
 
     if tls is True and not advanced_opts:
         return True
-    elif advanced_opts:
+    elif advanced_opts:  # --tls is a noop
         client_cert = None
         if cert or key:
             client_cert = (cert, key)
+
+        assert_hostname = None
+        if skip_hostname_check:
+            assert_hostname = False
+        elif hostname:
+            assert_hostname = hostname
+
         return TLSConfig(
             client_cert=client_cert, verify=verify, ca_cert=ca_cert,
-            assert_hostname=(
-                hostname or not options.get('--skip-hostname-check', False)
-            )
+            assert_hostname=assert_hostname
         )
-    else:
-        return None
+
+    return None
 
 
 def docker_client(environment, version=None, tls_config=None, host=None):
