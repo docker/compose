@@ -51,11 +51,15 @@ func (c *container) Runtime() string {
 }
 
 func (c *container) Pause() error {
-	return exec.Command(c.runtime, "pause", c.id).Run()
+	args := c.runtimeArgs
+	args = append(args, "pause", c.id)
+	return exec.Command(c.runtime, args...).Run()
 }
 
 func (c *container) Resume() error {
-	return exec.Command(c.runtime, "resume", c.id).Run()
+	args := c.runtimeArgs
+	args = append(args, "resume", c.id)
+	return exec.Command(c.runtime, args...).Run()
 }
 
 func (c *container) Checkpoints() ([]Checkpoint, error) {
@@ -107,6 +111,7 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 	add := func(flags ...string) {
 		args = append(args, flags...)
 	}
+	add(c.runtimeArgs...)
 	if !cpt.Exit {
 		add("--leave-running")
 	}
