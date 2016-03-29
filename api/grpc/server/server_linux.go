@@ -164,6 +164,7 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 	}
 	pbSt.CgroupStats.PidsStats = &types.PidsStats{
 		Current: lcSt.CgroupStats.PidsStats.Current,
+		Limit:   lcSt.CgroupStats.PidsStats.Limit,
 	}
 	return pbSt
 }
