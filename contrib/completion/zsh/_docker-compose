@@ -223,6 +223,18 @@ __docker-compose_subcommand() {
                 '--json[Output events as a stream of json objects.]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
+        (exec)
+            _arguments \
+                $opts_help \
+                '-d[Detached mode: Run command in the background.]' \
+                '--privileged[Give extended privileges to the process.]' \
+                '--user=[Run the command as this user.]:username:_users' \
+                '-T[Disable pseudo-tty allocation. By default `docker-compose exec` allocates a TTY.]' \
+                '--index=[Index of the container if there are multiple instances of a service (default: 1)]:index: ' \
+                '(-):running services:__docker-compose_runningservices' \
+                '(-):command: _command_names -e' \
+                '*::arguments: _normal' && ret=0
+            ;;
         (help)
             _arguments ':subcommand:__docker-compose_commands' && ret=0
             ;;
@@ -235,7 +247,10 @@ __docker-compose_subcommand() {
         (logs)
             _arguments \
                 $opts_help \
+                '(-f --follow)'{-f,--follow}'[Follow log output]' \
                 '--no-color[Produce monochrome output.]' \
+                '--tail=[Number of lines to show from the end of the logs for each container.]:number of lines: ' \
+                '(-t --timestamps)'{-t,--timestamps}'[Show timestamps]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (pause)
@@ -266,6 +281,7 @@ __docker-compose_subcommand() {
         (rm)
             _arguments \
                 $opts_help \
+                '(-a --all)'{-a,--all}"[Also remove one-off containers]" \
                 '(-f --force)'{-f,--force}"[Don't ask to confirm removal]" \
                 '-v[Remove volumes associated with containers]' \
                 '*:stopped services:__docker-compose_stoppedservices' && ret=0
@@ -274,15 +290,16 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '-d[Detached mode: Run container in the background, print new container name.]' \
-                '--name[Assign a name to the container]:name: ' \
-                '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
-                '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
+                '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
+                '--name[Assign a name to the container]:name: ' \
                 "--no-deps[Don't start linked services.]" \
+                '(-p --publish)'{-p,--publish=-}"[Run command with manually mapped container's port(s) to the host.]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
-                '(-p --publish)'{-p,--publish=-}"[Run command with manually mapped container's port(s) to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
+                '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
+                '(-w --workdir)'{-w=,--workdir=}'[Working directory inside the container]:workdir: ' \
                 '(-):services:__docker-compose_services' \
                 '(-):command: _command_names -e' \
                 '*::arguments: _normal' && ret=0
@@ -313,6 +330,7 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names.]' \
+                '--build[Build images before starting containers.]' \
                 '--no-color[Produce monochrome output.]' \
                 "--no-deps[Don't start linked services.]" \
                 "--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
