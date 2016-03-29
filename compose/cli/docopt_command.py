@@ -34,10 +34,6 @@ class DocoptDispatcher(object):
         if docstring is None:
             raise NoSuchCommand(command, self)
 
-        # checks to see if the command is help and if so outputs top level command options
-        if command == 'help' and options['ARGS'] == []:
-            raise SystemExit(docstring + '\n-------------------\n\n' + command_help)
-
         command_options = docopt_full_help(docstring, options['ARGS'], options_first=True)
         return options, handler, command_options
 
