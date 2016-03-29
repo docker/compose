@@ -206,7 +206,11 @@ func (c *container) readSpec() (*specs.Spec, error) {
 
 func (c *container) Delete() error {
 	err := os.RemoveAll(filepath.Join(c.root, c.id))
-	exec.Command(c.runtime, "delete", c.id).Run()
+
+	args := c.runtimeArgs
+	args = append(args, "delete", c.id)
+	exec.Command(c.runtime, args...).Run()
+
 	return err
 }
 
