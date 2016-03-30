@@ -116,11 +116,17 @@ func (p *process) start() error {
 		if p.checkpoint.UnixSockets {
 			add("--ext-unix-sk")
 		}
+		if p.state.NoPivotRoot {
+			add("--no-pivot")
+		}
 	} else {
 		args = append(args, "start",
 			"--bundle", p.bundle,
 			"--console", p.consolePath,
 		)
+		if p.state.NoPivotRoot {
+			args = append(args, "--no-pivot")
+		}
 	}
 	args = append(args,
 		"-d",

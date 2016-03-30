@@ -60,6 +60,7 @@ type state struct {
 	Stderr      string   `json:"stderr"`
 	Runtime     string   `json:"runtime"`
 	RuntimeArgs []string `json:"runtimeArgs"`
+	NoPivotRoot bool     `json:"noPivotRoot"`
 }
 
 type ProcessState struct {
@@ -69,6 +70,7 @@ type ProcessState struct {
 	Stdout      string   `json:"containerdStdout"`
 	Stderr      string   `json:"containerdStderr"`
 	RuntimeArgs []string `json:"runtimeArgs"`
+	NoPivotRoot bool     `json:"noPivotRoot"`
 
 	PlatformProcessState
 }

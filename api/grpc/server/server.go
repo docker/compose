@@ -38,6 +38,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.Stdout = c.Stdout
 	e.Stderr = c.Stderr
 	e.Labels = c.Labels
+	e.NoPivotRoot = c.NoPivotRoot
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	createContainerConfigCheckpoint(e, c)
 	s.sv.SendTask(e)

@@ -82,30 +82,42 @@ func NewStdio(stdin, stdout, stderr string) Stdio {
 	}
 }
 
+type ContainerOpts struct {
+	Root        string
+	ID          string
+	Bundle      string
+	Runtime     string
+	RuntimeArgs []string
+	Labels      []string
+	NoPivotRoot bool
+}
+
 // New returns a new container
-func New(root, id, bundle, runtimeName string, runtimeArgs, labels []string) (Container, error) {
+func New(opts ContainerOpts) (Container, error) {
 	c := &container{
-		root:        root,
-		id:          id,
-		bundle:      bundle,
-		labels:      labels,
+		root:        opts.Root,
+		id:          opts.ID,
+		bundle:      opts.Bundle,
+		labels:      opts.Labels,
 		processes:   make(map[string]*process),
-		runtime:     runtimeName,
-		runtimeArgs: runtimeArgs,
+		runtime:     opts.Runtime,
+		runtimeArgs: opts.RuntimeArgs,
+		noPivotRoot: opts.NoPivotRoot,
 	}
-	if err := os.Mkdir(filepath.Join(root, id), 0755); err != nil {
+	if err := os.Mkdir(filepath.Join(c.root, c.id), 0755); err != nil {
 		return nil, err
 	}
-	f, err := os.Create(filepath.Join(root, id, StateFile))
+	f, err := os.Create(filepath.Join(c.root, c.id, StateFile))
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(state{
-		Bundle:      bundle,
-		Labels:      labels,
-		Runtime:     runtimeName,
-		RuntimeArgs: runtimeArgs,
+		Bundle:      c.bundle,
+		Labels:      c.labels,
+		Runtime:     c.runtime,
+		RuntimeArgs: c.runtimeArgs,
+		NoPivotRoot: opts.NoPivotRoot,
 	}); err != nil {
 		return nil, err
 	}
@@ -129,6 +141,7 @@ func Load(root, id string) (Container, error) {
 		labels:      s.Labels,
 		runtime:     s.Runtime,
 		runtimeArgs: s.RuntimeArgs,
+		noPivotRoot: s.NoPivotRoot,
 		processes:   make(map[string]*process),
 	}
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
@@ -177,6 +190,7 @@ type container struct {
 	processes   map[string]*process
 	labels      []string
 	oomFds      []int
+	noPivotRoot bool
 }
 
 func (c *container) ID() string {
