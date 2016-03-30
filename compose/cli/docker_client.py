@@ -7,7 +7,6 @@ from docker import Client
 from docker.errors import TLSParameterError
 from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
-from requests.utils import urlparse
 
 from ..const import HTTP_TIMEOUT
 from .errors import UserError
@@ -21,15 +20,7 @@ def tls_config_from_options(options):
     cert = options.get('--tlscert')
     key = options.get('--tlskey')
     verify = options.get('--tlsverify')
-    host = options.get('--host')
     skip_hostname_check = options.get('--skip-hostname-check', False)
-
-    if not skip_hostname_check:
-        hostname = urlparse(host).hostname if host else None
-        # If the protocol is omitted, urlparse fails to extract the hostname.
-        # Make another attempt by appending a protocol.
-        if not hostname and host:
-            hostname = urlparse('tcp://{0}'.format(host)).hostname
 
     advanced_opts = any([ca_cert, cert, key, verify])
 
@@ -40,15 +31,9 @@ def tls_config_from_options(options):
         if cert or key:
             client_cert = (cert, key)
 
-        assert_hostname = None
-        if skip_hostname_check:
-            assert_hostname = False
-        elif hostname:
-            assert_hostname = hostname
-
         return TLSConfig(
             client_cert=client_cert, verify=verify, ca_cert=ca_cert,
-            assert_hostname=assert_hostname
+            assert_hostname=False if skip_hostname_check else None
         )
 
     return None
