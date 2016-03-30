@@ -49,7 +49,7 @@ def docker_client(environment, version=None, tls_config=None, host=None):
                  "Please use COMPOSE_HTTP_TIMEOUT instead.")
 
     try:
-        kwargs = kwargs_from_env(assert_hostname=False, environment=environment)
+        kwargs = kwargs_from_env(environment=environment)
     except TLSParameterError:
         raise UserError(
             "TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY "
