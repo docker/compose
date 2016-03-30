@@ -29,7 +29,7 @@ __docker-compose_all_services_in_compose_file() {
     local -a services
     already_selected=$(echo $words | tr " " "|")
     __docker-compose_q config --services \
-        | grep -Ev "$already_selected"
+        | grep -Ev "^(${already_selected})$"
 }
 
 # All services, even those without an existing container
@@ -54,7 +54,7 @@ __docker-compose_services_with_key() {
         | awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
         | grep " \+$1:" \
         | sed "s/:.*//g" \
-        | grep -Ev "$already_selected"
+        | grep -Ev "^(${already_selected})$"
 }
 
 # All services that are defined by a Dockerfile reference
