@@ -104,28 +104,6 @@ class TLSConfigTestCase(unittest.TestCase):
         with pytest.raises(docker.errors.TLSParameterError):
             tls_config_from_options(options)
 
-    def test_assert_hostname_explicit_host(self):
-        options = {
-            '--tlscacert': self.ca_cert, '--host': 'tcp://foobar.co.uk:1254'
-        }
-        result = tls_config_from_options(options)
-        assert isinstance(result, docker.tls.TLSConfig)
-        assert result.assert_hostname == 'foobar.co.uk'
-
-    def test_assert_hostname_explicit_host_no_proto(self):
-        options = {
-            '--tlscacert': self.ca_cert, '--host': 'foobar.co.uk:1254'
-        }
-        result = tls_config_from_options(options)
-        assert isinstance(result, docker.tls.TLSConfig)
-        assert result.assert_hostname == 'foobar.co.uk'
-
-    def test_assert_hostname_implicit_host(self):
-        options = {'--tlscacert': self.ca_cert}
-        result = tls_config_from_options(options)
-        assert isinstance(result, docker.tls.TLSConfig)
-        assert result.assert_hostname is None
-
     def test_assert_hostname_explicit_skip(self):
         options = {'--tlscacert': self.ca_cert, '--skip-hostname-check': True}
         result = tls_config_from_options(options)
