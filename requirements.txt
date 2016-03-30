@@ -1,6 +1,6 @@
 PyYAML==3.11
 cached-property==1.2.0
-docker-py==1.8.0rc3
+docker-py==1.8.0rc5
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4
