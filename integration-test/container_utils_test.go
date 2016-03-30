@@ -180,13 +180,13 @@ func NewContainerProcess(cs *ContainerdSuite, bundle *Bundle, cid, pid string) (
 	return c, nil
 }
 
-func (cs *ContainerdSuite) StartContainer(id, bundleName string) (c *containerProcess, err error) {
-	bundle, ok := bundleMap[bundleName]
-	if !ok {
+func (cs *ContainerdSuite) StartContainerWithEventFilter(id, bundleName string, filter func(*types.Event)) (c *containerProcess, err error) {
+	bundle := GetBundle(bundleName)
+	if bundle == nil {
 		return nil, fmt.Errorf("No such bundle '%s'", bundleName)
 	}
 
-	c, err = NewContainerProcess(cs, &bundle, id, "init")
+	c, err = NewContainerProcess(cs, bundle, id, "init")
 	if err != nil {
 		return nil, err
 	}
@@ -199,9 +199,13 @@ func (cs *ContainerdSuite) StartContainer(id, bundleName string) (c *containerPr
 		Stderr:     filepath.Join(cs.cwd, c.io.stderr),
 	}
 
-	cs.SetContainerEventFilter(id, func(event *types.Event) {
-		c.eventsCh <- event
-	})
+	if filter == nil {
+		filter = func(event *types.Event) {
+			c.eventsCh <- event
+		}
+	}
+
+	cs.SetContainerEventFilter(id, filter)
 
 	if _, err := cs.grpcClient.CreateContainer(context.Background(), r); err != nil {
 		c.Cleanup()
@@ -209,6 +213,10 @@ func (cs *ContainerdSuite) StartContainer(id, bundleName string) (c *containerPr
 	}
 
 	return c, nil
+}
+
+func (cs *ContainerdSuite) StartContainer(id, bundleName string) (c *containerProcess, err error) {
+	return cs.StartContainerWithEventFilter(id, bundleName, nil)
 }
 
 func (cs *ContainerdSuite) RunContainer(id, bundleName string) (c *containerProcess, err error) {

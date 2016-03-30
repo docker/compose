@@ -102,6 +102,14 @@ func CreateBundleWithFilter(source, name string, args []string, filter func(spec
 	return nil
 }
 
+func GetBundle(name string) *Bundle {
+	bundle, ok := bundleMap[name]
+	if !ok {
+		return nil
+	}
+	return &bundle
+}
+
 func CreateBusyboxBundle(name string, args []string) error {
 	return CreateBundleWithFilter("busybox", name, args, nil)
 }
