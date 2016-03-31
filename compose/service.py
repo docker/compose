@@ -355,6 +355,7 @@ class Service(object):
                     c.name, container_config_hash, config_hash,
                 )
                 has_diverged = True
+                break
 
         return has_diverged
 
