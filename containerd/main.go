@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -18,6 +18,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
+	"github.com/docker/docker/pkg/listeners"
 )
 
 const (
@@ -43,7 +44,7 @@ var daemonFlags = []cli.Flag{
 	cli.StringFlag{
 		Name:  "listen,l",
 		Value: defaultGRPCEndpoint,
-		Usage: "Address on which GRPC API will listen",
+		Usage: "proto://address on which the GRPC API will listen",
 	},
 	cli.StringFlag{
 		Name:  "runtime,r",
@@ -127,7 +128,13 @@ func daemon(context *cli.Context) error {
 	if err := sv.Start(); err != nil {
 		return err
 	}
-	server, err := startServer(context.String("listen"), sv)
+	// Split the listen string of the form proto://addr
+	listenSpec := context.String("listen")
+	listenParts := strings.SplitN(listenSpec, "://", 2)
+	if len(listenParts) != 2 {
+		return fmt.Errorf("bad listen address format %s, expected proto://address", listenSpec)
+	}
+	server, err := startServer(listenParts[0], listenParts[1], sv)
 	if err != nil {
 		return err
 	}
@@ -146,14 +153,17 @@ func daemon(context *cli.Context) error {
 	return nil
 }
 
-func startServer(address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
-	if err := os.RemoveAll(address); err != nil {
-		return nil, err
-	}
-	l, err := net.Listen(defaultListenType, address)
+func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
+	// TODO: We should use TLS.
+	// TODO: Add an option for the SocketGroup.
+	sockets, err := listeners.Init(protocol, address, "", nil)
 	if err != nil {
 		return nil, err
 	}
+	if len(sockets) != 1 {
+		return nil, fmt.Errorf("incorrect number of listeners")
+	}
+	l := sockets[0]
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(sv))
 	go func() {
