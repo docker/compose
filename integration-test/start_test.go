@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/docker/containerd/api/grpc/types"
@@ -132,5 +133,95 @@ func (cs *ContainerdSuite) TestStartBusyboxSleep(t *check.C) {
 		t.Assert(uint64(time.Now().Sub(start)), checker.LessOrEqualThan, uint64(6*time.Second))
 	case <-time.After(6 * time.Second):
 		t.Fatal("Container took more than 6 seconds to exit")
+	}
+}
+
+func (cs *ContainerdSuite) TestStartBusyboxTopKill(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	containerId := "top"
+	c, err := cs.StartContainer("top", bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-time.After(1 * time.Second)
+
+	err = cs.KillContainer(containerId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "exit",
+			Id:     containerId,
+			Status: 128 + uint32(syscall.SIGKILL),
+			Pid:    "init",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container took more than 2 seconds to terminate")
+		}
+	}
+}
+
+func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	containerId := "top"
+	c, err := cs.StartContainer("top", bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-time.After(1 * time.Second)
+
+	err = cs.SignalContainer(containerId, uint32(syscall.SIGTERM))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "exit",
+			Id:     containerId,
+			Status: 128 + uint32(syscall.SIGTERM),
+			Pid:    "init",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container took more than 2 seconds to terminate")
+		}
 	}
 }
