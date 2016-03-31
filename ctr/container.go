@@ -124,6 +124,10 @@ var startCommand = cli.Command{
 			Value: &cli.StringSlice{},
 			Usage: "set labels for the container",
 		},
+		cli.BoolFlag{
+			Name:  "no-pivot",
+			Usage: "do not use pivot root",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -149,13 +153,14 @@ var startCommand = cli.Command{
 			tty                  bool
 			c                    = getClient(context)
 			r                    = &types.CreateContainerRequest{
-				Id:         id,
-				BundlePath: bpath,
-				Checkpoint: context.String("checkpoint"),
-				Stdin:      s.stdin,
-				Stdout:     s.stdout,
-				Stderr:     s.stderr,
-				Labels:     context.StringSlice("label"),
+				Id:          id,
+				BundlePath:  bpath,
+				Checkpoint:  context.String("checkpoint"),
+				Stdin:       s.stdin,
+				Stdout:      s.stdout,
+				Stderr:      s.stderr,
+				Labels:      context.StringSlice("label"),
+				NoPivotRoot: context.Bool("no-pivot"),
 			}
 		)
 		restoreAndCloseStdin = func() {

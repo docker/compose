@@ -39,5 +39,6 @@ func populateProcessStateForEncoding(config *processConfig, uid int, gid int) Pr
 		Stdout:      config.stdio.Stdout,
 		Stderr:      config.stdio.Stderr,
 		RuntimeArgs: config.c.runtimeArgs,
+		NoPivotRoot: config.c.noPivotRoot,
 	}
 }

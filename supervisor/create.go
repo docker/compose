@@ -16,11 +16,20 @@ type StartTask struct {
 	Stdin         string
 	StartResponse chan StartResponse
 	Labels        []string
+	NoPivotRoot   bool
 }
 
 func (s *Supervisor) start(t *StartTask) error {
 	start := time.Now()
-	container, err := runtime.New(s.stateDir, t.ID, t.BundlePath, s.runtime, s.runtimeArgs, t.Labels)
+	container, err := runtime.New(runtime.ContainerOpts{
+		Root:        s.stateDir,
+		ID:          t.ID,
+		Bundle:      t.BundlePath,
+		Runtime:     s.runtime,
+		RuntimeArgs: s.runtimeArgs,
+		Labels:      t.Labels,
+		NoPivotRoot: t.NoPivotRoot,
+	})
 	if err != nil {
 		return err
 	}
