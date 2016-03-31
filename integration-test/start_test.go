@@ -250,3 +250,64 @@ func (cs *ContainerdSuite) TestStartBusyboxTrapUSR1(t *check.C) {
 
 	t.Assert(c.io.stdoutBuffer.String(), checker.Equals, "booh!")
 }
+
+func (cs *ContainerdSuite) TestStartBusyboxTopPauseResume(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	containerId := "top"
+	c, err := cs.StartContainer(containerId, bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cs.PauseContainer(containerId); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cs.ResumeContainer(containerId); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "pause",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "resume",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container took more than 2 seconds to terminate")
+		}
+	}
+
+	// check that status is running
+	containers, err := cs.ListRunningContainers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Assert(len(containers), checker.Equals, 1)
+	t.Assert(containers[0].Id, checker.Equals, "top")
+	t.Assert(containers[0].Status, checker.Equals, "running")
+}
