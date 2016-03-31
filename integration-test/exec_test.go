@@ -117,3 +117,59 @@ func (cs *ContainerdSuite) TestBusyboxTopExecTop(t *check.C) {
 	t.Assert(containers[0].Status, checker.Equals, "running")
 	t.Assert(containers[0].BundlePath, check.Equals, filepath.Join(cs.cwd, GetBundle(bundleName).Path))
 }
+
+func (cs *ContainerdSuite) TestBusyboxTopExecTopKillInit(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		err   error
+		initp *containerProcess
+	)
+
+	containerId := "top"
+	initp, err = cs.StartContainer(containerId, bundleName)
+	t.Assert(err, checker.Equals, nil)
+
+	execId := "top1"
+	_, err = cs.AddProcessToContainer(initp, execId, "/", []string{"PATH=/usr/bin"}, []string{"top"}, 0, 0)
+	t.Assert(err, checker.Equals, nil)
+
+	for idx, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerId,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "start-process",
+			Id:     containerId,
+			Status: 0,
+			Pid:    execId,
+		},
+		{
+			Type:   "exit",
+			Id:     containerId,
+			Status: 137,
+			Pid:    execId,
+		},
+		{
+			Type:   "exit",
+			Id:     containerId,
+			Status: 143,
+			Pid:    "init",
+		},
+	} {
+		ch := initp.GetEventsChannel()
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+		if idx == 1 {
+			// Process Started, kill it
+			cs.SignalContainerProcess(containerId, "init", uint32(syscall.SIGTERM))
+		}
+	}
+}
