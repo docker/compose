@@ -51,12 +51,18 @@ type ContainerdSuite struct {
 
 // getClient returns a connection to the Suite containerd
 func (cs *ContainerdSuite) getClient(socket string) error {
+	// Parse proto://address form addresses.
+	bindParts := strings.SplitN(socket, "://", 2)
+	if len(bindParts) != 2 {
+		return fmt.Errorf("bad bind address format %s, expected proto://address", socket)
+	}
+
 	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+			return net.DialTimeout(bindParts[0], bindParts[1], timeout)
 		},
 		))
 	conn, err := grpc.Dial(socket, dialOpts...)
@@ -202,7 +208,7 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 		c.Fatalf("Unable to created output directory '%s': %v", cs.stateDir, err)
 	}
 
-	cs.grpcSocket = filepath.Join(cs.outputDir, "containerd-master", "containerd.sock")
+	cs.grpcSocket = "unix://" + filepath.Join(cs.outputDir, "containerd-master", "containerd.sock")
 	cdLogFile := filepath.Join(cs.outputDir, "containerd-master", "containerd.log")
 
 	f, err := os.OpenFile(cdLogFile, os.O_CREATE|os.O_TRUNC|os.O_RDWR|os.O_SYNC, 0777)
