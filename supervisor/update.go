@@ -23,7 +23,7 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 		switch t.State {
 		case runtime.Running:
 			if err := container.Resume(); err != nil {
-				return ErrUnknownContainerStatus
+				return err
 			}
 			s.notifySubscribers(Event{
 				ID:        t.ID,
@@ -32,7 +32,7 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 			})
 		case runtime.Paused:
 			if err := container.Pause(); err != nil {
-				return ErrUnknownContainerStatus
+				return err
 			}
 			s.notifySubscribers(Event{
 				ID:        t.ID,
