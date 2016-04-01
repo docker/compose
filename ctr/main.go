@@ -41,8 +41,8 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "address",
-			Value: "/run/containerd/containerd.sock",
-			Usage: "address of GRPC API",
+			Value: "unix:///run/containerd/containerd.sock",
+			Usage: "proto://address of GRPC API",
 		},
 		cli.DurationFlag{
 			Name:  "conn-timeout",
