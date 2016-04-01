@@ -36,8 +36,10 @@ with Docker containers. This quick-start guide demonstrates how to use Compose t
 
     In this case, your Dockerfile should include these two lines:
 
-        FROM orchardup/php5
+        FROM php:5.6-fpm
+        RUN docker-php-ext-install mysql
         ADD . /code
+        CMD php -S 0.0.0.0:8000 -t /code/wordpress/
 
     This tells the Docker Engine daemon how to build an image defining a container that contains PHP and WordPress.
 
@@ -47,7 +49,6 @@ with Docker containers. This quick-start guide demonstrates how to use Compose t
         services:
           web:
             build: .
-            command: php -S 0.0.0.0:8000 -t /code/wordpress/
             ports:
               - "8000:8000"
             depends_on:
@@ -55,9 +56,12 @@ with Docker containers. This quick-start guide demonstrates how to use Compose t
             volumes:
               - .:/code
           db:
-            image: orchardup/mysql
+            image: mysql
             environment:
+              MYSQL_ROOT_PASSWORD: wordpress
               MYSQL_DATABASE: wordpress
+              MYSQL_USER: wordpress
+              MYSQL_PASSWORD: wordpress
 
 5. Download WordPress into the current directory:
 
@@ -71,8 +75,8 @@ with Docker containers. This quick-start guide demonstrates how to use Compose t
 
         <?php
         define('DB_NAME', 'wordpress');
-        define('DB_USER', 'root');
-        define('DB_PASSWORD', '');
+        define('DB_USER', 'wordpress');
+        define('DB_PASSWORD', 'wordpress');
         define('DB_HOST', "db:3306");
         define('DB_CHARSET', 'utf8');
         define('DB_COLLATE', '');
