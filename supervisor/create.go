@@ -49,5 +49,5 @@ func (s *Supervisor) start(t *StartTask) error {
 
 	s.startTasks <- task
 	ContainerCreateTimer.UpdateSince(start)
-	return errDeferedResponse
+	return errDeferredResponse
 }
