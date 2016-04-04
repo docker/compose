@@ -50,7 +50,7 @@ daemon-static:
 	cd containerd && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd
 
 shim: bin
-	cd containerd-shim && go build -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
+	cd containerd-shim && go build -tags "$(BUILDTAGS)" -ldflags "-w" -o ../bin/containerd-shim
 
 shim-static:
 	cd containerd-shim && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim

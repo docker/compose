@@ -2,11 +2,7 @@
 
 package osutils
 
-import (
-	"syscall"
-
-	"github.com/opencontainers/runc/libcontainer/utils"
-)
+import "syscall"
 
 // Exit is the wait4 information from an exited process
 type Exit struct {
@@ -34,7 +30,18 @@ func Reap() (exits []Exit, err error) {
 		}
 		exits = append(exits, Exit{
 			Pid:    pid,
-			Status: utils.ExitStatus(ws),
+			Status: exitStatus(ws),
 		})
 	}
+}
+
+const exitSignalOffset = 128
+
+// exitStatus returns the correct exit status for a process based on if it
+// was signaled or exited cleanly
+func exitStatus(status syscall.WaitStatus) int {
+	if status.Signaled() {
+		return exitSignalOffset + int(status.Signal())
+	}
+	return status.ExitStatus()
 }

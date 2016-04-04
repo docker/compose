@@ -8,10 +8,13 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/osutils"
 	"github.com/docker/docker/pkg/term"
 )
+
+func writeMessage(f *os.File, level string, err error) {
+	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}`, level, err)
+}
 
 // containerd-shim is a small shim that sits in front of a runtime implementation
 // that allows it to be repartented to init and handle reattach from the caller.
@@ -28,9 +31,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logrus.SetOutput(f)
-	logrus.SetFormatter(&logrus.JSONFormatter{})
-	if err := start(); err != nil {
+	if err := start(f); err != nil {
 		// this means that the runtime failed starting the container and will have the
 		// proper error messages in the runtime log so we should to treat this as a
 		// shim failure because the sim executed properly
@@ -41,13 +42,13 @@ func main() {
 		// log the error instead of writing to stderr because the shim will have
 		// /dev/null as it's stdio because it is supposed to be reparented to system
 		// init and will not have anyone to read from it
-		logrus.Error(err)
+		writeMessage(f, "error", err)
 		f.Close()
 		os.Exit(1)
 	}
 }
 
-func start() error {
+func start(log *os.File) error {
 	// start handling signals as soon as possible so that things are properly reaped
 	// or if runtime exits before we hit the handler
 	signals := make(chan os.Signal, 2048)
@@ -73,7 +74,7 @@ func start() error {
 	}
 	defer func() {
 		if err := p.Close(); err != nil {
-			logrus.Warn(err)
+			writeMessage(log, "warn", err)
 		}
 	}()
 	if err := p.start(); err != nil {
@@ -84,7 +85,7 @@ func start() error {
 		for {
 			var msg, w, h int
 			if _, err := fmt.Fscanf(control, "%d %d %d\n", &msg, &w, &h); err != nil {
-				logrus.Warn(err)
+				continue
 			}
 			switch msg {
 			case 0:
@@ -108,21 +109,12 @@ func start() error {
 	for s := range signals {
 		switch s {
 		case syscall.SIGCHLD:
-			exits, err := osutils.Reap()
-			if err != nil {
-				logrus.Warn(err)
-			}
+			exits, _ := osutils.Reap()
 			for _, e := range exits {
 				// check to see if runtime is one of the processes that has exited
 				if e.Pid == p.pid() {
 					exitShim = true
-					logrus.WithFields(logrus.Fields{
-						"pid":    e.Pid,
-						"status": e.Status,
-					}).Info("shim: runtime exited")
-					if err := writeInt("exitStatus", e.Status); err != nil {
-						logrus.WithFields(logrus.Fields{"status": e.Status}).Warn(err)
-					}
+					writeInt("exitStatus", e.Status)
 				}
 			}
 		}
