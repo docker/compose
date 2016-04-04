@@ -20,5 +20,5 @@ var (
 	//
 	// TODO: we could probably do a typed error with another error channel for this to make it
 	// less like magic
-	errDeferedResponse = errors.New("containerd: defered response")
+	errDeferredResponse = errors.New("containerd: deferred response")
 )

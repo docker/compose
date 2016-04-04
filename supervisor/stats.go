@@ -29,5 +29,5 @@ func (s *Supervisor) stats(t *StatsTask) error {
 		t.Stat <- s
 		ContainerStatsTimer.UpdateSince(start)
 	}()
-	return errDeferedResponse
+	return errDeferredResponse
 }

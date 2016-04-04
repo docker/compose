@@ -32,7 +32,7 @@ func (s *Supervisor) handleTask(i Task) {
 	default:
 		err = ErrUnknownTask
 	}
-	if err != errDeferedResponse {
+	if err != errDeferredResponse {
 		i.ErrorCh() <- err
 		close(i.ErrorCh())
 	}
