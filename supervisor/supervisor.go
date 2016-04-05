@@ -18,7 +18,7 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, runtimeName string, runtimeArgs []string) (*Supervisor, error) {
+func New(stateDir string, runtimeName string, runtimeArgs []string, timeout time.Duration) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
@@ -41,6 +41,7 @@ func New(stateDir string, runtimeName string, runtimeArgs []string) (*Supervisor
 		monitor:     monitor,
 		runtime:     runtimeName,
 		runtimeArgs: runtimeArgs,
+		timeout:     timeout,
 	}
 	if err := setupEventLog(s); err != nil {
 		return nil, err
@@ -118,6 +119,7 @@ type Supervisor struct {
 	tasks          chan Task
 	monitor        *Monitor
 	eventLog       []Event
+	timeout        time.Duration
 }
 
 // Stop closes all startTasks and sends a SIGTERM to each container's pid1 then waits for they to

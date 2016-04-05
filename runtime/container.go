@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
@@ -90,6 +91,7 @@ type ContainerOpts struct {
 	RuntimeArgs []string
 	Labels      []string
 	NoPivotRoot bool
+	Timeout     time.Duration
 }
 
 // New returns a new container
@@ -103,6 +105,7 @@ func New(opts ContainerOpts) (Container, error) {
 		runtime:     opts.Runtime,
 		runtimeArgs: opts.RuntimeArgs,
 		noPivotRoot: opts.NoPivotRoot,
+		timeout:     opts.Timeout,
 	}
 	if err := os.Mkdir(filepath.Join(c.root, c.id), 0755); err != nil {
 		return nil, err
@@ -191,6 +194,7 @@ type container struct {
 	labels      []string
 	oomFds      []int
 	noPivotRoot bool
+	timeout     time.Duration
 }
 
 func (c *container) ID() string {
@@ -223,8 +227,9 @@ func (c *container) Delete() error {
 
 	args := c.runtimeArgs
 	args = append(args, "delete", c.id)
-	exec.Command(c.runtime, args...).Run()
-
+	if derr := exec.Command(c.runtime, args...).Run(); err == nil {
+		err = derr
+	}
 	return err
 }
 

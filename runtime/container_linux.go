@@ -224,7 +224,7 @@ func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
 		}
 		return err
 	}
-	if err := waitForStart(p, cmd); err != nil {
+	if err := c.waitForStart(p, cmd); err != nil {
 		return err
 	}
 	c.processes[pid] = p
@@ -335,49 +335,76 @@ func (c *container) writeEventFD(root string, cfd, efd int) error {
 	return err
 }
 
-func waitForStart(p *process, cmd *exec.Cmd) error {
-	for i := 0; i < 300; i++ {
-		if _, err := p.getPidFromFile(); err != nil {
-			if os.IsNotExist(err) || err == errInvalidPidInt {
-				alive, err := isAlive(cmd)
-				if err != nil {
-					return err
-				}
-				if !alive {
-					// runc could have failed to run the container so lets get the error
-					// out of the logs or the shim could have encountered an error
-					messages, err := readLogMessages(filepath.Join(p.root, "shim-log.json"))
+type waitArgs struct {
+	pid int
+	err error
+}
+
+func (c *container) waitForStart(p *process, cmd *exec.Cmd) error {
+	wc := make(chan error, 1)
+	go func() {
+		for {
+			if _, err := p.getPidFromFile(); err != nil {
+				if os.IsNotExist(err) || err == errInvalidPidInt {
+					alive, err := isAlive(cmd)
 					if err != nil {
-						return err
+						wc <- err
+						return
 					}
-					for _, m := range messages {
-						if m.Level == "error" {
-							return fmt.Errorf("shim error: %v", m.Msg)
+					if !alive {
+						// runc could have failed to run the container so lets get the error
+						// out of the logs or the shim could have encountered an error
+						messages, err := readLogMessages(filepath.Join(p.root, "shim-log.json"))
+						if err != nil {
+							wc <- err
+							return
 						}
-					}
-					// no errors reported back from shim, check for runc/runtime errors
-					messages, err = readLogMessages(filepath.Join(p.root, "log.json"))
-					if err != nil {
-						if os.IsNotExist(err) {
-							return ErrContainerNotStarted
+						for _, m := range messages {
+							if m.Level == "error" {
+								wc <- fmt.Errorf("shim error: %v", m.Msg)
+								return
+							}
 						}
-						return err
-					}
-					for _, m := range messages {
-						if m.Level == "error" {
-							return fmt.Errorf("oci runtime error: %v", m.Msg)
+						// no errors reported back from shim, check for runc/runtime errors
+						messages, err = readLogMessages(filepath.Join(p.root, "log.json"))
+						if err != nil {
+							if os.IsNotExist(err) {
+								err = ErrContainerNotStarted
+							}
+							wc <- err
+							return
 						}
+						for _, m := range messages {
+							if m.Level == "error" {
+								wc <- fmt.Errorf("oci runtime error: %v", m.Msg)
+								return
+							}
+						}
+						wc <- ErrContainerNotStarted
+						return
 					}
-					return ErrContainerNotStarted
+					time.Sleep(15 * time.Millisecond)
+					continue
 				}
-				time.Sleep(50 * time.Millisecond)
-				continue
+				wc <- err
+				return
 			}
+			// the pid file was read successfully
+			wc <- nil
+			return
+		}
+	}()
+	select {
+	case err := <-wc:
+		if err != nil {
 			return err
 		}
 		return nil
+	case <-time.After(c.timeout):
+		cmd.Process.Kill()
+		cmd.Wait()
+		return ErrContainerStartTimeout
 	}
-	return errNoPidFile
 }
 
 // isAlive checks if the shim that launched the container is still alive
