@@ -383,7 +383,7 @@ func (c *container) waitForStart(p *process, cmd *exec.Cmd) error {
 						wc <- ErrContainerNotStarted
 						return
 					}
-					time.Sleep(50 * time.Millisecond)
+					time.Sleep(15 * time.Millisecond)
 					continue
 				}
 				wc <- err
