@@ -769,17 +769,17 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container(number=next_number, quiet=True)
         container.start()
 
-        self.assertTrue(container.is_running)
-        self.assertEqual(len(service.containers()), 1)
+        container.inspect()
+        assert container.is_running
+        assert len(service.containers()) == 1
 
         service.scale(1)
-
-        self.assertEqual(len(service.containers()), 1)
+        assert len(service.containers()) == 1
         container.inspect()
-        self.assertTrue(container.is_running)
+        assert container.is_running
 
         captured_output = mock_log.info.call_args[0]
-        self.assertIn('Desired container number already achieved', captured_output)
+        assert 'Desired container number already achieved' in captured_output
 
     @mock.patch('compose.service.log')
     def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
