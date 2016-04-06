@@ -4,6 +4,21 @@ Containerd is a daemon to control runC, built for performance and density.
 Containerd leverages runC's advanced features such as seccomp and user namespace support as well
 as checkpoint and restore for cloning and live migration of containers.
 
+## Getting started
+
+The easiest way to start using containerd is to download binaries from the [releases page](https://github.com/docker/containerd/releases).
+
+The included `ctr` command-line tool allows you interact with the containerd daemon:
+
+```
+$ sudo ctr containers start redis /containers/redis
+$ sudo ctr containers list
+ID                  PATH                STATUS              PROCESSES
+1                   /containers/redis   running             14063
+```
+
+`/containers/redis` is the path to an OCI bundle. [See the docs for more information.](docs/bundle.md)
+
 ## Docs
 
 For more documentation on various subjects refer to the `/docs` directory in this repository.
@@ -16,11 +31,6 @@ Currently, contributing to containerd is not for the first time devs as many dep
 work is being completed at a high rate.  
 
 After that just run `make` and the binaries for the daemon and client will be localed in the `bin/` directory.
-
-## Downloads
-
-The easy way to test and use containerd is to view the [releases page](https://github.com/docker/containerd/releases) for binary downloads.
-We encourage everyone to use containerd this way until it is out of alpha status.
 
 ## Performance
 
@@ -106,9 +116,7 @@ GLOBAL OPTIONS:
 
 The current roadmap and milestones for alpha and beta completion are in the github issues on this repository.  Please refer to these issues for what is being worked on and completed for the various stages of development.
 
-# API
-
-## GRPC API
+## API
 
 The API for containerd is with GRPC over a unix socket located at the default location of `/run/containerd/containerd.sock`.  
 
