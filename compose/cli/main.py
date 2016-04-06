@@ -20,7 +20,6 @@ from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
-from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
@@ -43,8 +42,12 @@ from .utils import get_version_info
 from .utils import yesno
 
 
-if not IS_WINDOWS_PLATFORM:
+try:
+    import dockerpty
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
+except ImportError:
+    dockerpty = None
+
 
 log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
@@ -570,7 +573,7 @@ class TopLevelCommand(object):
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
 
-        if IS_WINDOWS_PLATFORM and not detach:
+        if not dockerpty and not detach:
             raise UserError(
                 "Interactive mode is not yet supported on Windows.\n"
                 "Please pass the -d flag when using `docker-compose run`."
