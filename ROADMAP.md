@@ -30,4 +30,3 @@ The current state of integration is documented in [SWARM.md](SWARM.md).
 Compose works well for applications that are in a single repository and depend on services that are hosted on Docker Hub. If your application depends on another application within your organisation, Compose doesn't work as well.
 
 There are several ideas about how this could work, such as [including external files](https://github.com/docker/fig/issues/318).
-
