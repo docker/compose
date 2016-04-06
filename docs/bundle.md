@@ -1,4 +1,4 @@
-# OCI Bundle
+# Creating OCI bundles
 
 Since containerd consumes the OCI bundle format containers and configuration will have to be created
 on the machine that containerd is running on.  The easiest way to do this is to download an image 
