@@ -48,12 +48,17 @@ var daemonFlags = []cli.Flag{
 	cli.StringFlag{
 		Name:  "runtime,r",
 		Value: "runc",
-		Usage: "name of the OCI compliant runtime to use when executing containers",
+		Usage: "name or path of the OCI compliant runtime to use when executing containers",
 	},
 	cli.StringSliceFlag{
 		Name:  "runtime-args",
 		Value: &cli.StringSlice{},
 		Usage: "specify additional runtime args",
+	},
+	cli.StringFlag{
+		Name:  "shim",
+		Value: "containerd-shim",
+		Usage: "Name or path of shim",
 	},
 	cli.StringFlag{
 		Name:  "pprof-address",
@@ -86,6 +91,7 @@ func main() {
 			10,
 			context.String("runtime"),
 			context.StringSlice("runtime-args"),
+			context.String("shim"),
 			context.Duration("start-timeout"),
 		); err != nil {
 			logrus.Fatal(err)
@@ -96,7 +102,7 @@ func main() {
 	}
 }
 
-func daemon(address, stateDir string, concurrency int, runtimeName string, runtimeArgs []string, timeout time.Duration) error {
+func daemon(address, stateDir string, concurrency int, runtimeName string, runtimeArgs []string, shimName string, timeout time.Duration) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	s := make(chan os.Signal, 2048)
@@ -104,7 +110,7 @@ func daemon(address, stateDir string, concurrency int, runtimeName string, runti
 	if err := osutils.SetSubreaper(1); err != nil {
 		logrus.WithField("error", err).Error("containerd: set subpreaper")
 	}
-	sv, err := supervisor.New(stateDir, runtimeName, runtimeArgs, timeout)
+	sv, err := supervisor.New(stateDir, runtimeName, shimName, runtimeArgs, timeout)
 	if err != nil {
 		return err
 	}

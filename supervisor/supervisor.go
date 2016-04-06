@@ -18,7 +18,7 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, runtimeName string, runtimeArgs []string, timeout time.Duration) (*Supervisor, error) {
+func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, timeout time.Duration) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
@@ -41,6 +41,7 @@ func New(stateDir string, runtimeName string, runtimeArgs []string, timeout time
 		monitor:     monitor,
 		runtime:     runtimeName,
 		runtimeArgs: runtimeArgs,
+		shim:        shimName,
 		timeout:     timeout,
 	}
 	if err := setupEventLog(s); err != nil {
@@ -109,6 +110,7 @@ type Supervisor struct {
 	// name of the OCI compatible runtime used to execute containers
 	runtime     string
 	runtimeArgs []string
+	shim        string
 	containers  map[string]*containerInfo
 	startTasks  chan *startTask
 	// we need a lock around the subscribers map only because additions and deletions from
