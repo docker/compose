@@ -18,31 +18,28 @@
 
 
 __docker_compose_q() {
-	local file_args
-	if [ ${#compose_files[@]} -ne 0 ] ; then
-		file_args="${compose_files[@]/#/-f }"
-	fi
-	docker-compose 2>/dev/null $file_args ${compose_project:+-p $compose_project} "$@"
+	docker-compose 2>/dev/null $daemon_options "$@"
+}
+
+# Transforms a multiline list of strings into a single line string
+# with the words separated by "|".
+__docker_compose_to_alternatives() {
+	local parts=( $1 )
+	local IFS='|'
+	echo "${parts[*]}"
+}
+
+# Transforms a multiline list of options into an extglob pattern
+# suitable for use in case statements.
+__docker_compose_to_extglob() {
+	local extglob=$( __docker_compose_to_alternatives "$1" )
+	echo "@($extglob)"
 }
 
 # suppress trailing whitespace
 __docker_compose_nospace() {
 	# compopt is not available in ancient bash versions
 	type compopt &>/dev/null && compopt -o nospace
-}
-
-# For compatibility reasons, Compose and therefore its completion supports several
-# stack compositon files as listed here, in descending priority.
-# Support for these filenames might be dropped in some future version.
-__docker_compose_compose_file() {
-	local file
-	for file in docker-compose.y{,a}ml ; do
-		[ -e $file ] && {
-			echo $file
-			return
-		}
-	done
-	echo docker-compose.yml
 }
 
 # Extracts all service names from the compose file.
@@ -131,18 +128,22 @@ _docker_compose_create() {
 
 _docker_compose_docker_compose() {
 	case "$prev" in
+		--tlscacert|--tlscert|--tlskey)
+			_filedir
+			return
+			;;
 		--file|-f)
 			_filedir "y?(a)ml"
 			return
 			;;
-		--project-name|-p)
+		$(__docker_compose_to_extglob "$daemon_options_with_args") )
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--file -f --help -h --project-name -p --verbose --version -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "$daemon_boolean_options  $daemon_options_with_args --help -h --verbose --version -v" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -185,6 +186,24 @@ _docker_compose_events() {
 }
 
 
+_docker_compose_exec() {
+	case "$prev" in
+		--index|--user)
+			return
+			;;
+	esac
+
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "-d --help --index --privileged -T --user" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_running
+			;;
+	esac
+}
+
+
 _docker_compose_help() {
 	COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
 }
@@ -210,9 +229,15 @@ _docker_compose_kill() {
 
 
 _docker_compose_logs() {
+	case "$prev" in
+		--tail)
+			return
+			;;
+	esac
+
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --no-color" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--follow -f --help --no-color --tail --timestamps -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
@@ -300,7 +325,7 @@ _docker_compose_restart() {
 _docker_compose_rm() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--force -f --help -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--all -a --force -f --help -v" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_stopped
@@ -406,7 +431,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--abort-on-container-exit -d --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t --remove-orphans" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit --build -d --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t --remove-orphans" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
@@ -434,6 +459,7 @@ _docker_compose() {
 		create
 		down
 		events
+		exec
 		help
 		kill
 		logs
@@ -452,6 +478,22 @@ _docker_compose() {
 		version
 	)
 
+	# options for the docker daemon that have to be passed to secondary calls to
+	# docker-compose executed by this script
+	local daemon_boolean_options="
+		--skip-hostname-check
+		--tls
+		--tlsverify
+	"
+	local daemon_options_with_args="
+		--file -f
+		--host -H
+		--project-name -p
+		--tlscacert
+		--tlscert
+		--tlskey
+	"
+
 	COMPREPLY=()
 	local cur prev words cword
 	_get_comp_words_by_ref -n : cur prev words cword
@@ -459,17 +501,19 @@ _docker_compose() {
 	# search subcommand and invoke its handler.
 	# special treatment of some top-level options
 	local command='docker_compose'
+	local daemon_options=()
 	local counter=1
-	local compose_files=() compose_project
+
 	while [ $counter -lt $cword ]; do
 		case "${words[$counter]}" in
-			--file|-f)
-				(( counter++ ))
-				compose_files+=(${words[$counter]})
+			$(__docker_compose_to_extglob "$daemon_boolean_options") )
+				local opt=${words[counter]}
+				daemon_options+=($opt)
 				;;
-			--project-name|-p)
-				(( counter++ ))
-				compose_project="${words[$counter]}"
+			$(__docker_compose_to_extglob "$daemon_options_with_args") )
+				local opt=${words[counter]}
+				local arg=${words[++counter]}
+				daemon_options+=($opt $arg)
 				;;
 			-*)
 				;;

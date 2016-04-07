@@ -17,12 +17,12 @@ class DockerClientTestCase(unittest.TestCase):
     def test_docker_client_no_home(self):
         with mock.patch.dict(os.environ):
             del os.environ['HOME']
-            docker_client()
+            docker_client(os.environ)
 
     def test_docker_client_with_custom_timeout(self):
         timeout = 300
         with mock.patch('compose.cli.docker_client.HTTP_TIMEOUT', 300):
-            client = docker_client()
+            client = docker_client(os.environ)
             self.assertEqual(client.timeout, int(timeout))
 
 
@@ -103,3 +103,9 @@ class TLSConfigTestCase(unittest.TestCase):
         options = {'--tlskey': self.key}
         with pytest.raises(docker.errors.TLSParameterError):
             tls_config_from_options(options)
+
+    def test_assert_hostname_explicit_skip(self):
+        options = {'--tlscacert': self.ca_cert, '--skip-hostname-check': True}
+        result = tls_config_from_options(options)
+        assert isinstance(result, docker.tls.TLSConfig)
+        assert result.assert_hostname is False

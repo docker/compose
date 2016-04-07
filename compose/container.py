@@ -39,7 +39,7 @@ class Container(object):
 
     @classmethod
     def from_id(cls, client, id):
-        return cls(client, client.inspect_container(id))
+        return cls(client, client.inspect_container(id), has_been_inspected=True)
 
     @classmethod
     def create(cls, client, **options):

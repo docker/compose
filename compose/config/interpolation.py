@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
-import os
 from string import Template
 
 import six
@@ -11,12 +10,11 @@ from .errors import ConfigurationError
 log = logging.getLogger(__name__)
 
 
-def interpolate_environment_variables(config, section):
-    mapping = BlankDefaultDict(os.environ)
+def interpolate_environment_variables(config, section, environment):
 
     def process_item(name, config_dict):
         return dict(
-            (key, interpolate_value(name, key, val, section, mapping))
+            (key, interpolate_value(name, key, val, section, environment))
             for key, val in (config_dict or {}).items()
         )
 
@@ -58,25 +56,6 @@ def interpolate(string, mapping):
         return Template(string).substitute(mapping)
     except ValueError:
         raise InvalidInterpolation(string)
-
-
-class BlankDefaultDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(BlankDefaultDict, self).__init__(*args, **kwargs)
-        self.missing_keys = []
-
-    def __getitem__(self, key):
-        try:
-            return super(BlankDefaultDict, self).__getitem__(key)
-        except KeyError:
-            if key not in self.missing_keys:
-                log.warn(
-                    "The {} variable is not set. Defaulting to a blank string."
-                    .format(key)
-                )
-                self.missing_keys.append(key)
-
-            return ""
 
 
 class InvalidInterpolation(Exception):

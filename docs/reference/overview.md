@@ -25,10 +25,20 @@ Usage:
   docker-compose -h|--help
 
 Options:
-  -f, --file FILE           Specify an alternate compose file (default: docker-compose.yml)
-  -p, --project-name NAME   Specify an alternate project name (default: directory name)
-  --verbose                 Show more output
-  -v, --version             Print version and exit
+  -f, --file FILE             Specify an alternate compose file (default: docker-compose.yml)
+  -p, --project-name NAME     Specify an alternate project name (default: directory name)
+  --verbose                   Show more output
+  -v, --version               Print version and exit
+  -H, --host HOST             Daemon socket to connect to
+
+  --tls                       Use TLS; implied by --tlsverify
+  --tlscacert CA_PATH         Trust certs signed only by this CA
+  --tlscert CLIENT_CERT_PATH  Path to TLS certificate file
+  --tlskey TLS_KEY_PATH       Path to TLS key file
+  --tlsverify                 Use TLS and verify the remote
+  --skip-hostname-check       Don't check the daemon's hostname against the name specified
+                              in the client certificate (for example if your docker host
+                              is an IP address)
 
 Commands:
   build              Build or rebuild services
