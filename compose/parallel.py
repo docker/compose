@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import operator
 import sys
+from threading import Lock
 from threading import Thread
 
 from docker.errors import APIError
@@ -75,6 +76,7 @@ def setup_queue(objects, func, get_deps, get_name):
     results = Queue()
     started = set()   # objects being processed
     finished = set()  # objects which have been processed
+    locks = Locks()
 
     def do_op(obj):
         try:
@@ -83,21 +85,28 @@ def setup_queue(objects, func, get_deps, get_name):
         except Exception as e:
             results.put((obj, None, e))
 
+        locks.finished.acquire()
         finished.add(obj)
+        locks.finished.release()
         feed()
 
     def ready(obj):
         # Is object ready for performing operation
-        return obj not in started and all(
+        locks.acquire()
+        result = obj not in started and all(
             dep not in objects or dep in finished
             for dep in get_deps(obj)
         )
+        locks.release()
+        return result
 
     def feed():
         for obj in objects:
             if not ready(obj):
                 continue
+            locks.started.acquire()
             started.add(obj)
+            locks.started.release()
             t = Thread(target=do_op, args=(obj,))
             t.daemon = True
             t.start()
@@ -171,3 +180,17 @@ def parallel_kill(containers, options):
 
 def parallel_restart(containers, options):
     parallel_operation(containers, 'restart', options, 'Restarting')
+
+
+class Locks(object):
+    def __init__(self):
+        self.started = Lock()
+        self.finished = Lock()
+
+    def acquire(self):
+        self.started.acquire()
+        self.finished.acquire()
+
+    def release(self):
+        self.started.release()
+        self.finished.release()
