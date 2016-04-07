@@ -20,10 +20,6 @@ ENV GOPATH /go:/go/src/github.com/docker/containerd/vendor
 
 WORKDIR /go/src/github.com/docker/containerd
 
-# install golint/vet
-RUN go get github.com/golang/lint/golint \
-	&& go get golang.org/x/tools/cmd/vet
-
 # install seccomp: the version shipped in trusty is too old
 ENV SECCOMP_VERSION 2.3.0
 RUN set -x \
