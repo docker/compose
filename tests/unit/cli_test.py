@@ -64,12 +64,6 @@ class CLITestCase(unittest.TestCase):
         self.assertTrue(project.client)
         self.assertTrue(project.services)
 
-    def test_command_help(self):
-        with pytest.raises(SystemExit) as exc:
-            TopLevelCommand.help({'COMMAND': 'up'})
-
-        assert 'Usage: up' in exc.exconly()
-
     def test_command_help_nonexistent(self):
         with pytest.raises(NoSuchCommand):
             TopLevelCommand.help({'COMMAND': 'nonexistent'})
