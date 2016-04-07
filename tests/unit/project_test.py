@@ -270,12 +270,21 @@ class ProjectTest(unittest.TestCase):
                 'time': 1420092061,
                 'timeNano': 14200920610000004000,
             },
+            {
+                'status': 'destroy',
+                'from': 'example/db',
+                'id': 'eeeee',
+                'time': 1420092061,
+                'timeNano': 14200920610000004000,
+            },
         ])
 
         def dt_with_microseconds(dt, us):
             return datetime.datetime.fromtimestamp(dt).replace(microsecond=us)
 
         def get_container(cid):
+            if cid == 'eeeee':
+                raise NotFound(None, None, "oops")
             if cid == 'abcde':
                 name = 'web'
                 labels = {LABEL_SERVICE: name}

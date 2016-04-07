@@ -3,6 +3,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import shutil
+import tempfile
 
 import docker
 import py
@@ -43,11 +45,11 @@ class CLITestCase(unittest.TestCase):
         project_name = get_project_name(None, project_name=name)
         self.assertEquals('explicitprojectname', project_name)
 
+    @mock.patch.dict(os.environ)
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
-        with mock.patch.dict(os.environ):
-            os.environ['COMPOSE_PROJECT_NAME'] = name
-            project_name = get_project_name(None)
+        os.environ['COMPOSE_PROJECT_NAME'] = name
+        project_name = get_project_name(None)
         self.assertEquals(project_name, name)
 
     def test_project_name_with_empty_environment_var(self):
@@ -56,6 +58,22 @@ class CLITestCase(unittest.TestCase):
             os.environ['COMPOSE_PROJECT_NAME'] = ''
             project_name = get_project_name(base_dir)
         self.assertEquals('simplecomposefile', project_name)
+
+    @mock.patch.dict(os.environ)
+    def test_project_name_with_environment_file(self):
+        base_dir = tempfile.mkdtemp()
+        try:
+            name = 'namefromenvfile'
+            with open(os.path.join(base_dir, '.env'), 'w') as f:
+                f.write('COMPOSE_PROJECT_NAME={}'.format(name))
+            project_name = get_project_name(base_dir)
+            assert project_name == name
+
+            # Environment has priority over .env file
+            os.environ['COMPOSE_PROJECT_NAME'] = 'namefromenv'
+            assert get_project_name(base_dir) == os.environ['COMPOSE_PROJECT_NAME']
+        finally:
+            shutil.rmtree(base_dir)
 
     def test_get_project(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'

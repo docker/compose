@@ -744,7 +744,7 @@ While it is possible to declare volumes on the fly as part of the service
 declaration, this section allows you to create named volumes that can be
 reused across multiple services (without relying on `volumes_from`), and are
 easily retrieved and inspected using the docker command line or API.
-See the [docker volume](/engine/reference/commandline/volume_create.md)
+See the [docker volume](https://docs.docker.com/engine/reference/commandline/volume_create/)
 subcommand documentation for more information.
 
 ### driver
@@ -1089,21 +1089,24 @@ It's more complicated if you're using particular configuration features:
 ## Variable substitution
 
 Your configuration options can contain environment variables. Compose uses the
-variable values from the shell environment in which `docker-compose` is run. For
-example, suppose the shell contains `POSTGRES_VERSION=9.3` and you supply this
-configuration:
+variable values from the shell environment in which `docker-compose` is run.
+For example, suppose the shell contains `EXTERNAL_PORT=8000` and you supply
+this configuration:
 
-    db:
-      image: "postgres:${POSTGRES_VERSION}"
+    web:
+      build: .
+      ports:
+        - "${EXTERNAL_PORT}:5000"
 
-When you run `docker-compose up` with this configuration, Compose looks for the
-`POSTGRES_VERSION` environment variable in the shell and substitutes its value
-in. For this example, Compose resolves the `image` to `postgres:9.3` before
-running the configuration.
+When you run `docker-compose up` with this configuration, Compose looks for
+the `EXTERNAL_PORT` environment variable in the shell and substitutes its
+value in. In this example, Compose resolves the port mapping to `"8000:5000"`
+before creating the `web` container.
 
 If an environment variable is not set, Compose substitutes with an empty
-string. In the example above, if `POSTGRES_VERSION` is not set, the value for
-the `image` option is `postgres:`.
+string. In the example above, if `EXTERNAL_PORT` is not set, the value for the
+port mapping is `:5000` (which is of course an invalid port mapping, and will
+result in an error when attempting to create the container).
 
 Both `$VARIABLE` and `${VARIABLE}` syntax are supported. Extended shell-style
 features, such as `${VARIABLE-default}` and `${VARIABLE/foo/bar}`, are not
