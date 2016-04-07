@@ -94,7 +94,9 @@ def setup_queue(objects, func, get_deps, get_name):
         )
 
     def feed():
-        for obj in filter(ready, objects):
+        for obj in objects:
+            if not ready(obj):
+                continue
             started.add(obj)
             t = Thread(target=do_op, args=(obj,))
             t.daemon = True
