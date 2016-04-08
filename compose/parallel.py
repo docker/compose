@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import logging
 import operator
 import sys
 from threading import Thread
@@ -12,6 +13,9 @@ from six.moves.queue import Queue
 
 from compose.cli.signals import ShutdownException
 from compose.utils import get_output_stream
+
+
+log = logging.getLogger(__name__)
 
 
 def parallel_execute(objects, func, get_name, msg, get_deps=None):
@@ -28,32 +32,24 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
     for obj in objects:
         writer.initialize(get_name(obj))
 
-    q = setup_queue(objects, func, get_deps, get_name)
+    events = parallel_execute_stream(objects, func, get_deps)
 
-    done = 0
     errors = {}
     results = []
     error_to_reraise = None
 
-    while done < len(objects):
-        try:
-            obj, result, exception = q.get(timeout=1)
-        except Empty:
-            continue
-        # See https://github.com/docker/compose/issues/189
-        except thread.error:
-            raise ShutdownException()
-
+    for obj, result, exception in events:
         if exception is None:
             writer.write(get_name(obj), 'done')
             results.append(result)
         elif isinstance(exception, APIError):
             errors[get_name(obj)] = exception.explanation
             writer.write(get_name(obj), 'error')
+        elif isinstance(exception, UpstreamError):
+            writer.write(get_name(obj), 'error')
         else:
             errors[get_name(obj)] = exception
             error_to_reraise = exception
-        done += 1
 
     for obj_name, error in errors.items():
         stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
@@ -68,40 +64,83 @@ def _no_deps(x):
     return []
 
 
-def setup_queue(objects, func, get_deps, get_name):
+class State(object):
+    def __init__(self, objects):
+        self.objects = objects
+
+        self.started = set()   # objects being processed
+        self.finished = set()  # objects which have been processed
+        self.failed = set()    # objects which either failed or whose dependencies failed
+
+    def is_done(self):
+        return len(self.finished) + len(self.failed) >= len(self.objects)
+
+    def pending(self):
+        return set(self.objects) - self.started - self.finished - self.failed
+
+
+def parallel_execute_stream(objects, func, get_deps):
     if get_deps is None:
         get_deps = _no_deps
 
     results = Queue()
-    started = set()   # objects being processed
-    finished = set()  # objects which have been processed
+    state = State(objects)
 
-    def do_op(obj):
+    while not state.is_done():
+        for event in feed_queue(objects, func, get_deps, results, state):
+            yield event
+
         try:
-            result = func(obj)
-            results.put((obj, result, None))
-        except Exception as e:
-            results.put((obj, None, e))
+            event = results.get(timeout=0.1)
+        except Empty:
+            continue
+        # See https://github.com/docker/compose/issues/189
+        except thread.error:
+            raise ShutdownException()
 
-        finished.add(obj)
-        feed()
+        obj, _, exception = event
+        if exception is None:
+            log.debug('Finished processing: {}'.format(obj))
+            state.finished.add(obj)
+        else:
+            log.debug('Failed: {}'.format(obj))
+            state.failed.add(obj)
 
-    def ready(obj):
-        # Is object ready for performing operation
-        return obj not in started and all(
-            dep not in objects or dep in finished
-            for dep in get_deps(obj)
-        )
+        yield event
 
-    def feed():
-        for obj in filter(ready, objects):
-            started.add(obj)
-            t = Thread(target=do_op, args=(obj,))
+
+def queue_producer(obj, func, results):
+    try:
+        result = func(obj)
+        results.put((obj, result, None))
+    except Exception as e:
+        results.put((obj, None, e))
+
+
+def feed_queue(objects, func, get_deps, results, state):
+    pending = state.pending()
+    log.debug('Pending: {}'.format(pending))
+
+    for obj in pending:
+        deps = get_deps(obj)
+
+        if any(dep in state.failed for dep in deps):
+            log.debug('{} has upstream errors - not processing'.format(obj))
+            yield (obj, None, UpstreamError())
+            state.failed.add(obj)
+        elif all(
+            dep not in objects or dep in state.finished
+            for dep in deps
+        ):
+            log.debug('Starting producer thread for {}'.format(obj))
+            t = Thread(target=queue_producer, args=(obj, func, results))
             t.daemon = True
             t.start()
+            state.started.add(obj)
 
-    feed()
-    return results
+
+class UpstreamError(Exception):
+    pass
 
 
 class ParallelStreamWriter(object):
