@@ -1037,12 +1037,10 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(set(service.duplicate_containers()), set([duplicate]))
 
 
-def converge(service,
-             strategy=ConvergenceStrategy.changed,
-             do_build=True):
+def converge(service, strategy=ConvergenceStrategy.changed):
     """Create a converge plan from a strategy and execute the plan."""
     plan = service.convergence_plan(strategy)
-    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
+    return service.execute_convergence_plan(plan, timeout=1)
 
 
 class ConfigHashTest(DockerClientTestCase):

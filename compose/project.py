@@ -309,12 +309,13 @@ class Project(object):
     ):
         services = self.get_services_without_duplicate(service_names, include_deps=True)
 
+        for svc in services:
+            svc.ensure_image_exists(do_build=do_build)
         plans = self._get_convergence_plans(services, strategy)
 
         for service in services:
             service.execute_convergence_plan(
                 plans[service.name],
-                do_build,
                 detached=True,
                 start=False)
 
@@ -366,21 +367,19 @@ class Project(object):
            remove_orphans=False):
 
         self.initialize()
+        self.find_orphan_containers(remove_orphans)
+
         services = self.get_services_without_duplicate(
             service_names,
             include_deps=start_deps)
 
-        plans = self._get_convergence_plans(services, strategy)
-
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
-
-        self.find_orphan_containers(remove_orphans)
+        plans = self._get_convergence_plans(services, strategy)
 
         def do(service):
             return service.execute_convergence_plan(
                 plans[service.name],
-                do_build=do_build,
                 timeout=timeout,
                 detached=detached
             )

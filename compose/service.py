@@ -254,7 +254,6 @@ class Service(object):
 
     def create_container(self,
                          one_off=False,
-                         do_build=BuildAction.none,
                          previous_container=None,
                          number=None,
                          quiet=False,
@@ -263,7 +262,9 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        self.ensure_image_exists(do_build=do_build)
+        # This is only necessary for `scale` and `volumes_from`
+        # auto-creating containers to satisfy the dependency.
+        self.ensure_image_exists()
 
         container_options = self._get_container_create_options(
             override_options,
@@ -363,7 +364,6 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 do_build=BuildAction.none,
                                  timeout=DEFAULT_TIMEOUT,
                                  detached=False,
                                  start=True):
@@ -371,7 +371,7 @@ class Service(object):
         should_attach_logs = not detached
 
         if action == 'create':
-            container = self.create_container(do_build=do_build)
+            container = self.create_container()
 
             if should_attach_logs:
                 container.attach_log_stream()
@@ -385,7 +385,6 @@ class Service(object):
             return [
                 self.recreate_container(
                     container,
-                    do_build=do_build,
                     timeout=timeout,
                     attach_logs=should_attach_logs,
                     start_new_container=start
@@ -412,7 +411,6 @@ class Service(object):
     def recreate_container(
             self,
             container,
-            do_build=BuildAction.none,
             timeout=DEFAULT_TIMEOUT,
             attach_logs=False,
             start_new_container=True):
@@ -427,7 +425,6 @@ class Service(object):
         container.stop(timeout=timeout)
         container.rename_to_tmp_name()
         new_container = self.create_container(
-            do_build=do_build,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
