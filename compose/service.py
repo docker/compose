@@ -135,6 +135,9 @@ class Service(object):
         self.networks = networks or {}
         self.options = options
 
+    def __repr__(self):
+        return '<Service: {}>'.format(self.name)
+
     def containers(self, stopped=False, one_off=False, filters={}):
         filters.update({'label': self.labels(one_off=one_off)})
 
