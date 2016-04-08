@@ -91,7 +91,7 @@ def parallel_execute_stream(objects, func, get_deps):
             yield event
 
         try:
-            event = results.get(timeout=1)
+            event = results.get(timeout=0.1)
         except Empty:
             continue
         # See https://github.com/docker/compose/issues/189
