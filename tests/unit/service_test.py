@@ -420,7 +420,7 @@ class ServiceTest(unittest.TestCase):
             parse_repository_tag("url:5000/repo@sha256:digest"),
             ("url:5000/repo", "sha256:digest", "@"))
 
-    def test_create_container_with_build(self):
+    def test_create_container(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = [
             NoSuchImageError,
@@ -431,7 +431,7 @@ class ServiceTest(unittest.TestCase):
         ]
 
         with mock.patch('compose.service.log', autospec=True) as mock_log:
-            service.create_container(do_build=BuildAction.none)
+            service.create_container()
             assert mock_log.warn.called
             _, args, _ = mock_log.warn.mock_calls[0]
             assert 'was built because it did not already exist' in args[0]
@@ -448,20 +448,20 @@ class ServiceTest(unittest.TestCase):
             buildargs=None,
         )
 
-    def test_create_container_no_build(self):
+    def test_ensure_image_exists_no_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
 
-        service.create_container(do_build=BuildAction.skip)
-        self.assertFalse(self.mock_client.build.called)
+        service.ensure_image_exists(do_build=BuildAction.skip)
+        assert not self.mock_client.build.called
 
-    def test_create_container_no_build_but_needs_build(self):
+    def test_ensure_image_exists_no_build_but_needs_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = NoSuchImageError
         with pytest.raises(NeedsBuildError):
-            service.create_container(do_build=BuildAction.skip)
+            service.ensure_image_exists(do_build=BuildAction.skip)
 
-    def test_create_container_force_build(self):
+    def test_ensure_image_exists_force_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
         self.mock_client.build.return_value = [
@@ -469,7 +469,7 @@ class ServiceTest(unittest.TestCase):
         ]
 
         with mock.patch('compose.service.log', autospec=True) as mock_log:
-            service.create_container(do_build=BuildAction.force)
+            service.ensure_image_exists(do_build=BuildAction.force)
 
         assert not mock_log.warn.called
         self.mock_client.build.assert_called_once_with(
