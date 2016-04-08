@@ -22,6 +22,10 @@ deps = {
 }
 
 
+def get_deps(obj):
+    return deps[obj]
+
+
 def test_parallel_execute():
     results = parallel_execute(
         objects=[1, 2, 3, 4, 5],
@@ -44,7 +48,7 @@ def test_parallel_execute_with_deps():
         func=process,
         get_name=lambda obj: obj,
         msg="Processing",
-        get_deps=lambda obj: deps[obj],
+        get_deps=get_deps,
     )
 
     assert sorted(log) == sorted(objects)
@@ -67,7 +71,7 @@ def test_parallel_execute_with_upstream_errors():
         func=process,
         get_name=lambda obj: obj,
         msg="Processing",
-        get_deps=lambda obj: deps[obj],
+        get_deps=get_deps,
     )
 
     assert log == [cache]
