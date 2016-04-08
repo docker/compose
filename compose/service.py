@@ -453,20 +453,21 @@ class Service(object):
         connected_networks = container.get('NetworkSettings.Networks')
 
         for network, netdefs in self.networks.items():
-            aliases = netdefs.get('aliases', [])
-            ipv4_address = netdefs.get('ipv4_address', None)
-            ipv6_address = netdefs.get('ipv6_address', None)
             if network in connected_networks:
-                self.client.disconnect_container_from_network(
-                    container.id, network)
+                if short_id_alias_exists(container, network):
+                    continue
 
+                self.client.disconnect_container_from_network(
+                    container.id,
+                    network)
+
+            aliases = netdefs.get('aliases', [])
             self.client.connect_container_to_network(
                 container.id, network,
                 aliases=list(self._get_aliases(container).union(aliases)),
-                ipv4_address=ipv4_address,
-                ipv6_address=ipv6_address,
-                links=self._get_links(False)
-            )
+                ipv4_address=netdefs.get('ipv4_address', None),
+                ipv6_address=netdefs.get('ipv6_address', None),
+                links=self._get_links(False))
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
@@ -794,6 +795,12 @@ class Service(object):
                 raise
             else:
                 log.error(six.text_type(e))
+
+
+def short_id_alias_exists(container, network):
+    aliases = container.get(
+        'NetworkSettings.Networks.{net}.Aliases'.format(net=network)) or ()
+    return container.short_id in aliases
 
 
 class NetworkMode(object):
