@@ -13,6 +13,7 @@ from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
 from jsonschema import RefResolver
 from jsonschema import ValidationError
+from jsonschema import _utils
 
 from ..const import COMPOSEFILE_V1 as V1
 from .errors import ConfigurationError
@@ -200,10 +201,11 @@ def handle_error_for_schema_with_id(error, path):
     schema_id = error.schema['id']
 
     if is_service_dict_schema(schema_id) and error.validator == 'additionalProperties':
-        return "Invalid service name '{}' - only {} characters are allowed".format(
+        properties = _utils.find_additional_properties(error.instance, error.schema)
+	return "Invalid service name '{}' - only {} characters are allowed".format(
             # The service_name is the key to the json object
-            list(error.instance)[0],
-            VALID_NAME_CHARS)
+            properties.next(),
+	    VALID_NAME_CHARS)
 
     if error.validator == 'additionalProperties':
         if schema_id == '#/definitions/service':
