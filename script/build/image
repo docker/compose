@@ -10,7 +10,7 @@ fi
 TAG=$1
 VERSION="$(python setup.py --version)"
 
-./script/write-git-sha
+./script/build/write-git-sha
 python setup.py sdist
 cp dist/docker-compose-$VERSION.tar.gz dist/docker-compose-release.tar.gz
 docker build -t docker/compose:$TAG -f Dockerfile.run .

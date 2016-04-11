@@ -26,6 +26,7 @@ Options:
 -p, --publish=[]      Publish a container's port(s) to the host
 --service-ports       Run command with the service's ports enabled and mapped to the host.
 -T                    Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.
+-w, --workdir=""      Working directory inside the container
 ```
 
 Runs a one-time command against a service. For example, the following command starts the `web` service and runs `bash` as its command.

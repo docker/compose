@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from os import path
 
+import pytest
 from docker.errors import APIError
 from six import StringIO
 from six import text_type
@@ -24,10 +25,12 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
+from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import Service
+from tests.integration.testcases import v2_only
 
 
 def create_and_start_container(service, **override_options):
@@ -60,7 +63,7 @@ class ServiceTest(DockerClientTestCase):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
         self.assertEqual(db.containers(stopped=True), [])
-        self.assertEqual(db.containers(one_off=True, stopped=True), [container])
+        self.assertEqual(db.containers(one_off=OneOffFilter.only, stopped=True), [container])
 
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
@@ -102,6 +105,13 @@ class ServiceTest(DockerClientTestCase):
         container.start()
         self.assertEqual(container.get('HostConfig.CpuQuota'), 40000)
 
+    def test_create_container_with_shm_size(self):
+        self.require_api_version('1.22')
+        service = self.create_service('db', shm_size=67108864)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.ShmSize'), 67108864)
+
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
         service = self.create_service('db', extra_hosts=extra_hosts)
@@ -128,7 +138,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', read_only=read_only)
         container = service.create_container()
         service.start_container(container)
-        self.assertEqual(container.get('HostConfig.ReadonlyRootfs'), read_only, container.get('HostConfig'))
+        assert container.get('HostConfig.ReadonlyRootfs') == read_only
 
     def test_create_container_with_security_opt(self):
         security_opt = ['label:disable']
@@ -402,7 +412,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 0)
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
-        containers = service.execute_convergence_plan(ConvergencePlan('recreate', containers), start=False)
+        containers = service.execute_convergence_plan(
+            ConvergencePlan('recreate', containers),
+            start=False)
         self.assertEqual(len(service.containers()), 0)
         self.assertEqual(len(service.containers(stopped=True)), 1)
 
@@ -485,7 +497,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
         create_and_start_container(db)
 
-        c = create_and_start_container(db, one_off=True)
+        c = create_and_start_container(db, one_off=OneOffFilter.only)
 
         self.assertEqual(
             set(get_links(c)),
@@ -726,7 +738,7 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
-        self.assertIn("ERROR: for 2  Boom", mock_stderr.getvalue())
+        self.assertIn("ERROR: for composetest_web_2  Boom", mock_stderr.getvalue())
 
     def test_scale_with_unexpected_exception(self):
         """Test that when scaling if the API returns an error, that is not of type
@@ -757,17 +769,17 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container(number=next_number, quiet=True)
         container.start()
 
-        self.assertTrue(container.is_running)
-        self.assertEqual(len(service.containers()), 1)
+        container.inspect()
+        assert container.is_running
+        assert len(service.containers()) == 1
 
         service.scale(1)
-
-        self.assertEqual(len(service.containers()), 1)
+        assert len(service.containers()) == 1
         container.inspect()
-        self.assertTrue(container.is_running)
+        assert container.is_running
 
         captured_output = mock_log.info.call_args[0]
-        self.assertIn('Desired container number already achieved', captured_output)
+        assert 'Desired container number already achieved' in captured_output
 
     @mock.patch('compose.service.log')
     def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
@@ -775,7 +787,7 @@ class ServiceTest(DockerClientTestCase):
         results in warning output.
         """
         service = self.create_service('app', container_name='custom-container')
-        self.assertEqual(service.custom_container_name(), 'custom-container')
+        self.assertEqual(service.custom_container_name, 'custom-container')
 
         service.scale(3)
 
@@ -793,7 +805,9 @@ class ServiceTest(DockerClientTestCase):
         containers = service.containers()
         self.assertEqual(len(containers), 2)
         for container in containers:
-            self.assertEqual(list(container.inspect()['HostConfig']['PortBindings'].keys()), ['8000/tcp'])
+            self.assertEqual(
+                list(container.get('HostConfig.PortBindings')),
+                ['8000/tcp'])
 
     def test_scale_with_immediate_exit(self):
         service = self.create_service('web', image='busybox', command='true')
@@ -864,13 +878,21 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.DnsSearch'), ['dc1.example.com', 'dc2.example.com'])
 
+    @v2_only()
+    def test_tmpfs(self):
+        service = self.create_service('web', tmpfs=['/run'])
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.Tmpfs'), {'/run': ''})
+
     def test_working_dir_param(self):
         service = self.create_service('container', working_dir='/working/dir/sample')
         container = service.create_container()
         self.assertEqual(container.get('Config.WorkingDir'), '/working/dir/sample')
 
     def test_split_env(self):
-        service = self.create_service('web', environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
+        service = self.create_service(
+            'web',
+            environment=['NORMAL=F1', 'CONTAINS_EQUALS=F=2', 'TRAILING_EQUALS='])
         env = create_and_start_container(service).environment
         for k, v in {'NORMAL': 'F1', 'CONTAINS_EQUALS': 'F=2', 'TRAILING_EQUALS': ''}.items():
             self.assertEqual(env[k], v)
@@ -956,7 +978,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_custom_container_name(self):
         service = self.create_service('web', container_name='my-web-container')
-        self.assertEqual(service.custom_container_name(), 'my-web-container')
+        self.assertEqual(service.custom_container_name, 'my-web-container')
 
         container = create_and_start_container(service)
         self.assertEqual(container.name, 'my-web-container')
@@ -964,6 +986,7 @@ class ServiceTest(DockerClientTestCase):
         one_off_container = service.create_container(one_off=True)
         self.assertNotEqual(one_off_container.name, 'my-web-container')
 
+    @pytest.mark.skipif(True, reason="Broken on 1.11.0rc1")
     def test_log_drive_invalid(self):
         service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
@@ -1014,12 +1037,10 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(set(service.duplicate_containers()), set([duplicate]))
 
 
-def converge(service,
-             strategy=ConvergenceStrategy.changed,
-             do_build=True):
+def converge(service, strategy=ConvergenceStrategy.changed):
     """Create a converge plan from a strategy and execute the plan."""
     plan = service.convergence_plan(strategy)
-    return service.execute_convergence_plan(plan, do_build=do_build, timeout=1)
+    return service.execute_convergence_plan(plan, timeout=1)
 
 
 class ConfigHashTest(DockerClientTestCase):

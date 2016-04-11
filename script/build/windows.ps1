@@ -26,7 +26,7 @@
 #
 # 6. Build the binary:
 #
-#        .\script\build-windows.ps1
+#        .\script\build\windows.ps1
 
 $ErrorActionPreference = "Stop"
 

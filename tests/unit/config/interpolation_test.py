@@ -6,6 +6,7 @@ import os
 import mock
 import pytest
 
+from compose.config.environment import Environment
 from compose.config.interpolation import interpolate_environment_variables
 
 
@@ -19,7 +20,7 @@ def mock_env():
 
 def test_interpolate_environment_variables_in_services(mock_env):
     services = {
-        'servivea': {
+        'servicea': {
             'image': 'example:${USER}',
             'volumes': ['$FOO:/target'],
             'logging': {
@@ -31,7 +32,7 @@ def test_interpolate_environment_variables_in_services(mock_env):
         }
     }
     expected = {
-        'servivea': {
+        'servicea': {
             'image': 'example:jenny',
             'volumes': ['bar:/target'],
             'logging': {
@@ -42,7 +43,9 @@ def test_interpolate_environment_variables_in_services(mock_env):
             }
         }
     }
-    assert interpolate_environment_variables(services, 'service') == expected
+    assert interpolate_environment_variables(
+        services, 'service', Environment.from_env_file(None)
+    ) == expected
 
 
 def test_interpolate_environment_variables_in_volumes(mock_env):
@@ -66,4 +69,6 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    assert interpolate_environment_variables(volumes, 'volume') == expected
+    assert interpolate_environment_variables(
+        volumes, 'volume', Environment.from_env_file(None)
+    ) == expected

@@ -12,4 +12,4 @@ mkdir -p coverage-html
 docker build -t "$TAG" .
 
 GIT_VOLUME="--volume=$(pwd)/.git:/code/.git"
-. script/test-versions
+. script/test/all

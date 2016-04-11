@@ -40,6 +40,7 @@ DOCKER_START_KEYS = [
     'cap_add',
     'cap_drop',
     'cgroup_parent',
+    'cpu_quota',
     'devices',
     'dns',
     'dns_search',
@@ -54,9 +55,9 @@ DOCKER_START_KEYS = [
     'pid',
     'privileged',
     'restart',
-    'volumes_from',
     'security_opt',
-    'cpu_quota',
+    'shm_size',
+    'volumes_from',
 ]
 
 
@@ -103,6 +104,14 @@ class ImageType(enum.Enum):
     all = 2
 
 
+@enum.unique
+class BuildAction(enum.Enum):
+    """Enumeration for the possible build actions."""
+    none = 0
+    force = 1
+    skip = 2
+
+
 class Service(object):
     def __init__(
         self,
@@ -125,6 +134,9 @@ class Service(object):
         self.network_mode = network_mode or NetworkMode(None)
         self.networks = networks or {}
         self.options = options
+
+    def __repr__(self):
+        return '<Service: {}>'.format(self.name)
 
     def containers(self, stopped=False, one_off=False, filters={}):
         filters.update({'label': self.labels(one_off=one_off)})
@@ -161,11 +173,11 @@ class Service(object):
         - starts containers until there are at least `desired_num` running
         - removes all stopped containers
         """
-        if self.custom_container_name() and desired_num > 1:
+        if self.custom_container_name and desired_num > 1:
             log.warn('The "%s" service is using the custom container name "%s". '
                      'Docker requires each container to have a unique name. '
                      'Remove the custom name to scale the service.'
-                     % (self.name, self.custom_container_name()))
+                     % (self.name, self.custom_container_name))
 
         if self.specifies_host_port():
             log.warn('The "%s" service specifies a port on the host. If multiple containers '
@@ -195,7 +207,9 @@ class Service(object):
 
             if num_running != len(all_containers):
                 # we have some stopped containers, let's start them up again
-                stopped_containers = sorted([c for c in all_containers if not c.is_running], key=attrgetter('number'))
+                stopped_containers = sorted(
+                    (c for c in all_containers if not c.is_running),
+                    key=attrgetter('number'))
 
                 num_stopped = len(stopped_containers)
 
@@ -220,7 +234,7 @@ class Service(object):
             parallel_execute(
                 container_numbers,
                 lambda n: create_and_start(service=self, number=n),
-                lambda n: n,
+                lambda n: self.get_container_name(n),
                 "Creating and starting"
             )
 
@@ -240,7 +254,6 @@ class Service(object):
 
     def create_container(self,
                          one_off=False,
-                         do_build=True,
                          previous_container=None,
                          number=None,
                          quiet=False,
@@ -249,7 +262,9 @@ class Service(object):
         Create a container for this service. If the image doesn't exist, attempt to pull
         it.
         """
-        self.ensure_image_exists(do_build=do_build)
+        # This is only necessary for `scale` and `volumes_from`
+        # auto-creating containers to satisfy the dependency.
+        self.ensure_image_exists()
 
         container_options = self._get_container_create_options(
             override_options,
@@ -263,20 +278,29 @@ class Service(object):
 
         return Container.create(self.client, **container_options)
 
-    def ensure_image_exists(self, do_build=True):
+    def ensure_image_exists(self, do_build=BuildAction.none):
+        if self.can_be_built() and do_build == BuildAction.force:
+            self.build()
+            return
+
         try:
             self.image()
             return
         except NoSuchImageError:
             pass
 
-        if self.can_be_built():
-            if do_build:
-                self.build()
-            else:
-                raise NeedsBuildError(self)
-        else:
+        if not self.can_be_built():
             self.pull()
+            return
+
+        if do_build == BuildAction.skip:
+            raise NeedsBuildError(self)
+
+        self.build()
+        log.warn(
+            "Image for service {} was built because it did not already exist. To "
+            "rebuild this image you must use `docker-compose build` or "
+            "`docker-compose up --build`.".format(self.name))
 
     def image(self):
         try:
@@ -340,7 +364,6 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 do_build=True,
                                  timeout=DEFAULT_TIMEOUT,
                                  detached=False,
                                  start=True):
@@ -348,7 +371,7 @@ class Service(object):
         should_attach_logs = not detached
 
         if action == 'create':
-            container = self.create_container(do_build=do_build)
+            container = self.create_container()
 
             if should_attach_logs:
                 container.attach_log_stream()
@@ -362,7 +385,6 @@ class Service(object):
             return [
                 self.recreate_container(
                     container,
-                    do_build=do_build,
                     timeout=timeout,
                     attach_logs=should_attach_logs,
                     start_new_container=start
@@ -389,7 +411,6 @@ class Service(object):
     def recreate_container(
             self,
             container,
-            do_build=False,
             timeout=DEFAULT_TIMEOUT,
             attach_logs=False,
             start_new_container=True):
@@ -404,7 +425,6 @@ class Service(object):
         container.stop(timeout=timeout)
         container.rename_to_tmp_name()
         new_container = self.create_container(
-            do_build=do_build,
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
@@ -416,9 +436,10 @@ class Service(object):
         container.remove()
         return new_container
 
-    def start_container_if_stopped(self, container, attach_logs=False):
+    def start_container_if_stopped(self, container, attach_logs=False, quiet=False):
         if not container.is_running:
-            log.info("Starting %s" % container.name)
+            if not quiet:
+                log.info("Starting %s" % container.name)
             if attach_logs:
                 container.attach_log_stream()
             return self.start_container(container)
@@ -431,7 +452,10 @@ class Service(object):
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network, aliases in self.networks.items():
+        for network, netdefs in self.networks.items():
+            aliases = netdefs.get('aliases', [])
+            ipv4_address = netdefs.get('ipv4_address', None)
+            ipv6_address = netdefs.get('ipv6_address', None)
             if network in connected_networks:
                 self.client.disconnect_container_from_network(
                     container.id, network)
@@ -439,7 +463,9 @@ class Service(object):
             self.client.connect_container_to_network(
                 container.id, network,
                 aliases=list(self._get_aliases(container).union(aliases)),
-                links=self._get_links(False),
+                ipv4_address=ipv4_address,
+                ipv6_address=ipv6_address,
+                links=self._get_links(False)
             )
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
@@ -472,7 +498,7 @@ class Service(object):
             'image_id': self.image()['Id'],
             'links': self.get_link_names(),
             'net': self.network_mode.id,
-            'networks': list(self.networks.keys()),
+            'networks': self.networks,
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
@@ -494,10 +520,6 @@ class Service(object):
 
     def get_volumes_from_names(self):
         return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
-
-    def get_container_name(self, number, one_off=False):
-        # TODO: Implement issue #652 here
-        return build_container_name(self.project, self.name, number, one_off)
 
     # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
@@ -560,13 +582,10 @@ class Service(object):
             for k in DOCKER_CONFIG_KEYS if k in self.options)
         container_options.update(override_options)
 
-        if self.custom_container_name() and not one_off:
-            container_options['name'] = self.custom_container_name()
-        elif not container_options.get('name'):
+        if not container_options.get('name'):
             container_options['name'] = self.get_container_name(number, one_off)
 
-        if 'detach' not in container_options:
-            container_options['detach'] = True
+        container_options.setdefault('detach', True)
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
@@ -580,16 +599,9 @@ class Service(object):
             container_options['domainname'] = parts[2]
 
         if 'ports' in container_options or 'expose' in self.options:
-            ports = []
-            all_ports = container_options.get('ports', []) + self.options.get('expose', [])
-            for port_range in all_ports:
-                internal_range, _ = split_port(port_range)
-                for port in internal_range:
-                    port = str(port)
-                    if '/' in port:
-                        port = tuple(port.split('/'))
-                    ports.append(port)
-            container_options['ports'] = ports
+            container_options['ports'] = build_container_ports(
+                container_options,
+                self.options)
 
         container_options['environment'] = merge_environment(
             self.options.get('environment'),
@@ -655,6 +667,8 @@ class Service(object):
             ipc_mode=options.get('ipc'),
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
+            shm_size=options.get('shm_size'),
+            tmpfs=options.get('tmpfs'),
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
@@ -712,8 +726,15 @@ class Service(object):
             '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
         ]
 
+    @property
     def custom_container_name(self):
         return self.options.get('container_name')
+
+    def get_container_name(self, number, one_off=False):
+        if self.custom_container_name and not one_off:
+            return self.custom_container_name
+
+        return build_container_name(self.project, self.name, number, one_off)
 
     def remove_image(self, image_type):
         if not image_type or image_type == ImageType.none:
@@ -1029,3 +1050,18 @@ def format_environment(environment):
             return key
         return '{key}={value}'.format(key=key, value=value)
     return [format_env(*item) for item in environment.items()]
+
+# Ports
+
+
+def build_container_ports(container_options, options):
+    ports = []
+    all_ports = container_options.get('ports', []) + options.get('expose', [])
+    for port_range in all_ports:
+        internal_range, _ = split_port(port_range)
+        for port in internal_range:
+            port = str(port)
+            if '/' in port:
+                port = tuple(port.split('/'))
+            ports.append(port)
+    return ports
