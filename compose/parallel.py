@@ -17,6 +17,8 @@ from compose.utils import get_output_stream
 
 log = logging.getLogger(__name__)
 
+STOP = object()
+
 
 def parallel_execute(objects, func, get_name, msg, get_deps=None):
     """Runs func on objects in parallel while ensuring that func is
@@ -108,7 +110,7 @@ def parallel_execute_iter(objects, func, get_deps):
     results = Queue()
     state = State(objects)
 
-    while not state.is_done():
+    while True:
         feed_queue(objects, func, get_deps, results, state)
 
         try:
@@ -118,6 +120,9 @@ def parallel_execute_iter(objects, func, get_deps):
         # See https://github.com/docker/compose/issues/189
         except thread.error:
             raise ShutdownException()
+
+        if event is STOP:
+            break
 
         obj, _, exception = event
         if exception is None:
@@ -169,6 +174,9 @@ def feed_queue(objects, func, get_deps, results, state):
             t.daemon = True
             t.start()
             state.started.add(obj)
+
+    if state.is_done():
+        results.put(STOP)
 
 
 class UpstreamError(Exception):
