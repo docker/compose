@@ -32,7 +32,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
     for obj in objects:
         writer.initialize(get_name(obj))
 
-    events = parallel_execute_stream(objects, func, get_deps)
+    events = parallel_execute_iter(objects, func, get_deps)
 
     errors = {}
     results = []
@@ -86,7 +86,7 @@ class State(object):
         return set(self.objects) - self.started - self.finished - self.failed
 
 
-def parallel_execute_stream(objects, func, get_deps):
+def parallel_execute_iter(objects, func, get_deps):
     """
     Runs func on objects in parallel while ensuring that func is
     ran on object only after it is ran on all its dependencies.
@@ -130,7 +130,7 @@ def parallel_execute_stream(objects, func, get_deps):
         yield event
 
 
-def queue_producer(obj, func, results):
+def producer(obj, func, results):
     """
     The entry point for a producer thread which runs func on a single object.
     Places a tuple on the results queue once func has either returned or raised.
@@ -165,7 +165,7 @@ def feed_queue(objects, func, get_deps, results, state):
             for dep in deps
         ):
             log.debug('Starting producer thread for {}'.format(obj))
-            t = Thread(target=queue_producer, args=(obj, func, results))
+            t = Thread(target=producer, args=(obj, func, results))
             t.daemon = True
             t.start()
             state.started.add(obj)
