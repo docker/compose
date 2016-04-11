@@ -5,7 +5,7 @@ import six
 from docker.errors import APIError
 
 from compose.parallel import parallel_execute
-from compose.parallel import parallel_execute_stream
+from compose.parallel import parallel_execute_iter
 from compose.parallel import UpstreamError
 
 
@@ -81,7 +81,7 @@ def test_parallel_execute_with_upstream_errors():
     events = [
         (obj, result, type(exception))
         for obj, result, exception
-        in parallel_execute_stream(objects, process, get_deps)
+        in parallel_execute_iter(objects, process, get_deps)
     ]
 
     assert (cache, None, type(None)) in events
