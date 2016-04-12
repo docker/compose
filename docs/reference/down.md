@@ -12,17 +12,27 @@ parent = "smn_compose_cli"
 # down
 
 ```
-Stop containers and remove containers, networks, volumes, and images
-created by `up`. Only containers and networks are removed by default.
-
 Usage: down [options]
 
 Options:
-    --rmi type          Remove images, type may be one of: 'all' to remove
-                        all images, or 'local' to remove only images that
-                        don't have an custom name set by the `image` field
-    -v, --volumes       Remove data volumes
-
+    --rmi type          Remove images. Type must be one of:
+                        'all': Remove all images used by any service.
+                        'local': Remove only images that don't have a custom tag
+                        set by the `image` field.
+    -v, --volumes       Remove named volumes declared in the `volumes` section
+                        of the Compose file and anonymous volumes
+                        attached to containers.
     --remove-orphans    Remove containers for services not defined in the
                         Compose file
 ```
+
+Stops containers and removes containers, networks, volumes, and images
+created by `up`.
+
+By default, the only things removed are:
+
+- Containers for services defined in the Compose file
+- Networks defined in the `networks` section of the Compose file
+- The default network, if one is used
+
+Networks and volumes defined as `external` are never removed.
