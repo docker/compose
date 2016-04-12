@@ -1257,13 +1257,14 @@ class CLITestCase(DockerClientTestCase):
             'logscomposefile_another_1',
             'exited'))
 
-        # sleep for a short period to allow the tailing thread to receive the
-        # event. This is not great, but there isn't an easy way to do this
-        # without being able to stream stdout from the process.
-        time.sleep(0.5)
-        os.kill(proc.pid, signal.SIGINT)
-        result = wait_on_process(proc, returncode=1)
+        self.dispatch(['kill', 'simple'])
+
+        result = wait_on_process(proc)
+
+        assert 'hello' in result.stdout
         assert 'test' in result.stdout
+        assert 'logscomposefile_another_1 exited with code 0' in result.stdout
+        assert 'logscomposefile_simple_1 exited with code 137' in result.stdout
 
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
