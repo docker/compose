@@ -35,11 +35,13 @@ which the release page specifies, in your terminal.
 
      The following is an example command illustrating the format:
 
-        $ sudo wget https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` -O /usr/local/bin/docker-compose
+        $ LATEST_TAG=$(curl -s 'https://api.github.com/repos/docker/compose/tags?page=1&per_page=1' | python -c 'import sys, json; print json.load(sys.stdin)[0]["name"]')
+        $ sudo -E wget https://github.com/docker/compose/releases/download/${LATEST_TAG}/docker-compose-`uname -s`-`uname -m` -O /usr/local/bin/docker-compose
 
      OR
 
-        $ sudo curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+        $ LATEST_TAG=$(curl -s 'https://api.github.com/repos/docker/compose/tags?page=1&per_page=1' | python -c 'import sys, json; print json.load(sys.stdin)[0]["name"]')
+        $ sudo -E curl -L https://github.com/docker/compose/releases/download/${LATEST_TAG}/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
 
 
      If you have problems installing with `wget` or `curl`, see
@@ -78,7 +80,8 @@ to get started.
 Compose can also be run inside a container, from a small bash script wrapper.
 To install compose as a container run:
 
-    $ sudo curl -L https://github.com/docker/compose/releases/download/1.6.2/run.sh -o /usr/local/bin/docker-compose
+    $ LATEST_TAG=$(curl -s 'https://api.github.com/repos/docker/compose/tags?page=1&per_page=1' | python -c 'import sys, json; print json.load(sys.stdin)[0]["name"]')
+    $ sudo -E curl -L https://github.com/docker/compose/releases/download/${LATEST_TAG}/run.sh -o /usr/local/bin/docker-compose
     $ sudo chmod +x /usr/local/bin/docker-compose
 
 ## Master builds
