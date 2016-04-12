@@ -264,18 +264,29 @@ class TopLevelCommand(object):
 
     def down(self, options):
         """
-        Stop containers and remove containers, networks, volumes, and images
-        created by `up`. Only containers and networks are removed by default.
+        Stops containers and removes containers, networks, volumes, and images
+        created by `up`.
+
+        By default, the only things removed are:
+
+        - Containers for services defined in the Compose file
+        - Networks defined in the `networks` section of the Compose file
+        - The default network, if one is used
+
+        Networks and volumes defined as `external` are never removed.
 
         Usage: down [options]
 
         Options:
-            --rmi type          Remove images, type may be one of: 'all' to remove
-                                all images, or 'local' to remove only images that
-                                don't have an custom name set by the `image` field
-            -v, --volumes       Remove data volumes
-            --remove-orphans    Remove containers for services not defined in
-                                the Compose file
+            --rmi type          Remove images. Type must be one of:
+                                'all': Remove all images used by any service.
+                                'local': Remove only images that don't have a custom tag
+                                set by the `image` field.
+            -v, --volumes       Remove named volumes declared in the `volumes` section
+                                of the Compose file and anonymous volumes
+                                attached to containers.
+            --remove-orphans    Remove containers for services not defined in the
+                                Compose file
         """
         image_type = image_type_from_opt('--rmi', options['--rmi'])
         self.project.down(image_type, options['--volumes'], options['--remove-orphans'])
@@ -496,10 +507,10 @@ class TopLevelCommand(object):
 
     def rm(self, options):
         """
-        Remove stopped service containers.
+        Removes stopped service containers.
 
-        By default, volumes attached to containers will not be removed. You can see all
-        volumes with `docker volume ls`.
+        By default, anonymous volumes attached to containers will not be removed. You
+        can override this with `-v`. To list all volumes, use `docker volume ls`.
 
         Any data which is not in a volume will be lost.
 
@@ -507,7 +518,7 @@ class TopLevelCommand(object):
 
         Options:
             -f, --force   Don't ask to confirm removal
-            -v            Remove volumes associated with containers
+            -v            Remove any anonymous volumes attached to containers
             -a, --all     Also remove one-off containers created by
                           docker-compose run
         """
