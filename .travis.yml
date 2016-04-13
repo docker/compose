@@ -25,3 +25,5 @@ deploy:
   key: '$BINTRAY_API_KEY'
   file: ./bintray.json
   skip_cleanup: true
+  on:
+    all_branches: true

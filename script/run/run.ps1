@@ -5,7 +5,7 @@
 # $Env:DOCKER_COMPOSE_OPTIONS.
 
 if ($Env:DOCKER_COMPOSE_VERSION -eq $null -or $Env:DOCKER_COMPOSE_VERSION.Length -eq 0) {
-    $Env:DOCKER_COMPOSE_VERSION = "1.6.0rc1"
+    $Env:DOCKER_COMPOSE_VERSION = "latest"
 }
 
 if ($Env:DOCKER_COMPOSE_OPTIONS -eq $null) {

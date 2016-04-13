@@ -12,13 +12,18 @@ weight=22
 
 ## Using Compose in production
 
-> Compose is still primarily aimed at development and testing environments.
-> Compose may be used for smaller production deployments, but is probably
-> not yet suitable for larger deployments.
+When you define your app with Compose in development, you can use this
+definition to run your application in different environments such as CI,
+staging, and production.
 
-When deploying to production, you'll almost certainly want to make changes to
-your app configuration that are more appropriate to a live environment. These
-changes may include:
+The easiest way to deploy an application is to run it on a single server,
+similar to how you would run your development environment. If you want to scale
+up your application, you can run Compose apps on a Swarm cluster.
+
+### Modify your Compose file for production
+
+You'll almost certainly want to make changes to your app configuration that are
+more appropriate to a live environment. These changes may include:
 
 - Removing any volume bindings for application code, so that code stays inside
   the container and can't be changed from outside
@@ -73,8 +78,8 @@ commands will work with no further configuration.
 system, exposes the same API as a single Docker host, which means you can use
 Compose against a Swarm instance and run your apps across multiple hosts.
 
-Compose/Swarm integration is still in the experimental stage, but if you'd like
-to explore and experiment, check out the [integration guide](swarm.md).
+Read more about the Compose/Swarm integration in the
+[integration guide](swarm.md).
 
 ## Compose documentation
 

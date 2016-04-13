@@ -15,22 +15,26 @@ parent = "smn_compose_cli"
 Usage: up [options] [SERVICE...]
 
 Options:
--d                         Detached mode: Run containers in the background,
-                           print new container names.
-                           Incompatible with --abort-on-container-exit.
---no-color                 Produce monochrome output.
---no-deps                  Don't start linked services.
---force-recreate           Recreate containers even if their configuration
-                           and image haven't changed.
-                           Incompatible with --no-recreate.
---no-recreate              If containers already exist, don't recreate them.
-                           Incompatible with --force-recreate.
---no-build                 Don't build an image, even if it's missing
---abort-on-container-exit  Stops all containers if any container was stopped.
-                           Incompatible with -d.
--t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
-                           when attached or when containers are already
-                           running. (default: 10)
+    -d                         Detached mode: Run containers in the background,
+                               print new container names.
+                               Incompatible with --abort-on-container-exit.
+    --no-color                 Produce monochrome output.
+    --no-deps                  Don't start linked services.
+    --force-recreate           Recreate containers even if their configuration
+                               and image haven't changed.
+                               Incompatible with --no-recreate.
+    --no-recreate              If containers already exist, don't recreate them.
+                               Incompatible with --force-recreate.
+    --no-build                 Don't build an image, even if it's missing.
+    --build                    Build images before starting containers.
+    --abort-on-container-exit  Stops all containers if any container was stopped.
+                               Incompatible with -d.
+    -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
+                               when attached or when containers are already
+                               running. (default: 10)
+    --remove-orphans           Remove containers for services not defined in
+                               the Compose file
+
 ```
 
 Builds, (re)creates, starts, and attaches to containers for a service.

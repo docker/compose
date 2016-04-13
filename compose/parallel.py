@@ -1,71 +1,186 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import logging
 import operator
 import sys
 from threading import Thread
 
 from docker.errors import APIError
+from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
 
+from compose.cli.signals import ShutdownException
 from compose.utils import get_output_stream
 
 
-def perform_operation(func, arg, callback, index):
-    try:
-        callback((index, func(arg)))
-    except Exception as e:
-        callback((index, e))
+log = logging.getLogger(__name__)
+
+STOP = object()
 
 
-def parallel_execute(objects, func, index_func, msg):
-    """For a given list of objects, call the callable passing in the first
-    object we give it.
+def parallel_execute(objects, func, get_name, msg, get_deps=None):
+    """Runs func on objects in parallel while ensuring that func is
+    ran on object only after it is ran on all its dependencies.
+
+    get_deps called on object must return a collection with its dependencies.
+    get_name called on object must return its name.
     """
     objects = list(objects)
     stream = get_output_stream(sys.stderr)
+
     writer = ParallelStreamWriter(stream, msg)
-
     for obj in objects:
-        writer.initialize(index_func(obj))
+        writer.initialize(get_name(obj))
 
-    q = Queue()
+    events = parallel_execute_iter(objects, func, get_deps)
 
-    # TODO: limit the number of threads #1828
-    for obj in objects:
-        t = Thread(
-            target=perform_operation,
-            args=(func, obj, q.put, index_func(obj)))
-        t.daemon = True
-        t.start()
-
-    done = 0
     errors = {}
+    results = []
+    error_to_reraise = None
 
-    while done < len(objects):
+    for obj, result, exception in events:
+        if exception is None:
+            writer.write(get_name(obj), 'done')
+            results.append(result)
+        elif isinstance(exception, APIError):
+            errors[get_name(obj)] = exception.explanation
+            writer.write(get_name(obj), 'error')
+        elif isinstance(exception, UpstreamError):
+            writer.write(get_name(obj), 'error')
+        else:
+            errors[get_name(obj)] = exception
+            error_to_reraise = exception
+
+    for obj_name, error in errors.items():
+        stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
+
+    if error_to_reraise:
+        raise error_to_reraise
+
+    return results
+
+
+def _no_deps(x):
+    return []
+
+
+class State(object):
+    """
+    Holds the state of a partially-complete parallel operation.
+
+    state.started:   objects being processed
+    state.finished:  objects which have been processed
+    state.failed:    objects which either failed or whose dependencies failed
+    """
+    def __init__(self, objects):
+        self.objects = objects
+
+        self.started = set()
+        self.finished = set()
+        self.failed = set()
+
+    def is_done(self):
+        return len(self.finished) + len(self.failed) >= len(self.objects)
+
+    def pending(self):
+        return set(self.objects) - self.started - self.finished - self.failed
+
+
+def parallel_execute_iter(objects, func, get_deps):
+    """
+    Runs func on objects in parallel while ensuring that func is
+    ran on object only after it is ran on all its dependencies.
+
+    Returns an iterator of tuples which look like:
+
+    # if func returned normally when run on object
+    (object, result, None)
+
+    # if func raised an exception when run on object
+    (object, None, exception)
+
+    # if func raised an exception when run on one of object's dependencies
+    (object, None, UpstreamError())
+    """
+    if get_deps is None:
+        get_deps = _no_deps
+
+    results = Queue()
+    state = State(objects)
+
+    while True:
+        feed_queue(objects, func, get_deps, results, state)
+
         try:
-            msg_index, result = q.get(timeout=1)
+            event = results.get(timeout=0.1)
         except Empty:
             continue
+        # See https://github.com/docker/compose/issues/189
+        except thread.error:
+            raise ShutdownException()
 
-        if isinstance(result, APIError):
-            errors[msg_index] = "error", result.explanation
-            writer.write(msg_index, 'error')
-        elif isinstance(result, Exception):
-            errors[msg_index] = "unexpected_exception", result
+        if event is STOP:
+            break
+
+        obj, _, exception = event
+        if exception is None:
+            log.debug('Finished processing: {}'.format(obj))
+            state.finished.add(obj)
         else:
-            writer.write(msg_index, 'done')
-        done += 1
+            log.debug('Failed: {}'.format(obj))
+            state.failed.add(obj)
 
-    if not errors:
-        return
+        yield event
 
-    stream.write("\n")
-    for msg_index, (result, error) in errors.items():
-        stream.write("ERROR: for {}  {} \n".format(msg_index, error))
-        if result == 'unexpected_exception':
-            raise error
+
+def producer(obj, func, results):
+    """
+    The entry point for a producer thread which runs func on a single object.
+    Places a tuple on the results queue once func has either returned or raised.
+    """
+    try:
+        result = func(obj)
+        results.put((obj, result, None))
+    except Exception as e:
+        results.put((obj, None, e))
+
+
+def feed_queue(objects, func, get_deps, results, state):
+    """
+    Starts producer threads for any objects which are ready to be processed
+    (i.e. they have no dependencies which haven't been successfully processed).
+
+    Shortcuts any objects whose dependencies have failed and places an
+    (object, None, UpstreamError()) tuple on the results queue.
+    """
+    pending = state.pending()
+    log.debug('Pending: {}'.format(pending))
+
+    for obj in pending:
+        deps = get_deps(obj)
+
+        if any(dep in state.failed for dep in deps):
+            log.debug('{} has upstream errors - not processing'.format(obj))
+            results.put((obj, None, UpstreamError()))
+            state.failed.add(obj)
+        elif all(
+            dep not in objects or dep in state.finished
+            for dep in deps
+        ):
+            log.debug('Starting producer thread for {}'.format(obj))
+            t = Thread(target=producer, args=(obj, func, results))
+            t.daemon = True
+            t.start()
+            state.started.add(obj)
+
+    if state.is_done():
+        results.put(STOP)
+
+
+class UpstreamError(Exception):
+    pass
 
 
 class ParallelStreamWriter(object):
@@ -81,11 +196,15 @@ class ParallelStreamWriter(object):
         self.lines = []
 
     def initialize(self, obj_index):
+        if self.msg is None:
+            return
         self.lines.append(obj_index)
         self.stream.write("{} {} ... \r\n".format(self.msg, obj_index))
         self.stream.flush()
 
     def write(self, obj_index, status):
+        if self.msg is None:
+            return
         position = self.lines.index(obj_index)
         diff = len(self.lines) - position
         # move up
@@ -109,10 +228,6 @@ def parallel_operation(containers, operation, options, message):
 def parallel_remove(containers, options):
     stopped_containers = [c for c in containers if not c.is_running]
     parallel_operation(stopped_containers, 'remove', options, 'Removing')
-
-
-def parallel_stop(containers, options):
-    parallel_operation(containers, 'stop', options, 'Stopping')
 
 
 def parallel_start(containers, options):

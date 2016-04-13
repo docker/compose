@@ -46,10 +46,10 @@ A `docker-compose.yml` looks like this:
         - logvolume01:/var/log
         links:
         - redis
-        redis:
-          image: redis
-        volumes:
-          logvolume01: {}
+      redis:
+        image: redis
+    volumes:
+      logvolume01: {}
 
 For more information about the Compose file, see the
 [Compose file reference](compose-file.md)

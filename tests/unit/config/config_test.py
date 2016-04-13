@@ -11,11 +11,13 @@ from operator import itemgetter
 import py
 import pytest
 
+from ...helpers import build_config_details
 from compose.config import config
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
@@ -35,18 +37,14 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
             filename=filename,
             name=name,
             config=service_dict),
-        config.ConfigFile(filename=filename, config={}))
+        config.ConfigFile(filename=filename, config={}),
+        environment=Environment.from_env_file(working_dir)
+    )
     return config.process_service(resolver.run())
 
 
 def service_sort(services):
     return sorted(services, key=itemgetter('name'))
-
-
-def build_config_details(contents, working_dir='working_dir', filename='filename.yml'):
-    return config.ConfigDetails(
-        working_dir,
-        [config.ConfigFile(filename, contents)])
 
 
 class ConfigTest(unittest.TestCase):
@@ -342,20 +340,17 @@ class ConfigTest(unittest.TestCase):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
                 config.load(build_config_details(
-                    {invalid_name: {'image': 'busybox'}},
-                    'working_dir',
-                    'filename.yml'))
+                    {invalid_name: {'image': 'busybox'}}))
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
-    def test_config_invalid_service_names_v2(self):
+    def test_load_config_invalid_service_names_v2(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
-                config.load(
-                    build_config_details({
+                config.load(build_config_details(
+                    {
                         'version': '2',
-                        'services': {invalid_name: {'image': 'busybox'}}
-                    }, 'working_dir', 'filename.yml')
-                )
+                        'services': {invalid_name: {'image': 'busybox'}},
+                    }))
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
     def test_load_with_invalid_field_name(self):
@@ -412,7 +407,7 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         assert (
             "services.web.build.args contains an invalid type, it should be an "
-            "array, or an object" in exc.exconly()
+            "object, or an array" in exc.exconly()
         )
 
     def test_config_integer_service_name_raise_validation_error(self):
@@ -696,6 +691,31 @@ class ConfigTest(unittest.TestCase):
         assert isinstance(service['build']['args']['opt1'], str)
         assert service['build']['args']['opt1'] == '42'
         assert service['build']['args']['opt2'] == 'foobar'
+
+    def test_build_args_allow_empty_properties(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'foo': None
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'foo' in service['build']['args']
+        assert service['build']['args']['foo'] == 'None'
 
     def test_load_with_multiple_files_mismatched_networks_format(self):
         base_file = config.ConfigFile(
@@ -1098,22 +1118,18 @@ class ConfigTest(unittest.TestCase):
             ).services
             self.assertEqual(service[0]['entrypoint'], entrypoint)
 
-    @mock.patch('compose.config.validation.log')
-    def test_logs_warning_for_boolean_in_environment(self, mock_logging):
-        expected_warning_msg = "There is a boolean value in the 'environment'"
-        config.load(
-            build_config_details(
-                {'web': {
-                    'image': 'busybox',
-                    'environment': {'SHOW_STUFF': True}
-                }},
-                'working_dir',
-                'filename.yml'
-            )
-        )
+    def test_logs_warning_for_boolean_in_environment(self):
+        config_details = build_config_details({
+            'web': {
+                'image': 'busybox',
+                'environment': {'SHOW_STUFF': True}
+            }
+        })
 
-        assert mock_logging.warn.called
-        assert expected_warning_msg in mock_logging.warn.call_args[0][0]
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+
+        assert "contains true, which is an invalid type" in exc.exconly()
 
     def test_config_valid_environment_dict_key_contains_dashes(self):
         services = config.load(
@@ -1178,6 +1194,24 @@ class ConfigTest(unittest.TestCase):
                 'image': 'alpine',
                 'dns': ['8.8.8.8'],
                 'dns_search': ['domain.local'],
+            }
+        ]
+
+    def test_tmpfs_option(self):
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'tmpfs': '/run',
+                }
+            }
+        }))
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'tmpfs': ['/run'],
             }
         ]
 
@@ -1251,6 +1285,24 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_logging_v1(self):
+        base = {
+            'image': 'alpine:edge',
+            'log_driver': 'something',
+            'log_opt': {'foo': 'three'},
+        }
+        override = {
+            'image': 'alpine:edge',
+            'command': 'true',
+        }
+        actual = config.merge_service_dicts(base, override, V1)
+        assert actual == {
+            'image': 'alpine:edge',
+            'log_driver': 'something',
+            'log_opt': {'foo': 'three'},
+            'command': 'true',
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -1317,7 +1369,7 @@ class ConfigTest(unittest.TestCase):
         })
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
-        assert 'one.build is invalid, context is required.' in exc.exconly()
+        assert 'has neither an image nor a build context' in exc.exconly()
 
 
 class NetworkModeTest(unittest.TestCase):
@@ -1533,7 +1585,24 @@ class PortsTest(unittest.TestCase):
 
 class InterpolationTest(unittest.TestCase):
     @mock.patch.dict(os.environ)
+    def test_config_file_with_environment_file(self):
+        project_dir = 'tests/fixtures/default-env-file'
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
+        ).services
+
+        self.assertEqual(service_dicts[0], {
+            'name': 'web',
+            'image': 'alpine:latest',
+            'ports': ['5643', '9999'],
+            'command': 'true'
+        })
+
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
+        project_dir = 'tests/fixtures/environment-interpolation'
         os.environ.update(
             IMAGE="busybox",
             HOST_PORT="80",
@@ -1541,7 +1610,9 @@ class InterpolationTest(unittest.TestCase):
         )
 
         service_dicts = config.load(
-            config.find('tests/fixtures/environment-interpolation', None),
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
         ).services
 
         self.assertEqual(service_dicts, [
@@ -1571,7 +1642,7 @@ class InterpolationTest(unittest.TestCase):
             None,
         )
 
-        with mock.patch('compose.config.interpolation.log') as log:
+        with mock.patch('compose.config.environment.log') as log:
             config.load(config_details)
 
             self.assertEqual(2, log.warn.call_count)
@@ -1652,24 +1723,42 @@ class VolumeConfigTest(unittest.TestCase):
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     def test_relative_path_does_expand_posix(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['./data:/data']},
+            working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/myproject/data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['.:/data']},
+            working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='/home/me/myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['../otherproject:/data']},
+            working_dir='/home/me/myproject')
         self.assertEqual(d['volumes'], ['/home/me/otherproject:/data'])
 
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='windows paths')
     def test_relative_path_does_expand_windows(self):
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['./data:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['./data:/data']},
+            working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject\\data:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['.:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['.:/data']},
+            working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\myproject:/data'])
 
-        d = make_service_dict('foo', {'build': '.', 'volumes': ['../otherproject:/data']}, working_dir='c:\\Users\\me\\myproject')
+        d = make_service_dict(
+            'foo',
+            {'build': '.', 'volumes': ['../otherproject:/data']},
+            working_dir='c:\\Users\\me\\myproject')
         self.assertEqual(d['volumes'], ['c:\\Users\\me\\otherproject:/data'])
 
     @mock.patch.dict(os.environ)
@@ -1974,7 +2063,9 @@ class EnvTest(unittest.TestCase):
             },
         }
         self.assertEqual(
-            resolve_environment(service_dict),
+            resolve_environment(
+                service_dict, Environment.from_env_file(None)
+            ),
             {'FILE_DEF': 'F1', 'FILE_DEF_EMPTY': '', 'ENV_DEF': 'E3', 'NO_DEF': None},
         )
 
@@ -2011,7 +2102,10 @@ class EnvTest(unittest.TestCase):
         os.environ['FILE_DEF_EMPTY'] = 'E2'
         os.environ['ENV_DEF'] = 'E3'
         self.assertEqual(
-            resolve_environment({'env_file': ['tests/fixtures/env/resolve.env']}),
+            resolve_environment(
+                {'env_file': ['tests/fixtures/env/resolve.env']},
+                Environment.from_env_file(None)
+            ),
             {
                 'FILE_DEF': u'bär',
                 'FILE_DEF_EMPTY': '',
@@ -2034,7 +2128,7 @@ class EnvTest(unittest.TestCase):
             }
         }
         self.assertEqual(
-            resolve_build_args(build),
+            resolve_build_args(build, Environment.from_env_file(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
 
@@ -2066,7 +2160,9 @@ class EnvTest(unittest.TestCase):
 
 
 def load_from_filename(filename):
-    return config.load(config.find('.', [filename])).services
+    return config.load(
+        config.find('.', [filename], Environment.from_env_file('.'))
+    ).services
 
 
 class ExtendsTest(unittest.TestCase):
@@ -2269,7 +2365,7 @@ class ExtendsTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             load_from_filename('tests/fixtures/extends/service-with-invalid-schema.yml')
         assert (
-            "myweb has neither an image nor a build path specified" in
+            "myweb has neither an image nor a build context specified" in
             exc.exconly()
         )
 
@@ -2398,6 +2494,7 @@ class ExtendsTest(unittest.TestCase):
             },
         ]))
 
+    @mock.patch.dict(os.environ)
     def test_extends_with_environment_and_env_files(self):
         tmpdir = py.test.ensuretemp('test_extends_with_environment')
         self.addCleanup(tmpdir.remove)
@@ -2453,12 +2550,12 @@ class ExtendsTest(unittest.TestCase):
                 },
             },
         ]
-        with mock.patch.dict(os.environ):
-            os.environ['SECRET'] = 'secret'
-            os.environ['THING'] = 'thing'
-            os.environ['COMMON_ENV_FILE'] = 'secret'
-            os.environ['TOP_ENV_FILE'] = 'secret'
-            config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+
+        os.environ['SECRET'] = 'secret'
+        os.environ['THING'] = 'thing'
+        os.environ['COMMON_ENV_FILE'] = 'secret'
+        os.environ['TOP_ENV_FILE'] = 'secret'
+        config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
 
         assert config == expected
 
@@ -2553,14 +2650,11 @@ class VolumePathTest(unittest.TestCase):
 
     @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_split_path_mapping_with_windows_path(self):
-        windows_volume_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config:/opt/connect/config:ro"
-        expected_mapping = (
-            "/opt/connect/config:ro",
-            "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
-        )
+        host_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
+        windows_volume_path = host_path + ":/opt/connect/config:ro"
+        expected_mapping = ("/opt/connect/config:ro", host_path)
 
         mapping = config.split_path_mapping(windows_volume_path)
-
         self.assertEqual(mapping, expected_mapping)
 
 

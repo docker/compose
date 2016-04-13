@@ -39,7 +39,7 @@ class Container(object):
 
     @classmethod
     def from_id(cls, client, id):
-        return cls(client, client.inspect_container(id))
+        return cls(client, client.inspect_container(id), has_been_inspected=True)
 
     @classmethod
     def create(cls, client, **options):
@@ -215,6 +215,12 @@ class Container(object):
 
     def remove(self, **options):
         return self.client.remove_container(self.id, **options)
+
+    def create_exec(self, command, **options):
+        return self.client.exec_create(self.id, command, **options)
+
+    def start_exec(self, exec_id, **options):
+        return self.client.exec_start(exec_id, **options)
 
     def rename_to_tmp_name(self):
         """Rename the container to a hopefully unique temporary container name
