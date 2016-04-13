@@ -14,7 +14,7 @@ The included `ctr` command-line tool allows you interact with the containerd dae
 $ sudo ctr containers start redis /containers/redis
 $ sudo ctr containers list
 ID                  PATH                STATUS              PROCESSES
-1                   /containers/redis   running             14063
+redis               /containers/redis   running             14063
 ```
 
 `/containers/redis` is the path to an OCI bundle. [See the docs for more information.](docs/bundle.md)
