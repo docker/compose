@@ -1,4 +1,5 @@
-//+build !arm64,linux
+// +build linux,!aarch64
+
 package archutils
 
 import (
