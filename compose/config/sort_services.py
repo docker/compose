@@ -23,27 +23,30 @@ def get_source_name_from_network_mode(network_mode, source_type):
     return net_name
 
 
+def get_service_names(links):
+    return [link.split(':')[0] for link in links]
+
+
+def get_service_names_from_volumes_from(volumes_from):
+    return [volume_from.source for volume_from in volumes_from]
+
+
+def get_service_dependents(service_dict, services):
+    name = service_dict['name']
+    return [
+        service for service in services
+        if (name in get_service_names(service.get('links', [])) or
+            name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
+            name == get_service_name_from_network_mode(service.get('network_mode')) or
+            name in service.get('depends_on', []))
+    ]
+
+
 def sort_service_dicts(services):
     # Topological sort (Cormen/Tarjan algorithm).
     unmarked = services[:]
     temporary_marked = set()
     sorted_services = []
-
-    def get_service_names(links):
-        return [link.split(':')[0] for link in links]
-
-    def get_service_names_from_volumes_from(volumes_from):
-        return [volume_from.source for volume_from in volumes_from]
-
-    def get_service_dependents(service_dict, services):
-        name = service_dict['name']
-        return [
-            service for service in services
-            if (name in get_service_names(service.get('links', [])) or
-                name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
-                name == get_service_name_from_network_mode(service.get('network_mode')) or
-                name in service.get('depends_on', []))
-        ]
 
     def visit(n):
         if n['name'] in temporary_marked:

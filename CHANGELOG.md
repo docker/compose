@@ -1,6 +1,94 @@
 Change log
 ==========
 
+1.7.0 (2016-04-13)
+------------------
+
+**Breaking Changes**
+
+-   `docker-compose logs` no longer follows log output by default. It now
+    matches the behaviour of `docker logs` and exits after the current logs
+    are printed. Use `-f` to get the old default behaviour.
+
+-   Booleans are no longer allows as values for mappings in the Compose file
+    (for keys `environment`, `labels` and `extra_hosts`). Previously this
+    was a warning. Boolean values should be quoted so they become string values.
+
+New Features
+
+-   Compose now looks for a `.env` file in the directory where it's run and
+    reads any environment variables defined inside, if they're not already
+    set in the shell environment. This lets you easily set defaults for
+    variables used in the Compose file, or for any of the `COMPOSE_*` or
+    `DOCKER_*` variables.
+
+-   Added a `--remove-orphans` flag to both `docker-compose up` and
+    `docker-compose down` to remove containers for services that were removed
+    from the Compose file.
+
+-   Added a `--all` flag to `docker-compose rm` to include containers created
+    by `docker-compose run`. This will become the default behavior in the next
+    version of Compose.
+
+-   Added support for all the same TLS configuration flags used by the `docker`
+    client: `--tls`, `--tlscert`, `--tlskey`, etc.
+
+-   Compose files now support the `tmpfs` and `shm_size` options.
+
+-   Added the `--workdir` flag to `docker-compose run`
+
+-   `docker-compose logs` now shows logs for new containers that are created
+    after it starts.
+
+-   The `COMPOSE_FILE` environment variable can now contain multiple files,
+    separated by the host system's standard path separator (`:` on Mac/Linux,
+    `;` on Windows).
+
+-   You can now specify a static IP address when connecting a service to a
+    network with the `ipv4_address` and `ipv6_address` options.
+
+-   Added `--follow`, `--timestamp`, and `--tail` flags to the
+    `docker-compose logs` command.
+
+-   `docker-compose up`, and `docker-compose start` will now start containers
+    in parallel where possible.
+
+-   `docker-compose stop` now stops containers in reverse dependency order
+    instead of all at once.
+
+-   Added the `--build` flag to `docker-compose up` to force it to build a new
+    image. It now shows a warning if an image is automatically built when the
+    flag is not used.
+
+-   Added the `docker-compose exec` command for executing a process in a running
+    container.
+
+
+Bug Fixes
+
+-   `docker-compose down` now removes containers created by
+    `docker-compose run`.
+
+-   A more appropriate error is shown when a timeout is hit during `up` when
+    using a tty.
+
+-   Fixed a bug in `docker-compose down` where it would abort if some resources
+    had already been removed.
+
+-   Fixed a bug where changes to network aliases would not trigger a service
+    to be recreated.
+
+-   Fix a bug where a log message was printed about creating a new volume
+    when it already existed.
+
+-   Fixed a bug where interrupting `up` would not always shut down containers.
+
+-   Fixed a bug where `log_opt` and `log_driver` were not properly carried over
+    when extending services in the v1 Compose file format.
+
+-   Fixed a bug where empty values for build args would cause file validation
+    to fail.
+
 1.6.2 (2016-02-23)
 ------------------
 

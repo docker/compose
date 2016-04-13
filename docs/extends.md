@@ -290,34 +290,20 @@ replaces the old value.
     # result
     command: python otherapp.py
 
-In the case of `build` and `image`, using one in the local service causes
-Compose to discard the other, if it was defined in the original service.
+> **Note:** In the case of `build` and `image`, when using
+> [version 1 of the Compose file format](compose-file.md#version-1), using one
+> option in the local service causes Compose to discard the other option if it
+> was defined in the original service.
+>
+> For example, if the original service defines `image: webapp` and the
+> local service defines `build: .` then the resulting service will have
+> `build: .` and no `image` option.
+>
+> This is because `build` and `image` cannot be used together in a version 1
+> file.
 
-Example of image replacing build:
-
-    # original service
-    build: .
-
-    # local service
-    image: redis
-
-    # result
-    image: redis
-
-
-Example of build replacing image:
-
-    # original service
-    image: redis
-
-    # local service
-    build: .
-
-    # result
-    build: .
-
-For the **multi-value options** `ports`, `expose`, `external_links`, `dns` and
-`dns_search`, Compose concatenates both sets of values:
+For the **multi-value options** `ports`, `expose`, `external_links`, `dns`,
+`dns_search`, and `tmpfs`, Compose concatenates both sets of values:
 
     # original service
     expose:

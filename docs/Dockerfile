@@ -10,6 +10,7 @@ RUN svn checkout https://github.com/docker/kitematic/trunk/docs /docs/content/ki
 RUN svn checkout https://github.com/docker/toolbox/trunk/docs /docs/content/toolbox
 RUN svn checkout https://github.com/docker/opensource/trunk/docs /docs/content/project
 
+
 ENV PROJECT=compose
 # To get the git info for this repo
 COPY . /src

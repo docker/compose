@@ -59,6 +59,14 @@ optionally [dockerfile](#dockerfile) and [args](#args).
       args:
         buildno: 1
 
+If you specify `image` as well as `build`, then Compose tags the built image
+with the tag specified in `image`:
+
+    build: ./dir
+    image: webapp
+
+This will result in an image tagged `webapp`, built from `./dir`.
+
 > **Note**: In the [version 1 file format](#version-1), `build` is different in
 > two ways:
 >
@@ -95,13 +103,13 @@ specified.
 
 > **Note**: In the [version 1 file format](#version-1), `dockerfile` is
 > different in two ways:
->
-> -   It appears alongside `build`, not as a sub-option:
->
->         build: .
->         dockerfile: Dockerfile-alternate
-> -   Using `dockerfile` together with `image` is not allowed. Attempting to do
->     so results in an error.
+
+  * It appears alongside `build`, not as a sub-option:
+
+        build: .
+        dockerfile: Dockerfile-alternate
+
+  * Using `dockerfile` together with `image` is not allowed. Attempting to do so results in an error.
 
 #### args
 
@@ -195,6 +203,11 @@ Simple example:
       db:
         image: postgres
 
+> **Note:** `depends_on` will not wait for `db` and `redis` to be "ready" before
+> starting `web` - only until they have been started. If you need to wait
+> for a service to be ready, see [Controlling startup order](startup-order.md)
+> for more on this problem and strategies for solving it.
+
 ### dns
 
 Custom DNS servers. Can be a single value or a list.
@@ -212,6 +225,15 @@ Custom DNS search domains. Can be a single value or a list.
     dns_search:
       - dc1.example.com
       - dc2.example.com
+
+### tmpfs
+
+Mount a temporary file system inside the container. Can be a single value or a list.
+
+    tmpfs: /run
+    tmpfs:
+      - /run
+      - /tmp
 
 ### entrypoint
 
@@ -340,12 +362,21 @@ An entry with the ip address and hostname will be created in `/etc/hosts` inside
 
 ### image
 
-Tag or partial image ID. Can be local or remote - Compose will attempt to
-pull if it doesn't exist locally.
+Specify the image to start the container from. Can either be a repository/tag or
+a partial image ID.
 
-    image: ubuntu
-    image: orchardup/postgresql
+    image: redis
+    image: ubuntu:14.04
+    image: tutum/influxdb
+    image: example-registry.com:4000/postgresql
     image: a4bc65fd
+
+If the image does not exist, Compose attempts to pull it, unless you have also
+specified [build](#build), in which case it builds it using the specified
+options and tags it with the specified tag.
+
+> **Note**: In the [version 1 file format](#version-1), using `build` together
+> with `image` is not allowed. Attempting to do so results in an error.
 
 ### labels
 
@@ -496,7 +527,7 @@ The general format is shown here.
 
 In the example below, three services are provided (`web`, `worker`, and `db`), along with two networks (`new` and `legacy`). The `db` service is reachable at the hostname `db` or `database` on the `new` network, and at `db` or `mysql` on the `legacy` network.
 
-    version: 2
+    version: '2'
 
     services:
       web:
@@ -522,6 +553,38 @@ In the example below, three services are provided (`web`, `worker`, and `db`), a
     networks:
       new:
       legacy:
+
+#### ipv4_address, ipv6_address
+
+Specify a static IP address for containers for this service when joining the network.
+
+The corresponding network configuration in the [top-level networks section](#network-configuration-reference) must have an `ipam` block with subnet and gateway configurations covering each static address. If IPv6 addressing is desired, the `com.docker.network.enable_ipv6` driver option must be set to `true`.
+
+An example:
+
+    version: '2'
+
+    services:
+      app:
+        image: busybox
+        command: ifconfig
+        networks:
+          app_net:
+            ipv4_address: 172.16.238.10
+            ipv6_address: 2001:3984:3989::10
+
+    networks:
+      app_net:
+        driver: bridge
+        driver_opts:
+          com.docker.network.enable_ipv6: "true"
+        ipam:
+          driver: default
+          config:
+          - subnet: 172.16.238.0/24
+            gateway: 172.16.238.1
+          - subnet: 2001:3984:3989::/64
+            gateway: 2001:3984:3989::1
 
 ### pid
 
@@ -628,7 +691,8 @@ information.
 ### volumes_from
 
 Mount all of the volumes from another service or container, optionally
-specifying read-only access(``ro``) or read-write(``rw``).
+specifying read-only access (``ro``) or read-write (``rw``). If no access level is specified,
+then read-write will be used.
 
     volumes_from:
      - service_name
@@ -645,7 +709,7 @@ specifying read-only access(``ro``) or read-write(``rw``).
 >     - container_name
 >     - container_name:rw
 
-### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, stdin\_open, tty, user, working\_dir
+### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, shm\_size, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/engine/reference/run/) counterpart.
@@ -669,6 +733,7 @@ Each of these is a single value, analogous to its
     restart: always
 
     read_only: true
+    shm_size: 64M
     stdin_open: true
     tty: true
 
@@ -679,7 +744,7 @@ While it is possible to declare volumes on the fly as part of the service
 declaration, this section allows you to create named volumes that can be
 reused across multiple services (without relying on `volumes_from`), and are
 easily retrieved and inspected using the docker command line or API.
-See the [docker volume](/engine/reference/commandline/volume_create.md)
+See the [docker volume](https://docs.docker.com/engine/reference/commandline/volume_create/)
 subcommand documentation for more information.
 
 ### driver
@@ -699,7 +764,7 @@ documentation for more information. Optional.
        foo: "bar"
        baz: 1
 
-## external
+### external
 
 If set to `true`, specifies that this volume has been created outside of
 Compose. `docker-compose up` will not attempt to create it, and will raise

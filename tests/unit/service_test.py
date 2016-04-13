@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
+import pytest
 from docker.errors import APIError
 
 from .. import mock
@@ -13,8 +14,10 @@ from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.project import OneOffFilter
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
+from compose.service import BuildAction
 from compose.service import ContainerNetworkMode
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
@@ -146,7 +149,13 @@ class ServiceTest(unittest.TestCase):
     def test_memory_swap_limit(self):
         self.mock_client.create_host_config.return_value = {}
 
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, mem_limit=1000000000, memswap_limit=2000000000)
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            mem_limit=1000000000,
+            memswap_limit=2000000000)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -162,7 +171,12 @@ class ServiceTest(unittest.TestCase):
     def test_cgroup_parent(self):
         self.mock_client.create_host_config.return_value = {}
 
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, cgroup_parent='test')
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            cgroup_parent='test')
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -176,7 +190,13 @@ class ServiceTest(unittest.TestCase):
 
         log_opt = {'syslog-address': 'tcp://192.168.0.42:123'}
         logging = {'driver': 'syslog', 'options': log_opt}
-        service = Service(name='foo', image='foo', hostname='name', client=self.mock_client, logging=logging)
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            log_driver='syslog',
+            logging=logging)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
         self.assertTrue(self.mock_client.create_host_config.called)
@@ -237,7 +257,7 @@ class ServiceTest(unittest.TestCase):
         opts = service._get_container_create_options(
             {'name': name},
             1,
-            one_off=True)
+            one_off=OneOffFilter.only)
         self.assertEqual(opts['name'], name)
 
     def test_get_container_create_options_does_not_mutate_options(self):
@@ -266,7 +286,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(
             opts['labels'][LABEL_CONFIG_HASH],
-            'f8bfa1058ad1f4231372a0b1639f0dfdb574dafff4e8d7938049ae993f7cf1fc')
+            '2524a06fcb3d781aa2c981fc40bcfa08013bb318e4273bfa388df22023e6f2aa')
         assert opts['environment'] == ['also=real']
 
     def test_get_container_create_options_sets_affinity_with_binds(self):
@@ -387,13 +407,20 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(parse_repository_tag("user/repo"), ("user/repo", "", ":"))
         self.assertEqual(parse_repository_tag("user/repo:tag"), ("user/repo", "tag", ":"))
         self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", "", ":"))
-        self.assertEqual(parse_repository_tag("url:5000/repo:tag"), ("url:5000/repo", "tag", ":"))
+        self.assertEqual(
+            parse_repository_tag("url:5000/repo:tag"),
+            ("url:5000/repo", "tag", ":"))
+        self.assertEqual(
+            parse_repository_tag("root@sha256:digest"),
+            ("root", "sha256:digest", "@"))
+        self.assertEqual(
+            parse_repository_tag("user/repo@sha256:digest"),
+            ("user/repo", "sha256:digest", "@"))
+        self.assertEqual(
+            parse_repository_tag("url:5000/repo@sha256:digest"),
+            ("url:5000/repo", "sha256:digest", "@"))
 
-        self.assertEqual(parse_repository_tag("root@sha256:digest"), ("root", "sha256:digest", "@"))
-        self.assertEqual(parse_repository_tag("user/repo@sha256:digest"), ("user/repo", "sha256:digest", "@"))
-        self.assertEqual(parse_repository_tag("url:5000/repo@sha256:digest"), ("url:5000/repo", "sha256:digest", "@"))
-
-    def test_create_container_with_build(self):
+    def test_create_container(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = [
             NoSuchImageError,
@@ -403,7 +430,12 @@ class ServiceTest(unittest.TestCase):
             '{"stream": "Successfully built abcd"}',
         ]
 
-        service.create_container(do_build=True)
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            service.create_container()
+            assert mock_log.warn.called
+            _, args, _ = mock_log.warn.mock_calls[0]
+            assert 'was built because it did not already exist' in args[0]
+
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',
             dockerfile=None,
@@ -416,18 +448,41 @@ class ServiceTest(unittest.TestCase):
             buildargs=None,
         )
 
-    def test_create_container_no_build(self):
+    def test_ensure_image_exists_no_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
 
-        service.create_container(do_build=False)
-        self.assertFalse(self.mock_client.build.called)
+        service.ensure_image_exists(do_build=BuildAction.skip)
+        assert not self.mock_client.build.called
 
-    def test_create_container_no_build_but_needs_build(self):
+    def test_ensure_image_exists_no_build_but_needs_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.side_effect = NoSuchImageError
-        with self.assertRaises(NeedsBuildError):
-            service.create_container(do_build=False)
+        with pytest.raises(NeedsBuildError):
+            service.ensure_image_exists(do_build=BuildAction.skip)
+
+    def test_ensure_image_exists_force_build(self):
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
+        self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
+        self.mock_client.build.return_value = [
+            '{"stream": "Successfully built abcd"}',
+        ]
+
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            service.ensure_image_exists(do_build=BuildAction.force)
+
+        assert not mock_log.warn.called
+        self.mock_client.build.assert_called_once_with(
+            tag='default_foo',
+            dockerfile=None,
+            stream=True,
+            path='.',
+            pull=False,
+            forcerm=False,
+            nocache=False,
+            rm=True,
+            buildargs=None,
+        )
 
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
@@ -447,6 +502,7 @@ class ServiceTest(unittest.TestCase):
             image='example.com/foo',
             client=self.mock_client,
             network_mode=ServiceNetworkMode(Service('other')),
+            networks={'default': None},
             links=[(Service('one'), 'one')],
             volumes_from=[VolumeFromSpec(Service('two'), 'rw', 'service')])
 
@@ -456,7 +512,7 @@ class ServiceTest(unittest.TestCase):
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
-            'networks': [],
+            'networks': {'default': None},
             'volumes_from': [('two', 'rw')],
         }
         assert config_dict == expected
@@ -477,7 +533,7 @@ class ServiceTest(unittest.TestCase):
             'image_id': 'abcd',
             'options': {'image': 'example.com/foo'},
             'links': [],
-            'networks': [],
+            'networks': {},
             'net': 'aaabbb',
             'volumes_from': [],
         }
