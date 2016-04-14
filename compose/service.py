@@ -179,7 +179,7 @@ class Service(object):
                      'Remove the custom name to scale the service.'
                      % (self.name, self.custom_container_name))
 
-        if self.specifies_host_port():
+        if self.specifies_host_port() and desired_num > 1:
             log.warn('The "%s" service specifies a port on the host. If multiple containers '
                      'for this service are created on a single host, the port will clash.'
                      % self.name)

@@ -642,6 +642,26 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', project='testing')
         assert service.image_name == 'testing_foo'
 
+    @mock.patch('compose.service.log', autospec=True)
+    def test_only_log_warning_when_host_ports_clash(self, mock_log):
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        name = 'foo'
+        service = Service(
+            name,
+            client=self.mock_client,
+            ports=["8080:80"])
+
+        service.scale(0)
+        self.assertFalse(mock_log.warn.called)
+
+        service.scale(1)
+        self.assertFalse(mock_log.warn.called)
+
+        service.scale(2)
+        mock_log.warn.assert_called_once_with(
+            'The "{}" service specifies a port on the host. If multiple containers '
+            'for this service are created on a single host, the port will clash.'.format(name))
+
 
 def sort_by_name(dictionary_list):
     return sorted(dictionary_list, key=lambda k: k['name'])
