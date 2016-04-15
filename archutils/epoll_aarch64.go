@@ -5,15 +5,15 @@ package archutils
 // #include <sys/epoll.h>
 /*
 int EpollCreate1(int flag) {
-        return epoll_create1(0);
+        return epoll_create1(flag);
 }
 
-int EpollCtl(int efd, int op,int sfd, int Events, int Fd) {
+int EpollCtl(int efd, int op, int sfd, int Events, int Fd) {
         struct epoll_event event;
         event.events = Events;
         event.data.fd = Fd;
 
-        return epoll_ctl(efd,op,sfd,&event);
+        return epoll_ctl(efd, op, sfd, &event);
 }
 
 typedef struct Event{
@@ -41,7 +41,7 @@ import (
 )
 
 func EpollCreate1(flag int) (int, error) {
-	fd := int(C.EpollCreate1(0))
+	fd := int(C.EpollCreate1(C.int(flag)))
 	if fd < 0 {
 		return fd, fmt.Errorf("failed to create epoll, errno is %d", fd)
 	}
