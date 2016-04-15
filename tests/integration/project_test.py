@@ -565,7 +565,11 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'command': 'top',
-                'networks': {'foo': None, 'bar': None, 'baz': None},
+                'networks': {
+                    'foo': None,
+                    'bar': None,
+                    'baz': {'aliases': ['extra']},
+                },
             }],
             volumes={},
             networks={
@@ -581,15 +585,23 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data,
         )
         project.up()
-        self.assertEqual(len(project.containers()), 1)
+
+        containers = project.containers()
+        assert len(containers) == 1
+        container, = containers
 
         for net_name in ['foo', 'bar', 'baz']:
             full_net_name = 'composetest_{}'.format(net_name)
             network_data = self.client.inspect_network(full_net_name)
-            self.assertEqual(network_data['Name'], full_net_name)
+            assert network_data['Name'] == full_net_name
+
+        aliases_key = 'NetworkSettings.Networks.{net}.Aliases'
+        assert 'web' in container.get(aliases_key.format(net='composetest_foo'))
+        assert 'web' in container.get(aliases_key.format(net='composetest_baz'))
+        assert 'extra' in container.get(aliases_key.format(net='composetest_baz'))
 
         foo_data = self.client.inspect_network('composetest_foo')
-        self.assertEqual(foo_data['Driver'], 'bridge')
+        assert foo_data['Driver'] == 'bridge'
 
     @v2_only()
     def test_up_with_ipam_config(self):

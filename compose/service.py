@@ -535,7 +535,7 @@ class Service(object):
 
     def _get_aliases(self, network, container=None):
         if container and container.labels.get(LABEL_ONE_OFF) == "True":
-            return set()
+            return []
 
         return list(
             {self.name} |
