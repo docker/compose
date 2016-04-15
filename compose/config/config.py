@@ -726,7 +726,7 @@ class MergeDict(dict):
 
         merged = parse_sequence_func(self.base.get(field, []))
         merged.update(parse_sequence_func(self.override.get(field, [])))
-        self[field] = [item.repr() for item in merged.values()]
+        self[field] = [item.repr() for item in sorted(merged.values())]
 
     def merge_scalar(self, field):
         if self.needs_merge(field):
@@ -928,7 +928,7 @@ def dict_from_path_mappings(path_mappings):
 
 
 def path_mappings_from_dict(d):
-    return [join_path_mapping(v) for v in d.items()]
+    return [join_path_mapping(v) for v in sorted(d.items())]
 
 
 def split_path_mapping(volume_path):
