@@ -142,7 +142,7 @@ class TopLevelCommand(object):
     """Define and run multi-container applications with Docker.
 
     Usage:
-      docker-compose [-f=<arg>...] [options] [COMMAND] [ARGS...]
+      docker-compose [-f <arg>...] [options] [COMMAND] [ARGS...]
       docker-compose -h|--help
 
     Options:
