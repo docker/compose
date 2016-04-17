@@ -171,6 +171,14 @@ def validate_network_mode(service_config, service_names):
             "is undefined.".format(s=service_config, dep=dependency))
 
 
+def validate_links(service_config, service_names):
+    for dependency in service_config.config.get('links', []):
+        if dependency not in service_names:
+            raise ConfigurationError(
+                "Service '{s.name}' has a link to service '{dep}' which is "
+                "undefined.".format(s=service_config, dep=dependency))
+
+
 def validate_depends_on(service_config, service_names):
     for dependency in service_config.config.get('depends_on', []):
         if dependency not in service_names:
