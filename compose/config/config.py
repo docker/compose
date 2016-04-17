@@ -37,6 +37,7 @@ from .validation import validate_against_config_schema
 from .validation import validate_config_section
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
+from .validation import validate_links
 from .validation import validate_network_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
@@ -580,6 +581,7 @@ def validate_service(service_config, service_names, version):
     validate_ulimits(service_config)
     validate_network_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
+    validate_links(service_config, service_names)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(
