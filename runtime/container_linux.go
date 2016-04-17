@@ -133,7 +133,11 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 		add("--ext-unix-sk")
 	}
 	add(c.id)
-	return exec.Command(c.runtime, args...).Run()
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %s", err.Error(), string(out))
+	}
+	return err
 }
 
 func (c *container) DeleteCheckpoint(name string) error {
