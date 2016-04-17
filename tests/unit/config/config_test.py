@@ -1366,7 +1366,7 @@ class ConfigTest(unittest.TestCase):
                 build_config_details({
                     'version': '2',
                     'services': {
-                        'web': {'image': 'busybox', 'links': ['db']},
+                        'web': {'image': 'busybox', 'links': ['db:db']},
                     },
                 })
             )
