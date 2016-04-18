@@ -64,7 +64,7 @@ func setupEventLog(s *Supervisor) error {
 	}
 	logrus.WithField("count", len(s.eventLog)).Debug("containerd: read past events")
 	events := s.Events(time.Time{})
-	f, err := os.OpenFile(filepath.Join(s.stateDir, "events.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
+	f, err := os.OpenFile(filepath.Join(s.stateDir, "events.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
