@@ -1,35 +1,35 @@
-// +build arm64,linux
+// +build linux,aarch64
 
 package archutils
 
 // #include <sys/epoll.h>
 /*
 int EpollCreate1(int flag) {
-        return epoll_create1(flag);
+	return epoll_create1(flag);
 }
 
-int EpollCtl(int efd, int op, int sfd, int Events, int Fd) {
-        struct epoll_event event;
-        event.events = Events;
-        event.data.fd = Fd;
+int EpollCtl(int efd, int op,int sfd, int events, int fd) {
+	struct epoll_event event;
+	event.events = events;
+	event.data.fd = fd;
 
-        return epoll_ctl(efd, op, sfd, &event);
+	return epoll_ctl(efd, op, sfd, &event);
 }
 
-typedef struct Event{
-        uint32_t events;
-        int fd;
+struct event_t {
+	uint32_t events;
+	int fd;
 };
 
 struct epoll_event events[128];
-int run_epoll_wait(int fd, struct Event *event) {
-        int n, i;
-        n = epoll_wait(fd, events, 128, -1);
-        for (i = 0; i < n; i++) {
-                event[i].events = events[i].events;
-                event[i].fd = events[i].data.fd;
-        }
-        return n;
+int run_epoll_wait(int fd, struct event_t *event) {
+	int n, i;
+	n = epoll_wait(fd, events, 128, -1);
+	for (i = 0; i < n; i++) {
+		event[i].events = events[i].events;
+		event[i].fd = events[i].data.fd;
+	}
+	return n;
 }
 */
 import "C"
@@ -57,8 +57,8 @@ func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
 }
 
 func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (int, error) {
-	var c_events [128]C.struct_Event
-	n := int(C.run_epoll_wait(C.int(epfd), (*C.struct_Event)(unsafe.Pointer(&c_events))))
+	var c_events [128]C.struct_event_t
+	n := int(C.run_epoll_wait(C.int(epfd), (*C.struct_event_t)(unsafe.Pointer(&c_events))))
 	if n < 0 {
 		return int(n), fmt.Errorf("Failed to wait epoll")
 	}
