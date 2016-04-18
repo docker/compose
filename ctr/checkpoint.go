@@ -10,14 +10,24 @@ import (
 	netcontext "golang.org/x/net/context"
 )
 
+var checkpointSubCmds = []cli.Command{
+	listCheckpointCommand,
+	createCheckpointCommand,
+	deleteCheckpointCommand,
+}
+
 var checkpointCommand = cli.Command{
-	Name:  "checkpoints",
-	Usage: "list all checkpoints",
-	Subcommands: []cli.Command{
-		listCheckpointCommand,
-		createCheckpointCommand,
-		deleteCheckpointCommand,
-	},
+	Name:        "checkpoints",
+	Usage:       "list all checkpoints",
+	ArgsUsage:   "COMMAND [arguments...]",
+	Subcommands: checkpointSubCmds,
+	Description: func() string {
+		desc := "\n    COMMAND:\n"
+		for _, command := range checkpointSubCmds {
+			desc += fmt.Sprintf("    %-10.10s%s\n", command.Name, command.Usage)
+		}
+		return desc
+	}(),
 	Action: listCheckpoints,
 }
 

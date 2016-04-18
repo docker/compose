@@ -41,20 +41,30 @@ func getClient(ctx *cli.Context) types.APIClient {
 	return types.NewAPIClient(conn)
 }
 
+var contSubCmds = []cli.Command{
+	execCommand,
+	killCommand,
+	listCommand,
+	pauseCommand,
+	resumeCommand,
+	startCommand,
+	statsCommand,
+	watchCommand,
+	updateCommand,
+}
+
 var containersCommand = cli.Command{
-	Name:  "containers",
-	Usage: "interact with running containers",
-	Subcommands: []cli.Command{
-		execCommand,
-		killCommand,
-		listCommand,
-		pauseCommand,
-		resumeCommand,
-		startCommand,
-		statsCommand,
-		watchCommand,
-		updateCommand,
-	},
+	Name:        "containers",
+	Usage:       "interact with running containers",
+	ArgsUsage:   "COMMAND [arguments...]",
+	Subcommands: contSubCmds,
+	Description: func() string {
+		desc := "\n    COMMAND:\n"
+		for _, command := range contSubCmds {
+			desc += fmt.Sprintf("    %-10.10s%s\n", command.Name, command.Usage)
+		}
+		return desc
+	}(),
 	Action: listContainers,
 }
 
@@ -107,8 +117,9 @@ func listContainers(context *cli.Context) {
 }
 
 var startCommand = cli.Command{
-	Name:  "start",
-	Usage: "start a container",
+	Name:      "start",
+	Usage:     "start a container",
+	ArgsUsage: "ID BundlePath",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "checkpoint,c",
