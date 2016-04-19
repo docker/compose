@@ -32,6 +32,10 @@ You can use environment variables in configuration values with a Bash-like
 `${VARIABLE}` syntax - see [variable substitution](#variable-substitution) for
 full details.
 
+You can also use shell command as variable substitution using
+`$((command to get value))` syntax - see
+[command substitution](#command-substitution) for full details.
+
 
 ## Service configuration reference
 
@@ -1124,6 +1128,31 @@ Compose.
 If you forget and use a single dollar sign (`$`), Compose interprets the value as an environment variable and will warn you:
 
   The VAR_NOT_INTERPOLATED_BY_COMPOSE is not set. Substituting an empty string.
+
+## Command substitution
+
+Your configuration options can also be set by shell commands. For example
+suppose you need to get "user id" from your environement using `id -u` command:
+
+    web:
+        build: .
+        user: $((id -u))
+
+When you run `docker-compose up`, Compose will use the returned value to
+the "user" option (as `docker run -u $(id -u)` from command line)
+
+If the command fails, Compose will not start the container returning an error.
+
+You may use this syntax for environment:
+
+    web:
+        build: .
+        environment:
+            HOST_USERID: $((id -u))
+            HELLO: $((echo "Hella" | sed 's/o/a/'))
+
+In this example, container environment variable `$HOST_USERID` is set the host user id,
+and `$HELLO` is set to "Hello"
 
 ## Compose documentation
 
