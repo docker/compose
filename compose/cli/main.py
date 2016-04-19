@@ -372,10 +372,14 @@ class TopLevelCommand(object):
         """
         Get help on a command.
 
-        Usage: help COMMAND
+        Usage: help [COMMAND]
         """
-        handler = get_handler(cls, options['COMMAND'])
-        raise SystemExit(getdoc(handler))
+        if options['COMMAND']:
+            subject = get_handler(cls, options['COMMAND'])
+        else:
+            subject = cls
+
+        print(getdoc(subject))
 
     def kill(self, options):
         """
