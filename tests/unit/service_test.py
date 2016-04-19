@@ -663,6 +663,35 @@ class ServiceTest(unittest.TestCase):
             'for this service are created on a single host, the port will clash.'.format(name))
 
 
+class TestServiceNetwork(object):
+
+    def test_connect_container_to_networks_short_aliase_exists(self):
+        mock_client = mock.create_autospec(docker.Client)
+        service = Service(
+            'db',
+            mock_client,
+            'myproject',
+            image='foo',
+            networks={'project_default': {}})
+        container = Container(
+            None,
+            {
+                'Id': 'abcdef',
+                'NetworkSettings': {
+                    'Networks': {
+                        'project_default': {
+                            'Aliases': ['analias', 'abcdef'],
+                        },
+                    },
+                },
+            },
+            True)
+        service.connect_container_to_networks(container)
+
+        assert not mock_client.disconnect_container_from_network.call_count
+        assert not mock_client.connect_container_to_network.call_count
+
+
 def sort_by_name(dictionary_list):
     return sorted(dictionary_list, key=lambda k: k['name'])
 
