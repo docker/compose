@@ -23,7 +23,7 @@ func (s *Supervisor) delete(t *DeleteTask) error {
 		}
 		if !t.NoEvent {
 			s.notifySubscribers(Event{
-				Type:      "exit",
+				Type:      StateExit,
 				Timestamp: time.Now(),
 				ID:        t.ID,
 				Status:    t.Status,

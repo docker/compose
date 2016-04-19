@@ -73,7 +73,7 @@ func (s *Supervisor) execExit(t *ExecExitTask) error {
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
 		ID:        t.ID,
-		Type:      "exit",
+		Type:      StateExit,
 		PID:       t.PID,
 		Status:    t.Status,
 	})

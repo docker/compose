@@ -161,7 +161,7 @@ func (s *Supervisor) Events(from time.Time) chan Event {
 		}
 		// Notify the client that from now on it's live events
 		c <- Event{
-			Type:      "live",
+			Type:      StateLive,
 			Timestamp: time.Now(),
 		}
 	}
