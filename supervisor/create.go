@@ -27,6 +27,7 @@ func (s *Supervisor) start(t *StartTask) error {
 		Bundle:      t.BundlePath,
 		Runtime:     s.runtime,
 		RuntimeArgs: s.runtimeArgs,
+		Shim:        s.shim,
 		Labels:      t.Labels,
 		NoPivotRoot: t.NoPivotRoot,
 		Timeout:     s.timeout,

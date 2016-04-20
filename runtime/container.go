@@ -89,6 +89,7 @@ type ContainerOpts struct {
 	Bundle      string
 	Runtime     string
 	RuntimeArgs []string
+	Shim        string
 	Labels      []string
 	NoPivotRoot bool
 	Timeout     time.Duration
@@ -104,6 +105,7 @@ func New(opts ContainerOpts) (Container, error) {
 		processes:   make(map[string]*process),
 		runtime:     opts.Runtime,
 		runtimeArgs: opts.RuntimeArgs,
+		shim:        opts.Shim,
 		noPivotRoot: opts.NoPivotRoot,
 		timeout:     opts.Timeout,
 	}
@@ -144,6 +146,7 @@ func Load(root, id string) (Container, error) {
 		labels:      s.Labels,
 		runtime:     s.Runtime,
 		runtimeArgs: s.RuntimeArgs,
+		shim:        s.Shim,
 		noPivotRoot: s.NoPivotRoot,
 		processes:   make(map[string]*process),
 	}
@@ -190,6 +193,7 @@ type container struct {
 	bundle      string
 	runtime     string
 	runtimeArgs []string
+	shim        string
 	processes   map[string]*process
 	labels      []string
 	oomFds      []int

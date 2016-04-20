@@ -61,6 +61,7 @@ type state struct {
 	Stderr      string   `json:"stderr"`
 	Runtime     string   `json:"runtime"`
 	RuntimeArgs []string `json:"runtimeArgs"`
+	Shim        string   `json:"shim"`
 	NoPivotRoot bool     `json:"noPivotRoot"`
 }
 
