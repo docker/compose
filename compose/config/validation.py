@@ -219,7 +219,7 @@ def handle_error_for_schema_with_id(error, path):
             return get_unsupported_config_msg(path, invalid_config_key)
 
         if not error.path:
-            return '{}\n{}'.format(error.message, VERSION_EXPLANATION)
+            return '{}\n\n{}'.format(error.message, VERSION_EXPLANATION)
 
 
 def handle_generic_error(error, path):
