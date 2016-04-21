@@ -7,6 +7,11 @@ from string import Template
 import six
 
 from .errors import ConfigurationError
+from .func_map import func_map
+from .func_map import func_regexp
+from .func_map import inhibate_double_arobase
+from .func_map import InvalidHelperFunction
+
 log = logging.getLogger(__name__)
 
 
@@ -52,10 +57,24 @@ def recursive_interpolate(obj, mapping):
 
 
 def interpolate(string, mapping):
+    string = interpolate_function(string)
     try:
         return Template(string).substitute(mapping)
     except ValueError:
         raise InvalidInterpolation(string)
+
+
+def interpolate_function(string):
+    for match in func_regexp.finditer(string):
+        if string[:2] == '@@':
+            continue
+        cmd = match.group(1)
+        if cmd in func_map:
+            string = string.replace(match.group(0), str(func_map[cmd]()))
+        else:
+            raise InvalidHelperFunction('Unkwown helper function "%s"' % cmd)
+    string = inhibate_double_arobase.sub(lambda m: r'@{%s}' % m.group(1), string)
+    return string
 
 
 class InvalidInterpolation(Exception):

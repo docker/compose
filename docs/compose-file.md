@@ -32,6 +32,11 @@ You can use environment variables in configuration values with a Bash-like
 `${VARIABLE}` syntax - see [variable substitution](#variable-substitution) for
 full details.
 
+Futhermore, Compose exposes some helper functions that may be useful to get
+some values as launcher user id or host plateform name -
+see [helper function](#helper-functions) for full details.
+
+
 
 ## Service configuration reference
 
@@ -1128,6 +1133,24 @@ Compose.
 If you forget and use a single dollar sign (`$`), Compose interprets the value as an environment variable and will warn you:
 
   The VAR_NOT_INTERPOLATED_BY_COMPOSE is not set. Substituting an empty string.
+
+## Helper functions
+
+In configuration options, you may invoke "helper functions" to get specific host values.
+The form is `@{help_function}` where "helper\_function" is one of the following:
+
+- `get_user_id`: returns the current user id
+- `get_group_id`: returns the current user group id
+- `get_host_platform`: returns the name of the current platform - see [python sys.platform](https://docs.python.org/2/library/sys.html#sys.platform)
+- `get_docker_version`: returns the docker version (eg. 1.11.0)
+_ `get_compose_version`: returns the compose version (eg. 1.8.0)
+
+The whole helper functions returns `string` type value.
+
+To avoid helper function invokation, and get `@{string}`, you need to double arobase char
+as for environment variable that doubles dolar sign. Eg. `@@{foo}` yields `@{foo}` and will not be
+interpreted as helper function call.
+
 
 ## Compose documentation
 
