@@ -2,7 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import sys
 
+import docker
 import mock
 import pytest
 
@@ -22,32 +24,24 @@ def mock_env():
         yield
 
 
-@pytest.yield_fixture
-def mock_func_map():
-    def _uid():
-        return 5555
+def get_docker_version():
+    return ".".join([str(i) for i in docker.version_info])
 
-    def _gid():
-        return 5556
 
-    def _docker_version():
-        return "1.2.3"
+def get_uid():
+    if not IS_WINDOWS_PLATFORM:
+        return os.getuid()
+    # donot raise exception and return
+    # faked uid
+    return 1234
 
-    def _compose_version():
-        return compose.__version__
 
-    def _platform():
-        return 'mocked_platform'
-
-    with mock.patch.dict(compose.config.interpolation.func_map):
-        compose.config.interpolation.func_map = {
-            'get_user_id': _uid,
-            'get_group_id': _gid,
-            'get_compose_version': _compose_version,
-            'get_docker_version': _docker_version,
-            'get_host_platform': _platform
-        }
-        yield
+def get_guid():
+    if not IS_WINDOWS_PLATFORM:
+        return os.getgid()
+    # donot raise exception and return
+    # faked gid
+    return 1234
 
 
 def test_interpolate_environment_variables_in_services(mock_env):
@@ -106,12 +100,11 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
     ) == expected
 
 
-def test_invoke_funcmap_in_services(mock_env, mock_func_map):
+def test_invoke_funcmap_in_services(mock_env):
 
     services = {
         'servicea': {
             'image': '@{get_host_platform}:latest',
-            'user': '@{get_user_id}:@{get_group_id}',
             'environment': {
                 'COMPOSE_VERSION': '@{get_compose_version}',
                 'DOCKER_VERSION': '@{get_docker_version}',
@@ -120,12 +113,29 @@ def test_invoke_funcmap_in_services(mock_env, mock_func_map):
     }
     expected = {
         'servicea': {
-            'image': 'mocked_platform:latest',
-            'user': '5555:5556',
+            'image': '%s:latest' % sys.platform,
             'environment': {
                 'COMPOSE_VERSION': compose.__version__,
-                'DOCKER_VERSION': '1.2.3',
+                'DOCKER_VERSION': get_docker_version(),
             }
+        }
+    }
+
+    assert interpolate_environment_variables(
+        services, 'servicea', Environment.from_env_file(None)
+    ) == expected
+
+
+def test_invoke_posix_funcmap_in_services(mock_env):
+
+    services = {
+        'servicea': {
+            'user': '@{get_user_id}:@{get_group_id}',
+        }
+    }
+    expected = {
+        'servicea': {
+            'user': '%d:%d' % (get_uid(), get_guid()),
         }
     }
 
@@ -142,7 +152,7 @@ def test_invoke_funcmap_in_services(mock_env, mock_func_map):
             pass
 
 
-def test_inihbate_invoke_funcmap_in_services(mock_env, mock_func_map):
+def test_inihbate_invoke_funcmap_in_services(mock_env):
 
     services = {
         'servicea': {
@@ -159,7 +169,7 @@ def test_inihbate_invoke_funcmap_in_services(mock_env, mock_func_map):
     ) == expected
 
 
-def test_calling_unknown_helper_function(mock_env, mock_func_map):
+def test_calling_unknown_helper_function(mock_env):
 
     services = {
         'servicea': {
