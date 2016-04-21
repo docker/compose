@@ -502,9 +502,11 @@ the special form `service:[service name]`.
 Networks to join, referencing entries under the
 [top-level `networks` key](#network-configuration-reference).
 
-    networks:
-      - some-network
-      - other-network
+    services:
+      some-service:
+        networks:
+         - some-network
+         - other-network
 
 #### aliases
 
@@ -516,14 +518,16 @@ Since `aliases` is network-scoped, the same service can have different aliases o
 
 The general format is shown here.
 
-    networks:
-      some-network:
-        aliases:
-          - alias1
-          - alias3
-      other-network:
-        aliases:
-          - alias2
+    services:
+      some-service:
+        networks:
+          some-network:
+            aliases:
+             - alias1
+             - alias3
+          other-network:
+            aliases:
+             - alias2
 
 In the example below, three services are provided (`web`, `worker`, and `db`), along with two networks (`new` and `legacy`). The `db` service is reachable at the hostname `db` or `database` on the `new` network, and at `db` or `mysql` on the `legacy` network.
 
