@@ -32,6 +32,7 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
+from ..service import OperationFailedError
 from .command import get_config_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
@@ -61,7 +62,8 @@ def main():
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError, ProjectError) as e:
+    except (UserError, NoSuchService, ConfigurationError,
+            ProjectError, OperationFailedError) as e:
         log.error(e.msg)
         sys.exit(1)
     except BuildError as e:

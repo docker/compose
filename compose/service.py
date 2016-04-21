@@ -27,6 +27,7 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
+from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .progress_stream import stream_output
@@ -277,7 +278,11 @@ class Service(object):
         if 'name' in container_options and not quiet:
             log.info("Creating %s" % container_options['name'])
 
-        return Container.create(self.client, **container_options)
+        try:
+            return Container.create(self.client, **container_options)
+        except APIError as ex:
+            raise OperationFailedError("Cannot create container for service %s: %s" %
+                                       (self.name, ex.explanation))
 
     def ensure_image_exists(self, do_build=BuildAction.none):
         if self.can_be_built() and do_build == BuildAction.force:
@@ -447,7 +452,10 @@ class Service(object):
 
     def start_container(self, container):
         self.connect_container_to_networks(container)
-        container.start()
+        try:
+            container.start()
+        except APIError as ex:
+            raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
         return container
 
     def connect_container_to_networks(self, container):
