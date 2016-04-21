@@ -69,6 +69,11 @@ var daemonFlags = []cli.Flag{
 		Value: 15 * time.Second,
 		Usage: "timeout duration for waiting on a container to start before it is killed",
 	},
+	cli.IntFlag{
+		Name:  "retain-count",
+		Value: 500,
+		Usage: "number of past events to keep in the event log",
+	},
 }
 
 func main() {
@@ -85,15 +90,7 @@ func main() {
 	setAppBefore(app)
 
 	app.Action = func(context *cli.Context) {
-		if err := daemon(
-			context.String("listen"),
-			context.String("state-dir"),
-			10,
-			context.String("runtime"),
-			context.StringSlice("runtime-args"),
-			context.String("shim"),
-			context.Duration("start-timeout"),
-		); err != nil {
+		if err := daemon(context); err != nil {
 			logrus.Fatal(err)
 		}
 	}
@@ -102,7 +99,7 @@ func main() {
 	}
 }
 
-func daemon(address, stateDir string, concurrency int, runtimeName string, runtimeArgs []string, shimName string, timeout time.Duration) error {
+func daemon(context *cli.Context) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	s := make(chan os.Signal, 2048)
@@ -110,12 +107,18 @@ func daemon(address, stateDir string, concurrency int, runtimeName string, runti
 	if err := osutils.SetSubreaper(1); err != nil {
 		logrus.WithField("error", err).Error("containerd: set subpreaper")
 	}
-	sv, err := supervisor.New(stateDir, runtimeName, shimName, runtimeArgs, timeout)
+	sv, err := supervisor.New(
+		context.String("state-dir"),
+		context.String("runtime"),
+		context.String("shim"),
+		context.StringSlice("runtime-args"),
+		context.Duration("start-timeout"),
+		context.Int("retain-count"))
 	if err != nil {
 		return err
 	}
 	wg := &sync.WaitGroup{}
-	for i := 0; i < concurrency; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		w := supervisor.NewWorker(sv, wg)
 		go w.Start()
@@ -123,7 +126,7 @@ func daemon(address, stateDir string, concurrency int, runtimeName string, runti
 	if err := sv.Start(); err != nil {
 		return err
 	}
-	server, err := startServer(address, sv)
+	server, err := startServer(context.String("listen"), sv)
 	if err != nil {
 		return err
 	}

@@ -18,7 +18,7 @@ const (
 )
 
 // New returns an initialized Process supervisor.
-func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, timeout time.Duration) (*Supervisor, error) {
+func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, timeout time.Duration, retainCount int) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, ti
 		shim:        shimName,
 		timeout:     timeout,
 	}
-	if err := setupEventLog(s); err != nil {
+	if err := setupEventLog(s, retainCount); err != nil {
 		return nil, err
 	}
 	go s.exitHandler()
@@ -59,20 +59,60 @@ type containerInfo struct {
 	container runtime.Container
 }
 
-func setupEventLog(s *Supervisor) error {
+func setupEventLog(s *Supervisor, retainCount int) error {
 	if err := readEventLog(s); err != nil {
 		return err
 	}
 	logrus.WithField("count", len(s.eventLog)).Debug("containerd: read past events")
 	events := s.Events(time.Time{})
-	f, err := os.OpenFile(filepath.Join(s.stateDir, "events.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755)
+	return eventLogger(s, filepath.Join(s.stateDir, "events.log"), events, retainCount)
+}
+
+func eventLogger(s *Supervisor, path string, events chan Event, retainCount int) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
-	enc := json.NewEncoder(f)
 	go func() {
+		var (
+			count = len(s.eventLog)
+			enc   = json.NewEncoder(f)
+		)
 		for e := range events {
+			// if we have a specified retain count make sure the truncate the event
+			// log if it grows past the specified number of events to keep.
+			if retainCount > 0 {
+				if count > retainCount {
+					logrus.Debug("truncating event log")
+					// close the log file
+					if f != nil {
+						f.Close()
+					}
+					slice := retainCount - 1
+					l := len(s.eventLog)
+					if slice >= l {
+						slice = l
+					}
+					s.eventLock.Lock()
+					s.eventLog = s.eventLog[len(s.eventLog)-slice:]
+					s.eventLock.Unlock()
+					if f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755); err != nil {
+						logrus.WithField("error", err).Error("containerd: open event to journal")
+						continue
+					}
+					enc = json.NewEncoder(f)
+					count = 0
+					for _, le := range s.eventLog {
+						if err := enc.Encode(le); err != nil {
+							logrus.WithField("error", err).Error("containerd: write event to journal")
+						}
+					}
+				}
+			}
+			s.eventLock.Lock()
 			s.eventLog = append(s.eventLog, e)
+			s.eventLock.Unlock()
+			count++
 			if err := enc.Encode(e); err != nil {
 				logrus.WithField("error", err).Error("containerd: write event to journal")
 			}
@@ -121,6 +161,7 @@ type Supervisor struct {
 	tasks          chan Task
 	monitor        *Monitor
 	eventLog       []Event
+	eventLock      sync.Mutex
 	timeout        time.Duration
 }
 
@@ -156,7 +197,10 @@ func (s *Supervisor) Events(from time.Time) chan Event {
 	s.subscribers[c] = struct{}{}
 	if !from.IsZero() {
 		// replay old event
-		for _, e := range s.eventLog {
+		s.eventLock.Lock()
+		past := s.eventLog[:]
+		s.eventLock.Unlock()
+		for _, e := range past {
 			if e.Timestamp.After(from) {
 				c <- e
 			}
