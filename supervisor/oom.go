@@ -16,7 +16,7 @@ func (s *Supervisor) oom(t *OOMTask) error {
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
 		ID:        t.ID,
-		Type:      "oom",
+		Type:      StateOOM,
 	})
 	return nil
 }

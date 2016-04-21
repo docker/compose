@@ -68,7 +68,7 @@ func (w *worker) Start() {
 		w.s.notifySubscribers(Event{
 			Timestamp: time.Now(),
 			ID:        t.Container.ID(),
-			Type:      "start-container",
+			Type:      StateStart,
 		})
 	}
 }

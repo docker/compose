@@ -27,7 +27,7 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 			}
 			s.notifySubscribers(Event{
 				ID:        t.ID,
-				Type:      "resume",
+				Type:      StateResume,
 				Timestamp: time.Now(),
 			})
 		case runtime.Paused:
@@ -36,7 +36,7 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 			}
 			s.notifySubscribers(Event{
 				ID:        t.ID,
-				Type:      "pause",
+				Type:      StatePause,
 				Timestamp: time.Now(),
 			})
 		default:
