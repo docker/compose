@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -31,18 +32,21 @@ func Test(t *testing.T) {
 }
 
 func init() {
-	check.Suite(&ContainerdSuite{})
+	check.Suite(&ContainerdSuite{lastEventTs: uint64(time.Now().Unix())})
 }
 
 type ContainerdSuite struct {
 	cwd               string
 	outputDir         string
+	stateDir          string
+	grpcSocket        string
 	logFile           *os.File
 	cd                *exec.Cmd
 	syncChild         chan error
 	grpcClient        types.APIClient
 	eventFiltersMutex sync.Mutex
 	eventFilters      map[string]func(event *types.Event)
+	lastEventTs       uint64
 }
 
 // getClient returns a connection to the Suite containerd
@@ -69,15 +73,18 @@ func (cs *ContainerdSuite) getClient(socket string) error {
 // via `SetContainerEventFilter()`, it will be invoked every time an
 // event for that id is received
 func (cs *ContainerdSuite) ContainerdEventsHandler(events types.API_EventsClient) {
-	timestamp := uint64(time.Now().Unix())
 	for {
 		e, err := events.Recv()
 		if err != nil {
+			// If daemon died or exited, return
+			if strings.Contains(err.Error(), "transport is closing") {
+				break
+			}
 			time.Sleep(1 * time.Second)
-			events, _ = cs.grpcClient.Events(context.Background(), &types.EventsRequest{Timestamp: timestamp})
+			events, _ = cs.grpcClient.Events(context.Background(), &types.EventsRequest{Timestamp: cs.lastEventTs})
 			continue
 		}
-		timestamp = e.Timestamp
+		cs.lastEventTs = e.Timestamp
 		cs.eventFiltersMutex.Lock()
 		if f, ok := cs.eventFilters[e.Id]; ok {
 			f(e)
@@ -95,6 +102,73 @@ func generateReferenceSpecs(destination string) error {
 	specs := exec.Command("runc", "spec")
 	specs.Dir = destination
 	return specs.Run()
+}
+
+func (cs *ContainerdSuite) StopDaemon(kill bool) {
+	if cs.cd == nil {
+		return
+	}
+
+	if kill {
+		cs.cd.Process.Kill()
+		<-cs.syncChild
+		cs.cd = nil
+	} else {
+		// Terminate gently if possible
+		cs.cd.Process.Signal(os.Interrupt)
+
+		done := false
+		for done == false {
+			select {
+			case err := <-cs.syncChild:
+				if err != nil {
+					fmt.Printf("master containerd did not exit cleanly: %v\n", err)
+				}
+				done = true
+			case <-time.After(3 * time.Second):
+				fmt.Println("Timeout while waiting for containerd to exit, killing it!")
+				cs.cd.Process.Kill()
+			}
+		}
+	}
+}
+
+func (cs *ContainerdSuite) RestartDaemon(kill bool) error {
+	cs.StopDaemon(kill)
+
+	cd := exec.Command("containerd", "--debug",
+		"--state-dir", cs.stateDir,
+		"--listen", cs.grpcSocket,
+		"--metrics-interval", "0m0s",
+		"--runtime-args", fmt.Sprintf("--root=%s", filepath.Join(cs.cwd, cs.outputDir, "runc")),
+	)
+	cd.Stderr = cs.logFile
+	cd.Stdout = cs.logFile
+
+	if err := cd.Start(); err != nil {
+		return err
+	}
+	cs.cd = cd
+
+	if err := cs.getClient(cs.grpcSocket); err != nil {
+		// Kill the daemon
+		cs.cd.Process.Kill()
+		return err
+	}
+
+	// Monitor events
+	events, err := cs.grpcClient.Events(context.Background(), &types.EventsRequest{Timestamp: cs.lastEventTs})
+	if err != nil {
+		return err
+	}
+
+	go cs.ContainerdEventsHandler(events)
+
+	go func() {
+		cs.syncChild <- cd.Wait()
+	}()
+
+	return nil
 }
 
 func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
@@ -122,14 +196,14 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 	}
 
 	// Create our output directory
-	od := fmt.Sprintf(outputDirFormat, time.Now().Format("2006-01-02_150405.000000"))
-	cdStateDir := fmt.Sprintf("%s/containerd-master", od)
-	if err := os.MkdirAll(cdStateDir, 0755); err != nil {
-		c.Fatalf("Unable to created output directory '%s': %v", cdStateDir, err)
+	cs.outputDir = fmt.Sprintf(outputDirFormat, time.Now().Format("2006-01-02_150405.000000"))
+	cs.stateDir = filepath.Join(cs.outputDir, "containerd-master")
+	if err := os.MkdirAll(cs.stateDir, 0755); err != nil {
+		c.Fatalf("Unable to created output directory '%s': %v", cs.stateDir, err)
 	}
 
-	cdGRPCSock := filepath.Join(od, "containerd-master", "containerd.sock")
-	cdLogFile := filepath.Join(od, "containerd-master", "containerd.log")
+	cs.grpcSocket = filepath.Join(cs.outputDir, "containerd-master", "containerd.sock")
+	cdLogFile := filepath.Join(cs.outputDir, "containerd-master", "containerd.log")
 
 	f, err := os.OpenFile(cdLogFile, os.O_CREATE|os.O_TRUNC|os.O_RDWR|os.O_SYNC, 0777)
 	if err != nil {
@@ -137,39 +211,8 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 	}
 	cs.logFile = f
 
-	cd := exec.Command("containerd", "--debug",
-		"--state-dir", cdStateDir,
-		"--listen", cdGRPCSock,
-		"--metrics-interval", "0m0s",
-		"--runtime-args", fmt.Sprintf("--root=%s", filepath.Join(cs.cwd, cdStateDir, "runc")),
-	)
-	cd.Stderr = f
-	cd.Stdout = f
-
-	if err := cd.Start(); err != nil {
-		c.Fatalf("Unable to start the master containerd: %v", err)
-	}
-
-	cs.outputDir = od
-	cs.cd = cd
 	cs.syncChild = make(chan error)
-	if err := cs.getClient(cdGRPCSock); err != nil {
-		// Kill the daemon
-		cs.cd.Process.Kill()
-		c.Fatalf("Failed to connect to daemon: %v", err)
-	}
-
-	// Monitor events
-	events, err := cs.grpcClient.Events(context.Background(), &types.EventsRequest{})
-	if err != nil {
-		c.Fatalf("Could not register containerd event handler: %v", err)
-	}
-
-	go cs.ContainerdEventsHandler(events)
-
-	go func() {
-		cs.syncChild <- cd.Wait()
-	}()
+	cs.RestartDaemon(false)
 }
 
 func (cs *ContainerdSuite) TearDownSuite(c *check.C) {

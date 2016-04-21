@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	"github.com/docker/containerd/api/grpc/types"
@@ -263,4 +264,24 @@ func (cs *ContainerdSuite) AddProcessToContainer(init *containerProcess, pid, cw
 	}
 
 	return c, nil
+}
+
+type containerSorter struct {
+	c []*types.Container
+}
+
+func (s *containerSorter) Len() int {
+	return len(s.c)
+}
+
+func (s *containerSorter) Swap(i, j int) {
+	s.c[i], s.c[j] = s.c[j], s.c[i]
+}
+
+func (s *containerSorter) Less(i, j int) bool {
+	return s.c[i].Id < s.c[j].Id
+}
+
+func sortContainers(c []*types.Container) {
+	sort.Sort(&containerSorter{c})
 }

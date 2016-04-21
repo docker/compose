@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -310,4 +311,117 @@ func (cs *ContainerdSuite) TestStartBusyboxTopPauseResume(t *check.C) {
 	t.Assert(len(containers), checker.Equals, 1)
 	t.Assert(containers[0].Id, checker.Equals, "top")
 	t.Assert(containers[0].Status, checker.Equals, "running")
+}
+
+func (cs *ContainerdSuite) TestRestart(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	totalCtr := 10
+
+	for i := 0; i < totalCtr; i++ {
+		containerId := fmt.Sprintf("top%d", i)
+		c, err := cs.StartContainer(containerId, bundleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		e := c.GetNextEvent()
+
+		t.Assert(*e, checker.Equals, types.Event{
+			Type:      "start-container",
+			Id:        containerId,
+			Status:    0,
+			Pid:       "",
+			Timestamp: e.Timestamp,
+		})
+	}
+
+	// restart daemon gracefully (SIGINT)
+	cs.RestartDaemon(false)
+
+	// check that status is running
+	containers, err := cs.ListRunningContainers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sortContainers(containers)
+	t.Assert(len(containers), checker.Equals, totalCtr)
+	for i := 0; i < totalCtr; i++ {
+		t.Assert(containers[i].Id, checker.Equals, fmt.Sprintf("top%d", i))
+		t.Assert(containers[i].Status, checker.Equals, "running")
+	}
+
+	// Now kill daemon (SIGKILL)
+	cs.StopDaemon(true)
+
+	// Sleep a second to allow thevent e timestamp to change since
+	// it's second based
+	<-time.After(3 * time.Second)
+
+	// Kill a couple of containers
+	killedCtr := map[int]bool{4: true, 2: true}
+
+	var f func(*types.Event)
+	deathChans := make([]chan error, len(killedCtr))
+	deathChansIdx := 0
+
+	for i, _ := range killedCtr {
+		ch := make(chan error, 1)
+		deathChans[deathChansIdx] = ch
+		deathChansIdx++
+		syscall.Kill(int(containers[i].Pids[0]), syscall.SIGKILL)
+
+		// Filter to be notified of their death
+		containerId := fmt.Sprintf("top%d", i)
+		f = func(event *types.Event) {
+			expectedEvent := types.Event{
+				Type:   "exit",
+				Id:     containerId,
+				Status: 137,
+				Pid:    "init",
+			}
+			expectedEvent.Timestamp = event.Timestamp
+			if ok := t.Check(*event, checker.Equals, expectedEvent); !ok {
+				ch <- fmt.Errorf("Unexpected event: %#v", *event)
+			} else {
+				ch <- nil
+			}
+		}
+		cs.SetContainerEventFilter(containerId, f)
+	}
+
+	cs.RestartDaemon(true)
+
+	// Ensure we got our events
+	for i, _ := range deathChans {
+		done := false
+		for done == false {
+			select {
+			case err := <-deathChans[i]:
+				t.Assert(err, checker.Equals, nil)
+				done = true
+			case <-time.After(3 * time.Second):
+				t.Fatal("Exit event for container not received after 3 seconds")
+			}
+		}
+	}
+
+	// check that status is running
+	containers, err = cs.ListRunningContainers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sortContainers(containers)
+	t.Assert(len(containers), checker.Equals, totalCtr-len(killedCtr))
+	idShift := 0
+	for i := 0; i < totalCtr-len(killedCtr); i++ {
+		if _, ok := killedCtr[i+idShift]; ok {
+			idShift++
+		}
+		t.Assert(containers[i].Id, checker.Equals, fmt.Sprintf("top%d", i+idShift))
+		t.Assert(containers[i].Status, checker.Equals, "running")
+	}
 }

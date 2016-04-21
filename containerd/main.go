@@ -77,6 +77,7 @@ var daemonFlags = []cli.Flag{
 }
 
 func main() {
+	logrus.SetFormatter(&logrus.TextFormatter{TimestampFormat: time.RFC3339Nano})
 	appendPlatformFlags()
 	app := cli.NewApp()
 	app.Name = "containerd"
