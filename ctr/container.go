@@ -26,15 +26,22 @@ import (
 
 // TODO: parse flags and pass opts
 func getClient(ctx *cli.Context) types.APIClient {
+	// Parse proto://address form addresses.
+	bindSpec := ctx.GlobalString("address")
+	bindParts := strings.SplitN(bindSpec, "://", 2)
+	if len(bindParts) != 2 {
+		fatal(fmt.Sprintf("bad bind address format %s, expected proto://address", bindSpec), 1)
+	}
+
 	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(ctx.GlobalDuration("conn-timeout"))}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+			return net.DialTimeout(bindParts[0], bindParts[1], timeout)
 		},
 		))
-	conn, err := grpc.Dial(ctx.GlobalString("address"), dialOpts...)
+	conn, err := grpc.Dial(bindSpec, dialOpts...)
 	if err != nil {
 		fatal(err.Error(), 1)
 	}

@@ -9,7 +9,7 @@ clone git github.com/cloudfoundry/gosigar 3ed7c74352dae6dc00bdc8c74045375352e3ec
 clone git github.com/codegangsta/cli 9fec0fad02befc9209347cc6d620e68e1b45f74d
 clone git github.com/coreos/go-systemd 7b2428fec40033549c68f54e26e89e7ca9a9ce31
 clone git github.com/cyberdelia/go-metrics-graphite 7e54b5c2aa6eaff4286c44129c3def899dff528c
-clone git github.com/docker/docker 9ff767bcc06c924fd669d881a34847aa4fbaab5e
+clone git github.com/docker/docker f3dcc1c46249ffc4a73ab2005d1ad011dff3c7df
 clone git github.com/docker/go-units 5d2041e26a699eaca682e2ea41c8f891e1060444
 clone git github.com/godbus/dbus e2cf28118e66a6a63db46cf6088a35d2054d3bb0
 clone git github.com/golang/glog 23def4e6c14b4da8ac2ed8007337bc5eb5007998
@@ -27,5 +27,9 @@ clone git github.com/seccomp/libseccomp-golang 1b506fc7c24eec5a3693cdcbed40d9c22
 
 clone git github.com/vdemeester/shakers 24d7f1d6a71aa5d9cbe7390e4afb66b7eef9e1b3
 clone git github.com/go-check/check a625211d932a2a643d0d17352095f03fb7774663 https://github.com/cpuguy83/check.git
+
+# dependencies of docker/pkg/listeners
+clone git github.com/docker/go-connections v0.2.0
+clone git github.com/Microsoft/go-winio v0.3.2
 
 clean

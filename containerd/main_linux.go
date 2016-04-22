@@ -20,8 +20,7 @@ import (
 
 const (
 	defaultStateDir     = "/run/containerd"
-	defaultListenType   = "unix"
-	defaultGRPCEndpoint = "/run/containerd/containerd.sock"
+	defaultGRPCEndpoint = "unix:///run/containerd/containerd.sock"
 )
 
 func appendPlatformFlags() {
