@@ -284,6 +284,11 @@ func (c *container) Stats() (*Stat, error) {
 	}, nil
 }
 
+// Status implements the runtime Container interface.
+func (c *container) Status() (State, error) {
+	return "running", nil
+}
+
 func (c *container) OOM() (OOM, error) {
 	container, err := c.getLibctContainer()
 	if err != nil {
