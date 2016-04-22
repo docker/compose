@@ -3,7 +3,9 @@ package configs
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os/exec"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -247,10 +249,11 @@ func (hooks Hooks) MarshalJSON() ([]byte, error) {
 
 // HookState is the payload provided to a hook on execution.
 type HookState struct {
-	Version string `json:"version"`
-	ID      string `json:"id"`
-	Pid     int    `json:"pid"`
-	Root    string `json:"root"`
+	Version    string `json:"ociVersion"`
+	ID         string `json:"id"`
+	Pid        int    `json:"pid"`
+	Root       string `json:"root"`
+	BundlePath string `json:"bundlePath"`
 }
 
 type Hook interface {
@@ -274,10 +277,11 @@ func (f FuncHook) Run(s HookState) error {
 }
 
 type Command struct {
-	Path string   `json:"path"`
-	Args []string `json:"args"`
-	Env  []string `json:"env"`
-	Dir  string   `json:"dir"`
+	Path    string         `json:"path"`
+	Args    []string       `json:"args"`
+	Env     []string       `json:"env"`
+	Dir     string         `json:"dir"`
+	Timeout *time.Duration `json:"timeout"`
 }
 
 // NewCommandHooks will execute the provided command when the hook is run.
@@ -302,5 +306,23 @@ func (c Command) Run(s HookState) error {
 		Env:   c.Env,
 		Stdin: bytes.NewReader(b),
 	}
-	return cmd.Run()
+	errC := make(chan error, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			err = fmt.Errorf("%s: %s", err, out)
+		}
+		errC <- err
+	}()
+	if c.Timeout != nil {
+		select {
+		case err := <-errC:
+			return err
+		case <-time.After(*c.Timeout):
+			cmd.Process.Kill()
+			cmd.Wait()
+			return fmt.Errorf("hook ran past specified timeout of %.1fs", c.Timeout.Seconds())
+		}
+	}
+	return <-errC
 }

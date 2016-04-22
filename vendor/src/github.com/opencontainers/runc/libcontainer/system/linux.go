@@ -53,6 +53,14 @@ func Execv(cmd string, args []string, env []string) error {
 	return syscall.Exec(name, args, env)
 }
 
+func Prlimit(pid, resource int, limit syscall.Rlimit) error {
+	_, _, err := syscall.RawSyscall6(syscall.SYS_PRLIMIT64, uintptr(pid), uintptr(resource), uintptr(unsafe.Pointer(&limit)), uintptr(unsafe.Pointer(&limit)), 0, 0)
+	if err != 0 {
+		return err
+	}
+	return nil
+}
+
 func SetParentDeathSignal(sig uintptr) error {
 	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_PDEATHSIG, sig, 0); err != 0 {
 		return err

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -83,4 +84,19 @@ func CleanPath(path string) string {
 
 	// Clean the path again for good measure.
 	return filepath.Clean(path)
+}
+
+// SearchLabels searches a list of key-value pairs for the provided key and
+// returns the corresponding value. The pairs must be separated with '='.
+func SearchLabels(labels []string, query string) string {
+	for _, l := range labels {
+		parts := strings.SplitN(l, "=", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		if parts[0] == query {
+			return parts[1]
+		}
+	}
+	return ""
 }

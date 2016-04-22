@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 func newStateTransitionError(from, to containerState) error {
@@ -56,9 +57,10 @@ func destroy(c *linuxContainer) error {
 func runPoststopHooks(c *linuxContainer) error {
 	if c.config.Hooks != nil {
 		s := configs.HookState{
-			Version: c.config.Version,
-			ID:      c.id,
-			Root:    c.config.Rootfs,
+			Version:    c.config.Version,
+			ID:         c.id,
+			Root:       c.config.Rootfs,
+			BundlePath: utils.SearchLabels(c.config.Labels, "bundle"),
 		}
 		for _, hook := range c.config.Hooks.Poststop {
 			if err := hook.Run(s); err != nil {
