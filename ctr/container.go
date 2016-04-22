@@ -146,10 +146,10 @@ var startCommand = cli.Command{
 			path = context.Args().Get(1)
 		)
 		if path == "" {
-			fatal("bundle path cannot be empty", 1)
+			fatal("bundle path cannot be empty", ExitStatusMissingArg)
 		}
 		if id == "" {
-			fatal("container id cannot be empty", 1)
+			fatal("container id cannot be empty", ExitStatusMissingArg)
 		}
 		bpath, err := filepath.Abs(path)
 		if err != nil {
@@ -336,7 +336,7 @@ var pauseCommand = cli.Command{
 	Action: func(context *cli.Context) {
 		id := context.Args().First()
 		if id == "" {
-			fatal("container id cannot be empty", 1)
+			fatal("container id cannot be empty", ExitStatusMissingArg)
 		}
 		c := getClient(context)
 		_, err := c.UpdateContainer(netcontext.Background(), &types.UpdateContainerRequest{
@@ -356,7 +356,7 @@ var resumeCommand = cli.Command{
 	Action: func(context *cli.Context) {
 		id := context.Args().First()
 		if id == "" {
-			fatal("container id cannot be empty", 1)
+			fatal("container id cannot be empty", ExitStatusMissingArg)
 		}
 		c := getClient(context)
 		_, err := c.UpdateContainer(netcontext.Background(), &types.UpdateContainerRequest{
@@ -388,7 +388,7 @@ var killCommand = cli.Command{
 	Action: func(context *cli.Context) {
 		id := context.Args().First()
 		if id == "" {
-			fatal("container id cannot be empty", 1)
+			fatal("container id cannot be empty", ExitStatusMissingArg)
 		}
 		c := getClient(context)
 		if _, err := c.Signal(netcontext.Background(), &types.SignalRequest{
