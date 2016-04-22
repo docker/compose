@@ -891,7 +891,9 @@ def build_container_options(options, detach, command):
     }
 
     if options['-e']:
-        container_options['environment'] = parse_environment(options['-e'])
+        container_options['environment'] = Environment.from_command_line(
+            parse_environment(options['-e'])
+        )
 
     if options['--entrypoint']:
         container_options['entrypoint'] = options.get('--entrypoint')
