@@ -58,6 +58,18 @@ class Environment(dict):
         instance.update(os.environ)
         return instance
 
+    @classmethod
+    def from_command_line(cls, parsed_env_opts):
+        result = cls()
+        for k, v in parsed_env_opts.items():
+            # Values from the command line take priority, unless they're unset
+            # in which case they take the value from the system's environment
+            if v is None and k in os.environ:
+                result[k] = os.environ[k]
+            else:
+                result[k] = v
+        return result
+
     def __getitem__(self, key):
         try:
             return super(Environment, self).__getitem__(key)
