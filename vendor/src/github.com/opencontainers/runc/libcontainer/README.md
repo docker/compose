@@ -133,15 +133,15 @@ config := &configs.Config{
 	UidMappings: []configs.IDMap{
 		{
 			ContainerID: 0,
-			Host: 1000,
-			size: 65536,
+			HostID: 1000,
+			Size: 65536,
 		},
 	},
 	GidMappings: []configs.IDMap{
 		{
 			ContainerID: 0,
-			Host: 1000,
-			size: 65536,
+			HostID: 1000,
+			Size: 65536,
 		},
 	},
 	Networks: []*configs.Network{
@@ -216,6 +216,9 @@ container.Pause()
 
 // resume all paused processes.
 container.Resume()
+
+// send signal to container's init process.
+container.Signal(signal)
 ```
 
 

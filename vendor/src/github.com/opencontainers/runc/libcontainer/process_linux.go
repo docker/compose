@@ -89,6 +89,11 @@ func (p *setnsProcess) start() (err error) {
 	if err := setOomScoreAdj(p.config.Config.OomScoreAdj, p.pid()); err != nil {
 		return newSystemError(err)
 	}
+	// set rlimits, this has to be done here because we lose permissions
+	// to raise the limits once we enter a user-namespace
+	if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
+		return newSystemError(err)
+	}
 	if err := utils.WriteJSON(p.parentPipe, p.config); err != nil {
 		return newSystemError(err)
 	}
@@ -284,6 +289,11 @@ loop:
 			if err := setOomScoreAdj(p.config.Config.OomScoreAdj, p.pid()); err != nil {
 				return newSystemError(err)
 			}
+			// set rlimits, this has to be done here because we lose permissions
+			// to raise the limits once we enter a user-namespace
+			if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
+				return newSystemError(err)
+			}
 			// call prestart hooks
 			if !p.config.Config.Namespaces.Contains(configs.NEWNS) {
 				if p.config.Config.Hooks != nil {
@@ -308,10 +318,11 @@ loop:
 		case procHooks:
 			if p.config.Config.Hooks != nil {
 				s := configs.HookState{
-					Version: p.container.config.Version,
-					ID:      p.container.id,
-					Pid:     p.pid(),
-					Root:    p.config.Config.Rootfs,
+					Version:    p.container.config.Version,
+					ID:         p.container.id,
+					Pid:        p.pid(),
+					Root:       p.config.Config.Rootfs,
+					BundlePath: utils.SearchLabels(p.config.Config.Labels, "bundle"),
 				}
 				for _, hook := range p.config.Config.Hooks.Prestart {
 					if err := hook.Run(s); err != nil {
@@ -340,7 +351,7 @@ loop:
 		}
 	}
 	if !sentRun {
-		return newSystemError(fmt.Errorf("could not synchronise with container process"))
+		return newSystemError(fmt.Errorf("could not synchronise with container process: %v", ierr))
 	}
 	if p.config.Config.Namespaces.Contains(configs.NEWNS) && !sentResume {
 		return newSystemError(fmt.Errorf("could not synchronise after executing prestart hooks with container process"))

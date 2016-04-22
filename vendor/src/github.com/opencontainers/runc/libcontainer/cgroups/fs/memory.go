@@ -65,19 +65,56 @@ func (s *MemoryGroup) SetKernelMemory(path string, cgroup *configs.Cgroup) error
 	return nil
 }
 
-func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.Memory != 0 {
-		if err := writeFile(path, "memory.limit_in_bytes", strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
+func setMemoryAndSwap(path string, cgroup *configs.Cgroup) error {
+	// When memory and swap memory are both set, we need to handle the cases
+	// for updating container.
+	if cgroup.Resources.Memory != 0 && cgroup.Resources.MemorySwap > 0 {
+		memoryUsage, err := getMemoryData(path, "")
+		if err != nil {
 			return err
 		}
+
+		// When update memory limit, we should adapt the write sequence
+		// for memory and swap memory, so it won't fail because the new
+		// value and the old value don't fit kernel's validation.
+		if memoryUsage.Limit < uint64(cgroup.Resources.MemorySwap) {
+			if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
+				return err
+			}
+			if err := writeFile(path, "memory.limit_in_bytes", strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
+				return err
+			}
+		} else {
+			if err := writeFile(path, "memory.limit_in_bytes", strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
+				return err
+			}
+			if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
+				return err
+			}
+		}
+	} else {
+		if cgroup.Resources.Memory != 0 {
+			if err := writeFile(path, "memory.limit_in_bytes", strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
+				return err
+			}
+		}
+		if cgroup.Resources.MemorySwap > 0 {
+			if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
+				return err
+			}
+		}
 	}
+
+	return nil
+}
+
+func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
+	if err := setMemoryAndSwap(path, cgroup); err != nil {
+		return err
+	}
+
 	if cgroup.Resources.MemoryReservation != 0 {
 		if err := writeFile(path, "memory.soft_limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemoryReservation, 10)); err != nil {
-			return err
-		}
-	}
-	if cgroup.Resources.MemorySwap > 0 {
-		if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
 			return err
 		}
 	}

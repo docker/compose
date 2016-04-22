@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"syscall"
 
@@ -248,6 +249,13 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 		// ensure that this pipe is always closed
 		pipe.Close()
 	}()
+
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("panic from initialization: %v, %v", e, string(debug.Stack()))
+		}
+	}()
+
 	i, err = newContainerInit(it, pipe)
 	if err != nil {
 		return err

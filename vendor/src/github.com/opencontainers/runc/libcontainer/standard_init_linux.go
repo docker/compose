@@ -73,9 +73,6 @@ func (l *linuxStandardInit) Init() error {
 	if err := setupRoute(l.config.Config); err != nil {
 		return err
 	}
-	if err := setupRlimits(l.config.Rlimits); err != nil {
-		return err
-	}
 
 	label.Init()
 	// InitializeMountNamespace() can be executed only for a new mount namespace
