@@ -146,7 +146,11 @@ func createAPIContainer(c runtime.Container, getPids bool) (*types.Container, er
 		procs = append(procs, appendToProcs)
 	}
 	var pids []int
-	state := c.State()
+	state, err := c.Status()
+	if err != nil {
+		return nil, grpc.Errorf(codes.Internal, "get status for container: "+err.Error())
+	}
+
 	if getPids && (state == runtime.Running || state == runtime.Paused) {
 		if pids, err = c.Pids(); err != nil {
 			return nil, grpc.Errorf(codes.Internal, "get all pids for container: "+err.Error())

@@ -286,7 +286,22 @@ func (c *container) Stats() (*Stat, error) {
 
 // Status implements the runtime Container interface.
 func (c *container) Status() (State, error) {
-	return "running", nil
+	args := c.runtimeArgs
+	args = append(args, "state", c.id)
+
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf(string(out))
+	}
+
+	// We only require the runtime json output to have a top level Status field.
+	var s struct {
+		Status State `json:"status"`
+	}
+	if err := json.Unmarshal(out, &s); err != nil {
+		return "", err
+	}
+	return s.Status, nil
 }
 
 func (c *container) OOM() (OOM, error) {
