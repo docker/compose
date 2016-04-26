@@ -17,8 +17,6 @@ import (
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/specs"
 	"github.com/docker/containerd/supervisor"
-	"github.com/opencontainers/runc/libcontainer"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/system"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
@@ -368,75 +366,68 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 		Timestamp:   uint64(st.Timestamp.Unix()),
 		CgroupStats: &types.CgroupStats{},
 	}
-	lcSt, ok := st.Data.(*libcontainer.Stats)
-	if !ok {
-		return pbSt
-	}
-	cpuSt := lcSt.CgroupStats.CpuStats
 	systemUsage, _ := getSystemCPUUsage()
 	pbSt.CgroupStats.CpuStats = &types.CpuStats{
 		CpuUsage: &types.CpuUsage{
-			TotalUsage:        cpuSt.CpuUsage.TotalUsage,
-			PercpuUsage:       cpuSt.CpuUsage.PercpuUsage,
-			UsageInKernelmode: cpuSt.CpuUsage.UsageInKernelmode,
-			UsageInUsermode:   cpuSt.CpuUsage.UsageInUsermode,
+			TotalUsage:        st.Cpu.Usage.Total,
+			PercpuUsage:       st.Cpu.Usage.Percpu,
+			UsageInKernelmode: st.Cpu.Usage.Kernel,
+			UsageInUsermode:   st.Cpu.Usage.User,
 		},
 		ThrottlingData: &types.ThrottlingData{
-			Periods:          cpuSt.ThrottlingData.Periods,
-			ThrottledPeriods: cpuSt.ThrottlingData.ThrottledPeriods,
-			ThrottledTime:    cpuSt.ThrottlingData.ThrottledTime,
+			Periods:          st.Cpu.Throttling.Periods,
+			ThrottledPeriods: st.Cpu.Throttling.ThrottledPeriods,
+			ThrottledTime:    st.Cpu.Throttling.ThrottledTime,
 		},
 		SystemUsage: systemUsage,
 	}
-	memSt := lcSt.CgroupStats.MemoryStats
 	pbSt.CgroupStats.MemoryStats = &types.MemoryStats{
-		Cache: memSt.Cache,
+		Cache: st.Memory.Cache,
 		Usage: &types.MemoryData{
-			Usage:    memSt.Usage.Usage,
-			MaxUsage: memSt.Usage.MaxUsage,
-			Failcnt:  memSt.Usage.Failcnt,
-			Limit:    memSt.Usage.Limit,
+			Usage:    st.Memory.Usage.Usage,
+			MaxUsage: st.Memory.Usage.Max,
+			Failcnt:  st.Memory.Usage.Failcnt,
+			Limit:    st.Memory.Usage.Limit,
 		},
 		SwapUsage: &types.MemoryData{
-			Usage:    memSt.SwapUsage.Usage,
-			MaxUsage: memSt.SwapUsage.MaxUsage,
-			Failcnt:  memSt.SwapUsage.Failcnt,
-			Limit:    memSt.SwapUsage.Limit,
+			Usage:    st.Memory.Swap.Usage,
+			MaxUsage: st.Memory.Swap.Max,
+			Failcnt:  st.Memory.Swap.Failcnt,
+			Limit:    st.Memory.Swap.Limit,
 		},
 		KernelUsage: &types.MemoryData{
-			Usage:    memSt.KernelUsage.Usage,
-			MaxUsage: memSt.KernelUsage.MaxUsage,
-			Failcnt:  memSt.KernelUsage.Failcnt,
-			Limit:    memSt.KernelUsage.Limit,
+			Usage:    st.Memory.Kernel.Usage,
+			MaxUsage: st.Memory.Kernel.Max,
+			Failcnt:  st.Memory.Kernel.Failcnt,
+			Limit:    st.Memory.Kernel.Limit,
 		},
 	}
-	blkSt := lcSt.CgroupStats.BlkioStats
 	pbSt.CgroupStats.BlkioStats = &types.BlkioStats{
-		IoServiceBytesRecursive: convertBlkioEntryToPb(blkSt.IoServiceBytesRecursive),
-		IoServicedRecursive:     convertBlkioEntryToPb(blkSt.IoServicedRecursive),
-		IoQueuedRecursive:       convertBlkioEntryToPb(blkSt.IoQueuedRecursive),
-		IoServiceTimeRecursive:  convertBlkioEntryToPb(blkSt.IoServiceTimeRecursive),
-		IoWaitTimeRecursive:     convertBlkioEntryToPb(blkSt.IoWaitTimeRecursive),
-		IoMergedRecursive:       convertBlkioEntryToPb(blkSt.IoMergedRecursive),
-		IoTimeRecursive:         convertBlkioEntryToPb(blkSt.IoTimeRecursive),
-		SectorsRecursive:        convertBlkioEntryToPb(blkSt.SectorsRecursive),
+		IoServiceBytesRecursive: convertBlkioEntryToPb(st.Blkio.IoServiceBytesRecursive),
+		IoServicedRecursive:     convertBlkioEntryToPb(st.Blkio.IoServicedRecursive),
+		IoQueuedRecursive:       convertBlkioEntryToPb(st.Blkio.IoQueuedRecursive),
+		IoServiceTimeRecursive:  convertBlkioEntryToPb(st.Blkio.IoServiceTimeRecursive),
+		IoWaitTimeRecursive:     convertBlkioEntryToPb(st.Blkio.IoWaitTimeRecursive),
+		IoMergedRecursive:       convertBlkioEntryToPb(st.Blkio.IoMergedRecursive),
+		IoTimeRecursive:         convertBlkioEntryToPb(st.Blkio.IoTimeRecursive),
+		SectorsRecursive:        convertBlkioEntryToPb(st.Blkio.SectorsRecursive),
 	}
 	pbSt.CgroupStats.HugetlbStats = make(map[string]*types.HugetlbStats)
-	for k, st := range lcSt.CgroupStats.HugetlbStats {
+	for k, st := range st.Hugetlb {
 		pbSt.CgroupStats.HugetlbStats[k] = &types.HugetlbStats{
 			Usage:    st.Usage,
-			MaxUsage: st.MaxUsage,
+			MaxUsage: st.Max,
 			Failcnt:  st.Failcnt,
 		}
 	}
 	pbSt.CgroupStats.PidsStats = &types.PidsStats{
-		Current: lcSt.CgroupStats.PidsStats.Current,
-		Limit:   lcSt.CgroupStats.PidsStats.Limit,
+		Current: st.Pids.Current,
+		Limit:   st.Pids.Limit,
 	}
 	return pbSt
 }
 
-func convertBlkioEntryToPb(b []cgroups.BlkioStatEntry) []*types.BlkioStatsEntry {
+func convertBlkioEntryToPb(b []runtime.BlkioEntry) []*types.BlkioStatsEntry {
 	var pbEs []*types.BlkioStatsEntry
 	for _, e := range b {
 		pbEs = append(pbEs, &types.BlkioStatsEntry{
