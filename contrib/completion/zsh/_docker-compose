@@ -207,7 +207,8 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 "--rmi[Remove images, type may be one of: 'all' to remove all images, or 'local' to remove only images that don't have an custom name set by the 'image' field]:type:(all local)" \
-                '(-v --volumes)'{-v,--volumes}"[Remove data volumes]" && ret=0
+                '(-v --volumes)'{-v,--volumes}"[Remove data volumes]" \
+                '--remove-orphans[Remove containers for services not defined in the Compose file]' && ret=0
             ;;
         (events)
             _arguments \
@@ -329,6 +330,7 @@ __docker-compose_subcommand() {
                 "--no-build[Don't build an image, even if it's missing]" \
                 "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
                 '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                "--remove-orphans[Remove containers for services not defined in the Compose file]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (version)
