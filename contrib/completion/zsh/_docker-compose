@@ -185,7 +185,7 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '--force-rm[Always remove intermediate containers.]' \
-                '--no-cache[Do not use cache when building the image]' \
+                '--no-cache[Do not use cache when building the image.]' \
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
@@ -207,14 +207,14 @@ __docker-compose_subcommand() {
         (down)
             _arguments \
                 $opts_help \
-                "--rmi[Remove images, type may be one of: 'all' to remove all images, or 'local' to remove only images that don't have an custom name set by the 'image' field]:type:(all local)" \
-                '(-v --volumes)'{-v,--volumes}"[Remove data volumes]" \
+                "--rmi[Remove images. Type must be one of: 'all': Remove all images used by any service. 'local': Remove only images that don't have a custom tag set by the \`image\` field.]:type:(all local)" \
+                '(-v --volumes)'{-v,--volumes}"[Remove named volumes declared in the \`volumes\` section of the Compose file and anonymous volumes attached to containers.]" \
                 '--remove-orphans[Remove containers for services not defined in the Compose file]' && ret=0
             ;;
         (events)
             _arguments \
                 $opts_help \
-                '--json[Output events as a stream of json objects.]' \
+                '--json[Output events as a stream of json objects]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (exec)
@@ -224,7 +224,7 @@ __docker-compose_subcommand() {
                 '--privileged[Give extended privileges to the process.]' \
                 '--user=[Run the command as this user.]:username:_users' \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose exec` allocates a TTY.]' \
-                '--index=[Index of the container if there are multiple instances of a service (default: 1)]:index: ' \
+                '--index=[Index of the container if there are multiple instances of a service \[default: 1\]]:index: ' \
                 '(-):running services:__docker-compose_runningservices' \
                 '(-):command: _command_names -e' \
                 '*::arguments: _normal' && ret=0
@@ -255,8 +255,8 @@ __docker-compose_subcommand() {
         (port)
             _arguments \
                 $opts_help \
-                '--protocol=-[tcp or udap (defaults to tcp)]:protocol:(tcp udp)' \
-                '--index=-[index of the container if there are mutiple instances of a service (defaults to 1)]:index: ' \
+                '--protocol=[tcp or udp \[default: tcp\]]:protocol:(tcp udp)' \
+                '--index=[index of the container if there are multiple instances of a service \[default: 1\]]:index: ' \
                 '1:running services:__docker-compose_runningservices' \
                 '2:port:_ports' && ret=0
             ;;
@@ -276,7 +276,7 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '(-f --force)'{-f,--force}"[Don't ask to confirm removal]" \
-                '-v[Remove volumes associated with containers]' \
+                '-v[Remove any anonymous volumes attached to containers]' \
                 '*:stopped services:__docker-compose_stoppedservices' && ret=0
             ;;
         (run)
@@ -285,14 +285,14 @@ __docker-compose_subcommand() {
                 '-d[Detached mode: Run container in the background, print new container name.]' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
-                '--name[Assign a name to the container]:name: ' \
+                '--name=[Assign a name to the container]:name: ' \
                 "--no-deps[Don't start linked services.]" \
-                '(-p --publish)'{-p,--publish=-}"[Run command with manually mapped container's port(s) to the host.]" \
+                '(-p --publish)'{-p,--publish=}"[Publish a container's port(s) to the host]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
-                '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
-                '(-w --workdir)'{-w=,--workdir=}'[Working directory inside the container]:workdir: ' \
+                '(-u --user)'{-u,--user=}'[Run as specified username or uid]:username or uid:_users' \
+                '(-w --workdir)'{-w,--workdir=}'[Working directory inside the container]:workdir: ' \
                 '(-):services:__docker-compose_services' \
                 '(-):command: _command_names -e' \
                 '*::arguments: _normal' && ret=0
@@ -322,7 +322,7 @@ __docker-compose_subcommand() {
         (up)
             _arguments \
                 $opts_help \
-                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names.]' \
+                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names. Incompatible with --abort-on-container-exit.]' \
                 '--no-color[Produce monochrome output.]' \
                 "--no-deps[Don't start linked services.]" \
                 "(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
@@ -330,7 +330,7 @@ __docker-compose_subcommand() {
                 "(--build)--no-build[Don't build an image, even if it's missing.]" \
                 "(--no-build)--build[Build images before starting containers.]" \
                 "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
-                '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                '(-t --timeout)'{-t,--timeout}"[Use this timeout in seconds for container shutdown when attached or when containers are already running. (default: 10)]:seconds: " \
                 "--remove-orphans[Remove containers for services not defined in the Compose file]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
