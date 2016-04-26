@@ -49,11 +49,11 @@ RUN set -ex; \
 
 # Install pip
 RUN set -ex; \
-    curl -L https://pypi.python.org/packages/source/p/pip/pip-7.0.1.tar.gz | tar -xz; \
-    cd pip-7.0.1; \
+    curl -L https://pypi.python.org/packages/source/p/pip/pip-8.1.1.tar.gz | tar -xz; \
+    cd pip-8.1.1; \
     python setup.py install; \
     cd ..; \
-    rm -rf pip-7.0.1
+    rm -rf pip-8.1.1
 
 # Python3 requires a valid locale
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
