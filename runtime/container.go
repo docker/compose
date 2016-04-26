@@ -521,11 +521,15 @@ func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
 }
 
 func (c *container) Pids() ([]int, error) {
-	container, err := c.getLibctContainer()
+	out, err := exec.Command(c.runtime, "ps", "--format=json", c.id).CombinedOutput()
 	if err != nil {
+		return nil, fmt.Errorf(string(out))
+	}
+	var pids []int
+	if err := json.Unmarshal(out, &pids); err != nil {
 		return nil, err
 	}
-	return container.Processes()
+	return pids, nil
 }
 
 func (c *container) Stats() (*Stat, error) {
