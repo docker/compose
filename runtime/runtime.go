@@ -97,13 +97,3 @@ type ProcessState struct {
 
 	PlatformProcessState
 }
-
-type Stat struct {
-	// Timestamp is the time that the statistics where collected
-	Timestamp time.Time
-	// Data is the raw stats
-	// TODO: it is currently an interface because we don't know what type of exec drivers
-	// we will have or what the structure should look like at the moment os the containers
-	// can return what they want and we could marshal to json or whatever.
-	Data interface{}
-}

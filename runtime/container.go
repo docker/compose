@@ -521,27 +521,35 @@ func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
 }
 
 func (c *container) Pids() ([]int, error) {
-	container, err := c.getLibctContainer()
+	args := c.runtimeArgs
+	args = append(args, "ps", "--format=json", c.id)
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
+		return nil, fmt.Errorf("%s", out)
+	}
+	var pids []int
+	if err := json.Unmarshal(out, &pids); err != nil {
 		return nil, err
 	}
-	return container.Processes()
+	return pids, nil
 }
 
 func (c *container) Stats() (*Stat, error) {
-	container, err := c.getLibctContainer()
-	if err != nil {
-		return nil, err
-	}
 	now := time.Now()
-	stats, err := container.Stats()
+	args := c.runtimeArgs
+	args = append(args, "events", "--stats", c.id)
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
+		return nil, fmt.Errorf("%s", out)
+	}
+	s := struct {
+		Data *Stat `json:"data"`
+	}{}
+	if err := json.Unmarshal(out, &s); err != nil {
 		return nil, err
 	}
-	return &Stat{
-		Timestamp: now,
-		Data:      stats,
-	}, nil
+	s.Data.Timestamp = now
+	return s.Data, nil
 }
 
 func (c *container) OOM() (OOM, error) {
@@ -571,7 +579,7 @@ func (c *container) Status() (State, error) {
 
 	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf(string(out))
+		return "", fmt.Errorf("%s", out)
 	}
 
 	// We only require the runtime json output to have a top level Status field.
