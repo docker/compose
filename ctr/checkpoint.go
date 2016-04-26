@@ -43,7 +43,7 @@ func listCheckpoints(context *cli.Context) {
 		id = context.Args().First()
 	)
 	if id == "" {
-		fatal("container id cannot be empty", 1)
+		fatal("container id cannot be empty", ExitStatusMissingArg)
 	}
 	resp, err := c.ListCheckpoint(netcontext.Background(), &types.ListCheckpointRequest{
 		Id: id,
@@ -88,10 +88,10 @@ var createCheckpointCommand = cli.Command{
 			name        = context.Args().Get(1)
 		)
 		if containerID == "" {
-			fatal("container id at cannot be empty", 1)
+			fatal("container id at cannot be empty", ExitStatusMissingArg)
 		}
 		if name == "" {
-			fatal("checkpoint name cannot be empty", 1)
+			fatal("checkpoint name cannot be empty", ExitStatusMissingArg)
 		}
 		c := getClient(context)
 		if _, err := c.CreateCheckpoint(netcontext.Background(), &types.CreateCheckpointRequest{
@@ -118,10 +118,10 @@ var deleteCheckpointCommand = cli.Command{
 			name        = context.Args().Get(1)
 		)
 		if containerID == "" {
-			fatal("container id at cannot be empty", 1)
+			fatal("container id at cannot be empty", ExitStatusMissingArg)
 		}
 		if name == "" {
-			fatal("checkpoint name cannot be empty", 1)
+			fatal("checkpoint name cannot be empty", ExitStatusMissingArg)
 		}
 		c := getClient(context)
 		if _, err := c.DeleteCheckpoint(netcontext.Background(), &types.DeleteCheckpointRequest{
