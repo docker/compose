@@ -1,0 +1,14 @@
+version: "2"
+services:
+  never:
+    image: busybox
+    restart: "no"
+  always:
+    image: busybox
+    restart: always
+  on-failure:
+    image: busybox
+    restart: on-failure
+  on-failure-5:
+    image: busybox
+    restart: "on-failure:5"

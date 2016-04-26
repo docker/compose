@@ -190,6 +190,33 @@ class CLITestCase(DockerClientTestCase):
         }
         assert output == expected
 
+    def test_config_restart(self):
+        self.base_dir = 'tests/fixtures/restart'
+        result = self.dispatch(['config'])
+        assert yaml.load(result.stdout) == {
+            'version': '2.0',
+            'services': {
+                'never': {
+                    'image': 'busybox',
+                    'restart': 'no',
+                },
+                'always': {
+                    'image': 'busybox',
+                    'restart': 'always',
+                },
+                'on-failure': {
+                    'image': 'busybox',
+                    'restart': 'on-failure',
+                },
+                'on-failure-5': {
+                    'image': 'busybox',
+                    'restart': 'on-failure:5',
+                },
+            },
+            'networks': {},
+            'volumes': {},
+        }
+
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
