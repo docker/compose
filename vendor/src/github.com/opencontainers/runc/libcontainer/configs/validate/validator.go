@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 )
 
 type Validator interface {
@@ -42,7 +43,7 @@ func (v *ConfigValidator) Validate(config *configs.Config) error {
 	return nil
 }
 
-// rootfs validates the the rootfs is an absolute path and is not a symlink
+// rootfs validates if the rootfs is an absolute path and is not a symlink
 // to the container's root filesystem.
 func (v *ConfigValidator) rootfs(config *configs.Config) error {
 	cleaned, err := filepath.Abs(config.Rootfs)
@@ -52,7 +53,7 @@ func (v *ConfigValidator) rootfs(config *configs.Config) error {
 	if cleaned, err = filepath.EvalSymlinks(cleaned); err != nil {
 		return err
 	}
-	if config.Rootfs != cleaned {
+	if filepath.Clean(config.Rootfs) != cleaned {
 		return fmt.Errorf("%s is not an absolute path or is a symlink", config.Rootfs)
 	}
 	return nil
@@ -80,6 +81,10 @@ func (v *ConfigValidator) security(config *configs.Config) error {
 		!config.Namespaces.Contains(configs.NEWNS) {
 		return fmt.Errorf("unable to restrict sys entries without a private MNT namespace")
 	}
+	if config.ProcessLabel != "" && !selinux.SelinuxEnabled() {
+		return fmt.Errorf("selinux label is specified in config, but selinux is disabled or not supported")
+	}
+
 	return nil
 }
 
@@ -100,38 +105,33 @@ func (v *ConfigValidator) usernamespace(config *configs.Config) error {
 // /proc/sys isn't completely namespaced and depending on which namespaces
 // are specified, a subset of sysctls are permitted.
 func (v *ConfigValidator) sysctl(config *configs.Config) error {
-	validSysctlPrefixes := []string{}
-	validSysctlMap := make(map[string]bool)
-	if config.Namespaces.Contains(configs.NEWNET) {
-		validSysctlPrefixes = append(validSysctlPrefixes, "net.")
+	validSysctlMap := map[string]bool{
+		"kernel.msgmax":          true,
+		"kernel.msgmnb":          true,
+		"kernel.msgmni":          true,
+		"kernel.sem":             true,
+		"kernel.shmall":          true,
+		"kernel.shmmax":          true,
+		"kernel.shmmni":          true,
+		"kernel.shm_rmid_forced": true,
 	}
-	if config.Namespaces.Contains(configs.NEWIPC) {
-		validSysctlPrefixes = append(validSysctlPrefixes, "fs.mqueue.")
-		validSysctlMap = map[string]bool{
-			"kernel.msgmax":          true,
-			"kernel.msgmnb":          true,
-			"kernel.msgmni":          true,
-			"kernel.sem":             true,
-			"kernel.shmall":          true,
-			"kernel.shmmax":          true,
-			"kernel.shmmni":          true,
-			"kernel.shm_rmid_forced": true,
-		}
-	}
+
 	for s := range config.Sysctl {
-		if validSysctlMap[s] {
-			continue
-		}
-		valid := false
-		for _, vp := range validSysctlPrefixes {
-			if strings.HasPrefix(s, vp) {
-				valid = true
-				break
+		if validSysctlMap[s] || strings.HasPrefix(s, "fs.mqueue.") {
+			if config.Namespaces.Contains(configs.NEWIPC) {
+				continue
+			} else {
+				return fmt.Errorf("sysctl %q is not allowed in the hosts ipc namespace", s)
 			}
 		}
-		if !valid {
-			return fmt.Errorf("sysctl %q is not permitted in the config", s)
+		if strings.HasPrefix(s, "net.") {
+			if config.Namespaces.Contains(configs.NEWNET) {
+				continue
+			} else {
+				return fmt.Errorf("sysctl %q is not allowed in the hosts network namespace", s)
+			}
 		}
+		return fmt.Errorf("sysctl %q is not in a separate kernel namespace", s)
 	}
 
 	return nil

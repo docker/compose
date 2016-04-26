@@ -90,7 +90,7 @@ in tmpfs.
 
 After `/dev/null` has been setup we check for any external links between
 the container's io, STDIN, STDOUT, STDERR.  If the container's io is pointing
-to `/dev/null` outside the container we close and `dup2` the the `/dev/null` 
+to `/dev/null` outside the container we close and `dup2` the `/dev/null` 
 that is local to the container's rootfs.
 
 

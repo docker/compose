@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 
-	ocs "github.com/opencontainers/specs/specs-go"
+	ocs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var (

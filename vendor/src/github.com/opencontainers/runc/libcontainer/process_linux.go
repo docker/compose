@@ -70,47 +70,47 @@ func (p *setnsProcess) start() (err error) {
 	err = p.cmd.Start()
 	p.childPipe.Close()
 	if err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "starting setns process")
 	}
 	if p.bootstrapData != nil {
 		if _, err := io.Copy(p.parentPipe, p.bootstrapData); err != nil {
-			return newSystemError(err)
+			return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 		}
 	}
 	if err = p.execSetns(); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "executing setns process")
 	}
 	if len(p.cgroupPaths) > 0 {
 		if err := cgroups.EnterPid(p.cgroupPaths, p.pid()); err != nil {
-			return newSystemError(err)
+			return newSystemErrorWithCausef(err, "adding pid %d to cgroups", p.pid())
 		}
 	}
 	// set oom_score_adj
 	if err := setOomScoreAdj(p.config.Config.OomScoreAdj, p.pid()); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "setting oom score")
 	}
 	// set rlimits, this has to be done here because we lose permissions
 	// to raise the limits once we enter a user-namespace
 	if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "setting rlimits for process")
 	}
 	if err := utils.WriteJSON(p.parentPipe, p.config); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "writing config to pipe")
 	}
 
 	if err := syscall.Shutdown(int(p.parentPipe.Fd()), syscall.SHUT_WR); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "calling shutdown on init pipe")
 	}
 	// wait for the child process to fully complete and receive an error message
 	// if one was encoutered
 	var ierr *genericError
 	if err := json.NewDecoder(p.parentPipe).Decode(&ierr); err != nil && err != io.EOF {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "decoding init error from pipe")
 	}
 	// Must be done after Shutdown so the child will exit and we can wait for it.
 	if ierr != nil {
 		p.wait()
-		return newSystemError(ierr)
+		return ierr
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ func (p *setnsProcess) execSetns() error {
 	status, err := p.cmd.Process.Wait()
 	if err != nil {
 		p.cmd.Wait()
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "waiting on setns process to finish")
 	}
 	if !status.Success() {
 		p.cmd.Wait()
@@ -132,7 +132,7 @@ func (p *setnsProcess) execSetns() error {
 	var pid *pid
 	if err := json.NewDecoder(p.parentPipe).Decode(&pid); err != nil {
 		p.cmd.Wait()
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "reading pid from init pipe")
 	}
 	process, err := os.FindProcess(pid.Pid)
 	if err != nil {
@@ -231,26 +231,26 @@ func (p *initProcess) start() error {
 	p.childPipe.Close()
 	if err != nil {
 		p.process.ops = nil
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "starting init process command")
 	}
 	if _, err := io.Copy(p.parentPipe, p.bootstrapData); err != nil {
 		return err
 	}
 	if err := p.execSetns(); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "running exec setns process for init")
 	}
 	// Save the standard descriptor names before the container process
 	// can potentially move them (e.g., via dup2()).  If we don't do this now,
 	// we won't know at checkpoint time which file descriptor to look up.
 	fds, err := getPipeFds(p.pid())
 	if err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCausef(err, "getting pipe fds for pid %d", p.pid())
 	}
 	p.setExternalDescriptors(fds)
 	// Do this before syncing with child so that no children
 	// can escape the cgroup
 	if err := p.manager.Apply(p.pid()); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "applying cgroup configuration for process")
 	}
 	defer func() {
 		if err != nil {
@@ -259,10 +259,10 @@ func (p *initProcess) start() error {
 		}
 	}()
 	if err := p.createNetworkInterfaces(); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "creating nework interfaces")
 	}
 	if err := p.sendConfig(); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "sending config to init process")
 	}
 	var (
 		procSync   syncT
@@ -278,21 +278,21 @@ loop:
 			if err == io.EOF {
 				break loop
 			}
-			return newSystemError(err)
+			return newSystemErrorWithCause(err, "decoding sync type from init pipe")
 		}
 		switch procSync.Type {
 		case procReady:
 			if err := p.manager.Set(p.config.Config); err != nil {
-				return newSystemError(err)
+				return newSystemErrorWithCause(err, "setting cgroup config for ready process")
 			}
 			// set oom_score_adj
 			if err := setOomScoreAdj(p.config.Config.OomScoreAdj, p.pid()); err != nil {
-				return newSystemError(err)
+				return newSystemErrorWithCause(err, "setting oom score for ready process")
 			}
 			// set rlimits, this has to be done here because we lose permissions
 			// to raise the limits once we enter a user-namespace
 			if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
-				return newSystemError(err)
+				return newSystemErrorWithCause(err, "setting rlimits for ready process")
 			}
 			// call prestart hooks
 			if !p.config.Config.Namespaces.Contains(configs.NEWNS) {
@@ -303,16 +303,16 @@ loop:
 						Pid:     p.pid(),
 						Root:    p.config.Config.Rootfs,
 					}
-					for _, hook := range p.config.Config.Hooks.Prestart {
+					for i, hook := range p.config.Config.Hooks.Prestart {
 						if err := hook.Run(s); err != nil {
-							return newSystemError(err)
+							return newSystemErrorWithCausef(err, "running prestart hook %d", i)
 						}
 					}
 				}
 			}
 			// Sync with child.
 			if err := utils.WriteJSON(p.parentPipe, syncT{procRun}); err != nil {
-				return newSystemError(err)
+				return newSystemErrorWithCause(err, "reading syncT run type")
 			}
 			sentRun = true
 		case procHooks:
@@ -324,22 +324,22 @@ loop:
 					Root:       p.config.Config.Rootfs,
 					BundlePath: utils.SearchLabels(p.config.Config.Labels, "bundle"),
 				}
-				for _, hook := range p.config.Config.Hooks.Prestart {
+				for i, hook := range p.config.Config.Hooks.Prestart {
 					if err := hook.Run(s); err != nil {
-						return newSystemError(err)
+						return newSystemErrorWithCausef(err, "running prestart hook %d", i)
 					}
 				}
 			}
 			// Sync with child.
 			if err := utils.WriteJSON(p.parentPipe, syncT{procResume}); err != nil {
-				return newSystemError(err)
+				return newSystemErrorWithCause(err, "reading syncT resume type")
 			}
 			sentResume = true
 		case procError:
 			// wait for the child process to fully complete and receive an error message
 			// if one was encoutered
 			if err := dec.Decode(&ierr); err != nil && err != io.EOF {
-				return newSystemError(err)
+				return newSystemErrorWithCause(err, "decoding proc error from init")
 			}
 			if ierr != nil {
 				break loop
@@ -347,22 +347,22 @@ loop:
 			// Programmer error.
 			panic("No error following JSON procError payload.")
 		default:
-			return newSystemError(fmt.Errorf("invalid JSON synchronisation payload from child"))
+			return newSystemError(fmt.Errorf("invalid JSON payload from child"))
 		}
 	}
 	if !sentRun {
-		return newSystemError(fmt.Errorf("could not synchronise with container process: %v", ierr))
+		return newSystemErrorWithCause(ierr, "container init failed")
 	}
 	if p.config.Config.Namespaces.Contains(configs.NEWNS) && !sentResume {
 		return newSystemError(fmt.Errorf("could not synchronise after executing prestart hooks with container process"))
 	}
 	if err := syscall.Shutdown(int(p.parentPipe.Fd()), syscall.SHUT_WR); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "shutting down init pipe")
 	}
 	// Must be done after Shutdown so the child will exit and we can wait for it.
 	if ierr != nil {
 		p.wait()
-		return newSystemError(ierr)
+		return ierr
 	}
 	return nil
 }

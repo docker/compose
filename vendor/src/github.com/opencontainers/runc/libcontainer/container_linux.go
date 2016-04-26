@@ -62,7 +62,7 @@ type State struct {
 	ExternalDescriptors []string `json:"external_descriptors,omitempty"`
 }
 
-// A libcontainer container object.
+// Container is a libcontainer container object.
 //
 // Each container is thread-safe within the same process. Since a container can
 // be destroyed by a separate process, any function may return that the container
@@ -84,7 +84,7 @@ type Container interface {
 	// Systemerror - System error.
 	Restore(process *Process, criuOpts *CriuOpts) error
 
-	// If the Container state is RUNNING or PAUSING, sets the Container state to PAUSING and pauses
+	// If the Container state is RUNNING, sets the Container state to PAUSING and pauses
 	// the execution of any user processes. Asynchronously, when the container finished being paused the
 	// state is changed to PAUSED.
 	// If the Container state is PAUSED, do nothing.
@@ -141,7 +141,7 @@ func (c *linuxContainer) State() (*State, error) {
 func (c *linuxContainer) Processes() ([]int, error) {
 	pids, err := c.cgroupManager.GetAllPids()
 	if err != nil {
-		return nil, newSystemError(err)
+		return nil, newSystemErrorWithCause(err, "getting all container pids from cgroups")
 	}
 	return pids, nil
 }
@@ -152,14 +152,14 @@ func (c *linuxContainer) Stats() (*Stats, error) {
 		stats = &Stats{}
 	)
 	if stats.CgroupStats, err = c.cgroupManager.GetStats(); err != nil {
-		return stats, newSystemError(err)
+		return stats, newSystemErrorWithCause(err, "getting container stats from cgroups")
 	}
 	for _, iface := range c.config.Networks {
 		switch iface.Type {
 		case "veth":
 			istats, err := getNetworkInterfaceStats(iface.HostInterfaceName)
 			if err != nil {
-				return stats, newSystemError(err)
+				return stats, newSystemErrorWithCausef(err, "getting network stats for interface %q", iface.HostInterfaceName)
 			}
 			stats.Interfaces = append(stats.Interfaces, istats)
 		}
@@ -184,14 +184,14 @@ func (c *linuxContainer) Start(process *Process) error {
 	doInit := status == Destroyed
 	parent, err := c.newParentProcess(process, doInit)
 	if err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "creating new parent process")
 	}
 	if err := parent.start(); err != nil {
 		// terminate the process to ensure that it properly is reaped.
 		if err := parent.terminate(); err != nil {
 			logrus.Warn(err)
 		}
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "starting container process")
 	}
 	// generate a timestamp indicating when the container was started
 	c.created = time.Now().UTC()
@@ -211,12 +211,12 @@ func (c *linuxContainer) Start(process *Process) error {
 				Root:       c.config.Rootfs,
 				BundlePath: utils.SearchLabels(c.config.Labels, "bundle"),
 			}
-			for _, hook := range c.config.Hooks.Poststart {
+			for i, hook := range c.config.Hooks.Poststart {
 				if err := hook.Run(s); err != nil {
 					if err := parent.terminate(); err != nil {
 						logrus.Warn(err)
 					}
-					return newSystemError(err)
+					return newSystemErrorWithCausef(err, "running poststart hook %d", i)
 				}
 			}
 		}
@@ -226,7 +226,7 @@ func (c *linuxContainer) Start(process *Process) error {
 
 func (c *linuxContainer) Signal(s os.Signal) error {
 	if err := c.initProcess.signal(s); err != nil {
-		return newSystemError(err)
+		return newSystemErrorWithCause(err, "signaling init process")
 	}
 	return nil
 }
@@ -234,11 +234,11 @@ func (c *linuxContainer) Signal(s os.Signal) error {
 func (c *linuxContainer) newParentProcess(p *Process, doInit bool) (parentProcess, error) {
 	parentPipe, childPipe, err := newPipe()
 	if err != nil {
-		return nil, newSystemError(err)
+		return nil, newSystemErrorWithCause(err, "creating new init pipe")
 	}
 	cmd, err := c.commandTemplate(p, childPipe)
 	if err != nil {
-		return nil, newSystemError(err)
+		return nil, newSystemErrorWithCause(err, "creating new command template")
 	}
 	if !doInit {
 		return c.newSetnsProcess(p, cmd, parentPipe, childPipe)
@@ -299,7 +299,7 @@ func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, parentPipe, 
 	cmd.Env = append(cmd.Env, "_LIBCONTAINER_INITTYPE="+string(initSetns))
 	state, err := c.currentState()
 	if err != nil {
-		return nil, newSystemError(err)
+		return nil, newSystemErrorWithCause(err, "getting container's current state")
 	}
 	// for setns process, we dont have to set cloneflags as the process namespaces
 	// will only be set via setns syscall
@@ -408,13 +408,13 @@ func (c *linuxContainer) NotifyMemoryPressure(level PressureLevel) (<-chan struc
 	return notifyMemoryPressure(c.cgroupManager.GetPaths(), level)
 }
 
-// check Criu version greater than or equal to min_version
-func (c *linuxContainer) checkCriuVersion(min_version string) error {
+// checkCriuVersion checks Criu version greater than or equal to minVersion
+func (c *linuxContainer) checkCriuVersion(minVersion string) error {
 	var x, y, z, versionReq int
 
-	_, err := fmt.Sscanf(min_version, "%d.%d.%d\n", &x, &y, &z) // 1.5.2
+	_, err := fmt.Sscanf(minVersion, "%d.%d.%d\n", &x, &y, &z) // 1.5.2
 	if err != nil {
-		_, err = fmt.Sscanf(min_version, "Version: %d.%d\n", &x, &y) // 1.6
+		_, err = fmt.Sscanf(minVersion, "Version: %d.%d\n", &x, &y) // 1.6
 	}
 	versionReq = x*10000 + y*100 + z
 
@@ -459,7 +459,7 @@ func (c *linuxContainer) checkCriuVersion(min_version string) error {
 	c.criuVersion = x*10000 + y*100 + z
 
 	if c.criuVersion < versionReq {
-		return fmt.Errorf("CRIU version must be %s or higher", min_version)
+		return fmt.Errorf("CRIU version must be %s or higher", minVersion)
 	}
 
 	return nil
@@ -955,9 +955,9 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 				Pid:     int(notify.GetPid()),
 				Root:    c.config.Rootfs,
 			}
-			for _, hook := range c.config.Hooks.Prestart {
+			for i, hook := range c.config.Hooks.Prestart {
 				if err := hook.Run(s); err != nil {
-					return newSystemError(err)
+					return newSystemErrorWithCausef(err, "running prestart hook %d", i)
 				}
 			}
 		}
@@ -1046,7 +1046,7 @@ func (c *linuxContainer) isRunning() (bool, error) {
 		if err == syscall.ESRCH {
 			return false, nil
 		}
-		return false, newSystemError(err)
+		return false, newSystemErrorWithCausef(err, "sending signal 0 to pid %d", c.initProcess.pid())
 	}
 	return true, nil
 }
@@ -1057,7 +1057,7 @@ func (c *linuxContainer) isPaused() (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, newSystemError(err)
+		return false, newSystemErrorWithCause(err, "checking if container is paused")
 	}
 	return bytes.Equal(bytes.TrimSpace(data), []byte("FROZEN")), nil
 }
@@ -1125,7 +1125,7 @@ func (c *linuxContainer) orderNamespacePaths(namespaces map[configs.NamespaceTyp
 			}
 			// only set to join this namespace if it exists
 			if _, err := os.Lstat(p); err != nil {
-				return nil, newSystemError(err)
+				return nil, newSystemErrorWithCausef(err, "running lstat on namespace path %q", p)
 			}
 			// do not allow namespace path with comma as we use it to separate
 			// the namespace paths
