@@ -358,10 +358,17 @@ _docker-compose() {
 
     _arguments -C \
         '(- :)'{-h,--help}'[Get help]' \
-        '--verbose[Show more output]' \
-        '(- :)'{-v,--version}'[Print version and exit]' \
         '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
+        '--verbose[Show more output]' \
+        '(- :)'{-v,--version}'[Print version and exit]' \
+        '(-H --host)'{-H,--host}'[Daemon socket to connect to]:host:' \
+        '--tls[Use TLS; implied by --tlsverify]' \
+        '--tlscacert=[Trust certs signed only by this CA]:ca path:' \
+        '--tlscert=[Path to TLS certificate file]:client cert path:' \
+        '--tlskey=[Path to TLS key file]:tls key path:' \
+        '--tlsverify[Use TLS and verify the remote]' \
+        "--skip-hostname-check[Don't check the daemon's hostname against the name specified in the client certificate (for example if your docker host is an IP address)]" \
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 
