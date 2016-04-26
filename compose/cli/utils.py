@@ -12,6 +12,13 @@ from six.moves import input
 
 import compose
 
+# WindowsError is not defined on non-win32 platforms. Avoid runtime errors by
+# defining it as OSError (its parent class) if missing.
+try:
+    WindowsError
+except NameError:
+    WindowsError = OSError
+
 
 def yesno(prompt, default=None):
     """
