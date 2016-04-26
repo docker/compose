@@ -205,7 +205,7 @@ func (p *process) pid() int {
 
 func (p *process) delete() error {
 	if !p.state.Exec {
-		out, err := exec.Command(p.runtime, "delete", p.id).CombinedOutput()
+		out, err := exec.Command(p.runtime, append(p.state.RuntimeArgs, "delete", p.id)...).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%s: %v", out, err)
 		}
