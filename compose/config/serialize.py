@@ -19,12 +19,14 @@ yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
 
 
 def serialize_config(config):
-    services = {service.pop('name'): service for service in config.services}
-
-    if config.version == V1:
-        for service_dict in services.values():
-            if 'network_mode' not in service_dict:
-                service_dict['network_mode'] = 'bridge'
+    denormalized_services = [
+        denormalize_service_dict(service_dict, config.version)
+        for service_dict in config.services
+    ]
+    services = {
+        service_dict.pop('name'): service_dict
+        for service_dict in denormalized_services
+    }
 
     output = {
         'version': V2_0,
@@ -38,3 +40,15 @@ def serialize_config(config):
         default_flow_style=False,
         indent=2,
         width=80)
+
+
+def denormalize_service_dict(service_dict, version):
+    service_dict = service_dict.copy()
+
+    if 'restart' in service_dict:
+        service_dict['restart'] = types.serialize_restart_spec(service_dict['restart'])
+
+    if version == V1 and 'network_mode' not in service_dict:
+        service_dict['network_mode'] = 'bridge'
+
+    return service_dict
