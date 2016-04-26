@@ -1,4 +1,4 @@
-// Libcontainer provides a native Go implementation for creating containers
+// Package libcontainer provides a native Go implementation for creating containers
 // with namespaces, cgroups, capabilities, and filesystem access controls.
 // It allows you to manage the lifecycle of the container performing additional operations
 // after the container is created.
@@ -11,23 +11,23 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-// The status of a container.
+// Status is the status of a container.
 type Status int
 
 const (
-	// The container exists but has not been run yet
+	// Created is the status that denotes the container exists but has not been run yet
 	Created Status = iota
 
-	// The container exists and is running.
+	// Created is the status that denotes the container exists and is running.
 	Running
 
-	// The container exists, it is in the process of being paused.
+	// Pausing is the status that denotes the container exists, it is in the process of being paused.
 	Pausing
 
-	// The container exists, but all its processes are paused.
+	// Paused is the status that denotes the container exists, but all its processes are paused.
 	Paused
 
-	// The container does not exist.
+	// Destroyed is the status that denotes the container does not exist.
 	Destroyed
 )
 
@@ -67,7 +67,7 @@ type BaseState struct {
 	Config configs.Config `json:"config"`
 }
 
-// A libcontainer container object.
+// BaseContainer is a libcontainer container object.
 //
 // Each container is thread-safe within the same process. Since a container can
 // be destroyed by a separate process, any function may return that the container

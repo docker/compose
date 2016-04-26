@@ -14,7 +14,7 @@ import (
 
 	"github.com/docker/containerd/specs"
 	"github.com/opencontainers/runc/libcontainer"
-	ocs "github.com/opencontainers/specs/specs-go"
+	ocs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func getRootIDs(s *specs.Spec) (int, int, error) {
