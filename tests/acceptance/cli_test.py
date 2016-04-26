@@ -145,6 +145,13 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
+    def test_shorthand_host_opt(self):
+        self.dispatch(
+            ['-H={0}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
+             'up', '-d'],
+            returncode=0
+        )
+
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
