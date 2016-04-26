@@ -200,7 +200,8 @@ __docker-compose_subcommand() {
                 $opts_help \
                 "(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
                 "(--force-recreate)--no-recreate[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
-                "--no-build[Don't build an image, even if it's missing.]" \
+                "(--build)--no-build[Don't build an image, even if it's missing.]" \
+                "(--no-build)--build[Build images before creating containers.]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (down)
@@ -322,12 +323,12 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names.]' \
-                '--build[Build images before starting containers.]' \
                 '--no-color[Produce monochrome output.]' \
                 "--no-deps[Don't start linked services.]" \
                 "(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
                 "(--force-recreate)--no-recreate[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
-                "--no-build[Don't build an image, even if it's missing.]" \
+                "(--build)--no-build[Don't build an image, even if it's missing.]" \
+                "(--no-build)--build[Build images before starting containers.]" \
                 "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
                 '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
                 "--remove-orphans[Remove containers for services not defined in the Compose file]" \
