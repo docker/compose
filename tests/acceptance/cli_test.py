@@ -145,15 +145,11 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
         assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_quiet_with_error(self):
         self.base_dir = None
         result = self.dispatch([
@@ -162,14 +158,10 @@ class CLITestCase(DockerClientTestCase):
         ], returncode=1)
         assert "'notaservice' must be a mapping" in result.stderr
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '-q']).stdout == ''
 
-    # TODO: this shouldn't be v2-dependent
-    @v2_only()
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
@@ -197,6 +189,58 @@ class CLITestCase(DockerClientTestCase):
             },
         }
         assert output == expected
+
+    def test_config_restart(self):
+        self.base_dir = 'tests/fixtures/restart'
+        result = self.dispatch(['config'])
+        assert yaml.load(result.stdout) == {
+            'version': '2.0',
+            'services': {
+                'never': {
+                    'image': 'busybox',
+                    'restart': 'no',
+                },
+                'always': {
+                    'image': 'busybox',
+                    'restart': 'always',
+                },
+                'on-failure': {
+                    'image': 'busybox',
+                    'restart': 'on-failure',
+                },
+                'on-failure-5': {
+                    'image': 'busybox',
+                    'restart': 'on-failure:5',
+                },
+            },
+            'networks': {},
+            'volumes': {},
+        }
+
+    def test_config_v1(self):
+        self.base_dir = 'tests/fixtures/v1-config'
+        result = self.dispatch(['config'])
+        assert yaml.load(result.stdout) == {
+            'version': '2.0',
+            'services': {
+                'net': {
+                    'image': 'busybox',
+                    'network_mode': 'bridge',
+                },
+                'volume': {
+                    'image': 'busybox',
+                    'volumes': ['/data:rw'],
+                    'network_mode': 'bridge',
+                },
+                'app': {
+                    'image': 'busybox',
+                    'volumes_from': ['service:volume:rw'],
+                    'network_mode': 'service:net',
+                },
+            },
+            'networks': {},
+            'volumes': {},
+        }
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
@@ -683,9 +727,7 @@ class CLITestCase(DockerClientTestCase):
             ['-f', 'v2-invalid.yml', 'up', '-d'],
             returncode=1)
 
-        # TODO: fix validation error messages for v2 files
-        # assert "Unsupported config option for service 'web': 'net'" in exc.exconly()
-        assert "Unsupported config option" in result.stderr
+        assert "Unsupported config option for services.bar: 'net'" in result.stderr
 
     def test_up_with_net_v1(self):
         self.base_dir = 'tests/fixtures/net-container'
