@@ -521,7 +521,9 @@ func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
 }
 
 func (c *container) Pids() ([]int, error) {
-	out, err := exec.Command(c.runtime, "ps", "--format=json", c.id).CombinedOutput()
+	args := c.runtimeArgs
+	args = append(args, "ps", "--format=json", c.id)
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("%s", out)
 	}
@@ -534,7 +536,9 @@ func (c *container) Pids() ([]int, error) {
 
 func (c *container) Stats() (*Stat, error) {
 	now := time.Now()
-	out, err := exec.Command(c.runtime, "events", "--stats", c.id).CombinedOutput()
+	args := c.runtimeArgs
+	args = append(args, "events", "--stats", c.id)
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("%s", out)
 	}
