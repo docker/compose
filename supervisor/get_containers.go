@@ -9,16 +9,20 @@ type GetContainersTask struct {
 }
 
 func (s *Supervisor) getContainers(t *GetContainersTask) error {
+
 	if t.ID != "" {
-		ci := s.containers[t.ID]
-		if ci == nil {
+		ci, ok := s.containers[t.ID]
+		if !ok {
 			return ErrContainerNotFound
 		}
 		t.Containers = append(t.Containers, ci.container)
+
 		return nil
 	}
-	for _, i := range s.containers {
-		t.Containers = append(t.Containers, i.container)
+
+	for _, ci := range s.containers {
+		t.Containers = append(t.Containers, ci.container)
 	}
+
 	return nil
 }

@@ -61,6 +61,11 @@ func (c *container) Stats() (*Stat, error) {
 	return nil, errors.New("Stats not yet implemented on Windows")
 }
 
+// Status implements the runtime Container interface.
+func (c *container) Status() (State, error) {
+	return "", errors.New("Status not yet implemented on Windows")
+}
+
 func (c *container) OOM() (OOM, error) {
 	return nil, errors.New("OOM not yet implemented on Windows")
 }

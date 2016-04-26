@@ -52,6 +52,9 @@ type Container interface {
 	OOM() (OOM, error)
 	// UpdateResource updates the containers resources to new values
 	UpdateResources(*Resource) error
+
+	// Status return the current status of the container.
+	Status() (State, error)
 }
 
 type OOM interface {
