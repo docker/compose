@@ -8,7 +8,6 @@ import (
 
 type StartTask struct {
 	baseTask
-	platformStartTask
 	ID            string
 	BundlePath    string
 	Stdout        string
@@ -17,6 +16,7 @@ type StartTask struct {
 	StartResponse chan StartResponse
 	Labels        []string
 	NoPivotRoot   bool
+	Checkpoint    *runtime.Checkpoint
 }
 
 func (s *Supervisor) start(t *StartTask) error {
@@ -47,7 +47,9 @@ func (s *Supervisor) start(t *StartTask) error {
 		Stdout:        t.Stdout,
 		Stderr:        t.Stderr,
 	}
-	task.setTaskCheckpoint(t)
+	if t.Checkpoint != nil {
+		task.Checkpoint = t.Checkpoint.Name
+	}
 
 	s.startTasks <- task
 	ContainerCreateTimer.UpdateSince(start)

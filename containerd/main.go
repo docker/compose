@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -12,18 +15,24 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/cloudfoundry/gosigar"
 	"github.com/codegangsta/cli"
+	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/docker/containerd/api/http/pprof"
 	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
+	"github.com/rcrowley/go-metrics"
 )
 
 const (
-	usage     = `High performance container daemon`
-	minRlimit = 1024
+	usage               = `High performance container daemon`
+	minRlimit           = 1024
+	defaultStateDir     = "/run/containerd"
+	defaultGRPCEndpoint = "unix:///run/containerd/containerd.sock"
 )
 
 var daemonFlags = []cli.Flag{
@@ -75,11 +84,14 @@ var daemonFlags = []cli.Flag{
 		Value: 500,
 		Usage: "number of past events to keep in the event log",
 	},
+	cli.StringFlag{
+		Name:  "graphite-address",
+		Usage: "Address of graphite server",
+	},
 }
 
 func main() {
 	logrus.SetFormatter(&logrus.TextFormatter{TimestampFormat: time.RFC3339Nano})
-	appendPlatformFlags()
 	app := cli.NewApp()
 	app.Name = "containerd"
 	if containerd.GitCommit != "" {
@@ -89,7 +101,24 @@ func main() {
 	}
 	app.Usage = usage
 	app.Flags = daemonFlags
-	setAppBefore(app)
+	app.Before = func(context *cli.Context) error {
+		if context.GlobalBool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
+			if context.GlobalDuration("metrics-interval") > 0 {
+				if err := debugMetrics(context.GlobalDuration("metrics-interval"), context.GlobalString("graphite-address")); err != nil {
+					return err
+				}
+			}
+
+		}
+		if p := context.GlobalString("pprof-address"); len(p) > 0 {
+			pprof.Enable(p)
+		}
+		if err := checkLimits(); err != nil {
+			return err
+		}
+		return nil
+	}
 
 	app.Action = func(context *cli.Context) {
 		if err := daemon(context); err != nil {
@@ -182,4 +211,73 @@ func getDefaultID() string {
 		panic(err)
 	}
 	return hostname
+}
+
+func checkLimits() error {
+	var l syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &l); err != nil {
+		return err
+	}
+	if l.Cur <= minRlimit {
+		logrus.WithFields(logrus.Fields{
+			"current": l.Cur,
+			"max":     l.Max,
+		}).Warn("containerd: low RLIMIT_NOFILE changing to max")
+		l.Cur = l.Max
+		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
+	}
+	return nil
+}
+
+func processMetrics() {
+	var (
+		g    = metrics.NewGauge()
+		fg   = metrics.NewGauge()
+		memg = metrics.NewGauge()
+	)
+	metrics.DefaultRegistry.Register("goroutines", g)
+	metrics.DefaultRegistry.Register("fds", fg)
+	metrics.DefaultRegistry.Register("memory-used", memg)
+	collect := func() {
+		// update number of goroutines
+		g.Update(int64(runtime.NumGoroutine()))
+		// collect the number of open fds
+		fds, err := osutils.GetOpenFds(os.Getpid())
+		if err != nil {
+			logrus.WithField("error", err).Error("containerd: get open fd count")
+		}
+		fg.Update(int64(fds))
+		// get the memory used
+		m := sigar.ProcMem{}
+		if err := m.Get(os.Getpid()); err != nil {
+			logrus.WithField("error", err).Error("containerd: get pid memory information")
+		}
+		memg.Update(int64(m.Size))
+	}
+	go func() {
+		collect()
+		for range time.Tick(30 * time.Second) {
+			collect()
+		}
+	}()
+}
+
+func debugMetrics(interval time.Duration, graphiteAddr string) error {
+	for name, m := range supervisor.Metrics() {
+		if err := metrics.DefaultRegistry.Register(name, m); err != nil {
+			return err
+		}
+	}
+	processMetrics()
+	if graphiteAddr != "" {
+		addr, err := net.ResolveTCPAddr("tcp", graphiteAddr)
+		if err != nil {
+			return err
+		}
+		go graphite.Graphite(metrics.DefaultRegistry, 10e9, "metrics", addr)
+	} else {
+		l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
+		go metrics.Log(metrics.DefaultRegistry, interval, l)
+	}
+	return nil
 }
