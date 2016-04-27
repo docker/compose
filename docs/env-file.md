@@ -13,8 +13,8 @@ weight=10
 # Environment file
 
 Compose supports declaring default environment variables in an environment
-file named `.env` and placed in the same folder as your
-[compose file](compose-file.md).
+file named `.env` placed in the folder `docker-compose` command is executed from
+*(current working directory)*.
 
 Compose expects each line in an env file to be in `VAR=VAL` format. Lines
 beginning with `#` (i.e. comments) are ignored, as are blank lines.
