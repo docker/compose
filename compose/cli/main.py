@@ -426,7 +426,8 @@ class TopLevelCommand(object):
             self.project,
             containers,
             options['--no-color'],
-            log_args).run()
+            log_args,
+            event_stream=self.project.events(service_names=options['SERVICE'])).run()
 
     def pause(self, options):
         """
