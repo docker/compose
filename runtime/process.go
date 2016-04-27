@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -39,6 +40,8 @@ type Process interface {
 	SystemPid() int
 	// State returns if the process is running or not
 	State() State
+	// Wait reaps the shim process if avaliable
+	Wait()
 }
 
 type processConfig struct {
@@ -139,6 +142,7 @@ type process struct {
 	container   *container
 	spec        specs.ProcessSpec
 	stdio       Stdio
+	cmd         *exec.Cmd
 }
 
 func (p *process) ID() string {
@@ -217,6 +221,13 @@ func (p *process) getPidFromFile() (int, error) {
 	}
 	p.pid = i
 	return i, nil
+}
+
+// Wait will reap the shim process
+func (p *process) Wait() {
+	if p.cmd != nil {
+		p.cmd.Wait()
+	}
 }
 
 func getExitPipe(path string) (*os.File, error) {
