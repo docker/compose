@@ -61,6 +61,10 @@ func (p *testProcess) State() runtime.State {
 	return runtime.Running
 }
 
+func (p *testProcess) Wait() {
+
+}
+
 func TestSortProcesses(t *testing.T) {
 	p := []runtime.Process{
 		&testProcess{"ls"},
