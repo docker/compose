@@ -401,6 +401,7 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 			Failcnt:  st.Memory.Kernel.Failcnt,
 			Limit:    st.Memory.Kernel.Limit,
 		},
+		Stats: st.Memory.Raw,
 	}
 	pbSt.CgroupStats.BlkioStats = &types.BlkioStats{
 		IoServiceBytesRecursive: convertBlkioEntryToPb(st.Blkio.IoServiceBytesRecursive),
