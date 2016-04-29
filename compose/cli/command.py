@@ -21,12 +21,15 @@ log = logging.getLogger(__name__)
 
 def project_from_options(project_dir, options):
     environment = Environment.from_env_file(project_dir)
+    host = options.get('--host')
+    if host is not None:
+        host = host.lstrip('=')
     return get_project(
         project_dir,
         get_config_path_from_options(project_dir, options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
-        host=options.get('--host'),
+        host=host,
         tls_config=tls_config_from_options(options),
         environment=environment
     )
