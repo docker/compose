@@ -182,7 +182,17 @@ __docker-compose_commands() {
 }
 
 __docker-compose_subcommand() {
-    local opts_help='(: -)--help[Print usage]'
+    local opts_help opts_force_recreate opts_no_recreate opts_no_build opts_remove_orphans opts_timeout opts_no_color opts_no_deps
+
+    opts_help='(: -)--help[Print usage]'
+    opts_force_recreate="(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]"
+    opts_no_recreate="(--force-recreate)--no-recreate[If containers already exist, don't recreate them. Incompatible with --force-recreate.]"
+    opts_no_build="(--build)--no-build[Don't build an image, even if it's missing.]"
+    opts_remove_orphans="--remove-orphans[Remove containers for services not defined in the Compose file]"
+    opts_timeout=('(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: ")
+    opts_no_color='--no-color[Produce monochrome output.]'
+    opts_no_deps="--no-deps[Don't start linked services.]"
+
     integer ret=1
 
     case "$words[1]" in
@@ -203,9 +213,9 @@ __docker-compose_subcommand() {
         (create)
             _arguments \
                 $opts_help \
-                "(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
-                "(--force-recreate)--no-recreate[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
-                "(--build)--no-build[Don't build an image, even if it's missing.]" \
+                $opts_force_recreate \
+                $opts_no_recreate \
+                $opts_no_build \
                 "(--no-build)--build[Build images before creating containers.]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
@@ -214,7 +224,7 @@ __docker-compose_subcommand() {
                 $opts_help \
                 "--rmi[Remove images. Type must be one of: 'all': Remove all images used by any service. 'local': Remove only images that don't have a custom tag set by the \`image\` field.]:type:(all local)" \
                 '(-v --volumes)'{-v,--volumes}"[Remove named volumes declared in the \`volumes\` section of the Compose file and anonymous volumes attached to containers.]" \
-                '--remove-orphans[Remove containers for services not defined in the Compose file]' && ret=0
+                $opts_remove_orphans && ret=0
             ;;
         (events)
             _arguments \
@@ -247,7 +257,7 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '(-f --follow)'{-f,--follow}'[Follow log output]' \
-                '--no-color[Produce monochrome output.]' \
+                $opts_no_color \
                 '--tail=[Number of lines to show from the end of the logs for each container.]:number of lines: ' \
                 '(-t --timestamps)'{-t,--timestamps}'[Show timestamps]' \
                 '*:services:__docker-compose_services_all' && ret=0
@@ -291,7 +301,7 @@ __docker-compose_subcommand() {
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '--name=[Assign a name to the container]:name: ' \
-                "--no-deps[Don't start linked services.]" \
+                $opts_no_deps \
                 '(-p --publish)'{-p,--publish=}"[Publish a container's port(s) to the host]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
@@ -305,7 +315,7 @@ __docker-compose_subcommand() {
         (scale)
             _arguments \
                 $opts_help \
-                '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                $opts_timeout \
                 '*:running services:__docker-compose_runningservices' && ret=0
             ;;
         (start)
@@ -316,7 +326,7 @@ __docker-compose_subcommand() {
         (stop|restart)
             _arguments \
                 $opts_help \
-                '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                $opts_timeout \
                 '*:running services:__docker-compose_runningservices' && ret=0
             ;;
         (unpause)
@@ -328,15 +338,15 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names. Incompatible with --abort-on-container-exit.]' \
-                '--no-color[Produce monochrome output.]' \
-                "--no-deps[Don't start linked services.]" \
-                "(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
-                "(--force-recreate)--no-recreate[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
-                "(--build)--no-build[Don't build an image, even if it's missing.]" \
+                $opts_no_color \
+                $opts_no_deps \
+                $opts_force_recreate \
+                $opts_no_recreate \
+                $opts_no_build \
                 "(--no-build)--build[Build images before starting containers.]" \
                 "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
                 '(-t --timeout)'{-t,--timeout}"[Use this timeout in seconds for container shutdown when attached or when containers are already running. (default: 10)]:seconds: " \
-                "--remove-orphans[Remove containers for services not defined in the Compose file]" \
+                $opts_remove_orphans \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (version)
