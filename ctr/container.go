@@ -55,6 +55,7 @@ var contSubCmds = []cli.Command{
 	pauseCommand,
 	resumeCommand,
 	startCommand,
+	stateCommand,
 	statsCommand,
 	watchCommand,
 	updateCommand,
