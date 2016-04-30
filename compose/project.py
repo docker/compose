@@ -342,7 +342,10 @@ class Project(object):
             filters={'label': self.labels()},
             decode=True
         ):
-            if event['status'] in IMAGE_EVENTS:
+            # The first part of this condition is a guard against some events
+            # broadcasted by swarm that don't have a status field.
+            # See https://github.com/docker/compose/issues/3316
+            if 'status' not in event or event['status'] in IMAGE_EVENTS:
                 # We don't receive any image events because labels aren't applied
                 # to images
                 continue
