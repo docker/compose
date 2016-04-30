@@ -390,13 +390,18 @@ class Project(object):
         def get_deps(service):
             return {self.get_service(dep) for dep in service.get_dependency_names()}
 
-        results = parallel.parallel_execute(
+        results, errors = parallel.parallel_execute(
             services,
             do,
             operator.attrgetter('name'),
             None,
             get_deps
         )
+        if errors:
+            raise ProjectError(
+                'Encountered errors while bringing up the project.'
+            )
+
         return [
             container
             for svc_containers in results
@@ -531,3 +536,7 @@ class NoSuchService(Exception):
 
     def __str__(self):
         return self.msg
+
+
+class ProjectError(Exception):
+    pass
