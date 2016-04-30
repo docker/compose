@@ -29,7 +29,7 @@ def get_deps(obj):
 
 
 def test_parallel_execute():
-    results = parallel_execute(
+    results, errors = parallel_execute(
         objects=[1, 2, 3, 4, 5],
         func=lambda x: x * 2,
         get_name=six.text_type,
@@ -37,6 +37,7 @@ def test_parallel_execute():
     )
 
     assert sorted(results) == [2, 4, 6, 8, 10]
+    assert errors == {}
 
 
 def test_parallel_execute_with_deps():

@@ -24,6 +24,7 @@ from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
+from ..project import ProjectError
 from ..service import BuildAction
 from ..service import BuildError
 from ..service import ConvergenceStrategy
@@ -58,7 +59,7 @@ def main():
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError) as e:
+    except (UserError, NoSuchService, ConfigurationError, ProjectError) as e:
         log.error(e.msg)
         sys.exit(1)
     except BuildError as e:
