@@ -19,6 +19,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
+from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
 from tests.integration.testcases import v2_only
 
@@ -752,7 +753,8 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data,
         )
 
-        assert len(project.up()) == 0
+        with self.assertRaises(ProjectError):
+            project.up()
 
     @v2_only()
     def test_project_up_volumes(self):
