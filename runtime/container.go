@@ -130,6 +130,7 @@ func New(opts ContainerOpts) (Container, error) {
 		Labels:      c.labels,
 		Runtime:     c.runtime,
 		RuntimeArgs: c.runtimeArgs,
+		Shim:        c.shim,
 		NoPivotRoot: opts.NoPivotRoot,
 	}); err != nil {
 		return nil, err
