@@ -138,7 +138,7 @@ func New(opts ContainerOpts) (Container, error) {
 	return c, nil
 }
 
-func Load(root, id string) (Container, error) {
+func Load(root, id string, timeout time.Duration) (Container, error) {
 	var s state
 	f, err := os.Open(filepath.Join(root, id, StateFile))
 	if err != nil {
@@ -158,6 +158,7 @@ func Load(root, id string) (Container, error) {
 		shim:        s.Shim,
 		noPivotRoot: s.NoPivotRoot,
 		processes:   make(map[string]*process),
+		timeout:     timeout,
 	}
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
 	if err != nil {
