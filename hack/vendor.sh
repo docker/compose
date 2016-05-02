@@ -9,7 +9,7 @@ clone git github.com/cloudfoundry/gosigar 3ed7c74352dae6dc00bdc8c74045375352e3ec
 clone git github.com/codegangsta/cli 9fec0fad02befc9209347cc6d620e68e1b45f74d
 clone git github.com/coreos/go-systemd 7b2428fec40033549c68f54e26e89e7ca9a9ce31
 clone git github.com/cyberdelia/go-metrics-graphite 7e54b5c2aa6eaff4286c44129c3def899dff528c
-clone git github.com/docker/docker f3dcc1c46249ffc4a73ab2005d1ad011dff3c7df
+clone git github.com/docker/docker 2f6e3b0ba027b558adabd41344fee59db4441011
 clone git github.com/docker/go-units 5d2041e26a699eaca682e2ea41c8f891e1060444
 clone git github.com/godbus/dbus e2cf28118e66a6a63db46cf6088a35d2054d3bb0
 clone git github.com/golang/glog 23def4e6c14b4da8ac2ed8007337bc5eb5007998
