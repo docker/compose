@@ -69,6 +69,9 @@ func setupRootfs(config *configs.Config, console *linuxConsole, pipe io.ReadWrit
 		if err := setupDevSymlinks(config.Rootfs); err != nil {
 			return newSystemErrorWithCause(err, "setting up /dev symlinks")
 		}
+		if err := label.Relabel(filepath.Join(config.Rootfs, "dev"), config.MountLabel, false); err != nil {
+			return err
+		}
 	}
 	// Signal the parent to run the pre-start hooks.
 	// The hooks are run after the mounts are setup, but before we switch to the new

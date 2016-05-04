@@ -18,7 +18,7 @@ import (
 
 const cgroupNamePrefix = "name="
 
-// https://www.kernel.org/doc/Documentation/cgroups/cgroups.txt
+// https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt
 func FindCgroupMountpoint(subsystem string) (string, error) {
 	// We are not using mount.GetMounts() because it's super-inefficient,
 	// parsing it directly sped up x10 times because of not using Sscanf.
