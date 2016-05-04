@@ -486,14 +486,14 @@ func DupSecOpt(src string) []string {
 		con["level"] == "" {
 		return nil
 	}
-	return []string{"label:user:" + con["user"],
-		"label:role:" + con["role"],
-		"label:type:" + con["type"],
-		"label:level:" + con["level"]}
+	return []string{"label=user:" + con["user"],
+		"label=role:" + con["role"],
+		"label=type:" + con["type"],
+		"label=level:" + con["level"]}
 }
 
 // DisableSecOpt returns a security opt that can be used to disabling SELinux
 // labeling support for future container processes
 func DisableSecOpt() []string {
-	return []string{"label:disable"}
+	return []string{"label=disable"}
 }

@@ -123,7 +123,10 @@ func (l *linuxStandardInit) Init() error {
 	if err := syncParentReady(l.pipe); err != nil {
 		return err
 	}
-	if l.config.Config.Seccomp != nil {
+	// Without NoNewPrivileges seccomp is a privileged operation, so we need to
+	// do this before dropping capabilities; otherwise do it as late as possible
+	// just before execve so as few syscalls take place after it as possible.
+	if l.config.Config.Seccomp != nil && !l.config.NoNewPrivileges {
 		if err := seccomp.InitSeccomp(l.config.Config.Seccomp); err != nil {
 			return err
 		}
@@ -141,6 +144,11 @@ func (l *linuxStandardInit) Init() error {
 	// just kill ourself and not cause problems for someone else.
 	if syscall.Getppid() != l.parentPid {
 		return syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+	}
+	if l.config.Config.Seccomp != nil && l.config.NoNewPrivileges {
+		if err := seccomp.InitSeccomp(l.config.Config.Seccomp); err != nil {
+			return err
+		}
 	}
 
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
