@@ -1083,7 +1083,7 @@ It's more complicated if you're using particular configuration features:
           data: {}
 
     By default, Compose creates a volume whose name is prefixed with your
-    project name. If you want it to just be called `data`, declared it as
+    project name. If you want it to just be called `data`, declare it as
     external:
 
         volumes:
