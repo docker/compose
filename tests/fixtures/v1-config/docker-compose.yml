@@ -1,0 +1,10 @@
+net:
+  image: busybox
+volume:
+  image: busybox
+  volumes:
+    - /data
+app:
+  image: busybox
+  net: "container:net"
+  volumes_from: ["volume"]

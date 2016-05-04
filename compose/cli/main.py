@@ -24,6 +24,7 @@ from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
+from ..project import ProjectError
 from ..service import BuildAction
 from ..service import BuildError
 from ..service import ConvergenceStrategy
@@ -58,7 +59,7 @@ def main():
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError) as e:
+    except (UserError, NoSuchService, ConfigurationError, ProjectError) as e:
         log.error(e.msg)
         sys.exit(1)
     except BuildError as e:
@@ -142,7 +143,7 @@ class TopLevelCommand(object):
     """Define and run multi-container applications with Docker.
 
     Usage:
-      docker-compose [-f=<arg>...] [options] [COMMAND] [ARGS...]
+      docker-compose [-f <arg>...] [options] [COMMAND] [ARGS...]
       docker-compose -h|--help
 
     Options:
@@ -361,10 +362,14 @@ class TopLevelCommand(object):
         """
         Get help on a command.
 
-        Usage: help COMMAND
+        Usage: help [COMMAND]
         """
-        handler = get_handler(cls, options['COMMAND'])
-        raise SystemExit(getdoc(handler))
+        if options['COMMAND']:
+            subject = get_handler(cls, options['COMMAND'])
+        else:
+            subject = cls
+
+        print(getdoc(subject))
 
     def kill(self, options):
         """
@@ -411,7 +416,8 @@ class TopLevelCommand(object):
             self.project,
             containers,
             options['--no-color'],
-            log_args).run()
+            log_args,
+            event_stream=self.project.events(service_names=options['SERVICE'])).run()
 
     def pause(self, options):
         """

@@ -7,6 +7,8 @@ from __future__ import unicode_literals
 import os
 from collections import namedtuple
 
+import six
+
 from compose.config.config import V1
 from compose.config.errors import ConfigurationError
 from compose.const import IS_WINDOWS_PLATFORM
@@ -87,6 +89,13 @@ def parse_restart_spec(restart_config):
         max_retry_count = 0
 
     return {'Name': name, 'MaximumRetryCount': int(max_retry_count)}
+
+
+def serialize_restart_spec(restart_spec):
+    parts = [restart_spec['Name']]
+    if restart_spec['MaximumRetryCount']:
+        parts.append(six.text_type(restart_spec['MaximumRetryCount']))
+    return ':'.join(parts)
 
 
 def parse_extra_hosts(extra_hosts_config):

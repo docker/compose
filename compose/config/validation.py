@@ -171,6 +171,14 @@ def validate_network_mode(service_config, service_names):
             "is undefined.".format(s=service_config, dep=dependency))
 
 
+def validate_links(service_config, service_names):
+    for link in service_config.config.get('links', []):
+        if link.split(':')[0] not in service_names:
+            raise ConfigurationError(
+                "Service '{s.name}' has a link to service '{link}' which is "
+                "undefined.".format(s=service_config, link=link))
+
+
 def validate_depends_on(service_config, service_names):
     for dependency in service_config.config.get('depends_on', []):
         if dependency not in service_names:
@@ -211,7 +219,7 @@ def handle_error_for_schema_with_id(error, path):
             return get_unsupported_config_msg(path, invalid_config_key)
 
         if not error.path:
-            return '{}\n{}'.format(error.message, VERSION_EXPLANATION)
+            return '{}\n\n{}'.format(error.message, VERSION_EXPLANATION)
 
 
 def handle_generic_error(error, path):
@@ -408,6 +416,6 @@ def handle_errors(errors, format_error_func, filename):
 
     error_msg = '\n'.join(format_error_func(error) for error in errors)
     raise ConfigurationError(
-        "Validation failed{file_msg}, reason(s):\n{error_msg}".format(
-            file_msg=" in file '{}'".format(filename) if filename else "",
+        "The Compose file{file_msg} is invalid because:\n{error_msg}".format(
+            file_msg=" '{}'".format(filename) if filename else "",
             error_msg=error_msg))

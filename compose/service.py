@@ -453,20 +453,20 @@ class Service(object):
         connected_networks = container.get('NetworkSettings.Networks')
 
         for network, netdefs in self.networks.items():
-            aliases = netdefs.get('aliases', [])
-            ipv4_address = netdefs.get('ipv4_address', None)
-            ipv6_address = netdefs.get('ipv6_address', None)
             if network in connected_networks:
+                if short_id_alias_exists(container, network):
+                    continue
+
                 self.client.disconnect_container_from_network(
-                    container.id, network)
+                    container.id,
+                    network)
 
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=list(self._get_aliases(container).union(aliases)),
-                ipv4_address=ipv4_address,
-                ipv6_address=ipv6_address,
-                links=self._get_links(False)
-            )
+                aliases=self._get_aliases(netdefs, container),
+                ipv4_address=netdefs.get('ipv4_address', None),
+                ipv6_address=netdefs.get('ipv6_address', None),
+                links=self._get_links(False))
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
@@ -533,11 +533,32 @@ class Service(object):
         numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
 
-    def _get_aliases(self, container):
-        if container.labels.get(LABEL_ONE_OFF) == "True":
-            return set()
+    def _get_aliases(self, network, container=None):
+        if container and container.labels.get(LABEL_ONE_OFF) == "True":
+            return []
 
-        return {self.name, container.short_id}
+        return list(
+            {self.name} |
+            ({container.short_id} if container else set()) |
+            set(network.get('aliases', ()))
+        )
+
+    def build_default_networking_config(self):
+        if not self.networks:
+            return {}
+
+        network = self.networks[self.network_mode.id]
+        endpoint = {
+            'Aliases': self._get_aliases(network),
+            'IPAMConfig': {},
+        }
+
+        if network.get('ipv4_address'):
+            endpoint['IPAMConfig']['IPv4Address'] = network.get('ipv4_address')
+        if network.get('ipv6_address'):
+            endpoint['IPAMConfig']['IPv6Address'] = network.get('ipv6_address')
+
+        return {"EndpointsConfig": {self.network_mode.id: endpoint}}
 
     def _get_links(self, link_to_self):
         links = {}
@@ -632,6 +653,10 @@ class Service(object):
         container_options['host_config'] = self._get_container_host_config(
             override_options,
             one_off=one_off)
+
+        networking_config = self.build_default_networking_config()
+        if networking_config:
+            container_options['networking_config'] = networking_config
 
         container_options['environment'] = format_environment(
             container_options['environment'])
@@ -794,6 +819,12 @@ class Service(object):
                 raise
             else:
                 log.error(six.text_type(e))
+
+
+def short_id_alias_exists(container, network):
+    aliases = container.get(
+        'NetworkSettings.Networks.{net}.Aliases'.format(net=network)) or ()
+    return container.short_id in aliases
 
 
 class NetworkMode(object):
