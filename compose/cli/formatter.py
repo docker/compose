@@ -10,7 +10,7 @@ from compose.cli import colors
 
 
 def get_tty_width():
-    tty_size = os.popen('stty size', 'r').read().split()
+    tty_size = os.popen('stty size 2> /dev/null', 'r').read().split()
     if len(tty_size) != 2:
         return 0
     _, width = tty_size
