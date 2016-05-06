@@ -164,6 +164,11 @@ var startCommand = cli.Command{
 			fatal(fmt.Sprintf("cannot get the absolute path of the bundle: %v", err), 1)
 		}
 		s, err := createStdio()
+		defer func() {
+			if s.stdin != "" {
+				os.RemoveAll(filepath.Dir(s.stdin))
+			}
+		}()
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
@@ -463,6 +468,11 @@ var execCommand = cli.Command{
 			},
 		}
 		s, err := createStdio()
+		defer func() {
+			if s.stdin != "" {
+				os.RemoveAll(filepath.Dir(s.stdin))
+			}
+		}()
 		if err != nil {
 			fatal(err.Error(), 1)
 		}

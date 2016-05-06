@@ -305,7 +305,7 @@ func (s *Supervisor) restore() error {
 			continue
 		}
 		id := d.Name()
-		container, err := runtime.Load(s.stateDir, id)
+		container, err := runtime.Load(s.stateDir, id, s.timeout)
 		if err != nil {
 			return err
 		}
