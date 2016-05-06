@@ -1,4 +1,4 @@
-// +build linux,!aarch64
+// +build linux,!arm64
 
 package archutils
 
