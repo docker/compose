@@ -59,13 +59,13 @@ optionally [dockerfile](#dockerfile) and [args](#args).
       args:
         buildno: 1
 
-If you specify `image` as well as `build`, then Compose tags the built image
-with the tag specified in `image`:
+If you specify `image` as well as `build`, then Compose names the built image
+with the `webapp` and optional `tag` specified in `image`:
 
     build: ./dir
-    image: webapp
+    image: webapp:tag
 
-This will result in an image tagged `webapp`, built from `./dir`.
+This will result in an image named `webapp` and tagged `tag`, built from `./dir`.
 
 > **Note**: In the [version 1 file format](#version-1), `build` is different in
 > two ways:
