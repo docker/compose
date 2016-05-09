@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -260,23 +261,42 @@ func (c *container) RemoveProcess(pid string) error {
 	return os.RemoveAll(filepath.Join(c.root, c.id, pid))
 }
 
+func u64Ptr(i uint64) *uint64 { return &i }
+
 func (c *container) UpdateResources(r *Resource) error {
-	container, err := c.getLibctContainer()
-	if err != nil {
+	sr := ocs.Resources{
+		Memory: &ocs.Memory{
+			Limit:       u64Ptr(uint64(r.Memory)),
+			Reservation: u64Ptr(uint64(r.MemoryReservation)),
+			Swap:        u64Ptr(uint64(r.MemorySwap)),
+			Kernel:      u64Ptr(uint64(r.KernelMemory)),
+		},
+		CPU: &ocs.CPU{
+			Shares: u64Ptr(uint64(r.CPUShares)),
+			Quota:  u64Ptr(uint64(r.CPUQuota)),
+			Period: u64Ptr(uint64(r.CPUPeriod)),
+			Cpus:   &r.CpusetCpus,
+			Mems:   &r.CpusetMems,
+		},
+		BlockIO: &ocs.BlockIO{
+			Weight: &r.BlkioWeight,
+		},
+	}
+
+	srStr := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(srStr).Encode(&sr); err != nil {
 		return err
 	}
-	config := container.Config()
-	config.Cgroups.Resources.CpuShares = r.CPUShares
-	config.Cgroups.Resources.BlkioWeight = r.BlkioWeight
-	config.Cgroups.Resources.CpuPeriod = r.CPUPeriod
-	config.Cgroups.Resources.CpuQuota = r.CPUQuota
-	config.Cgroups.Resources.CpusetCpus = r.CpusetCpus
-	config.Cgroups.Resources.CpusetMems = r.CpusetMems
-	config.Cgroups.Resources.KernelMemory = r.KernelMemory
-	config.Cgroups.Resources.Memory = r.Memory
-	config.Cgroups.Resources.MemoryReservation = r.MemoryReservation
-	config.Cgroups.Resources.MemorySwap = r.MemorySwap
-	return container.Set(config)
+
+	args := c.runtimeArgs
+	args = append(args, "update", "-r", "-", c.id)
+	cmd := exec.Command(c.runtime, args...)
+	cmd.Stdin = srStr
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf(string(b))
+	}
+	return nil
 }
 
 func getRootIDs(s *specs.Spec) (int, int, error) {
