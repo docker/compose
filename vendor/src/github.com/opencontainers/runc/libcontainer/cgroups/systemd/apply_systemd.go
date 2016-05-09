@@ -214,11 +214,9 @@ func (m *Manager) Apply(pid int) error {
 			newProp("BlockIOWeight", uint64(c.Resources.BlkioWeight)))
 	}
 
-	// We need to set kernel memory before processes join cgroup because
-	// kmem.limit_in_bytes can only be set when the cgroup is empty.
-	// And swap memory limit needs to be set after memory limit, only
-	// memory limit is handled by systemd, so it's kind of ugly here.
-	if c.Resources.KernelMemory > 0 {
+	// We have to set kernel memory here, as we can't change it once
+	// processes have been attached to the cgroup.
+	if c.Resources.KernelMemory != 0 {
 		if err := setKernelMemory(c); err != nil {
 			return err
 		}
@@ -469,11 +467,5 @@ func setKernelMemory(c *configs.Cgroup) error {
 		return err
 	}
 
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return err
-	}
-
-	// This doesn't get called by manager.Set, so we need to do it here.
-	s := &fs.MemoryGroup{}
-	return s.SetKernelMemory(path, c)
+	return os.MkdirAll(path, 0755)
 }
