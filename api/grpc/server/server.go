@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/specs"
@@ -31,6 +32,15 @@ func NewServer(sv *supervisor.Supervisor) types.APIServer {
 	return &apiServer{
 		sv: sv,
 	}
+}
+
+func (s *apiServer) GetServerVersion(ctx context.Context, c *types.GetServerVersionRequest) (*types.GetServerVersionResponse, error) {
+	return &types.GetServerVersionResponse{
+		Major:    containerd.VersionMajor,
+		Minor:    containerd.VersionMinor,
+		Patch:    containerd.VersionPatch,
+		Revision: containerd.GitCommit,
+	}, nil
 }
 
 func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContainerRequest) (*types.CreateContainerResponse, error) {

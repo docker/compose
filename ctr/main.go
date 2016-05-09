@@ -5,9 +5,12 @@ import (
 	"os"
 	"time"
 
+	netcontext "golang.org/x/net/context"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/api/grpc/types"
 )
 
 const usage = `High performance container daemon cli`
@@ -55,6 +58,7 @@ func main() {
 		containersCommand,
 		eventsCommand,
 		stateCommand,
+		versionCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -65,6 +69,19 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+var versionCommand = cli.Command{
+	Name:  "version",
+	Usage: "return the daemon version",
+	Action: func(context *cli.Context) {
+		c := getClient(context)
+		resp, err := c.GetServerVersion(netcontext.Background(), &types.GetServerVersionRequest{})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		fmt.Printf("daemon version %d.%d.%d commit: %s\n", resp.Major, resp.Minor, resp.Patch, resp.Revision)
+	},
 }
 
 func fatal(err string, code int) {

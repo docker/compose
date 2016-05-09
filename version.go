@@ -1,5 +1,11 @@
 package containerd
 
-const Version = "0.2.0"
+import "fmt"
+
+const VersionMajor = 0
+const VersionMinor = 2
+const VersionPatch = 0
+
+var Version = fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
 
 var GitCommit = ""
