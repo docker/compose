@@ -18,7 +18,7 @@ yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
 
 
-def serialize_config(config):
+def denormalize_config(config):
     denormalized_services = [
         denormalize_service_dict(service_dict, config.version)
         for service_dict in config.services
@@ -32,15 +32,17 @@ def serialize_config(config):
         if 'external_name' in net_conf:
             del net_conf['external_name']
 
-    output = {
+    return {
         'version': V2_0,
         'services': services,
         'networks': networks,
         'volumes': config.volumes,
     }
 
+
+def serialize_config(config):
     return yaml.safe_dump(
-        output,
+        denormalize_config(config),
         default_flow_style=False,
         indent=2,
         width=80)

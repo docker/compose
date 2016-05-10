@@ -15,6 +15,7 @@ from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 
 from . import __version__
+from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
@@ -806,16 +807,31 @@ class Service(object):
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
         log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
-        output = self.client.pull(
-            repo,
-            tag=tag,
-            stream=True,
-        )
+        output = self.client.pull(repo, tag=tag, stream=True)
 
         try:
-            stream_output(output, sys.stdout)
+            return progress_stream.get_digest_from_pull(
+                stream_output(output, sys.stdout))
         except StreamOutputError as e:
             if not ignore_pull_failures:
+                raise
+            else:
+                log.error(six.text_type(e))
+
+    def push(self, ignore_push_failures=False):
+        if 'image' not in self.options or 'build' not in self.options:
+            return
+
+        repo, tag, separator = parse_repository_tag(self.options['image'])
+        tag = tag or 'latest'
+        log.info('Pushing %s (%s%s%s)...' % (self.name, repo, separator, tag))
+        output = self.client.push(repo, tag=tag, stream=True)
+
+        try:
+            return progress_stream.get_digest_from_push(
+                stream_output(output, sys.stdout))
+        except StreamOutputError as e:
+            if not ignore_push_failures:
                 raise
             else:
                 log.error(six.text_type(e))

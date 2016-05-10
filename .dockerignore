@@ -7,3 +7,4 @@ coverage-html
 docs/_site
 venv
 .tox
+dist

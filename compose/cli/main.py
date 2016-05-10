@@ -14,10 +14,10 @@ from operator import attrgetter
 from . import errors
 from . import signals
 from .. import __version__
-from ..config import config
+from ..bundle import get_image_digests
+from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
-from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -30,7 +30,7 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
-from .command import get_config_path_from_options
+from .command import get_config_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
 from .docopt_command import get_handler
@@ -98,7 +98,7 @@ def perform_command(options, handler, command_options):
         handler(command_options)
         return
 
-    if options['COMMAND'] == 'config':
+    if options['COMMAND'] in ('config', 'bundle'):
         command = TopLevelCommand(None)
         handler(command, options, command_options)
         return
@@ -164,6 +164,7 @@ class TopLevelCommand(object):
 
     Commands:
       build              Build or rebuild services
+      bundle             Generate a Docker bundle from the Compose file
       config             Validate and view the compose file
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
@@ -176,6 +177,7 @@ class TopLevelCommand(object):
       port               Print the public port for a port binding
       ps                 List containers
       pull               Pulls service images
+      push               Push service images
       restart            Restart services
       rm                 Remove stopped containers
       run                Run a one-off command
@@ -212,6 +214,34 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)))
 
+    def bundle(self, config_options, options):
+        """
+        Generate a Docker bundle from the Compose file.
+
+        Local images will be pushed to a Docker registry, and remote images
+        will be pulled to fetch an image digest.
+
+        Usage: bundle [options]
+
+        Options:
+            -o, --output PATH          Path to write the bundle file to.
+                                       Defaults to "<project name>.dsb".
+        """
+        self.project = project_from_options('.', config_options)
+        compose_config = get_config_from_options(self.project_dir, config_options)
+
+        output = options["--output"]
+        if not output:
+            output = "{}.dsb".format(self.project.name)
+
+        with errors.handle_connection_errors(self.project.client):
+            image_digests = get_image_digests(self.project)
+
+        with open(output, 'w') as f:
+            f.write(serialize_bundle(compose_config, image_digests))
+
+        log.info("Wrote bundle to {}".format(output))
+
     def config(self, config_options, options):
         """
         Validate and view the compose file.
@@ -224,13 +254,7 @@ class TopLevelCommand(object):
             --services      Print the service names, one per line.
 
         """
-        environment = Environment.from_env_file(self.project_dir)
-        config_path = get_config_path_from_options(
-            self.project_dir, config_options, environment
-        )
-        compose_config = config.load(
-            config.find(self.project_dir, config_path, environment)
-        )
+        compose_config = get_config_from_options(self.project_dir, config_options)
 
         if options['--quiet']:
             return
@@ -516,6 +540,20 @@ class TopLevelCommand(object):
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures')
+        )
+
+    def push(self, options):
+        """
+        Pushes images for services.
+
+        Usage: push [options] [SERVICE...]
+
+        Options:
+            --ignore-push-failures  Push what it can and ignores images with push failures.
+        """
+        self.project.push(
+            service_names=options['SERVICE'],
+            ignore_push_failures=options.get('--ignore-push-failures')
         )
 
     def rm(self, options):
