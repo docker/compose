@@ -294,7 +294,7 @@ func (c *container) UpdateResources(r *Resource) error {
 	cmd.Stdin = srStr
 	b, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf(string(b))
+		return fmt.Errorf("%s: %q", err.Error(), string(b))
 	}
 	return nil
 }
@@ -335,7 +335,7 @@ func (c *container) Pause() error {
 	args = append(args, "pause", c.id)
 	b, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf(string(b))
+		return fmt.Errorf("%s: %q", err.Error(), string(b))
 	}
 	return nil
 }
@@ -345,7 +345,7 @@ func (c *container) Resume() error {
 	args = append(args, "resume", c.id)
 	b, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf(string(b))
+		return fmt.Errorf("%s: %q", err.Error(), string(b))
 	}
 	return nil
 }
@@ -415,7 +415,7 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 	add(c.id)
 	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s: %s", err.Error(), string(out))
+		return fmt.Errorf("%s: %q", err.Error(), string(out))
 	}
 	return err
 }
@@ -548,7 +548,7 @@ func (c *container) Pids() ([]int, error) {
 	args = append(args, "ps", "--format=json", c.id)
 	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("%s", out)
+		return nil, fmt.Errorf("%s: %q", err.Error(), out)
 	}
 	var pids []int
 	if err := json.Unmarshal(out, &pids); err != nil {
@@ -563,7 +563,7 @@ func (c *container) Stats() (*Stat, error) {
 	args = append(args, "events", "--stats", c.id)
 	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("%s", out)
+		return nil, fmt.Errorf("%s: %q", err.Error(), out)
 	}
 	s := struct {
 		Data *Stat `json:"data"`
@@ -602,7 +602,7 @@ func (c *container) Status() (State, error) {
 
 	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("%s", out)
+		return "", fmt.Errorf("%s: %q", err.Error(), out)
 	}
 
 	// We only require the runtime json output to have a top level Status field.
