@@ -334,6 +334,13 @@ class TopLevelCommand(object):
         """
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
+        detach = options['-d']
+
+        if IS_WINDOWS_PLATFORM and not detach:
+            raise UserError(
+                "Interactive mode is not yet supported on Windows.\n"
+                "Please pass the -d flag when using `docker-compose exec`."
+            )
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -350,7 +357,7 @@ class TopLevelCommand(object):
 
         exec_id = container.create_exec(command, **create_exec_options)
 
-        if options['-d']:
+        if detach:
             container.start_exec(exec_id, tty=tty)
             return
 
