@@ -2658,8 +2658,6 @@ class ExpandPathTest(unittest.TestCase):
 
 
 class VolumePathTest(unittest.TestCase):
-
-    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_split_path_mapping_with_windows_path(self):
         host_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
         windows_volume_path = host_path + ":/opt/connect/config:ro"
