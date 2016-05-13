@@ -1360,6 +1360,17 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         assert "Service 'one' depends on service 'three'" in exc.exconly()
 
+    def test_linked_service_is_undefined(self):
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': '2',
+                    'services': {
+                        'web': {'image': 'busybox', 'links': ['db:db']},
+                    },
+                })
+            )
+
     def test_load_dockerfile_without_context(self):
         config_details = build_config_details({
             'version': '2',

@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 import os
 import shutil
 import tempfile
+from io import StringIO
 
 import docker
 import py
@@ -83,10 +84,10 @@ class CLITestCase(unittest.TestCase):
         self.assertTrue(project.services)
 
     def test_command_help(self):
-        with pytest.raises(SystemExit) as exc:
+        with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
             TopLevelCommand.help({'COMMAND': 'up'})
 
-        assert 'Usage: up' in exc.exconly()
+        assert "Usage: up" in fake_stdout.getvalue()
 
     def test_command_help_nonexistent(self):
         with pytest.raises(NoSuchCommand):

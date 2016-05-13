@@ -342,7 +342,10 @@ class Project(object):
             filters={'label': self.labels()},
             decode=True
         ):
-            if event['status'] in IMAGE_EVENTS:
+            # The first part of this condition is a guard against some events
+            # broadcasted by swarm that don't have a status field.
+            # See https://github.com/docker/compose/issues/3316
+            if 'status' not in event or event['status'] in IMAGE_EVENTS:
                 # We don't receive any image events because labels aren't applied
                 # to images
                 continue
@@ -387,13 +390,18 @@ class Project(object):
         def get_deps(service):
             return {self.get_service(dep) for dep in service.get_dependency_names()}
 
-        results = parallel.parallel_execute(
+        results, errors = parallel.parallel_execute(
             services,
             do,
             operator.attrgetter('name'),
             None,
             get_deps
         )
+        if errors:
+            raise ProjectError(
+                'Encountered errors while bringing up the project.'
+            )
+
         return [
             container
             for svc_containers in results
@@ -528,3 +536,7 @@ class NoSuchService(Exception):
 
     def __str__(self):
         return self.msg
+
+
+class ProjectError(Exception):
+    pass

@@ -59,7 +59,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
     if error_to_reraise:
         raise error_to_reraise
 
-    return results
+    return results, errors
 
 
 def _no_deps(x):

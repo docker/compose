@@ -37,6 +37,7 @@ from .validation import validate_against_config_schema
 from .validation import validate_config_section
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
+from .validation import validate_links
 from .validation import validate_network_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
@@ -580,6 +581,7 @@ def validate_service(service_config, service_names, version):
     validate_ulimits(service_config)
     validate_network_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
+    validate_links(service_config, service_names)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(
@@ -726,7 +728,7 @@ class MergeDict(dict):
 
         merged = parse_sequence_func(self.base.get(field, []))
         merged.update(parse_sequence_func(self.override.get(field, [])))
-        self[field] = [item.repr() for item in merged.values()]
+        self[field] = [item.repr() for item in sorted(merged.values())]
 
     def merge_scalar(self, field):
         if self.needs_merge(field):
@@ -928,7 +930,7 @@ def dict_from_path_mappings(path_mappings):
 
 
 def path_mappings_from_dict(d):
-    return [join_path_mapping(v) for v in d.items()]
+    return [join_path_mapping(v) for v in sorted(d.items())]
 
 
 def split_path_mapping(volume_path):

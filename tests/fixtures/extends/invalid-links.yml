@@ -1,3 +1,5 @@
+mydb:
+  build: '.'
 myweb:
   build: '.'
   extends:
