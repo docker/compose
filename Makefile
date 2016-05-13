@@ -82,7 +82,7 @@ lint:
 shell: dbuild
 	$(DOCKER_RUN) bash
 
-test: all validate
+test: validate
 	go test -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
 ifneq ($(wildcard /.dockerenv), )
 	$(MAKE) install bundles-rootfs
