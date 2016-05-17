@@ -47,3 +47,5 @@ RUN set -x \
 COPY . /go/src/github.com/docker/containerd
 
 WORKDIR /go/src/github.com/docker/containerd
+
+RUN make all install
