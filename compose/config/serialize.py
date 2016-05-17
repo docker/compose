@@ -27,11 +27,15 @@ def serialize_config(config):
         service_dict.pop('name'): service_dict
         for service_dict in denormalized_services
     }
+    networks = config.networks.copy()
+    for net_name, net_conf in networks.items():
+        if 'external_name' in net_conf:
+            del net_conf['external_name']
 
     output = {
         'version': V2_0,
         'services': services,
-        'networks': config.networks,
+        'networks': networks,
         'volumes': config.volumes,
     }
 
