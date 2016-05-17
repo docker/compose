@@ -59,13 +59,13 @@ optionally [dockerfile](#dockerfile) and [args](#args).
       args:
         buildno: 1
 
-If you specify `image` as well as `build`, then Compose tags the built image
-with the tag specified in `image`:
+If you specify `image` as well as `build`, then Compose names the built image
+with the `webapp` and optional `tag` specified in `image`:
 
     build: ./dir
-    image: webapp
+    image: webapp:tag
 
-This will result in an image tagged `webapp`, built from `./dir`.
+This will result in an image named `webapp` and tagged `tag`, built from `./dir`.
 
 > **Note**: In the [version 1 file format](#version-1), `build` is different in
 > two ways:
@@ -502,9 +502,11 @@ the special form `service:[service name]`.
 Networks to join, referencing entries under the
 [top-level `networks` key](#network-configuration-reference).
 
-    networks:
-      - some-network
-      - other-network
+    services:
+      some-service:
+        networks:
+         - some-network
+         - other-network
 
 #### aliases
 
@@ -516,14 +518,16 @@ Since `aliases` is network-scoped, the same service can have different aliases o
 
 The general format is shown here.
 
-    networks:
-      some-network:
-        aliases:
-          - alias1
-          - alias3
-      other-network:
-        aliases:
-          - alias2
+    services:
+      some-service:
+        networks:
+          some-network:
+            aliases:
+             - alias1
+             - alias3
+          other-network:
+            aliases:
+             - alias2
 
 In the example below, three services are provided (`web`, `worker`, and `db`), along with two networks (`new` and `legacy`). The `db` service is reachable at the hostname `db` or `database` on the `new` network, and at `db` or `mysql` on the `legacy` network.
 
@@ -1079,7 +1083,7 @@ It's more complicated if you're using particular configuration features:
           data: {}
 
     By default, Compose creates a volume whose name is prefixed with your
-    project name. If you want it to just be called `data`, declared it as
+    project name. If you want it to just be called `data`, declare it as
     external:
 
         volumes:
@@ -1089,21 +1093,24 @@ It's more complicated if you're using particular configuration features:
 ## Variable substitution
 
 Your configuration options can contain environment variables. Compose uses the
-variable values from the shell environment in which `docker-compose` is run. For
-example, suppose the shell contains `POSTGRES_VERSION=9.3` and you supply this
-configuration:
+variable values from the shell environment in which `docker-compose` is run.
+For example, suppose the shell contains `EXTERNAL_PORT=8000` and you supply
+this configuration:
 
-    db:
-      image: "postgres:${POSTGRES_VERSION}"
+    web:
+      build: .
+      ports:
+        - "${EXTERNAL_PORT}:5000"
 
-When you run `docker-compose up` with this configuration, Compose looks for the
-`POSTGRES_VERSION` environment variable in the shell and substitutes its value
-in. For this example, Compose resolves the `image` to `postgres:9.3` before
-running the configuration.
+When you run `docker-compose up` with this configuration, Compose looks for
+the `EXTERNAL_PORT` environment variable in the shell and substitutes its
+value in. In this example, Compose resolves the port mapping to `"8000:5000"`
+before creating the `web` container.
 
 If an environment variable is not set, Compose substitutes with an empty
-string. In the example above, if `POSTGRES_VERSION` is not set, the value for
-the `image` option is `postgres:`.
+string. In the example above, if `EXTERNAL_PORT` is not set, the value for the
+port mapping is `:5000` (which is of course an invalid port mapping, and will
+result in an error when attempting to create the container).
 
 Both `$VARIABLE` and `${VARIABLE}` syntax are supported. Extended shell-style
 features, such as `${VARIABLE-default}` and `${VARIABLE/foo/bar}`, are not
