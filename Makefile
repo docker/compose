@@ -91,3 +91,6 @@ ifneq ($(wildcard /.dockerenv), )
 endif
 
 validate: fmt
+
+uninstall:
+	$(foreach file,containerd containerd-shim ctr,rm /usr/local/bin/$(file);)
