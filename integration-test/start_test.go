@@ -9,6 +9,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/integration/checker"
 	"github.com/go-check/check"
+	"google.golang.org/grpc"
 )
 
 func (cs *ContainerdSuite) TestStartBusyboxLsSlash(t *check.C) {
@@ -44,14 +45,14 @@ var
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxNoSuchFile(t *check.C) {
-	expectedOutput := `oci runtime error: exec: \"NoSuchFile\": executable file not found in $PATH`
+	expectedOutput := `oci runtime error: exec: "NoSuchFile": executable file not found in $PATH`
 
 	if err := CreateBusyboxBundle("busybox-no-such-file", []string{"NoSuchFile"}); err != nil {
 		t.Fatal(err)
 	}
 
 	_, err := cs.RunContainer("NoSuchFile", "busybox-no-such-file")
-	t.Assert(err.Error(), checker.Contains, expectedOutput)
+	t.Assert(grpc.ErrorDesc(err), checker.Contains, expectedOutput)
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxTop(t *check.C) {
