@@ -166,11 +166,9 @@ func (p *process) start() error {
 	cmd.Stdin = p.stdio.stdin
 	cmd.Stdout = p.stdio.stdout
 	cmd.Stderr = p.stdio.stderr
-	// set the parent death signal to SIGKILL so that if the shim dies the container
-	// process also dies
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGKILL,
-	}
+	// Call out to setPDeathSig to set SysProcAttr as elements are platform specific
+	cmd.SysProcAttr = setPDeathSig()
+
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
 			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {

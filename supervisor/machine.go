@@ -1,3 +1,5 @@
+// +build !solaris
+
 package supervisor
 
 import "github.com/cloudfoundry/gosigar"

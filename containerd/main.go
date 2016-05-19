@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -15,14 +14,12 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/cloudfoundry/gosigar"
 	"github.com/codegangsta/cli"
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/http/pprof"
-	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
 	"github.com/rcrowley/go-metrics"
@@ -220,39 +217,6 @@ func checkLimits() error {
 		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
 	}
 	return nil
-}
-
-func processMetrics() {
-	var (
-		g    = metrics.NewGauge()
-		fg   = metrics.NewGauge()
-		memg = metrics.NewGauge()
-	)
-	metrics.DefaultRegistry.Register("goroutines", g)
-	metrics.DefaultRegistry.Register("fds", fg)
-	metrics.DefaultRegistry.Register("memory-used", memg)
-	collect := func() {
-		// update number of goroutines
-		g.Update(int64(runtime.NumGoroutine()))
-		// collect the number of open fds
-		fds, err := osutils.GetOpenFds(os.Getpid())
-		if err != nil {
-			logrus.WithField("error", err).Error("containerd: get open fd count")
-		}
-		fg.Update(int64(fds))
-		// get the memory used
-		m := sigar.ProcMem{}
-		if err := m.Get(os.Getpid()); err != nil {
-			logrus.WithField("error", err).Error("containerd: get pid memory information")
-		}
-		memg.Update(int64(m.Size))
-	}
-	go func() {
-		collect()
-		for range time.Tick(30 * time.Second) {
-			collect()
-		}
-	}()
 }
 
 func debugMetrics(interval time.Duration, graphiteAddr string) error {

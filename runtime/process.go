@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/docker/containerd/specs"
+	"golang.org/x/sys/unix"
 )
 
 type Process interface {
@@ -231,7 +232,7 @@ func (p *process) Wait() {
 }
 
 func getExitPipe(path string) (*os.File, error) {
-	if err := syscall.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+	if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 	// add NONBLOCK in case the other side has already closed or else
@@ -240,7 +241,7 @@ func getExitPipe(path string) (*os.File, error) {
 }
 
 func getControlPipe(path string) (*os.File, error) {
-	if err := syscall.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+	if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 	return os.OpenFile(path, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
