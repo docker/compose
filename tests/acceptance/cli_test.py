@@ -1192,8 +1192,6 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
-        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
-        self.dispatch(['rm', '-f', '-a'], None)
         self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 0)
 
         service.create_container(one_off=False)

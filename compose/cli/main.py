@@ -532,17 +532,15 @@ class TopLevelCommand(object):
         Options:
             -f, --force   Don't ask to confirm removal
             -v            Remove any anonymous volumes attached to containers
-            -a, --all     Also remove one-off containers created by
+            -a, --all     Obsolete. Also remove one-off containers created by
                           docker-compose run
         """
         if options.get('--all'):
-            one_off = OneOffFilter.include
-        else:
             log.warn(
-                'Not including one-off containers created by `docker-compose run`.\n'
-                'To include them, use `docker-compose rm --all`.\n'
-                'This will be the default behavior in the next version of Compose.\n')
-            one_off = OneOffFilter.exclude
+                '--all flag is obsolete. This is now the default behavior '
+                'of `docker-compose rm`'
+            )
+        one_off = OneOffFilter.include
 
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off
