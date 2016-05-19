@@ -6,9 +6,9 @@ import os
 import platform
 import ssl
 import subprocess
+import sys
 
 import docker
-from six.moves import input
 
 import compose
 
@@ -40,6 +40,16 @@ def yesno(prompt, default=None):
         return default
     else:
         return None
+
+
+def input(prompt):
+    """
+    Version of input (raw_input in Python 2) which forces a flush of sys.stdout
+    to avoid problems where the prompt fails to appear due to line buffering
+    """
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    return sys.stdin.readline().rstrip(b'\n')
 
 
 def call_silently(*args, **kwargs):
