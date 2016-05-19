@@ -2664,7 +2664,15 @@ class VolumePathTest(unittest.TestCase):
         expected_mapping = ("/opt/connect/config:ro", host_path)
 
         mapping = config.split_path_mapping(windows_volume_path)
-        self.assertEqual(mapping, expected_mapping)
+        assert mapping == expected_mapping
+
+    def test_split_path_mapping_with_windows_path_in_container(self):
+        host_path = 'c:\\Users\\remilia\\data'
+        container_path = 'c:\\scarletdevil\\data'
+        expected_mapping = (container_path, host_path)
+
+        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        assert mapping == expected_mapping
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
