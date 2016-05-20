@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import functools
 import logging
+import ntpath
 import operator
 import os
 import string
@@ -944,7 +945,7 @@ def split_path_mapping(volume_path):
     if volume_path.startswith('.') or volume_path.startswith('~'):
         drive, volume_config = '', volume_path
     else:
-        drive, volume_config = os.path.splitdrive(volume_path)
+        drive, volume_config = ntpath.splitdrive(volume_path)
 
     if ':' in volume_config:
         (host, container) = volume_config.split(':', 1)
