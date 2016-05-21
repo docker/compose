@@ -42,6 +42,9 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
+from .utils import get_plugin_dir
+from ..plugin_manager import PluginManager
+from ..plugin_manager import NoPluginError
 
 
 if not IS_WINDOWS_PLATFORM:
@@ -101,6 +104,11 @@ def perform_command(options, handler, command_options):
     if options['COMMAND'] == 'config':
         command = TopLevelCommand(None)
         handler(command, options, command_options)
+        return
+
+    if options['COMMAND'] == 'plugin':
+        command = TopLevelCommand(None)
+        handler(command, command_options)
         return
 
     project = project_from_options('.', options)
@@ -173,6 +181,7 @@ class TopLevelCommand(object):
       kill               Kill containers
       logs               View output from containers
       pause              Pause services
+      plugin             Manages the plugins
       port               Print the public port for a port binding
       ps                 List containers
       pull               Pulls service images
@@ -596,7 +605,7 @@ class TopLevelCommand(object):
         if options['--publish'] and options['--service-ports']:
             raise UserError(
                 'Service port mapping and manual port mapping '
-                'can not be used togather'
+                'can not be used together'
             )
 
         if options['COMMAND']:
@@ -775,6 +784,33 @@ class TopLevelCommand(object):
             print(__version__)
         else:
             print(get_version_info('full'))
+
+    def plugin(self, options):
+        """
+        Manages docker-compose plugins
+
+        Usage: plugin [install|uninstall|list|config] [PLUGIN]
+        """
+
+        plugin_manager = PluginManager(get_plugin_dir())
+
+        if options['list']:
+            plugins = plugin_manager.get_plugins()
+
+            for plugin_name, plugin in plugins.items():
+                print(plugin.name, plugin.description)
+        elif options['PLUGIN'] is not None:
+            try:
+                if options['install']:
+                    plugin_manager.install_plugin(options['PLUGIN'])
+                elif options['uninstall']:
+                    plugin_manager.uninstall_plugin(options['PLUGIN'])
+                elif options['config']:
+                    plugin_manager.configure_plugin(options['PLUGIN'])
+            except NoPluginError:
+                raise UserError("Plugin %s doesn't exist" % options['PLUGIN'])
+        else:
+            return False
 
 
 def convergence_strategy_from_opts(options):
