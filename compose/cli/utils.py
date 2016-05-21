@@ -12,6 +12,11 @@ from six.moves import input
 
 import compose
 
+
+from ..const import HOME_DIR
+from ..const import PLUGIN_DIR
+
+
 # WindowsError is not defined on non-win32 platforms. Avoid runtime errors by
 # defining it as OSError (its parent class) if missing.
 try:
@@ -93,3 +98,11 @@ def get_build_version():
 
     with open(filename) as fh:
         return fh.read().strip()
+
+
+def get_user_home():
+    return os.path.expanduser("~")
+
+
+def get_plugin_dir():
+    return os.path.join(get_user_home(), HOME_DIR, PLUGIN_DIR)

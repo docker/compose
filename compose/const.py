@@ -14,6 +14,8 @@ LABEL_PROJECT = 'com.docker.compose.project'
 LABEL_SERVICE = 'com.docker.compose.service'
 LABEL_VERSION = 'com.docker.compose.version'
 LABEL_CONFIG_HASH = 'com.docker.compose.config-hash'
+HOME_DIR = '.docker-compose'
+PLUGIN_DIR = 'plugins'
 
 COMPOSEFILE_V1 = '1'
 COMPOSEFILE_V2_0 = '2.0'
