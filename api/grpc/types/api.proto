@@ -47,6 +47,8 @@ message CreateContainerRequest {
 	string stderr = 6; // path to file where stderr will be written (optional)
 	repeated string labels = 7;
 	bool noPivotRoot = 8;
+	string runtime = 9;
+	repeated string runtimeArgs = 10;
 }
 
 message CreateContainerResponse {

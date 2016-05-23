@@ -17,16 +17,24 @@ type StartTask struct {
 	Labels        []string
 	NoPivotRoot   bool
 	Checkpoint    *runtime.Checkpoint
+	Runtime       string
+	RuntimeArgs   []string
 }
 
 func (s *Supervisor) start(t *StartTask) error {
 	start := time.Now()
+	rt := s.runtime
+	rtArgs := s.runtimeArgs
+	if t.Runtime != "" {
+		rt = t.Runtime
+		rtArgs = t.RuntimeArgs
+	}
 	container, err := runtime.New(runtime.ContainerOpts{
 		Root:        s.stateDir,
 		ID:          t.ID,
 		Bundle:      t.BundlePath,
-		Runtime:     s.runtime,
-		RuntimeArgs: s.runtimeArgs,
+		Runtime:     rt,
+		RuntimeArgs: rtArgs,
 		Shim:        s.shim,
 		Labels:      t.Labels,
 		NoPivotRoot: t.NoPivotRoot,

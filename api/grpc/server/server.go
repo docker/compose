@@ -52,6 +52,8 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.Stderr = c.Stderr
 	e.Labels = c.Labels
 	e.NoPivotRoot = c.NoPivotRoot
+	e.Runtime = c.Runtime
+	e.RuntimeArgs = c.RuntimeArgs
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
