@@ -18,8 +18,8 @@ from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
 from .config.sort_services import get_service_name_from_network_mode
-from .container import Container
 from .core import dockerclient as dc
+from .core.container import Container
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks

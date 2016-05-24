@@ -16,8 +16,8 @@ from compose.config import ConfigurationError
 from compose.config.config import V2_0
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.container import Container
 from compose.core import dockerclient as dc
+from compose.core.container import Container
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy

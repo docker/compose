@@ -14,7 +14,7 @@ from compose.cli.log_printer import consume_queue
 from compose.cli.log_printer import QueueItem
 from compose.cli.log_printer import wait_on_exit
 from compose.cli.log_printer import watch_events
-from compose.container import Container
+from compose.core.container import Container
 from tests import mock
 
 

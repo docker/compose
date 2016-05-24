@@ -5,12 +5,12 @@ import logging
 
 import pytest
 
-from compose import container
 from compose.cli.errors import UserError
 from compose.cli.formatter import ConsoleWarningFormatter
 from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import filter_containers_to_service_names
 from compose.cli.main import setup_console_handler
+from compose.core import container
 from compose.service import ConvergenceStrategy
 from tests import mock
 

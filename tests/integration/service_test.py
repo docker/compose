@@ -23,8 +23,8 @@ from compose.common.const import LABEL_SERVICE
 from compose.common.const import LABEL_VERSION
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.container import Container
 from compose.core import dockerclient as dc
+from compose.core.container import Container
 from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy

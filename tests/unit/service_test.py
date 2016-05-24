@@ -12,8 +12,8 @@ from compose.common.const import LABEL_PROJECT
 from compose.common.const import LABEL_SERVICE
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.container import Container
 from compose.core import dockerclient as dc
+from compose.core.container import Container
 from compose.project import OneOffFilter
 from compose.service import build_ulimits
 from compose.service import build_volume_binding

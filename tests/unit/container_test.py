@@ -3,9 +3,9 @@ from __future__ import unicode_literals
 
 from .. import mock
 from .. import unittest
-from compose.container import Container
-from compose.container import get_container_name
 from compose.core import dockerclient as dc
+from compose.core.container import Container
+from compose.core.container import get_container_name
 
 
 class ContainerTest(unittest.TestCase):

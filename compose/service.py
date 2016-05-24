@@ -21,8 +21,8 @@ from .common.const import LABEL_VERSION
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
-from .container import Container
 from .core import dockerclient as dc
+from .core.container import Container
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .progress_stream import stream_output

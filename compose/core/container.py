@@ -5,7 +5,7 @@ from functools import reduce
 
 import six
 
-from .common import const
+from ..common import const
 
 
 class Container(object):

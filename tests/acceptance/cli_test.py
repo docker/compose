@@ -16,14 +16,13 @@ import yaml
 
 from .. import mock
 from compose.cli.command import get_project
-from compose.container import Container
 from compose.core import dockerclient as dc
+from compose.core.container import Container
 from compose.project import OneOffFilter
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
 from tests.integration.testcases import v2_only
-
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
