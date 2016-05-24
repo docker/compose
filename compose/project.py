@@ -7,7 +7,6 @@ import operator
 from functools import reduce
 
 import enum
-from docker.errors import APIError
 
 from . import parallel
 from .config import ConfigurationError
@@ -20,6 +19,7 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
+from .core import dockerclient as dc
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks
@@ -211,7 +211,7 @@ class Project(object):
         if container_name:
             try:
                 return ContainerNetworkMode(Container.from_id(self.client, container_name))
-            except APIError:
+            except dc.errors.APIError:
                 raise ConfigurationError(
                     "Service '{name}' uses the network stack of container '{dep}' which "
                     "does not exist.".format(name=service_dict['name'], dep=container_name))
@@ -354,7 +354,7 @@ class Project(object):
             try:
                 # this can fail if the conatiner has been removed
                 container = Container.from_id(self.client, event['id'])
-            except APIError:
+            except dc.errors.APIError:
                 continue
             if container.service not in service_names:
                 continue
@@ -517,7 +517,7 @@ def get_volumes_from(project, service_dict):
             try:
                 container = Container.from_id(project.client, spec.source)
                 return spec._replace(source=container)
-            except APIError:
+            except dc.errors.APIError:
                 pass
 
         raise ConfigurationError(

@@ -6,11 +6,11 @@ import operator
 import sys
 from threading import Thread
 
-from docker.errors import APIError
 from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
 
+from .core import dockerclient as dc
 from compose.cli.signals import ShutdownException
 from compose.utils import get_output_stream
 
@@ -44,7 +44,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
         if exception is None:
             writer.write(get_name(obj), 'done')
             results.append(result)
-        elif isinstance(exception, APIError):
+        elif isinstance(exception, dc.errors.APIError):
             errors[get_name(obj)] = exception.explanation
             writer.write(get_name(obj), 'error')
         elif isinstance(exception, UpstreamError):

@@ -1,16 +1,16 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import docker
 import pytest
 
 from compose import volume
+from compose.core import dockerclient as dc
 from tests import mock
 
 
 @pytest.fixture
 def mock_client():
-    return mock.create_autospec(docker.Client)
+    return mock.create_autospec(dc.client.Client)
 
 
 class TestVolume(object):

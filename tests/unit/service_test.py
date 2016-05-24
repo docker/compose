@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import docker
 import pytest
-from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
@@ -14,6 +13,7 @@ from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.core import dockerclient as dc
 from compose.project import OneOffFilter
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
@@ -560,7 +560,7 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.remove_image.assert_called_once_with(web.image_name)
 
     def test_remove_image_with_error(self):
-        self.mock_client.remove_image.side_effect = error = APIError(
+        self.mock_client.remove_image.side_effect = error = dc.errors.APIError(
             message="testing",
             response={},
             explanation="Boom")

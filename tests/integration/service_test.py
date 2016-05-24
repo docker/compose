@@ -7,7 +7,6 @@ import tempfile
 from os import path
 
 import pytest
-from docker.errors import APIError
 from six import StringIO
 from six import text_type
 
@@ -25,6 +24,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
+from compose.core import dockerclient as dc
 from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
@@ -272,7 +272,7 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
-        self.assertRaises(APIError,
+        self.assertRaises(dc.errors.APIError,
                           self.client.inspect_container,
                           old_container.id)
 
@@ -728,7 +728,7 @@ class ServiceTest(DockerClientTestCase):
 
         with mock.patch(
             'compose.container.Container.create',
-            side_effect=APIError(
+            side_effect=dc.errors.APIError(
                 message="testing",
                 response={},
                 explanation="Boom")):
@@ -991,7 +991,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
 
-        with self.assertRaisesRegexp(APIError, expected_error_msg):
+        with self.assertRaisesRegexp(dc.errors.APIError, expected_error_msg):
             create_and_start_container(service)
 
     def test_log_drive_empty_default_jsonfile(self):

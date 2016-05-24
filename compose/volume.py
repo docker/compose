@@ -3,10 +3,9 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker.errors import NotFound
-
 from .config import ConfigurationError
-
+from .core import dockerclient as dc
+# from docker.errors import NotFound
 log = logging.getLogger(__name__)
 
 
@@ -38,7 +37,7 @@ class Volume(object):
     def exists(self):
         try:
             self.inspect()
-        except NotFound:
+        except dc.errors.NotFound:
             return False
         return True
 
@@ -78,7 +77,7 @@ class ProjectVolumes(object):
         for volume in self.volumes.values():
             try:
                 volume.remove()
-            except NotFound:
+            except dc.errors.NotFound:
                 log.warn("Volume %s not found.", volume.full_name)
 
     def initialize(self):
@@ -122,7 +121,7 @@ class ProjectVolumes(object):
                                 volume.inspect()['Driver']
                             )
                         )
-        except NotFound:
+        except dc.errors.NotFound:
             raise ConfigurationError(
                 'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
             )

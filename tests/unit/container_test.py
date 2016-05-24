@@ -1,12 +1,11 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import docker
-
 from .. import mock
 from .. import unittest
 from compose.container import Container
 from compose.container import get_container_name
+from compose.core import dockerclient as dc
 
 
 class ContainerTest(unittest.TestCase):
@@ -98,7 +97,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.name_without_project, "custom_name_of_container")
 
     def test_inspect_if_not_inspected(self):
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(dc.client.Client)
         container = Container(mock_client, dict(Id="the_id"))
 
         container.inspect_if_not_inspected()

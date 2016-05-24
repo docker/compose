@@ -8,13 +8,13 @@ import re
 import sys
 
 import six
-from docker.utils.ports import split_port
 from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
 from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from ..const import COMPOSEFILE_V1 as V1
+from ..core import dockerclient as dc
 from .errors import ConfigurationError
 from .errors import VERSION_EXPLANATION
 from .sort_services import get_service_name_from_network_mode
@@ -47,7 +47,7 @@ VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)
 def format_ports(instance):
     try:
-        split_port(instance)
+        dc.ports.split_port(instance)
     except ValueError as e:
         raise ValidationError(six.text_type(e))
     return True

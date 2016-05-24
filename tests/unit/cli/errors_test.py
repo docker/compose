@@ -2,11 +2,11 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import pytest
-from docker.errors import APIError
 from requests.exceptions import ConnectionError
 
 from compose.cli import errors
 from compose.cli.errors import handle_connection_errors
+from compose.core import dockerclient as dc
 from tests import mock
 
 
@@ -37,7 +37,7 @@ class TestHandleConnectionErrors(object):
     def test_api_error_version_mismatch(self, mock_logging):
         with pytest.raises(errors.ConnectionError):
             with handle_connection_errors(mock.Mock(api_version='1.22')):
-                raise APIError(None, None, b"client is newer than server")
+                raise dc.errors.APIError(None, None, b"client is newer than server")
 
         _, args, _ = mock_logging.error.mock_calls[0]
         assert "Docker Engine of version 1.10.0 or greater" in args[0]
@@ -46,6 +46,6 @@ class TestHandleConnectionErrors(object):
         msg = b"Something broke!"
         with pytest.raises(errors.ConnectionError):
             with handle_connection_errors(mock.Mock(api_version='1.22')):
-                raise APIError(None, None, msg)
+                raise dc.errors.APIError(None, None, msg)
 
         mock_logging.error.assert_called_once_with(msg)

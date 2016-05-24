@@ -9,10 +9,6 @@ from operator import attrgetter
 
 import enum
 import six
-from docker.errors import APIError
-from docker.utils import LogConfig
-from docker.utils.ports import build_port_bindings
-from docker.utils.ports import split_port
 
 from . import __version__
 from .config import DOCKER_CONFIG_KEYS
@@ -26,11 +22,16 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
+from .core import dockerclient as dc
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+# from docker.errors import APIError
+# from docker.utils import LogConfig
+# from docker.utils.ports import build_port_bindings
+# from docker.utils.ports import split_port
 
 
 log = logging.getLogger(__name__)
@@ -305,7 +306,7 @@ class Service(object):
     def image(self):
         try:
             return self.client.inspect_image(self.image_name)
-        except APIError as e:
+        except dc.errors.APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
                 raise NoSuchImageError("Image '{}' not found".format(self.image_name))
             else:
@@ -670,7 +671,7 @@ class Service(object):
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
-            port_bindings=build_port_bindings(options.get('ports') or []),
+            port_bindings=dc.ports.build_port_bindings(options.get('ports') or []),
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=options.get('privileged', False),
@@ -771,13 +772,13 @@ class Service(object):
         try:
             self.client.remove_image(self.image_name)
             return True
-        except APIError as e:
+        except dc.errors.APIError as e:
             log.error("Failed to remove image for service %s: %s", self.name, e)
             return False
 
     def specifies_host_port(self):
         def has_host_port(binding):
-            _, external_bindings = split_port(binding)
+            _, external_bindings = dc.ports.split_port(binding)
 
             # there are no external bindings
             if external_bindings is None:
@@ -1068,7 +1069,7 @@ def build_ulimits(ulimit_config):
 def get_log_config(logging_dict):
     log_driver = logging_dict.get('driver', "") if logging_dict else ""
     log_options = logging_dict.get('options', None) if logging_dict else None
-    return LogConfig(
+    return dc.utils.LogConfig(
         type=log_driver,
         config=log_options
     )
@@ -1089,7 +1090,7 @@ def build_container_ports(container_options, options):
     ports = []
     all_ports = container_options.get('ports', []) + options.get('expose', [])
     for port_range in all_ports:
-        internal_range, _ = split_port(port_range)
+        internal_range, _ = dc.ports.split_port(port_range)
         for port in internal_range:
             port = str(port)
             if '/' in port:

@@ -8,9 +8,8 @@ import ssl
 import subprocess
 import sys
 
-import docker
-
 import compose
+from ..core import dockerclient as dc
 
 # WindowsError is not defined on non-win32 platforms. Avoid runtime errors by
 # defining it as OSError (its parent class) if missing.
@@ -88,7 +87,7 @@ def get_version_info(scope):
             "OpenSSL version: {}"
         ).format(
             versioninfo,
-            docker.version,
+            dc.client.version,
             platform.python_implementation(),
             platform.python_version(),
             ssl.OPENSSL_VERSION)

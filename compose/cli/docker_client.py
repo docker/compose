@@ -3,12 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker import Client
-from docker.errors import TLSParameterError
-from docker.tls import TLSConfig
-from docker.utils import kwargs_from_env
-
 from ..const import HTTP_TIMEOUT
+from ..core import dockerclient as dc
 from .errors import UserError
 
 log = logging.getLogger(__name__)
@@ -31,7 +27,7 @@ def tls_config_from_options(options):
         if cert or key:
             client_cert = (cert, key)
 
-        return TLSConfig(
+        return dc.tls.TLSConfig(
             client_cert=client_cert, verify=verify, ca_cert=ca_cert,
             assert_hostname=False if skip_hostname_check else None
         )
@@ -49,8 +45,8 @@ def docker_client(environment, version=None, tls_config=None, host=None):
                  "Please use COMPOSE_HTTP_TIMEOUT instead.")
 
     try:
-        kwargs = kwargs_from_env(environment=environment)
-    except TLSParameterError:
+        kwargs = dc.utils.kwargs_from_env(environment=environment)
+    except dc.errors.TLSParameterError:
         raise UserError(
             "TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY "
             "and DOCKER_CERT_PATH are set correctly.\n"
@@ -70,4 +66,4 @@ def docker_client(environment, version=None, tls_config=None, host=None):
     else:
         kwargs['timeout'] = HTTP_TIMEOUT
 
-    return Client(**kwargs)
+    return dc.client.Client(**kwargs)

@@ -13,11 +13,11 @@ from collections import namedtuple
 from operator import attrgetter
 
 import yaml
-from docker import errors
 
 from .. import mock
 from compose.cli.command import get_project
 from compose.container import Container
+from compose.core import dockerclient as dc
 from compose.project import OneOffFilter
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
@@ -88,7 +88,7 @@ class ContainerStateCondition(object):
         try:
             container = self.client.inspect_container(self.name)
             return container['State']['Status'] == self.status
-        except errors.APIError:
+        except dc.errors.APIError:
             return False
 
     def __str__(self):

@@ -2,8 +2,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import six
-from docker.errors import APIError
 
+from compose.core import dockerclient as dc
 from compose.parallel import parallel_execute
 from compose.parallel import parallel_execute_iter
 from compose.parallel import UpstreamError
@@ -66,7 +66,7 @@ def test_parallel_execute_with_upstream_errors():
 
     def process(x):
         if x is data_volume:
-            raise APIError(None, None, "Something went wrong")
+            raise dc.errors.APIError(None, None, "Something went wrong")
         log.append(x)
 
     parallel_execute(
@@ -86,6 +86,6 @@ def test_parallel_execute_with_upstream_errors():
     ]
 
     assert (cache, None, type(None)) in events
-    assert (data_volume, None, APIError) in events
+    assert (data_volume, None, dc.errors.APIError) in events
     assert (db, None, UpstreamError) in events
     assert (web, None, UpstreamError) in events

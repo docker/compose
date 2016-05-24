@@ -5,7 +5,6 @@ import random
 
 import py
 import pytest
-from docker.errors import NotFound
 
 from .. import mock
 from ..helpers import build_config
@@ -18,6 +17,7 @@ from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.core import dockerclient as dc
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
@@ -1043,7 +1043,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project.volumes.initialize()
 
-        with self.assertRaises(NotFound):
+        with self.assertRaises(dc.errors.NotFound):
             self.client.inspect_volume(full_vol_name)
 
     @v2_only()

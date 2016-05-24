@@ -1,9 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from docker.errors import DockerException
-
 from .testcases import DockerClientTestCase
+from compose.core import dockerclient as dc
 from compose.volume import Volume
 
 
@@ -15,7 +14,7 @@ class VolumeTest(DockerClientTestCase):
         for volume in self.tmp_volumes:
             try:
                 self.client.remove_volume(volume.full_name)
-            except DockerException:
+            except dc.errors.DockerException:
                 pass
 
     def create_volume(self, name, driver=None, opts=None, external=None):

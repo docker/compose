@@ -6,7 +6,6 @@ import logging
 import socket
 from textwrap import dedent
 
-from docker.errors import APIError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
 from requests.exceptions import SSLError
@@ -14,6 +13,7 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
 from ..const import HTTP_TIMEOUT
+from ..core import dockerclient as dc
 from .utils import call_silently
 from .utils import is_mac
 from .utils import is_ubuntu
@@ -58,7 +58,7 @@ def handle_connection_errors(client):
         if call_silently(['which', 'docker-machine']) == 0:
             exit_with_error(conn_error_docker_machine)
         exit_with_error(conn_error_generic.format(url=client.base_url))
-    except APIError as e:
+    except dc.errors.APIError as e:
         log_api_error(e, client.api_version)
         raise ConnectionError()
     except (ReadTimeout, socket.timeout) as e:

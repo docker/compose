@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import functools
 import os
 
-from docker.utils import version_lt
 from pytest import skip
 
 from .. import unittest
@@ -15,6 +14,7 @@ from compose.config.config import V2_0
 from compose.config.environment import Environment
 from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
+from compose.core import dockerclient as dc
 from compose.progress_stream import stream_output
 from compose.service import Service
 
@@ -37,7 +37,7 @@ def engine_version_too_low_for_v2():
     if 'DOCKER_VERSION' not in os.environ:
         return False
     version = os.environ['DOCKER_VERSION'].partition('-')[0]
-    return version_lt(version, '1.10')
+    return dc.utils.version_lt(version, '1.10')
 
 
 def v2_only():
@@ -105,5 +105,5 @@ class DockerClientTestCase(unittest.TestCase):
 
     def require_api_version(self, minimum):
         api_version = self.client.version()['ApiVersion']
-        if version_lt(api_version, minimum):
+        if dc.utils.version_lt(api_version, minimum):
             skip("API version is too low ({} < {})".format(api_version, minimum))

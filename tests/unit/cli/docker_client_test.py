@@ -3,11 +3,11 @@ from __future__ import unicode_literals
 
 import os
 
-import docker
 import pytest
 
 from compose.cli.docker_client import docker_client
 from compose.cli.docker_client import tls_config_from_options
+from compose.core import dockerclient as docker
 from tests import mock
 from tests import unittest
 

@@ -3,12 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker.errors import NotFound
-from docker.utils import create_ipam_config
-from docker.utils import create_ipam_pool
-
 from .config import ConfigurationError
-
+from .core import dockerclient as dc
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +28,7 @@ class Network(object):
                     'Network {0} declared as external. No new '
                     'network will be created.'.format(self.name)
                 )
-            except NotFound:
+            except dc.errors.NotFound:
                 raise ConfigurationError(
                     'Network {name} declared as external, but could'
                     ' not be found. Please create the network manually'
@@ -53,7 +49,7 @@ class Network(object):
                 raise ConfigurationError(
                     'Network "{}" needs to be recreated - options have changed'
                     .format(self.full_name))
-        except NotFound:
+        except dc.errors.NotFound:
             driver_name = 'the default driver'
             if self.driver:
                 driver_name = 'driver "{}"'.format(self.driver)
@@ -92,10 +88,10 @@ def create_ipam_config_from_dict(ipam_dict):
     if not ipam_dict:
         return None
 
-    return create_ipam_config(
+    return dc.utils.create_ipam_config(
         driver=ipam_dict.get('driver'),
         pool_configs=[
-            create_ipam_pool(
+            dc.utils.create_ipam_pool(
                 subnet=config.get('subnet'),
                 iprange=config.get('ip_range'),
                 gateway=config.get('gateway'),
@@ -151,7 +147,7 @@ class ProjectNetworks(object):
         for network in self.networks.values():
             try:
                 network.remove()
-            except NotFound:
+            except dc.errors.NotFound:
                 log.warn("Network %s not found.", network.full_name)
 
     def initialize(self):

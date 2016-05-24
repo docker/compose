@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import datetime
 
 import docker
-from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
@@ -12,6 +11,7 @@ from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.core import dockerclient as dc
 from compose.project import Project
 from compose.service import ImageType
 from compose.service import Service
@@ -284,7 +284,7 @@ class ProjectTest(unittest.TestCase):
 
         def get_container(cid):
             if cid == 'eeeee':
-                raise NotFound(None, None, "oops")
+                raise dc.errors.NotFound(None, None, "oops")
             if cid == 'abcde':
                 name = 'web'
                 labels = {LABEL_SERVICE: name}
@@ -505,8 +505,8 @@ class ProjectTest(unittest.TestCase):
                 volumes={'data': {}},
             ),
         )
-        self.mock_client.remove_network.side_effect = NotFound(None, None, 'oops')
-        self.mock_client.remove_volume.side_effect = NotFound(None, None, 'oops')
+        self.mock_client.remove_network.side_effect = dc.errors.NotFound(None, None, 'oops')
+        self.mock_client.remove_volume.side_effect = dc.errors.NotFound(None, None, 'oops')
 
         project.down(ImageType.all, True)
         self.mock_client.remove_image.assert_called_once_with("busybox:latest")
