@@ -5,9 +5,7 @@ from functools import reduce
 
 import six
 
-from .const import LABEL_CONTAINER_NUMBER
-from .const import LABEL_PROJECT
-from .const import LABEL_SERVICE
+from .common import const
 
 
 class Container(object):
@@ -68,11 +66,11 @@ class Container(object):
 
     @property
     def service(self):
-        return self.labels.get(LABEL_SERVICE)
+        return self.labels.get(const.LABEL_SERVICE)
 
     @property
     def name_without_project(self):
-        project = self.labels.get(LABEL_PROJECT)
+        project = self.labels.get(const.LABEL_PROJECT)
 
         if self.name.startswith('{0}_{1}'.format(project, self.service)):
             return '{0}_{1}'.format(self.service, self.number)
@@ -81,10 +79,10 @@ class Container(object):
 
     @property
     def number(self):
-        number = self.labels.get(LABEL_CONTAINER_NUMBER)
+        number = self.labels.get(const.LABEL_CONTAINER_NUMBER)
         if not number:
             raise ValueError("Container {0} does not have a {1} label".format(
-                self.short_id, LABEL_CONTAINER_NUMBER))
+                self.short_id, const.LABEL_CONTAINER_NUMBER))
         return int(number)
 
     @property

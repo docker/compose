@@ -9,15 +9,15 @@ from functools import reduce
 import enum
 
 from . import parallel
+from .common.const import DEFAULT_TIMEOUT
+from .common.const import IMAGE_EVENTS
+from .common.const import LABEL_ONE_OFF
+from .common.const import LABEL_PROJECT
+from .common.const import LABEL_SERVICE
 from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
 from .config.sort_services import get_service_name_from_network_mode
-from .const import DEFAULT_TIMEOUT
-from .const import IMAGE_EVENTS
-from .const import LABEL_ONE_OFF
-from .const import LABEL_PROJECT
-from .const import LABEL_SERVICE
 from .container import Container
 from .core import dockerclient as dc
 from .network import build_networks
@@ -31,7 +31,6 @@ from .service import Service
 from .service import ServiceNetworkMode
 from .utils import microseconds_from_time_nano
 from .volume import ProjectVolumes
-
 
 log = logging.getLogger(__name__)
 

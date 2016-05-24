@@ -18,7 +18,7 @@ from compose.cli.command import get_project_name
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
-from compose.const import IS_WINDOWS_PLATFORM
+from compose.common.const import IS_WINDOWS_PLATFORM
 from compose.core import dockerclient as dc
 from compose.project import Project
 

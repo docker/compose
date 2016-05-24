@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 
-from ..const import HTTP_TIMEOUT
+from ..common.const import HTTP_TIMEOUT
 from ..core import dockerclient as dc
 from .errors import UserError
 

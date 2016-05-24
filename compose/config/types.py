@@ -9,9 +9,9 @@ from collections import namedtuple
 
 import six
 
+from ..common.const import IS_WINDOWS_PLATFORM
 from compose.config.config import V1
 from compose.config.errors import ConfigurationError
-from compose.const import IS_WINDOWS_PLATFORM
 
 
 class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode type')):

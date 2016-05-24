@@ -3,13 +3,13 @@ from __future__ import unicode_literals
 
 import pytest
 
+from compose.common.const import IS_WINDOWS_PLATFORM
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.errors import ConfigurationError
 from compose.config.types import parse_extra_hosts
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import IS_WINDOWS_PLATFORM
 
 
 def test_parse_extra_hosts_list():

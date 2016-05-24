@@ -12,6 +12,7 @@ import py
 import pytest
 
 from ...helpers import build_config_details
+from compose.common.const import IS_WINDOWS_PLATFORM
 from compose.config import config
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
@@ -21,7 +22,6 @@ from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
-from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
 

@@ -7,7 +7,7 @@ import os
 
 import six
 
-from ..const import IS_WINDOWS_PLATFORM
+from ..common.const import IS_WINDOWS_PLATFORM
 from .errors import ConfigurationError
 
 log = logging.getLogger(__name__)

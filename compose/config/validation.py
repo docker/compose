@@ -13,12 +13,11 @@ from jsonschema import FormatChecker
 from jsonschema import RefResolver
 from jsonschema import ValidationError
 
-from ..const import COMPOSEFILE_V1 as V1
+from ..common.const import COMPOSEFILE_V1 as V1
 from ..core import dockerclient as dc
 from .errors import ConfigurationError
 from .errors import VERSION_EXPLANATION
 from .sort_services import get_service_name_from_network_mode
-
 
 log = logging.getLogger(__name__)
 

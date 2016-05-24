@@ -7,9 +7,9 @@ import docker
 
 from .. import mock
 from .. import unittest
+from compose.common.const import LABEL_SERVICE
 from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
-from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.core import dockerclient as dc
 from compose.project import Project

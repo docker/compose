@@ -9,8 +9,8 @@ import six
 
 from . import verbose_proxy
 from .. import config
+from ..common.const import API_VERSIONS
 from ..config.environment import Environment
-from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
 from .docker_client import tls_config_from_options

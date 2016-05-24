@@ -15,14 +15,14 @@ from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import pull_busybox
 from compose import __version__
+from compose.common.const import LABEL_CONFIG_HASH
+from compose.common.const import LABEL_CONTAINER_NUMBER
+from compose.common.const import LABEL_ONE_OFF
+from compose.common.const import LABEL_PROJECT
+from compose.common.const import LABEL_SERVICE
+from compose.common.const import LABEL_VERSION
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import LABEL_CONFIG_HASH
-from compose.const import LABEL_CONTAINER_NUMBER
-from compose.const import LABEL_ONE_OFF
-from compose.const import LABEL_PROJECT
-from compose.const import LABEL_SERVICE
-from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.core import dockerclient as dc
 from compose.project import OneOffFilter

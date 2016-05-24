@@ -11,16 +11,16 @@ import enum
 import six
 
 from . import __version__
+from .common.const import DEFAULT_TIMEOUT
+from .common.const import LABEL_CONFIG_HASH
+from .common.const import LABEL_CONTAINER_NUMBER
+from .common.const import LABEL_ONE_OFF
+from .common.const import LABEL_PROJECT
+from .common.const import LABEL_SERVICE
+from .common.const import LABEL_VERSION
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
-from .const import DEFAULT_TIMEOUT
-from .const import LABEL_CONFIG_HASH
-from .const import LABEL_CONTAINER_NUMBER
-from .const import LABEL_ONE_OFF
-from .const import LABEL_PROJECT
-from .const import LABEL_SERVICE
-from .const import LABEL_VERSION
 from .container import Container
 from .core import dockerclient as dc
 from .parallel import parallel_execute
@@ -28,6 +28,7 @@ from .parallel import parallel_start
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+
 # from docker.errors import APIError
 # from docker.utils import LogConfig
 # from docker.utils.ports import build_port_bindings

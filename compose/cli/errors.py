@@ -11,13 +11,12 @@ from requests.exceptions import ReadTimeout
 from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
-from ..const import API_VERSION_TO_ENGINE_VERSION
-from ..const import HTTP_TIMEOUT
+from ..common.const import API_VERSION_TO_ENGINE_VERSION
+from ..common.const import HTTP_TIMEOUT
 from ..core import dockerclient as dc
 from .utils import call_silently
 from .utils import is_mac
 from .utils import is_ubuntu
-
 
 log = logging.getLogger(__name__)
 

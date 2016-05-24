@@ -9,13 +9,13 @@ import pytest
 from .. import mock
 from ..helpers import build_config
 from .testcases import DockerClientTestCase
+from compose.common.const import LABEL_PROJECT
+from compose.common.const import LABEL_SERVICE
 from compose.config import config
 from compose.config import ConfigurationError
 from compose.config.config import V2_0
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import LABEL_PROJECT
-from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.core import dockerclient as dc
 from compose.project import Project

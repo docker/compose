@@ -14,13 +14,13 @@ from operator import attrgetter
 from . import errors
 from . import signals
 from .. import __version__
+from ..common.const import DEFAULT_TIMEOUT
+from ..common.const import IS_WINDOWS_PLATFORM
 from ..config import config
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
-from ..const import DEFAULT_TIMEOUT
-from ..const import IS_WINDOWS_PLATFORM
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
@@ -42,7 +42,6 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
-
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation

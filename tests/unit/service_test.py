@@ -6,12 +6,12 @@ import pytest
 
 from .. import mock
 from .. import unittest
+from compose.common.const import LABEL_CONFIG_HASH
+from compose.common.const import LABEL_ONE_OFF
+from compose.common.const import LABEL_PROJECT
+from compose.common.const import LABEL_SERVICE
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import LABEL_CONFIG_HASH
-from compose.const import LABEL_ONE_OFF
-from compose.const import LABEL_PROJECT
-from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.core import dockerclient as dc
 from compose.project import OneOffFilter

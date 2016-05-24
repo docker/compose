@@ -13,8 +13,8 @@ import six
 import yaml
 from cached_property import cached_property
 
-from ..const import COMPOSEFILE_V1 as V1
-from ..const import COMPOSEFILE_V2_0 as V2_0
+from ..common.const import COMPOSEFILE_V1 as V1
+from ..common.const import COMPOSEFILE_V2_0 as V2_0
 from ..utils import build_string_dict
 from .environment import env_vars_from_file
 from .environment import Environment
@@ -42,7 +42,6 @@ from .validation import validate_network_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
-
 
 DOCKER_CONFIG_KEYS = [
     'cap_add',

@@ -6,8 +6,8 @@ import os
 import pytest
 
 from compose.cli.command import get_config_path_from_options
+from compose.common.const import IS_WINDOWS_PLATFORM
 from compose.config.environment import Environment
-from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 
 
