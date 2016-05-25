@@ -12,7 +12,7 @@ from six.moves.queue import Queue
 
 from . import colors
 from compose import utils
-from compose.cli.signals import ShutdownException
+from compose.common.signals import ShutdownException
 from compose.utils import split_buffer
 
 
