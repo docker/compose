@@ -25,12 +25,14 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
-from compose.project import OneOffFilter
+from compose.core.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import Service
 from tests.integration.testcases import v2_only
+
+container_create_fqmn = 'compose.core.container.Container.create'
 
 
 def create_and_start_container(service, **override_options):
@@ -727,7 +729,7 @@ class ServiceTest(DockerClientTestCase):
         service.create_container(number=next_number, quiet=True)
 
         with mock.patch(
-            'compose.container.Container.create',
+            container_create_fqmn,
             side_effect=dc.errors.APIError(
                 message="testing",
                 response={},
@@ -749,7 +751,7 @@ class ServiceTest(DockerClientTestCase):
         service.create_container(number=next_number, quiet=True)
 
         with mock.patch(
-            'compose.container.Container.create',
+            container_create_fqmn,
             side_effect=ValueError("BOOM")
         ):
             with self.assertRaises(ValueError):

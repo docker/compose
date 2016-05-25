@@ -18,10 +18,12 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
-from compose.project import Project
-from compose.project import ProjectError
+from compose.core.project import Project
+from compose.core.project import ProjectError
 from compose.service import ConvergenceStrategy
 from tests.integration.testcases import v2_only
+
+project_log = 'compose.core.project.log'
 
 
 class ProjectTest(DockerClientTestCase):
@@ -1129,7 +1131,7 @@ class ProjectTest(DockerClientTestCase):
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
         )
-        with mock.patch('compose.project.log') as mock_log:
+        with mock.patch(project_log) as mock_log:
             project.up()
 
         mock_log.warning.assert_called_once_with(mock.ANY)

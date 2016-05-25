@@ -18,7 +18,7 @@ from .. import mock
 from compose.cli.command import get_project
 from compose.core import dockerclient as dc
 from compose.core.container import Container
-from compose.project import OneOffFilter
+from compose.core.project import OneOffFilter
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox

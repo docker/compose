@@ -20,7 +20,7 @@ from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.common.const import IS_WINDOWS_PLATFORM
 from compose.core import dockerclient as dc
-from compose.project import Project
+from compose.core.project import Project
 
 
 class CLITestCase(unittest.TestCase):

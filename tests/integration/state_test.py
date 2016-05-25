@@ -10,7 +10,7 @@ import py
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from compose.config import config
-from compose.project import Project
+from compose.core.project import Project
 from compose.service import ConvergenceStrategy
 
 

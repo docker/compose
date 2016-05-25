@@ -14,7 +14,7 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
-from compose.project import OneOffFilter
+from compose.core.project import OneOffFilter
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction

@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from .. import mock
 from .testcases import DockerClientTestCase
 from compose.config.types import VolumeSpec
-from compose.project import Project
+from compose.core.project import Project
 from compose.service import ConvergenceStrategy
 
 

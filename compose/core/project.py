@@ -8,29 +8,29 @@ from functools import reduce
 
 import enum
 
-from . import parallel
-from .common.const import DEFAULT_TIMEOUT
-from .common.const import IMAGE_EVENTS
-from .common.const import LABEL_ONE_OFF
-from .common.const import LABEL_PROJECT
-from .common.const import LABEL_SERVICE
-from .config import ConfigurationError
-from .config.config import V1
-from .config.sort_services import get_container_name_from_network_mode
-from .config.sort_services import get_service_name_from_network_mode
-from .core import dockerclient as dc
-from .core.container import Container
-from .network import build_networks
-from .network import get_networks
-from .network import ProjectNetworks
-from .service import BuildAction
-from .service import ContainerNetworkMode
-from .service import ConvergenceStrategy
-from .service import NetworkMode
-from .service import Service
-from .service import ServiceNetworkMode
-from .utils import microseconds_from_time_nano
-from .volume import ProjectVolumes
+from compose import parallel
+from compose.common.const import DEFAULT_TIMEOUT
+from compose.common.const import IMAGE_EVENTS
+from compose.common.const import LABEL_ONE_OFF
+from compose.common.const import LABEL_PROJECT
+from compose.common.const import LABEL_SERVICE
+from compose.config import ConfigurationError
+from compose.config.config import V1
+from compose.config.sort_services import get_container_name_from_network_mode
+from compose.config.sort_services import get_service_name_from_network_mode
+from compose.core import dockerclient as dc
+from compose.core.container import Container
+from compose.core.network import build_networks
+from compose.core.network import get_networks
+from compose.core.network import ProjectNetworks
+from compose.service import BuildAction
+from compose.service import ContainerNetworkMode
+from compose.service import ConvergenceStrategy
+from compose.service import NetworkMode
+from compose.service import Service
+from compose.service import ServiceNetworkMode
+from compose.utils import microseconds_from_time_nano
+from compose.volume import ProjectVolumes
 
 log = logging.getLogger(__name__)
 

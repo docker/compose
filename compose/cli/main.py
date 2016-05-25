@@ -21,10 +21,10 @@ from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
+from ..core.project import NoSuchService
+from ..core.project import OneOffFilter
+from ..core.project import ProjectError
 from ..progress_stream import StreamOutputError
-from ..project import NoSuchService
-from ..project import OneOffFilter
-from ..project import ProjectError
 from ..service import BuildAction
 from ..service import BuildError
 from ..service import ConvergenceStrategy

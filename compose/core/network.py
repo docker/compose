@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
-from .config import ConfigurationError
-from .core import dockerclient as dc
+from compose.config import ConfigurationError
+from compose.core import dockerclient as dc
 
 log = logging.getLogger(__name__)
 
