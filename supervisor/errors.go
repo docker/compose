@@ -8,7 +8,7 @@ var (
 	ErrBundleNotFound         = errors.New("containerd: bundle not found")
 	ErrContainerNotFound      = errors.New("containerd: container not found")
 	ErrContainerExists        = errors.New("containerd: container already exists")
-	ErrProcessNotFound        = errors.New("containerd: processs not found for container")
+	ErrProcessNotFound        = errors.New("containerd: process not found for container")
 	ErrUnknownContainerStatus = errors.New("containerd: unknown container status ")
 	ErrUnknownTask            = errors.New("containerd: unknown task type")
 
