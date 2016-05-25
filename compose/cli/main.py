@@ -24,7 +24,6 @@ from ..config.serialize import serialize_config
 from ..core.project import NoSuchService
 from ..core.project import OneOffFilter
 from ..core.project import ProjectError
-from ..progress_stream import StreamOutputError
 from ..service import BuildAction
 from ..service import BuildError
 from ..service import ConvergenceStrategy
@@ -42,6 +41,7 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
+from compose.cli.progress_stream import StreamOutputError
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation

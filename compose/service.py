@@ -25,14 +25,9 @@ from .core import dockerclient as dc
 from .core.container import Container
 from .parallel import parallel_execute
 from .parallel import parallel_start
-from .progress_stream import stream_output
-from .progress_stream import StreamOutputError
 from .utils import json_hash
-
-# from docker.errors import APIError
-# from docker.utils import LogConfig
-# from docker.utils.ports import build_port_bindings
-# from docker.utils.ports import split_port
+from compose.cli.progress_stream import stream_output
+from compose.cli.progress_stream import StreamOutputError
 
 
 log = logging.getLogger(__name__)
