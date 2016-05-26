@@ -35,6 +35,13 @@ var listCheckpointCommand = cli.Command{
 	Name:   "list",
 	Usage:  "list all checkpoints for a container",
 	Action: listCheckpoints,
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "checkpoint-dir",
+			Value: "",
+			Usage: "path to checkpoint directory",
+		},
+	},
 }
 
 func listCheckpoints(context *cli.Context) {
@@ -47,6 +54,7 @@ func listCheckpoints(context *cli.Context) {
 	}
 	resp, err := c.ListCheckpoint(netcontext.Background(), &types.ListCheckpointRequest{
 		Id: id,
+		CheckpointDir: context.String("checkpoint-dir"),
 	})
 	if err != nil {
 		fatal(err.Error(), 1)
@@ -81,6 +89,11 @@ var createCheckpointCommand = cli.Command{
 			Name:  "shell",
 			Usage: "checkpoint shell jobs",
 		},
+		cli.StringFlag{
+			Name:  "checkpoint-dir",
+			Value: "",
+			Usage: "directory to store checkpoints",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -96,6 +109,7 @@ var createCheckpointCommand = cli.Command{
 		c := getClient(context)
 		if _, err := c.CreateCheckpoint(netcontext.Background(), &types.CreateCheckpointRequest{
 			Id: containerID,
+			CheckpointDir: context.String("checkpoint-dir"),
 			Checkpoint: &types.Checkpoint{
 				Name:        name,
 				Exit:        context.Bool("exit"),
@@ -112,6 +126,13 @@ var createCheckpointCommand = cli.Command{
 var deleteCheckpointCommand = cli.Command{
 	Name:  "delete",
 	Usage: "delete a container's checkpoint",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "checkpoint-dir",
+			Value: "",
+			Usage: "path to checkpoint directory",
+		},
+	},
 	Action: func(context *cli.Context) {
 		var (
 			containerID = context.Args().Get(0)
@@ -125,8 +146,9 @@ var deleteCheckpointCommand = cli.Command{
 		}
 		c := getClient(context)
 		if _, err := c.DeleteCheckpoint(netcontext.Background(), &types.DeleteCheckpointRequest{
-			Id:   containerID,
-			Name: name,
+			Id:            containerID,
+			Name:          name,
+			CheckpointDir: context.String("checkpoint-dir"),
 		}); err != nil {
 			fatal(err.Error(), 1)
 		}

@@ -22,7 +22,7 @@ type Container interface {
 	// Path returns the path to the bundle
 	Path() string
 	// Start starts the init process of the container
-	Start(checkpoint string, s Stdio) (Process, error)
+	Start(checkpointPath string, s Stdio) (Process, error)
 	// Exec starts another process in an existing container
 	Exec(string, specs.ProcessSpec, Stdio) (Process, error)
 	// Delete removes the container's state and any resources
@@ -38,11 +38,11 @@ type Container interface {
 	// RemoveProcess removes the specified process from the container
 	RemoveProcess(string) error
 	// Checkpoints returns all the checkpoints for a container
-	Checkpoints() ([]Checkpoint, error)
+	Checkpoints(checkpointDir string) ([]Checkpoint, error)
 	// Checkpoint creates a new checkpoint
-	Checkpoint(Checkpoint) error
+	Checkpoint(checkpoint Checkpoint, checkpointDir string) error
 	// DeleteCheckpoint deletes the checkpoint for the provided name
-	DeleteCheckpoint(name string) error
+	DeleteCheckpoint(name string, checkpointDir string) error
 	// Labels are user provided labels for the container
 	Labels() []string
 	// Pids returns all pids inside the container
@@ -290,8 +290,12 @@ func (c *container) Resume() error {
 	return nil
 }
 
-func (c *container) Checkpoints() ([]Checkpoint, error) {
-	dirs, err := ioutil.ReadDir(filepath.Join(c.bundle, "checkpoints"))
+func (c *container) Checkpoints(checkpointDir string) ([]Checkpoint, error) {
+	if checkpointDir == "" {
+		checkpointDir = filepath.Join(c.bundle, "checkpoints")
+	}
+
+	dirs, err := ioutil.ReadDir(checkpointDir)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +304,7 @@ func (c *container) Checkpoints() ([]Checkpoint, error) {
 		if !d.IsDir() {
 			continue
 		}
-		path := filepath.Join(c.bundle, "checkpoints", d.Name(), "config.json")
+		path := filepath.Join(checkpointDir, d.Name(), "config.json")
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return nil, err
@@ -314,11 +318,16 @@ func (c *container) Checkpoints() ([]Checkpoint, error) {
 	return out, nil
 }
 
-func (c *container) Checkpoint(cpt Checkpoint) error {
-	if err := os.MkdirAll(filepath.Join(c.bundle, "checkpoints"), 0755); err != nil {
+func (c *container) Checkpoint(cpt Checkpoint, checkpointDir string) error {
+	if checkpointDir == "" {
+		checkpointDir = filepath.Join(c.bundle, "checkpoints")
+	}
+
+	if err := os.MkdirAll(checkpointDir, 0755); err != nil {
 		return err
 	}
-	path := filepath.Join(c.bundle, "checkpoints", cpt.Name)
+
+	path := filepath.Join(checkpointDir, cpt.Name)
 	if err := os.Mkdir(path, 0755); err != nil {
 		return err
 	}
@@ -360,11 +369,14 @@ func (c *container) Checkpoint(cpt Checkpoint) error {
 	return err
 }
 
-func (c *container) DeleteCheckpoint(name string) error {
-	return os.RemoveAll(filepath.Join(c.bundle, "checkpoints", name))
+func (c *container) DeleteCheckpoint(name string, checkpointDir string) error {
+	if checkpointDir == "" {
+		checkpointDir = filepath.Join(c.bundle, "checkpoints")
+	}
+	return os.RemoveAll(filepath.Join(checkpointDir, name))
 }
 
-func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
+func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, InitProcessID)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
@@ -381,7 +393,7 @@ func (c *container) Start(checkpoint string, s Stdio) (Process, error) {
 		return nil, err
 	}
 	config := &processConfig{
-		checkpoint:  checkpoint,
+		checkpoint:  checkpointPath,
 		root:        processRoot,
 		id:          InitProcessID,
 		c:           c,

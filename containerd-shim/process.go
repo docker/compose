@@ -36,31 +36,32 @@ type checkpoint struct {
 
 type processState struct {
 	specs.ProcessSpec
-	Exec        bool     `json:"exec"`
-	Stdin       string   `json:"containerdStdin"`
-	Stdout      string   `json:"containerdStdout"`
-	Stderr      string   `json:"containerdStderr"`
-	RuntimeArgs []string `json:"runtimeArgs"`
-	NoPivotRoot bool     `json:"noPivotRoot"`
-	Checkpoint  string   `json:"checkpoint"`
-	RootUID     int      `json:"rootUID"`
-	RootGID     int      `json:"rootGID"`
+	Exec           bool     `json:"exec"`
+	Stdin          string   `json:"containerdStdin"`
+	Stdout         string   `json:"containerdStdout"`
+	Stderr         string   `json:"containerdStderr"`
+	RuntimeArgs    []string `json:"runtimeArgs"`
+	NoPivotRoot    bool     `json:"noPivotRoot"`
+	CheckpointPath string   `json:"checkpoint"`
+	RootUID        int      `json:"rootUID"`
+	RootGID        int      `json:"rootGID"`
 }
 
 type process struct {
 	sync.WaitGroup
-	id           string
-	bundle       string
-	stdio        *stdio
-	exec         bool
-	containerPid int
-	checkpoint   *checkpoint
-	shimIO       *IO
-	stdinCloser  io.Closer
-	console      *os.File
-	consolePath  string
-	state        *processState
-	runtime      string
+	id             string
+	bundle         string
+	stdio          *stdio
+	exec           bool
+	containerPid   int
+	checkpoint     *checkpoint
+	checkpointPath string
+	shimIO         *IO
+	stdinCloser    io.Closer
+	console        *os.File
+	consolePath    string
+	state          *processState
+	runtime        string
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
@@ -74,12 +75,13 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 		return nil, err
 	}
 	p.state = s
-	if s.Checkpoint != "" {
-		cpt, err := loadCheckpoint(bundle, s.Checkpoint)
+	if s.CheckpointPath != "" {
+		cpt, err := loadCheckpoint(s.CheckpointPath)
 		if err != nil {
 			return nil, err
 		}
 		p.checkpoint = cpt
+		p.checkpointPath = s.CheckpointPath
 	}
 	if err := p.openIO(); err != nil {
 		return nil, err
@@ -100,8 +102,8 @@ func loadProcess() (*processState, error) {
 	return &s, nil
 }
 
-func loadCheckpoint(bundle, name string) (*checkpoint, error) {
-	f, err := os.Open(filepath.Join(bundle, "checkpoints", name, "config.json"))
+func loadCheckpoint(checkpointPath string) (*checkpoint, error) {
+	f, err := os.Open(filepath.Join(checkpointPath, "config.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +132,7 @@ func (p *process) start() error {
 		)
 	} else if p.checkpoint != nil {
 		args = append(args, "restore",
-			"--image-path", filepath.Join(p.bundle, "checkpoints", p.checkpoint.Name),
+			"--image-path", filepath.Join(p.checkpointPath),
 		)
 		add := func(flags ...string) {
 			args = append(args, flags...)

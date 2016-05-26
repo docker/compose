@@ -134,6 +134,11 @@ var startCommand = cli.Command{
 			Value: "",
 			Usage: "checkpoint to start the container from",
 		},
+		cli.StringFlag{
+			Name:  "checkpoint-dir",
+			Value: "",
+			Usage: "path to checkpoint directory",
+		},
 		cli.BoolFlag{
 			Name:  "attach,a",
 			Usage: "connect to the stdio of the container",
@@ -177,14 +182,15 @@ var startCommand = cli.Command{
 			tty                  bool
 			c                    = getClient(context)
 			r                    = &types.CreateContainerRequest{
-				Id:          id,
-				BundlePath:  bpath,
-				Checkpoint:  context.String("checkpoint"),
-				Stdin:       s.stdin,
-				Stdout:      s.stdout,
-				Stderr:      s.stderr,
-				Labels:      context.StringSlice("label"),
-				NoPivotRoot: context.Bool("no-pivot"),
+				Id:            id,
+				BundlePath:    bpath,
+				Checkpoint:    context.String("checkpoint"),
+				CheckpointDir: context.String("checkpoint-dir"),
+				Stdin:         s.stdin,
+				Stdout:        s.stdout,
+				Stderr:        s.stderr,
+				Labels:        context.StringSlice("label"),
+				NoPivotRoot:   context.Bool("no-pivot"),
 			}
 		)
 		restoreAndCloseStdin = func() {

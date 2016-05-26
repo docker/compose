@@ -56,6 +56,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.RuntimeArgs = c.RuntimeArgs
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
+		e.CheckpointDir = c.CheckpointDir
 		e.Checkpoint = &runtime.Checkpoint{
 			Name: c.Checkpoint,
 		}
@@ -77,6 +78,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
 	e := &supervisor.CreateCheckpointTask{}
 	e.ID = r.Id
+	e.CheckpointDir = r.CheckpointDir
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        r.Checkpoint.Name,
 		Exit:        r.Checkpoint.Exit,
@@ -84,6 +86,7 @@ func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpo
 		UnixSockets: r.Checkpoint.UnixSockets,
 		Shell:       r.Checkpoint.Shell,
 	}
+
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err
@@ -97,6 +100,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 	}
 	e := &supervisor.DeleteCheckpointTask{}
 	e.ID = r.Id
+	e.CheckpointDir = r.CheckpointDir
 	e.Checkpoint = &runtime.Checkpoint{
 		Name: r.Name,
 	}
@@ -124,7 +128,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 		return nil, grpc.Errorf(codes.NotFound, "no such containers")
 	}
 	var out []*types.Checkpoint
-	checkpoints, err := container.Checkpoints()
+	checkpoints, err := container.Checkpoints(r.CheckpointDir)
 	if err != nil {
 		return nil, err
 	}

@@ -13,13 +13,13 @@ type Worker interface {
 }
 
 type startTask struct {
-	Container     runtime.Container
-	Checkpoint    string
-	Stdin         string
-	Stdout        string
-	Stderr        string
-	Err           chan error
-	StartResponse chan StartResponse
+	Container      runtime.Container
+	CheckpointPath string
+	Stdin          string
+	Stdout         string
+	Stderr         string
+	Err            chan error
+	StartResponse  chan StartResponse
 }
 
 func NewWorker(s *Supervisor, wg *sync.WaitGroup) Worker {
@@ -38,7 +38,7 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.startTasks {
 		started := time.Now()
-		process, err := t.Container.Start(t.Checkpoint, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
+		process, err := t.Container.Start(t.CheckpointPath, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"error": err,

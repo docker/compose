@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/docker/containerd/runtime"
@@ -17,6 +18,7 @@ type StartTask struct {
 	Labels        []string
 	NoPivotRoot   bool
 	Checkpoint    *runtime.Checkpoint
+	CheckpointDir string
 	Runtime       string
 	RuntimeArgs   []string
 }
@@ -56,7 +58,7 @@ func (s *Supervisor) start(t *StartTask) error {
 		Stderr:        t.Stderr,
 	}
 	if t.Checkpoint != nil {
-		task.Checkpoint = t.Checkpoint.Name
+		task.CheckpointPath = filepath.Join(t.CheckpointDir, t.Checkpoint.Name)
 	}
 
 	s.startTasks <- task
