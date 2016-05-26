@@ -1912,6 +1912,14 @@ class MergePortsTest(unittest.TestCase, MergeListsTest):
     base_config = ['10:8000', '9000']
     override_config = ['20:8000']
 
+    def test_duplicate_port_mappings(self):
+        service_dict = config.merge_service_dicts(
+            {self.config_name: self.base_config},
+            {self.config_name: self.base_config},
+            DEFAULT_VERSION
+        )
+        assert set(service_dict[self.config_name]) == set(self.base_config)
+
 
 class MergeNetworksTest(unittest.TestCase, MergeListsTest):
     config_name = 'networks'

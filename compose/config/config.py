@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import functools
 import logging
 import ntpath
-import operator
 import os
 import string
 import sys
@@ -749,13 +748,10 @@ def merge_service_dicts(base, override, version):
         md.merge_field(field, merge_path_mappings)
 
     for field in [
-        'depends_on',
-        'expose',
-        'external_links',
-        'ports',
-        'volumes_from',
+        'ports', 'cap_add', 'cap_drop', 'expose', 'external_links',
+        'security_opt', 'volumes_from', 'depends_on',
     ]:
-        md.merge_field(field, operator.add, default=[])
+        md.merge_field(field, merge_unique_items_lists, default=[])
 
     for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
@@ -769,6 +765,10 @@ def merge_service_dicts(base, override, version):
         md['build'] = merge_build(md, base, override)
 
     return dict(md)
+
+
+def merge_unique_items_lists(base, override):
+    return sorted(set().union(base, override))
 
 
 def merge_build(output, base, override):
