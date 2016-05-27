@@ -19,6 +19,7 @@ from compose.config.config import V1
 from compose.config.sort_services import get_container_name_from_network_mode
 from compose.config.sort_services import get_service_name_from_network_mode
 from compose.core import dockerclient as dc
+from compose.core import errors as core_errors
 from compose.core import parallel
 from compose.core.container import Container
 from compose.core.network import build_networks
@@ -132,7 +133,7 @@ class Project(object):
             if service.name == name:
                 return service
 
-        raise NoSuchService(name)
+        raise core_errors.NoSuchService(name)
 
     def validate_service_names(self, service_names):
         """
@@ -142,7 +143,7 @@ class Project(object):
         valid_names = self.service_names
         for name in service_names:
             if name not in valid_names:
-                raise NoSuchService(name)
+                raise core_errors.NoSuchService(name)
 
     def get_services(self, service_names=None, include_deps=False):
         """
@@ -188,7 +189,7 @@ class Project(object):
                     service_name, link_name = link, None
                 try:
                     links.append((self.get_service(service_name), link_name))
-                except NoSuchService:
+                except core_errors.NoSuchService:
                     raise ConfigurationError(
                         'Service "%s" has a link to service "%s" which does not '
                         'exist.' % (service_dict['name'], service_name))
@@ -397,7 +398,7 @@ class Project(object):
             get_deps
         )
         if errors:
-            raise ProjectError(
+            raise core_errors.ProjectError(
                 'Encountered errors while bringing up the project.'
             )
 
@@ -509,7 +510,7 @@ def get_volumes_from(project, service_dict):
         if spec.type == 'service':
             try:
                 return spec._replace(source=project.get_service(spec.source))
-            except NoSuchService:
+            except core_errors.NoSuchService:
                 pass
 
         if spec.type == 'container':
@@ -526,17 +527,3 @@ def get_volumes_from(project, service_dict):
                 spec.source))
 
     return [build_volume_from(vf) for vf in volumes_from]
-
-
-class NoSuchService(Exception):
-    def __init__(self, name):
-        self.name = name
-        self.msg = "No such service: %s" % self.name
-
-    def __str__(self):
-        return self.msg
-
-
-class ProjectError(Exception):
-    def __init__(self, msg):
-        self.msg = msg

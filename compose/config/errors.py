@@ -44,3 +44,8 @@ class ComposeFileNotFound(ConfigurationError):
 
         Supported filenames: %s
         """ % ", ".join(supported_filenames))
+
+
+class InvalidInterpolation(Exception):
+    def __init__(self, string):
+        self.string = string

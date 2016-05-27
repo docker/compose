@@ -5,7 +5,7 @@ import logging
 
 from compose.config import ConfigurationError
 from compose.core import dockerclient as dc
-# from docker.errors import NotFound
+
 log = logging.getLogger(__name__)
 
 

@@ -127,3 +127,15 @@ conn_error_generic = """
 
     If it's at a non-standard location, specify the URL with the DOCKER_HOST environment variable.
 """
+
+
+class NoSuchCommand(Exception):
+    def __init__(self, command, supercommand):
+        super(NoSuchCommand, self).__init__("No such command: %s" % command)
+
+        self.command = command
+        self.supercommand = supercommand
+
+
+class ShutdownException(Exception):
+    pass

@@ -10,9 +10,10 @@ from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
 
-from compose.common.signals import ShutdownException
+from compose.cli.signals import ShutdownException
 from compose.common.utils import get_output_stream
 from compose.core import dockerclient as dc
+from compose.core import errors as core_errors
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
         elif isinstance(exception, dc.errors.APIError):
             errors[get_name(obj)] = exception.explanation
             writer.write(get_name(obj), 'error')
-        elif isinstance(exception, UpstreamError):
+        elif isinstance(exception, core_errors.UpstreamError):
             writer.write(get_name(obj), 'error')
         else:
             errors[get_name(obj)] = exception
@@ -162,7 +163,7 @@ def feed_queue(objects, func, get_deps, results, state):
 
         if any(dep in state.failed for dep in deps):
             log.debug('{} has upstream errors - not processing'.format(obj))
-            results.put((obj, None, UpstreamError()))
+            results.put((obj, None, core_errors.UpstreamError()))
             state.failed.add(obj)
         elif all(
             dep not in objects or dep in state.finished
@@ -176,10 +177,6 @@ def feed_queue(objects, func, get_deps, results, state):
 
     if state.is_done():
         results.put(STOP)
-
-
-class UpstreamError(Exception):
-    pass
 
 
 class ParallelStreamWriter(object):

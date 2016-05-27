@@ -25,6 +25,7 @@ from compose.config import DOCKER_CONFIG_KEYS
 from compose.config import merge_environment
 from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
+from compose.core import errors
 from compose.core.container import Container
 from compose.core.parallel import parallel_execute
 from compose.core.parallel import parallel_start
@@ -55,22 +56,6 @@ DOCKER_START_KEYS = [
     'shm_size',
     'volumes_from',
 ]
-
-
-class BuildError(Exception):
-    def __init__(self, service, reason):
-        self.service = service
-        self.reason = reason
-
-
-class NeedsBuildError(Exception):
-    def __init__(self, service):
-        self.service = service
-
-
-class NoSuchImageError(Exception):
-    pass
-
 
 ServiceName = namedtuple('ServiceName', 'project service number')
 
@@ -282,7 +267,7 @@ class Service(object):
         try:
             self.image()
             return
-        except NoSuchImageError:
+        except errors.NoSuchImageError:
             pass
 
         if not self.can_be_built():
@@ -290,7 +275,7 @@ class Service(object):
             return
 
         if do_build == BuildAction.skip:
-            raise NeedsBuildError(self)
+            raise errors.NeedsBuildError(self)
 
         self.build()
         log.warn(
@@ -303,7 +288,7 @@ class Service(object):
             return self.client.inspect_image(self.image_name)
         except dc.errors.APIError as e:
             if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                raise NoSuchImageError("Image '{}' not found".format(self.image_name))
+                raise errors.NoSuchImageError("Image '{}' not found".format(self.image_name))
             else:
                 raise
 
@@ -338,7 +323,7 @@ class Service(object):
 
         try:
             config_hash = self.config_hash
-        except NoSuchImageError as e:
+        except errors.NoSuchImageError as e:
             log.debug(
                 'Service %s has diverged: %s',
                 self.name, six.text_type(e),
@@ -717,7 +702,7 @@ class Service(object):
         try:
             all_events = stream_output(build_output, sys.stdout)
         except StreamOutputError as e:
-            raise BuildError(self, six.text_type(e))
+            raise errors.BuildError(self, six.text_type(e))
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes
@@ -733,7 +718,7 @@ class Service(object):
                     image_id = match.group(1)
 
         if image_id is None:
-            raise BuildError(self, event if all_events else 'Unknown')
+            raise errors.BuildError(self, event if all_events else 'Unknown')
 
         return image_id
 

@@ -6,7 +6,7 @@ from string import Template
 
 import six
 
-from .errors import ConfigurationError
+from . import errors
 log = logging.getLogger(__name__)
 
 
@@ -27,8 +27,8 @@ def interpolate_environment_variables(config, section, environment):
 def interpolate_value(name, config_key, value, section, mapping):
     try:
         return recursive_interpolate(value, mapping)
-    except InvalidInterpolation as e:
-        raise ConfigurationError(
+    except errors.InvalidInterpolation as e:
+        raise errors.ConfigurationError(
             'Invalid interpolation format for "{config_key}" option '
             'in {section} "{name}": "{string}"'.format(
                 config_key=config_key,
@@ -55,9 +55,4 @@ def interpolate(string, mapping):
     try:
         return Template(string).substitute(mapping)
     except ValueError:
-        raise InvalidInterpolation(string)
-
-
-class InvalidInterpolation(Exception):
-    def __init__(self, string):
-        self.string = string
+        raise errors.InvalidInterpolation(string)

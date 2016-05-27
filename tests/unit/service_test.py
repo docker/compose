@@ -14,6 +14,8 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
+from compose.core.errors import NeedsBuildError
+from compose.core.errors import NoSuchImageError
 from compose.core.project import OneOffFilter
 from compose.core.service import build_ulimits
 from compose.core.service import build_volume_binding
@@ -22,9 +24,7 @@ from compose.core.service import ContainerNetworkMode
 from compose.core.service import get_container_data_volumes
 from compose.core.service import ImageType
 from compose.core.service import merge_volume_bindings
-from compose.core.service import NeedsBuildError
 from compose.core.service import NetworkMode
-from compose.core.service import NoSuchImageError
 from compose.core.service import parse_repository_tag
 from compose.core.service import Service
 from compose.core.service import ServiceNetworkMode

@@ -6,6 +6,8 @@ from inspect import getdoc
 from docopt import docopt
 from docopt import DocoptExit
 
+from .errors import NoSuchCommand
+
 
 def docopt_full_help(docstring, *args, **kwargs):
     try:
@@ -49,11 +51,3 @@ def get_handler(command_class, command):
         raise NoSuchCommand(command, command_class)
 
     return getattr(command_class, command)
-
-
-class NoSuchCommand(Exception):
-    def __init__(self, command, supercommand):
-        super(NoSuchCommand, self).__init__("No such command: %s" % command)
-
-        self.command = command
-        self.supercommand = supercommand

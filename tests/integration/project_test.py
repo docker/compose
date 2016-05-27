@@ -18,8 +18,8 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
+from compose.core.errors import ProjectError
 from compose.core.project import Project
-from compose.core.project import ProjectError
 from compose.core.service import ConvergenceStrategy
 from tests.integration.testcases import v2_only
 

@@ -4,8 +4,8 @@ from __future__ import unicode_literals
 import unittest
 
 from compose.config.environment import Environment as bddict
+from compose.config.errors import InvalidInterpolation
 from compose.config.interpolation import interpolate
-from compose.config.interpolation import InvalidInterpolation
 
 
 class InterpolationTest(unittest.TestCase):

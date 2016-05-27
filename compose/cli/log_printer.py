@@ -11,8 +11,8 @@ from six.moves.queue import Empty
 from six.moves.queue import Queue
 
 from . import colors
+from compose.cli.signals import ShutdownException
 from compose.common import utils
-from compose.common.signals import ShutdownException
 from compose.common.utils import split_buffer
 
 

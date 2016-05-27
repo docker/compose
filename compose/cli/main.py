@@ -20,9 +20,9 @@ from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
-from ..core.project import NoSuchService
+from ..core.errors import NoSuchService
+from ..core.errors import ProjectError
 from ..core.project import OneOffFilter
-from ..core.project import ProjectError
 from .command import get_config_path_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
@@ -35,13 +35,13 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
-from compose.common import signals
+from compose.cli import signals
 from compose.common.progress_stream import StreamOutputError
+from compose.core.errors import BuildError
+from compose.core.errors import NeedsBuildError
 from compose.core.service import BuildAction
-from compose.core.service import BuildError
 from compose.core.service import ConvergenceStrategy
 from compose.core.service import ImageType
-from compose.core.service import NeedsBuildError
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
