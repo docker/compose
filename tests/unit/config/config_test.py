@@ -715,7 +715,7 @@ class ConfigTest(unittest.TestCase):
         ).services[0]
         assert 'args' in service['build']
         assert 'foo' in service['build']['args']
-        assert service['build']['args']['foo'] == 'None'
+        assert service['build']['args']['foo'] == ''
 
     def test_load_with_multiple_files_mismatched_networks_format(self):
         base_file = config.ConfigFile(

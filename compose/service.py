@@ -701,12 +701,6 @@ class Service(object):
 
         build_opts = self.options.get('build', {})
         path = build_opts.get('context')
-        # If build argument is not defined and there is no environment variable
-        # with the same name then build argument value will be None
-        # Moreover it will be sent to the docker engine as None and then
-        # interpreted as string None which in many cases will fail the build
-        # That is why we filter out all pairs with value equal to None
-        buildargs = {k: v for k, v in build_opts.get('args', {}).items() if v != 'None'}
         # python2 os.path() doesn't support unicode, so we need to encode it to
         # a byte string
         if not six.PY3:
@@ -721,7 +715,7 @@ class Service(object):
             pull=pull,
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
-            buildargs=buildargs,
+            buildargs=build_opts.get('args', None),
         )
 
         try:
