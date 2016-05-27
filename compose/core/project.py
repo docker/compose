@@ -30,7 +30,7 @@ from compose.core.service import ConvergenceStrategy
 from compose.core.service import NetworkMode
 from compose.core.service import Service
 from compose.core.service import ServiceNetworkMode
-from compose.volume import ProjectVolumes
+from compose.core.volume import ProjectVolumes
 
 log = logging.getLogger(__name__)
 

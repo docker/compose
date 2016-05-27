@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import pytest
 
-from compose import volume
 from compose.core import dockerclient as dc
+from compose.core import volume
 from tests import mock
 
 

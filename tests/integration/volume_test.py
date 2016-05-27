@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from .testcases import DockerClientTestCase
 from compose.core import dockerclient as dc
-from compose.volume import Volume
+from compose.core.volume import Volume
 
 
 class VolumeTest(DockerClientTestCase):
