@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from six import StringIO
 
-from compose.cli import progress_stream
+from compose.common import progress_stream
 from tests import unittest
 
 

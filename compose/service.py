@@ -26,9 +26,8 @@ from .core.container import Container
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .utils import json_hash
-from compose.cli.progress_stream import stream_output
-from compose.cli.progress_stream import StreamOutputError
-
+from compose.common.progress_stream import stream_output
+from compose.common.progress_stream import StreamOutputError
 
 log = logging.getLogger(__name__)
 

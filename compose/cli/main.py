@@ -40,8 +40,8 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
-from compose.cli.progress_stream import StreamOutputError
 from compose.common import signals
+from compose.common.progress_stream import StreamOutputError
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation

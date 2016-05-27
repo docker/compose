@@ -8,9 +8,9 @@ from pytest import skip
 
 from .. import unittest
 from compose.cli.docker_client import docker_client
-from compose.cli.progress_stream import stream_output
 from compose.common.const import API_VERSIONS
 from compose.common.const import LABEL_PROJECT
+from compose.common.progress_stream import stream_output
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
