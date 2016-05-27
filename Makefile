@@ -18,8 +18,8 @@ ifeq ($(INTERACTIVE), 1)
 	DOCKER_FLAGS += -t
 endif
 
-TEST_ARTIFACTS_DIR := integration-test/test-artifacts
-BUNDLE_ARCHIVES_DIR := $(TEST_ARTIFACTS_DIR)/archives
+TESTBENCH_ARTIFACTS_DIR := output/test-artifacts
+TESTBENCH_BUNDLE_DIR := $(TESTBENCH_ARTIFACTS_DIR)/archives
 
 DOCKER_IMAGE := containerd-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
 DOCKER_RUN := docker run --privileged --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
@@ -35,7 +35,7 @@ bin:
 	mkdir -p bin/
 
 clean:
-	rm -rf bin
+	rm -rf bin && rm -rf output
 
 client: bin
 	cd ctr && go build -ldflags "${LDFLAGS}" -o ../bin/ctr
@@ -55,17 +55,20 @@ shim: bin
 shim-static:
 	cd containerd-shim && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
 
-$(BUNDLE_ARCHIVES_DIR)/busybox.tar:
-	@mkdir -p $(BUNDLE_ARCHIVES_DIR)
-	curl -sSL 'https://github.com/jpetazzo/docker-busybox/raw/buildroot-2014.11/rootfs.tar' -o $(BUNDLE_ARCHIVES_DIR)/busybox.tar
+$(TESTBENCH_BUNDLE_DIR)/busybox.tar:
+	mkdir -p $(TESTBENCH_BUNDLE_DIR)
+	curl -sSL 'https://github.com/jpetazzo/docker-busybox/raw/buildroot-2014.11/rootfs.tar' -o $(TESTBENCH_BUNDLE_DIR)/busybox.tar
 
-bundles-rootfs: $(BUNDLE_ARCHIVES_DIR)/busybox.tar
+bundles-rootfs: $(TESTBENCH_BUNDLE_DIR)/busybox.tar
 
-dbuild: $(BUNDLE_ARCHIVES_DIR)/busybox.tar
+dbuild: $(TESTBENCH_BUNDLE_DIR)/busybox.tar
 	@docker build --rm --force-rm -t "$(DOCKER_IMAGE)" .
 
 dtest: dbuild
 	$(DOCKER_RUN) make test
+
+dbench: dbuild
+	$(DOCKER_RUN) make bench
 
 install:
 	cp bin/* /usr/local/bin/
@@ -82,13 +85,15 @@ lint:
 shell: dbuild
 	$(DOCKER_RUN) bash
 
-test: validate
-	go test -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
+test: validate install bundles-rootfs
+	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
 ifneq ($(wildcard /.dockerenv), )
-	$(MAKE) install bundles-rootfs
 	cd integration-test ; \
 	go test -check.v -check.timeout=$(TEST_TIMEOUT) timeout=$(TEST_SUITE_TIMEOUT) $(TESTFLAGS) github.com/docker/containerd/integration-test
 endif
+
+bench: shim validate install bundles-rootfs
+	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
 
 validate: fmt
 

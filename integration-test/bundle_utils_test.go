@@ -8,12 +8,8 @@ import (
 	"path/filepath"
 	"reflect"
 
+	utils "github.com/docker/containerd/testutils"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
-)
-
-var (
-	bundlesDir      = filepath.Join("test-artifacts", "oci-bundles")
-	refOciSpecsPath = filepath.Join(bundlesDir, "config.json")
 )
 
 type OciProcessArgs struct {
@@ -48,7 +44,7 @@ func untarRootfs(source string, destination string) error {
 func CreateBundleWithFilter(source, name string, args []string, filter func(spec *ocs.Spec)) error {
 	// Generate the spec
 	var spec ocs.Spec
-	if f, err := os.Open(refOciSpecsPath); err != nil {
+	if f, err := os.Open(utils.RefOciSpecsPath); err != nil {
 		return fmt.Errorf("Failed to open default spec: %v", err)
 	} else {
 		if err := json.NewDecoder(f).Decode(&spec); err != nil {
@@ -63,7 +59,7 @@ func CreateBundleWithFilter(source, name string, args []string, filter func(spec
 		filter(&spec)
 	}
 
-	bundlePath := filepath.Join(bundlesDir, name)
+	bundlePath := filepath.Join(utils.BundlesRoot, name)
 	nb := Bundle{source, name, spec, bundlePath}
 
 	// Check that we don't already have such a bundle
@@ -78,7 +74,7 @@ func CreateBundleWithFilter(source, name string, args []string, filter func(spec
 	// Nothing should be there, but just in case
 	os.RemoveAll(bundlePath)
 
-	if err := untarRootfs(filepath.Join(archivesDir, source+".tar"), bundlePath); err != nil {
+	if err := untarRootfs(filepath.Join(utils.ArchivesDir, source+".tar"), bundlePath); err != nil {
 		return fmt.Errorf("Failed to untar %s.tar: %v", source, err)
 	}
 

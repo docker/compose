@@ -19,12 +19,8 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/docker/containerd/api/grpc/types"
+	utils "github.com/docker/containerd/testutils"
 	"github.com/go-check/check"
-)
-
-var (
-	outputDirFormat = filepath.Join("test-artifacts", "runs", "%s")
-	archivesDir     = filepath.Join("test-artifacts", "archives")
 )
 
 func Test(t *testing.T) {
@@ -102,14 +98,6 @@ func (cs *ContainerdSuite) ContainerdEventsHandler(events types.API_EventsClient
 	}
 }
 
-// generateReferencesSpecs invoke `runc spec` to produce the baseline
-// specs from which all future bundle will be generated
-func generateReferenceSpecs(destination string) error {
-	specs := exec.Command("runc", "spec")
-	specs.Dir = destination
-	return specs.Run()
-}
-
 func (cs *ContainerdSuite) StopDaemon(kill bool) {
 	if cs.cd == nil {
 		return
@@ -181,28 +169,29 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 	bundleMap = make(map[string]Bundle)
 	cs.eventFilters = make(map[string]func(event *types.Event))
 
-	// Get our CWD
-	if cwd, err := os.Getwd(); err != nil {
-		c.Fatalf("Could not determine current working directory: %v", err)
-	} else {
-		cs.cwd = cwd
+	// Get working directory for tests
+	wd := utils.GetTestOutDir()
+	if err := os.Chdir(wd); err != nil {
+		c.Fatalf("Could not change working directory: %v", err)
 	}
+	cs.cwd = wd
 
 	// Clean old bundles
-	os.RemoveAll(bundlesDir)
+	os.RemoveAll(utils.BundlesRoot)
 
 	// Ensure the oci bundles directory exists
-	if err := os.MkdirAll(bundlesDir, 0755); err != nil {
+	if err := os.MkdirAll(utils.BundlesRoot, 0755); err != nil {
 		c.Fatalf("Failed to create bundles directory: %v", err)
 	}
 
 	// Generate the reference spec
-	if err := generateReferenceSpecs(bundlesDir); err != nil {
+	if err := utils.GenerateReferenceSpecs(utils.BundlesRoot); err != nil {
 		c.Fatalf("Unable to generate OCI reference spec: %v", err)
 	}
 
 	// Create our output directory
-	cs.outputDir = fmt.Sprintf(outputDirFormat, time.Now().Format("2006-01-02_150405.000000"))
+	cs.outputDir = fmt.Sprintf(utils.OutputDirFormat, time.Now().Format("2006-01-02_150405.000000"))
+
 	cs.stateDir = filepath.Join(cs.outputDir, "containerd-master")
 	if err := os.MkdirAll(cs.stateDir, 0755); err != nil {
 		c.Fatalf("Unable to created output directory '%s': %v", cs.stateDir, err)
