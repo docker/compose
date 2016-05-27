@@ -26,13 +26,14 @@ from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
 from compose.core.project import OneOffFilter
-from compose.service import ConvergencePlan
-from compose.service import ConvergenceStrategy
-from compose.service import NetworkMode
-from compose.service import Service
+from compose.core.service import ConvergencePlan
+from compose.core.service import ConvergenceStrategy
+from compose.core.service import NetworkMode
+from compose.core.service import Service
 from tests.integration.testcases import v2_only
 
 container_create_fqmn = 'compose.core.container.Container.create'
+service_log_fqmn = 'compose.core.service.log'
 
 
 def create_and_start_container(service, **override_options):
@@ -363,7 +364,7 @@ class ServiceTest(DockerClientTestCase):
 
         service.options['volumes'] = [VolumeSpec.parse('/tmp:/data')]
 
-        with mock.patch('compose.service.log') as mock_log:
+        with mock.patch(service_log_fqmn) as mock_log:
             new_container, = service.execute_convergence_plan(
                 ConvergencePlan('recreate', [old_container]))
 
@@ -393,7 +394,7 @@ class ServiceTest(DockerClientTestCase):
         )
         service.options['volumes'] = []
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             new_container, = service.execute_convergence_plan(
                 ConvergencePlan('recreate', [old_container]))
 
@@ -760,7 +761,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
 
-    @mock.patch('compose.service.log')
+    @mock.patch(service_log_fqmn)
     def test_scale_with_desired_number_already_achieved(self, mock_log):
         """
         Test that calling scale with a desired number that is equal to the
@@ -783,7 +784,7 @@ class ServiceTest(DockerClientTestCase):
         captured_output = mock_log.info.call_args[0]
         assert 'Desired container number already achieved' in captured_output
 
-    @mock.patch('compose.service.log')
+    @mock.patch(service_log_fqmn)
     def test_scale_with_custom_container_name_outputs_warning(self, mock_log):
         """Test that calling scale on a service that has a custom container name
         results in warning output.

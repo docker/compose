@@ -10,24 +10,24 @@ from operator import attrgetter
 import enum
 import six
 
-from . import __version__
-from .common.const import DEFAULT_TIMEOUT
-from .common.const import LABEL_CONFIG_HASH
-from .common.const import LABEL_CONTAINER_NUMBER
-from .common.const import LABEL_ONE_OFF
-from .common.const import LABEL_PROJECT
-from .common.const import LABEL_SERVICE
-from .common.const import LABEL_VERSION
-from .config import DOCKER_CONFIG_KEYS
-from .config import merge_environment
-from .config.types import VolumeSpec
-from .core import dockerclient as dc
-from .core.container import Container
-from .utils import json_hash
+from compose import __version__
+from compose.common.const import DEFAULT_TIMEOUT
+from compose.common.const import LABEL_CONFIG_HASH
+from compose.common.const import LABEL_CONTAINER_NUMBER
+from compose.common.const import LABEL_ONE_OFF
+from compose.common.const import LABEL_PROJECT
+from compose.common.const import LABEL_SERVICE
+from compose.common.const import LABEL_VERSION
 from compose.common.progress_stream import stream_output
 from compose.common.progress_stream import StreamOutputError
+from compose.config import DOCKER_CONFIG_KEYS
+from compose.config import merge_environment
+from compose.config.types import VolumeSpec
+from compose.core import dockerclient as dc
+from compose.core.container import Container
 from compose.core.parallel import parallel_execute
 from compose.core.parallel import parallel_start
+from compose.utils import json_hash
 
 log = logging.getLogger(__name__)
 

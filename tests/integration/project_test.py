@@ -20,7 +20,7 @@ from compose.core import dockerclient as dc
 from compose.core.container import Container
 from compose.core.project import Project
 from compose.core.project import ProjectError
-from compose.service import ConvergenceStrategy
+from compose.core.service import ConvergenceStrategy
 from tests.integration.testcases import v2_only
 
 project_log = 'compose.core.project.log'

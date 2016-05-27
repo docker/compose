@@ -13,8 +13,8 @@ from compose.config.types import VolumeFromSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
 from compose.core.project import Project
-from compose.service import ImageType
-from compose.service import Service
+from compose.core.service import ImageType
+from compose.core.service import Service
 
 
 class ProjectTest(unittest.TestCase):

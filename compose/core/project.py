@@ -23,12 +23,12 @@ from compose.core.container import Container
 from compose.core.network import build_networks
 from compose.core.network import get_networks
 from compose.core.network import ProjectNetworks
-from compose.service import BuildAction
-from compose.service import ContainerNetworkMode
-from compose.service import ConvergenceStrategy
-from compose.service import NetworkMode
-from compose.service import Service
-from compose.service import ServiceNetworkMode
+from compose.core.service import BuildAction
+from compose.core.service import ContainerNetworkMode
+from compose.core.service import ConvergenceStrategy
+from compose.core.service import NetworkMode
+from compose.core.service import Service
+from compose.core.service import ServiceNetworkMode
 from compose.utils import microseconds_from_time_nano
 from compose.volume import ProjectVolumes
 

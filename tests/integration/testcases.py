@@ -16,7 +16,7 @@ from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.environment import Environment
 from compose.core import dockerclient as dc
-from compose.service import Service
+from compose.core.service import Service
 
 
 def pull_busybox(client):

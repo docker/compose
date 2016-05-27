@@ -5,7 +5,9 @@ from .. import mock
 from .testcases import DockerClientTestCase
 from compose.config.types import VolumeSpec
 from compose.core.project import Project
-from compose.service import ConvergenceStrategy
+from compose.core.service import ConvergenceStrategy
+
+service_create_container_fqmn = 'compose.core.service.Service.create_container'
 
 
 class ResilienceTest(DockerClientTestCase):
@@ -26,7 +28,7 @@ class ResilienceTest(DockerClientTestCase):
         self.assertEqual(container.get_mount('/var/db')['Source'], self.host_path)
 
     def test_create_failure(self):
-        with mock.patch('compose.service.Service.create_container', crash):
+        with mock.patch(service_create_container_fqmn, crash):
             with self.assertRaises(Crash):
                 self.project.up(strategy=ConvergenceStrategy.always)
 
@@ -35,7 +37,7 @@ class ResilienceTest(DockerClientTestCase):
         self.assertEqual(container.get_mount('/var/db')['Source'], self.host_path)
 
     def test_start_failure(self):
-        with mock.patch('compose.service.Service.start_container', crash):
+        with mock.patch(service_create_container_fqmn, crash):
             with self.assertRaises(Crash):
                 self.project.up(strategy=ConvergenceStrategy.always)
 

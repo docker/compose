@@ -11,7 +11,7 @@ from .testcases import DockerClientTestCase
 from .testcases import get_links
 from compose.config import config
 from compose.core.project import Project
-from compose.service import ConvergenceStrategy
+from compose.core.service import ConvergenceStrategy
 
 
 class ProjectTestCase(DockerClientTestCase):

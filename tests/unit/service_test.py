@@ -15,20 +15,24 @@ from compose.config.types import VolumeSpec
 from compose.core import dockerclient as dc
 from compose.core.container import Container
 from compose.core.project import OneOffFilter
-from compose.service import build_ulimits
-from compose.service import build_volume_binding
-from compose.service import BuildAction
-from compose.service import ContainerNetworkMode
-from compose.service import get_container_data_volumes
-from compose.service import ImageType
-from compose.service import merge_volume_bindings
-from compose.service import NeedsBuildError
-from compose.service import NetworkMode
-from compose.service import NoSuchImageError
-from compose.service import parse_repository_tag
-from compose.service import Service
-from compose.service import ServiceNetworkMode
-from compose.service import warn_on_masked_volume
+from compose.core.service import build_ulimits
+from compose.core.service import build_volume_binding
+from compose.core.service import BuildAction
+from compose.core.service import ContainerNetworkMode
+from compose.core.service import get_container_data_volumes
+from compose.core.service import ImageType
+from compose.core.service import merge_volume_bindings
+from compose.core.service import NeedsBuildError
+from compose.core.service import NetworkMode
+from compose.core.service import NoSuchImageError
+from compose.core.service import parse_repository_tag
+from compose.core.service import Service
+from compose.core.service import ServiceNetworkMode
+from compose.core.service import warn_on_masked_volume
+
+
+service_log_fqmn = 'compose.core.service.log'
+service_container_fqcn = 'compose.core.service.Container'
 
 
 class ServiceTest(unittest.TestCase):
@@ -340,7 +344,7 @@ class ServiceTest(unittest.TestCase):
 
         self.assertRaises(ValueError, service.get_container)
 
-    @mock.patch('compose.service.Container', autospec=True)
+    @mock.patch(service_container_fqcn, autospec=True)
     def test_get_container(self, mock_container_class):
         container_dict = dict(Name='default_foo_2')
         self.mock_client.containers.return_value = [container_dict]
@@ -351,7 +355,7 @@ class ServiceTest(unittest.TestCase):
         mock_container_class.from_ps.assert_called_once_with(
             self.mock_client, container_dict)
 
-    @mock.patch('compose.service.log', autospec=True)
+    @mock.patch(service_log_fqmn, autospec=True)
     def test_pull_image(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage:sometag')
         service.pull()
@@ -369,7 +373,7 @@ class ServiceTest(unittest.TestCase):
             tag='latest',
             stream=True)
 
-    @mock.patch('compose.service.log', autospec=True)
+    @mock.patch(service_log_fqmn, autospec=True)
     def test_pull_image_digest(self, mock_log):
         service = Service('foo', client=self.mock_client, image='someimage@sha256:1234')
         service.pull()
@@ -379,7 +383,7 @@ class ServiceTest(unittest.TestCase):
             stream=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage@sha256:1234)...')
 
-    @mock.patch('compose.service.Container', autospec=True)
+    @mock.patch(service_container_fqcn, autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
         service = Service('foo', client=self.mock_client, image='someimage')
@@ -392,7 +396,7 @@ class ServiceTest(unittest.TestCase):
         new_container.start.assert_called_once_with()
         mock_container.remove.assert_called_once_with()
 
-    @mock.patch('compose.service.Container', autospec=True)
+    @mock.patch(service_container_fqcn, autospec=True)
     def test_recreate_container_with_timeout(self, _):
         mock_container = mock.create_autospec(Container)
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
@@ -430,7 +434,7 @@ class ServiceTest(unittest.TestCase):
             '{"stream": "Successfully built abcd"}',
         ]
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             service.create_container()
             assert mock_log.warn.called
             _, args, _ = mock_log.warn.mock_calls[0]
@@ -468,7 +472,7 @@ class ServiceTest(unittest.TestCase):
             '{"stream": "Successfully built abcd"}',
         ]
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             service.ensure_image_exists(do_build=BuildAction.force)
 
         assert not mock_log.warn.called
@@ -566,7 +570,7 @@ class ServiceTest(unittest.TestCase):
             explanation="Boom")
 
         web = Service('web', image='example', client=self.mock_client)
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             assert not web.remove_image(ImageType.all)
         mock_log.error.assert_called_once_with(
             "Failed to remove image for service %s: %s", web.name, error)
@@ -642,7 +646,7 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', project='testing')
         assert service.image_name == 'testing_foo'
 
-    @mock.patch('compose.service.log', autospec=True)
+    @mock.patch(service_log_fqmn, autospec=True)
     def test_only_log_warning_when_host_ports_clash(self, mock_log):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         name = 'foo'
@@ -957,7 +961,7 @@ class ServiceVolumesTest(unittest.TestCase):
         container_volumes = []
         service = 'service_name'
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
         assert not mock_log.warn.called
@@ -970,7 +974,7 @@ class ServiceVolumesTest(unittest.TestCase):
         ]
         service = 'service_name'
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
         mock_log.warn.assert_called_once_with(mock.ANY)
@@ -980,7 +984,7 @@ class ServiceVolumesTest(unittest.TestCase):
         container_volumes = [VolumeSpec('/home/user', '/path', 'rw')]
         service = 'service_name'
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
         assert not mock_log.warn.called
@@ -992,7 +996,7 @@ class ServiceVolumesTest(unittest.TestCase):
         ]
         service = 'service_name'
 
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
+        with mock.patch(service_log_fqmn, autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
         assert not mock_log.warn.called
