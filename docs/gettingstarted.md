@@ -137,8 +137,8 @@ The `redis` service uses the latest public [Redis](https://registry.hub.docker.c
 2. Enter `http://0.0.0.0:5000/` in a browser to see the application running.
 
    If you're using Docker on Linux natively, then the web app should now be
-   listening on port 5000 on your Docker daemon host. If http://0.0.0.0:5000
-   doesn't resolve, you can also try http://localhost:5000.
+   listening on port 5000 on your Docker daemon host. If `http://0.0.0.0:5000`
+   doesn't resolve, you can also try `http://localhost:5000`.
 
    If you're using Docker Machine on a Mac, use `docker-machine ip MACHINE_VM` to get
    the IP address of your Docker host. Then, `open http://MACHINE_VM_IP:5000` in a
