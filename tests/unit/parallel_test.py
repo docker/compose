@@ -4,10 +4,9 @@ from __future__ import unicode_literals
 import six
 
 from compose.core import dockerclient as dc
-from compose.parallel import parallel_execute
-from compose.parallel import parallel_execute_iter
-from compose.parallel import UpstreamError
-
+from compose.core.parallel import parallel_execute
+from compose.core.parallel import parallel_execute_iter
+from compose.core.parallel import UpstreamError
 
 web = 'web'
 db = 'db'

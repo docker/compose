@@ -23,11 +23,11 @@ from .config import merge_environment
 from .config.types import VolumeSpec
 from .core import dockerclient as dc
 from .core.container import Container
-from .parallel import parallel_execute
-from .parallel import parallel_start
 from .utils import json_hash
 from compose.common.progress_stream import stream_output
 from compose.common.progress_stream import StreamOutputError
+from compose.core.parallel import parallel_execute
+from compose.core.parallel import parallel_start
 
 log = logging.getLogger(__name__)
 

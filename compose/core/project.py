@@ -8,7 +8,6 @@ from functools import reduce
 
 import enum
 
-from compose import parallel
 from compose.common.const import DEFAULT_TIMEOUT
 from compose.common.const import IMAGE_EVENTS
 from compose.common.const import LABEL_ONE_OFF
@@ -19,6 +18,7 @@ from compose.config.config import V1
 from compose.config.sort_services import get_container_name_from_network_mode
 from compose.config.sort_services import get_service_name_from_network_mode
 from compose.core import dockerclient as dc
+from compose.core import parallel
 from compose.core.container import Container
 from compose.core.network import build_networks
 from compose.core.network import get_networks
