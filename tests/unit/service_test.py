@@ -445,7 +445,7 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
-            buildargs={},
+            buildargs=None,
         )
 
     def test_ensure_image_exists_no_build(self):
@@ -481,33 +481,7 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
-            buildargs={},
-        )
-
-    def test_ensure_filter_out_empty_build_args(self):
-        args = {u'no_proxy': 'None', u'https_proxy': 'something'}
-        service = Service('foo',
-                          client=self.mock_client,
-                          build={'context': '.', 'args': args})
-        self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
-        self.mock_client.build.return_value = [
-            '{"stream": "Successfully built abcd"}',
-        ]
-
-        with mock.patch('compose.service.log', autospec=True) as mock_log:
-            service.ensure_image_exists(do_build=BuildAction.force)
-
-        assert not mock_log.warn.called
-        self.mock_client.build.assert_called_once_with(
-            tag='default_foo',
-            dockerfile=None,
-            stream=True,
-            path='.',
-            pull=False,
-            forcerm=False,
-            nocache=False,
-            rm=True,
-            buildargs={u'https_proxy': 'something'},
+            buildargs=None,
         )
 
     def test_build_does_not_pull(self):
