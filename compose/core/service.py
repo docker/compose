@@ -20,6 +20,7 @@ from compose.common.const import LABEL_SERVICE
 from compose.common.const import LABEL_VERSION
 from compose.common.progress_stream import stream_output
 from compose.common.progress_stream import StreamOutputError
+from compose.common.utils import json_hash
 from compose.config import DOCKER_CONFIG_KEYS
 from compose.config import merge_environment
 from compose.config.types import VolumeSpec
@@ -27,7 +28,6 @@ from compose.core import dockerclient as dc
 from compose.core.container import Container
 from compose.core.parallel import parallel_execute
 from compose.core.parallel import parallel_start
-from compose.utils import json_hash
 
 log = logging.getLogger(__name__)
 

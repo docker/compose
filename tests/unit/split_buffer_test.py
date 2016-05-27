@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from .. import unittest
-from compose.utils import split_buffer
+from compose.common.utils import split_buffer
 
 
 class SplitBufferTest(unittest.TestCase):

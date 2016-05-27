@@ -13,6 +13,7 @@ from compose.common.const import IMAGE_EVENTS
 from compose.common.const import LABEL_ONE_OFF
 from compose.common.const import LABEL_PROJECT
 from compose.common.const import LABEL_SERVICE
+from compose.common.utils import microseconds_from_time_nano
 from compose.config import ConfigurationError
 from compose.config.config import V1
 from compose.config.sort_services import get_container_name_from_network_mode
@@ -29,7 +30,6 @@ from compose.core.service import ConvergenceStrategy
 from compose.core.service import NetworkMode
 from compose.core.service import Service
 from compose.core.service import ServiceNetworkMode
-from compose.utils import microseconds_from_time_nano
 from compose.volume import ProjectVolumes
 
 log = logging.getLogger(__name__)

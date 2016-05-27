@@ -11,8 +11,8 @@ from six.moves.queue import Empty
 from six.moves.queue import Queue
 
 from compose.common.signals import ShutdownException
+from compose.common.utils import get_output_stream
 from compose.core import dockerclient as dc
-from compose.utils import get_output_stream
 
 log = logging.getLogger(__name__)
 

@@ -15,7 +15,6 @@ from cached_property import cached_property
 
 from ..common.const import COMPOSEFILE_V1 as V1
 from ..common.const import COMPOSEFILE_V2_0 as V2_0
-from ..utils import build_string_dict
 from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
@@ -42,6 +41,7 @@ from .validation import validate_network_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
+from compose.common.utils import build_string_dict
 
 DOCKER_CONFIG_KEYS = [
     'cap_add',
