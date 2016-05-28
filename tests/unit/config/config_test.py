@@ -717,6 +717,34 @@ class ConfigTest(unittest.TestCase):
         assert 'foo' in service['build']['args']
         assert service['build']['args']['foo'] == ''
 
+    # If build argument is None then it will be converted to the empty
+    # string. Make sure that int zero kept as it is, i.e. not converted to
+    # the empty string
+    def test_build_args_check_zero_preserved(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'foo': 0
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'foo' in service['build']['args']
+        assert service['build']['args']['foo'] == '0'
+
     def test_load_with_multiple_files_mismatched_networks_format(self):
         base_file = config.ConfigFile(
             'base.yaml',
