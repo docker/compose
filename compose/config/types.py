@@ -75,13 +75,31 @@ class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode type')):
 
 
 def parse_restart_spec(restart_config):
+    allowed_restart_policies = [
+        'no',
+        'always',
+        'on-failure',
+        'unless-stopped',
+    ]
     if not restart_config:
         return None
+
     parts = restart_config.split(':')
+    restart_policy = parts[0]
+    if restart_policy not in allowed_restart_policies:
+        raise ConfigurationError(
+            "Restart policy '{restart_policy}' is invalid. Please specify one "
+            "of the following allowed policies: '{valid_policies}'".format(
+                restart_policy=restart_policy,
+                valid_policies=', '.join(allowed_restart_policies)
+            )
+        )
+
     if len(parts) > 2:
         raise ConfigurationError(
             "Restart %s has incorrect format, should be "
             "mode[:max_retry]" % restart_config)
+
     if len(parts) == 2:
         name, max_retry_count = parts
     else:
