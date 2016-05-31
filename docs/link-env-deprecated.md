@@ -16,7 +16,9 @@ weight=89
 >
 > Environment variables will only be populated if you're using the [legacy version 1 Compose file format](compose-file.md#versioning).
 
-Compose uses [Docker links] to expose services' containers to one another. Each linked container injects a set of environment variables, each of which begins with the uppercase name of the container.
+Compose uses [Docker links](/engine/userguide/networking/default_network/dockerlinks.md)
+to expose services' containers to one another. Each linked container injects a set of
+environment variables, each of which begins with the uppercase name of the container.
 
 To see what environment variables are available to a service, run `docker-compose run SERVICE env`.
 
@@ -37,8 +39,6 @@ Protocol (tcp or udp), e.g. `DB_PORT_5432_TCP_PROTO=tcp`
 
 <b><i>name</i>\_NAME</b><br>
 Fully qualified container name, e.g. `DB_1_NAME=/myapp_web_1/myapp_db_1`
-
-[Docker links]: https://docs.docker.com/engine/userguide/networking/default_network/dockerlinks/
 
 ## Related Information
 
