@@ -29,8 +29,8 @@ and a `docker-compose.yml` file.
     The Dockerfile defines an application's image content via one or more build
     commands that configure that image. Once built, you can run the image in a
     container.  For more information on `Dockerfiles`, see the [Docker user
-    guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile)
-    and the [Dockerfile reference](https://docs.docker.com/engine/reference/builder/).
+    guide](/engine/userguide/containers/dockerimages.md#building-an-image-from-a-dockerfile)
+    and the [Dockerfile reference](/engine/reference/builder.md).
 
 3. Add the following content to the `Dockerfile`.
 
