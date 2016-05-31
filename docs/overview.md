@@ -159,8 +159,8 @@ and destroy isolated testing environments for your test suite. By defining the f
 
 Compose has traditionally been focused on development and testing workflows,
 but with each release we're making progress on more production-oriented features. You can use Compose to deploy to a remote Docker Engine. The Docker Engine may be a single instance provisioned with
-[Docker Machine](https://docs.docker.com/machine/) or an entire
-[Docker Swarm](https://docs.docker.com/swarm/) cluster.
+[Docker Machine](/machine/overview.md) or an entire
+[Docker Swarm](/swarm/overview.md) cluster.
 
 For details on using production-oriented features, see
 [compose in production](production.md) in this documentation.

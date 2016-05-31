@@ -32,7 +32,7 @@ Dockerfile consists of:
 
 That'll put your application code inside an image that will build a container
 with Ruby, Bundler and all your dependencies inside it. For more information on
-how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile) and the [Dockerfile reference](https://docs.docker.com/engine/reference/builder/).
+how to write Dockerfiles, see the [Docker user guide](/engine/userguide/containers/dockerimages.md#building-an-image-from-a-dockerfile) and the [Dockerfile reference](/engine/reference/builder.md).
 
 Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten in a moment by `rails new`.
 
@@ -152,7 +152,7 @@ Finally, you need to create the database. In another terminal, run:
 
     $ docker-compose run web rake db:create
 
-That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](https://docs.docker.com/machine/), then `docker-machine ip MACHINE_VM` returns the Docker host IP address.
+That's it. Your app should now be running on port 3000 on your Docker daemon. If you're using [Docker Machine](/machine/overview.md), then `docker-machine ip MACHINE_VM` returns the Docker host IP address.
 
 ![Rails example](images/rails-welcome.png)
 
