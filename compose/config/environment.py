@@ -60,6 +60,12 @@ class Environment(dict):
         instance.update(os.environ)
         return instance
 
+    @classmethod
+    def init_from_env(cls):
+        instance = cls()
+        instance.update(os.environ)
+        return instance
+
     def __getitem__(self, key):
         try:
             return super(Environment, self).__getitem__(key)

@@ -10,7 +10,7 @@ from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
 
-from compose.cli.signals import ShutdownException
+from compose.common.signals import ShutdownException
 from compose.common.utils import get_output_stream
 from compose.core import dockerclient as dc
 from compose.core import errors as core_errors

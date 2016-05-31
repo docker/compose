@@ -3,7 +3,9 @@ from __future__ import unicode_literals
 
 import signal
 
-from compose.cli.errors import ShutdownException
+
+class ShutdownException(Exception):
+    pass
 
 
 def shutdown(signal, frame):

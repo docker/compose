@@ -135,7 +135,3 @@ class NoSuchCommand(Exception):
 
         self.command = command
         self.supercommand = supercommand
-
-
-class ShutdownException(Exception):
-    pass

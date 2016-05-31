@@ -268,9 +268,10 @@ class Project(object):
     def kill(self, service_names=None, **options):
         parallel.parallel_kill(self.containers(service_names), options)
 
-    def remove_stopped(self, service_names=None, one_off=OneOffFilter.exclude, **options):
+    def remove_stopped(self, service_names=None, one_off=None, **options):
+        _one_off = one_off if one_off else OneOffFilter.exclude
         parallel.parallel_remove(self.containers(
-            service_names, stopped=True, one_off=one_off
+            service_names, stopped=True, one_off=_one_off
         ), options)
 
     def down(self, remove_image_type, include_volumes, remove_orphans=False):
@@ -301,17 +302,14 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
-    def create(
-        self,
-        service_names=None,
-        strategy=ConvergenceStrategy.changed,
-        do_build=BuildAction.none,
-    ):
+    def create(self, service_names=None, strategy=None, do_build=None):
+        _strategy = ConvergenceStrategy.changed if not strategy else strategy
+        _do_build = BuildAction.none if not do_build else do_build
         services = self.get_services_without_duplicate(service_names, include_deps=True)
 
         for svc in services:
-            svc.ensure_image_exists(do_build=do_build)
-        plans = self._get_convergence_plans(services, strategy)
+            svc.ensure_image_exists(do_build=_do_build)
+        plans = self._get_convergence_plans(services, _strategy)
 
         for service in services:
             service.execute_convergence_plan(
@@ -448,13 +446,14 @@ class Project(object):
                 filters={'label': self.labels(one_off=one_off)})])
         )
 
-    def containers(self, service_names=None, stopped=False, one_off=OneOffFilter.exclude):
+    def containers(self, service_names=None, stopped=False, one_off=None):
+        _one_off = one_off if one_off else OneOffFilter.exclude
         if service_names:
             self.validate_service_names(service_names)
         else:
             service_names = self.service_names
 
-        containers = self._labeled_containers(stopped, one_off)
+        containers = self._labeled_containers(stopped, _one_off)
 
         def matches_service_names(container):
             return container.labels.get(LABEL_SERVICE) in service_names

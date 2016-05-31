@@ -9,3 +9,8 @@
 /venv
 README.rst
 compose/GITSHA
+tests/acceptance/__pycache__/
+tests/integration/__pycache__/
+tests/unit/__pycache__/
+tests/unit/cli/__pycache__/
+tests/unit/config/__pycache__/

@@ -7,9 +7,9 @@ import pytest
 
 from compose.cli.errors import UserError
 from compose.cli.formatter import ConsoleWarningFormatter
-from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import filter_containers_to_service_names
 from compose.cli.main import setup_console_handler
+from compose.common.utils import convergence_strategy_from_opts
 from compose.core import container
 from compose.core.service import ConvergenceStrategy
 from tests import mock
@@ -78,27 +78,51 @@ class TestSetupConsoleHandlerTestCase(object):
 class TestConvergeStrategyFromOptsTestCase(object):
 
     def test_invalid_opts(self):
-        options = {'--force-recreate': True, '--no-recreate': True}
+        options = {'force_recreate': True, 'no_recreate': True}
         with pytest.raises(UserError):
-            convergence_strategy_from_opts(options)
+            convergence_strategy_from_opts(
+                exception_class=UserError,
+                message="--build and --no-build can not be combined.",
+                force_recreate_strategy=ConvergenceStrategy.always,
+                no_recreate_strategy=ConvergenceStrategy.never,
+                alternative_strategy=ConvergenceStrategy.changed,
+                **options)
 
     def test_always(self):
-        options = {'--force-recreate': True, '--no-recreate': False}
+        options = {'force_recreate': True, 'no_recreate': False}
         assert (
-            convergence_strategy_from_opts(options) ==
+            convergence_strategy_from_opts(
+                exception_class=UserError,
+                message="--build and --no-build can not be combined.",
+                force_recreate_strategy=ConvergenceStrategy.always,
+                no_recreate_strategy=ConvergenceStrategy.never,
+                alternative_strategy=ConvergenceStrategy.changed,
+                **options) ==
             ConvergenceStrategy.always
         )
 
     def test_never(self):
-        options = {'--force-recreate': False, '--no-recreate': True}
+        options = {'force_recreate': False, 'no_recreate': True}
         assert (
-            convergence_strategy_from_opts(options) ==
+            convergence_strategy_from_opts(
+                exception_class=UserError,
+                message="--build and --no-build can not be combined.",
+                force_recreate_strategy=ConvergenceStrategy.always,
+                no_recreate_strategy=ConvergenceStrategy.never,
+                alternative_strategy=ConvergenceStrategy.changed,
+                **options) ==
             ConvergenceStrategy.never
         )
 
     def test_changed(self):
-        options = {'--force-recreate': False, '--no-recreate': False}
+        options = {'force_recreate': False, 'no_recreate': False}
         assert (
-            convergence_strategy_from_opts(options) ==
+            convergence_strategy_from_opts(
+                exception_class=UserError,
+                message="--build and --no-build can not be combined.",
+                force_recreate_strategy=ConvergenceStrategy.always,
+                no_recreate_strategy=ConvergenceStrategy.never,
+                alternative_strategy=ConvergenceStrategy.changed,
+                **options) ==
             ConvergenceStrategy.changed
         )

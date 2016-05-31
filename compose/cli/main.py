@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import contextlib
 import functools
 import json
 import logging
@@ -35,7 +34,8 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
-from compose.cli import signals
+from compose.common import signals
+from compose.common import utils
 from compose.common.progress_stream import StreamOutputError
 from compose.core.errors import BuildError
 from compose.core.errors import NeedsBuildError
@@ -258,8 +258,24 @@ class TopLevelCommand(object):
 
         self.project.create(
             service_names=service_names,
-            strategy=convergence_strategy_from_opts(options),
-            do_build=build_action_from_opts(options),
+            strategy=utils.convergence_strategy_from_opts(
+                no_recreate=options['--no-recreate'],
+                force_recreate=options['--force-recreate'],
+                exception_class=UserError,
+                message="--build and --no-build can not be combined.",
+                force_recreate_strategy=ConvergenceStrategy.always,
+                no_recreate_strategy=ConvergenceStrategy.never,
+                alternative_strategy=ConvergenceStrategy.changed
+            ),
+            do_build=utils.build_action_from_opts(
+                build=options['--build'],
+                no_build=options['--no-build'],
+                exception_class=UserError,
+                message="--build and --no-build can not be combined.",
+                build_action=BuildAction.force,
+                no_build_action=BuildAction.skip,
+                alternative_action=BuildAction.none,
+            ),
         )
 
     def down(self, options):
@@ -288,7 +304,9 @@ class TopLevelCommand(object):
             --remove-orphans    Remove containers for services not defined in the
                                 Compose file
         """
-        image_type = image_type_from_opt('--rmi', options['--rmi'])
+        image_type = utils.image_type_from_opt('--rmi', options['--rmi'],
+                                               image_type_class=ImageType,
+                                               exception_class=UserError)
         self.project.down(image_type, options['--volumes'], options['--remove-orphans'])
 
     def events(self, options):
@@ -477,7 +495,7 @@ class TopLevelCommand(object):
         """
         containers = sorted(
             self.project.containers(service_names=options['SERVICE'], stopped=True) +
-            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+            self.project.containers(service_names=options['SERVICE']),
             key=attrgetter('name'))
 
         if options['-q']:
@@ -738,12 +756,27 @@ class TopLevelCommand(object):
         if detached and cascade_stop:
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        with up_shutdown_context(self.project, service_names, timeout, detached):
+        with utils.up_shutdown_context(self.project, service_names, timeout, detached):
             to_attach = self.project.up(
                 service_names=service_names,
                 start_deps=start_deps,
-                strategy=convergence_strategy_from_opts(options),
-                do_build=build_action_from_opts(options),
+                strategy=utils.convergence_strategy_from_opts(
+                    no_recreate=options['--no-recreate'],
+                    force_recreate=options['--force-recreate'],
+                    exception_class=UserError,
+                    message="--build and --no-build can not be combined.",
+                    force_recreate_strategy=ConvergenceStrategy.always,
+                    no_recreate_strategy=ConvergenceStrategy.never,
+                    alternative_strategy=ConvergenceStrategy.changed),
+                do_build=utils.build_action_from_opts(
+                    build=options['--build'],
+                    no_build=options['--no-build'],
+                    exception_class=UserError,
+                    message="--build and --no-build can not be combined.",
+                    build_action=BuildAction.force,
+                    no_build_action=BuildAction.skip,
+                    alternative_action=BuildAction.none,
+                ),
                 timeout=timeout,
                 detached=detached,
                 remove_orphans=remove_orphans)
@@ -779,43 +812,6 @@ class TopLevelCommand(object):
             print(__version__)
         else:
             print(get_version_info('full'))
-
-
-def convergence_strategy_from_opts(options):
-    no_recreate = options['--no-recreate']
-    force_recreate = options['--force-recreate']
-    if force_recreate and no_recreate:
-        raise UserError("--force-recreate and --no-recreate cannot be combined.")
-
-    if force_recreate:
-        return ConvergenceStrategy.always
-
-    if no_recreate:
-        return ConvergenceStrategy.never
-
-    return ConvergenceStrategy.changed
-
-
-def image_type_from_opt(flag, value):
-    if not value:
-        return ImageType.none
-    try:
-        return ImageType[value]
-    except KeyError:
-        raise UserError("%s flag must be one of: all, local" % flag)
-
-
-def build_action_from_opts(options):
-    if options['--build'] and options['--no-build']:
-        raise UserError("--build and --no-build can not be combined.")
-
-    if options['--build']:
-        return BuildAction.force
-
-    if options['--no-build']:
-        return BuildAction.skip
-
-    return BuildAction.none
 
 
 def build_container_options(options, detach, command):
@@ -928,24 +924,6 @@ def filter_containers_to_service_names(containers, service_names):
         container
         for container in containers if container.service in service_names
     ]
-
-
-@contextlib.contextmanager
-def up_shutdown_context(project, service_names, timeout, detached):
-    if detached:
-        yield
-        return
-
-    signals.set_signal_handler_to_shutdown()
-    try:
-        try:
-            yield
-        except signals.ShutdownException:
-            print("Gracefully stopping... (press Ctrl+C again to force)")
-            project.stop(service_names=service_names, timeout=timeout)
-    except signals.ShutdownException:
-        project.kill(service_names=service_names)
-        sys.exit(2)
 
 
 def list_containers(containers):
