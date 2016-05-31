@@ -152,6 +152,16 @@ var startCommand = cli.Command{
 			Name:  "no-pivot",
 			Usage: "do not use pivot root",
 		},
+		cli.StringFlag{
+			Name:  "runtime,r",
+			Value: "runc",
+			Usage: "name or path of the OCI compliant runtime to use when executing containers",
+		},
+		cli.StringSliceFlag{
+			Name:  "runtime-args",
+			Value: &cli.StringSlice{},
+			Usage: "specify additional runtime args",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -191,6 +201,8 @@ var startCommand = cli.Command{
 				Stderr:        s.stderr,
 				Labels:        context.StringSlice("label"),
 				NoPivotRoot:   context.Bool("no-pivot"),
+				Runtime:       context.String("runtime"),
+				RuntimeArgs:   context.StringSlice("runtime-args"),
 			}
 		)
 		restoreAndCloseStdin = func() {
