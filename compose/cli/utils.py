@@ -11,8 +11,6 @@ import docker
 from six.moves import input
 
 import compose
-
-
 from ..const import HOME_DIR
 from ..const import PLUGIN_DIR
 

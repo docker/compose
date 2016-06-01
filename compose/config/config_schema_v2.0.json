@@ -38,6 +38,17 @@
         }
       },
       "additionalProperties": false
+    },
+
+    "plugins": {
+      "id": "#/properties/plugins",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/plugin"
+        }
+      },
+      "additionalProperties": false
     }
   },
 
@@ -313,6 +324,15 @@
           }
         }
       }
+    },
+
+    "plugin": {
+      "version": {
+        "type": "string"
+      },
+      "id": "#/definitions/plugin",
+      "type": "object",
+      "options": {"$ref": "#/definitions/list_or_dict"}
     }
   }
 }

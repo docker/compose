@@ -21,6 +21,8 @@ from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
+from ..plugin import PluginError
+from ..plugin_manager import PluginManager
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
@@ -40,12 +42,9 @@ from .formatter import ConsoleWarningFormatter
 from .formatter import Formatter
 from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
+from .utils import get_plugin_dir
 from .utils import get_version_info
 from .utils import yesno
-from .utils import get_plugin_dir
-from ..plugin_manager import PluginManager
-from ..plugin_manager import NoPluginError
-
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
@@ -73,6 +72,9 @@ def main():
         sys.exit(1)
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
+        sys.exit(1)
+    except PluginError as e:
+        log.error(e.msg)
         sys.exit(1)
     except errors.ConnectionError:
         sys.exit(1)
@@ -199,6 +201,7 @@ class TopLevelCommand(object):
     def __init__(self, project, project_dir='.'):
         self.project = project
         self.project_dir = '.'
+        self.plugin_manager = PluginManager(get_plugin_dir())
 
     def build(self, options):
         """
@@ -792,25 +795,41 @@ class TopLevelCommand(object):
         Usage: plugin [install|uninstall|list|config] [PLUGIN]
         """
 
-        plugin_manager = PluginManager(get_plugin_dir())
-
         if options['list']:
-            plugins = plugin_manager.get_plugins()
+            plugins = self.plugin_manager.get_plugins()
 
-            for plugin_name, plugin in plugins.items():
-                print(plugin.name, plugin.description)
-        elif options['PLUGIN'] is not None:
-            try:
-                if options['install']:
-                    plugin_manager.install_plugin(options['PLUGIN'])
-                elif options['uninstall']:
-                    plugin_manager.uninstall_plugin(options['PLUGIN'])
-                elif options['config']:
-                    plugin_manager.configure_plugin(options['PLUGIN'])
-            except NoPluginError:
-                raise UserError("Plugin %s doesn't exist" % options['PLUGIN'])
+            if len(plugins) <= 0:
+                print('No plugins installed.')
+            else:
+                headers = [
+                    'Name',
+                    'Description',
+                    'Version'
+                ]
+                rows = []
+
+                for plugin_name, plugin in plugins.items():
+                    rows.append([
+                        plugin.name,
+                        plugin.description,
+                        plugin.version
+                    ])
+
+                print(Formatter().table(headers, rows))
+
+        elif options['install']:
+            self.plugin_manager.install_plugin(options['PLUGIN'])
+        elif options['uninstall']:
+            if self.plugin_manager.is_plugin_installed(options['PLUGIN']):
+                print("Going to remove plugin '{}'".format(options['PLUGIN']))
+
+                if options.get('--force') or yesno("Are you sure? [yN] ", default=False):
+                    self.plugin_manager.uninstall_plugin(options['PLUGIN'])
+        elif options['config']:
+            self.plugin_manager.configure_plugin(options['PLUGIN'])
         else:
-            return False
+            subject = get_handler(self, 'plugin')
+            print(getdoc(subject))
 
 
 def convergence_strategy_from_opts(options):
