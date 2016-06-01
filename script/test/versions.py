@@ -28,6 +28,7 @@ from __future__ import unicode_literals
 import argparse
 import itertools
 import operator
+import re
 from collections import namedtuple
 
 import requests
@@ -40,8 +41,16 @@ class Version(namedtuple('_Version', 'major minor patch rc')):
 
     @classmethod
     def parse(cls, version):
-        version = version.lstrip('v')
+        version = re.search(
+            r'v((\d+\.)?(\d+\.)?(\*|\d+)(-rc(\d+))?)',
+            version
+        ).group(1)
+
         version, _, rc = version.partition('-')
+
+        if version.count('.') is 1:
+            version += '.0'
+
         major, minor, patch = version.split('.', 3)
         return cls(int(major), int(minor), int(patch), rc)
 

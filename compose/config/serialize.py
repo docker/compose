@@ -33,6 +33,7 @@ def serialize_config(config):
         'services': services,
         'networks': config.networks,
         'volumes': config.volumes,
+        'plugins': config.plugins,
     }
 
     return yaml.safe_dump(
