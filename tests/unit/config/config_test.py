@@ -48,6 +48,7 @@ def service_sort(services):
 
 
 class ConfigTest(unittest.TestCase):
+
     def test_load(self):
         service_dicts = config.load(
             build_config_details(
@@ -1384,6 +1385,7 @@ class ConfigTest(unittest.TestCase):
 
 
 class NetworkModeTest(unittest.TestCase):
+
     def test_network_mode_standard(self):
         config_data = config.load(build_config_details({
             'version': '2',
@@ -1595,6 +1597,7 @@ class PortsTest(unittest.TestCase):
 
 
 class InterpolationTest(unittest.TestCase):
+
     @mock.patch.dict(os.environ)
     def test_config_file_with_environment_file(self):
         project_dir = 'tests/fixtures/default-env-file'
@@ -1692,10 +1695,11 @@ class InterpolationTest(unittest.TestCase):
                 None,
             )
         ).services[0]
-        self.assertEquals(service_dict['environment']['POSTGRES_PASSWORD'], '')
+        self.assertEqual(service_dict['environment']['POSTGRES_PASSWORD'], '')
 
 
 class VolumeConfigTest(unittest.TestCase):
+
     def test_no_binding(self):
         d = make_service_dict('foo', {'build': '.', 'volumes': ['/data']}, working_dir='.')
         self.assertEqual(d['volumes'], ['/data'])
@@ -1840,6 +1844,7 @@ class MergeDevicesTest(unittest.TestCase, MergePathMappingTest):
 
 
 class BuildOrImageMergeTest(unittest.TestCase):
+
     def test_merge_build_or_image_no_override(self):
         self.assertEqual(
             config.merge_service_dicts({'build': '.'}, {}, V1),
@@ -1928,6 +1933,7 @@ class MergeNetworksTest(unittest.TestCase, MergeListsTest):
 
 
 class MergeStringsOrListsTest(unittest.TestCase):
+
     def test_no_override(self):
         service_dict = config.merge_service_dicts(
             {'dns': '8.8.8.8'},
@@ -1958,6 +1964,7 @@ class MergeStringsOrListsTest(unittest.TestCase):
 
 
 class MergeLabelsTest(unittest.TestCase):
+
     def test_empty(self):
         assert 'labels' not in config.merge_service_dicts({}, {}, DEFAULT_VERSION)
 
@@ -1998,6 +2005,7 @@ class MergeLabelsTest(unittest.TestCase):
 
 
 class MemoryOptionsTest(unittest.TestCase):
+
     def test_validation_fails_with_just_memswap_limit(self):
         """
         When you set a 'memswap_limit' it is invalid config unless you also set
@@ -2040,6 +2048,7 @@ class MemoryOptionsTest(unittest.TestCase):
 
 
 class EnvTest(unittest.TestCase):
+
     def test_parse_environment_as_list(self):
         environment = [
             'NORMAL=F1',
@@ -2185,6 +2194,7 @@ def load_from_filename(filename):
 
 
 class ExtendsTest(unittest.TestCase):
+
     def test_extends(self):
         service_dicts = load_from_filename('tests/fixtures/extends/docker-compose.yml')
 
@@ -2376,9 +2386,9 @@ class ExtendsTest(unittest.TestCase):
             )
         ).services
 
-        self.assertEquals(len(service), 1)
+        self.assertEqual(len(service), 1)
         self.assertIsInstance(service[0], dict)
-        self.assertEquals(service[0]['command'], "/bin/true")
+        self.assertEqual(service[0]['command'], "/bin/true")
 
     def test_extended_service_with_invalid_config(self):
         with pytest.raises(ConfigurationError) as exc:
@@ -2390,7 +2400,7 @@ class ExtendsTest(unittest.TestCase):
 
     def test_extended_service_with_valid_config(self):
         service = load_from_filename('tests/fixtures/extends/service-with-valid-composite-extends.yml')
-        self.assertEquals(service[0]['command'], "top")
+        self.assertEqual(service[0]['command'], "top")
 
     def test_extends_file_defaults_to_self(self):
         """
@@ -2622,7 +2632,7 @@ class ExtendsTest(unittest.TestCase):
         """)
 
         service = load_from_filename(str(tmpdir.join('docker-compose.yml')))
-        self.assertEquals(service[0]['command'], "top")
+        self.assertEqual(service[0]['command'], "top")
 
     def test_extends_with_depends_on(self):
         tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
@@ -2666,6 +2676,7 @@ class ExpandPathTest(unittest.TestCase):
 
 
 class VolumePathTest(unittest.TestCase):
+
     def test_split_path_mapping_with_windows_path(self):
         host_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
         windows_volume_path = host_path + ":/opt/connect/config:ro"
@@ -2685,6 +2696,7 @@ class VolumePathTest(unittest.TestCase):
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class BuildPathTest(unittest.TestCase):
+
     def setUp(self):
         self.abs_context_path = os.path.join(os.getcwd(), 'tests/fixtures/build-ctx')
 
@@ -2707,7 +2719,7 @@ class BuildPathTest(unittest.TestCase):
             {'build': relative_build_path},
             working_dir='tests/fixtures/build-path'
         )
-        self.assertEquals(service_dict['build'], self.abs_context_path)
+        self.assertEqual(service_dict['build'], self.abs_context_path)
 
     def test_absolute_path(self):
         service_dict = make_service_dict(
@@ -2715,11 +2727,11 @@ class BuildPathTest(unittest.TestCase):
             {'build': self.abs_context_path},
             working_dir='tests/fixtures/build-path'
         )
-        self.assertEquals(service_dict['build'], self.abs_context_path)
+        self.assertEqual(service_dict['build'], self.abs_context_path)
 
     def test_from_file(self):
         service_dict = load_from_filename('tests/fixtures/build-path/docker-compose.yml')
-        self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
+        self.assertEqual(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
 
     def test_valid_url_in_build_path(self):
         valid_urls = [

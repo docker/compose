@@ -29,36 +29,36 @@ class CLITestCase(unittest.TestCase):
         test_dir = py._path.local.LocalPath('tests/fixtures/simple-composefile')
         with test_dir.as_cwd():
             project_name = get_project_name('.')
-            self.assertEquals('simplecomposefile', project_name)
+            self.assertEqual('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_base_dir(self):
         base_dir = 'tests/fixtures/simple-composefile'
         project_name = get_project_name(base_dir)
-        self.assertEquals('simplecomposefile', project_name)
+        self.assertEqual('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         base_dir = 'tests/fixtures/UpperCaseDir'
         project_name = get_project_name(base_dir)
-        self.assertEquals('uppercasedir', project_name)
+        self.assertEqual('uppercasedir', project_name)
 
     def test_project_name_with_explicit_project_name(self):
         name = 'explicit-project-name'
         project_name = get_project_name(None, project_name=name)
-        self.assertEquals('explicitprojectname', project_name)
+        self.assertEqual('explicitprojectname', project_name)
 
     @mock.patch.dict(os.environ)
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         os.environ['COMPOSE_PROJECT_NAME'] = name
         project_name = get_project_name(None)
-        self.assertEquals(project_name, name)
+        self.assertEqual(project_name, name)
 
     def test_project_name_with_empty_environment_var(self):
         base_dir = 'tests/fixtures/simple-composefile'
         with mock.patch.dict(os.environ):
             os.environ['COMPOSE_PROJECT_NAME'] = ''
             project_name = get_project_name(base_dir)
-        self.assertEquals('simplecomposefile', project_name)
+        self.assertEqual('simplecomposefile', project_name)
 
     @mock.patch.dict(os.environ)
     def test_project_name_with_environment_file(self):
@@ -158,7 +158,7 @@ class CLITestCase(unittest.TestCase):
             '--workdir': None,
         })
 
-        self.assertEquals(
+        self.assertEqual(
             mock_client.create_host_config.call_args[1]['restart_policy']['Name'],
             'always'
         )

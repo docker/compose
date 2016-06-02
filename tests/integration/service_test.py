@@ -39,6 +39,7 @@ def create_and_start_container(service, **override_options):
 
 
 class ServiceTest(DockerClientTestCase):
+
     def test_containers(self):
         foo = self.create_service('foo')
         bar = self.create_service('bar')
@@ -940,7 +941,7 @@ class ServiceTest(DockerClientTestCase):
         with mock.patch.object(self.client, '_version', '1.20'):
             service = self.create_service('web')
             service_config = service._get_container_host_config({})
-            self.assertEquals(service_config['NetworkMode'], 'default')
+            self.assertEqual(service_config['NetworkMode'], 'default')
 
     def test_labels(self):
         labels_dict = {
@@ -1044,6 +1045,7 @@ def converge(service, strategy=ConvergenceStrategy.changed):
 
 
 class ConfigHashTest(DockerClientTestCase):
+
     def test_no_config_hash_when_one_off(self):
         web = self.create_service('web')
         container = web.create_container(one_off=True)

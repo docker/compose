@@ -842,8 +842,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(self.project.containers()), 1)
 
         stdout, stderr = self.dispatch(['exec', '-T', 'console', 'ls', '-1d', '/'])
-        self.assertEquals(stdout, "/\n")
-        self.assertEquals(stderr, "")
+        self.assertEqual(stdout, "/\n")
+        self.assertEqual(stderr, "")
 
     def test_exec_custom_user(self):
         self.base_dir = 'tests/fixtures/links-composefile'
@@ -851,8 +851,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(self.project.containers()), 1)
 
         stdout, stderr = self.dispatch(['exec', '-T', '--user=operator', 'console', 'whoami'])
-        self.assertEquals(stdout, "operator\n")
-        self.assertEquals(stderr, "")
+        self.assertEqual(stdout, "operator\n")
+        self.assertEqual(stderr, "")
 
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
