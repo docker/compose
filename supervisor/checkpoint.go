@@ -4,6 +4,7 @@ package supervisor
 
 import "github.com/docker/containerd/runtime"
 
+// CreateCheckpointTask holds needed parameters to create a new checkpoint
 type CreateCheckpointTask struct {
 	baseTask
 	ID            string
@@ -19,6 +20,7 @@ func (s *Supervisor) createCheckpoint(t *CreateCheckpointTask) error {
 	return i.container.Checkpoint(*t.Checkpoint, t.CheckpointDir)
 }
 
+// DeleteCheckpointTask holds needed parameters to delete a checkpoint
 type DeleteCheckpointTask struct {
 	baseTask
 	ID            string

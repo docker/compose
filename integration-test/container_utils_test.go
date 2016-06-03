@@ -21,10 +21,10 @@ func (cs *ContainerdSuite) ListRunningContainers() ([]*types.Container, error) {
 	return resp.Containers, nil
 }
 
-func (cs *ContainerdSuite) SignalContainerProcess(id string, procId string, sig uint32) error {
+func (cs *ContainerdSuite) SignalContainerProcess(id string, procID string, sig uint32) error {
 	_, err := cs.grpcClient.Signal(context.Background(), &types.SignalRequest{
 		Id:     id,
-		Pid:    procId,
+		Pid:    procID,
 		Signal: sig,
 	})
 	return err
@@ -74,8 +74,8 @@ type stdio struct {
 	stderrBuffer bytes.Buffer
 }
 
-type containerProcess struct {
-	containerId string
+type ContainerProcess struct {
+	containerID string
 	pid         string
 	bundle      *Bundle
 	io          stdio
@@ -84,7 +84,7 @@ type containerProcess struct {
 	hasExited   bool
 }
 
-func (c *containerProcess) openIo() (err error) {
+func (c *ContainerProcess) openIo() (err error) {
 	defer func() {
 		if err != nil {
 			c.Cleanup()
@@ -111,11 +111,11 @@ func (c *containerProcess) openIo() (err error) {
 	return nil
 }
 
-func (c *containerProcess) GetEventsChannel() chan *types.Event {
+func (c *ContainerProcess) GetEventsChannel() chan *types.Event {
 	return c.eventsCh
 }
 
-func (c *containerProcess) GetNextEvent() *types.Event {
+func (c *ContainerProcess) GetNextEvent() *types.Event {
 	if c.hasExited {
 		return nil
 	}
@@ -131,16 +131,16 @@ func (c *containerProcess) GetNextEvent() *types.Event {
 	return e
 }
 
-func (c *containerProcess) CloseStdin() error {
+func (c *ContainerProcess) CloseStdin() error {
 	_, err := c.cs.grpcClient.UpdateProcess(context.Background(), &types.UpdateProcessRequest{
-		Id:         c.containerId,
+		Id:         c.containerID,
 		Pid:        c.pid,
 		CloseStdin: true,
 	})
 	return err
 }
 
-func (c *containerProcess) Cleanup() {
+func (c *ContainerProcess) Cleanup() {
 	for _, f := range []*os.File{
 		c.io.stdinf,
 		c.io.stdoutf,
@@ -153,9 +153,9 @@ func (c *containerProcess) Cleanup() {
 	}
 }
 
-func NewContainerProcess(cs *ContainerdSuite, bundle *Bundle, cid, pid string) (c *containerProcess, err error) {
-	c = &containerProcess{
-		containerId: cid,
+func NewContainerProcess(cs *ContainerdSuite, bundle *Bundle, cid, pid string) (c *ContainerProcess, err error) {
+	c = &ContainerProcess{
+		containerID: cid,
 		pid:         "init",
 		bundle:      bundle,
 		eventsCh:    make(chan *types.Event, 8),
@@ -181,7 +181,7 @@ func NewContainerProcess(cs *ContainerdSuite, bundle *Bundle, cid, pid string) (
 	return c, nil
 }
 
-func (cs *ContainerdSuite) StartContainerWithEventFilter(id, bundleName string, filter func(*types.Event)) (c *containerProcess, err error) {
+func (cs *ContainerdSuite) StartContainerWithEventFilter(id, bundleName string, filter func(*types.Event)) (c *ContainerProcess, err error) {
 	bundle := GetBundle(bundleName)
 	if bundle == nil {
 		return nil, fmt.Errorf("No such bundle '%s'", bundleName)
@@ -216,11 +216,11 @@ func (cs *ContainerdSuite) StartContainerWithEventFilter(id, bundleName string, 
 	return c, nil
 }
 
-func (cs *ContainerdSuite) StartContainer(id, bundleName string) (c *containerProcess, err error) {
+func (cs *ContainerdSuite) StartContainer(id, bundleName string) (c *ContainerProcess, err error) {
 	return cs.StartContainerWithEventFilter(id, bundleName, nil)
 }
 
-func (cs *ContainerdSuite) RunContainer(id, bundleName string) (c *containerProcess, err error) {
+func (cs *ContainerdSuite) RunContainer(id, bundleName string) (c *ContainerProcess, err error) {
 	c, err = cs.StartContainer(id, bundleName)
 	if err != nil {
 		return nil, err
@@ -236,14 +236,14 @@ func (cs *ContainerdSuite) RunContainer(id, bundleName string) (c *containerProc
 	return c, err
 }
 
-func (cs *ContainerdSuite) AddProcessToContainer(init *containerProcess, pid, cwd string, env, args []string, uid, gid uint32) (c *containerProcess, err error) {
-	c, err = NewContainerProcess(cs, init.bundle, init.containerId, pid)
+func (cs *ContainerdSuite) AddProcessToContainer(init *ContainerProcess, pid, cwd string, env, args []string, uid, gid uint32) (c *ContainerProcess, err error) {
+	c, err = NewContainerProcess(cs, init.bundle, init.containerID, pid)
 	if err != nil {
 		return nil, err
 	}
 
 	pr := &types.AddProcessRequest{
-		Id:   init.containerId,
+		Id:   init.containerID,
 		Pid:  pid,
 		Args: args,
 		Cwd:  cwd,

@@ -8,6 +8,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// Worker interface
 type Worker interface {
 	Start()
 }
@@ -22,6 +23,7 @@ type startTask struct {
 	StartResponse  chan StartResponse
 }
 
+// NewWorker return a new initialized worker
 func NewWorker(s *Supervisor, wg *sync.WaitGroup) Worker {
 	return &worker{
 		s:  s,
@@ -34,6 +36,7 @@ type worker struct {
 	s  *Supervisor
 }
 
+// Start runs a loop in charge of starting new containers
 func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.startTasks {

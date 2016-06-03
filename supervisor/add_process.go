@@ -7,6 +7,8 @@ import (
 	"github.com/docker/containerd/specs"
 )
 
+// AddProcessTask holds everything necessary to add a process to a
+// container
 type AddProcessTask struct {
 	baseTask
 	ID            string

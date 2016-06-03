@@ -9,6 +9,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// NewMonitor starts a new process monitor and returns it
 func NewMonitor() (*Monitor, error) {
 	m := &Monitor{
 		receivers: make(map[int]interface{}),
@@ -24,6 +25,7 @@ func NewMonitor() (*Monitor, error) {
 	return m, nil
 }
 
+// Monitor represents a runtime.Process monitor
 type Monitor struct {
 	m         sync.Mutex
 	receivers map[int]interface{}
@@ -32,14 +34,17 @@ type Monitor struct {
 	epollFd   int
 }
 
+// Exits returns the channel used to notify of a process exit
 func (m *Monitor) Exits() chan runtime.Process {
 	return m.exits
 }
 
+// OOMs returns the channel used to notify of a container exit due to OOM
 func (m *Monitor) OOMs() chan string {
 	return m.ooms
 }
 
+// Monitor adds a process to the list of the one being monitored
 func (m *Monitor) Monitor(p runtime.Process) error {
 	m.m.Lock()
 	defer m.m.Unlock()
@@ -56,6 +61,7 @@ func (m *Monitor) Monitor(p runtime.Process) error {
 	return nil
 }
 
+// MonitorOOM adds a container to the list of the ones monitored for OOM
 func (m *Monitor) MonitorOOM(c runtime.Container) error {
 	m.m.Lock()
 	defer m.m.Unlock()
@@ -76,6 +82,7 @@ func (m *Monitor) MonitorOOM(c runtime.Container) error {
 	return nil
 }
 
+// Close cleans up resources allocated by NewMonitor()
 func (m *Monitor) Close() error {
 	return syscall.Close(m.epollFd)
 }

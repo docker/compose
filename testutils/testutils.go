@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Output directory for testing and benchmark artifacts
+// GetTestOutDir returns the output directory for testing and benchmark artifacts
 func GetTestOutDir() string {
 	out, _ := exec.Command("git", "rev-parse", "--show-toplevel").CombinedOutput()
 	repoRoot := string(out)
@@ -17,11 +17,18 @@ func GetTestOutDir() string {
 }
 
 var (
-	ArchivesDir     = filepath.Join("test-artifacts", "archives")
-	BundlesRoot     = filepath.Join("test-artifacts", "oci-bundles")
+	// ArchivesDir holds the location of the available rootfs
+	ArchivesDir = filepath.Join("test-artifacts", "archives")
+	// BundlesRoot holds the location where OCI Bundles are stored
+	BundlesRoot = filepath.Join("test-artifacts", "oci-bundles")
+	// OutputDirFormat holds the standard format used when creating a
+	// new test output directory
 	OutputDirFormat = filepath.Join("test-artifacts", "runs", "%s")
+	// RefOciSpecsPath holds the path to the generic OCI config
 	RefOciSpecsPath = filepath.Join(BundlesRoot, "config.json")
-	StateDir        = "/run/containerd-bench-test"
+	// StateDir holds the path to the directory used by the containerd
+	// started by tests
+	StateDir = "/run/containerd-bench-test"
 )
 
 // untarRootfs untars the given `source` tarPath into `destination/rootfs`
@@ -36,6 +43,7 @@ func untarRootfs(source string, destination string) error {
 	return tar.Run()
 }
 
+// GenerateReferenceSpecs generates a default OCI specs via `runc spec`
 func GenerateReferenceSpecs(destination string) error {
 	if _, err := os.Stat(filepath.Join(destination, "config.json")); err == nil {
 		return nil
@@ -45,6 +53,7 @@ func GenerateReferenceSpecs(destination string) error {
 	return specs.Run()
 }
 
+// CreateBundle generates a valid OCI bundle from the given rootfs
 func CreateBundle(source, name string) error {
 	bundlePath := filepath.Join(BundlesRoot, name)
 
@@ -55,6 +64,7 @@ func CreateBundle(source, name string) error {
 	return nil
 }
 
+// CreateBusyboxBundle generates a bundle based on the busybox rootfs
 func CreateBusyboxBundle(name string) error {
 	return CreateBundle("busybox", name)
 }

@@ -24,8 +24,8 @@ type checkpoint struct {
 	Created time.Time `json:"created"`
 	// Name is the name of the checkpoint
 	Name string `json:"name"`
-	// Tcp checkpoints open tcp connections
-	Tcp bool `json:"tcp"`
+	// TCP checkpoints open tcp connections
+	TCP bool `json:"tcp"`
 	// UnixSockets persists unix sockets in the checkpoint
 	UnixSockets bool `json:"unixSockets"`
 	// Shell persists tty sessions in the checkpoint
@@ -140,7 +140,7 @@ func (p *process) start() error {
 		if p.checkpoint.Shell {
 			add("--shell-job")
 		}
-		if p.checkpoint.Tcp {
+		if p.checkpoint.TCP {
 			add("--tcp-established")
 		}
 		if p.checkpoint.UnixSockets {
@@ -292,6 +292,7 @@ func (p *process) openIO() error {
 	return nil
 }
 
+// IO holds all 3 standard io Reader/Writer (stdin,stdout,stderr)
 type IO struct {
 	Stdin  io.WriteCloser
 	Stdout io.ReadCloser

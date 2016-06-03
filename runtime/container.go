@@ -16,6 +16,7 @@ import (
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+// Container defines the operations allowed on a container
 type Container interface {
 	// ID returns the container ID
 	ID() string
@@ -60,6 +61,7 @@ type Container interface {
 	Status() (State, error)
 }
 
+// OOM wraps a container OOM.
 type OOM interface {
 	io.Closer
 	FD() int
@@ -68,12 +70,15 @@ type OOM interface {
 	Removed() bool
 }
 
+// Stdio holds the path to the 3 pipes used for the standard ios.
 type Stdio struct {
 	Stdin  string
 	Stdout string
 	Stderr string
 }
 
+// NewStdio wraps the given standard io path into an Stdio struct.
+// If a given parameter is the empty string, it is replaced by "/dev/null"
 func NewStdio(stdin, stdout, stderr string) Stdio {
 	for _, s := range []*string{
 		&stdin, &stdout, &stderr,
@@ -89,6 +94,7 @@ func NewStdio(stdin, stdout, stderr string) Stdio {
 	}
 }
 
+// ContainerOpts keeps the options passed at container creation
 type ContainerOpts struct {
 	Root        string
 	ID          string
@@ -136,6 +142,7 @@ func New(opts ContainerOpts) (Container, error) {
 	return c, nil
 }
 
+// Load return a new container from the matchin state file on disk.
 func Load(root, id string, timeout time.Duration) (Container, error) {
 	var s state
 	f, err := os.Open(filepath.Join(root, id, StateFile))
@@ -355,7 +362,7 @@ func (c *container) Checkpoint(cpt Checkpoint, checkpointDir string) error {
 	if cpt.Shell {
 		add("--shell-job")
 	}
-	if cpt.Tcp {
+	if cpt.TCP {
 		add("--tcp-established")
 	}
 	if cpt.UnixSockets {

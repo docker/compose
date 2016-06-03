@@ -17,12 +17,12 @@ func (cs *ContainerdSuite) TestBusyboxTopExecEcho(t *check.C) {
 
 	var (
 		err   error
-		initp *containerProcess
-		echop *containerProcess
+		initp *ContainerProcess
+		echop *ContainerProcess
 	)
 
-	containerId := "top"
-	initp, err = cs.StartContainer(containerId, bundleName)
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
 	t.Assert(err, checker.Equals, nil)
 
 	echop, err = cs.AddProcessToContainer(initp, "echo", "/", []string{"PATH=/bin"}, []string{"sh", "-c", "echo -n Ay Caramba! ; exit 1"}, 0, 0)
@@ -31,19 +31,19 @@ func (cs *ContainerdSuite) TestBusyboxTopExecEcho(t *check.C) {
 	for _, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "start-process",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "echo",
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 1,
 			Pid:    "echo",
 		},
@@ -66,35 +66,35 @@ func (cs *ContainerdSuite) TestBusyboxTopExecTop(t *check.C) {
 
 	var (
 		err   error
-		initp *containerProcess
+		initp *ContainerProcess
 	)
 
-	containerId := "top"
-	initp, err = cs.StartContainer(containerId, bundleName)
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
 	t.Assert(err, checker.Equals, nil)
 
-	execId := "top1"
-	_, err = cs.AddProcessToContainer(initp, execId, "/", []string{"PATH=/usr/bin"}, []string{"top"}, 0, 0)
+	execID := "top1"
+	_, err = cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/usr/bin"}, []string{"top"}, 0, 0)
 	t.Assert(err, checker.Equals, nil)
 
 	for idx, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "start-process",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
-			Pid:    execId,
+			Pid:    execID,
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 137,
-			Pid:    execId,
+			Pid:    execID,
 		},
 	} {
 		ch := initp.GetEventsChannel()
@@ -103,7 +103,7 @@ func (cs *ContainerdSuite) TestBusyboxTopExecTop(t *check.C) {
 		t.Assert(*e, checker.Equals, evt)
 		if idx == 1 {
 			// Process Started, kill it
-			cs.SignalContainerProcess(containerId, "top1", uint32(syscall.SIGKILL))
+			cs.SignalContainerProcess(containerID, "top1", uint32(syscall.SIGKILL))
 		}
 	}
 
@@ -126,39 +126,39 @@ func (cs *ContainerdSuite) TestBusyboxTopExecTopKillInit(t *check.C) {
 
 	var (
 		err   error
-		initp *containerProcess
+		initp *ContainerProcess
 	)
 
-	containerId := "top"
-	initp, err = cs.StartContainer(containerId, bundleName)
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
 	t.Assert(err, checker.Equals, nil)
 
-	execId := "top1"
-	_, err = cs.AddProcessToContainer(initp, execId, "/", []string{"PATH=/usr/bin"}, []string{"top"}, 0, 0)
+	execID := "top1"
+	_, err = cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/usr/bin"}, []string{"top"}, 0, 0)
 	t.Assert(err, checker.Equals, nil)
 
 	for idx, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "start-process",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
-			Pid:    execId,
+			Pid:    execID,
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 137,
-			Pid:    execId,
+			Pid:    execID,
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 143,
 			Pid:    "init",
 		},
@@ -169,7 +169,7 @@ func (cs *ContainerdSuite) TestBusyboxTopExecTopKillInit(t *check.C) {
 		t.Assert(*e, checker.Equals, evt)
 		if idx == 1 {
 			// Process Started, kill it
-			cs.SignalContainerProcess(containerId, "init", uint32(syscall.SIGTERM))
+			cs.SignalContainerProcess(containerID, "init", uint32(syscall.SIGTERM))
 		}
 	}
 }

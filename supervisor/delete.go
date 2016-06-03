@@ -7,6 +7,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// DeleteTask holds needed parameters to remove a container
 type DeleteTask struct {
 	baseTask
 	ID      string

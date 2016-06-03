@@ -1,6 +1,8 @@
 // +build linux
 
-// http://man7.org/linux/man-pages/man2/prctl.2.html
+// Package osutils provide access to the Get Child and Set Child prctl
+// flags.
+// See http://man7.org/linux/man-pages/man2/prctl.2.html
 package osutils
 
 import (
@@ -8,6 +10,7 @@ import (
 	"unsafe"
 )
 
+// PR_SET_CHILD_SUBREAPER allows setting the child subreaper.
 // If arg2 is nonzero, set the "child subreaper" attribute of the
 // calling process; if arg2 is zero, unset the attribute.  When a
 // process is marked as a child subreaper, all of the children
@@ -19,16 +22,18 @@ import (
 // nearest still living ancestor subreaper will receive a SIGCHLD
 // signal and be able to wait(2) on the process to discover its
 // termination status.
-const PR_SET_CHILD_SUBREAPER = 36
+const prSetChildSubreaper = 36
 
+// PR_GET_CHILD_SUBREAPER allows retrieving the current child
+// subreaper.
 // Return the "child subreaper" setting of the caller, in the
 // location pointed to by (int *) arg2.
-const PR_GET_CHILD_SUBREAPER = 37
+const prGetChildSubreaper = 37
 
 // GetSubreaper returns the subreaper setting for the calling process
 func GetSubreaper() (int, error) {
 	var i uintptr
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, PR_GET_CHILD_SUBREAPER, uintptr(unsafe.Pointer(&i)), 0); err != 0 {
+	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, prGetChildSubreaper, uintptr(unsafe.Pointer(&i)), 0); err != 0 {
 		return -1, err
 	}
 	return int(i), nil
@@ -36,7 +41,7 @@ func GetSubreaper() (int, error) {
 
 // SetSubreaper sets the value i as the subreaper setting for the calling process
 func SetSubreaper(i int) error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, PR_SET_CHILD_SUBREAPER, uintptr(i), 0); err != 0 {
+	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, prSetChildSubreaper, uintptr(i), 0); err != 0 {
 		return err
 	}
 	return nil

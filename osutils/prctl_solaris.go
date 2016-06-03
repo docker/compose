@@ -7,6 +7,7 @@ import (
 )
 
 //Solaris TODO
+
 // GetSubreaper returns the subreaper setting for the calling process
 func GetSubreaper() (int, error) {
 	return 0, errors.New("osutils GetSubreaper not implemented on Solaris")

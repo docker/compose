@@ -3,14 +3,18 @@ package supervisor
 import "errors"
 
 var (
-	// External errors
-	ErrTaskChanNil            = errors.New("containerd: task channel is nil")
-	ErrBundleNotFound         = errors.New("containerd: bundle not found")
-	ErrContainerNotFound      = errors.New("containerd: container not found")
-	ErrContainerExists        = errors.New("containerd: container already exists")
-	ErrProcessNotFound        = errors.New("containerd: process not found for container")
+	// ErrContainerNotFound is returned when the container ID passed
+	// for a given operation is invalid
+	ErrContainerNotFound = errors.New("containerd: container not found")
+	// ErrProcessNotFound is returned when the process ID passed for
+	// a given operation is invalid
+	ErrProcessNotFound = errors.New("containerd: process not found for container")
+	// ErrUnknownContainerStatus is returned when the container status
+	// cannot be determined
 	ErrUnknownContainerStatus = errors.New("containerd: unknown container status ")
-	ErrUnknownTask            = errors.New("containerd: unknown task type")
+	// ErrUnknownTask is returned when an unknown Task type is
+	// scheduled (should never happen).
+	ErrUnknownTask = errors.New("containerd: unknown task type")
 
 	// Internal errors
 	errShutdown          = errors.New("containerd: supervisor is shutdown")

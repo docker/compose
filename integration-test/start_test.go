@@ -79,8 +79,8 @@ func (cs *ContainerdSuite) TestStartBusyboxLsEvents(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerId := "ls-events"
-	c, err := cs.StartContainer(containerId, "busybox-ls")
+	containerID := "ls-events"
+	c, err := cs.StartContainer(containerID, "busybox-ls")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,13 +88,13 @@ func (cs *ContainerdSuite) TestStartBusyboxLsEvents(t *check.C) {
 	for _, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "init",
 		},
@@ -144,7 +144,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopKill(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerId := "top"
+	containerID := "top"
 	c, err := cs.StartContainer("top", bundleName)
 	if err != nil {
 		t.Fatal(err)
@@ -152,7 +152,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopKill(t *check.C) {
 
 	<-time.After(1 * time.Second)
 
-	err = cs.KillContainer(containerId)
+	err = cs.KillContainer(containerID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,13 +160,13 @@ func (cs *ContainerdSuite) TestStartBusyboxTopKill(t *check.C) {
 	for _, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 128 + uint32(syscall.SIGKILL),
 			Pid:    "init",
 		},
@@ -189,7 +189,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerId := "top"
+	containerID := "top"
 	c, err := cs.StartContainer("top", bundleName)
 	if err != nil {
 		t.Fatal(err)
@@ -197,7 +197,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
 
 	<-time.After(1 * time.Second)
 
-	err = cs.SignalContainer(containerId, uint32(syscall.SIGTERM))
+	err = cs.SignalContainer(containerID, uint32(syscall.SIGTERM))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,13 +205,13 @@ func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
 	for _, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "exit",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 128 + uint32(syscall.SIGTERM),
 			Pid:    "init",
 		},
@@ -233,13 +233,13 @@ func (cs *ContainerdSuite) TestStartBusyboxTrapUSR1(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerId := "trap-usr1"
-	c, err := cs.StartContainer(containerId, "busybox-trap-usr1")
+	containerID := "trap-usr1"
+	c, err := cs.StartContainer(containerID, "busybox-trap-usr1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := cs.SignalContainer(containerId, uint32(syscall.SIGUSR1)); err != nil {
+	if err := cs.SignalContainer(containerID, uint32(syscall.SIGUSR1)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -259,36 +259,36 @@ func (cs *ContainerdSuite) TestStartBusyboxTopPauseResume(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerId := "top"
-	c, err := cs.StartContainer(containerId, bundleName)
+	containerID := "top"
+	c, err := cs.StartContainer(containerID, bundleName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := cs.PauseContainer(containerId); err != nil {
+	if err := cs.PauseContainer(containerID); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := cs.ResumeContainer(containerId); err != nil {
+	if err := cs.ResumeContainer(containerID); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, evt := range []types.Event{
 		{
 			Type:   "start-container",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "pause",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
 		{
 			Type:   "resume",
-			Id:     containerId,
+			Id:     containerID,
 			Status: 0,
 			Pid:    "",
 		},
@@ -323,8 +323,8 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 	totalCtr := 10
 
 	for i := 0; i < totalCtr; i++ {
-		containerId := fmt.Sprintf("top%d", i)
-		c, err := cs.StartContainer(containerId, bundleName)
+		containerID := fmt.Sprintf("top%d", i)
+		c, err := cs.StartContainer(containerID, bundleName)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -333,7 +333,7 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 
 		t.Assert(*e, checker.Equals, types.Event{
 			Type:      "start-container",
-			Id:        containerId,
+			Id:        containerID,
 			Status:    0,
 			Pid:       "",
 			Timestamp: e.Timestamp,
@@ -369,18 +369,18 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 	deathChans := make([]chan error, len(killedCtr))
 	deathChansIdx := 0
 
-	for i, _ := range killedCtr {
+	for i := range killedCtr {
 		ch := make(chan error, 1)
 		deathChans[deathChansIdx] = ch
 		deathChansIdx++
 		syscall.Kill(int(containers[i].Pids[0]), syscall.SIGKILL)
 
 		// Filter to be notified of their death
-		containerId := fmt.Sprintf("top%d", i)
+		containerID := fmt.Sprintf("top%d", i)
 		f = func(event *types.Event) {
 			expectedEvent := types.Event{
 				Type:   "exit",
-				Id:     containerId,
+				Id:     containerID,
 				Status: 137,
 				Pid:    "init",
 			}
@@ -391,13 +391,13 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 				ch <- nil
 			}
 		}
-		cs.SetContainerEventFilter(containerId, f)
+		cs.SetContainerEventFilter(containerID, f)
 	}
 
 	cs.RestartDaemon(true)
 
 	// Ensure we got our events
-	for i, _ := range deathChans {
+	for i := range deathChans {
 		done := false
 		for done == false {
 			select {

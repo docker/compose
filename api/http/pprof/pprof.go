@@ -1,6 +1,7 @@
 package pprof
 
 import (
+	// expvar init routine adds the "/debug/vars" handler
 	_ "expvar"
 	"net/http"
 	"net/http/pprof"
@@ -8,6 +9,7 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// Enable registers the "/debug/pprof" handler
 func Enable(address string) {
 	http.Handle("/", http.RedirectHandler("/debug/pprof", http.StatusMovedPermanently))
 

@@ -2,22 +2,25 @@ package runtime
 
 import "time"
 
+// Stat holds a container statistics
 type Stat struct {
 	// Timestamp is the time that the statistics where collected
 	Timestamp time.Time
-	Cpu       Cpu                `json:"cpu"`
+	CPU       CPU                `json:"cpu"`
 	Memory    Memory             `json:"memory"`
 	Pids      Pids               `json:"pids"`
 	Blkio     Blkio              `json:"blkio"`
 	Hugetlb   map[string]Hugetlb `json:"hugetlb"`
 }
 
+// Hugetlb holds information regarding a container huge tlb usage
 type Hugetlb struct {
 	Usage   uint64 `json:"usage,omitempty"`
 	Max     uint64 `json:"max,omitempty"`
 	Failcnt uint64 `json:"failcnt"`
 }
 
+// BlkioEntry represents a single record for a Blkio stat
 type BlkioEntry struct {
 	Major uint64 `json:"major,omitempty"`
 	Minor uint64 `json:"minor,omitempty"`
@@ -25,6 +28,7 @@ type BlkioEntry struct {
 	Value uint64 `json:"value,omitempty"`
 }
 
+// Blkio regroups all the Blkio related stats
 type Blkio struct {
 	IoServiceBytesRecursive []BlkioEntry `json:"ioServiceBytesRecursive,omitempty"`
 	IoServicedRecursive     []BlkioEntry `json:"ioServicedRecursive,omitempty"`
@@ -36,18 +40,21 @@ type Blkio struct {
 	SectorsRecursive        []BlkioEntry `json:"sectorsRecursive,omitempty"`
 }
 
+// Pids holds the stat of the pid usage of the machine
 type Pids struct {
 	Current uint64 `json:"current,omitempty"`
 	Limit   uint64 `json:"limit,omitempty"`
 }
 
+// Throttling holds a cpu throttling information
 type Throttling struct {
 	Periods          uint64 `json:"periods,omitempty"`
 	ThrottledPeriods uint64 `json:"throttledPeriods,omitempty"`
 	ThrottledTime    uint64 `json:"throttledTime,omitempty"`
 }
 
-type CpuUsage struct {
+// CPUUsage holds information regarding cpu usage
+type CPUUsage struct {
 	// Units: nanoseconds.
 	Total  uint64   `json:"total,omitempty"`
 	Percpu []uint64 `json:"percpu,omitempty"`
@@ -55,11 +62,13 @@ type CpuUsage struct {
 	User   uint64   `json:"user"`
 }
 
-type Cpu struct {
-	Usage      CpuUsage   `json:"usage,omitempty"`
+// CPU regroups both a CPU usage and throttling information
+type CPU struct {
+	Usage      CPUUsage   `json:"usage,omitempty"`
 	Throttling Throttling `json:"throttling,omitempty"`
 }
 
+// MemoryEntry regroups statistic about a given type of memory
 type MemoryEntry struct {
 	Limit   uint64 `json:"limit"`
 	Usage   uint64 `json:"usage,omitempty"`
@@ -67,6 +76,7 @@ type MemoryEntry struct {
 	Failcnt uint64 `json:"failcnt"`
 }
 
+// Memory holds information regarding the different type of memories available
 type Memory struct {
 	Cache     uint64            `json:"cache,omitempty"`
 	Usage     MemoryEntry       `json:"usage,omitempty"`

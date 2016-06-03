@@ -144,6 +144,7 @@ func readEventLog(s *Supervisor) error {
 	return nil
 }
 
+// Supervisor represents a container supervisor
 type Supervisor struct {
 	// stateDir is the directory on the system to store container runtime state information.
 	stateDir string
@@ -179,6 +180,7 @@ func (s *Supervisor) Close() error {
 	return nil
 }
 
+// Event represents a container event
 type Event struct {
 	ID        string    `json:"id"`
 	Type      string    `json:"type"`

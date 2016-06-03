@@ -7,6 +7,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// StartTask holds needed parameters to create a new container
 type StartTask struct {
 	baseTask
 	ID            string

@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Process holds the operation allowed on a container's process
 type Process interface {
 	io.Closer
 

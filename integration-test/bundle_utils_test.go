@@ -44,14 +44,14 @@ func untarRootfs(source string, destination string) error {
 func CreateBundleWithFilter(source, name string, args []string, filter func(spec *ocs.Spec)) error {
 	// Generate the spec
 	var spec ocs.Spec
-	if f, err := os.Open(utils.RefOciSpecsPath); err != nil {
+	f, err := os.Open(utils.RefOciSpecsPath)
+	if err != nil {
 		return fmt.Errorf("Failed to open default spec: %v", err)
-	} else {
-		if err := json.NewDecoder(f).Decode(&spec); err != nil {
-			return fmt.Errorf("Failed to load default spec: %v", err)
-		}
-		f.Close()
 	}
+	if err := json.NewDecoder(f).Decode(&spec); err != nil {
+		return fmt.Errorf("Failed to load default spec: %v", err)
+	}
+	f.Close()
 
 	spec.Process.Args = args
 	spec.Process.Terminal = false

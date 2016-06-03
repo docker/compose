@@ -6,6 +6,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// UpdateTask holds needed parameters to update a container resource constraints
 type UpdateTask struct {
 	baseTask
 	ID        string
@@ -50,6 +51,8 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 	return nil
 }
 
+// UpdateProcessTask holds needed parameters to update a container
+// process terminal size or close its stdin
 type UpdateProcessTask struct {
 	baseTask
 	ID         string

@@ -6,6 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// OOMTask holds needed parameters to report a container OOM
 type OOMTask struct {
 	baseTask
 	ID string

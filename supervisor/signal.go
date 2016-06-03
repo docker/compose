@@ -2,6 +2,7 @@ package supervisor
 
 import "os"
 
+// SignalTask holds needed parameters to signal a container
 type SignalTask struct {
 	baseTask
 	ID     string

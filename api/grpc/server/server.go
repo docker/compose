@@ -82,7 +82,7 @@ func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpo
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        r.Checkpoint.Name,
 		Exit:        r.Checkpoint.Exit,
-		Tcp:         r.Checkpoint.Tcp,
+		TCP:         r.Checkpoint.Tcp,
 		UnixSockets: r.Checkpoint.UnixSockets,
 		Shell:       r.Checkpoint.Shell,
 	}
@@ -135,7 +135,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 	for _, c := range checkpoints {
 		out = append(out, &types.Checkpoint{
 			Name:        c.Name,
-			Tcp:         c.Tcp,
+			Tcp:         c.TCP,
 			Shell:       c.Shell,
 			UnixSockets: c.UnixSockets,
 			// TODO: figure out timestamp
@@ -333,15 +333,15 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 	systemUsage, _ := getSystemCPUUsage()
 	pbSt.CgroupStats.CpuStats = &types.CpuStats{
 		CpuUsage: &types.CpuUsage{
-			TotalUsage:        st.Cpu.Usage.Total,
-			PercpuUsage:       st.Cpu.Usage.Percpu,
-			UsageInKernelmode: st.Cpu.Usage.Kernel,
-			UsageInUsermode:   st.Cpu.Usage.User,
+			TotalUsage:        st.CPU.Usage.Total,
+			PercpuUsage:       st.CPU.Usage.Percpu,
+			UsageInKernelmode: st.CPU.Usage.Kernel,
+			UsageInUsermode:   st.CPU.Usage.User,
 		},
 		ThrottlingData: &types.ThrottlingData{
-			Periods:          st.Cpu.Throttling.Periods,
-			ThrottledPeriods: st.Cpu.Throttling.ThrottledPeriods,
-			ThrottledTime:    st.Cpu.Throttling.ThrottledTime,
+			Periods:          st.CPU.Throttling.Periods,
+			ThrottledPeriods: st.CPU.Throttling.ThrottledPeriods,
+			ThrottledTime:    st.CPU.Throttling.ThrottledTime,
 		},
 		SystemUsage: systemUsage,
 	}

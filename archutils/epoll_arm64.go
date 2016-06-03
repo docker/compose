@@ -40,6 +40,7 @@ import (
 	"unsafe"
 )
 
+// EpollCreate1 calls a C implementation
 func EpollCreate1(flag int) (int, error) {
 	fd := int(C.EpollCreate1(C.int(flag)))
 	if fd < 0 {
@@ -48,6 +49,7 @@ func EpollCreate1(flag int) (int, error) {
 	return fd, nil
 }
 
+// EpollCtl calls a C implementation
 func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
 	errno := C.EpollCtl(C.int(epfd), C.int(syscall.EPOLL_CTL_ADD), C.int(fd), C.int(event.Events), C.int(event.Fd))
 	if errno < 0 {
@@ -56,6 +58,7 @@ func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
 	return nil
 }
 
+// EpollWait calls a C implementation
 func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (int, error) {
 	var c_events [128]C.struct_event_t
 	n := int(C.run_epoll_wait(C.int(epfd), (*C.struct_event_t)(unsafe.Pointer(&c_events))))

@@ -80,7 +80,7 @@ fmt:
 	@gofmt -s -l . | grep -v vendor | grep -v .pb. | tee /dev/stderr
 
 lint:
-	@golint ./... | grep -v vendor | grep -v .pb. | tee /dev/stderr
+	@hack/validate-lint
 
 shell: dbuild
 	$(DOCKER_RUN) bash
@@ -95,7 +95,7 @@ endif
 bench: shim validate install bundles-rootfs
 	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
 
-validate: fmt
+validate: fmt lint
 
 uninstall:
 	$(foreach file,containerd containerd-shim ctr,rm /usr/local/bin/$(file);)

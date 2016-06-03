@@ -6,6 +6,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// StatsTask holds needed parameters to retrieve a container statistics
 type StatsTask struct {
 	baseTask
 	ID   string

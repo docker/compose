@@ -7,6 +7,7 @@ import (
 	"github.com/docker/containerd/runtime"
 )
 
+// ExitTask holds needed parameters to execute the exit task
 type ExitTask struct {
 	baseTask
 	Process runtime.Process
@@ -56,6 +57,7 @@ func (s *Supervisor) exit(t *ExitTask) error {
 	return nil
 }
 
+// ExecExitTask holds needed parameters to execute the exec exit task
 type ExecExitTask struct {
 	baseTask
 	ID      string
