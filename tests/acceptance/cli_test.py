@@ -1473,6 +1473,17 @@ class CLITestCase(DockerClientTestCase):
         assert Counter(e['action'] for e in lines) == {'create': 2, 'start': 2}
 
     def test_events_human_readable(self):
+
+        def has_timestamp(string):
+            str_iso_date, str_iso_time, container_info = string.split(' ', 2)
+            try:
+                return isinstance(datetime.datetime.strptime(
+                    '%s %s' % (str_iso_date, str_iso_time),
+                    '%Y-%m-%d %H:%M:%S.%f'),
+                    datetime.datetime)
+            except ValueError:
+                return False
+
         events_proc = start_process(self.base_dir, ['events'])
         self.dispatch(['up', '-d', 'simple'])
         wait_on_condition(ContainerCountCondition(self.project, 1))
@@ -1489,7 +1500,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
-        assert lines[0].startswith(datetime.date.today().isoformat())
+
+        assert has_timestamp(lines[0])
 
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
