@@ -78,6 +78,7 @@ type Resource struct {
 	CpusetCpus        string
 	CpusetMems        string
 	KernelMemory      int64
+	KernelTCPMemory   int64
 	Memory            int64
 	MemoryReservation int64
 	MemorySwap        int64

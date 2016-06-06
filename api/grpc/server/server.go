@@ -273,6 +273,9 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 		if rs.KernelMemoryLimit != 0 {
 			e.Resources.KernelMemory = int64(rs.KernelMemoryLimit)
 		}
+		if rs.KernelTCPMemoryLimit != 0 {
+			e.Resources.KernelTCPMemory = int64(rs.KernelTCPMemoryLimit)
+		}
 		if rs.MemoryLimit != 0 {
 			e.Resources.Memory = int64(rs.MemoryLimit)
 		}

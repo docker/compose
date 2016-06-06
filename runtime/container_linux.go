@@ -62,6 +62,7 @@ func (c *container) UpdateResources(r *Resource) error {
 			Reservation: u64Ptr(uint64(r.MemoryReservation)),
 			Swap:        u64Ptr(uint64(r.MemorySwap)),
 			Kernel:      u64Ptr(uint64(r.KernelMemory)),
+			KernelTCP:   u64Ptr(uint64(r.KernelTCPMemory)),
 		},
 		CPU: &ocs.CPU{
 			Shares: u64Ptr(uint64(r.CPUShares)),

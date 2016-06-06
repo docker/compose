@@ -598,6 +598,9 @@ var updateCommand = cli.Command{
 			Name: "kernel-limit",
 		},
 		cli.IntFlag{
+			Name: "kernel-tcp-limit",
+		},
+		cli.IntFlag{
 			Name: "blkio-weight",
 		},
 		cli.StringFlag{
@@ -621,6 +624,8 @@ var updateCommand = cli.Command{
 		req.Resources.CpuShares = uint32(context.Int("cpu-shares"))
 		req.Resources.CpusetCpus = context.String("cpuset-cpus")
 		req.Resources.CpusetMems = context.String("cpuset-mems")
+		req.Resources.KernelMemoryLimit = uint32(context.Int("kernel-limit"))
+		req.Resources.KernelTCPMemoryLimit = uint32(context.Int("kernel-tcp-limit"))
 		c := getClient(context)
 		if _, err := c.UpdateContainer(netcontext.Background(), req); err != nil {
 			fatal(err.Error(), 1)
