@@ -351,6 +351,7 @@ func (c *container) Checkpoint(cpt Checkpoint, checkpointDir string) error {
 	args := []string{
 		"checkpoint",
 		"--image-path", path,
+		"--work-path", filepath.Join(path, "criu.work"),
 	}
 	add := func(flags ...string) {
 		args = append(args, flags...)
