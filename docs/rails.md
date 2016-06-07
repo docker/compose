@@ -22,6 +22,7 @@ container. This is done using a file called `Dockerfile`. To begin with, the
 Dockerfile consists of:
 
     FROM ruby:2.3
+    ENV BUNDLE_PATH /bundler
     RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs
     RUN mkdir /myapp
     WORKDIR /myapp
@@ -58,10 +59,13 @@ to link them together and expose the web app's port.
         command: bundle exec rails s -p 3000 -b '0.0.0.0'
         volumes:
           - .:/myapp
+          - bundler:/bundler
         ports:
           - "3000:3000"
         depends_on:
           - db
+    volumes:
+      bundler: {}
 
 ### Build the project
 
