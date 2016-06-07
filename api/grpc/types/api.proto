@@ -127,6 +127,7 @@ message Checkpoint {
 	bool tcp = 3; // allow open tcp connections
 	bool unixSockets = 4; // allow external unix sockets
 	bool shell = 5; // allow shell-jobs
+	repeated string emptyNS = 6;
 }
 
 message ListCheckpointResponse {

@@ -369,6 +369,9 @@ func (c *container) Checkpoint(cpt Checkpoint, checkpointDir string) error {
 	if cpt.UnixSockets {
 		add("--ext-unix-sk")
 	}
+	for _, ns := range cpt.EmptyNS {
+		add("--empty-ns", ns)
+	}
 	add(c.id)
 	out, err := exec.Command(c.runtime, args...).CombinedOutput()
 	if err != nil {

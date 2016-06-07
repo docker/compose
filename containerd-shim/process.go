@@ -32,6 +32,8 @@ type checkpoint struct {
 	Shell bool `json:"shell"`
 	// Exit exits the container after the checkpoint is finished
 	Exit bool `json:"exit"`
+	// EmptyNS tells CRIU not to restore a particular namespace
+	EmptyNS []string `json:"emptyNS,omitempty"`
 }
 
 type processState struct {
@@ -151,6 +153,10 @@ func (p *process) create() error {
 		if p.state.NoPivotRoot {
 			add("--no-pivot")
 		}
+		for _, ns := range p.checkpoint.EmptyNS {
+			add("--empty-ns", ns)
+		}
+
 	} else {
 		args = append(args, "create",
 			"--bundle", p.bundle,
