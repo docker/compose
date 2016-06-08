@@ -35,7 +35,7 @@ that should get you started.
 This step is optional, but recommended. Pre-commit hooks will run style checks
 and in some cases fix style issues for you, when you commit code.
 
-Install the git pre-commit hooks using [tox](https://tox.readthedocs.org) by
+Install the git pre-commit hooks using [tox](https://tox.readthedocs.io) by
 running `tox -e pre-commit` or by following the
 [pre-commit install guide](http://pre-commit.com/#install).
 
