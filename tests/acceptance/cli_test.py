@@ -1196,6 +1196,11 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
+        service = self.project.get_service('simple')
+        service.create_container()
+        self.dispatch(['rm', '-fs'], None)
+        simple = self.project.get_service('simple')
+        self.assertEqual(len(simple.containers()), 0)
 
     def test_rm_all(self):
         service = self.project.get_service('simple')
