@@ -85,6 +85,7 @@ func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpo
 		TCP:         r.Checkpoint.Tcp,
 		UnixSockets: r.Checkpoint.UnixSockets,
 		Shell:       r.Checkpoint.Shell,
+		EmptyNS:     r.Checkpoint.EmptyNS,
 	}
 
 	s.sv.SendTask(e)

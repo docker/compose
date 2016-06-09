@@ -57,6 +57,8 @@ type Checkpoint struct {
 	Shell bool `json:"shell"`
 	// Exit exits the container after the checkpoint is finished
 	Exit bool `json:"exit"`
+	// EmptyNS tells CRIU to omit a specified namespace
+	EmptyNS []string `json:"emptyNS,omitempty"`
 }
 
 // PlatformProcessState container platform-specific fields in the ProcessState structure

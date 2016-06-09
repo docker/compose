@@ -53,7 +53,7 @@ func listCheckpoints(context *cli.Context) {
 		fatal("container id cannot be empty", ExitStatusMissingArg)
 	}
 	resp, err := c.ListCheckpoint(netcontext.Background(), &types.ListCheckpointRequest{
-		Id: id,
+		Id:            id,
 		CheckpointDir: context.String("checkpoint-dir"),
 	})
 	if err != nil {
@@ -94,6 +94,10 @@ var createCheckpointCommand = cli.Command{
 			Value: "",
 			Usage: "directory to store checkpoints",
 		},
+		cli.StringSliceFlag{
+			Name:  "empty-ns",
+			Usage: "create a namespace, but don't restore its properties",
+		},
 	},
 	Action: func(context *cli.Context) {
 		var (
@@ -107,16 +111,21 @@ var createCheckpointCommand = cli.Command{
 			fatal("checkpoint name cannot be empty", ExitStatusMissingArg)
 		}
 		c := getClient(context)
+		checkpoint := types.Checkpoint{
+			Name:        name,
+			Exit:        context.Bool("exit"),
+			Tcp:         context.Bool("tcp"),
+			Shell:       context.Bool("shell"),
+			UnixSockets: context.Bool("unix-sockets"),
+		}
+
+		emptyNSes := context.StringSlice("empty-ns")
+		checkpoint.EmptyNS = append(checkpoint.EmptyNS, emptyNSes...)
+
 		if _, err := c.CreateCheckpoint(netcontext.Background(), &types.CreateCheckpointRequest{
-			Id: containerID,
+			Id:            containerID,
 			CheckpointDir: context.String("checkpoint-dir"),
-			Checkpoint: &types.Checkpoint{
-				Name:        name,
-				Exit:        context.Bool("exit"),
-				Tcp:         context.Bool("tcp"),
-				Shell:       context.Bool("shell"),
-				UnixSockets: context.Bool("unix-sockets"),
-			},
+			Checkpoint:    &checkpoint,
 		}); err != nil {
 			fatal(err.Error(), 1)
 		}
