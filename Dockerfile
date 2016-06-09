@@ -55,7 +55,7 @@ RUN set -x \
 	&& rm -rf "$SECCOMP_PATH"
 
 # Install runc
-ENV RUNC_COMMIT afaa21f79ade3b2e99a68f3f15e7219155aa4662
+ENV RUNC_COMMIT eb217f273125d3e4d6731389fe804e46e0b14ac6
 RUN set -x \
 	&& export GOPATH="$(mktemp -d)" \
     && git clone git://github.com/opencontainers/runc.git "$GOPATH/src/github.com/opencontainers/runc" \
