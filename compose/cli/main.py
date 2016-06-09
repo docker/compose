@@ -531,6 +531,7 @@ class TopLevelCommand(object):
 
         Options:
             -f, --force   Don't ask to confirm removal
+            -s, --stop    Stop the containers, if required, before removing
             -v            Remove any anonymous volumes attached to containers
             -a, --all     Obsolete. Also remove one-off containers created by
                           docker-compose run
@@ -542,9 +543,19 @@ class TopLevelCommand(object):
             )
         one_off = OneOffFilter.include
 
+        if options.get('--stop'):
+            running_containers = self.project.containers(
+                service_names=options['SERVICE'], stopped=False, one_off=one_off
+            )
+            self.project.stop(
+                service_names=running_containers,
+                one_off=one_off
+            )
+
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off
         )
+
         stopped_containers = [c for c in all_containers if not c.is_running]
 
         if len(stopped_containers) > 0:

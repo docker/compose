@@ -16,6 +16,7 @@ Usage: rm [options] [SERVICE...]
 
 Options:
     -f, --force   Don't ask to confirm removal
+    -s, --stop    Stop the containers, if required, before removing
     -v            Remove any anonymous volumes attached to containers
     -a, --all     Also remove one-off containers created by
                   docker-compose run
