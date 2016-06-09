@@ -11,13 +11,14 @@ RUN apt-get update && apt-get install -y \
 	git \
 	make \
 	jq \
+	pkg-config \
 	apparmor \
 	libapparmor-dev \
 	--no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Install Go
-ENV GO_VERSION 1.5.3
+ENV GO_VERSION 1.6.2
 RUN curl -sSL  "https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz" | tar -v -C /usr/local -xz
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 ENV GOPATH /go:/go/src/github.com/docker/containerd/vendor
@@ -54,7 +55,7 @@ RUN set -x \
 	&& rm -rf "$SECCOMP_PATH"
 
 # Install runc
-ENV RUNC_COMMIT d49ece5a83da3dcb820121d6850e2b61bd0a5fbe
+ENV RUNC_COMMIT afaa21f79ade3b2e99a68f3f15e7219155aa4662
 RUN set -x \
 	&& export GOPATH="$(mktemp -d)" \
     && git clone git://github.com/opencontainers/runc.git "$GOPATH/src/github.com/opencontainers/runc" \

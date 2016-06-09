@@ -9,6 +9,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/integration/checker"
 	"github.com/go-check/check"
+	ocs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc"
 )
 
@@ -61,7 +62,8 @@ func (cs *ContainerdSuite) TestStartBusyboxTop(t *check.C) {
 		t.Fatal(err)
 	}
 
-	_, err := cs.StartContainer("top", bundleName)
+	containerID := "start-busybox-top"
+	_, err := cs.StartContainer(containerID, bundleName)
 	t.Assert(err, checker.Equals, nil)
 
 	containers, err := cs.ListRunningContainers()
@@ -69,7 +71,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTop(t *check.C) {
 		t.Fatal(err)
 	}
 	t.Assert(len(containers), checker.Equals, 1)
-	t.Assert(containers[0].Id, checker.Equals, "top")
+	t.Assert(containers[0].Id, checker.Equals, containerID)
 	t.Assert(containers[0].Status, checker.Equals, "running")
 	t.Assert(containers[0].BundlePath, check.Equals, filepath.Join(cs.cwd, GetBundle(bundleName).Path))
 }
@@ -144,8 +146,8 @@ func (cs *ContainerdSuite) TestStartBusyboxTopKill(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerID := "top"
-	c, err := cs.StartContainer("top", bundleName)
+	containerID := "top-kill"
+	c, err := cs.StartContainer(containerID, bundleName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,8 +191,8 @@ func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerID := "top"
-	c, err := cs.StartContainer("top", bundleName)
+	containerID := "top-sigterm"
+	c, err := cs.StartContainer(containerID, bundleName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +231,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxTrapUSR1(t *check.C) {
-	if err := CreateBusyboxBundle("busybox-trap-usr1", []string{"sh", "-c", "trap 'echo -n booh!' SIGUSR1 ; sleep 100  &  wait"}); err != nil {
+	if err := CreateBusyboxBundle("busybox-trap-usr1", []string{"sh", "-c", "trap 'echo -n booh!' SIGUSR1 ; sleep 60  &  wait"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -238,6 +240,8 @@ func (cs *ContainerdSuite) TestStartBusyboxTrapUSR1(t *check.C) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	<-time.After(1 * time.Second)
 
 	if err := cs.SignalContainer(containerID, uint32(syscall.SIGUSR1)); err != nil {
 		t.Fatal(err)
@@ -259,7 +263,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopPauseResume(t *check.C) {
 		t.Fatal(err)
 	}
 
-	containerID := "top"
+	containerID := "top-pause-resume"
 	c, err := cs.StartContainer(containerID, bundleName)
 	if err != nil {
 		t.Fatal(err)
@@ -310,8 +314,57 @@ func (cs *ContainerdSuite) TestStartBusyboxTopPauseResume(t *check.C) {
 		t.Fatal(err)
 	}
 	t.Assert(len(containers), checker.Equals, 1)
-	t.Assert(containers[0].Id, checker.Equals, "top")
+	t.Assert(containers[0].Id, checker.Equals, containerID)
 	t.Assert(containers[0].Status, checker.Equals, "running")
+}
+
+func (cs *ContainerdSuite) TestOOM(t *check.C) {
+	bundleName := "busybox-sh-512k-memlimit"
+	if err := CreateBundleWithFilter("busybox", bundleName, []string{"sh", "-c", "x=oom-party-time; while true; do x=$x$x$x$x$x$x$x$x$x$x; done"}, func(spec *ocs.Spec) {
+		// Limit to 512k for quick oom
+		var limit uint64 = 8 * 1024 * 1024
+		spec.Linux.Resources.Memory = &ocs.Memory{
+			Limit: &limit,
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	containerID := "sh-oom"
+	c, err := cs.StartContainer(containerID, bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "oom",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "exit",
+			Id:     containerID,
+			Status: 137,
+			Pid:    "init",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(60 * time.Second):
+			t.Fatal("Container took more than 10 seconds to terminate")
+		}
+	}
 }
 
 func (cs *ContainerdSuite) TestRestart(t *check.C) {

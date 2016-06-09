@@ -17,6 +17,10 @@ func (p *testProcess) ID() string {
 	return p.id
 }
 
+func (p *testProcess) Start() error {
+	return nil
+}
+
 func (p *testProcess) CloseStdin() error {
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,11 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"golang.org/x/net/context"
 )
+
+func (cs *ContainerdSuite) GetLogs() string {
+	b, _ := ioutil.ReadFile(cs.logFile.Name())
+	return string(b)
+}
 
 func (cs *ContainerdSuite) ListRunningContainers() ([]*types.Container, error) {
 	resp, err := cs.grpcClient.State(context.Background(), &types.StateRequest{})
@@ -36,6 +42,16 @@ func (cs *ContainerdSuite) SignalContainer(id string, sig uint32) error {
 
 func (cs *ContainerdSuite) KillContainer(id string) error {
 	return cs.SignalContainerProcess(id, "init", uint32(syscall.SIGKILL))
+}
+
+func (cs *ContainerdSuite) UpdateContainerResource(id string, rs *types.UpdateResource) error {
+	_, err := cs.grpcClient.UpdateContainer(context.Background(), &types.UpdateContainerRequest{
+		Id:        id,
+		Pid:       "init",
+		Status:    "",
+		Resources: rs,
+	})
+	return err
 }
 
 func (cs *ContainerdSuite) PauseContainer(id string) error {

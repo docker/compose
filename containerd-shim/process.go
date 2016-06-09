@@ -115,7 +115,7 @@ func loadCheckpoint(checkpointPath string) (*checkpoint, error) {
 	return &cpt, nil
 }
 
-func (p *process) start() error {
+func (p *process) create() error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -127,6 +127,7 @@ func (p *process) start() error {
 	}, p.state.RuntimeArgs...)
 	if p.state.Exec {
 		args = append(args, "exec",
+			"-d",
 			"--process", filepath.Join(cwd, "process.json"),
 			"--console", p.consolePath,
 		)
@@ -151,7 +152,7 @@ func (p *process) start() error {
 			add("--no-pivot")
 		}
 	} else {
-		args = append(args, "start",
+		args = append(args, "create",
 			"--bundle", p.bundle,
 			"--console", p.consolePath,
 		)
@@ -160,7 +161,6 @@ func (p *process) start() error {
 		}
 	}
 	args = append(args,
-		"-d",
 		"--pid-file", filepath.Join(cwd, "pid"),
 		p.id,
 	)
@@ -198,6 +198,25 @@ func (p *process) start() error {
 	}
 	p.containerPid = pid
 	return nil
+}
+
+func (p *process) start() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	logPath := filepath.Join(cwd, "log.json")
+	args := append([]string{
+		"--log", logPath,
+		"--log-format", "json",
+	}, p.state.RuntimeArgs...)
+	args = append(args, "start", p.id)
+	cmd := exec.Command(p.runtime, args...)
+	cmd.Dir = p.bundle
+	cmd.Stdin = p.stdio.stdin
+	cmd.Stdout = p.stdio.stdout
+	cmd.Stderr = p.stdio.stderr
+	return cmd.Run()
 }
 
 func (p *process) pid() int {

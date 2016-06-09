@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -11,46 +12,84 @@ import (
 	"syscall"
 
 	"github.com/docker/containerd/specs"
-	"github.com/opencontainers/runc/libcontainer"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func (c *container) getLibctContainer() (libcontainer.Container, error) {
-	runtimeRoot := "/run/runc"
+func findCgroupMountpointAndRoot(pid int, subsystem string) (string, string, error) {
+	f, err := os.Open(fmt.Sprintf("/proc/%d/mountinfo", pid))
+	if err != nil {
+		return "", "", err
+	}
+	defer f.Close()
 
-	// Check that the root wasn't changed
-	for _, opt := range c.runtimeArgs {
-		if strings.HasPrefix(opt, "--root=") {
-			runtimeRoot = strings.TrimPrefix(opt, "--root=")
-			break
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		fields := strings.Split(txt, " ")
+		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
+			if opt == subsystem {
+				return fields[4], fields[3], nil
+			}
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return "", "", err
+	}
 
-	f, err := libcontainer.New(runtimeRoot, libcontainer.Cgroupfs)
+	return "", "", fmt.Errorf("cgroup path for %s not found", subsystem)
+}
+
+func parseCgroupFile(path string) (map[string]string, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	return f.Load(c.id)
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	cgroups := make(map[string]string)
+
+	for s.Scan() {
+		if err := s.Err(); err != nil {
+			return nil, err
+		}
+
+		text := s.Text()
+		parts := strings.Split(text, ":")
+
+		for _, subs := range strings.Split(parts[1], ",") {
+			cgroups[subs] = parts[2]
+		}
+	}
+	return cgroups, nil
 }
 
 func (c *container) OOM() (OOM, error) {
-	container, err := c.getLibctContainer()
-	if err != nil {
-		if lerr, ok := err.(libcontainer.Error); ok {
-			// with oom registration sometimes the container can run, exit, and be destroyed
-			// faster than we can get the state back so we can just ignore this
-			if lerr.Code() == libcontainer.ContainerNotExists {
-				return nil, ErrContainerExited
-			}
-		}
-		return nil, err
+	p := c.processes[InitProcessID]
+	if p == nil {
+		return nil, fmt.Errorf("no init process found")
 	}
-	state, err := container.State()
+
+	mountpoint, hostRoot, err := findCgroupMountpointAndRoot(os.Getpid(), "memory")
 	if err != nil {
 		return nil, err
 	}
-	memoryPath := state.CgroupPaths["memory"]
-	return c.getMemeoryEventFD(memoryPath)
+
+	cgroups, err := parseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", p.pid))
+	if err != nil {
+		return nil, err
+	}
+
+	root, ok := cgroups["memory"]
+	if !ok {
+		return nil, fmt.Errorf("no memory cgroup for container %s", c.ID())
+	}
+
+	// Take care of the case were we're running inside a container
+	// ourself
+	root = strings.TrimPrefix(root, hostRoot)
+
+	return c.getMemeoryEventFD(filepath.Join(mountpoint, root))
 }
 
 func u64Ptr(i uint64) *uint64 { return &i }

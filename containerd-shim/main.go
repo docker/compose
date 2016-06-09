@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -77,7 +78,7 @@ func start(log *os.File) error {
 			writeMessage(log, "warn", err)
 		}
 	}()
-	if err := p.start(); err != nil {
+	if err := p.create(); err != nil {
 		p.delete()
 		return err
 	}
@@ -102,6 +103,11 @@ func start(log *os.File) error {
 					Height: uint16(h),
 				}
 				term.SetWinsize(p.console.Fd(), &ws)
+			case 2:
+				// tell runtime to execute the init process
+				if err := p.start(); err != nil {
+					syscall.Kill(p.pid(), syscall.SIGKILL)
+				}
 			}
 		}
 	}()
@@ -120,6 +126,7 @@ func start(log *os.File) error {
 		}
 		// runtime has exited so the shim can also exit
 		if exitShim {
+			ioutil.WriteFile(fmt.Sprintf("/tmp/shim-delete-%d", p.pid()), []byte("deleting"), 0600)
 			p.delete()
 			p.Wait()
 			return nil

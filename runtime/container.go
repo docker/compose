@@ -413,7 +413,7 @@ func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.startCmd(InitProcessID, cmd, p); err != nil {
+	if err := c.createCmd(InitProcessID, cmd, p); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -453,13 +453,13 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 	if err != nil {
 		return nil, err
 	}
-	if err := c.startCmd(pid, cmd, p); err != nil {
+	if err := c.createCmd(pid, cmd, p); err != nil {
 		return nil, err
 	}
 	return p, nil
 }
 
-func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
+func (c *container) createCmd(pid string, cmd *exec.Cmd, p *process) error {
 	p.cmd = cmd
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
@@ -469,7 +469,7 @@ func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
 		}
 		return err
 	}
-	if err := c.waitForStart(p, cmd); err != nil {
+	if err := c.waitForCreate(p, cmd); err != nil {
 		return err
 	}
 	c.processes[pid] = p
@@ -552,7 +552,7 @@ type waitArgs struct {
 	err error
 }
 
-func (c *container) waitForStart(p *process, cmd *exec.Cmd) error {
+func (c *container) waitForCreate(p *process, cmd *exec.Cmd) error {
 	wc := make(chan error, 1)
 	go func() {
 		for {

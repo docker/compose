@@ -23,6 +23,9 @@ type Process interface {
 	// This is either "init" when it is the container's init process or
 	// it is a user provided id for the process similar to the container id
 	ID() string
+	// Start unblocks the associated container init process.
+	// This should only be called on the process with ID "init"
+	Start() error
 	CloseStdin() error
 	Resize(int, int) error
 	// ExitFD returns the fd the provides an event when the process exits
@@ -251,4 +254,14 @@ func getControlPipe(path string) (*os.File, error) {
 // Signal sends the provided signal to the process
 func (p *process) Signal(s os.Signal) error {
 	return syscall.Kill(p.pid, s.(syscall.Signal))
+}
+
+// Start unblocks the associated container init process.
+// This should only be called on the process with ID "init"
+func (p *process) Start() error {
+	if p.ID() == InitProcessID {
+		_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 2, 0, 0)
+		return err
+	}
+	return nil
 }

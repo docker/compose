@@ -63,6 +63,9 @@ func (w *worker) Start() {
 		if err := w.s.monitorProcess(process); err != nil {
 			logrus.WithField("error", err).Error("containerd: add process to monitor")
 		}
+		if err := process.Start(); err != nil {
+			logrus.WithField("error", err).Error("containerd: start init process")
+		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
 		t.StartResponse <- StartResponse{
