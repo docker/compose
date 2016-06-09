@@ -22,6 +22,7 @@ import (
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/transport"
 )
 
 // TODO: parse flags and pass opts
@@ -638,6 +639,10 @@ func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid strin
 	for {
 		e, err := events.Recv()
 		if err != nil {
+			if grpc.ErrorDesc(err) == transport.ErrConnClosing.Desc {
+				closer()
+				os.Exit(128 + int(syscall.SIGHUP))
+			}
 			time.Sleep(1 * time.Second)
 			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{Timestamp: timestamp})
 			continue
