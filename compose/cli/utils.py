@@ -49,7 +49,7 @@ def input(prompt):
     """
     sys.stdout.write(prompt)
     sys.stdout.flush()
-    return sys.stdin.readline().rstrip(b'\n')
+    return sys.stdin.readline().rstrip('\n')
 
 
 def call_silently(*args, **kwargs):
