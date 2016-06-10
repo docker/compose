@@ -38,7 +38,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
 
     errors = {}
     results = []
-    error_to_reraise = None
+    exceptions_to_reraise = ()
 
     for obj, result, exception in events:
         if exception is None:
@@ -51,13 +51,13 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
             writer.write(get_name(obj), 'error')
         else:
             errors[get_name(obj)] = exception
-            error_to_reraise = exception
+            exceptions_to_reraise = (exception,)
 
     for obj_name, error in errors.items():
         stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
 
-    if error_to_reraise:
-        raise error_to_reraise
+    for exception in exceptions_to_reraise:
+        raise exception
 
     return results, errors
 
