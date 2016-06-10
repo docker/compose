@@ -47,6 +47,7 @@ Commands:
   down               Stop and remove containers, networks, images, and volumes
   events             Receive real time events from containers
   help               Get help on a command
+  images             List images
   kill               Kill containers
   logs               View output from containers
   pause              Pause services
