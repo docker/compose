@@ -1986,3 +1986,30 @@ class CLITestCase(DockerClientTestCase):
         result = wait_on_process(proc, returncode=1)
 
         assert 'exitcodefrom_another_1 exited with code 1' in result.stdout
+
+    def test_images(self):
+        self.project.get_service('simple').create_container()
+        result = self.dispatch(['images'])
+        assert 'simplecomposefile_simple' in result.stdout
+
+    def test_images_default_composefile(self):
+        self.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['images'])
+
+        self.assertIn('multiplecomposefiles_simple', result.stdout)
+        self.assertIn('multiplecomposefiles_another', result.stdout)
+        self.assertNotIn('multiplecomposefiles_yetanother', result.stdout)
+
+    def test_images_alternate_composefile(self):
+        config_path = os.path.abspath(
+            'tests/fixtures/multiple-composefiles/compose2.yml')
+        self._project = get_project(self.base_dir, [config_path])
+
+        self.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.dispatch(['-f', 'compose2.yml', 'up', '-d'])
+        result = self.dispatch(['-f', 'compose2.yml', 'images'])
+
+        self.assertNotIn('multiplecomposefiles_simple', result.stdout)
+        self.assertNotIn('multiplecomposefiles_another', result.stdout)
+        self.assertIn('multiplecomposefiles_yetanother', result.stdout)
