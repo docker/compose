@@ -23,3 +23,10 @@
         - from __future__ import absolute_import
         - --add-import
         - from __future__ import unicode_literals
+-   repo: git://github.com/pre-commit/mirrors-pylint
+    sha: 4de6c8dfadef1a271a814561ce05b8bc1c446d22
+    hooks:
+    -   id: pylint
+        args:
+        - --errors-only
+        - --reports=n
