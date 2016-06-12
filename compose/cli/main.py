@@ -496,14 +496,15 @@ class TopLevelCommand(object):
             ]
             rows = []
             for container in containers:
+                container.human_readable_duration
                 command = container.human_readable_command
                 if len(command) > 30:
                     command = '%s ...' % command[:26]
                 rows.append([
                     container.short_id,
-                    str.split(str(container.image_config['RepoTags'][0]), ':')[0],
+                    container.get('Config')['Image'],
                     command,
-                    'created',
+                    container.human_readable_duration,
                     container.human_readable_state,
                     container.human_readable_ports,
                     container.name
