@@ -486,10 +486,13 @@ class TopLevelCommand(object):
                 print(container.id)
         else:
             headers = [
-                'Name',
+                'Container ID',
+                'Image',
                 'Command',
-                'State',
+                'Created',
+                'Status',
                 'Ports',
+                'Name'
             ]
             rows = []
             for container in containers:
@@ -497,10 +500,13 @@ class TopLevelCommand(object):
                 if len(command) > 30:
                     command = '%s ...' % command[:26]
                 rows.append([
-                    container.name,
+                    container.short_id,
+                    str.split(str(container.image_config['RepoTags'][0]), ':')[0],
                     command,
+                    'created',
                     container.human_readable_state,
                     container.human_readable_ports,
+                    container.name
                 ])
             print(Formatter().table(headers, rows))
 
