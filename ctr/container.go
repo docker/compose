@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"text/tabwriter"
@@ -576,32 +577,46 @@ var statsCommand = cli.Command{
 	},
 }
 
+func getUpdateCommandInt64Flag(context *cli.Context, name string) uint64 {
+	str := context.String(name)
+	if str == "" {
+		return 0
+	}
+
+	val, err := strconv.ParseUint(str, 0, 64)
+	if err != nil {
+		fatal(err.Error(), 1)
+	}
+
+	return val
+}
+
 var updateCommand = cli.Command{
 	Name:  "update",
 	Usage: "update a containers resources",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "memory-limit",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "memory-reservation",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "memory-swap",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "cpu-quota",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "cpu-period",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "kernel-limit",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "kernel-tcp-limit",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name: "blkio-weight",
 		},
 		cli.StringFlag{
@@ -616,17 +631,17 @@ var updateCommand = cli.Command{
 			Id: context.Args().First(),
 		}
 		req.Resources = &types.UpdateResource{}
-		req.Resources.MemoryLimit = uint32(context.Int("memory-limit"))
-		req.Resources.MemoryReservation = uint32(context.Int("memory-reservation"))
-		req.Resources.MemorySwap = uint32(context.Int("memory-swap"))
-		req.Resources.BlkioWeight = uint32(context.Int("blkio-weight"))
-		req.Resources.CpuPeriod = uint32(context.Int("cpu-period"))
-		req.Resources.CpuQuota = uint32(context.Int("cpu-quota"))
-		req.Resources.CpuShares = uint32(context.Int("cpu-shares"))
+		req.Resources.MemoryLimit = getUpdateCommandInt64Flag(context, "memory-limit")
+		req.Resources.MemoryReservation = getUpdateCommandInt64Flag(context, "memory-reservation")
+		req.Resources.MemorySwap = getUpdateCommandInt64Flag(context, "memory-swap")
+		req.Resources.BlkioWeight = getUpdateCommandInt64Flag(context, "blkio-weight")
+		req.Resources.CpuPeriod = getUpdateCommandInt64Flag(context, "cpu-period")
+		req.Resources.CpuQuota = getUpdateCommandInt64Flag(context, "cpu-quota")
+		req.Resources.CpuShares = getUpdateCommandInt64Flag(context, "cpu-shares")
 		req.Resources.CpusetCpus = context.String("cpuset-cpus")
 		req.Resources.CpusetMems = context.String("cpuset-mems")
-		req.Resources.KernelMemoryLimit = uint32(context.Int("kernel-limit"))
-		req.Resources.KernelTCPMemoryLimit = uint32(context.Int("kernel-tcp-limit"))
+		req.Resources.KernelMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-limit")
+		req.Resources.KernelTCPMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-tcp-limit")
 		c := getClient(context)
 		if _, err := c.UpdateContainer(netcontext.Background(), req); err != nil {
 			fatal(err.Error(), 1)
