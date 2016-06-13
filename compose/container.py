@@ -136,7 +136,7 @@ class Container(object):
 
     @property
     def human_readable_duration(self):
-        parsedDate = map(int, re.findall(r"[\d]+", self.get('Created')))
+        parsedDate = list(map(int, re.findall(r"[\d]+", self.get('Created'))))
         date = datetime(parsedDate[0],
                         parsedDate[1],
                         parsedDate[2],
