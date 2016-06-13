@@ -940,9 +940,10 @@ def split_path_mapping(volume_path):
     path. Using splitdrive so windows absolute paths won't cause issues with
     splitting on ':'.
     """
-    # splitdrive has limitations when it comes to relative paths, so when it's
-    # relative, handle special case to set the drive to ''
-    if volume_path.startswith('.') or volume_path.startswith('~'):
+    # splitdrive is very naive, so handle special cases where we can be sure
+    # the first character is not a drive.
+    if (volume_path.startswith('.') or volume_path.startswith('~') or
+            volume_path.startswith('/')):
         drive, volume_config = '', volume_path
     else:
         drive, volume_config = ntpath.splitdrive(volume_path)
