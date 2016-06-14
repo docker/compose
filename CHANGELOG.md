@@ -1,6 +1,97 @@
 Change log
 ==========
 
+1.8.0 (2016-06-14)
+-----------------
+
+New Features
+
+- Added `docker-compose bundle`, a command that builds a bundle file
+  to be consumed by the new *Docker Stack* commands in Docker 1.12.
+  This command automatically pushes and pulls images as needed.
+
+- Added `docker-compose push`, a command that pushes service images
+  to a registry.
+
+- As announced in 1.7.0, `docker-compose rm` now removes containers
+  created by `docker-compose run` by default.
+
+- Compose now supports specifying a custom TLS version for
+  interaction with the Docker Engine using the `COMPOSE_TLS_VERSION`
+  environment variable.
+
+Bug Fixes
+
+- Fixed a bug where a Compose would erroneously try to read `.env`
+  at the project's root when it is a directory.
+
+- Improved config merging when multiple compose files are involved
+  for several service sub-keys.
+
+- Fixed a bug where volume mappings containing Windows drives would
+  sometimes be parsed incorrectly.
+
+- Fixed a bug in Windows environment where volume mappings of the
+  host's root directory would be parsed incorrectly.
+
+- Fixed a bug where `docker-compose config` would ouput an invalid
+  Compose file if external networks were specified.
+
+- Fixed an issue where unset buildargs would be assigned a string
+  containing `'None'` instead of the expected empty value.
+
+- Fixed a bug where yes/no prompts on Windows would not show before
+  receiving input.
+
+- Fixed a bug where trying to `docker-compose exec` on Windows
+  without the `-d` option would exit with a stacktrace. This will
+  still fail for the time being, but should do so gracefully.
+
+- Fixed a bug where errors during `docker-compose up` would show
+  an unrelated stacktrace at the end of the process.
+
+
+1.7.1 (2016-05-04)
+-----------------
+
+Bug Fixes
+
+- Fixed a bug where the output of `docker-compose config` for v1 files
+  would be an invalid configuration file.
+
+- Fixed a bug where `docker-compose config` would not check the validity
+  of links.
+
+- Fixed an issue where `docker-compose help` would not output a list of
+  available commands and generic options as expected.
+
+- Fixed an issue where filtering by service when using `docker-compose logs`
+  would not apply for newly created services.
+
+- Fixed a bug where unchanged services would sometimes be recreated in
+  in the up phase when using Compose with Python 3.
+
+- Fixed an issue where API errors encountered during the up phase would
+  not be recognized as a failure state by Compose.
+
+- Fixed a bug where Compose would raise a NameError because of an undefined
+  exception name on non-Windows platforms.
+
+- Fixed a bug where the wrong version of `docker-py` would sometimes be
+  installed alongside Compose.
+
+- Fixed a bug where the host value output by `docker-machine config default`
+  would not be recognized as valid options by the `docker-compose`
+  command line.
+
+- Fixed an issue where Compose would sometimes exit unexpectedly  while
+  reading events broadcasted by a Swarm cluster.
+
+- Corrected a statement in the docs about the location of the `.env` file,
+  which is indeed read from the current directory, instead of in the same
+  location as the Compose file.
+
+
 1.7.0 (2016-04-13)
 ------------------
 
