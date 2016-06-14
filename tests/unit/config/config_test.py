@@ -2682,6 +2682,13 @@ class VolumePathTest(unittest.TestCase):
         mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
         assert mapping == expected_mapping
 
+    def test_split_path_mapping_with_root_mount(self):
+        host_path = '/'
+        container_path = '/var/hostroot'
+        expected_mapping = (container_path, host_path)
+        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        assert mapping == expected_mapping
+
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class BuildPathTest(unittest.TestCase):
