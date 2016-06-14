@@ -593,12 +593,12 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
 
-    def test_start_container_stays_unpriviliged(self):
+    def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], False)
 
-    def test_start_container_becomes_priviliged(self):
+    def test_start_container_becomes_privileged(self):
         service = self.create_service('web', privileged=True)
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
