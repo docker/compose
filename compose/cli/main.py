@@ -664,7 +664,7 @@ class TopLevelCommand(object):
         if options['--publish'] and options['--service-ports']:
             raise UserError(
                 'Service port mapping and manual port mapping '
-                'can not be used togather'
+                'can not be used together'
             )
 
         if options['COMMAND']:
