@@ -40,6 +40,22 @@ SUPPORTED_KEYS = {
 VERSION = '0.1'
 
 
+class NeedsPush(Exception):
+    def __init__(self, image_name):
+        self.image_name = image_name
+
+
+class NeedsPull(Exception):
+    def __init__(self, image_name):
+        self.image_name = image_name
+
+
+class MissingDigests(Exception):
+    def __init__(self, needs_push, needs_pull):
+        self.needs_push = needs_push
+        self.needs_pull = needs_pull
+
+
 def serialize_bundle(config, image_digests):
     if config.networks:
         log.warn("Unsupported top level key 'networks' - ignoring")
@@ -54,21 +70,36 @@ def serialize_bundle(config, image_digests):
     )
 
 
-def get_image_digests(project):
-    return {
-        service.name: get_image_digest(service)
-        for service in project.services
-    }
+def get_image_digests(project, allow_fetch=False):
+    digests = {}
+    needs_push = set()
+    needs_pull = set()
+
+    for service in project.services:
+        try:
+            digests[service.name] = get_image_digest(
+                service,
+                allow_fetch=allow_fetch,
+            )
+        except NeedsPush as e:
+            needs_push.add(e.image_name)
+        except NeedsPull as e:
+            needs_pull.add(e.image_name)
+
+    if needs_push or needs_pull:
+        raise MissingDigests(needs_push, needs_pull)
+
+    return digests
 
 
-def get_image_digest(service):
+def get_image_digest(service, allow_fetch=False):
     if 'image' not in service.options:
         raise UserError(
             "Service '{s.name}' doesn't define an image tag. An image name is "
             "required to generate a proper image digest for the bundle. Specify "
             "an image repo and tag with the 'image' option.".format(s=service))
 
-    repo, tag, separator = parse_repository_tag(service.options['image'])
+    separator = parse_repository_tag(service.options['image'])[2]
     # Compose file already uses a digest, no lookup required
     if separator == '@':
         return service.options['image']
@@ -87,13 +118,17 @@ def get_image_digest(service):
         # digests
         return image['RepoDigests'][0]
 
+    if not allow_fetch:
+        if 'build' in service.options:
+            raise NeedsPush(service.image_name)
+        else:
+            raise NeedsPull(service.image_name)
+
+    return fetch_image_digest(service)
+
+
+def fetch_image_digest(service):
     if 'build' not in service.options:
-        log.warn(
-            "Compose needs to pull the image for '{s.name}' in order to create "
-            "a bundle. This may result in a more recent image being used. "
-            "It is recommended that you use an image tagged with a "
-            "specific version to minimize the potential "
-            "differences.".format(s=service))
         digest = service.pull()
     else:
         try:
@@ -108,11 +143,14 @@ def get_image_digest(service):
     if not digest:
         raise ValueError("Failed to get digest for %s" % service.name)
 
+    repo = parse_repository_tag(service.options['image'])[0]
     identifier = '{repo}@{digest}'.format(repo=repo, digest=digest)
 
     # Pull by digest so that image['RepoDigests'] is populated for next time
     # and we don't have to pull/push again
     service.client.pull(identifier)
+
+    log.info("Stored digest for {}".format(service.image_name))
 
     return identifier
 
