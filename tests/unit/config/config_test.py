@@ -715,7 +715,35 @@ class ConfigTest(unittest.TestCase):
         ).services[0]
         assert 'args' in service['build']
         assert 'foo' in service['build']['args']
-        assert service['build']['args']['foo'] == 'None'
+        assert service['build']['args']['foo'] == ''
+
+    # If build argument is None then it will be converted to the empty
+    # string. Make sure that int zero kept as it is, i.e. not converted to
+    # the empty string
+    def test_build_args_check_zero_preserved(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'foo': 0
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'foo' in service['build']['args']
+        assert service['build']['args']['foo'] == '0'
 
     def test_load_with_multiple_files_mismatched_networks_format(self):
         base_file = config.ConfigFile(
@@ -1912,6 +1940,14 @@ class MergePortsTest(unittest.TestCase, MergeListsTest):
     base_config = ['10:8000', '9000']
     override_config = ['20:8000']
 
+    def test_duplicate_port_mappings(self):
+        service_dict = config.merge_service_dicts(
+            {self.config_name: self.base_config},
+            {self.config_name: self.base_config},
+            DEFAULT_VERSION
+        )
+        assert set(service_dict[self.config_name]) == set(self.base_config)
+
 
 class MergeNetworksTest(unittest.TestCase, MergeListsTest):
     config_name = 'networks'
@@ -2658,15 +2694,28 @@ class ExpandPathTest(unittest.TestCase):
 
 
 class VolumePathTest(unittest.TestCase):
-
-    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_split_path_mapping_with_windows_path(self):
         host_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
         windows_volume_path = host_path + ":/opt/connect/config:ro"
         expected_mapping = ("/opt/connect/config:ro", host_path)
 
         mapping = config.split_path_mapping(windows_volume_path)
-        self.assertEqual(mapping, expected_mapping)
+        assert mapping == expected_mapping
+
+    def test_split_path_mapping_with_windows_path_in_container(self):
+        host_path = 'c:\\Users\\remilia\\data'
+        container_path = 'c:\\scarletdevil\\data'
+        expected_mapping = (container_path, host_path)
+
+        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        assert mapping == expected_mapping
+
+    def test_split_path_mapping_with_root_mount(self):
+        host_path = '/'
+        container_path = '/var/hostroot'
+        expected_mapping = (container_path, host_path)
+        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        assert mapping == expected_mapping
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')

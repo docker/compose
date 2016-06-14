@@ -15,7 +15,7 @@ weight=4
 This quick-start guide demonstrates how to use Docker Compose to set up and run a simple Django/PostgreSQL app. Before starting, you'll need to have
 [Compose installed](install.md).
 
-## Define the project components
+### Define the project components
 
 For this project, you need to create a Dockerfile, a Python dependencies file,
 and a `docker-compose.yml` file.
@@ -29,8 +29,8 @@ and a `docker-compose.yml` file.
     The Dockerfile defines an application's image content via one or more build
     commands that configure that image. Once built, you can run the image in a
     container.  For more information on `Dockerfiles`, see the [Docker user
-    guide](https://docs.docker.com/engine/userguide/dockerimages/#building-an-image-from-a-dockerfile)
-    and the [Dockerfile reference](https://docs.docker.com/engine/reference/builder/).
+    guide](/engine/userguide/containers/dockerimages.md#building-an-image-from-a-dockerfile)
+    and the [Dockerfile reference](/engine/reference/builder.md).
 
 3. Add the following content to the `Dockerfile`.
 
@@ -89,7 +89,7 @@ and a `docker-compose.yml` file.
 
 10. Save and close the `docker-compose.yml` file.
 
-## Create a Django project
+### Create a Django project
 
 In this step, you create a Django started project by building the image from the build context defined in the previous procedure.
 
@@ -137,7 +137,7 @@ In this step, you create a Django started project by building the image from the
         -rw-r--r--  1 user  staff   16 Feb 13 23:01 requirements.txt
 
 
-## Connect the database
+### Connect the database
 
 In this section, you set up the database connection for Django.
 

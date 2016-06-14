@@ -14,9 +14,9 @@ desired_python_version="2.7.9"
 desired_python_brew_version="2.7.9"
 python_formula="https://raw.githubusercontent.com/Homebrew/homebrew/1681e193e4d91c9620c4901efd4458d9b6fcda8e/Library/Formula/python.rb"
 
-desired_openssl_version="1.0.1j"
-desired_openssl_brew_version="1.0.1j_1"
-openssl_formula="https://raw.githubusercontent.com/Homebrew/homebrew/62fc2a1a65e83ba9dbb30b2e0a2b7355831c714b/Library/Formula/openssl.rb"
+desired_openssl_version="1.0.2h"
+desired_openssl_brew_version="1.0.2h"
+openssl_formula="https://raw.githubusercontent.com/Homebrew/homebrew-core/30d3766453347f6e22b3ed6c74bb926d6def2eb5/Formula/openssl.rb"
 
 PATH="/usr/local/bin:$PATH"
 

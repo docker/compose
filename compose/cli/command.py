@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
+import ssl
 
 import six
 
@@ -35,6 +36,16 @@ def project_from_options(project_dir, options):
     )
 
 
+def get_config_from_options(base_dir, options):
+    environment = Environment.from_env_file(base_dir)
+    config_path = get_config_path_from_options(
+        base_dir, options, environment
+    )
+    return config.load(
+        config.find(base_dir, config_path, environment)
+    )
+
+
 def get_config_path_from_options(base_dir, options, environment):
     file_option = options.get('--file')
     if file_option:
@@ -46,10 +57,28 @@ def get_config_path_from_options(base_dir, options, environment):
     return None
 
 
-def get_client(environment, verbose=False, version=None, tls_config=None, host=None):
+def get_tls_version(environment):
+    compose_tls_version = environment.get('COMPOSE_TLS_VERSION', None)
+    if not compose_tls_version:
+        return None
+
+    tls_attr_name = "PROTOCOL_{}".format(compose_tls_version)
+    if not hasattr(ssl, tls_attr_name):
+        log.warn(
+            'The {} protocol is unavailable. You may need to update your '
+            'version of Python or OpenSSL. Falling back to TLSv1 (default).'
+        )
+        return None
+
+    return getattr(ssl, tls_attr_name)
+
+
+def get_client(environment, verbose=False, version=None, tls_config=None, host=None,
+               tls_version=None):
+
     client = docker_client(
         version=version, tls_config=tls_config, host=host,
-        environment=environment
+        environment=environment, tls_version=get_tls_version(environment)
     )
     if verbose:
         version_info = six.iteritems(client.version())
@@ -74,6 +103,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     api_version = environment.get(
         'COMPOSE_API_VERSION',
         API_VERSIONS[config_data.version])
+
     client = get_client(
         verbose=verbose, version=api_version, tls_config=tls_config,
         host=host, environment=environment
