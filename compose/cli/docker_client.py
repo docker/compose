@@ -39,7 +39,8 @@ def tls_config_from_options(options):
     return None
 
 
-def docker_client(environment, version=None, tls_config=None, host=None):
+def docker_client(environment, version=None, tls_config=None, host=None,
+                  tls_version=None):
     """
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
@@ -49,7 +50,7 @@ def docker_client(environment, version=None, tls_config=None, host=None):
                  "Please use COMPOSE_HTTP_TIMEOUT instead.")
 
     try:
-        kwargs = kwargs_from_env(environment=environment)
+        kwargs = kwargs_from_env(environment=environment, ssl_version=tls_version)
     except TLSParameterError:
         raise UserError(
             "TLS configuration is invalid - make sure your DOCKER_TLS_VERIFY "
