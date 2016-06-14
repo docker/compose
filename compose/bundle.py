@@ -5,11 +5,13 @@ import json
 import logging
 
 import six
+from docker.utils import split_command
 from docker.utils.ports import split_port
 
 from .cli.errors import UserError
 from .config.serialize import denormalize_config
 from .network import get_network_defs_for_service
+from .service import format_environment
 from .service import NoSuchImageError
 from .service import parse_repository_tag
 
@@ -18,11 +20,22 @@ log = logging.getLogger(__name__)
 
 
 SERVICE_KEYS = {
-    'command': 'Command',
-    'environment': 'Env',
     'working_dir': 'WorkingDir',
+    'user': 'User',
+    'labels': 'Labels',
 }
 
+IGNORED_KEYS = {'build'}
+
+SUPPORTED_KEYS = {
+    'image',
+    'ports',
+    'expose',
+    'networks',
+    'command',
+    'environment',
+    'entrypoint',
+} | set(SERVICE_KEYS)
 
 VERSION = '0.1'
 
@@ -120,22 +133,32 @@ def to_bundle(config, image_digests):
     }
 
 
-def convert_service_to_bundle(name, service_dict, image_id):
-    container_config = {'Image': image_id}
+def convert_service_to_bundle(name, service_dict, image_digest):
+    container_config = {'Image': image_digest}
 
     for key, value in service_dict.items():
-        if key in ('build', 'image', 'ports', 'expose', 'networks'):
-            pass
-        elif key == 'environment':
-            container_config['env'] = {
+        if key in IGNORED_KEYS:
+            continue
+
+        if key not in SUPPORTED_KEYS:
+            log.warn("Unsupported key '{}' in services.{} - ignoring".format(key, name))
+            continue
+
+        if key == 'environment':
+            container_config['Env'] = format_environment({
                 envkey: envvalue for envkey, envvalue in value.items()
                 if envvalue
-            }
-        elif key in SERVICE_KEYS:
-            container_config[SERVICE_KEYS[key]] = value
-        else:
-            log.warn("Unsupported key '{}' in services.{} - ignoring".format(key, name))
+            })
+            continue
 
+        if key in SERVICE_KEYS:
+            container_config[SERVICE_KEYS[key]] = value
+            continue
+
+    set_command_and_args(
+        container_config,
+        service_dict.get('entrypoint', []),
+        service_dict.get('command', []))
     container_config['Networks'] = make_service_networks(name, service_dict)
 
     ports = make_port_specs(service_dict)
@@ -143,6 +166,21 @@ def convert_service_to_bundle(name, service_dict, image_id):
         container_config['Ports'] = ports
 
     return container_config
+
+
+# See https://github.com/docker/swarmkit/blob//agent/exec/container/container.go#L95
+def set_command_and_args(config, entrypoint, command):
+    if isinstance(entrypoint, six.string_types):
+        entrypoint = split_command(entrypoint)
+    if isinstance(command, six.string_types):
+        command = split_command(command)
+
+    if entrypoint:
+        config['Command'] = entrypoint + command
+        return
+
+    if command:
+        config['Args'] = command
 
 
 def make_service_networks(name, service_dict):
