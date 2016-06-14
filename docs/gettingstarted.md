@@ -77,7 +77,7 @@ dependencies the Python application requires, including Python itself.
   * Install the Python dependencies.
   * Set the default command for the container to `python app.py`
 
-  For more information on how to write Dockerfiles, see the [Docker user guide](/engine/userguide/containers/dockerimages.md#building-an-image-from-a-dockerfile) and the [Dockerfile reference](/engine/reference/builder.md).
+  For more information on how to write Dockerfiles, see the [Docker user guide](/engine/tutorials/dockerimages.md#building-an-image-from-a-dockerfile) and the [Dockerfile reference](/engine/reference/builder.md).
 
 2. Build the image.
 

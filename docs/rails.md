@@ -32,7 +32,7 @@ Dockerfile consists of:
 
 That'll put your application code inside an image that will build a container
 with Ruby, Bundler and all your dependencies inside it. For more information on
-how to write Dockerfiles, see the [Docker user guide](/engine/userguide/containers/dockerimages.md#building-an-image-from-a-dockerfile) and the [Dockerfile reference](/engine/reference/builder.md).
+how to write Dockerfiles, see the [Docker user guide](/engine/tutorials/dockerimages.md#building-an-image-from-a-dockerfile) and the [Dockerfile reference](/engine/reference/builder.md).
 
 Next, create a bootstrap `Gemfile` which just loads Rails. It'll be overwritten in a moment by `rails new`.
 
