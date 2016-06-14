@@ -57,17 +57,7 @@ class MissingDigests(Exception):
 
 
 def serialize_bundle(config, image_digests):
-    if config.networks:
-        log.warn("Unsupported top level key 'networks' - ignoring")
-
-    if config.volumes:
-        log.warn("Unsupported top level key 'volumes' - ignoring")
-
-    return json.dumps(
-        to_bundle(config, image_digests),
-        indent=2,
-        sort_keys=True,
-    )
+    return json.dumps(to_bundle(config, image_digests), indent=2, sort_keys=True)
 
 
 def get_image_digests(project, allow_fetch=False):
@@ -99,7 +89,7 @@ def get_image_digest(service, allow_fetch=False):
             "required to generate a proper image digest for the bundle. Specify "
             "an image repo and tag with the 'image' option.".format(s=service))
 
-    separator = parse_repository_tag(service.options['image'])[2]
+    _, _, separator = parse_repository_tag(service.options['image'])
     # Compose file already uses a digest, no lookup required
     if separator == '@':
         return service.options['image']
@@ -143,24 +133,32 @@ def fetch_image_digest(service):
     if not digest:
         raise ValueError("Failed to get digest for %s" % service.name)
 
-    repo = parse_repository_tag(service.options['image'])[0]
+    repo, _, _ = parse_repository_tag(service.options['image'])
     identifier = '{repo}@{digest}'.format(repo=repo, digest=digest)
 
-    # Pull by digest so that image['RepoDigests'] is populated for next time
-    # and we don't have to pull/push again
-    service.client.pull(identifier)
-
-    log.info("Stored digest for {}".format(service.image_name))
+    # only do this is RepoTags isn't already populated
+    image = service.image()
+    if not image['RepoDigests']:
+        # Pull by digest so that image['RepoDigests'] is populated for next time
+        # and we don't have to pull/push again
+        service.client.pull(identifier)
+        log.info("Stored digest for {}".format(service.image_name))
 
     return identifier
 
 
 def to_bundle(config, image_digests):
+    if config.networks:
+        log.warn("Unsupported top level key 'networks' - ignoring")
+
+    if config.volumes:
+        log.warn("Unsupported top level key 'volumes' - ignoring")
+
     config = denormalize_config(config)
 
     return {
-        'version': VERSION,
-        'services': {
+        'Version': VERSION,
+        'Services': {
             name: convert_service_to_bundle(
                 name,
                 service_dict,
