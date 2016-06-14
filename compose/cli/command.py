@@ -36,6 +36,16 @@ def project_from_options(project_dir, options):
     )
 
 
+def get_config_from_options(base_dir, options):
+    environment = Environment.from_env_file(base_dir)
+    config_path = get_config_path_from_options(
+        base_dir, options, environment
+    )
+    return config.load(
+        config.find(base_dir, config_path, environment)
+    )
+
+
 def get_config_path_from_options(base_dir, options, environment):
     file_option = options.get('--file')
     if file_option:
