@@ -11,7 +11,7 @@ parent="workw_compose"
 
 # Using Compose with Swarm
 
-Docker Compose and [Docker Swarm](/swarm/overview) aim to have full integration, meaning
+Docker Compose and [Docker Swarm](/swarm/overview.md) aim to have full integration, meaning
 you can point a Compose app at a Swarm cluster and have it all just work as if
 you were using a single Docker host.
 
@@ -30,7 +30,7 @@ format](compose-file.md#versioning) you are using:
       or a custom driver which supports multi-host networking.
 
 Read [Get started with multi-host networking](https://docs.docker.com/engine/userguide/networking/get-started-overlay/) to see how to
-set up a Swarm cluster with [Docker Machine](/machine/overview) and the overlay driver. Once you've got it running, deploying your app to it should be as simple as:
+set up a Swarm cluster with [Docker Machine](/machine/overview.md) and the overlay driver. Once you've got it running, deploying your app to it should be as simple as:
 
     $ eval "$(docker-machine env --swarm <name of swarm master machine>)"
     $ docker-compose up

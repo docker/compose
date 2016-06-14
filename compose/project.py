@@ -440,6 +440,10 @@ class Project(object):
         for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
+    def push(self, service_names=None, ignore_push_failures=False):
+        for service in self.get_services(service_names, include_deps=False):
+            service.push(ignore_push_failures)
+
     def _labeled_containers(self, stopped=False, one_off=OneOffFilter.exclude):
         return list(filter(None, [
             Container.from_ps(self.client, container)
@@ -539,4 +543,5 @@ class NoSuchService(Exception):
 
 
 class ProjectError(Exception):
-    pass
+    def __init__(self, msg):
+        self.msg = msg

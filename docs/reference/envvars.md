@@ -78,6 +78,11 @@ Configures the path to the `ca.pem`, `cert.pem`, and `key.pem` files used for TL
 Configures the time (in seconds) a request to the Docker daemon is allowed to hang before Compose considers
 it failed. Defaults to 60 seconds.
 
+## COMPOSE\_TLS\_VERSION
+
+Configure which TLS version is used for TLS communication with the `docker`
+daemon. Defaults to `TLSv1`.
+Supported values are: `TLSv1`, `TLSv1_1`, `TLSv1_2`.
 
 ## Related Information
 

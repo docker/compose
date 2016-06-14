@@ -14,10 +14,10 @@ from operator import attrgetter
 from . import errors
 from . import signals
 from .. import __version__
-from ..config import config
+from ..bundle import get_image_digests
+from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
-from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -30,7 +30,7 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
-from .command import get_config_path_from_options
+from .command import get_config_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
 from .docopt_command import get_handler
@@ -98,7 +98,7 @@ def perform_command(options, handler, command_options):
         handler(command_options)
         return
 
-    if options['COMMAND'] == 'config':
+    if options['COMMAND'] in ('config', 'bundle'):
         command = TopLevelCommand(None)
         handler(command, options, command_options)
         return
@@ -164,6 +164,7 @@ class TopLevelCommand(object):
 
     Commands:
       build              Build or rebuild services
+      bundle             Generate a Docker bundle from the Compose file
       config             Validate and view the compose file
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
@@ -176,6 +177,7 @@ class TopLevelCommand(object):
       port               Print the public port for a port binding
       ps                 List containers
       pull               Pulls service images
+      push               Push service images
       restart            Restart services
       rm                 Remove stopped containers
       run                Run a one-off command
@@ -212,6 +214,34 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)))
 
+    def bundle(self, config_options, options):
+        """
+        Generate a Docker bundle from the Compose file.
+
+        Local images will be pushed to a Docker registry, and remote images
+        will be pulled to fetch an image digest.
+
+        Usage: bundle [options]
+
+        Options:
+            -o, --output PATH          Path to write the bundle file to.
+                                       Defaults to "<project name>.dsb".
+        """
+        self.project = project_from_options('.', config_options)
+        compose_config = get_config_from_options(self.project_dir, config_options)
+
+        output = options["--output"]
+        if not output:
+            output = "{}.dsb".format(self.project.name)
+
+        with errors.handle_connection_errors(self.project.client):
+            image_digests = get_image_digests(self.project)
+
+        with open(output, 'w') as f:
+            f.write(serialize_bundle(compose_config, image_digests))
+
+        log.info("Wrote bundle to {}".format(output))
+
     def config(self, config_options, options):
         """
         Validate and view the compose file.
@@ -224,13 +254,7 @@ class TopLevelCommand(object):
             --services      Print the service names, one per line.
 
         """
-        environment = Environment.from_env_file(self.project_dir)
-        config_path = get_config_path_from_options(
-            self.project_dir, config_options, environment
-        )
-        compose_config = config.load(
-            config.find(self.project_dir, config_path, environment)
-        )
+        compose_config = get_config_from_options(self.project_dir, config_options)
 
         if options['--quiet']:
             return
@@ -265,18 +289,29 @@ class TopLevelCommand(object):
 
     def down(self, options):
         """
-        Stop containers and remove containers, networks, volumes, and images
-        created by `up`. Only containers and networks are removed by default.
+        Stops containers and removes containers, networks, volumes, and images
+        created by `up`.
+
+        By default, the only things removed are:
+
+        - Containers for services defined in the Compose file
+        - Networks defined in the `networks` section of the Compose file
+        - The default network, if one is used
+
+        Networks and volumes defined as `external` are never removed.
 
         Usage: down [options]
 
         Options:
-            --rmi type          Remove images, type may be one of: 'all' to remove
-                                all images, or 'local' to remove only images that
-                                don't have an custom name set by the `image` field
-            -v, --volumes       Remove data volumes
-            --remove-orphans    Remove containers for services not defined in
-                                the Compose file
+            --rmi type          Remove images. Type must be one of:
+                                'all': Remove all images used by any service.
+                                'local': Remove only images that don't have a custom tag
+                                set by the `image` field.
+            -v, --volumes       Remove named volumes declared in the `volumes` section
+                                of the Compose file and anonymous volumes
+                                attached to containers.
+            --remove-orphans    Remove containers for services not defined in the
+                                Compose file
         """
         image_type = image_type_from_opt('--rmi', options['--rmi'])
         self.project.down(image_type, options['--volumes'], options['--remove-orphans'])
@@ -323,6 +358,13 @@ class TopLevelCommand(object):
         """
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
+        detach = options['-d']
+
+        if IS_WINDOWS_PLATFORM and not detach:
+            raise UserError(
+                "Interactive mode is not yet supported on Windows.\n"
+                "Please pass the -d flag when using `docker-compose exec`."
+            )
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -339,7 +381,7 @@ class TopLevelCommand(object):
 
         exec_id = container.create_exec(command, **create_exec_options)
 
-        if options['-d']:
+        if detach:
             container.start_exec(exec_id, tty=tty)
             return
 
@@ -500,12 +542,26 @@ class TopLevelCommand(object):
             ignore_pull_failures=options.get('--ignore-pull-failures')
         )
 
+    def push(self, options):
+        """
+        Pushes images for services.
+
+        Usage: push [options] [SERVICE...]
+
+        Options:
+            --ignore-push-failures  Push what it can and ignores images with push failures.
+        """
+        self.project.push(
+            service_names=options['SERVICE'],
+            ignore_push_failures=options.get('--ignore-push-failures')
+        )
+
     def rm(self, options):
         """
-        Remove stopped service containers.
+        Removes stopped service containers.
 
-        By default, volumes attached to containers will not be removed. You can see all
-        volumes with `docker volume ls`.
+        By default, anonymous volumes attached to containers will not be removed. You
+        can override this with `-v`. To list all volumes, use `docker volume ls`.
 
         Any data which is not in a volume will be lost.
 
@@ -513,18 +569,16 @@ class TopLevelCommand(object):
 
         Options:
             -f, --force   Don't ask to confirm removal
-            -v            Remove volumes associated with containers
-            -a, --all     Also remove one-off containers created by
+            -v            Remove any anonymous volumes attached to containers
+            -a, --all     Obsolete. Also remove one-off containers created by
                           docker-compose run
         """
         if options.get('--all'):
-            one_off = OneOffFilter.include
-        else:
             log.warn(
-                'Not including one-off containers created by `docker-compose run`.\n'
-                'To include them, use `docker-compose rm --all`.\n'
-                'This will be the default behavior in the next version of Compose.\n')
-            one_off = OneOffFilter.exclude
+                '--all flag is obsolete. This is now the default behavior '
+                'of `docker-compose rm`'
+            )
+        one_off = OneOffFilter.include
 
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off

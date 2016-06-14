@@ -224,6 +224,20 @@ class CLITestCase(DockerClientTestCase):
             'volumes': {},
         }
 
+    def test_config_external_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+        result = self.dispatch(['-f', 'external-networks.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'networks' in json_result
+        assert json_result['networks'] == {
+            'networks_foo': {
+                'external': True  # {'name': 'networks_foo'}
+            },
+            'bar': {
+                'external': {'name': 'networks_bar'}
+            }
+        }
+
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
@@ -1192,8 +1206,6 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
-        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
-        self.dispatch(['rm', '-f', '-a'], None)
         self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 0)
 
         service.create_container(one_off=False)
@@ -1306,13 +1318,14 @@ class CLITestCase(DockerClientTestCase):
             'logscomposefile_another_1',
             'exited'))
 
-        # sleep for a short period to allow the tailing thread to receive the
-        # event. This is not great, but there isn't an easy way to do this
-        # without being able to stream stdout from the process.
-        time.sleep(0.5)
-        os.kill(proc.pid, signal.SIGINT)
-        result = wait_on_process(proc, returncode=1)
+        self.dispatch(['kill', 'simple'])
+
+        result = wait_on_process(proc)
+
+        assert 'hello' in result.stdout
         assert 'test' in result.stdout
+        assert 'logscomposefile_another_1 exited with code 0' in result.stdout
+        assert 'logscomposefile_simple_1 exited with code 137' in result.stdout
 
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
@@ -1474,6 +1487,17 @@ class CLITestCase(DockerClientTestCase):
         assert Counter(e['action'] for e in lines) == {'create': 2, 'start': 2}
 
     def test_events_human_readable(self):
+
+        def has_timestamp(string):
+            str_iso_date, str_iso_time, container_info = string.split(' ', 2)
+            try:
+                return isinstance(datetime.datetime.strptime(
+                    '%s %s' % (str_iso_date, str_iso_time),
+                    '%Y-%m-%d %H:%M:%S.%f'),
+                    datetime.datetime)
+            except ValueError:
+                return False
+
         events_proc = start_process(self.base_dir, ['events'])
         self.dispatch(['up', '-d', 'simple'])
         wait_on_condition(ContainerCountCondition(self.project, 1))
@@ -1490,7 +1514,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
-        assert lines[0].startswith(datetime.date.today().isoformat())
+
+        assert has_timestamp(lines[0])
 
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
