@@ -65,3 +65,23 @@ class ProgressStreamTestCase(unittest.TestCase):
 
         events = progress_stream.stream_output(events, output)
         self.assertTrue(len(output.getvalue()) > 0)
+
+
+def test_get_digest_from_push():
+    digest = "sha256:abcd"
+    events = [
+        {"status": "..."},
+        {"status": "..."},
+        {"progressDetail": {}, "aux": {"Digest": digest}},
+    ]
+    assert progress_stream.get_digest_from_push(events) == digest
+
+
+def test_get_digest_from_pull():
+    digest = "sha256:abcd"
+    events = [
+        {"status": "..."},
+        {"status": "..."},
+        {"status": "Digest: %s" % digest},
+    ]
+    assert progress_stream.get_digest_from_pull(events) == digest
