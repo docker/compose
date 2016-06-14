@@ -70,6 +70,7 @@ DOCKER_CONFIG_KEYS = [
     'mem_limit',
     'memswap_limit',
     'net',
+    'oom_score_adj'
     'pid',
     'ports',
     'privileged',
