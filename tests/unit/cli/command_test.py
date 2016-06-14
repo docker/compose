@@ -55,6 +55,7 @@ class TestGetTlsVersion(object):
         environment = {}
         assert get_tls_version(environment) is None
 
+    @pytest.mark.skipif(not hasattr(ssl, 'PROTOCOL_TLSv1_2'), reason='TLS v1.2 unsupported')
     def test_get_tls_version_upgrade(self):
         environment = {'COMPOSE_TLS_VERSION': 'TLSv1_2'}
         assert get_tls_version(environment) == ssl.PROTOCOL_TLSv1_2
