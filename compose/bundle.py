@@ -136,7 +136,7 @@ def fetch_image_digest(service):
     repo, _, _ = parse_repository_tag(service.options['image'])
     identifier = '{repo}@{digest}'.format(repo=repo, digest=digest)
 
-    # only do this is RepoTags isn't already populated
+    # only do this if RepoDigests isn't already populated
     image = service.image()
     if not image['RepoDigests']:
         # Pull by digest so that image['RepoDigests'] is populated for next time
