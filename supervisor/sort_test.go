@@ -4,9 +4,14 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"flag"
 
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/specs"
+)
+
+var (
+	runtimeTool = flag.String("runtime", "runc", "Runtime to use for this test")
 )
 
 type testProcess struct {

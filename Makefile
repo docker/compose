@@ -10,6 +10,8 @@ LDFLAGS := -X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
 TEST_TIMEOUT ?= 5m
 TEST_SUITE_TIMEOUT ?= 10m
 
+RUNTIME ?= runc
+
 # if this session isn't interactive, then we don't want to allocate a
 # TTY, which would fail, but if it is interactive, we do want to attach
 # so that the user can send e.g. ^C through.
@@ -86,14 +88,14 @@ shell: dbuild
 	$(DOCKER_RUN) bash
 
 test: validate install bundles-rootfs
-	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
+	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test ) -runtime=$(RUNTIME)
 ifneq ($(wildcard /.dockerenv), )
 	cd integration-test ; \
 	go test -check.v -check.timeout=$(TEST_TIMEOUT) timeout=$(TEST_SUITE_TIMEOUT) $(TESTFLAGS) github.com/docker/containerd/integration-test
 endif
 
 bench: shim validate install bundles-rootfs
-	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
+	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test) -runtime=$(RUNTIME)
 
 validate: fmt lint
 
