@@ -222,6 +222,7 @@ func (p *process) start() error {
 	cmd.Stdin = p.stdio.stdin
 	cmd.Stdout = p.stdio.stdout
 	cmd.Stderr = p.stdio.stderr
+	cmd.SysProcAttr = setPDeathSig()
 	return cmd.Run()
 }
 
@@ -231,7 +232,9 @@ func (p *process) pid() int {
 
 func (p *process) delete() error {
 	if !p.state.Exec {
-		out, err := exec.Command(p.runtime, append(p.state.RuntimeArgs, "delete", p.id)...).CombinedOutput()
+		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "delete", p.id)...)
+		cmd.SysProcAttr = setPDeathSig()
+		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%s: %v", out, err)
 		}
