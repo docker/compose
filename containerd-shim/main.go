@@ -17,6 +17,12 @@ func writeMessage(f *os.File, level string, err error) {
 	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}`, level, err)
 }
 
+type controlMessage struct {
+	Type   int
+	Width  int
+	Height int
+}
+
 // containerd-shim is a small shim that sits in front of a runtime implementation
 // that allows it to be repartented to init and handle reattach from the caller.
 //
@@ -82,13 +88,40 @@ func start(log *os.File) error {
 		p.delete()
 		return err
 	}
+	msgC := make(chan controlMessage, 32)
 	go func() {
 		for {
-			var msg, w, h int
-			if _, err := fmt.Fscanf(control, "%d %d %d\n", &msg, &w, &h); err != nil {
+			var m controlMessage
+			if _, err := fmt.Fscanf(control, "%d %d %d\n", &m.Type, &m.Width, &m.Height); err != nil {
 				continue
 			}
-			switch msg {
+			msgC <- m
+		}
+	}()
+	var exitShim bool
+	for {
+		select {
+		case s := <-signals:
+			switch s {
+			case syscall.SIGCHLD:
+				exits, _ := osutils.Reap()
+				for _, e := range exits {
+					// check to see if runtime is one of the processes that has exited
+					if e.Pid == p.pid() {
+						exitShim = true
+						writeInt("exitStatus", e.Status)
+					}
+				}
+			}
+			// runtime has exited so the shim can also exit
+			if exitShim {
+				ioutil.WriteFile(fmt.Sprintf("/tmp/shim-delete-%d", p.pid()), []byte("deleting"), 0600)
+				p.delete()
+				p.Wait()
+				return nil
+			}
+		case msg := <-msgC:
+			switch msg.Type {
 			case 0:
 				// close stdin
 				if p.stdinCloser != nil {
@@ -99,37 +132,18 @@ func start(log *os.File) error {
 					continue
 				}
 				ws := term.Winsize{
-					Width:  uint16(w),
-					Height: uint16(h),
+					Width:  uint16(msg.Width),
+					Height: uint16(msg.Height),
 				}
 				term.SetWinsize(p.console.Fd(), &ws)
 			case 2:
 				// tell runtime to execute the init process
 				if err := p.start(); err != nil {
-					syscall.Kill(p.pid(), syscall.SIGKILL)
+					p.delete()
+					p.Wait()
+					return err
 				}
 			}
-		}
-	}()
-	var exitShim bool
-	for s := range signals {
-		switch s {
-		case syscall.SIGCHLD:
-			exits, _ := osutils.Reap()
-			for _, e := range exits {
-				// check to see if runtime is one of the processes that has exited
-				if e.Pid == p.pid() {
-					exitShim = true
-					writeInt("exitStatus", e.Status)
-				}
-			}
-		}
-		// runtime has exited so the shim can also exit
-		if exitShim {
-			ioutil.WriteFile(fmt.Sprintf("/tmp/shim-delete-%d", p.pid()), []byte("deleting"), 0600)
-			p.delete()
-			p.Wait()
-			return nil
 		}
 	}
 	return nil
