@@ -231,14 +231,14 @@ class TopLevelCommand(object):
             --fetch-digests            Automatically fetch image digests if missing
 
             -o, --output PATH          Path to write the bundle file to.
-                                       Defaults to "<project name>.dsb".
+                                       Defaults to "<project name>.dab".
         """
         self.project = project_from_options('.', config_options)
         compose_config = get_config_from_options(self.project_dir, config_options)
 
         output = options["--output"]
         if not output:
-            output = "{}.dsb".format(self.project.name)
+            output = "{}.dab".format(self.project.name)
 
         with errors.handle_connection_errors(self.project.client):
             try:
