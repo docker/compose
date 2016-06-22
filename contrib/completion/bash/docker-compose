@@ -316,6 +316,18 @@ _docker_compose_pull() {
 }
 
 
+_docker_compose_push() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help --ignore-push-failures" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_all
+			;;
+	esac
+}
+
+
 _docker_compose_restart() {
 	case "$prev" in
 		--timeout|-t)
@@ -480,6 +492,7 @@ _docker_compose() {
 		port
 		ps
 		pull
+		push
 		restart
 		rm
 		run
