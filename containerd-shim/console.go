@@ -9,7 +9,7 @@ import (
 	"unsafe"
 )
 
-// NewConsole returns an initalized console that can be used within a container by copying bytes
+// NewConsole returns an initialized console that can be used within a container by copying bytes
 // from the master side to the slave that is attached as the tty for the container's init process.
 func newConsole(uid, gid int) (*os.File, string, error) {
 	master, err := os.OpenFile("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0)

@@ -11,7 +11,7 @@ var (
 	// ErrContainerExited is returned when access to an exited
 	// container is attempted
 	ErrContainerExited = errors.New("containerd: container has exited")
-	// ErrProcessNotExited is returned when trying to retrive the exit
+	// ErrProcessNotExited is returned when trying to retrieve the exit
 	// status of an alive process
 	ErrProcessNotExited = errors.New("containerd: process has not exited")
 	// ErrContainerNotStarted is returned when a container fails to
