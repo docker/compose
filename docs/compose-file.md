@@ -115,9 +115,9 @@ specified.
 
 > [Version 2 file format](#version-2) only.
 
-Add build arguments. You can use either an array or a dictionary. Any
+Add build arguments. You can use either a sequence or a dictionary. Any
 boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
-they are not converted to True or False by the YML parser.
+they are not converted to True or False by the YAML parser.
 
 Build arguments with only a key are resolved to their environment value on the
 machine Compose is running on.
@@ -172,7 +172,7 @@ results in an error.
 
 ### devices
 
-List of device mappings.  Uses the same format as the `--device` docker
+Sequence of device mappings.  Uses the same format as the `--device` docker
 client create option.
 
     devices:
@@ -210,7 +210,7 @@ Simple example:
 
 ### dns
 
-Custom DNS servers. Can be a single value or a list.
+Custom DNS servers. Can be a single value or a sequence.
 
     dns: 8.8.8.8
     dns:
@@ -219,7 +219,7 @@ Custom DNS servers. Can be a single value or a list.
 
 ### dns_search
 
-Custom DNS search domains. Can be a single value or a list.
+Custom DNS search domains. Can be a single value or a sequence.
 
     dns_search: example.com
     dns_search:
@@ -228,7 +228,7 @@ Custom DNS search domains. Can be a single value or a list.
 
 ### tmpfs
 
-Mount a temporary file system inside the container. Can be a single value or a list.
+Mount a temporary file system inside the container. Can be a single value or a sequence.
 
     tmpfs: /run
     tmpfs:
@@ -241,7 +241,7 @@ Override the default entrypoint.
 
     entrypoint: /code/entrypoint.sh
 
-The entrypoint can also be a list, in a manner similar to [dockerfile](https://docs.docker.com/engine/reference/builder/#entrypoint):
+The entrypoint can also be a sequence, in a manner similar to [dockerfile](https://docs.docker.com/engine/reference/builder/#entrypoint):
 
     entrypoint:
         - php
@@ -254,7 +254,7 @@ The entrypoint can also be a list, in a manner similar to [dockerfile](https://d
 
 ### env_file
 
-Add environment variables from a file. Can be a single value or a list.
+Add environment variables from a file. Can be a single value or a sequence.
 
 If you have specified a Compose file with `docker-compose -f FILE`, paths in
 `env_file` are relative to the directory that file is in.
@@ -276,9 +276,9 @@ beginning with `#` (i.e. comments) are ignored, as are blank lines.
 
 ### environment
 
-Add environment variables. You can use either an array or a dictionary. Any
+Add environment variables. You can use either a sequence or a dictionary. Any
 boolean values; true, false, yes no, need to be enclosed in quotes to ensure
-they are not converted to True or False by the YML parser.
+they are not converted to True or False by the YAML parser.
 
 Environment variables with only a key are resolved to their values on the
 machine Compose is running on, which can be helpful for secret or host-specific values.
@@ -315,11 +315,11 @@ and an optional `file` key.
       file: common.yml
       service: webapp
 
-The `service` the name of the service being extended, for example
+The `service` is the name of the service being extended, for example
 `web` or `database`. The `file` is the location of a Compose configuration
 file defining that service.
 
-If you omit the `file` Compose looks for the service configuration in the
+If you omit the `file` key Compose looks for the service configuration in the
 current file. The `file` value can be an absolute or relative path. If you
 specify a relative path, Compose treats it as relative to the location of the
 current file.
@@ -380,7 +380,7 @@ options and tags it with the specified tag.
 
 ### labels
 
-Add metadata to containers using [Docker labels](https://docs.docker.com/engine/userguide/labels-custom-metadata/). You can use either an array or a dictionary.
+Add metadata to containers using [Docker labels](https://docs.docker.com/engine/userguide/labels-custom-metadata/). You can use either a sequence or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
 
@@ -760,7 +760,7 @@ Specify which volume driver should be used for this volume. Defaults to
 
 ### driver_opts
 
-Specify a list of options as key-value pairs to pass to the driver for this
+Specify a dictionary of options as key-value pairs to pass to the driver for this
 volume. Those options are driver-dependent - consult the driver's
 documentation for more information. Optional.
 
@@ -822,7 +822,7 @@ The Docker Engine will return an error if the driver is not available.
 
 ### driver_opts
 
-Specify a list of options as key-value pairs to pass to the driver for this
+Specify a dictionary of options as key-value pairs to pass to the driver for this
 network. Those options are driver-dependent - consult the driver's
 documentation for more information. Optional.
 
@@ -836,7 +836,7 @@ Specify custom IPAM config. This is an object with several properties, each of
 which is optional:
 
 -   `driver`: Custom IPAM driver, instead of the default.
--   `config`: A list with zero or more config blocks, each containing any of
+-   `config`: A sequence with zero or more config blocks, each containing any of
     the following keys:
     - `subnet`: Subnet in CIDR format that represents a network segment
     - `ip_range`: Range of IPs from which to allocate container IPs
