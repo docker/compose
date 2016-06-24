@@ -20,6 +20,9 @@ var (
 	// ErrContainerStartTimeout is returned if a container takes too
 	// long to start
 	ErrContainerStartTimeout = errors.New("containerd: container did not start before the specified timeout")
+	// ErrShimExited is returned if the shim or the contianer's init process
+	// exits before completing
+	ErrShimExited = errors.New("containerd: shim exited before container process was started")
 
 	errNoPidFile      = errors.New("containerd: no process pid file found")
 	errInvalidPidInt  = errors.New("containerd: process pid is invalid")

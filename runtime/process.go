@@ -260,8 +260,33 @@ func (p *process) Signal(s os.Signal) error {
 // This should only be called on the process with ID "init"
 func (p *process) Start() error {
 	if p.ID() == InitProcessID {
-		_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 2, 0, 0)
-		return err
+		var (
+			errC     = make(chan error, 1)
+			shimExit = make(chan struct{}, 1)
+			args     = append(p.container.runtimeArgs, "start", p.container.id)
+			cmd      = exec.Command(p.container.runtime, args...)
+		)
+		go func() {
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				errC <- fmt.Errorf("%s: %q", err.Error(), out)
+			}
+			errC <- nil
+		}()
+		go func() {
+			p.Wait()
+			close(shimExit)
+		}()
+		select {
+		case err := <-errC:
+			if err != nil {
+				return err
+			}
+		case <-shimExit:
+			cmd.Process.Kill()
+			cmd.Wait()
+			return ErrShimExited
+		}
 	}
 	return nil
 }

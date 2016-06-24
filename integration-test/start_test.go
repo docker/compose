@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -326,6 +327,9 @@ func (cs *ContainerdSuite) TestOOM(t *check.C) {
 		spec.Linux.Resources.Memory = &ocs.Memory{
 			Limit: &limit,
 		}
+		if swapEnabled() {
+			spec.Linux.Resources.Memory.Swap = &limit
+		}
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +366,7 @@ func (cs *ContainerdSuite) TestOOM(t *check.C) {
 			evt.Timestamp = e.Timestamp
 			t.Assert(*e, checker.Equals, evt)
 		case <-time.After(60 * time.Second):
-			t.Fatal("Container took more than 10 seconds to terminate")
+			t.Fatalf("Container took more than 60 seconds to %s", evt.Type)
 		}
 	}
 }
@@ -478,4 +482,9 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 		t.Assert(containers[i].Id, checker.Equals, fmt.Sprintf("top%d", i+idShift))
 		t.Assert(containers[i].Status, checker.Equals, "running")
 	}
+}
+
+func swapEnabled() bool {
+	_, err := os.Stat("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes")
+	return err == nil
 }
