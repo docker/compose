@@ -228,6 +228,8 @@ Custom DNS search domains. Can be a single value or a list.
 
 ### tmpfs
 
+> [Version 2 file format](#version-2) only.
+
 Mount a temporary file system inside the container. Can be a single value or a list.
 
     tmpfs: /run
