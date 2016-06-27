@@ -23,7 +23,7 @@ __docker-compose_q() {
     docker-compose 2>/dev/null $compose_options "$@"
 }
 
-# Extracts all service names from docker-compose.yml.
+# All services defined in docker-compose.yml
 __docker-compose_all_services_in_compose_file() {
     local already_selected
     local -a services
