@@ -197,6 +197,11 @@ __docker-compose_subcommand() {
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
+        (bundle)
+            _arguments \
+                $opts_help \
+                '(--output -o)'{--output,-o}'[Path to write the bundle file to. Defaults to "<project name>.dsb".]:file:_files' && ret=0
+            ;;
         (config)
             _arguments \
                 $opts_help \
