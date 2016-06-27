@@ -206,26 +206,6 @@ func (p *process) create() error {
 	return nil
 }
 
-func (p *process) start() error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	logPath := filepath.Join(cwd, "log.json")
-	args := append([]string{
-		"--log", logPath,
-		"--log-format", "json",
-	}, p.state.RuntimeArgs...)
-	args = append(args, "start", p.id)
-	cmd := exec.Command(p.runtime, args...)
-	cmd.Dir = p.bundle
-	cmd.Stdin = p.stdio.stdin
-	cmd.Stdout = p.stdio.stdout
-	cmd.Stderr = p.stdio.stderr
-	cmd.SysProcAttr = setPDeathSig()
-	return cmd.Run()
-}
-
 func (p *process) pid() int {
 	return p.containerPid
 }

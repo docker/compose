@@ -136,13 +136,6 @@ func start(log *os.File) error {
 					Height: uint16(msg.Height),
 				}
 				term.SetWinsize(p.console.Fd(), &ws)
-			case 2:
-				// tell runtime to execute the init process
-				if err := p.start(); err != nil {
-					p.delete()
-					p.Wait()
-					return err
-				}
 			}
 		}
 	}

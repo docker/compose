@@ -62,9 +62,23 @@ func (w *worker) Start() {
 		}
 		if err := w.s.monitorProcess(process); err != nil {
 			logrus.WithField("error", err).Error("containerd: add process to monitor")
+			t.Err <- err
+			evt := &DeleteTask{
+				ID:      t.Container.ID(),
+				NoEvent: true,
+			}
+			w.s.SendTask(evt)
+			continue
 		}
 		if err := process.Start(); err != nil {
 			logrus.WithField("error", err).Error("containerd: start init process")
+			t.Err <- err
+			evt := &DeleteTask{
+				ID:      t.Container.ID(),
+				NoEvent: true,
+			}
+			w.s.SendTask(evt)
+			continue
 		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
