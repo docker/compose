@@ -1162,7 +1162,10 @@ class CLITestCase(DockerClientTestCase):
             ]
 
             for _, config in networks.items():
-                assert not config['Aliases']
+                # TODO: once we drop support for API <1.24, this can be changed to:
+                # assert config['Aliases'] == [container.short_id]
+                aliases = set(config['Aliases']) - set([container.short_id])
+                assert not aliases
 
     @v2_only()
     def test_run_detached_connects_to_network(self):
@@ -1179,7 +1182,10 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         for _, config in networks.items():
-            assert not config['Aliases']
+            # TODO: once we drop support for API <1.24, this can be changed to:
+            # assert config['Aliases'] == [container.short_id]
+            aliases = set(config['Aliases']) - set([container.short_id])
+            assert not aliases
 
         assert self.lookup(container, 'app')
         assert self.lookup(container, 'db')
