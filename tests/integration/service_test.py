@@ -397,7 +397,7 @@ class ServiceTest(DockerClientTestCase):
 
         assert not mock_log.warn.called
         assert (
-            [mount['Destination'] for mount in new_container.get('Mounts')],
+            [mount['Destination'] for mount in new_container.get('Mounts')] ==
             ['/data']
         )
         assert new_container.get_mount('/data')['Source'] != host_path
