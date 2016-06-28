@@ -726,7 +726,7 @@ class CLITestCase(DockerClientTestCase):
         # No network was created
         network_name = self.project.networks.networks['default'].full_name
         networks = self.client.networks(names=[network_name])
-        assert networks == []
+        assert not networks
 
         web = self.project.get_service('web')
         db = self.project.get_service('db')
@@ -1135,7 +1135,9 @@ class CLITestCase(DockerClientTestCase):
             ]
 
             for _, config in networks.items():
-                assert not config['Aliases']
+                if config['Aliases']:
+                    assert len(config['Aliases']) == 1
+                    assert container.get('Id').startswith(config['Aliases'][0])
 
     @v2_only()
     def test_run_detached_connects_to_network(self):
@@ -1152,7 +1154,9 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         for _, config in networks.items():
-            assert not config['Aliases']
+            if config['Aliases']:
+                assert len(config['Aliases']) == 1
+                assert container.get('Id').startswith(config['Aliases'][0])
 
         assert self.lookup(container, 'app')
         assert self.lookup(container, 'db')
