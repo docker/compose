@@ -477,7 +477,9 @@ class Service(object):
                 aliases=self._get_aliases(netdefs, container),
                 ipv4_address=netdefs.get('ipv4_address', None),
                 ipv6_address=netdefs.get('ipv6_address', None),
-                links=self._get_links(False))
+                links=self._get_links(False),
+                link_local_ips=netdefs.get('link_local_ips', None),
+            )
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():

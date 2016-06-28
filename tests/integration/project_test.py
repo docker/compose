@@ -13,6 +13,7 @@ from .testcases import DockerClientTestCase
 from compose.config import config
 from compose.config import ConfigurationError
 from compose.config.config import V2_0
+from compose.config.config import V2_1
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
@@ -21,6 +22,7 @@ from compose.container import Container
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
+from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 
 
@@ -755,6 +757,31 @@ class ProjectTest(DockerClientTestCase):
 
         with self.assertRaises(ProjectError):
             project.up()
+
+    @v2_1_only()
+    def test_up_with_network_link_local_ips(self):
+        config_data = config.Config(
+            version=V2_1,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {
+                    'linklocaltest': {
+                        'link_local_ips': ['169.254.8.8']
+                    }
+                }
+            }],
+            volumes={},
+            networks={
+                'linklocaltest': {'driver': 'bridge'}
+            }
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up()
 
     @v2_only()
     def test_project_up_with_network_internal(self):

@@ -7,6 +7,7 @@ import yaml
 from compose.config import types
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.config import V2_1
 
 
 def serialize_config_type(dumper, data):
@@ -32,8 +33,12 @@ def denormalize_config(config):
         if 'external_name' in net_conf:
             del net_conf['external_name']
 
+    version = config.version
+    if version not in (V2_0, V2_1):
+        version = V2_0
+
     return {
-        'version': V2_0,
+        'version': version,
         'services': services,
         'networks': networks,
         'volumes': config.volumes,
