@@ -201,7 +201,11 @@ func (p *process) Stdio() Stdio {
 
 // Close closes any open files and/or resouces on the process
 func (p *process) Close() error {
-	return p.exitPipe.Close()
+	err := p.exitPipe.Close()
+	if cerr := p.controlPipe.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 func (p *process) State() State {
