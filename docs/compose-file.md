@@ -825,7 +825,7 @@ called `data` and mount it into the `db` service's containers.
 You can also specify the name of the volume separately from the name used to
 refer to it within the Compose file:
 
-    volumes
+    volumes:
       data:
         external:
           name: actual-name-of-volume
