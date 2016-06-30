@@ -20,6 +20,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/specs"
 	"github.com/docker/docker/pkg/term"
+	"github.com/golang/protobuf/ptypes"
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
@@ -650,7 +651,7 @@ var updateCommand = cli.Command{
 }
 
 func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid string, closer func()) {
-	timestamp := uint64(time.Now().Unix())
+	timestamp := time.Now()
 	for {
 		e, err := events.Recv()
 		if err != nil {
@@ -659,10 +660,16 @@ func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid strin
 				os.Exit(128 + int(syscall.SIGHUP))
 			}
 			time.Sleep(1 * time.Second)
-			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{Timestamp: timestamp})
+			tsp, err := ptypes.TimestampProto(timestamp)
+			if err != nil {
+				closer()
+				fmt.Fprintf(os.Stderr, "%s", err.Error())
+				os.Exit(1)
+			}
+			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{Timestamp: tsp})
 			continue
 		}
-		timestamp = e.Timestamp
+		timestamp, err = ptypes.Timestamp(e.Timestamp)
 		if e.Id == id && e.Type == "exit" && e.Pid == pid {
 			closer()
 			os.Exit(int(e.Status))

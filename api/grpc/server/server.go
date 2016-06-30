@@ -17,6 +17,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/supervisor"
+	"github.com/golang/protobuf/ptypes"
 	"golang.org/x/net/context"
 )
 
@@ -310,16 +311,24 @@ func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessReq
 
 func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer) error {
 	t := time.Time{}
-	if r.Timestamp != 0 {
-		t = time.Unix(int64(r.Timestamp), 0)
+	if r.Timestamp != nil {
+		from, err := ptypes.Timestamp(r.Timestamp)
+		if err != nil {
+			return err
+		}
+		t = from
 	}
 	events := s.sv.Events(t)
 	defer s.sv.Unsubscribe(events)
 	for e := range events {
+		tsp, err := ptypes.TimestampProto(e.Timestamp)
+		if err != nil {
+			return err
+		}
 		if err := stream.Send(&types.Event{
 			Id:        e.ID,
 			Type:      e.Type,
-			Timestamp: uint64(e.Timestamp.Unix()),
+			Timestamp: tsp,
 			Pid:       e.PID,
 			Status:    uint32(e.Status),
 		}); err != nil {
@@ -330,8 +339,9 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 }
 
 func convertToPb(st *runtime.Stat) *types.StatsResponse {
+	tsp, _ := ptypes.TimestampProto(st.Timestamp)
 	pbSt := &types.StatsResponse{
-		Timestamp:   uint64(st.Timestamp.Unix()),
+		Timestamp:   tsp,
 		CgroupStats: &types.CgroupStats{},
 	}
 	systemUsage, _ := getSystemCPUUsage()
