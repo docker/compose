@@ -222,7 +222,7 @@ class CLITestCase(DockerClientTestCase):
                 'other': {
                     'image': 'busybox:latest',
                     'command': 'top',
-                    'volumes': ['/data:rw'],
+                    'volumes': ['/data'],
                 },
             },
         }
