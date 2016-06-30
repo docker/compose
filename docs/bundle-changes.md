@@ -9,4 +9,4 @@ A user can also populate this directory and provide the checkpoint name on the c
 
 
 As of this point, containerd has no other additions to the bundle.
-Runtime state is currently stored in a tmp filesystem like `/run`.
+Runtime state is currently stored in a tmpfs filesystem like `/run`.

@@ -25,7 +25,7 @@ message CreateContainerRequest {
 
 ## Attach
 
-In order to have attach like functionality for your containers you use the same API request but named pipes or `fifo`s can be used to achieve this type of functionality.
+In order to have attach like functionality for your containers you use the same API request but named pipes or fifos can be used to achieve this type of functionality.
 The default CLI for containerd does this if you specify the `--attach` flag on `create` or `start`.
 It will create fifos for each of the containers stdio which the CLI can read and write to.
 This can be used to create an interactive session with the container, `bash` for example, or to have a blocking way to collect the container's STDIO and forward it to your logging facilities.
