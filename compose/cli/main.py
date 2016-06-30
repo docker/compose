@@ -19,6 +19,7 @@ from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
