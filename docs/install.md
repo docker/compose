@@ -51,6 +51,11 @@ which the release page specifies, in your terminal.
 6.  Optionally, install [command completion](completion.md) for the
 `bash` and `zsh` shell.
 
+     > Note: On Ubuntu 16.04 you also need to install python-ipaddress package:
+     ```
+     $ sudo apt-get install python-ipaddress
+     ```
+
 7. Test the installation.
 
         $ docker-compose --version
