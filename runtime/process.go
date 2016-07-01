@@ -67,6 +67,7 @@ func newProcess(config *processConfig) (*process, error) {
 		container: config.c,
 		spec:      config.processSpec,
 		stdio:     config.stdio,
+		cmdDoneCh: make(chan struct{}),
 	}
 	uid, gid, err := getRootIDs(config.spec)
 	if err != nil {
@@ -148,6 +149,8 @@ type process struct {
 	spec        specs.ProcessSpec
 	stdio       Stdio
 	cmd         *exec.Cmd
+	cmdSuccess  bool
+	cmdDoneCh   chan struct{}
 }
 
 func (p *process) ID() string {
@@ -230,8 +233,8 @@ func (p *process) getPidFromFile() (int, error) {
 
 // Wait will reap the shim process
 func (p *process) Wait() {
-	if p.cmd != nil {
-		p.cmd.Wait()
+	if p.cmdDoneCh != nil {
+		<-p.cmdDoneCh
 	}
 }
 
@@ -261,10 +264,9 @@ func (p *process) Signal(s os.Signal) error {
 func (p *process) Start() error {
 	if p.ID() == InitProcessID {
 		var (
-			errC     = make(chan error, 1)
-			shimExit = make(chan struct{}, 1)
-			args     = append(p.container.runtimeArgs, "start", p.container.id)
-			cmd      = exec.Command(p.container.runtime, args...)
+			errC = make(chan error, 1)
+			args = append(p.container.runtimeArgs, "start", p.container.id)
+			cmd  = exec.Command(p.container.runtime, args...)
 		)
 		go func() {
 			out, err := cmd.CombinedOutput()
@@ -273,19 +275,21 @@ func (p *process) Start() error {
 			}
 			errC <- nil
 		}()
-		go func() {
-			p.Wait()
-			close(shimExit)
-		}()
 		select {
 		case err := <-errC:
 			if err != nil {
 				return err
 			}
-		case <-shimExit:
-			cmd.Process.Kill()
-			cmd.Wait()
-			return ErrShimExited
+		case <-p.cmdDoneCh:
+			if !p.cmdSuccess {
+				cmd.Process.Kill()
+				cmd.Wait()
+				return ErrShimExited
+			}
+			err := <-errC
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
