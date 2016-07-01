@@ -369,6 +369,8 @@ class Project(object):
            detached=False,
            remove_orphans=False):
 
+        warn_for_swarm_mode(self.client)
+
         self.initialize()
         self.find_orphan_containers(remove_orphans)
 
@@ -531,6 +533,20 @@ def get_volumes_from(project, service_dict):
                 spec.source))
 
     return [build_volume_from(vf) for vf in volumes_from]
+
+
+def warn_for_swarm_mode(client):
+    info = client.info()
+    if info.get('Swarm', {}).get('LocalNodeState') == 'active':
+        log.warn(
+            "The Docker Engine you're using is running in swarm mode.\n\n"
+            "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
+            "All containers will be scheduled on the current node.\n\n"
+            "To deploy your application across the swarm, "
+            "use the bundle feature of the Docker experimental build.\n\n"
+            "More info:\n"
+            "https://github.com/docker/docker/tree/master/experimental\n"
+        )
 
 
 class NoSuchService(Exception):
