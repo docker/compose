@@ -465,6 +465,7 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 func (c *container) createCmd(pid string, cmd *exec.Cmd, p *process) error {
 	p.cmd = cmd
 	if err := cmd.Start(); err != nil {
+		close(p.cmdDoneCh)
 		if exErr, ok := err.(*exec.Error); ok {
 			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
 				return fmt.Errorf("%s not installed on system", c.shim)
@@ -472,6 +473,13 @@ func (c *container) createCmd(pid string, cmd *exec.Cmd, p *process) error {
 		}
 		return err
 	}
+	go func() {
+		err := p.cmd.Wait()
+		if err == nil {
+			p.cmdSuccess = true
+		}
+		close(p.cmdDoneCh)
+	}()
 	if err := c.waitForCreate(p, cmd); err != nil {
 		return err
 	}

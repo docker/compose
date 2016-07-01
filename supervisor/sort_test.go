@@ -1,10 +1,10 @@
 package supervisor
 
 import (
+	"flag"
 	"os"
 	"sort"
 	"testing"
-	"flag"
 
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/specs"
@@ -71,7 +71,6 @@ func (p *testProcess) State() runtime.State {
 }
 
 func (p *testProcess) Wait() {
-
 }
 
 func TestSortProcesses(t *testing.T) {
