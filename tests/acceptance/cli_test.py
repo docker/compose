@@ -1216,6 +1216,18 @@ class CLITestCase(DockerClientTestCase):
             'simplecomposefile_simple_run_1',
             'exited'))
 
+    @mock.patch.dict(os.environ)
+    def test_run_env_values_from_system(self):
+        os.environ['FOO'] = 'bar'
+        os.environ['BAR'] = 'baz'
+
+        self.dispatch(['run', '-e', 'FOO', 'simple', 'true'], None)
+
+        container = self.project.containers(one_off=OneOffFilter.only, stopped=True)[0]
+        environment = container.get('Config.Env')
+        assert 'FOO=bar' in environment
+        assert 'BAR=baz' not in environment
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()

@@ -19,6 +19,7 @@ from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -891,7 +892,9 @@ def build_container_options(options, detach, command):
     }
 
     if options['-e']:
-        container_options['environment'] = parse_environment(options['-e'])
+        container_options['environment'] = Environment.from_command_line(
+            parse_environment(options['-e'])
+        )
 
     if options['--entrypoint']:
         container_options['entrypoint'] = options.get('--entrypoint')
