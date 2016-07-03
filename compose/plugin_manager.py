@@ -4,9 +4,13 @@ from __future__ import unicode_literals
 import imp
 import os
 import shutil
-import sys
 import tarfile
-import urllib.request as request
+
+try:
+    import urllib.request as request
+except ImportError:
+    import urllib2 as request
+
 import zipfile
 
 from .plugin import Plugin
@@ -50,7 +54,6 @@ class PluginManager(object):
                 "Missing __init__.py file."
             )
 
-        sys.path.append(path)  # doesn't work with pyinstaller :(
         plugin_instance = imp.load_source(current_plugin_dir, init_file)
 
         if not hasattr(plugin_instance, 'plugin'):
@@ -58,12 +61,13 @@ class PluginManager(object):
                 "Plugin '{}' is not a plugin. Missing plugin attribute.".format(current_plugin_dir)
             )
 
-        if not isinstance(plugin_instance.plugin, Plugin):
+        if not issubclass(plugin_instance.plugin, Plugin):
             raise InvalidPluginError(
                 "Wrong plugin instance.".format(current_plugin_dir)
             )
 
-        self.plugin_list[current_plugin_dir] = plugin_instance.plugin
+        self.plugin_list[current_plugin_dir] = plugin_instance.plugin({})  # TODO add config
+
         return self.plugin_list[current_plugin_dir]
 
     def __plugin_exists(self, name):
