@@ -12,8 +12,8 @@ Before you start, you’ll need to install the experimental build of Docker, and
 
 -   To install the experimental Docker build on a Mac, run these commands:
 
-        $ curl -L https://experimental.docker.com/builds/Darwin/x86_64/docker-latest > /usr/local/bin/docker
-        $ chmod +x /usr/local/bin/docker
+        $ sudo curl -L https://experimental.docker.com/builds/Darwin/x86_64/docker-latest -o /usr/local/bin/docker
+        $ sudo chmod +x /usr/local/bin/docker
 
 -   To install Machine, follow the instructions [here](https://docs.docker.com/machine/install-machine/).
 
