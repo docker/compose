@@ -178,7 +178,7 @@ class TopLevelCommand(object):
       pause              Pause services
       port               Print the public port for a port binding
       ps                 List containers
-      pull               Pulls service images
+      pull               Pull service images
       push               Push service images
       restart            Restart services
       rm                 Remove stopped containers
