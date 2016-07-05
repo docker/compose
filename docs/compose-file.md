@@ -818,7 +818,7 @@ called `data` and mount it into the `db` service's containers.
       db:
         image: postgres
         volumes:
-          - data:/var/lib/postgres/data
+          - data:/var/lib/postgresql/data
 
     volumes:
       data:
