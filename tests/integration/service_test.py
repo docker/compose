@@ -30,6 +30,7 @@ from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import Service
+from compose.service import ServiceError
 from tests.integration.testcases import v2_only
 
 
@@ -734,7 +735,8 @@ class ServiceTest(DockerClientTestCase):
                 explanation="Boom")):
 
             with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
-                service.scale(3)
+                with self.assertRaises(ServiceError):
+                    service.scale(3)
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
@@ -792,7 +794,8 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('app', container_name='custom-container')
         self.assertEqual(service.custom_container_name, 'custom-container')
 
-        service.scale(3)
+        with self.assertRaises(ServiceError):
+            service.scale(3)
 
         captured_output = mock_log.warn.call_args[0][0]
 

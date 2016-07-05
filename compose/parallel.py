@@ -222,33 +222,40 @@ class ParallelStreamWriter(object):
 
 
 def parallel_operation(containers, operation, options, message):
-    parallel_execute(
+    results, errors = parallel_execute(
         containers,
         operator.methodcaller(operation, **options),
         operator.attrgetter('name'),
         message)
+    return results, errors
 
 
 def parallel_remove(containers, options):
     stopped_containers = [c for c in containers if not c.is_running]
-    parallel_operation(stopped_containers, 'remove', options, 'Removing')
+    results, errors = parallel_operation(stopped_containers, 'remove', options, 'Removing')
+    return results, errors
 
 
 def parallel_start(containers, options):
-    parallel_operation(containers, 'start', options, 'Starting')
+    results, errors = parallel_operation(containers, 'start', options, 'Starting')
+    return results, errors
 
 
 def parallel_pause(containers, options):
-    parallel_operation(containers, 'pause', options, 'Pausing')
+    results, errors = parallel_operation(containers, 'pause', options, 'Pausing')
+    return results, errors
 
 
 def parallel_unpause(containers, options):
-    parallel_operation(containers, 'unpause', options, 'Unpausing')
+    results, errors = parallel_operation(containers, 'unpause', options, 'Unpausing')
+    return results, errors
 
 
 def parallel_kill(containers, options):
-    parallel_operation(containers, 'kill', options, 'Killing')
+    results, errors = parallel_operation(containers, 'kill', options, 'Killing')
+    return results, errors
 
 
 def parallel_restart(containers, options):
-    parallel_operation(containers, 'restart', options, 'Restarting')
+    results, errors = parallel_operation(containers, 'restart', options, 'Restarting')
+    return results, errors

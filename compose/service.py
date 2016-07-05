@@ -80,6 +80,11 @@ class NoSuchImageError(Exception):
     pass
 
 
+class ServiceError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+
 ServiceName = namedtuple('ServiceName', 'project service number')
 
 
@@ -167,6 +172,10 @@ class Service(object):
             self.start_container_if_stopped(c, **options)
         return containers
 
+    def check_errors(self, errors):
+        if errors:
+            raise ServiceError('Encountered errors while scaling service')
+
     def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
         """
         Adjusts the number of containers to the specified number and ensures
@@ -223,7 +232,9 @@ class Service(object):
                 else:
                     containers_to_start = stopped_containers
 
-                parallel_start(containers_to_start, {})
+                results, errors = parallel_start(containers_to_start, {})
+
+                self.check_errors(errors)
 
                 num_running += len(containers_to_start)
 
@@ -235,12 +246,14 @@ class Service(object):
                 )
             ]
 
-            parallel_execute(
+            results, errors = parallel_execute(
                 container_numbers,
                 lambda n: create_and_start(service=self, number=n),
                 lambda n: self.get_container_name(n),
                 "Creating and starting"
             )
+
+            self.check_errors(errors)
 
         if desired_num < num_running:
             num_to_stop = num_running - desired_num
@@ -249,12 +262,14 @@ class Service(object):
                 running_containers,
                 key=attrgetter('number'))
 
-            parallel_execute(
+            results, errors = parallel_execute(
                 sorted_running_containers[-num_to_stop:],
                 stop_and_remove,
                 lambda c: c.name,
                 "Stopping and removing",
             )
+
+            self.check_errors(errors)
 
     def create_container(self,
                          one_off=False,
