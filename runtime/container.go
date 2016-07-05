@@ -251,8 +251,8 @@ func (c *container) Delete() error {
 
 	args := c.runtimeArgs
 	args = append(args, "delete", c.id)
-	if derr := exec.Command(c.runtime, args...).Run(); err == nil {
-		err = derr
+	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); err != nil {
+		err = fmt.Errorf("%s: %q", derr, string(b))
 	}
 	return err
 }

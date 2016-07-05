@@ -8,6 +8,7 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/golang/protobuf/ptypes"
 	netcontext "golang.org/x/net/context"
 )
 
@@ -22,7 +23,7 @@ var eventsCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) {
 		var (
-			t int64
+			t = time.Time{}
 			c = getClient(context)
 		)
 		if ts := context.String("timestamp"); ts != "" {
@@ -30,15 +31,19 @@ var eventsCommand = cli.Command{
 			if err != nil {
 				fatal(err.Error(), 1)
 			}
-			t = from.Unix()
+			t = from
+		}
+		tsp, err := ptypes.TimestampProto(t)
+		if err != nil {
+			fatal(err.Error(), 1)
 		}
 		events, err := c.Events(netcontext.Background(), &types.EventsRequest{
-			Timestamp: uint64(t),
+			Timestamp: tsp,
 		})
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
-		w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
+		w := tabwriter.NewWriter(os.Stdout, 31, 1, 1, ' ', 0)
 		fmt.Fprint(w, "TIME\tTYPE\tID\tPID\tSTATUS\n")
 		w.Flush()
 		for {
@@ -46,7 +51,12 @@ var eventsCommand = cli.Command{
 			if err != nil {
 				fatal(err.Error(), 1)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", time.Unix(int64(e.Timestamp), 0).Format(time.RFC3339Nano), e.Type, e.Id, e.Pid, e.Status)
+			t, err := ptypes.Timestamp(e.Timestamp)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Unable to convert timestamp")
+				t = time.Time{}
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", t.Format(time.RFC3339Nano), e.Type, e.Id, e.Pid, e.Status)
 			w.Flush()
 		}
 	},

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package types;
 
+import "google/protobuf/timestamp.proto";
+
 service API {
 	rpc GetServerVersion(GetServerVersionRequest) returns (GetServerVersionResponse) {}
 	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
@@ -207,7 +209,8 @@ message UpdateContainerResponse {
 }
 
 message EventsRequest {
-	uint64 timestamp = 1;
+	// Tag 1 is deprecated (old uint64 timestamp)
+	google.protobuf.Timestamp timestamp = 2;
 }
 
 message Event {
@@ -215,7 +218,8 @@ message Event {
 	string id = 2;
 	uint32 status = 3;
 	string pid = 4;
-	uint64 timestamp = 5;
+	// Tag 5 is deprecated (old uint64 timestamp)
+	google.protobuf.Timestamp timestamp = 6;
 }
 
 message NetworkStats {
@@ -305,7 +309,8 @@ message CgroupStats {
 message StatsResponse {
 	repeated NetworkStats network_stats = 1;
 	CgroupStats cgroup_stats = 2;
-	uint64 timestamp = 3;
+	// Tag 3 is deprecated (old uint64 timestamp)
+	google.protobuf.Timestamp timestamp = 4;
 };
 
 message StatsRequest {

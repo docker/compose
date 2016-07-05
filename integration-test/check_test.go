@@ -21,6 +21,7 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	utils "github.com/docker/containerd/testutils"
 	"github.com/go-check/check"
+	"github.com/golang/protobuf/ptypes/timestamp"
 )
 
 func Test(t *testing.T) {
@@ -28,7 +29,7 @@ func Test(t *testing.T) {
 }
 
 func init() {
-	check.Suite(&ContainerdSuite{lastEventTs: uint64(time.Now().Unix())})
+	check.Suite(&ContainerdSuite{})
 }
 
 type ContainerdSuite struct {
@@ -42,7 +43,7 @@ type ContainerdSuite struct {
 	grpcClient        types.APIClient
 	eventFiltersMutex sync.Mutex
 	eventFilters      map[string]func(event *types.Event)
-	lastEventTs       uint64
+	lastEventTs       *timestamp.Timestamp
 }
 
 // getClient returns a connection to the Suite containerd
