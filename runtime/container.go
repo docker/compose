@@ -143,7 +143,7 @@ func New(opts ContainerOpts) (Container, error) {
 }
 
 // Load return a new container from the matchin state file on disk.
-func Load(root, id string, timeout time.Duration) (Container, error) {
+func Load(root, id, shimName string, timeout time.Duration) (Container, error) {
 	var s state
 	f, err := os.Open(filepath.Join(root, id, StateFile))
 	if err != nil {
@@ -165,6 +165,11 @@ func Load(root, id string, timeout time.Duration) (Container, error) {
 		processes:   make(map[string]*process),
 		timeout:     timeout,
 	}
+
+	if c.shim == "" {
+		c.shim = shimName
+	}
+
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
 	if err != nil {
 		return nil, err
