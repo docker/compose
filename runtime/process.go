@@ -132,6 +132,13 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 				return nil, err
 			}
 			p.exitPipe = exit
+
+			control, err := getControlPipe(filepath.Join(root, ControlFile))
+			if err != nil {
+				return nil, err
+			}
+			p.controlPipe = control
+
 			return p, nil
 		}
 		return nil, err
