@@ -103,3 +103,7 @@ def get_build_version():
 
     with open(filename) as fh:
         return fh.read().strip()
+
+
+def is_docker_for_mac_installed():
+    return is_mac() and os.path.isdir('/Applications/Docker.app')
