@@ -338,7 +338,7 @@ func (p *process) initializeIO(rootuid int) (i *IO, err error) {
 	}
 	fds = append(fds, r.Fd(), w.Fd())
 	p.stdio.stderr, i.Stderr = w, r
-	// change ownership of the pipes incase we are in a user namespace
+	// change ownership of the pipes in case we are in a user namespace
 	for _, fd := range fds {
 		if err := syscall.Fchown(int(fd), rootuid, rootuid); err != nil {
 			return nil, err
