@@ -4,6 +4,11 @@ Change log
 1.8.0 (2016-06-14)
 -----------------
 
+**Breaking Changes**
+
+- As announced in 1.7.0, `docker-compose rm` now removes containers
+  created by `docker-compose run` by default.
+
 New Features
 
 - Added `docker-compose bundle`, a command that builds a bundle file
@@ -12,9 +17,6 @@ New Features
 
 - Added `docker-compose push`, a command that pushes service images
   to a registry.
-
-- As announced in 1.7.0, `docker-compose rm` now removes containers
-  created by `docker-compose run` by default.
 
 - Compose now supports specifying a custom TLS version for
   interaction with the Docker Engine using the `COMPOSE_TLS_VERSION`
