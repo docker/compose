@@ -15,9 +15,11 @@ from . import errors
 from . import signals
 from .. import __version__
 from ..bundle import get_image_digests
+from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
@@ -216,26 +218,50 @@ class TopLevelCommand(object):
 
     def bundle(self, config_options, options):
         """
-        Generate a Docker bundle from the Compose file.
+        Generate a Distributed Application Bundle (DAB) from the Compose file.
 
-        Local images will be pushed to a Docker registry, and remote images
-        will be pulled to fetch an image digest.
+        Images must have digests stored, which requires interaction with a
+        Docker registry. If digests aren't stored for all images, you can pass
+        `--fetch-digests` to automatically fetch them. Images for services
+        with a `build` key will be pushed. Images for services without a
+        `build` key will be pulled.
 
         Usage: bundle [options]
 
         Options:
+            --fetch-digests            Automatically fetch image digests if missing
+
             -o, --output PATH          Path to write the bundle file to.
-                                       Defaults to "<project name>.dsb".
+                                       Defaults to "<project name>.dab".
         """
         self.project = project_from_options('.', config_options)
         compose_config = get_config_from_options(self.project_dir, config_options)
 
         output = options["--output"]
         if not output:
-            output = "{}.dsb".format(self.project.name)
+            output = "{}.dab".format(self.project.name)
 
         with errors.handle_connection_errors(self.project.client):
-            image_digests = get_image_digests(self.project)
+            try:
+                image_digests = get_image_digests(
+                    self.project,
+                    allow_fetch=options['--fetch-digests'],
+                )
+            except MissingDigests as e:
+                def list_images(images):
+                    return "\n".join("    {}".format(name) for name in sorted(images))
+
+                paras = ["Some images are missing digests."]
+
+                if e.needs_push:
+                    paras += ["The following images need to be pushed:", list_images(e.needs_push)]
+
+                if e.needs_pull:
+                    paras += ["The following images need to be pulled:", list_images(e.needs_pull)]
+
+                paras.append("If this is OK, run `docker-compose bundle --fetch-digests`.")
+
+                raise UserError("\n\n".join(paras))
 
         with open(output, 'w') as f:
             f.write(serialize_bundle(compose_config, image_digests))
@@ -866,7 +892,9 @@ def build_container_options(options, detach, command):
     }
 
     if options['-e']:
-        container_options['environment'] = parse_environment(options['-e'])
+        container_options['environment'] = Environment.from_command_line(
+            parse_environment(options['-e'])
+        )
 
     if options['--entrypoint']:
         container_options['entrypoint'] = options.get('--entrypoint')

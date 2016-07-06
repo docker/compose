@@ -12,6 +12,7 @@ from collections import Counter
 from collections import namedtuple
 from operator import attrgetter
 
+import py
 import yaml
 from docker import errors
 
@@ -377,6 +378,32 @@ class CLITestCase(DockerClientTestCase):
                 filters={"label": labels})
         ]
         assert not containers
+
+    def test_bundle_with_digests(self):
+        self.base_dir = 'tests/fixtures/bundle-with-digests/'
+        tmpdir = py.test.ensuretemp('cli_test_bundle')
+        self.addCleanup(tmpdir.remove)
+        filename = str(tmpdir.join('example.dab'))
+
+        self.dispatch(['bundle', '--output', filename])
+        with open(filename, 'r') as fh:
+            bundle = json.load(fh)
+
+        assert bundle == {
+            'Version': '0.1',
+            'Services': {
+                'web': {
+                    'Image': ('dockercloud/hello-world@sha256:fe79a2cfbd17eefc3'
+                              '44fb8419420808df95a1e22d93b7f621a7399fd1e9dca1d'),
+                    'Networks': ['default'],
+                },
+                'redis': {
+                    'Image': ('redis@sha256:a84cb8f53a70e19f61ff2e1d5e73fb7ae62d'
+                              '374b2b7392de1e7d77be26ef8f7b'),
+                    'Networks': ['default'],
+                }
+            },
+        }
 
     def test_create(self):
         self.dispatch(['create'])
@@ -1135,7 +1162,10 @@ class CLITestCase(DockerClientTestCase):
             ]
 
             for _, config in networks.items():
-                assert not config['Aliases']
+                # TODO: once we drop support for API <1.24, this can be changed to:
+                # assert config['Aliases'] == [container.short_id]
+                aliases = set(config['Aliases'] or []) - set([container.short_id])
+                assert not aliases
 
     @v2_only()
     def test_run_detached_connects_to_network(self):
@@ -1152,7 +1182,10 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         for _, config in networks.items():
-            assert not config['Aliases']
+            # TODO: once we drop support for API <1.24, this can be changed to:
+            # assert config['Aliases'] == [container.short_id]
+            aliases = set(config['Aliases'] or []) - set([container.short_id])
+            assert not aliases
 
         assert self.lookup(container, 'app')
         assert self.lookup(container, 'db')
@@ -1182,6 +1215,18 @@ class CLITestCase(DockerClientTestCase):
             self.project.client,
             'simplecomposefile_simple_run_1',
             'exited'))
+
+    @mock.patch.dict(os.environ)
+    def test_run_env_values_from_system(self):
+        os.environ['FOO'] = 'bar'
+        os.environ['BAR'] = 'baz'
+
+        self.dispatch(['run', '-e', 'FOO', 'simple', 'true'], None)
+
+        container = self.project.containers(one_off=OneOffFilter.only, stopped=True)[0]
+        environment = container.get('Config.Env')
+        assert 'FOO=bar' in environment
+        assert 'BAR=baz' not in environment
 
     def test_rm(self):
         service = self.project.get_service('simple')
