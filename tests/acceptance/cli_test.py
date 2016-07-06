@@ -1164,7 +1164,7 @@ class CLITestCase(DockerClientTestCase):
             for _, config in networks.items():
                 # TODO: once we drop support for API <1.24, this can be changed to:
                 # assert config['Aliases'] == [container.short_id]
-                aliases = set(config['Aliases']) - set([container.short_id])
+                aliases = set(config['Aliases'] or []) - set([container.short_id])
                 assert not aliases
 
     @v2_only()
@@ -1184,7 +1184,7 @@ class CLITestCase(DockerClientTestCase):
         for _, config in networks.items():
             # TODO: once we drop support for API <1.24, this can be changed to:
             # assert config['Aliases'] == [container.short_id]
-            aliases = set(config['Aliases']) - set([container.short_id])
+            aliases = set(config['Aliases'] or []) - set([container.short_id])
             assert not aliases
 
         assert self.lookup(container, 'app')
