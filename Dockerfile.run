@@ -1,8 +1,11 @@
 
 FROM    alpine:edge
 RUN     apk -U add \
+            curl \
             python \
             py-pip
+
+RUN     curl https://bootstrap.pypa.io/ez_setup.py | python -
 
 COPY    requirements.txt /code/requirements.txt
 RUN     pip install -r /code/requirements.txt
