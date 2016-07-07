@@ -13,7 +13,6 @@ from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
-from ..const import HTTP_TIMEOUT
 from .utils import call_silently
 from .utils import is_docker_for_mac_installed
 from .utils import is_mac
@@ -47,7 +46,7 @@ def handle_connection_errors(client):
         raise ConnectionError()
     except RequestsConnectionError as e:
         if e.args and isinstance(e.args[0], ReadTimeoutError):
-            log_timeout_error()
+            log_timeout_error(client.timeout)
             raise ConnectionError()
         exit_with_error(get_conn_error_message(client.base_url))
     except APIError as e:
@@ -58,13 +57,13 @@ def handle_connection_errors(client):
         raise ConnectionError()
 
 
-def log_timeout_error():
+def log_timeout_error(timeout):
     log.error(
         "An HTTP request took too long to complete. Retry with --verbose to "
         "obtain debug information.\n"
         "If you encounter this issue regularly because of slow network "
         "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
-        "value (current value: %s)." % HTTP_TIMEOUT)
+        "value (current value: %s)." % timeout)
 
 
 def log_api_error(e, client_version):
