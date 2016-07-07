@@ -74,6 +74,14 @@ This will result in an image named `webapp` and tagged `tag`, built from `./dir`
 > -   Using `build` together with `image` is not allowed. Attempting to do so
 >     results in an error.
 
+Specifying args requires using [args](#args) in the Dockerfile for consumption.
+
+     FROM $CONTAINER:$TAG
+     ARG NODE_ENV
+     ENV NODE_ENV ${NODE_ENV}
+
+In combination with passing environmental variables to Compose via an environment file or your local shell, you are now able to specify build-time values.
+
 #### context
 
 > [Version 2 file format](#version-2) only. In version 1, just use
