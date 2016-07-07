@@ -6,6 +6,7 @@ import os
 import docker
 import pytest
 
+from compose.cli import errors
 from compose.cli.docker_client import docker_client
 from compose.cli.docker_client import tls_config_from_options
 from tests import mock
@@ -19,11 +20,25 @@ class DockerClientTestCase(unittest.TestCase):
             del os.environ['HOME']
             docker_client(os.environ)
 
+    @mock.patch.dict(os.environ)
     def test_docker_client_with_custom_timeout(self):
-        timeout = 300
-        with mock.patch('compose.cli.docker_client.HTTP_TIMEOUT', 300):
-            client = docker_client(os.environ)
-            self.assertEqual(client.timeout, int(timeout))
+        os.environ['COMPOSE_HTTP_TIMEOUT'] = '123'
+        client = docker_client(os.environ)
+        assert client.timeout == 123
+
+    @mock.patch.dict(os.environ)
+    def test_custom_timeout_error(self):
+        os.environ['COMPOSE_HTTP_TIMEOUT'] = '123'
+        client = docker_client(os.environ)
+
+        with mock.patch('compose.cli.errors.log') as fake_log:
+            with pytest.raises(errors.ConnectionError):
+                with errors.handle_connection_errors(client):
+                    raise errors.RequestsConnectionError(
+                        errors.ReadTimeoutError(None, None, None))
+
+        assert fake_log.error.call_count == 1
+        assert '123' in fake_log.error.call_args[0][0]
 
 
 class TLSConfigTestCase(unittest.TestCase):
