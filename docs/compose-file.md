@@ -889,6 +889,20 @@ A full example:
             host2: 172.28.1.6
             host3: 172.28.1.7
 
+### group_add
+
+Specify additional groups (by name or number) which the user inside the container will be a member of. Groups must exist in both the container and the host system to be added. An example of where this is useful is when multiple containers (running as different users) need to all read or write the same file on the host system. That file can be owned by a group shared by all the containers, and specified in `group_add`. See the [Docker documentation](https://docs.docker.com/engine/reference/run/#/additional-groups) for more details.
+
+A full example:
+
+    version: '2'
+    services:
+        image: alpine
+        group_add:
+          - mail
+
+Running `id` inside the created container will show that the user belongs to the `mail` group, which would not have been the case if `group_add` were not used.
+
 ### internal
 
 By default, Docker also connects a bridge network to it to provide external connectivity. If you want to create an externally isolated overlay network, you can set this option to `true`.
