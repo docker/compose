@@ -69,6 +69,7 @@ DOCKER_CONFIG_KEYS = [
     'mac_address',
     'mem_limit',
     'memswap_limit',
+    'memory_reservation',
     'net',
     'oom_score_adj'
     'pid',
