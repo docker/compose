@@ -859,6 +859,10 @@ A full example:
             host2: 172.28.1.6
             host3: 172.28.1.7
 
+### internal
+
+By default, Docker also connects a bridge network to it to provide external connectivity. If you want to create an externally isolated overlay network, you can set this option to `true`.
+
 ### external
 
 If set to `true`, specifies that this network has been created outside of
@@ -866,7 +870,7 @@ Compose. `docker-compose up` will not attempt to create it, and will raise
 an error if it doesn't exist.
 
 `external` cannot be used in conjunction with other network configuration keys
-(`driver`, `driver_opts`, `ipam`).
+(`driver`, `driver_opts`, `ipam`, `internal`).
 
 In the example below, `proxy` is the gateway to the outside world. Instead of
 attemping to create a network called `[projectname]_outside`, Compose will

@@ -577,6 +577,24 @@ class CLITestCase(DockerClientTestCase):
         assert 'ahead' in front_aliases
 
     @v2_only()
+    def test_up_with_network_internal(self):
+        self.require_api_version('1.23')
+        filename = 'network-internal.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+        internal_net = '{}_internal'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # One network was created: internal
+        assert sorted(n['Name'] for n in networks) == [internal_net]
+
+        assert networks[0]['Internal'] is True
+
+    @v2_only()
     def test_up_with_network_static_addresses(self):
         filename = 'network-static-addresses.yml'
         ipv4_address = '172.16.100.100'
