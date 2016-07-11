@@ -668,8 +668,10 @@ class TopLevelCommand(object):
                 'can not be used together'
             )
 
-        if options['COMMAND']:
+        if options['COMMAND'] is not None:
             command = [options['COMMAND']] + options['ARGS']
+        elif options['--entrypoint'] is not None:
+            command = []
         else:
             command = service.options.get('command')
 
