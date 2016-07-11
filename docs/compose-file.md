@@ -734,6 +734,7 @@ Each of these is a single value, analogous to its
 
     mem_limit: 1000000000
     memswap_limit: 2000000000
+    mem_reservation: 500000000
     privileged: true
 
     restart: always
