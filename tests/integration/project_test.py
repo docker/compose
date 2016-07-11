@@ -757,6 +757,33 @@ class ProjectTest(DockerClientTestCase):
             project.up()
 
     @v2_only()
+    def test_project_up_with_network_internal(self):
+        self.require_api_version('1.23')
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {'internal': None},
+            }],
+            volumes={},
+            networks={
+                'internal': {'driver': 'bridge', 'internal': True},
+            },
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up()
+
+        network = self.client.networks(names=['composetest_internal'])[0]
+
+        assert network['Internal'] is True
+
+    @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
