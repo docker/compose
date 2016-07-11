@@ -1,0 +1,6 @@
+version: "2"
+services:
+  test:
+    image: busybox
+    entrypoint: printf
+    command: default args

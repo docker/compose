@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import datetime
 import json
 import os
-import shlex
 import signal
 import subprocess
 import time
@@ -965,16 +964,54 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    def test_run_service_with_entrypoint_overridden(self):
-        self.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
-        name = 'service'
-        self.dispatch(['run', '--entrypoint', '/bin/echo', name, 'helloworld'])
-        service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
-        self.assertEqual(
-            shlex.split(container.human_readable_command),
-            [u'/bin/echo', u'helloworld'],
-        )
+    def test_run_service_with_dockerfile_entrypoint(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['printf']
+        assert container.get('Config.Cmd') == ['default', 'args']
+
+    def test_run_service_with_dockerfile_entrypoint_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert not container.get('Config.Cmd')
+
+    def test_run_service_with_dockerfile_entrypoint_and_command_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test', 'foo'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert container.get('Config.Cmd') == ['foo']
+
+    def test_run_service_with_compose_file_entrypoint(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['printf']
+        assert container.get('Config.Cmd') == ['default', 'args']
+
+    def test_run_service_with_compose_file_entrypoint_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert not container.get('Config.Cmd')
+
+    def test_run_service_with_compose_file_entrypoint_and_command_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test', 'foo'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert container.get('Config.Cmd') == ['foo']
+
+    def test_run_service_with_compose_file_entrypoint_and_empty_string_command(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test', ''])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert container.get('Config.Cmd') == ['']
 
     def test_run_service_with_user_overridden(self):
         self.base_dir = 'tests/fixtures/user-composefile'
