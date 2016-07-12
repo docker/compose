@@ -185,7 +185,6 @@ class ServiceTest(unittest.TestCase):
             500000000
         )
 
-
     def test_cgroup_parent(self):
         self.mock_client.create_host_config.return_value = {}
 
