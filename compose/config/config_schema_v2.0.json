@@ -247,7 +247,8 @@
             "name": {"type": "string"}
           },
           "additionalProperties": false
-        }
+        },
+        "internal": {"type": "boolean"}
       },
       "additionalProperties": false
     },

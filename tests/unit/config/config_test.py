@@ -101,6 +101,10 @@ class ConfigTest(unittest.TestCase):
                                 {'subnet': '172.28.0.0/16'}
                             ]
                         }
+                    },
+                    'internal': {
+                        'driver': 'bridge',
+                        'internal': True
                     }
                 }
             }, 'working_dir', 'filename.yml')
@@ -140,6 +144,10 @@ class ConfigTest(unittest.TestCase):
                         {'subnet': '172.28.0.0/16'}
                     ]
                 }
+            },
+            'internal': {
+                'driver': 'bridge',
+                'internal': True
             }
         })
 
