@@ -56,6 +56,7 @@ DOCKER_CONFIG_KEYS = [
     'devices',
     'dns',
     'dns_search',
+    'dns_opt',
     'domainname',
     'entrypoint',
     'env_file',
