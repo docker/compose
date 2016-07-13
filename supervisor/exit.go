@@ -41,7 +41,7 @@ func (s *Supervisor) exit(t *ExitTask) error {
 			Status:  status,
 			Process: proc,
 		}
-		s.SendTask(ne)
+		s.execExit(ne)
 		return nil
 	}
 	container := proc.Container()
@@ -50,7 +50,7 @@ func (s *Supervisor) exit(t *ExitTask) error {
 		Status: status,
 		PID:    proc.ID(),
 	}
-	s.SendTask(ne)
+	s.delete(ne)
 
 	ExitProcessTimer.UpdateSince(start)
 

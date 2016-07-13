@@ -160,8 +160,14 @@ func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.
 }
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
+
+	getState := func(c runtime.Container) (interface{}, error) {
+		return createAPIContainer(c, true)
+	}
+
 	e := &supervisor.GetContainersTask{}
 	e.ID = r.Id
+	e.GetState = getState
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err
@@ -173,12 +179,8 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 			Memory: uint64(m.Memory),
 		},
 	}
-	for _, c := range e.Containers {
-		apiC, err := createAPIContainer(c, true)
-		if err != nil {
-			return nil, err
-		}
-		state.Containers = append(state.Containers, apiC)
+	for idx := range e.Containers {
+		state.Containers = append(state.Containers, e.States[idx].(*types.Container))
 	}
 	return state, nil
 }
@@ -318,21 +320,26 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 		}
 		t = from
 	}
-	events := s.sv.Events(t)
+	if r.StoredOnly && t.IsZero() {
+		return fmt.Errorf("invalid parameter: StoredOnly cannot be specified without setting a valid Timestamp")
+	}
+	events := s.sv.Events(t, r.StoredOnly, r.Id)
 	defer s.sv.Unsubscribe(events)
 	for e := range events {
 		tsp, err := ptypes.TimestampProto(e.Timestamp)
 		if err != nil {
 			return err
 		}
-		if err := stream.Send(&types.Event{
-			Id:        e.ID,
-			Type:      e.Type,
-			Timestamp: tsp,
-			Pid:       e.PID,
-			Status:    uint32(e.Status),
-		}); err != nil {
-			return err
+		if r.Id == "" || e.ID == r.Id {
+			if err := stream.Send(&types.Event{
+				Id:        e.ID,
+				Type:      e.Type,
+				Timestamp: tsp,
+				Pid:       e.PID,
+				Status:    uint32(e.Status),
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

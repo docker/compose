@@ -211,6 +211,8 @@ message UpdateContainerResponse {
 message EventsRequest {
 	// Tag 1 is deprecated (old uint64 timestamp)
 	google.protobuf.Timestamp timestamp = 2;
+	bool storedOnly = 3;
+	string id = 4;
 }
 
 message Event {

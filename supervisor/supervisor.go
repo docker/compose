@@ -64,7 +64,7 @@ func setupEventLog(s *Supervisor, retainCount int) error {
 		return err
 	}
 	logrus.WithField("count", len(s.eventLog)).Debug("containerd: read past events")
-	events := s.Events(time.Time{})
+	events := s.Events(time.Time{}, false, "")
 	return eventLogger(s, filepath.Join(s.stateDir, "events.log"), events, retainCount)
 }
 
@@ -191,12 +191,13 @@ type Event struct {
 
 // Events returns an event channel that external consumers can use to receive updates
 // on container events
-func (s *Supervisor) Events(from time.Time) chan Event {
+func (s *Supervisor) Events(from time.Time, storedOnly bool, id string) chan Event {
+	c := make(chan Event, defaultBufferSize)
+	if storedOnly {
+		defer s.Unsubscribe(c)
+	}
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
-	c := make(chan Event, defaultBufferSize)
-	EventSubscriberCounter.Inc(1)
-	s.subscribers[c] = struct{}{}
 	if !from.IsZero() {
 		// replay old event
 		s.eventLock.Lock()
@@ -204,14 +205,17 @@ func (s *Supervisor) Events(from time.Time) chan Event {
 		s.eventLock.Unlock()
 		for _, e := range past {
 			if e.Timestamp.After(from) {
-				c <- e
+				if id == "" || e.ID == id {
+					c <- e
+				}
 			}
 		}
-		// Notify the client that from now on it's live events
-		c <- Event{
-			Type:      StateLive,
-			Timestamp: time.Now(),
-		}
+	}
+	if storedOnly {
+		close(c)
+	} else {
+		EventSubscriberCounter.Inc(1)
+		s.subscribers[c] = struct{}{}
 	}
 	return c
 }
@@ -220,9 +224,11 @@ func (s *Supervisor) Events(from time.Time) chan Event {
 func (s *Supervisor) Unsubscribe(sub chan Event) {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
-	delete(s.subscribers, sub)
-	close(sub)
-	EventSubscriberCounter.Dec(1)
+	if _, ok := s.subscribers[sub]; ok {
+		delete(s.subscribers, sub)
+		close(sub)
+		EventSubscriberCounter.Dec(1)
+	}
 }
 
 // notifySubscribers will send the provided event to the external subscribers
@@ -364,8 +370,6 @@ func (s *Supervisor) handleTask(i Task) {
 		err = s.delete(t)
 	case *ExitTask:
 		err = s.exit(t)
-	case *ExecExitTask:
-		err = s.execExit(t)
 	case *GetContainersTask:
 		err = s.getContainers(t)
 	case *SignalTask:

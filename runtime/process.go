@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 
 	"github.com/docker/containerd/specs"
@@ -68,6 +69,7 @@ func newProcess(config *processConfig) (*process, error) {
 		spec:      config.processSpec,
 		stdio:     config.stdio,
 		cmdDoneCh: make(chan struct{}),
+		state:     Running,
 	}
 	uid, gid, err := getRootIDs(config.spec)
 	if err != nil {
@@ -121,6 +123,7 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 			Stdout: s.Stdout,
 			Stderr: s.Stderr,
 		},
+		state: Stopped,
 	}
 	if _, err := p.getPidFromFile(); err != nil {
 		return nil, err
@@ -139,6 +142,7 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 			}
 			p.controlPipe = control
 
+			p.state = Running
 			return p, nil
 		}
 		return nil, err
@@ -158,6 +162,8 @@ type process struct {
 	cmd         *exec.Cmd
 	cmdSuccess  bool
 	cmdDoneCh   chan struct{}
+	state       State
+	stateLock   sync.Mutex
 }
 
 func (p *process) ID() string {
@@ -198,6 +204,9 @@ func (p *process) ExitStatus() (int, error) {
 	if len(data) == 0 {
 		return -1, ErrProcessNotExited
 	}
+	p.stateLock.Lock()
+	p.state = Stopped
+	p.stateLock.Unlock()
 	return strconv.Atoi(string(data))
 }
 
@@ -219,14 +228,9 @@ func (p *process) Close() error {
 }
 
 func (p *process) State() State {
-	if p.pid == 0 {
-		return Stopped
-	}
-	err := syscall.Kill(p.pid, 0)
-	if err != nil && err == syscall.ESRCH {
-		return Stopped
-	}
-	return Running
+	p.stateLock.Lock()
+	defer p.stateLock.Unlock()
+	return p.state
 }
 
 func (p *process) getPidFromFile() (int, error) {

@@ -9,14 +9,32 @@ import (
 	"path/filepath"
 	"sort"
 	"syscall"
+	"time"
 
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/net/context"
 )
 
 func (cs *ContainerdSuite) GetLogs() string {
 	b, _ := ioutil.ReadFile(cs.logFile.Name())
 	return string(b)
+}
+
+func (cs *ContainerdSuite) Events(from time.Time, storedOnly bool, id string) (types.API_EventsClient, error) {
+	var (
+		ftsp *timestamp.Timestamp
+		err  error
+	)
+	if !from.IsZero() {
+		ftsp, err = ptypes.TimestampProto(from)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return cs.grpcClient.Events(context.Background(), &types.EventsRequest{Timestamp: ftsp, StoredOnly: storedOnly, Id: id})
 }
 
 func (cs *ContainerdSuite) ListRunningContainers() ([]*types.Container, error) {
