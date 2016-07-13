@@ -1411,7 +1411,6 @@ class ConfigTest(unittest.TestCase):
         ]
 
     def test_group_add_option(self):
-
         actual = config.load(build_config_details({
             'version': '2',
             'services': {
@@ -1427,6 +1426,25 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'alpine',
                 'group_add': ["docker", 777]
+            }
+        ]
+
+    def test_dns_opt_option(self):
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'dns_opt': ["use-vc", "no-tld-query"]
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'dns_opt': ["use-vc", "no-tld-query"]
             }
         ]
 
