@@ -79,7 +79,7 @@ var createCheckpointCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "unix-sockets",
-			Usage: "perist unix sockets",
+			Usage: "persist unix sockets",
 		},
 		cli.BoolFlag{
 			Name:  "exit",
