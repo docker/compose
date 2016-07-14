@@ -187,7 +187,7 @@ message StateResponse {
 message UpdateContainerRequest {
 	string id = 1; // ID of container
 	string pid = 2;
-	string status = 3; // Status to whcih containerd will try to change
+	string status = 3; // Status to which containerd will try to change
 	UpdateResource resources =4;
 }
 
@@ -283,7 +283,7 @@ message BlkioStatsEntry {
 }
 
 message BlkioStats {
-	repeated BlkioStatsEntry io_service_bytes_recursive = 1; // number of bytes tranferred to and from the block device
+	repeated BlkioStatsEntry io_service_bytes_recursive = 1; // number of bytes transferred to and from the block device
 	repeated BlkioStatsEntry io_serviced_recursive = 2;
 	repeated BlkioStatsEntry io_queued_recursive = 3;
 	repeated BlkioStatsEntry io_service_time_recursive = 4;
