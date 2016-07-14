@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# Backwards compatiblity for jenkins
+# jenkins entrypoint 
 #
-# TODO: remove this script after all current PRs and jenkins are updated with
-# the new script/test/ci change
-set -e
-exec script/test/ci
+set -eu
+
+curl -L -o dobi-linux 'https://github.com/dnephin/dobi/releases/download/v0.2/dobi-linux'
+chmod +x dobi-linux
+DOCKER_API_VERSION=1.22 ./dobi-linux ci

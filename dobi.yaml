@@ -1,0 +1,119 @@
+#
+# Dobi project configuration
+# https://github.com/dnephin/dobi
+#
+
+meta:
+    project: compose
+    default: all
+    exec-id: '{env.BUILD_NUMBER:user}'
+
+#
+# Mounts
+#
+mount=source:
+    bind: .
+    path: /code
+
+mount=dot-git:
+    bind: .git
+    path: /code/.git
+
+mount=dist:
+    bind: dist/
+    path: /code/dist
+
+#
+# Images
+#
+image=builder:
+    image: compose-dev
+    tags: ['{git.short-sha}']
+    context: .
+
+image=dist-image:
+    image: docker/compose
+    tags: ['{env.COMPOSE_VERSION}']
+    dockerfile: Dockerfile.run
+    context: .
+    depends: [source-tarball, write-git-sha]
+
+# TODO: image with all release dependencies
+#image=releaser
+
+# TODO: image and run to replace docs/Makefile
+
+#
+# Run containers
+#
+run=shell:
+    use: builder
+    mounts: [source]
+    interactive: true
+    entrypoint: "bash"
+    provide-docker: true
+
+# TODO: separate image for linting, and remove linting from builder Dockerfile
+#image=linter
+run=lint:
+    use: builder
+    mounts: [dot-git]
+    interactive: true
+    entrypoint: "tox -e pre-commit"
+
+run=test-all:
+    use: builder
+    mounts: [dot-git]
+    interactive: true
+    provide-docker: true
+    entrypoint: "script/test/all"
+    env:
+      - "DOCKER_VERSIONS={env.TEST_DOCKER_VERSIONS:all}"
+      - "DOCKER_DAEMON_ARGS=--storage-driver={env.STORAGE_DRIVER:overlay}"
+      # This must match the image and tag used by `builder`
+      - "TAG=compose-dev:{git.short-sha}"
+
+run=binary-linux:
+    use: builder
+    mounts: [dot-git, dist]
+    entrypoint: "script/build/linux-entrypoint"
+    depends: [clean]
+
+run=source-tarball:
+    use: builder
+    # TODO: how to support variables or globbing in artifact name?
+    artifact: dist/
+    mounts: [dot-git, dist]
+    entrypoint: "bash -c '
+                 python setup.py sdist &&
+                 cp dist/docker-compose-*.tar.gz dist/docker-compose-release.tar.gz'"
+    depends: [clean]
+
+# Write the current commit sha to the file GITSHA. This file is included in
+# packaging so that `docker-compose version` can output the git sha used to
+# build the package.
+run=write-git-sha:
+    use: builder
+    artifact: compose/GITSHA
+    mounts: [source]
+    entrypoint: "script/build/write-git-sha"
+
+run=clean:
+    use: builder
+    mounts: [source]
+    entrypoint: "script/clean"
+
+#
+# Aliases
+#
+alias=test:
+    tasks: [test-all]
+
+alias=build:
+    tasks: [binary-linux]
+
+alias=all:
+    tasks: [lint, test]
+
+alias=ci:
+    tasks: [lint, test, build]

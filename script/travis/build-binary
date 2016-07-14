@@ -3,7 +3,10 @@
 set -ex
 
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-    script/build/linux
+    wget 'https://github.com/dnephin/dobi/releases/download/v0.2/dobi-linux'
+    chmod +x dobi-linux
+    DOCKER_API_VERSION=1.20 ./dobi-linux binary-linux
+
     # TODO: requires auth to push, so disable for now
     # script/build/image master
     # docker push docker/compose:master

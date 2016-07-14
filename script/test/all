@@ -4,13 +4,6 @@
 
 set -e
 
->&2 echo "Running lint checks"
-docker run --rm \
-  --tty \
-  ${GIT_VOLUME} \
-  --entrypoint="tox" \
-  "$TAG" -e pre-commit
-
 get_versions="docker run --rm
     --entrypoint=/code/.tox/py27/bin/python
     $TAG
