@@ -14,6 +14,7 @@ type DeleteTask struct {
 	Status  int
 	PID     string
 	NoEvent bool
+	Process runtime.Process
 }
 
 func (s *Supervisor) delete(t *DeleteTask) error {
@@ -21,6 +22,9 @@ func (s *Supervisor) delete(t *DeleteTask) error {
 		start := time.Now()
 		if err := s.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
+		}
+		if t.Process != nil {
+			t.Process.Wait()
 		}
 		if !t.NoEvent {
 			s.notifySubscribers(Event{

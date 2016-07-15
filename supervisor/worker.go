@@ -51,6 +51,7 @@ func (w *worker) Start() {
 			evt := &DeleteTask{
 				ID:      t.Container.ID(),
 				NoEvent: true,
+				Process: process,
 			}
 			w.s.SendTask(evt)
 			continue
@@ -66,6 +67,7 @@ func (w *worker) Start() {
 			evt := &DeleteTask{
 				ID:      t.Container.ID(),
 				NoEvent: true,
+				Process: process,
 			}
 			w.s.SendTask(evt)
 			continue
@@ -76,6 +78,7 @@ func (w *worker) Start() {
 			evt := &DeleteTask{
 				ID:      t.Container.ID(),
 				NoEvent: true,
+				Process: process,
 			}
 			w.s.SendTask(evt)
 			continue

@@ -46,9 +46,10 @@ func (s *Supervisor) exit(t *ExitTask) error {
 	}
 	container := proc.Container()
 	ne := &DeleteTask{
-		ID:     container.ID(),
-		Status: status,
-		PID:    proc.ID(),
+		ID:      container.ID(),
+		Status:  status,
+		PID:     proc.ID(),
+		Process: proc,
 	}
 	s.delete(ne)
 
@@ -72,6 +73,7 @@ func (s *Supervisor) execExit(t *ExecExitTask) error {
 	if err := container.RemoveProcess(t.PID); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
+	t.Process.Wait()
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
 		ID:        t.ID,

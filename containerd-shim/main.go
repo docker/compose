@@ -115,6 +115,7 @@ func start(log *os.File) error {
 			// runtime has exited so the shim can also exit
 			if exitShim {
 				// Let containerd take care of calling the runtime delete
+				f.Close()
 				p.Wait()
 				return nil
 			}

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -9,14 +10,13 @@ import (
 	"syscall"
 	"testing"
 	"time"
-	"flag"
 
 	utils "github.com/docker/containerd/testutils"
 )
 
 var (
-	devNull = "/dev/null"
-	stdin   io.WriteCloser
+	devNull     = "/dev/null"
+	stdin       io.WriteCloser
 	runtimeTool = flag.String("runtime", "runc", "Runtime to use for this test")
 )
 
@@ -163,12 +163,16 @@ func BenchmarkBusyboxSh(b *testing.B) {
 }
 
 func benchmarkStartContainer(b *testing.B, c Container, s Stdio, bundleName string) {
-	if _, err := c.Start("", s); err != nil {
+	p, err := c.Start("", s)
+	if err != nil {
 		b.Fatalf("Error starting container %v", err)
 	}
 
 	kill := exec.Command(c.Runtime(), "kill", bundleName, "KILL")
 	kill.Run()
+
+	p.Wait()
+	c.Delete()
 
 	// wait for kill to finish. selected wait time is arbitrary
 	time.Sleep(500 * time.Millisecond)
