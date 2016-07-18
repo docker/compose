@@ -26,7 +26,7 @@ class PluginTest(unittest.TestCase):
 
         with mock.patch('compose.plugin.open', m, create=True):
             Plugin.__init__ = mock.Mock(return_value=None)
-            plugin = Plugin()
+            plugin = Plugin(None)  # TODO plugin_manager mock
             plugin.load_plugin_info_from_file('plugin.json')
 
             assert plugin.name == 'Plugin name'
