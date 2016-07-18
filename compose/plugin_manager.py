@@ -33,17 +33,7 @@ class PluginManager(object):
     def __init__(self, plugin_dir):
         self.plugin_dir = plugin_dir
         self.__plugin_download_dir = os.path.join(self.plugin_dir, '.downloads')
-        self.plugin_list = {}
-
-        if os.path.isdir(plugin_dir):
-            for current_plugin_dir in os.listdir(self.plugin_dir):
-                plugin_path = os.path.join(self.plugin_dir, current_plugin_dir)
-
-                if os.path.isdir(plugin_path):
-                    try:
-                        self.__load_plugin(plugin_path)
-                    except InvalidPluginError:
-                        print("Invalid plugin '{}' installed".format(current_plugin_dir))
+        self.plugin_list = None
 
     def __load_plugin(self, path):
         current_plugin_dir = os.path.basename(path)
@@ -66,15 +56,29 @@ class PluginManager(object):
                 "Wrong plugin instance.".format(current_plugin_dir)
             )
 
-        self.plugin_list[current_plugin_dir] = plugin_instance.plugin({})  # TODO add config
-
-        return self.plugin_list[current_plugin_dir]
+        return plugin_instance.plugin(self)
 
     def __plugin_exists(self, name):
-        if name not in self.plugin_list:
+        if name not in self.get_plugins():
             raise PluginDoesNotExistError("Plugin '{}' doesn't exists".format(name))
 
     def get_plugins(self):
+        if self.plugin_list is None:
+            self.plugin_list = {}
+
+            if os.path.isdir(self.plugin_dir):
+                for current_plugin_dir in os.listdir(self.plugin_dir):
+                    plugin_path = os.path.join(self.plugin_dir, current_plugin_dir)
+
+                    if os.path.isdir(plugin_path):
+                        try:
+                            plugin = self.__load_plugin(plugin_path)
+                            self.plugin_list[plugin.id] = plugin
+                        except InvalidPluginError:
+                            print("Invalid plugin '{}' installed".format(current_plugin_dir))
+                        except TypeError as e:
+                            print("Invalid plugin error: {}".format(str(e)))
+
         return self.plugin_list
 
     def is_plugin_installed(self, name):

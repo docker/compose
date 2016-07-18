@@ -81,6 +81,8 @@ def main():
 
 
 def dispatch():
+    plugin_manager = PluginManager(get_plugin_dir())
+    plugin_manager.get_plugins()  # TODO
     setup_logging()
     dispatcher = DocoptDispatcher(
         TopLevelCommand,
@@ -94,27 +96,34 @@ def dispatch():
         sys.exit(1)
 
     setup_console_handler(console_handler, options.get('--verbose'))
-    return functools.partial(perform_command, options, handler, command_options)
+    return functools.partial(perform_command, options, handler, command_options, plugin_manager)
 
 
-def perform_command(options, handler, command_options):
+def perform_command(options, handler, command_options, plugin_manager):
     if options['COMMAND'] in ('help', 'version'):
         # Skip looking up the compose file.
         handler(command_options)
         return
 
     if options['COMMAND'] == 'config':
-        command = TopLevelCommand(None)
+        command = TopLevelCommand(None, plugin_manager)
         handler(command, options, command_options)
         return
 
-    if options['COMMAND'] == 'plugin':
-        command = TopLevelCommand(None)
+    none_project_commands = ['plugin']
+
+    for tlc_command in TopLevelCommand.__dict__:
+        if hasattr(getattr(TopLevelCommand, tlc_command), '__standalone__') and \
+           getattr(TopLevelCommand, tlc_command).__standalone__ is True:
+            none_project_commands.append(tlc_command)
+
+    if options['COMMAND'] in none_project_commands:
+        command = TopLevelCommand(None, plugin_manager)
         handler(command, command_options)
         return
 
     project = project_from_options('.', options)
-    command = TopLevelCommand(project)
+    command = TopLevelCommand(project, plugin_manager)
     with errors.handle_connection_errors(project.client):
         handler(command, command_options)
 
@@ -198,10 +207,10 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, project_dir='.'):
+    def __init__(self, project, plugin_manager, project_dir='.'):
         self.project = project
-        self.project_dir = '.'
-        self.plugin_manager = PluginManager(get_plugin_dir())
+        self.plugin_manager = plugin_manager
+        self.project_dir = project_dir
 
     def build(self, options):
         """
