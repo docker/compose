@@ -274,6 +274,11 @@ beginning with `#` (i.e. comments) are ignored, as are blank lines.
     # Set Rails/Rack environment
     RACK_ENV=development
 
+> **Note:** If your service specifies a [build](#build) option, variables
+> defined in environment files will _not_ be automatically visible during the
+> build. Use the [args](#args) sub-option of `build` to define build-time
+> environment variables.
+
 ### environment
 
 Add environment variables. You can use either an array or a dictionary. Any
@@ -292,6 +297,11 @@ machine Compose is running on, which can be helpful for secret or host-specific 
       - RACK_ENV=development
       - SHOW=true
       - SESSION_SECRET
+
+> **Note:** If your service specifies a [build](#build) option, variables
+> defined in `environment` will _not_ be automatically visible during the
+> build. Use the [args](#args) sub-option of `build` to define build-time
+> environment variables.
 
 ### expose
 
