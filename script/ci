@@ -2,8 +2,20 @@
 #
 # jenkins entrypoint 
 #
-set -eu
+set -eux
 
 curl -L -o dobi-linux 'https://github.com/dnephin/dobi/releases/download/v0.2/dobi-linux'
 chmod +x dobi-linux
-DOCKER_API_VERSION=1.22 ./dobi-linux ci
+
+# Jenkins runs this script in a container, exposing the docker socket. The
+# relative paths used by dobi won't be correct for mounts because they are
+# container paths. Fake the working directory so that it matches the host
+# working directory, and the relative volume mounts will be correct.
+
+# TODO: Pass in an env var from jenkins instead of this hardcoded path
+WORKDIR=/home/ubuntu/workspace/Compose-PRs
+mkdir -p $(dirname $WORKDIR)
+ln -s /code $WORKDIR
+cd $WORKDIR
+
+DOCKER_API_VERSION=1.22 /code/dobi-linux ci
