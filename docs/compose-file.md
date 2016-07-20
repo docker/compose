@@ -115,9 +115,8 @@ specified.
 
 > [Version 2 file format](#version-2) only.
 
-Add build arguments. You can use either an array or a dictionary. Any
-boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
-they are not converted to True or False by the YML parser.
+Add build arguments, which are environment variables accessible only during the
+build process.
 
 First, specify the arguments in your Dockerfile:
 
@@ -142,18 +141,15 @@ or a list:
         - buildno=1
         - password=secret
 
-Build arguments with only a key are resolved to their environment value on the
-machine Compose is running on.
+You can omit the value when specifying a build argument, in which case its value
+at build time is the value in the environment where Compose is running.
 
-    build:
-      args:
-        buildno: 1
-        user: someuser
+    args:
+      - buildno
+      - password
 
-    build:
-      args:
-        - buildno=1
-        - user=someuser
+> **Note**: YAML boolean values (`true`, `false`, `yes`, `no`, `on`, `off`) must
+> be enclosed in quotes, so that the parser interprets them as strings.
 
 ### cap_add, cap_drop
 
