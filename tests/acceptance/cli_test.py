@@ -114,6 +114,8 @@ class CLITestCase(DockerClientTestCase):
             for n in networks:
                 if n['Name'].startswith('{}_'.format(self.project.name)):
                     self.client.remove_network(n['Name'])
+        if hasattr(self, '_project'):
+            del self._project
 
         super(CLITestCase, self).tearDown()
 
