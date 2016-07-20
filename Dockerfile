@@ -44,8 +44,7 @@ RUN set -ex; \
 ENV LD_LIBRARY_PATH /usr/local/lib
 
 # Install setuptools
-RUN set -ex; \
-    curl -L https://bootstrap.pypa.io/ez_setup.py | python
+RUN set -ex; curl -L https://bootstrap.pypa.io/ez_setup.py | python
 
 # Install pip
 RUN set -ex; \
@@ -66,11 +65,9 @@ RUN pip install tox==2.1.1
 
 ADD requirements.txt /code/
 ADD requirements-dev.txt /code/
-ADD .pre-commit-config.yaml /code/
 ADD setup.py /code/
 ADD tox.ini /code/
-ADD compose /code/compose/
-RUN tox --notest
+RUN tox --notest -e py27,py34
 
 ADD . /code/
 RUN chown -R user /code/

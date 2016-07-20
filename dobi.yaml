@@ -38,6 +38,11 @@ image=dist-image:
     context: .
     depends: [source-tarball, write-git-sha]
 
+image=linter:
+    image: compose-lint
+    dockerfile: Dockerfile.lint
+    context: .
+
 # TODO: image with all release dependencies
 #image=releaser
 
@@ -53,13 +58,9 @@ run=shell:
     entrypoint: "bash"
     provide-docker: true
 
-# TODO: separate image for linting, and remove linting from builder Dockerfile
-#image=linter
 run=lint:
-    use: builder
-    mounts: [dot-git]
-    interactive: true
-    entrypoint: "tox -e pre-commit"
+    use: linter
+    mounts: [source]
 
 run=test-all:
     use: builder

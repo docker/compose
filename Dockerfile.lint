@@ -1,0 +1,13 @@
+
+FROM    alpine:3.4
+
+RUN     apk add -U python py-pip python-dev musl-dev gcc git bash
+RUN     pip install pre-commit
+
+WORKDIR /code
+COPY    .pre-commit-config.yaml ./
+
+# run pre-commit once to git pull hooks
+RUN     git init && pre-commit run -a -v
+
+CMD     ["pre-commit", "run", "-a", "-v"]
