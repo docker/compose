@@ -1,0 +1,37 @@
+
+mount=hub-config:
+    bind: ~/.config/hub
+    path: /root/.config/hub
+    file: true
+
+image=releaser:
+    image: compose-releaser
+    dockerfile: Dockerfile.release
+
+# Write the current commit sha to the file GITSHA. This file is included in
+# packaging so that `docker-compose version` can output the git sha used to
+# build the package.
+job=write-git-sha:
+    use: releaser
+    artifact: compose/GITSHA
+    mounts: [source]
+    entrypoint: "script/build/write-git-sha"
+
+job=release-shell:
+    use: releaser
+    mounts: [source, hub-config]
+    provide-docker: true
+    interactive: true
+    command: "bash"
+
+job=readme-rst:
+    use: releaser
+    mounts: [source]
+    command: "script/release/generate-readme-rst"
+    depends: [write-git-sha]
+
+job=release-check-github-build-status:
+    use: releaser
+    mounts: [source]
+    command: "script/release/check-github-build-status"
+    env: ['SKIP_BUILD_CHECK={env.SKIP_BUILD_CHECK:}']

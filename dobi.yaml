@@ -1,12 +1,12 @@
 #
-# Dobi project configuration
-# https://github.com/dnephin/dobi
+# Compose project tasks
 #
+# https://github.com/dnephin/dobi
 
 meta:
     project: compose
     default: all
-    exec-id: '{env.BUILD_NUMBER:user}'
+    include: [dobi-release.yml]
 
 #
 # Mounts
@@ -41,6 +41,7 @@ image=dist-image:
     dockerfile: Dockerfile.run
     context: .
     depends: [source-tarball, write-git-sha]
+    description: "Build the distribution image"
 
 image=linter:
     image: compose-lint
@@ -53,24 +54,24 @@ image=docs-image:
     context: docs/
     tags: ['{unique}', '{git.short-sha}']
 
-# TODO: image with all release dependencies
-#image=releaser
 
 #
 # Run containers
 #
-run=shell:
+job=shell:
     use: builder
     mounts: [source]
     interactive: true
     entrypoint: "bash"
     provide-docker: true
+    description: "Start an interactive development environment"
 
-run=lint:
+job=lint:
     use: linter
     mounts: [source]
+    description: "Run code style checks and static validation"
 
-run=test-all:
+job=test-all:
     use: builder
     mounts: [dot-git]
     interactive: true
@@ -82,13 +83,13 @@ run=test-all:
       # This must match the image and tag used by `builder`
       - "TAG=compose-dev:{git.short-sha}"
 
-run=binary-linux:
+job=binary-linux:
     use: builder
     mounts: [dot-git, dist]
     entrypoint: "script/build/linux-entrypoint"
     depends: [clean]
 
-run=source-tarball:
+job=source-tarball:
     use: builder
     # TODO: how to support variables or globbing in artifact name?
     artifact: dist/
@@ -98,29 +99,20 @@ run=source-tarball:
                  cp dist/docker-compose-*.tar.gz dist/docker-compose-release.tar.gz'"
     depends: [clean]
 
-# Write the current commit sha to the file GITSHA. This file is included in
-# packaging so that `docker-compose version` can output the git sha used to
-# build the package.
-run=write-git-sha:
-    use: builder
-    artifact: compose/GITSHA
-    mounts: [source]
-    entrypoint: "script/build/write-git-sha"
-
-run=clean:
+job=clean:
     use: builder
     mounts: [source]
     entrypoint: "script/clean"
 
-run=docs:
+job=docs:
     use: docs-image
     interactive: true
     mounts: [docs-source]
     command: "bash -c 'exec hugo server --port=8000 --bind=0.0.0.0 --watch $HUGO_ARGS'"
-    env:
-      - "HUGO_ARGS={env.HUGO_ARGS:}"
+    env: ["HUGO_ARGS={env.HUGO_ARGS:}"]
+    description: "Build and serve the docs"
 
-run=docs-shell:
+job=docs-shell:
     use: docs-image
     interactive: true
     mounts: [docs-source]
@@ -131,9 +123,11 @@ run=docs-shell:
 #
 alias=test:
     tasks: [test-all]
+    description: "Run all tests"
 
 alias=build:
     tasks: [binary-linux]
+    description: "Build the binary"
 
 alias=all:
     tasks: [lint, test]

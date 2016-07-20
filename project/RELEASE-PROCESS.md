@@ -3,17 +3,17 @@ Building a Compose release
 
 ## Prerequisites
 
-The release scripts require the following tools installed on the host:
+The release scripts require the following tools:
 
-* https://hub.github.com/
-* https://stedolan.github.io/jq/
-* http://pandoc.org/
+* [git](https://git-scm.com/)
+* [dobi](http://dnephin.github.io/dobi/)
+
 
 ## To get started with a new release
 
 Create a branch, update version, and add release notes by running `make-branch`
 
-        ./script/release/make-branch $VERSION [$BASE_VERSION]
+    ./script/release/make-branch $VERSION [$BASE_VERSION]
 
 `$BASE_VERSION` will default to master. Use the last version tag for a bug fix
 release.
@@ -35,7 +35,9 @@ As part of this script you'll be asked to:
 
 ## When a PR is merged into master that we want in the release
 
-1. Check out the bump branch and run the cherry pick script
+1. Check out the bump branch and run the cherry pick script. If you don't have
+   [hub](https://hub.github.com/) installed on your host use
+   `dobi release-shell` to start a container to run this command.
 
         git checkout bump-$VERSION
         ./script/release/cherry-pick-pr $PR_NUMBER

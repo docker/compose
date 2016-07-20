@@ -1,0 +1,21 @@
+
+# Pandoc is not available for alpine yet, so use debian for now
+FROM        debian:jessie
+
+RUN         apt-get update && apt-get install -y \
+                git curl vim jq
+
+WORKDIR     /tmp
+RUN         export url=https://github.com/github/hub/releases/download; \
+            export version=2.2.3; \
+            curl -sSL $url/v$version/hub-linux-amd64-$version.tgz | tar -xz && \
+            cp hub-linux*/bin/hub /usr/local/bin/ && \
+            rm -rf /tmp/*
+
+RUN         export url=https://github.com/jgm/pandoc/releases/download/; \
+            export version=1.17.2; \
+            curl -sSL -o pandoc.deb $url/$version/pandoc-$version-1-amd64.deb && \
+            dpkg -i pandoc.deb && \
+            rm -rf /tmp/*
+
+WORKDIR     /code

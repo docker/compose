@@ -20,12 +20,7 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 VERSION="$(git config "branch.${BRANCH}.release")" || usage
 REPO=docker/compose
 
-# Build the binaries
-script/clean
-script/build/linux
-
-echo "Building the container distribution"
-script/build/image $VERSION
+COMPOSE_VERSION=$VERSION dobi clean binary-linux dist-image
 
 echo "Create a github release"
 # TODO: script more of this https://developer.github.com/v3/repos/releases/
