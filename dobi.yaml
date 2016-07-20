@@ -23,6 +23,10 @@ mount=dist:
     bind: dist/
     path: /code/dist
 
+mount=docs-source:
+    bind: docs/
+    path: /docs/content/compose
+
 #
 # Images
 #
@@ -43,10 +47,14 @@ image=linter:
     dockerfile: Dockerfile.lint
     context: .
 
+image=docs-image:
+    image: compose-docs
+    dockerfile: Dockerfile
+    context: docs/
+    tags: ['{unique}', '{git.short-sha}']
+
 # TODO: image with all release dependencies
 #image=releaser
-
-# TODO: image and run to replace docs/Makefile
 
 #
 # Run containers
@@ -103,6 +111,20 @@ run=clean:
     use: builder
     mounts: [source]
     entrypoint: "script/clean"
+
+run=docs:
+    use: docs-image
+    interactive: true
+    mounts: [docs-source]
+    command: "bash -c 'exec hugo server --port=8000 --bind=0.0.0.0 --watch $HUGO_ARGS'"
+    env:
+      - "HUGO_ARGS={env.HUGO_ARGS:}"
+
+run=docs-shell:
+    use: docs-image
+    interactive: true
+    mounts: [docs-source]
+    command: "bash"
 
 #
 # Aliases
