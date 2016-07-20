@@ -862,6 +862,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.OomScoreAdj'), 500)
 
+    def test_oom_kill_disable_value(self):
+        service = self.create_service('web', oom_kill_disable=True)
+        container = create_and_start_container(service)
+        self.assertTrue(container.get('HostConfig.OomKillDisable'))
+
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart={
             'Name': 'on-failure',
