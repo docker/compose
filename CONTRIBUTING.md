@@ -24,11 +24,14 @@ that should get you started.
 2. Clone your forked repository locally `git clone git@github.com:yourusername/compose.git`.
 3. You must [configure a remote](https://help.github.com/articles/configuring-a-remote-for-a-fork/) for your fork so that you can [sync changes you make](https://help.github.com/articles/syncing-a-fork/) with the original repository.
 4. Enter the local directory `cd compose`.
-5. Set up a development environment by running `python setup.py develop`. This
-   will install the dependencies and set up a symlink from your `docker-compose`
-   executable to the checkout of the repository. When you now run
-   `docker-compose` from anywhere on your machine, it will run your development
-   version of Compose.
+5. Make sure both [Docker](https://docs.docker.com/engine/installation/) and
+   [dobi](https://dnephin.github.io/dobi/install.html) are installed.
+6. Set up a development environment by running
+
+       # Start a project shell in a container.
+       $ dobi shell
+       # Create the virtualenv for building and testing Compose
+       $ tox --notest
 
 ## Install pre-commit hooks
 
@@ -39,7 +42,7 @@ Install the git pre-commit hooks using [tox](https://tox.readthedocs.io) by
 running `tox -e pre-commit` or by following the
 [pre-commit install guide](http://pre-commit.com/#install).
 
-To run the style checks at any time run `tox -e pre-commit`.
+To run the style checks at any time run `dobi lint`.
 
 ## Submitting a pull request
 
@@ -47,25 +50,23 @@ See Docker's [basic contribution workflow](https://docs.docker.com/opensource/wo
 
 ## Running the test suite
 
-Use the test script to run linting checks and then the full test suite against
-different Python interpreters:
+Use the test script to run the full test suite:
 
-    $ script/test/default
+    $ dobi test
 
-Tests are run against a Docker daemon inside a container, so that we can test
-against multiple Docker versions. By default they'll run against only the latest
-Docker version - set the `DOCKER_VERSIONS` environment variable to "all" to run
-against all supported versions:
+Set the `DOCKER_VERSIONS` environment variable to "default" to run
+against only the latest docker version, or set it to any version tag.
 
-    $ DOCKER_VERSIONS=all script/test/default
+    $ DOCKER_VERSIONS=default dobi test
 
-Arguments to `script/test/default` are passed through to the `tox` executable, so
-you can specify a test directory, file, module, class or method:
+To run a subset of tests, enter into a project shell and run the test script
+directly:
 
-    $ script/test/default tests/unit
-    $ script/test/default tests/unit/cli_test.py
-    $ script/test/default tests/unit/config_test.py::ConfigTest
-    $ script/test/default tests/unit/config_test.py::ConfigTest::test_load
+    $ dobi shell
+    $ tox tests/unit
+    $ tox tests/unit/cli_test.py
+    $ tox tests/unit/config_test.py::ConfigTest
+    $ tox tests/unit/config_test.py::ConfigTest::test_load
 
 ## Finding things to work on
 
