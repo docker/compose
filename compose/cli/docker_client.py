@@ -45,10 +45,6 @@ def docker_client(environment, version=None, tls_config=None, host=None,
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
     """
-    if 'DOCKER_CLIENT_TIMEOUT' in environment:
-        log.warn("The DOCKER_CLIENT_TIMEOUT environment variable is deprecated.  "
-                 "Please use COMPOSE_HTTP_TIMEOUT instead.")
-
     try:
         kwargs = kwargs_from_env(environment=environment, ssl_version=tls_version)
     except TLSParameterError:
