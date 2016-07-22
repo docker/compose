@@ -82,6 +82,9 @@
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "domainname": {"type": "string"},
+        "healthcheck-cmd": {"type": "string"},
+        "healthcheck-retries": {"type": "string"},
+        "healthcheck-delay": {"type": "string"},
         "entrypoint": {
           "oneOf": [
             {"type": "string"},
