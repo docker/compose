@@ -1,0 +1,11 @@
+version: '2'
+services:
+  test:
+    image: busybox
+    command: top
+    volumes:
+      - /container-path
+      - testvolume:/container-named-path
+
+volumes:
+  testvolume: {}
