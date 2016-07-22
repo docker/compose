@@ -2,9 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import datetime
-import time
 import logging
 import operator
+import time
 from functools import reduce
 
 import enum
@@ -21,6 +21,7 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
+from .errors import OperationFailedError
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks
@@ -32,8 +33,6 @@ from .service import Service
 from .service import ServiceNetworkMode
 from .utils import microseconds_from_time_nano
 from .volume import ProjectVolumes
-
-from .errors import OperationFailedError
 
 log = logging.getLogger(__name__)
 
@@ -267,7 +266,8 @@ class Project(object):
                         raise OperationFailedError(("Health check was finished for service %s: %s. " +
                                                     "Return non zero result") % (service_name, cmd))
                 else:
-                    raise OperationFailedError("Cannot execute health check of service %s: %s. Service is not run" % (service_name, cmd))
+                    raise OperationFailedError(("Cannot execute health check of service %s: %s." +
+                                               "Service is not run") % (service_name, cmd))
 
             else:
                 cmd = tokens[0]
@@ -283,7 +283,8 @@ class Project(object):
                 result = Project.execute_cmd_with_retry(service.get_container(), cmd, retries, delay)
 
             if not result and cmd:
-                raise OperationFailedError("Health check of service %s doesn't pass : %s" % (service.name, cmd))
+                raise OperationFailedError(("Health check of service %s " +
+                                           "doesn't pass : %s") % (service.name, cmd))
 
             return containers
         else:
