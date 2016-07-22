@@ -239,12 +239,13 @@ class Project(object):
 
     @staticmethod
     def healthcheck_start(service, services, execute):
-        cmd = service.options.get('healthcheck-cmd')
+        healthcheck_config = service.options.get('healthcheck', {})
+        cmd = healthcheck_config.get('cmd')
         result = None
         if cmd:
             log.info('Check health status for %s' % service.name)
-            retries = service.options.get('healthcheck-retries', 2)
-            delay = service.options.get('healthcheck-delay', 5)
+            retries = healthcheck_config.get('retries', 3)
+            delay = healthcheck_config.get('delay', 5)
             tokens = cmd.split(':', 1)
             executed_cmd_locally = False
             if len(tokens) == 2:
