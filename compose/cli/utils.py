@@ -107,3 +107,18 @@ def get_build_version():
 
 def is_docker_for_mac_installed():
     return is_mac() and os.path.isdir('/Applications/Docker.app')
+
+
+def generate_user_agent():
+    parts = [
+        "docker-compose/{}".format(compose.__version__),
+        "docker-py/{}".format(docker.__version__),
+    ]
+    try:
+        p_system = platform.system()
+        p_release = platform.release()
+    except IOError:
+        pass
+    else:
+        parts.append("{}/{}".format(p_system, p_release))
+    return " ".join(parts)
