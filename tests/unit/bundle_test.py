@@ -41,44 +41,30 @@ def test_get_image_digest_no_image(mock_service):
     assert "doesn't define an image tag" in exc.exconly()
 
 
-def test_fetch_image_digest_for_image_with_saved_digest(mock_service):
-    mock_service.options['image'] = image_id = 'abcd'
-    mock_service.pull.return_value = expected = 'sha256:thedigest'
-    mock_service.image.return_value = {'RepoDigests': ['digest1']}
-
-    digest = bundle.fetch_image_digest(mock_service)
-    assert digest == image_id + '@' + expected
-
-    mock_service.pull.assert_called_once_with()
-    assert not mock_service.push.called
-    assert not mock_service.client.pull.called
-
-
-def test_fetch_image_digest_for_image(mock_service):
-    mock_service.options['image'] = image_id = 'abcd'
-    mock_service.pull.return_value = expected = 'sha256:thedigest'
-    mock_service.image.return_value = {'RepoDigests': []}
-
-    digest = bundle.fetch_image_digest(mock_service)
-    assert digest == image_id + '@' + expected
-
-    mock_service.pull.assert_called_once_with()
-    assert not mock_service.push.called
-    mock_service.client.pull.assert_called_once_with(digest)
-
-
-def test_fetch_image_digest_for_build(mock_service):
+def test_push_image_with_saved_digest(mock_service):
     mock_service.options['build'] = '.'
     mock_service.options['image'] = image_id = 'abcd'
     mock_service.push.return_value = expected = 'sha256:thedigest'
     mock_service.image.return_value = {'RepoDigests': ['digest1']}
 
-    digest = bundle.fetch_image_digest(mock_service)
+    digest = bundle.push_image(mock_service)
     assert digest == image_id + '@' + expected
 
     mock_service.push.assert_called_once_with()
-    assert not mock_service.pull.called
-    assert not mock_service.client.pull.called
+    assert not mock_service.client.push.called
+
+
+def test_push_image(mock_service):
+    mock_service.options['build'] = '.'
+    mock_service.options['image'] = image_id = 'abcd'
+    mock_service.push.return_value = expected = 'sha256:thedigest'
+    mock_service.image.return_value = {'RepoDigests': []}
+
+    digest = bundle.push_image(mock_service)
+    assert digest == image_id + '@' + expected
+
+    mock_service.push.assert_called_once_with()
+    mock_service.client.pull.assert_called_once_with(digest)
 
 
 def test_to_bundle():

@@ -223,15 +223,16 @@ class TopLevelCommand(object):
         Generate a Distributed Application Bundle (DAB) from the Compose file.
 
         Images must have digests stored, which requires interaction with a
-        Docker registry. If digests aren't stored for all images, you can pass
-        `--fetch-digests` to automatically fetch them. Images for services
-        with a `build` key will be pushed. Images for services without a
-        `build` key will be pulled.
+        Docker registry. If digests aren't stored for all images, you can fetch
+        them with `docker-compose pull` or `docker-compose push`. To push images
+        automatically when bundling, pass `--push-images`. Only services with
+        a `build` option specified will have their images pushed.
 
         Usage: bundle [options]
 
         Options:
-            --fetch-digests            Automatically fetch image digests if missing
+            --push-images              Automatically push images for any services
+                                       which have a `build` option specified.
 
             -o, --output PATH          Path to write the bundle file to.
                                        Defaults to "<project name>.dab".
@@ -247,7 +248,7 @@ class TopLevelCommand(object):
             try:
                 image_digests = get_image_digests(
                     self.project,
-                    allow_fetch=options['--fetch-digests'],
+                    allow_push=options['--push-images'],
                 )
             except MissingDigests as e:
                 def list_images(images):
@@ -256,12 +257,28 @@ class TopLevelCommand(object):
                 paras = ["Some images are missing digests."]
 
                 if e.needs_push:
-                    paras += ["The following images need to be pushed:", list_images(e.needs_push)]
+                    command_hint = (
+                        "Use `docker-compose push {}` to push them. "
+                        "You can do this automatically with `docker-compose bundle --push-images`."
+                        .format(" ".join(sorted(e.needs_push)))
+                    )
+                    paras += [
+                        "The following images can be pushed:",
+                        list_images(e.needs_push),
+                        command_hint,
+                    ]
 
                 if e.needs_pull:
-                    paras += ["The following images need to be pulled:", list_images(e.needs_pull)]
+                    command_hint = (
+                        "Use `docker-compose pull {}` to pull them. "
+                        .format(" ".join(sorted(e.needs_pull)))
+                    )
 
-                paras.append("If this is OK, run `docker-compose bundle --fetch-digests`.")
+                    paras += [
+                        "The following images need to be pulled:",
+                        list_images(e.needs_pull),
+                        command_hint,
+                    ]
 
                 raise UserError("\n\n".join(paras))
 
