@@ -783,6 +783,17 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up()
 
+        service_container = project.get_service('web').containers()[0]
+        ipam_config = service_container.inspect().get(
+            'NetworkSettings', {}
+        ).get(
+            'Networks', {}
+        ).get(
+            'composetest_linklocaltest', {}
+        ).get('IPAMConfig', {})
+        assert 'LinkLocalIPs' in ipam_config
+        assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
+
     @v2_only()
     def test_project_up_with_network_internal(self):
         self.require_api_version('1.23')
