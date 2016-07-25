@@ -60,7 +60,7 @@ def serialize_bundle(config, image_digests):
     return json.dumps(to_bundle(config, image_digests), indent=2, sort_keys=True)
 
 
-def get_image_digests(project, allow_fetch=False):
+def get_image_digests(project, allow_push=False):
     digests = {}
     needs_push = set()
     needs_pull = set()
@@ -69,7 +69,7 @@ def get_image_digests(project, allow_fetch=False):
         try:
             digests[service.name] = get_image_digest(
                 service,
-                allow_fetch=allow_fetch,
+                allow_push=allow_push,
             )
         except NeedsPush as e:
             needs_push.add(e.image_name)
@@ -82,7 +82,7 @@ def get_image_digests(project, allow_fetch=False):
     return digests
 
 
-def get_image_digest(service, allow_fetch=False):
+def get_image_digest(service, allow_push=False):
     if 'image' not in service.options:
         raise UserError(
             "Service '{s.name}' doesn't define an image tag. An image name is "
@@ -108,27 +108,24 @@ def get_image_digest(service, allow_fetch=False):
         # digests
         return image['RepoDigests'][0]
 
-    if not allow_fetch:
-        if 'build' in service.options:
-            raise NeedsPush(service.image_name)
-        else:
-            raise NeedsPull(service.image_name)
-
-    return fetch_image_digest(service)
-
-
-def fetch_image_digest(service):
     if 'build' not in service.options:
-        digest = service.pull()
-    else:
-        try:
-            digest = service.push()
-        except:
-            log.error(
-                "Failed to push image for service '{s.name}'. Please use an "
-                "image tag that can be pushed to a Docker "
-                "registry.".format(s=service))
-            raise
+        raise NeedsPull(service.image_name)
+
+    if not allow_push:
+        raise NeedsPush(service.image_name)
+
+    return push_image(service)
+
+
+def push_image(service):
+    try:
+        digest = service.push()
+    except:
+        log.error(
+            "Failed to push image for service '{s.name}'. Please use an "
+            "image tag that can be pushed to a Docker "
+            "registry.".format(s=service))
+        raise
 
     if not digest:
         raise ValueError("Failed to get digest for %s" % service.name)
