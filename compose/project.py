@@ -545,7 +545,7 @@ def warn_for_swarm_mode(client):
             "To deploy your application across the swarm, "
             "use the bundle feature of the Docker experimental build.\n\n"
             "More info:\n"
-            "https://github.com/docker/docker/tree/master/experimental\n"
+            "https://docs.docker.com/compose/bundles\n"
         )
 
 
