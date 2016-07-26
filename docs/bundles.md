@@ -196,3 +196,6 @@ A service has the following fields:
         deploying a bundle should create networks as needed.
     </dd>
 </dl>
+
+> **Note:** Some configuration options are not yet supported in the DAB format,
+> including volume mounts.
