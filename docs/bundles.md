@@ -119,8 +119,7 @@ Run 'docker stack COMMAND --help' for more information on a command.
 ## Bundle file format
 
 Distributed application bundles are described in a JSON format. When bundles
-are persisted as files, the file extension is `.dab` (Docker 1.12RC2 tools use
-`.dsb` for the file extension—this will be updated in the next release client).
+are persisted as files, the file extension is `.dab`.
 
 A bundle has two top-level fields: `version` and `services`. The version used
 by Docker 1.12 tools is `0.1`.
