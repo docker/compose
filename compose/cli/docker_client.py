@@ -10,6 +10,7 @@ from docker.utils import kwargs_from_env
 
 from ..const import HTTP_TIMEOUT
 from .errors import UserError
+from .utils import generate_user_agent
 
 log = logging.getLogger(__name__)
 
@@ -66,5 +67,7 @@ def docker_client(environment, version=None, tls_config=None, host=None,
         kwargs['timeout'] = int(timeout)
     else:
         kwargs['timeout'] = HTTP_TIMEOUT
+
+    kwargs['user_agent'] = generate_user_agent()
 
     return Client(**kwargs)

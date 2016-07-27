@@ -2,10 +2,12 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import platform
 
 import docker
 import pytest
 
+import compose
 from compose.cli import errors
 from compose.cli.docker_client import docker_client
 from compose.cli.docker_client import tls_config_from_options
@@ -39,6 +41,16 @@ class DockerClientTestCase(unittest.TestCase):
 
         assert fake_log.error.call_count == 1
         assert '123' in fake_log.error.call_args[0][0]
+
+    def test_user_agent(self):
+        client = docker_client(os.environ)
+        expected = "docker-compose/{0} docker-py/{1} {2}/{3}".format(
+            compose.__version__,
+            docker.__version__,
+            platform.system(),
+            platform.release()
+        )
+        self.assertEqual(client.headers['User-Agent'], expected)
 
 
 class TLSConfigTestCase(unittest.TestCase):
