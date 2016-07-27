@@ -117,7 +117,7 @@ _docker_compose_bundle() {
 			;;
 	esac
 
-	COMPREPLY=( $( compgen -W "--fetch-digests --help --output -o" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "--push-images --help --output -o" -- "$cur" ) )
 }
 
 
