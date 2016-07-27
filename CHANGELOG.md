@@ -9,11 +9,15 @@ Change log
 - As announced in 1.7.0, `docker-compose rm` now removes containers
   created by `docker-compose run` by default.
 
+- Setting `entrypoint` on a service now empties out any default
+  command that was set on the image (i.e. any `CMD` instruction in the
+  Dockerfile used to build it). This makes it consistent with
+  the `--entrypoint` flag to `docker run`.
+
 New Features
 
 - Added `docker-compose bundle`, a command that builds a bundle file
   to be consumed by the new *Docker Stack* commands in Docker 1.12.
-  This command automatically pushes and pulls images as needed.
 
 - Added `docker-compose push`, a command that pushes service images
   to a registry.
@@ -26,6 +30,9 @@ Bug Fixes
 
 - Fixed a bug where Compose would erroneously try to read `.env`
   at the project's root when it is a directory.
+
+- `docker-compose run -e VAR` now passes `VAR` through from the shell
+  to the container, as with `docker run -e VAR`.
 
 - Improved config merging when multiple compose files are involved
   for several service sub-keys.
@@ -51,6 +58,9 @@ Bug Fixes
 
 - Fixed a bug where errors during `docker-compose up` would show
   an unrelated stacktrace at the end of the process.
+
+- `docker-compose create` and `docker-compose start` show more
+  descriptive error messages when something goes wrong.
 
 
 1.7.1 (2016-05-04)
