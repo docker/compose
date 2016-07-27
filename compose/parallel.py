@@ -12,6 +12,7 @@ from six.moves.queue import Empty
 from six.moves.queue import Queue
 
 from compose.cli.signals import ShutdownException
+from compose.errors import OperationFailedError
 from compose.utils import get_output_stream
 
 
@@ -46,6 +47,9 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
             results.append(result)
         elif isinstance(exception, APIError):
             errors[get_name(obj)] = exception.explanation
+            writer.write(get_name(obj), 'error')
+        elif isinstance(exception, OperationFailedError):
+            errors[get_name(obj)] = exception.msg
             writer.write(get_name(obj), 'error')
         elif isinstance(exception, UpstreamError):
             writer.write(get_name(obj), 'error')

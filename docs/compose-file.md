@@ -115,22 +115,41 @@ specified.
 
 > [Version 2 file format](#version-2) only.
 
-Add build arguments. You can use either an array or a dictionary. Any
-boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
-they are not converted to True or False by the YML parser.
+Add build arguments, which are environment variables accessible only during the
+build process.
 
-Build arguments with only a key are resolved to their environment value on the
-machine Compose is running on.
+First, specify the arguments in your Dockerfile:
+
+    ARG buildno
+    ARG password
+
+    RUN echo "Build number: $buildno"
+    RUN script-requiring-password.sh "$password"
+
+Then specify the arguments under the `build` key. You can pass either a mapping
+or a list:
 
     build:
+      context: .
       args:
         buildno: 1
-        user: someuser
+        password: secret
 
     build:
+      context: .
       args:
         - buildno=1
-        - user=someuser
+        - password=secret
+
+You can omit the value when specifying a build argument, in which case its value
+at build time is the value in the environment where Compose is running.
+
+    args:
+      - buildno
+      - password
+
+> **Note**: YAML boolean values (`true`, `false`, `yes`, `no`, `on`, `off`) must
+> be enclosed in quotes, so that the parser interprets them as strings.
 
 ### cap_add, cap_drop
 
@@ -274,6 +293,11 @@ beginning with `#` (i.e. comments) are ignored, as are blank lines.
     # Set Rails/Rack environment
     RACK_ENV=development
 
+> **Note:** If your service specifies a [build](#build) option, variables
+> defined in environment files will _not_ be automatically visible during the
+> build. Use the [args](#args) sub-option of `build` to define build-time
+> environment variables.
+
 ### environment
 
 Add environment variables. You can use either an array or a dictionary. Any
@@ -292,6 +316,11 @@ machine Compose is running on, which can be helpful for secret or host-specific 
       - RACK_ENV=development
       - SHOW=true
       - SESSION_SECRET
+
+> **Note:** If your service specifies a [build](#build) option, variables
+> defined in `environment` will _not_ be automatically visible during the
+> build. Use the [args](#args) sub-option of `build` to define build-time
+> environment variables.
 
 ### expose
 
