@@ -53,7 +53,7 @@ def handle_connection_errors(client):
         log_api_error(e, client.api_version)
         raise ConnectionError()
     except (ReadTimeout, socket.timeout) as e:
-        log_timeout_error()
+        log_timeout_error(client.timeout)
         raise ConnectionError()
 
 

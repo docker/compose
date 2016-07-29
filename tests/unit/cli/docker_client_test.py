@@ -42,6 +42,14 @@ class DockerClientTestCase(unittest.TestCase):
         assert fake_log.error.call_count == 1
         assert '123' in fake_log.error.call_args[0][0]
 
+        with mock.patch('compose.cli.errors.log') as fake_log:
+            with pytest.raises(errors.ConnectionError):
+                with errors.handle_connection_errors(client):
+                    raise errors.ReadTimeout()
+
+        assert fake_log.error.call_count == 1
+        assert '123' in fake_log.error.call_args[0][0]
+
     def test_user_agent(self):
         client = docker_client(os.environ)
         expected = "docker-compose/{0} docker-py/{1} {2}/{3}".format(
