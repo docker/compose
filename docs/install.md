@@ -41,6 +41,9 @@ which the release page specifies, in your terminal.
 
         curl -L https://github.com/docker/compose/releases/download/1.8.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 
+     The following command installs latest release:
+    
+        curl  -s https://api.github.com/repos/docker/compose/releases | grep browser_download_url | grep Linux |  head -n 1 | cut -d '"' -f 4 | xargs curl -L  | sudo dd of=/usr/local/bin/docker-compose
      If you have problems installing with `curl`, see
      [Alternative Install Options](#alternative-install-options).
 
