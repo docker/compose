@@ -5,11 +5,13 @@ import codecs
 import hashlib
 import json
 import json.decoder
+import logging
 
 import six
 
 
 json_decoder = json.JSONDecoder()
+log = logging.getLogger(__name__)
 
 
 def get_output_stream(stream):
@@ -60,13 +62,21 @@ def split_buffer(stream, splitter=None, decoder=lambda a: a):
             yield item
 
     if buffered:
-        yield decoder(buffered)
+        try:
+            yield decoder(buffered)
+        except ValueError:
+            log.error(
+                'Compose tried parsing the following chunk as a JSON object, '
+                'but failed:\n%s' % repr(buffered)
+            )
+            raise
 
 
 def json_splitter(buffer):
     """Attempt to parse a json object from a buffer. If there is at least one
     object, return it and the rest of the buffer, otherwise return None.
     """
+    buffer = buffer.strip()
     try:
         obj, index = json_decoder.raw_decode(buffer)
         rest = buffer[json.decoder.WHITESPACE.match(buffer, index).end():]
