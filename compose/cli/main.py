@@ -82,7 +82,6 @@ def main():
 
 def dispatch():
     plugin_manager = PluginManager(get_plugin_dir())
-    plugin_manager.get_plugins()  # TODO
     setup_logging()
     dispatcher = DocoptDispatcher(
         TopLevelCommand,
@@ -96,6 +95,7 @@ def dispatch():
         sys.exit(1)
 
     setup_console_handler(console_handler, options.get('--verbose'))
+    plugin_manager.load_config('.', options)
     return functools.partial(perform_command, options, handler, command_options, plugin_manager)
 
 
@@ -825,7 +825,6 @@ class TopLevelCommand(object):
                     ])
 
                 print(Formatter().table(headers, rows))
-
         elif options['install']:
             self.plugin_manager.install_plugin(options['PLUGIN'])
         elif options['uninstall']:

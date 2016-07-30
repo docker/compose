@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from inspect import cleandoc
 from inspect import getdoc
 
 from docopt import docopt
@@ -21,7 +22,12 @@ class DocoptDispatcher(object):
         self.options = options
 
     def parse(self, argv):
-        command_help = getdoc(self.command_class)
+        # Fix for http://bugs.python.org/issue12773
+        if hasattr(self.command_class, '__modified_doc__'):
+            command_help = cleandoc(self.command_class.__modified_doc__)
+        else:
+            command_help = getdoc(self.command_class)
+
         options = docopt_full_help(command_help, argv, **self.options)
         command = options['COMMAND']
 

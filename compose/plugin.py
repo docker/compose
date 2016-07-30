@@ -6,8 +6,6 @@ import inspect
 import json
 import os
 import re
-from abc import ABCMeta
-from abc import abstractmethod
 from functools import partial
 
 import compose
@@ -22,8 +20,11 @@ def compose_patch(obj, name):
 
         method = partial(fnc, original)
         method.__doc__ = fnc.__doc__
-        setattr(obj, name, method)
 
+        if hasattr(original, '__standalone__'):
+            method.__standalone__ = original.__standalone__
+
+        setattr(obj, name, method)
         return fnc
     return wrapper
 
@@ -61,11 +62,17 @@ def compose_command(standalone=False):
             )
 
         fnc.__standalone__ = standalone
-        compose.cli.main.TopLevelCommand.__doc__ = update_command_doc(
+        modified_doc = update_command_doc(
             compose.cli.main.TopLevelCommand.__doc__,
             fnc.__name__,
             fnc.__doc__
         )
+
+        # Using __modified_doc__ as fix for http://bugs.python.org/issue12773
+        try:
+            compose.cli.main.TopLevelCommand.__doc__ = modified_doc
+        except AttributeError:
+            compose.cli.main.TopLevelCommand.__modified_doc__ = modified_doc
 
         setattr(compose.cli.main.TopLevelCommand, fnc.__name__, fnc)
         return return_fnc
@@ -96,11 +103,11 @@ class PluginCommandError(PluginError):
 
 
 class Plugin:
-    __metaclass__ = ABCMeta
     required_fields = ['name', 'version']
 
-    def __init__(self, plugin_manager):
+    def __init__(self, plugin_manager, config):
         self.plugin_manager = plugin_manager
+        self.config = config
         file = os.path.abspath(inspect.getfile(self.__class__))
         self.path = os.path.dirname(file)
         self.id = os.path.basename(self.path)
@@ -143,7 +150,3 @@ class Plugin:
 
     def configure(self):
         print("'{}' needs no configuration".format(self.name))
-
-    @abstractmethod
-    def execute(self):
-        pass
