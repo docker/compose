@@ -9,6 +9,8 @@ import logging
 
 import six
 
+from .errors import StreamParseError
+
 
 json_decoder = json.JSONDecoder()
 log = logging.getLogger(__name__)
@@ -64,12 +66,12 @@ def split_buffer(stream, splitter=None, decoder=lambda a: a):
     if buffered:
         try:
             yield decoder(buffered)
-        except ValueError:
+        except Exception as e:
             log.error(
-                'Compose tried parsing the following chunk as a JSON object, '
-                'but failed:\n%s' % repr(buffered)
+                'Compose tried decoding the following data chunk, but failed:'
+                '\n%s' % repr(buffered)
             )
-            raise
+            raise StreamParseError(e)
 
 
 def json_splitter(buffer):
