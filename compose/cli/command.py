@@ -8,6 +8,7 @@ import ssl
 
 import six
 
+from . import errors
 from . import verbose_proxy
 from .. import config
 from ..config.environment import Environment
@@ -110,7 +111,8 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         host=host, environment=environment
     )
 
-    return Project.from_config(project_name, config_data, client)
+    with errors.handle_connection_errors(client):
+        return Project.from_config(project_name, config_data, client)
 
 
 def get_project_name(working_dir, project_name=None, environment=None):
