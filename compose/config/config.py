@@ -750,7 +750,7 @@ def merge_service_dicts(base, override, version):
 
     for field in [
         'ports', 'cap_add', 'cap_drop', 'expose', 'external_links',
-        'security_opt', 'volumes_from', 'depends_on',
+        'security_opt', 'volumes_from', 'depends_on', 'extra_hosts',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 
