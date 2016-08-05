@@ -8,6 +8,7 @@ import json.decoder
 import logging
 
 import six
+from pytimeparse.timeparse import timeparse
 
 from .errors import StreamParseError
 
@@ -108,3 +109,7 @@ def microseconds_from_time_nano(time_nano):
 
 def build_string_dict(source_dict):
     return dict((k, str(v if v is not None else '')) for k, v in source_dict.items())
+
+
+def duration_from_string(duration_string):
+    return timeparse(duration_string) * 1000000000
