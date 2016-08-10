@@ -616,8 +616,7 @@ class TopLevelCommand(object):
         Options:
             -f, --force   Don't ask to confirm removal
             -v            Remove any anonymous volumes attached to containers
-            -a, --all     Obsolete. Also remove one-off containers created by
-                          docker-compose run
+            -a, --all     Deprecated - no effect.
         """
         if options.get('--all'):
             log.warn(
