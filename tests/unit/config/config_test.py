@@ -2094,6 +2094,16 @@ class MemoryOptionsTest(unittest.TestCase):
         ).services
         self.assertEqual(service_dict[0]['memswap_limit'], "512M")
 
+    def test_validation_with_correct_mem_reservation_values(self):
+        service_dict = config.load(
+            build_config_details(
+                {'foo': {'image': 'busybox', 'mem_reservation': 500000}},
+                'tests/fixtures/extends',
+                'common.yml'
+            )
+        ).services
+        self.assertEqual(service_dict[0]['mem_reservation'], 500000)
+
 
 class EnvTest(unittest.TestCase):
     def test_parse_environment_as_list(self):
