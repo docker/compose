@@ -17,6 +17,7 @@ from docker.utils.ports import split_port
 from . import __version__
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
+from .config import merge_build_args
 from .config import merge_environment
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
@@ -707,13 +708,18 @@ class Service(object):
             oom_score_adj=options.get('oom_score_adj')
         )
 
-    def build(self, no_cache=False, pull=False, force_rm=False):
+    def build(self, no_cache=False, pull=False, force_rm=False, build_args=None):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
-        path = build_opts.get('context')
+
+        self_args_opts = build_opts.get('args', None)
+        if self_args_opts and build_args:
+            merge_build_args(self_args_opts, build_args, self.options.get('environment'))
+
         # python2 os.path() doesn't support unicode, so we need to encode it to
         # a byte string
+        path = build_opts.get('context')
         if not six.PY3:
             path = path.encode('utf8')
 
@@ -726,7 +732,7 @@ class Service(object):
             pull=pull,
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
-            buildargs=build_opts.get('args', None),
+            buildargs=self_args_opts
         )
 
         try:
