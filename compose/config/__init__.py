@@ -9,4 +9,5 @@ from .config import find
 from .config import load
 from .config import merge_build_args
 from .config import merge_environment
+from .config import merge_build_args
 from .config import parse_environment
