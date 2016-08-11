@@ -15,6 +15,7 @@ import yaml
 from ...helpers import build_config_details
 from compose.config import config
 from compose.config import types
+from compose.config.config import merge_build_args
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
@@ -2880,6 +2881,24 @@ class EnvTest(unittest.TestCase):
             resolve_build_args(build, Environment.from_env_file(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
+
+    @mock.patch.dict(os.environ)
+    def test_merge_build_args(self):
+        os.environ['env_arg'] = 'value2'
+
+        base = {
+            'arg1': 'arg1_value',
+            'arg2': 'arg2_value'
+        }
+        override = {
+            'arg1': 'arg1_new_value',
+            'arg2': 'arg2_value'
+        }
+        self.assertEqual(base['arg1'], 'arg1_value')
+
+        merge_build_args(base, override, os.environ)
+
+        self.assertEqual(base['arg1'], 'arg1_new_value')
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)
