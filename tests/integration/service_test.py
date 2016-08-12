@@ -397,7 +397,7 @@ class ServiceTest(DockerClientTestCase):
 
         assert not mock_log.warn.called
         assert (
-            [mount['Destination'] for mount in new_container.get('Mounts')],
+            [mount['Destination'] for mount in new_container.get('Mounts')] ==
             ['/data']
         )
         assert new_container.get_mount('/data')['Source'] != host_path
@@ -593,12 +593,12 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
 
-    def test_start_container_stays_unpriviliged(self):
+    def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], False)
 
-    def test_start_container_becomes_priviliged(self):
+    def test_start_container_becomes_privileged(self):
         service = self.create_service('web', privileged=True)
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
@@ -738,7 +738,10 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
-        self.assertIn("ERROR: for composetest_web_2  Boom", mock_stderr.getvalue())
+        self.assertIn(
+            "ERROR: for composetest_web_2  Cannot create container for service web: Boom",
+            mock_stderr.getvalue()
+        )
 
     def test_scale_with_unexpected_exception(self):
         """Test that when scaling if the API returns an error, that is not of type
@@ -853,6 +856,11 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'always')
+
+    def test_oom_score_adj_value(self):
+        service = self.create_service('web', oom_score_adj=500)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.OomScoreAdj'), 500)
 
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart={

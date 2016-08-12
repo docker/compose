@@ -15,6 +15,7 @@ from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 
 from . import __version__
+from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
@@ -26,6 +27,7 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
+from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .progress_stream import stream_output
@@ -52,6 +54,7 @@ DOCKER_START_KEYS = [
     'log_opt',
     'mem_limit',
     'memswap_limit',
+    'oom_score_adj',
     'pid',
     'privileged',
     'restart',
@@ -276,7 +279,11 @@ class Service(object):
         if 'name' in container_options and not quiet:
             log.info("Creating %s" % container_options['name'])
 
-        return Container.create(self.client, **container_options)
+        try:
+            return Container.create(self.client, **container_options)
+        except APIError as ex:
+            raise OperationFailedError("Cannot create container for service %s: %s" %
+                                       (self.name, ex.explanation))
 
     def ensure_image_exists(self, do_build=BuildAction.none):
         if self.can_be_built() and do_build == BuildAction.force:
@@ -446,7 +453,10 @@ class Service(object):
 
     def start_container(self, container):
         self.connect_container_to_networks(container)
-        container.start()
+        try:
+            container.start()
+        except APIError as ex:
+            raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
         return container
 
     def connect_container_to_networks(self, container):
@@ -694,6 +704,7 @@ class Service(object):
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
             tmpfs=options.get('tmpfs'),
+            oom_score_adj=options.get('oom_score_adj')
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
@@ -806,16 +817,31 @@ class Service(object):
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
         log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
-        output = self.client.pull(
-            repo,
-            tag=tag,
-            stream=True,
-        )
+        output = self.client.pull(repo, tag=tag, stream=True)
 
         try:
-            stream_output(output, sys.stdout)
+            return progress_stream.get_digest_from_pull(
+                stream_output(output, sys.stdout))
         except StreamOutputError as e:
             if not ignore_pull_failures:
+                raise
+            else:
+                log.error(six.text_type(e))
+
+    def push(self, ignore_push_failures=False):
+        if 'image' not in self.options or 'build' not in self.options:
+            return
+
+        repo, tag, separator = parse_repository_tag(self.options['image'])
+        tag = tag or 'latest'
+        log.info('Pushing %s (%s%s%s)...' % (self.name, repo, separator, tag))
+        output = self.client.push(repo, tag=tag, stream=True)
+
+        try:
+            return progress_stream.get_digest_from_push(
+                stream_output(output, sys.stdout))
+        except StreamOutputError as e:
+            if not ignore_push_failures:
                 raise
             else:
                 log.error(six.text_type(e))

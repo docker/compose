@@ -1,0 +1,9 @@
+
+version: '2.0'
+
+services:
+  web:
+    image: dockercloud/hello-world@sha256:fe79a2cfbd17eefc344fb8419420808df95a1e22d93b7f621a7399fd1e9dca1d
+
+  redis:
+    image: redis@sha256:a84cb8f53a70e19f61ff2e1d5e73fb7ae62d374b2b7392de1e7d77be26ef8f7b

@@ -63,6 +63,10 @@ class DockerClientTestCase(unittest.TestCase):
 
         cls.client = docker_client(Environment(), version)
 
+    @classmethod
+    def tearDownClass(cls):
+        del cls.client
+
     def tearDown(self):
         for c in self.client.containers(
                 all=True,

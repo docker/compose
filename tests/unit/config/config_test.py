@@ -101,6 +101,10 @@ class ConfigTest(unittest.TestCase):
                                 {'subnet': '172.28.0.0/16'}
                             ]
                         }
+                    },
+                    'internal': {
+                        'driver': 'bridge',
+                        'internal': True
                     }
                 }
             }, 'working_dir', 'filename.yml')
@@ -140,6 +144,10 @@ class ConfigTest(unittest.TestCase):
                         {'subnet': '172.28.0.0/16'}
                     ]
                 }
+            },
+            'internal': {
+                'driver': 'bridge',
+                'internal': True
             }
         })
 
@@ -715,7 +723,35 @@ class ConfigTest(unittest.TestCase):
         ).services[0]
         assert 'args' in service['build']
         assert 'foo' in service['build']['args']
-        assert service['build']['args']['foo'] == 'None'
+        assert service['build']['args']['foo'] == ''
+
+    # If build argument is None then it will be converted to the empty
+    # string. Make sure that int zero kept as it is, i.e. not converted to
+    # the empty string
+    def test_build_args_check_zero_preserved(self):
+        service = config.load(
+            build_config_details(
+                {
+                    'version': '2',
+                    'services': {
+                        'web': {
+                            'build': {
+                                'context': '.',
+                                'dockerfile': 'Dockerfile-alt',
+                                'args': {
+                                    'foo': 0
+                                }
+                            }
+                        }
+                    }
+                },
+                'tests/fixtures/extends',
+                'filename.yml'
+            )
+        ).services[0]
+        assert 'args' in service['build']
+        assert 'foo' in service['build']['args']
+        assert service['build']['args']['foo'] == '0'
 
     def test_load_with_multiple_files_mismatched_networks_format(self):
         base_file = config.ConfigFile(
@@ -1212,6 +1248,26 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'alpine',
                 'tmpfs': ['/run'],
+            }
+        ]
+
+    def test_oom_score_adj_option(self):
+
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'oom_score_adj': 500
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'oom_score_adj': 500
             }
         ]
 
@@ -2679,6 +2735,13 @@ class VolumePathTest(unittest.TestCase):
         container_path = 'c:\\scarletdevil\\data'
         expected_mapping = (container_path, host_path)
 
+        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        assert mapping == expected_mapping
+
+    def test_split_path_mapping_with_root_mount(self):
+        host_path = '/'
+        container_path = '/var/hostroot'
+        expected_mapping = (container_path, host_path)
         mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
         assert mapping == expected_mapping
 

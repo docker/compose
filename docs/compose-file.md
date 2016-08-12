@@ -115,22 +115,41 @@ specified.
 
 > [Version 2 file format](#version-2) only.
 
-Add build arguments. You can use either an array or a dictionary. Any
-boolean values; true, false, yes, no, need to be enclosed in quotes to ensure
-they are not converted to True or False by the YML parser.
+Add build arguments, which are environment variables accessible only during the
+build process.
 
-Build arguments with only a key are resolved to their environment value on the
-machine Compose is running on.
+First, specify the arguments in your Dockerfile:
+
+    ARG buildno
+    ARG password
+
+    RUN echo "Build number: $buildno"
+    RUN script-requiring-password.sh "$password"
+
+Then specify the arguments under the `build` key. You can pass either a mapping
+or a list:
 
     build:
+      context: .
       args:
         buildno: 1
-        user: someuser
+        password: secret
 
     build:
+      context: .
       args:
         - buildno=1
-        - user=someuser
+        - password=secret
+
+You can omit the value when specifying a build argument, in which case its value
+at build time is the value in the environment where Compose is running.
+
+    args:
+      - buildno
+      - password
+
+> **Note**: YAML boolean values (`true`, `false`, `yes`, `no`, `on`, `off`) must
+> be enclosed in quotes, so that the parser interprets them as strings.
 
 ### cap_add, cap_drop
 
@@ -228,6 +247,8 @@ Custom DNS search domains. Can be a single value or a list.
 
 ### tmpfs
 
+> [Version 2 file format](#version-2) only.
+
 Mount a temporary file system inside the container. Can be a single value or a list.
 
     tmpfs: /run
@@ -274,6 +295,11 @@ beginning with `#` (i.e. comments) are ignored, as are blank lines.
     # Set Rails/Rack environment
     RACK_ENV=development
 
+> **Note:** If your service specifies a [build](#build) option, variables
+> defined in environment files will _not_ be automatically visible during the
+> build. Use the [args](#args) sub-option of `build` to define build-time
+> environment variables.
+
 ### environment
 
 Add environment variables. You can use either an array or a dictionary. Any
@@ -292,6 +318,11 @@ machine Compose is running on, which can be helpful for secret or host-specific 
       - RACK_ENV=development
       - SHOW=true
       - SESSION_SECRET
+
+> **Note:** If your service specifies a [build](#build) option, variables
+> defined in `environment` will _not_ be automatically visible during the
+> build. Use the [args](#args) sub-option of `build` to define build-time
+> environment variables.
 
 ### expose
 
@@ -713,7 +744,7 @@ then read-write will be used.
 >     - container_name
 >     - container_name:rw
 
-### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, privileged, read\_only, restart, shm\_size, stdin\_open, tty, user, working\_dir
+### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, oom_score_adj, privileged, read\_only, restart, shm\_size, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/engine/reference/run/) counterpart.
@@ -787,7 +818,7 @@ called `data` and mount it into the `db` service's containers.
       db:
         image: postgres
         volumes:
-          - data:/var/lib/postgres/data
+          - data:/var/lib/postgresql/data
 
     volumes:
       data:
@@ -796,7 +827,7 @@ called `data` and mount it into the `db` service's containers.
 You can also specify the name of the volume separately from the name used to
 refer to it within the Compose file:
 
-    volumes
+    volumes:
       data:
         external:
           name: actual-name-of-volume
@@ -857,6 +888,10 @@ A full example:
             host2: 172.28.1.6
             host3: 172.28.1.7
 
+### internal
+
+By default, Docker also connects a bridge network to it to provide external connectivity. If you want to create an externally isolated overlay network, you can set this option to `true`.
+
 ### external
 
 If set to `true`, specifies that this network has been created outside of
@@ -864,7 +899,7 @@ Compose. `docker-compose up` will not attempt to create it, and will raise
 an error if it doesn't exist.
 
 `external` cannot be used in conjunction with other network configuration keys
-(`driver`, `driver_opts`, `ipam`).
+(`driver`, `driver_opts`, `ipam`, `internal`).
 
 In the example below, `proxy` is the gateway to the outside world. Instead of
 attemping to create a network called `[projectname]_outside`, Compose will
