@@ -128,8 +128,6 @@ func main() {
 }
 
 func daemon(context *cli.Context) error {
-	// setup a standard reaper so that we don't leave any zombies if we are still alive
-	// this is just good practice because we are spawning new processes
 	s := make(chan os.Signal, 2048)
 	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
 	sv, err := supervisor.New(
