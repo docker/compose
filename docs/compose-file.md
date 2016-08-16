@@ -744,7 +744,7 @@ then read-write will be used.
 >     - container_name
 >     - container_name:rw
 
-### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, oom_score_adj, privileged, read\_only, restart, shm\_size, stdin\_open, tty, user, working\_dir
+### cpu\_shares, cpu\_quota, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, mem\_swappiness, oom\_score\_adj, privileged, read\_only, restart, shm\_size, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
 [docker run](https://docs.docker.com/engine/reference/run/) counterpart.
@@ -763,6 +763,7 @@ Each of these is a single value, analogous to its
 
     mem_limit: 1000000000
     memswap_limit: 2000000000
+    mem_swappiness: 10
     privileged: true
 
     restart: always

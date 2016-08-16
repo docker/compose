@@ -1271,6 +1271,24 @@ class ConfigTest(unittest.TestCase):
             }
         ]
 
+    def test_swappiness_option(self):
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'mem_swappiness': 10,
+                }
+            }
+        }))
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'mem_swappiness': 10,
+            }
+        ]
+
     def test_merge_service_dicts_from_files_with_extends_in_base(self):
         base = {
             'volumes': ['.:/app'],
