@@ -8,8 +8,10 @@ if [ -z "$1" ]; then
 fi
 
 TAG=$1
+
 VERSION="$(python setup.py --version)"
 
 ./script/build/write-git-sha
 python setup.py sdist bdist_wheel
-docker build --build-arg version=$VERSION -t docker/compose:$TAG -f Dockerfile.run .
+./script/build/linux
+docker build -t docker/compose:$TAG -f Dockerfile.run .
