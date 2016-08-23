@@ -706,7 +706,8 @@ class Service(object):
             shm_size=options.get('shm_size'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
-            mem_swappiness=options.get('mem_swappiness')
+            mem_swappiness=options.get('mem_swappiness'),
+            publish_all_ports=options.get('publish_all_ports', False)
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
