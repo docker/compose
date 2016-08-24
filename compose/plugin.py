@@ -11,20 +11,33 @@ from functools import partial
 import compose
 
 
-def compose_patch(obj, name):
+class PartialMethod(partial):
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+
+        return partial(
+            self.func,
+            instance,
+            *(self.args or ()),
+            **(self.keywords or {})
+        )
+
+
+def compose_patch(scope, name):
     def wrapper(fnc):
-        original = getattr(obj, name)
+        original = getattr(scope, name)
 
         if fnc.__doc__ is None:
             fnc.__doc__ = original.__doc__
 
-        method = partial(fnc, original)
-        method.__doc__ = fnc.__doc__
+        patched = PartialMethod(fnc, original)
+        patched.__doc__ = fnc.__doc__
 
         if hasattr(original, '__standalone__'):
-            method.__standalone__ = original.__standalone__
+            patched.__standalone__ = original.__standalone__
 
-        setattr(obj, name, method)
+        setattr(scope, name, patched)
         return fnc
     return wrapper
 
@@ -61,14 +74,15 @@ def compose_command(standalone=False):
                 "Command function '{}' must not called out of scope.".format(fnc.__name__)
             )
 
-        fnc.__standalone__ = standalone
-        modified_doc = update_command_doc(
-            compose.cli.main.TopLevelCommand.__doc__,
-            fnc.__name__,
-            fnc.__doc__
-        )
-
         # Using __modified_doc__ as fix for http://bugs.python.org/issue12773
+        if hasattr(compose.cli.main.TopLevelCommand, '__modified_doc__'):
+            original_doc = compose.cli.main.TopLevelCommand.__modified_doc__
+        else:
+            original_doc = compose.cli.main.TopLevelCommand.__doc__
+
+        fnc.__standalone__ = standalone
+        modified_doc = update_command_doc(original_doc, fnc.__name__, fnc.__doc__)
+
         try:
             compose.cli.main.TopLevelCommand.__doc__ = modified_doc
         except AttributeError:
@@ -80,14 +94,7 @@ def compose_command(standalone=False):
 
 
 class PluginError(Exception):
-    def __init__(self, *message, **errors):
-        # Call the base class constructor with the parameters it needs
-        super(PluginError, self).__init__(message, errors)
-
-        self.message = message
-
-    def __get_message(self):
-        return self.message
+    pass
 
 
 class PluginJsonFileError(PluginError):
@@ -131,7 +138,6 @@ class Plugin:
         if os.path.isfile(file):
             with open(file) as f:
                 plugin_info = json.load(f)
-
                 self.check_required_plugin_file_settings(plugin_info, self.required_fields)
                 self.name = plugin_info['name']
                 self.description = plugin_info['description'] if 'description' in plugin_info else ''
@@ -140,13 +146,13 @@ class Plugin:
             raise PluginJsonFileError('JSON plugin file not found')
 
     def install(self):
-        pass
+        return True
 
     def uninstall(self):
-        pass
+        return True
 
     def update(self):
-        pass
+        return None
 
     def configure(self):
-        print("'{}' needs no configuration".format(self.name))
+        return None
