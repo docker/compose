@@ -14,7 +14,7 @@ from compose.config.errors import ComposeFileNotFound
 try:
     import urllib.request as request
 except ImportError:
-    import urllib2 as request
+    import urllib as request
 
 import zipfile
 
@@ -46,7 +46,7 @@ class PluginManager(object):
         self.plugin_classes = None
         self.plugin_list = None
 
-        self.plugin_classes = self.__get_plugin_classes()
+        self.plugin_classes = self._get_plugin_classes()
 
     def load_config(self, project_dir, options):
         try:
@@ -57,9 +57,9 @@ class PluginManager(object):
         except ComposeFileNotFound:
             self.config = False
 
-        self.__load_plugins()
+        self._load_plugins()
 
-    def __get_plugin_paths(self):
+    def _get_plugin_paths(self):
         paths = {}
 
         if os.path.isdir(self.plugin_dir):
@@ -72,7 +72,7 @@ class PluginManager(object):
         return paths
 
     @staticmethod
-    def __source_plugin(path):
+    def _source_plugin(path):
         current_plugin_dir = os.path.basename(path)
         init_file = os.path.join(path, '__init__.py')
 
@@ -95,31 +95,26 @@ class PluginManager(object):
 
         return plugin_package.plugin
 
-    def __get_plugin_classes(self):
+    def _get_plugin_classes(self):
         if self.plugin_classes is None:
             self.plugin_classes = {}
 
-            for (plugin_id, plugin_path) in self.__get_plugin_paths().items():
-                try:
-                    plugin = self.__source_plugin(plugin_path)
-                    self.plugin_classes[plugin_id] = plugin
-                except InvalidPluginError:
-                    print("Invalid plugin '{}' installed".format(plugin_id))
-                except TypeError as e:
-                    print("Invalid plugin error: {}".format(str(e)))
+            for (plugin_id, plugin_path) in self._get_plugin_paths().items():
+                plugin = self._source_plugin(plugin_path)
+                self.plugin_classes[plugin_id] = plugin
 
         return self.plugin_classes
 
-    def __load_plugins(self):
+    def _load_plugins(self):
         if self.plugin_list is None:
             if self.config is None:
-                raise NoneLoadedConfigError("The configuration wan't loaded for the plugin manager. "
+                raise NoneLoadedConfigError("The configuration wasn't loaded for the plugin manager. "
                                             "Plugins can only instantiated after that.")
 
             plugins_config = self.config.plugins if self.config is not False else {}
             self.plugin_list = {}
 
-            for (plugin_id, plugin_class) in self.__get_plugin_classes().items():
+            for (plugin_id, plugin_class) in self._get_plugin_classes().items():
                 plugin_config = plugins_config[plugin_id] if plugin_id in plugins_config else {}
                 plugin_instance = plugin_class(self, plugin_config)
                 self.plugin_list[plugin_id] = plugin_instance
@@ -127,20 +122,20 @@ class PluginManager(object):
         return self.plugin_list
 
     def get_plugins(self):
-        return self.__load_plugins()
+        return self._load_plugins()
 
-    def __plugin_exists(self, plugin_id):
-        if id not in self.get_plugins():
+    def _plugin_exists(self, plugin_id):
+        if plugin_id not in self.get_plugins():
             raise PluginDoesNotExistError("Plugin '{}' doesn't exists".format(plugin_id))
 
     def is_plugin_installed(self, plugin_id):
         try:
-            self.__plugin_exists(plugin_id)
+            self._plugin_exists(plugin_id)
             return True
         except PluginDoesNotExistError:
             return False
 
-    def __get_plugin_file(self, plugin):
+    def _get_plugin_file(self, plugin):
         try:
             file = os.path.join(self.__plugin_download_dir, os.path.basename(plugin))
             request.urlretrieve(plugin, file)
@@ -152,7 +147,7 @@ class PluginManager(object):
 
         return file
 
-    def __check_plugin_archive(self, file):
+    def _check_plugin_archive(self, file):
         if zipfile.is_zipfile(file):
             archive = zipfile.ZipFile(file)
         elif tarfile.is_tarfile(file):
@@ -160,32 +155,37 @@ class PluginManager(object):
         else:
             raise InvalidPluginFileTypeError('Invalid file type.')
 
+        root_folders = []
         plugin_folder = None
 
-        # TODO improve check
         for file in archive.namelist():
-            if file.endswith('plugin.json'):
-                plugin_folder = os.path.dirname(file)
-                break
+            if file.endswith('/') and file.count('/') == 1:
+                root_folders.append(file[:-1])
 
-        if plugin_folder is None:
+            if file.count('/') == 1 and file.endswith('plugin.json'):
+                plugin_folder = os.path.dirname(file)
+
+        if len(root_folders) != 1:
+            raise InvalidPluginFileTypeError('Wrong plugin structure.')
+
+        if plugin_folder is None or plugin_folder not in root_folders:
             raise InvalidPluginFileTypeError('Missing plugin.json file.')
 
         archive.extractall(self.plugin_dir)
         return os.path.join(self.plugin_dir, plugin_folder)
 
     def install_plugin(self, plugin):
-        file = self.__get_plugin_file(plugin)
+        file = self._get_plugin_file(plugin)
 
         if not os.path.isdir(self.plugin_dir):
             os.makedirs(self.plugin_dir)
 
-        plugin_path = self.__check_plugin_archive(file)
+        plugin_path = self._check_plugin_archive(file)
 
         try:
-            plugin_class = self.__source_plugin(plugin_path)
+            plugin_class = self._source_plugin(plugin_path)
             plugin_instance = plugin_class(self, {})
-            plugin_instance.install()
+            plugin_installed = plugin_instance.install()
         except InvalidPluginError as e:
             shutil.rmtree(plugin_path)
             raise e
@@ -193,8 +193,10 @@ class PluginManager(object):
         if os.path.isdir(self.__plugin_download_dir):
             shutil.rmtree(self.__plugin_download_dir)
 
+        return plugin_installed
+
     def uninstall_plugin(self, name):
-        self.__plugin_exists(name)
+        self._plugin_exists(name)
 
         # After the uninstall method was successful remove the plugin
         if self.plugin_list[name].uninstall():
@@ -203,9 +205,9 @@ class PluginManager(object):
         return False
 
     def update_plugin(self, plugin_id):
-        self.__plugin_exists(plugin_id)
+        self._plugin_exists(plugin_id)
         return self.plugin_list[plugin_id].update()
 
     def configure_plugin(self, plugin_id):
-        self.__plugin_exists(plugin_id)
+        self._plugin_exists(plugin_id)
         return self.plugin_list[plugin_id].configure()
