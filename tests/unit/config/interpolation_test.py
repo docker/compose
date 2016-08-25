@@ -7,7 +7,9 @@ import mock
 import pytest
 
 from compose.config.environment import Environment
+from compose.config.errors import ConfigurationError
 from compose.config.interpolation import interpolate_environment_variables
+from compose.const import IS_WINDOWS_PLATFORM
 
 
 @pytest.yield_fixture
@@ -72,3 +74,60 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
     assert interpolate_environment_variables(
         volumes, 'volume', Environment.from_env_file(None)
     ) == expected
+
+
+@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="posix only")
+def test_interpolate_command(mock_env):
+    services = {
+        'servicea': {
+            'image': 'example:$((echo "FOO"))',
+            'volumes': ['$((echo "BAR")):/target'],
+            'logging': {
+                'driver': '$((echo "BAZ"))',
+                'options': {
+                    'user': '$((echo "QUX"))',
+                }
+            }
+        }
+    }
+    expected = {
+        'servicea': {
+            'image': 'example:FOO',
+            'volumes': ['BAR:/target'],
+            'logging': {
+                'driver': 'BAZ',
+                'options': {
+                    'user': 'QUX',
+                }
+            }
+        }
+    }
+
+    assert interpolate_environment_variables(
+        services, 'service', Environment.from_env_file(None)
+    ) == expected
+
+
+@pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="posix only")
+def test_interpolate_bad_command(mock_env):
+    services = {
+        'servicea': {
+            'image': 'example:$((echo "FOO"))',
+            'volumes': ['$((echo "BAR")):/target'],
+            'logging': {
+                'driver': '$((echo "BAZ"))',
+                'options': {
+                    'user': '$((this is a bad command))',
+                }
+            }
+        }
+    }
+
+    try:
+        interpolate_environment_variables(
+            services, 'service', Environment.from_env_file(None)
+        )
+    except ConfigurationError:
+        pass
+    except Exception as e:
+        raise e
