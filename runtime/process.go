@@ -297,7 +297,9 @@ func (p *process) Start() error {
 			}
 		case <-p.cmdDoneCh:
 			if !p.cmdSuccess {
-				cmd.Process.Kill()
+				if cmd.Process != nil {
+					cmd.Process.Kill()
+				}
 				cmd.Wait()
 				return ErrShimExited
 			}
