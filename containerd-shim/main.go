@@ -25,8 +25,11 @@ type controlMessage struct {
 // containerd-shim is a small shim that sits in front of a runtime implementation
 // that allows it to be repartented to init and handle reattach from the caller.
 //
-// the cwd of the shim should be the bundle for the container.  Arg1 should be the path
-// to the state directory where the shim can locate fifos and other information.
+// the cwd of the shim should be the path to the state directory where the shim
+// can locate fifos and other information.
+// Arg0: id of the container
+// Arg1: bundle path
+// Arg2: runtime binary
 func main() {
 	flag.Parse()
 	cwd, err := os.Getwd()
