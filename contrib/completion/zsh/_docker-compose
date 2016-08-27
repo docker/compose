@@ -19,52 +19,49 @@
 #  * @felixr docker zsh completion script : https://github.com/felixr/docker-zsh-completion
 # -------------------------------------------------------------------------
 
-# For compatibility reasons, Compose and therefore its completion supports several
-# stack compositon files as listed here, in descending priority.
-# Support for these filenames might be dropped in some future version.
-__docker-compose_compose_file() {
-    local file
-    for file in docker-compose.y{,a}ml ; do
-        [ -e $file ] && {
-            echo $file
-            return
-        }
-    done
-    echo docker-compose.yml
+__docker-compose_q() {
+    docker-compose 2>/dev/null $compose_options "$@"
 }
 
-# Extracts all service names from docker-compose.yml.
-___docker-compose_all_services_in_compose_file() {
+# All services defined in docker-compose.yml
+__docker-compose_all_services_in_compose_file() {
     local already_selected
     local -a services
     already_selected=$(echo $words | tr " " "|")
-    awk -F: '/^[a-zA-Z0-9]/{print $1}' "${compose_file:-$(__docker-compose_compose_file)}" 2>/dev/null | grep -Ev "$already_selected"
+    __docker-compose_q config --services \
+        | grep -Ev "^(${already_selected})$"
 }
 
 # All services, even those without an existing container
 __docker-compose_services_all() {
     [[ $PREFIX = -* ]] && return 1
     integer ret=1
-    services=$(___docker-compose_all_services_in_compose_file)
+    services=$(__docker-compose_all_services_in_compose_file)
     _alternative "args:services:($services)" && ret=0
 
     return ret
 }
 
 # All services that have an entry with the given key in their docker-compose.yml section
-___docker-compose_services_with_key() {
+__docker-compose_services_with_key() {
     local already_selected
     local -a buildable
     already_selected=$(echo $words | tr " " "|")
     # flatten sections to one line, then filter lines containing the key and return section name.
-    awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' "${compose_file:-$(__docker-compose_compose_file)}" 2>/dev/null | awk -F: -v key=": +$1:" '$0 ~ key {print $1}' 2>/dev/null | grep -Ev "$already_selected"
+    __docker-compose_q config \
+        | sed -n -e '/^services:/,/^[^ ]/p' \
+        | sed -n 's/^  //p' \
+        | awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
+        | grep " \+$1:" \
+        | cut -d: -f1 \
+        | grep -Ev "^(${already_selected})$"
 }
 
 # All services that are defined by a Dockerfile reference
 __docker-compose_services_from_build() {
     [[ $PREFIX = -* ]] && return 1
     integer ret=1
-    buildable=$(___docker-compose_services_with_key build)
+    buildable=$(__docker-compose_services_with_key build)
     _alternative "args:buildable services:($buildable)" && ret=0
 
    return ret
@@ -74,7 +71,7 @@ __docker-compose_services_from_build() {
 __docker-compose_services_from_image() {
     [[ $PREFIX = -* ]] && return 1
     integer ret=1
-    pullable=$(___docker-compose_services_with_key image)
+    pullable=$(__docker-compose_services_with_key image)
     _alternative "args:pullable services:($pullable)" && ret=0
 
     return ret
@@ -96,7 +93,7 @@ __docker-compose_get_services() {
     shift
     [[ $kind =~ (stopped|all) ]] && args=($args -a)
 
-    lines=(${(f)"$(_call_program commands docker ps $args)"})
+    lines=(${(f)"$(_call_program commands docker $docker_options ps $args)"})
     services=(${(f)"$(_call_program commands docker-compose 2>/dev/null $compose_options ps -q)"})
 
     # Parse header line to find columns
@@ -185,7 +182,17 @@ __docker-compose_commands() {
 }
 
 __docker-compose_subcommand() {
-    local opts_help='(: -)--help[Print usage]'
+    local opts_help opts_force_recreate opts_no_recreate opts_no_build opts_remove_orphans opts_timeout opts_no_color opts_no_deps
+
+    opts_help='(: -)--help[Print usage]'
+    opts_force_recreate="(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]"
+    opts_no_recreate="(--force-recreate)--no-recreate[If containers already exist, don't recreate them. Incompatible with --force-recreate.]"
+    opts_no_build="(--build)--no-build[Don't build an image, even if it's missing.]"
+    opts_remove_orphans="--remove-orphans[Remove containers for services not defined in the Compose file]"
+    opts_timeout=('(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: ")
+    opts_no_color='--no-color[Produce monochrome output.]'
+    opts_no_deps="--no-deps[Don't start linked services.]"
+
     integer ret=1
 
     case "$words[1]" in
@@ -193,9 +200,15 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '--force-rm[Always remove intermediate containers.]' \
-                '--no-cache[Do not use cache when building the image]' \
+                '--no-cache[Do not use cache when building the image.]' \
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
+            ;;
+        (bundle)
+            _arguments \
+                $opts_help \
+                '--push-images[Automatically push images for any services which have a `build` option specified.]' \
+                '(--output -o)'{--output,-o}'[Path to write the bundle file to. Defaults to "<project name>.dab".]:file:_files' && ret=0
             ;;
         (config)
             _arguments \
@@ -206,21 +219,23 @@ __docker-compose_subcommand() {
         (create)
             _arguments \
                 $opts_help \
-                "(--no-recreate --no-build)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
-                "(--force-recreate)--no-build[If containers already exist, don't recreate them. Incompatible with --force-recreate.]" \
-                "(--force-recreate)--no-recreate[Don't build an image, even if it's missing]" \
+                $opts_force_recreate \
+                $opts_no_recreate \
+                $opts_no_build \
+                "(--no-build)--build[Build images before creating containers.]" \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (down)
             _arguments \
                 $opts_help \
-                "--rmi[Remove images, type may be one of: 'all' to remove all images, or 'local' to remove only images that don't have an custom name set by the 'image' field]:type:(all local)" \
-                '(-v --volumes)'{-v,--volumes}"[Remove data volumes]" && ret=0
+                "--rmi[Remove images. Type must be one of: 'all': Remove all images used by any service. 'local': Remove only images that don't have a custom tag set by the \`image\` field.]:type:(all local)" \
+                '(-v --volumes)'{-v,--volumes}"[Remove named volumes declared in the \`volumes\` section of the Compose file and anonymous volumes attached to containers.]" \
+                $opts_remove_orphans && ret=0
             ;;
         (events)
             _arguments \
                 $opts_help \
-                '--json[Output events as a stream of json objects.]' \
+                '--json[Output events as a stream of json objects]' \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (exec)
@@ -230,7 +245,7 @@ __docker-compose_subcommand() {
                 '--privileged[Give extended privileges to the process.]' \
                 '--user=[Run the command as this user.]:username:_users' \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose exec` allocates a TTY.]' \
-                '--index=[Index of the container if there are multiple instances of a service (default: 1)]:index: ' \
+                '--index=[Index of the container if there are multiple instances of a service \[default: 1\]]:index: ' \
                 '(-):running services:__docker-compose_runningservices' \
                 '(-):command: _command_names -e' \
                 '*::arguments: _normal' && ret=0
@@ -248,7 +263,7 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '(-f --follow)'{-f,--follow}'[Follow log output]' \
-                '--no-color[Produce monochrome output.]' \
+                $opts_no_color \
                 '--tail=[Number of lines to show from the end of the logs for each container.]:number of lines: ' \
                 '(-t --timestamps)'{-t,--timestamps}'[Show timestamps]' \
                 '*:services:__docker-compose_services_all' && ret=0
@@ -261,8 +276,8 @@ __docker-compose_subcommand() {
         (port)
             _arguments \
                 $opts_help \
-                '--protocol=-[tcp or udap (defaults to tcp)]:protocol:(tcp udp)' \
-                '--index=-[index of the container if there are mutiple instances of a service (defaults to 1)]:index: ' \
+                '--protocol=[tcp or udp \[default: tcp\]]:protocol:(tcp udp)' \
+                '--index=[index of the container if there are multiple instances of a service \[default: 1\]]:index: ' \
                 '1:running services:__docker-compose_runningservices' \
                 '2:port:_ports' && ret=0
             ;;
@@ -278,12 +293,17 @@ __docker-compose_subcommand() {
                 '--ignore-pull-failures[Pull what it can and ignores images with pull failures.]' \
                 '*:services:__docker-compose_services_from_image' && ret=0
             ;;
+        (push)
+            _arguments \
+                $opts_help \
+                '--ignore-push-failures[Push what it can and ignores images with push failures.]' \
+                '*:services:__docker-compose_services' && ret=0
+            ;;
         (rm)
             _arguments \
                 $opts_help \
-                '(-a --all)'{-a,--all}"[Also remove one-off containers]" \
                 '(-f --force)'{-f,--force}"[Don't ask to confirm removal]" \
-                '-v[Remove volumes associated with containers]' \
+                '-v[Remove any anonymous volumes attached to containers]' \
                 '*:stopped services:__docker-compose_stoppedservices' && ret=0
             ;;
         (run)
@@ -292,14 +312,14 @@ __docker-compose_subcommand() {
                 '-d[Detached mode: Run container in the background, print new container name.]' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
-                '--name[Assign a name to the container]:name: ' \
-                "--no-deps[Don't start linked services.]" \
-                '(-p --publish)'{-p,--publish=-}"[Run command with manually mapped container's port(s) to the host.]" \
+                '--name=[Assign a name to the container]:name: ' \
+                $opts_no_deps \
+                '(-p --publish)'{-p,--publish=}"[Publish a container's port(s) to the host]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
-                '(-u --user)'{-u,--user=-}'[Run as specified username or uid]:username or uid:_users' \
-                '(-w --workdir)'{-w=,--workdir=}'[Working directory inside the container]:workdir: ' \
+                '(-u --user)'{-u,--user=}'[Run as specified username or uid]:username or uid:_users' \
+                '(-w --workdir)'{-w,--workdir=}'[Working directory inside the container]:workdir: ' \
                 '(-):services:__docker-compose_services' \
                 '(-):command: _command_names -e' \
                 '*::arguments: _normal' && ret=0
@@ -307,7 +327,7 @@ __docker-compose_subcommand() {
         (scale)
             _arguments \
                 $opts_help \
-                '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                $opts_timeout \
                 '*:running services:__docker-compose_runningservices' && ret=0
             ;;
         (start)
@@ -318,7 +338,7 @@ __docker-compose_subcommand() {
         (stop|restart)
             _arguments \
                 $opts_help \
-                '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                $opts_timeout \
                 '*:running services:__docker-compose_runningservices' && ret=0
             ;;
         (unpause)
@@ -329,15 +349,16 @@ __docker-compose_subcommand() {
         (up)
             _arguments \
                 $opts_help \
-                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names.]' \
-                '--build[Build images before starting containers.]' \
-                '--no-color[Produce monochrome output.]' \
-                "--no-deps[Don't start linked services.]" \
-                "--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]" \
-                "--no-recreate[If containers already exist, don't recreate them.]" \
-                "--no-build[Don't build an image, even if it's missing]" \
+                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names. Incompatible with --abort-on-container-exit.]' \
+                $opts_no_color \
+                $opts_no_deps \
+                $opts_force_recreate \
+                $opts_no_recreate \
+                $opts_no_build \
+                "(--no-build)--build[Build images before starting containers.]" \
                 "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
-                '(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: " \
+                '(-t --timeout)'{-t,--timeout}"[Use this timeout in seconds for container shutdown when attached or when containers are already running. (default: 10)]:seconds: " \
+                $opts_remove_orphans \
                 '*:services:__docker-compose_services_all' && ret=0
             ;;
         (version)
@@ -367,16 +388,57 @@ _docker-compose() {
 
     _arguments -C \
         '(- :)'{-h,--help}'[Get help]' \
-        '--verbose[Show more output]' \
-        '(- :)'{-v,--version}'[Print version and exit]' \
         '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
+        '--verbose[Show more output]' \
+        '(- :)'{-v,--version}'[Print version and exit]' \
+        '(-H --host)'{-H,--host}'[Daemon socket to connect to]:host:' \
+        '--tls[Use TLS; implied by --tlsverify]' \
+        '--tlscacert=[Trust certs signed only by this CA]:ca path:' \
+        '--tlscert=[Path to TLS certificate file]:client cert path:' \
+        '--tlskey=[Path to TLS key file]:tls key path:' \
+        '--tlsverify[Use TLS and verify the remote]' \
+        "--skip-hostname-check[Don't check the daemon's hostname against the name specified in the client certificate (for example if your docker host is an IP address)]" \
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 
-    local compose_file=${opt_args[-f]}${opt_args[--file]}
-    local compose_project=${opt_args[-p]}${opt_args[--project-name]}
-    local compose_options="${compose_file:+--file $compose_file} ${compose_project:+--project-name $compose_project}"
+    local -a relevant_compose_flags relevant_docker_flags compose_options docker_options
+
+    relevant_compose_flags=(
+        "--file" "-f"
+        "--host" "-H"
+        "--project-name" "-p"
+        "--tls"
+        "--tlscacert"
+        "--tlscert"
+        "--tlskey"
+        "--tlsverify"
+        "--skip-hostname-check"
+    )
+
+    relevant_docker_flags=(
+        "--host" "-H"
+        "--tls"
+        "--tlscacert"
+        "--tlscert"
+        "--tlskey"
+        "--tlsverify"
+    )
+
+    for k in "${(@k)opt_args}"; do
+        if [[ -n "${relevant_docker_flags[(r)$k]}" ]]; then
+            docker_options+=$k
+            if [[ -n "$opt_args[$k]" ]]; then
+                docker_options+=$opt_args[$k]
+            fi
+        fi
+        if [[ -n "${relevant_compose_flags[(r)$k]}" ]]; then
+            compose_options+=$k
+            if [[ -n "$opt_args[$k]" ]]; then
+                compose_options+=$opt_args[$k]
+            fi
+        fi
+    done
 
     case $state in
         (command)

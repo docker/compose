@@ -20,6 +20,11 @@ class ResilienceTest(DockerClientTestCase):
         self.db.start_container(container)
         self.host_path = container.get_mount('/var/db')['Source']
 
+    def tearDown(self):
+        del self.project
+        del self.db
+        super(ResilienceTest, self).tearDown()
+
     def test_successful_recreate(self):
         self.project.up(strategy=ConvergenceStrategy.always)
         container = self.db.containers()[0]

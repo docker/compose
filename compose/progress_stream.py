@@ -91,3 +91,22 @@ def print_output_event(event, stream, is_terminal):
         stream.write("%s%s" % (event['stream'], terminator))
     else:
         stream.write("%s%s\n" % (status, terminator))
+
+
+def get_digest_from_pull(events):
+    for event in events:
+        status = event.get('status')
+        if not status or 'Digest' not in status:
+            continue
+
+        _, digest = status.split(':', 1)
+        return digest.strip()
+    return None
+
+
+def get_digest_from_push(events):
+    for event in events:
+        digest = event.get('aux', {}).get('Digest')
+        if digest:
+            return digest
+    return None

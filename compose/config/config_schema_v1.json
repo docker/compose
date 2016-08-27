@@ -85,6 +85,7 @@
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
         "memswap_limit": {"type": ["number", "string"]},
+        "mem_swappiness": {"type": "integer"},
         "net": {"type": "string"},
         "pid": {"type": ["string", "null"]},
 

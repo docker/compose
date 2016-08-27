@@ -6,9 +6,9 @@ import os
 import platform
 import ssl
 import subprocess
+import sys
 
 import docker
-from six.moves import input
 
 import compose
 from ..const import HOME_DIR
@@ -43,6 +43,16 @@ def yesno(prompt, default=None):
         return default
     else:
         return None
+
+
+def input(prompt):
+    """
+    Version of input (raw_input in Python 2) which forces a flush of sys.stdout
+    to avoid problems where the prompt fails to appear due to line buffering
+    """
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    return sys.stdin.readline().rstrip('\n')
 
 
 def call_silently(*args, **kwargs):
@@ -96,6 +106,25 @@ def get_build_version():
 
     with open(filename) as fh:
         return fh.read().strip()
+
+
+def is_docker_for_mac_installed():
+    return is_mac() and os.path.isdir('/Applications/Docker.app')
+
+
+def generate_user_agent():
+    parts = [
+        "docker-compose/{}".format(compose.__version__),
+        "docker-py/{}".format(docker.__version__),
+    ]
+    try:
+        p_system = platform.system()
+        p_release = platform.release()
+    except IOError:
+        pass
+    else:
+        parts.append("{}/{}".format(p_system, p_release))
+    return " ".join(parts)
 
 
 def get_user_home():

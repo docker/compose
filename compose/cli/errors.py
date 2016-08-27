@@ -13,8 +13,8 @@ from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
-from ..const import HTTP_TIMEOUT
 from .utils import call_silently
+from .utils import is_docker_for_mac_installed
 from .utils import is_mac
 from .utils import is_ubuntu
 
@@ -46,33 +46,24 @@ def handle_connection_errors(client):
         raise ConnectionError()
     except RequestsConnectionError as e:
         if e.args and isinstance(e.args[0], ReadTimeoutError):
-            log_timeout_error()
+            log_timeout_error(client.timeout)
             raise ConnectionError()
-
-        if call_silently(['which', 'docker']) != 0:
-            if is_mac():
-                exit_with_error(docker_not_found_mac)
-            if is_ubuntu():
-                exit_with_error(docker_not_found_ubuntu)
-            exit_with_error(docker_not_found_generic)
-        if call_silently(['which', 'docker-machine']) == 0:
-            exit_with_error(conn_error_docker_machine)
-        exit_with_error(conn_error_generic.format(url=client.base_url))
+        exit_with_error(get_conn_error_message(client.base_url))
     except APIError as e:
         log_api_error(e, client.api_version)
         raise ConnectionError()
     except (ReadTimeout, socket.timeout) as e:
-        log_timeout_error()
+        log_timeout_error(client.timeout)
         raise ConnectionError()
 
 
-def log_timeout_error():
+def log_timeout_error(timeout):
     log.error(
         "An HTTP request took too long to complete. Retry with --verbose to "
         "obtain debug information.\n"
         "If you encounter this issue regularly because of slow network "
         "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
-        "value (current value: %s)." % HTTP_TIMEOUT)
+        "value (current value: %s)." % timeout)
 
 
 def log_api_error(e, client_version):
@@ -95,6 +86,20 @@ def log_api_error(e, client_version):
 def exit_with_error(msg):
     log.error(dedent(msg).strip())
     raise ConnectionError()
+
+
+def get_conn_error_message(url):
+    if call_silently(['which', 'docker']) != 0:
+        if is_mac():
+            return docker_not_found_mac
+        if is_ubuntu():
+            return docker_not_found_ubuntu
+        return docker_not_found_generic
+    if is_docker_for_mac_installed():
+        return conn_error_docker_for_mac
+    if call_silently(['which', 'docker-machine']) == 0:
+        return conn_error_docker_machine
+    return conn_error_generic.format(url=url)
 
 
 docker_not_found_mac = """
@@ -120,6 +125,10 @@ docker_not_found_generic = """
 
 conn_error_docker_machine = """
     Couldn't connect to Docker daemon - you might need to run `docker-machine start default`.
+"""
+
+conn_error_docker_for_mac = """
+    Couldn't connect to Docker daemon. You might need to start Docker for Mac.
 """
 
 

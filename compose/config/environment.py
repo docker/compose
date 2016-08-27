@@ -28,6 +28,8 @@ def env_vars_from_file(filename):
     """
     if not os.path.exists(filename):
         raise ConfigurationError("Couldn't find env file: %s" % filename)
+    elif not os.path.isfile(filename):
+        raise ConfigurationError("%s is not a file." % (filename))
     env = {}
     for line in codecs.open(filename, 'r', 'utf-8'):
         line = line.strip()
@@ -57,6 +59,18 @@ class Environment(dict):
         instance = _initialize()
         instance.update(os.environ)
         return instance
+
+    @classmethod
+    def from_command_line(cls, parsed_env_opts):
+        result = cls()
+        for k, v in parsed_env_opts.items():
+            # Values from the command line take priority, unless they're unset
+            # in which case they take the value from the system's environment
+            if v is None and k in os.environ:
+                result[k] = os.environ[k]
+            else:
+                result[k] = v
+        return result
 
     def __getitem__(self, key):
         try:

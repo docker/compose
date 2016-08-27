@@ -17,6 +17,8 @@ class VolumeTest(DockerClientTestCase):
                 self.client.remove_volume(volume.full_name)
             except DockerException:
                 pass
+        del self.tmp_volumes
+        super(VolumeTest, self).tearDown()
 
     def create_volume(self, name, driver=None, opts=None, external=None):
         if external and isinstance(external, bool):

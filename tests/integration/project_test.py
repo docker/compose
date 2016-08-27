@@ -757,6 +757,33 @@ class ProjectTest(DockerClientTestCase):
             project.up()
 
     @v2_only()
+    def test_project_up_with_network_internal(self):
+        self.require_api_version('1.23')
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {'internal': None},
+            }],
+            volumes={},
+            networks={
+                'internal': {'driver': 'bridge', 'internal': True},
+            },
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up()
+
+        network = self.client.networks(names=['composetest_internal'])[0]
+
+        assert network['Internal'] is True
+
+    @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{0}'.format(vol_name)
@@ -833,6 +860,42 @@ class ProjectTest(DockerClientTestCase):
         log_config = another.get('HostConfig.LogConfig')
         self.assertTrue(log_config)
         self.assertEqual(log_config.get('Type'), 'none')
+
+    @v2_only()
+    def test_project_up_port_mappings_with_multiple_files(self):
+        base_file = config.ConfigFile(
+            'base.yml',
+            {
+                'version': V2_0,
+                'services': {
+                    'simple': {
+                        'image': 'busybox:latest',
+                        'command': 'top',
+                        'ports': ['1234:1234']
+                    },
+                },
+
+            })
+        override_file = config.ConfigFile(
+            'override.yml',
+            {
+                'version': V2_0,
+                'services': {
+                    'simple': {
+                        'ports': ['1234:1234']
+                    }
+                }
+
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+
+        config_data = config.load(details)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        containers = project.containers()
+        self.assertEqual(len(containers), 1)
 
     @v2_only()
     def test_initialize_volumes(self):

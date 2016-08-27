@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import datetime
 import json
 import os
-import shlex
 import signal
 import subprocess
 import time
@@ -12,6 +11,7 @@ from collections import Counter
 from collections import namedtuple
 from operator import attrgetter
 
+import py
 import yaml
 from docker import errors
 
@@ -113,6 +113,8 @@ class CLITestCase(DockerClientTestCase):
             for n in networks:
                 if n['Name'].startswith('{}_'.format(self.project.name)):
                     self.client.remove_network(n['Name'])
+        if hasattr(self, '_project'):
+            del self._project
 
         super(CLITestCase, self).tearDown()
 
@@ -222,6 +224,20 @@ class CLITestCase(DockerClientTestCase):
             },
             'networks': {},
             'volumes': {},
+        }
+
+    def test_config_external_network(self):
+        self.base_dir = 'tests/fixtures/networks'
+        result = self.dispatch(['-f', 'external-networks.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'networks' in json_result
+        assert json_result['networks'] == {
+            'networks_foo': {
+                'external': True  # {'name': 'networks_foo'}
+            },
+            'bar': {
+                'external': {'name': 'networks_bar'}
+            }
         }
 
     def test_config_v1(self):
@@ -363,6 +379,32 @@ class CLITestCase(DockerClientTestCase):
                 filters={"label": labels})
         ]
         assert not containers
+
+    def test_bundle_with_digests(self):
+        self.base_dir = 'tests/fixtures/bundle-with-digests/'
+        tmpdir = py.test.ensuretemp('cli_test_bundle')
+        self.addCleanup(tmpdir.remove)
+        filename = str(tmpdir.join('example.dab'))
+
+        self.dispatch(['bundle', '--output', filename])
+        with open(filename, 'r') as fh:
+            bundle = json.load(fh)
+
+        assert bundle == {
+            'Version': '0.1',
+            'Services': {
+                'web': {
+                    'Image': ('dockercloud/hello-world@sha256:fe79a2cfbd17eefc3'
+                              '44fb8419420808df95a1e22d93b7f621a7399fd1e9dca1d'),
+                    'Networks': ['default'],
+                },
+                'redis': {
+                    'Image': ('redis@sha256:a84cb8f53a70e19f61ff2e1d5e73fb7ae62d'
+                              '374b2b7392de1e7d77be26ef8f7b'),
+                    'Networks': ['default'],
+                }
+            },
+        }
 
     def test_create(self):
         self.dispatch(['create'])
@@ -534,6 +576,24 @@ class CLITestCase(DockerClientTestCase):
         assert 'web' in front_aliases
         assert 'forward_facing' in front_aliases
         assert 'ahead' in front_aliases
+
+    @v2_only()
+    def test_up_with_network_internal(self):
+        self.require_api_version('1.23')
+        filename = 'network-internal.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+        internal_net = '{}_internal'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # One network was created: internal
+        assert sorted(n['Name'] for n in networks) == [internal_net]
+
+        assert networks[0]['Internal'] is True
 
     @v2_only()
     def test_up_with_network_static_addresses(self):
@@ -924,16 +984,54 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    def test_run_service_with_entrypoint_overridden(self):
-        self.base_dir = 'tests/fixtures/dockerfile_with_entrypoint'
-        name = 'service'
-        self.dispatch(['run', '--entrypoint', '/bin/echo', name, 'helloworld'])
-        service = self.project.get_service(name)
-        container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
-        self.assertEqual(
-            shlex.split(container.human_readable_command),
-            [u'/bin/echo', u'helloworld'],
-        )
+    def test_run_service_with_dockerfile_entrypoint(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['printf']
+        assert container.get('Config.Cmd') == ['default', 'args']
+
+    def test_run_service_with_dockerfile_entrypoint_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert not container.get('Config.Cmd')
+
+    def test_run_service_with_dockerfile_entrypoint_and_command_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test', 'foo'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert container.get('Config.Cmd') == ['foo']
+
+    def test_run_service_with_compose_file_entrypoint(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['printf']
+        assert container.get('Config.Cmd') == ['default', 'args']
+
+    def test_run_service_with_compose_file_entrypoint_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert not container.get('Config.Cmd')
+
+    def test_run_service_with_compose_file_entrypoint_and_command_overridden(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test', 'foo'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert container.get('Config.Cmd') == ['foo']
+
+    def test_run_service_with_compose_file_entrypoint_and_empty_string_command(self):
+        self.base_dir = 'tests/fixtures/entrypoint-composefile'
+        self.dispatch(['run', '--entrypoint', 'echo', 'test', ''])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') == ['echo']
+        assert container.get('Config.Cmd') == ['']
 
     def test_run_service_with_user_overridden(self):
         self.base_dir = 'tests/fixtures/user-composefile'
@@ -1121,7 +1219,10 @@ class CLITestCase(DockerClientTestCase):
             ]
 
             for _, config in networks.items():
-                assert not config['Aliases']
+                # TODO: once we drop support for API <1.24, this can be changed to:
+                # assert config['Aliases'] == [container.short_id]
+                aliases = set(config['Aliases'] or []) - set([container.short_id])
+                assert not aliases
 
     @v2_only()
     def test_run_detached_connects_to_network(self):
@@ -1138,7 +1239,10 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         for _, config in networks.items():
-            assert not config['Aliases']
+            # TODO: once we drop support for API <1.24, this can be changed to:
+            # assert config['Aliases'] == [container.short_id]
+            aliases = set(config['Aliases'] or []) - set([container.short_id])
+            assert not aliases
 
         assert self.lookup(container, 'app')
         assert self.lookup(container, 'db')
@@ -1169,6 +1273,18 @@ class CLITestCase(DockerClientTestCase):
             'simplecomposefile_simple_run_1',
             'exited'))
 
+    @mock.patch.dict(os.environ)
+    def test_run_env_values_from_system(self):
+        os.environ['FOO'] = 'bar'
+        os.environ['BAR'] = 'baz'
+
+        self.dispatch(['run', '-e', 'FOO', 'simple', 'true'], None)
+
+        container = self.project.containers(one_off=OneOffFilter.only, stopped=True)[0]
+        environment = container.get('Config.Env')
+        assert 'FOO=bar' in environment
+        assert 'BAR=baz' not in environment
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
@@ -1192,8 +1308,6 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
         self.dispatch(['rm', '-f'], None)
         self.assertEqual(len(service.containers(stopped=True)), 0)
-        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 1)
-        self.dispatch(['rm', '-f', '-a'], None)
         self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 0)
 
         service.create_container(one_off=False)
@@ -1475,6 +1589,17 @@ class CLITestCase(DockerClientTestCase):
         assert Counter(e['action'] for e in lines) == {'create': 2, 'start': 2}
 
     def test_events_human_readable(self):
+
+        def has_timestamp(string):
+            str_iso_date, str_iso_time, container_info = string.split(' ', 2)
+            try:
+                return isinstance(datetime.datetime.strptime(
+                    '%s %s' % (str_iso_date, str_iso_time),
+                    '%Y-%m-%d %H:%M:%S.%f'),
+                    datetime.datetime)
+            except ValueError:
+                return False
+
         events_proc = start_process(self.base_dir, ['events'])
         self.dispatch(['up', '-d', 'simple'])
         wait_on_condition(ContainerCountCondition(self.project, 1))
@@ -1491,7 +1616,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
-        assert lines[0].startswith(datetime.date.today().isoformat())
+
+        assert has_timestamp(lines[0])
 
     def test_env_file_relative_to_compose_file(self):
         config_path = os.path.abspath('tests/fixtures/env-file/docker-compose.yml')
