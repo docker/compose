@@ -152,7 +152,7 @@ class Plugin:
         return True
 
     def update(self):
-        return True
+        return None
 
     def configure(self):
         return None

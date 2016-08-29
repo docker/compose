@@ -98,7 +98,9 @@ class PluginManagerTest(unittest.TestCase):
         plugin_manager = PluginManager('')
 
         with mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile,\
-                mock.patch('imp.load_source') as mock_load_source:
+                mock.patch('imp.load_source') as mock_load_source, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             mock_load_source.return_value = self._get_helper_class()
             mock_isfile.return_value = True
 
@@ -114,7 +116,9 @@ class PluginManagerTest(unittest.TestCase):
         plugin_manager = PluginManager('')
 
         with mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile, \
-                mock.patch('imp.load_source') as mock_load_source:
+                mock.patch('imp.load_source') as mock_load_source, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             mock_load_source.return_value = self._get_helper_class({
                 'plugin': self._get_helper_class().__class__
             })
@@ -129,7 +133,9 @@ class PluginManagerTest(unittest.TestCase):
         plugin_manager = PluginManager('')
 
         with mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile, \
-                mock.patch('imp.load_source') as mock_load_source:
+                mock.patch('imp.load_source') as mock_load_source, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             mock_load_source.return_value = self._get_helper_class({
                 'plugin': Plugin
             })
@@ -145,8 +151,9 @@ class PluginManagerTest(unittest.TestCase):
         with mock.patch('compose.plugin_manager.os.path.isdir') as mock_isdir, \
                 mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile, \
                 mock.patch('compose.plugin_manager.os.listdir') as mock_listdir, \
-                mock.patch('imp.load_source') as mock_load_source:
-
+                mock.patch('imp.load_source') as mock_load_source, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             plugin_manager = PluginManager('')
             plugin_manager.plugin_classes = None
             mock_load_source.return_value = self._get_helper_class({
@@ -178,8 +185,9 @@ class PluginManagerTest(unittest.TestCase):
                 mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile, \
                 mock.patch('compose.plugin_manager.os.listdir') as mock_listdir, \
                 mock.patch('imp.load_source') as mock_load_source, \
-                mock.patch.object(Plugin, '__init__') as mock_plugin:
-
+                mock.patch.object(Plugin, '__init__') as mock_plugin, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             mock_plugin.return_value = None
 
             plugin_manager = PluginManager('')
@@ -209,8 +217,9 @@ class PluginManagerTest(unittest.TestCase):
                 mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile, \
                 mock.patch('compose.plugin_manager.os.listdir') as mock_listdir, \
                 mock.patch('imp.load_source') as mock_load_source, \
-                mock.patch.object(Plugin, '__init__') as mock_plugin:
-
+                mock.patch.object(Plugin, '__init__') as mock_plugin, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             mock_plugin.return_value = None
             mock_load_source.return_value = self._get_helper_class({
                 'plugin': Plugin
@@ -241,7 +250,8 @@ class PluginManagerTest(unittest.TestCase):
     def test_get_plugin_file(self):
         with mock.patch('compose.plugin_manager.request.urlretrieve') as mock_urlretrieve, \
                 mock.patch('compose.plugin_manager.os.path.isfile') as mock_isfile, \
-                mock.patch('compose.plugin_manager.os.path.realpath') as mock_realpath:
+                mock.patch('compose.plugin_manager.os.path.realpath') as mock_realpath, \
+                mock.patch('os.mkdir') as mock_mkdir:
             plugin_manager = PluginManager('plugin_dir')
 
             self.assertEquals(
@@ -251,11 +261,12 @@ class PluginManagerTest(unittest.TestCase):
 
             mock_urlretrieve.side_effect = ValueError()
             mock_isfile.return_value = False
+            mock_mkdir.return_value = True
 
-            self.assertEquals(
-                plugin_manager._get_plugin_file('plugin_name'),
-                False
-            )
+            with self.assertRaises(InvalidPluginError) as e:
+                plugin_manager._get_plugin_file('no_plugin')
+
+            self.assertEqual(str(e.exception), "Invalid plugin url or file given.")
 
             mock_isfile.return_value = True
             mock_realpath.return_value = '/real/path/to/plugin/plugin_name'
@@ -281,7 +292,7 @@ class PluginManagerTest(unittest.TestCase):
             mock_is_zipfile.return_value = True
             mock_zipfile.return_value = self._get_archive_mock([])
 
-            with self.assertRaises(InvalidPluginFileTypeError) as e:
+            with self.assertRaises(InvalidPluginError) as e:
                 plugin_manager._check_plugin_archive('no_plugin')
 
             self.assertEqual(str(e.exception), "Wrong plugin structure.")
@@ -292,7 +303,7 @@ class PluginManagerTest(unittest.TestCase):
                 'root_dir/plugin.json'
             ])
 
-            with self.assertRaises(InvalidPluginFileTypeError) as e:
+            with self.assertRaises(InvalidPluginError) as e:
                 plugin_manager._check_plugin_archive('plugin.zip')
 
             self.assertEqual(str(e.exception), "Wrong plugin structure.")
@@ -302,7 +313,7 @@ class PluginManagerTest(unittest.TestCase):
                 'root_dir/plugin.js'
             ])
 
-            with self.assertRaises(InvalidPluginFileTypeError) as e:
+            with self.assertRaises(InvalidPluginError) as e:
                 plugin_manager._check_plugin_archive('plugin.zip')
 
             self.assertEqual(str(e.exception), "Missing plugin.json file.")
@@ -335,9 +346,13 @@ class PluginManagerTest(unittest.TestCase):
                 mock.patch('compose.plugin_manager.tarfile.is_tarfile') as mock_is_tarfile, \
                 mock.patch('compose.plugin_manager.zipfile.ZipFile') as mock_zipfile, \
                 mock.patch('imp.load_source') as mock_load_source, \
-                mock.patch('shutil.rmtree') as mock_rmtree:
+                mock.patch('shutil.rmtree') as mock_rmtree, \
+                mock.patch('os.mkdir') as mock_mkdir, \
+                mock.patch('os.walk') as mock_walk:
+            mock_walk.return_value = []
             mock_urlretrieve.side_effect = ValueError()
             mock_isfile.return_value = True
+            mock_mkdir.return_value = True
             mock_realpath.return_value = '/real/path/to/plugin/plugin_name'
 
             mock_isdir.return_value = False
@@ -410,7 +425,7 @@ class PluginManagerTest(unittest.TestCase):
             "Plugin 'none_plugin' doesn't exists"
         )
 
-        self.assertEquals(plugin_manager.update_plugin('plugin'), True)
+        self.assertEquals(plugin_manager.update_plugin('plugin'), None)
 
     def test_configure_plugin(self):
         plugin_manager = self._get_plugin_manager_with_plugin()

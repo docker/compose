@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import imp
 import os
 import shutil
+import sys
 import tarfile
 
 from compose.cli.command import get_config_path_from_options
@@ -81,6 +82,9 @@ class PluginManager(object):
                 "Missing __init__.py file."
             )
 
+        for root, dirs, files in os.walk(path):
+            sys.path.append(root)
+
         plugin_package = imp.load_source(current_plugin_dir, init_file)
 
         if not hasattr(plugin_package, 'plugin'):
@@ -137,13 +141,16 @@ class PluginManager(object):
 
     def _get_plugin_file(self, plugin):
         try:
+            if not os.path.isdir(self.__plugin_download_dir):
+                os.mkdir(self.__plugin_download_dir)
+
             file = os.path.join(self.__plugin_download_dir, os.path.basename(plugin))
             request.urlretrieve(plugin, file)
         except ValueError:  # invalid URL
             file = os.path.realpath(plugin)
 
             if not os.path.isfile(file):
-                return False
+                raise InvalidPluginError('Invalid plugin url or file given.')
 
         return file
 
@@ -166,10 +173,10 @@ class PluginManager(object):
                 plugin_folder = os.path.dirname(file)
 
         if len(root_folders) != 1:
-            raise InvalidPluginFileTypeError('Wrong plugin structure.')
+            raise InvalidPluginError('Wrong plugin structure.')
 
         if plugin_folder is None or plugin_folder not in root_folders:
-            raise InvalidPluginFileTypeError('Missing plugin.json file.')
+            raise InvalidPluginError('Missing plugin.json file.')
 
         archive.extractall(self.plugin_dir)
         return os.path.join(self.plugin_dir, plugin_folder)
