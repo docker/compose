@@ -142,7 +142,7 @@ class PluginManager(object):
     def _get_plugin_file(self, plugin):
         try:
             if not os.path.isdir(self.__plugin_download_dir):
-                os.mkdir(self.__plugin_download_dir)
+                os.makedirs(self.__plugin_download_dir)
 
             file = os.path.join(self.__plugin_download_dir, os.path.basename(plugin))
             request.urlretrieve(plugin, file)
@@ -182,11 +182,10 @@ class PluginManager(object):
         return os.path.join(self.plugin_dir, plugin_folder)
 
     def install_plugin(self, plugin):
-        file = self._get_plugin_file(plugin)
-
         if not os.path.isdir(self.plugin_dir):
             os.makedirs(self.plugin_dir)
 
+        file = self._get_plugin_file(plugin)
         plugin_path = self._check_plugin_archive(file)
 
         try:
