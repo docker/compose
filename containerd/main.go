@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -87,6 +88,32 @@ var daemonFlags = []cli.Flag{
 	},
 }
 
+// DumpStacks dumps the runtime stack.
+func dumpStacks() {
+	var (
+		buf       []byte
+		stackSize int
+	)
+	bufferLen := 16384
+	for stackSize == len(buf) {
+		buf = make([]byte, bufferLen)
+		stackSize = runtime.Stack(buf, true)
+		bufferLen *= 2
+	}
+	buf = buf[:stackSize]
+	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+func setupDumpStacksTrap() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGUSR1)
+	go func() {
+		for range c {
+			dumpStacks()
+		}
+	}()
+}
+
 func main() {
 	logrus.SetFormatter(&logrus.TextFormatter{TimestampFormat: time.RFC3339Nano})
 	app := cli.NewApp()
@@ -99,6 +126,7 @@ func main() {
 	app.Usage = usage
 	app.Flags = daemonFlags
 	app.Before = func(context *cli.Context) error {
+		setupDumpStacksTrap()
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 			if context.GlobalDuration("metrics-interval") > 0 {
@@ -106,7 +134,6 @@ func main() {
 					return err
 				}
 			}
-
 		}
 		if p := context.GlobalString("pprof-address"); len(p) > 0 {
 			pprof.Enable(p)
