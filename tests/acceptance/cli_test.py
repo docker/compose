@@ -180,6 +180,7 @@ class CLITestCase(DockerClientTestCase):
             'version': '2.0',
             'volumes': {'data': {'driver': 'local'}},
             'networks': {'front': {}},
+            'plugins': {},
             'services': {
                 'web': {
                     'build': {
@@ -221,6 +222,7 @@ class CLITestCase(DockerClientTestCase):
                 },
             },
             'networks': {},
+            'plugins': {},
             'volumes': {},
         }
 
@@ -246,6 +248,7 @@ class CLITestCase(DockerClientTestCase):
                 },
             },
             'networks': {},
+            'plugins': {},
             'volumes': {},
         }
 
