@@ -65,10 +65,11 @@ class PluginManager(object):
 
         if os.path.isdir(self.plugin_dir):
             for current_plugin_dir in os.listdir(self.plugin_dir):
-                plugin_path = os.path.join(self.plugin_dir, current_plugin_dir)
+                if current_plugin_dir != '.downloads':
+                    plugin_path = os.path.join(self.plugin_dir, current_plugin_dir)
 
-                if os.path.isdir(plugin_path):
-                    paths[current_plugin_dir] = plugin_path
+                    if os.path.isdir(plugin_path):
+                        paths[current_plugin_dir] = plugin_path
 
         return paths
 
