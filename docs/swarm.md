@@ -5,6 +5,7 @@ description = "How to use Compose and Swarm together to deploy apps to multi-hos
 keywords = ["documentation, docs,  docker, compose, orchestration, containers, swarm"]
 [menu.main]
 parent="workw_compose"
+advisory = "swarm"
 +++
 <![end-metadata]-->
 
