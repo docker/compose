@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import os
+
 from .. import mock
 from .. import unittest
 from compose.plugin import Plugin
@@ -80,8 +82,8 @@ class PluginManagerTest(unittest.TestCase):
             self.assertEquals(
                 plugin_manager._get_plugin_paths(),
                 {
-                    'plugin_1': 'plugin_dir/plugin_1',
-                    'plugin_3': 'plugin_dir/plugin_3'
+                    'plugin_1': os.path.join('plugin_dir', 'plugin_1'),
+                    'plugin_3': os.path.join('plugin_dir', 'plugin_3')
                 }
             )
 
@@ -314,7 +316,7 @@ class PluginManagerTest(unittest.TestCase):
 
             self.assertEquals(
                 plugin_manager._get_plugin_file('plugin_name'),
-                'plugin_dir/.downloads/plugin_name'
+                os.path.join('plugin_dir', '.downloads', 'plugin_name')
             )
 
             mock_urlretrieve.side_effect = ValueError()
@@ -392,7 +394,7 @@ class PluginManagerTest(unittest.TestCase):
             ])
 
             result = plugin_manager._check_plugin_archive('plugin.zip')
-            self.assertEqual(result, "plugin_dir/root_dir")
+            self.assertEqual(result, os.path.join('plugin_dir', 'root_dir'))
 
     def test_install_plugin(self):
         with mock.patch('compose.plugin_manager.request.urlretrieve') as mock_urlretrieve, \
