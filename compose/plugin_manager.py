@@ -6,6 +6,7 @@ import os
 import shutil
 import sys
 import tarfile
+from distutils.version import LooseVersion
 
 from compose.cli.command import get_config_path_from_options
 from compose.config import config
@@ -36,6 +37,10 @@ class InvalidPluginFileTypeError(PluginError):
 
 
 class NoneLoadedConfigError(PluginError):
+    pass
+
+
+class PluginRequirementsError(PluginError):
     pass
 
 
@@ -110,6 +115,26 @@ class PluginManager(object):
 
         return self.plugin_classes
 
+    @staticmethod
+    def _check_required_plugins(plugins_config, plugins):
+        plugin_diff = list(set(plugins_config.keys()) - set(plugins.keys()))
+
+        if len(plugin_diff) > 0:
+            plugin_diff = sorted(plugin_diff)
+            raise PluginRequirementsError(
+                "Missing required plugins: '{}'".format("', '".join(plugin_diff))
+            )
+
+        for (plugin_id, plugin_config) in plugins_config.items():
+            if 'version' in plugin_config and \
+                    LooseVersion(plugins[plugin_id].version) < LooseVersion(plugin_config['version']):
+                raise PluginRequirementsError(
+                    "Plugin '{}' must at least version '{}'".format(
+                        plugin_id,
+                        LooseVersion(plugin_config['version'])
+                    )
+                )
+
     def _load_plugins(self):
         if self.plugin_list is None:
             if self.config is None:
@@ -120,9 +145,18 @@ class PluginManager(object):
             self.plugin_list = {}
 
             for (plugin_id, plugin_class) in self._get_plugin_classes().items():
-                plugin_config = plugins_config[plugin_id] if plugin_id in plugins_config else {}
+                if plugin_id in plugins_config and 'options' in plugins_config[plugin_id]:
+                    plugin_config = plugins_config[plugin_id].options
+                else:
+                    plugin_config = {}
+
                 plugin_instance = plugin_class(self, plugin_config)
                 self.plugin_list[plugin_id] = plugin_instance
+
+            self._check_required_plugins(
+                plugins_config,
+                self.plugin_list
+            )
 
         return self.plugin_list
 
@@ -213,7 +247,10 @@ class PluginManager(object):
 
     def update_plugin(self, plugin_id):
         self._plugin_exists(plugin_id)
-        return self.plugin_list[plugin_id].update()
+        plugins = self.get_plugins()
+        plugin_version = plugins[plugin_id].version
+
+        return self.plugin_list[plugin_id].update(plugin_version)
 
     def configure_plugin(self, plugin_id):
         self._plugin_exists(plugin_id)

@@ -151,7 +151,7 @@ class Plugin:
     def uninstall(self):
         return True
 
-    def update(self):
+    def update(self, old_version):
         return None
 
     def configure(self):

@@ -182,7 +182,7 @@ class PluginTest(unittest.TestCase):
 
     def test_update(self):
         plugin = self._get_loaded_plugin()
-        self.assertEquals(plugin.update(), None)
+        self.assertEquals(plugin.update('0.0.1'), None)
 
     def test_configure(self):
         plugin = self._get_loaded_plugin()

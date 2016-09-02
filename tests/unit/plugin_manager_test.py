@@ -9,6 +9,7 @@ from compose.plugin_manager import InvalidPluginFileTypeError
 from compose.plugin_manager import NoneLoadedConfigError
 from compose.plugin_manager import PluginDoesNotExistError
 from compose.plugin_manager import PluginManager
+from compose.plugin_manager import PluginRequirementsError
 
 
 class PluginManagerTest(unittest.TestCase):
@@ -26,8 +27,8 @@ class PluginManagerTest(unittest.TestCase):
 
     def _get_archive_mock(self, files):
         class MockArchive:
-            def __init__(self, files):
-                self.files = files
+            def __init__(self, archive_files):
+                self.files = archive_files
 
             def __iter__(self):
                 return iter(self.files)
@@ -50,6 +51,7 @@ class PluginManagerTest(unittest.TestCase):
         plugin_copy = Plugin
         plugin_copy.__init__ = lambda a, b, c: None
         plugin_copy.path = 'path'
+        plugin_copy.version = '0.0.1'
         plugin_manager.plugin_list = {
             'plugin': plugin_copy(plugin_manager, {})
         }
@@ -167,6 +169,62 @@ class PluginManagerTest(unittest.TestCase):
                 'plugin_1': Plugin,
                 'plugin_2': Plugin
             })
+
+    def test_check_required_plugins(self):
+        with mock.patch.object(Plugin, '__init__') as mock_plugin:
+            mock_plugin.return_value = None
+            plugin_manager = PluginManager('')
+
+            plugins = {}
+            plugins_config = {
+                'plugin_1': {},
+                'plugin_2': {}
+            }
+
+            with self.assertRaises(PluginRequirementsError) as e:
+                plugin_manager._check_required_plugins(plugins_config, plugins)
+
+            self.assertEqual(
+                str(e.exception),
+                "Missing required plugins: 'plugin_1', 'plugin_2'"
+            )
+
+            plugin_1 = Plugin(plugin_manager, {})
+            plugin_1.version = '0.0.1'
+
+            plugin_2 = Plugin(plugin_manager, {})
+            plugin_2.version = '2.0.1'
+
+            plugins = {
+                'plugin_1': plugin_1,
+                'plugin_2': plugin_2
+            }
+            plugins_config = {
+                'plugin_1': {
+                    'version': '2.0.0'
+                },
+                'plugin_2': {}
+            }
+
+            with self.assertRaises(PluginRequirementsError) as e:
+                plugin_manager._check_required_plugins(plugins_config, plugins)
+
+            self.assertEqual(
+                str(e.exception),
+                "Plugin 'plugin_1' must at least version '2.0.0'"
+            )
+
+            plugins_config = {
+                'plugin_1': {
+                    'version': '0.0.1'
+                },
+                'plugin_2': {
+                    'version': '1.0.0'
+                }
+            }
+
+            result = plugin_manager._check_required_plugins(plugins_config, plugins)
+            self.assertEquals(result, None)
 
     def test_load_plugins_none_loaded_config(self):
         plugin_manager = PluginManager('')
