@@ -330,12 +330,16 @@
     },
 
     "plugin": {
-      "version": {
-        "type": "string"
-      },
       "id": "#/definitions/plugin",
       "type": "object",
-      "options": {"$ref": "#/definitions/list_or_dict"}
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/list_or_dict"
+        }
+      }
     }
   }
 }
