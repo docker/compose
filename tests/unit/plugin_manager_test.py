@@ -384,7 +384,7 @@ class PluginManagerTest(unittest.TestCase):
             ])
 
             result = plugin_manager._check_plugin_archive('plugin.zip')
-            self.assertEqual(result, "plugin_dir/root_dir")
+            self.assertEqual(result, os.path.join('plugin_dir', 'root_dir'))
 
             mock_is_zipfile.return_value = False
             mock_is_tarfile.return_value = True
