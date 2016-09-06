@@ -1,0 +1,5 @@
+version: "2"
+services:
+  test:
+    image: busybox
+    volumes_from: ["container:composetest_data_container"]
