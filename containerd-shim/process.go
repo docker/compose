@@ -135,6 +135,7 @@ func (p *process) create() error {
 		)
 	} else if p.checkpoint != nil {
 		args = append(args, "restore",
+			"-d",
 			"--image-path", p.checkpointPath,
 			"--work-path", filepath.Join(p.checkpointPath, "criu.work", "restore-"+time.Now().Format(time.RFC3339)),
 		)
