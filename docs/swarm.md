@@ -11,6 +11,10 @@ parent="workw_compose"
 
 # Using Compose with Swarm
 
+> **Note:** “Swarm” here refers to [Docker Swarm](/swarm/overview.md), a product separate from Docker Engine. It does _not_ refer to [swarm mode](/engine/swarm), which is a built-in feature of Docker Engine introduced in version 1.12.
+>
+> Integration between Compose and swarm mode is at the experimental stage. See [Docker Stacks and Bundles](bundles.md) for details.
+
 Docker Compose and [Docker Swarm](/swarm/overview.md) aim to have full integration, meaning
 you can point a Compose app at a Swarm cluster and have it all just work as if
 you were using a single Docker host.
