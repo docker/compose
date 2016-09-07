@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -487,4 +488,51 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 func swapEnabled() bool {
 	_, err := os.Stat("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes")
 	return err == nil
+}
+
+func (cs *ContainerdSuite) TestSigkillShimReuseName(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+	containerID := "top"
+	c, err := cs.StartContainer(containerID, bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sigkill the shim
+	exec.Command("pkill", "-9", "containerd-shim").Run()
+
+	// Wait for it to be reaped
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "exit",
+			Id:     containerID,
+			Status: 128 + 9,
+			Pid:    "init",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container took more than 2 seconds to terminate")
+		}
+	}
+
+	// Start a new continer with the same name
+	c, err = cs.StartContainer(containerID, bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
 	"golang.org/x/sys/unix"
 )
@@ -193,8 +194,58 @@ func (p *process) Resize(w, h int) error {
 	return err
 }
 
-func (p *process) ExitStatus() (int, error) {
+func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
+	if rerr == nil || p.cmd == nil || p.cmd.Process == nil {
+		return rst, rerr
+	}
+
+	// Possible that the shim was SIGKILLED
+	e := unix.Kill(p.cmd.Process.Pid, 0)
+	if e != syscall.ESRCH {
+		return rst, rerr
+	}
+
+	// Ensure we got the shim ProcessState
+	<-p.cmdDoneCh
+
+	shimStatus := p.cmd.ProcessState.Sys().(syscall.WaitStatus)
+	if shimStatus.Signaled() && shimStatus.Signal() == syscall.SIGKILL {
+		logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): shim was SIGKILL'ed reaping its child with pid %d", p.container.id, p.id, p.pid)
+
+		var (
+			status unix.WaitStatus
+			rusage unix.Rusage
+			wpid   int
+		)
+
+		for wpid == 0 {
+			wpid, e = unix.Wait4(p.pid, &status, unix.WNOHANG, &rusage)
+			if e != nil {
+				logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): Wait4(%d): %v", p.container.id, p.id, p.pid, rerr)
+				return rst, rerr
+			}
+		}
+
+		if wpid == p.pid {
+			rerr = nil
+			rst = 128 + int(shimStatus.Signal())
+		} else {
+			logrus.Errorf("containerd: ExitStatus(container: %s, process: %s): unexpected returned pid from wait4 %v (expected %v)", p.container.id, p.id, wpid, p.pid)
+		}
+
+		p.stateLock.Lock()
+		p.state = Stopped
+		p.stateLock.Unlock()
+	}
+
+	return rst, rerr
+}
+
+func (p *process) ExitStatus() (rst int, rerr error) {
 	data, err := ioutil.ReadFile(filepath.Join(p.root, ExitStatusFile))
+	defer func() {
+		rst, rerr = p.handleSigkilledShim(rst, rerr)
+	}()
 	if err != nil {
 		if os.IsNotExist(err) {
 			return -1, ErrProcessNotExited
