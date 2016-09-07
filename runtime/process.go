@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
@@ -126,6 +128,13 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 		},
 		state: Stopped,
 	}
+
+	startTime, err := ioutil.ReadFile(filepath.Join(p.root, StartTimeFile))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	p.startTime = string(startTime)
+
 	if _, err := p.getPidFromFile(); err != nil {
 		return nil, err
 	}
@@ -151,6 +160,30 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 	return p, nil
 }
 
+func readProcStatField(pid int, field int) (string, error) {
+	data, err := ioutil.ReadFile(filepath.Join(string(filepath.Separator), "proc", strconv.Itoa(pid), "stat"))
+	if err != nil {
+		return "", err
+	}
+
+	if field > 2 {
+		// First, split out the name since he could contains spaces.
+		parts := strings.Split(string(data), ") ")
+		// Now split out the rest, we end up with 2 fields less
+		parts = strings.Split(parts[1], " ")
+		return parts[field-2-1], nil // field count start at 1 in manual
+	}
+
+	parts := strings.Split(string(data), " (")
+
+	if field == 1 {
+		return parts[0], nil
+	}
+
+	parts = strings.Split(parts[1], ") ")
+	return parts[0], nil
+}
+
 type process struct {
 	root        string
 	id          string
@@ -165,6 +198,7 @@ type process struct {
 	cmdDoneCh   chan struct{}
 	state       State
 	stateLock   sync.Mutex
+	startTime   string
 }
 
 func (p *process) ID() string {
@@ -195,7 +229,47 @@ func (p *process) Resize(w, h int) error {
 }
 
 func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
-	if rerr == nil || p.cmd == nil || p.cmd.Process == nil {
+	if p.cmd == nil || p.cmd.Process == nil {
+		e := unix.Kill(p.pid, 0)
+		if e == syscall.ESRCH {
+			return rst, rerr
+		}
+
+		// If it's not the same process, just mark it stopped and set
+		// the status to 255
+		if same, err := p.isSameProcess(); !same {
+			logrus.Warnf("containerd: %s:%s (pid %d) is not the same process anymore (%v)", p.container.id, p.id, p.pid, err)
+			p.stateLock.Lock()
+			p.state = Stopped
+			p.stateLock.Unlock()
+			// Create the file so we get the exit event generated once monitor kicks in
+			// without going to this all process again
+			rerr = ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte("255"), 0644)
+			return 255, nil
+		}
+
+		ppid, err := readProcStatField(p.pid, 4)
+		if err != nil {
+			return rst, fmt.Errorf("could not check process ppid: %v (%v)", err, rerr)
+		}
+		if ppid == "1" {
+			logrus.Warnf("containerd: %s:%s shim died, killing associated process", p.container.id, p.id)
+			unix.Kill(p.pid, syscall.SIGKILL)
+			// wait for the process to die
+			for {
+				e := unix.Kill(p.pid, 0)
+				if e == syscall.ESRCH {
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+
+			rst = 128 + int(syscall.SIGKILL)
+			// Create the file so we get the exit event generated once monitor kicks in
+			// without going to this all process again
+			rerr = ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%d", rst)), 0644)
+		}
+
 		return rst, rerr
 	}
 
@@ -217,6 +291,9 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 			rusage unix.Rusage
 			wpid   int
 		)
+
+		// Some processes change their PR_SET_PDEATHSIG, so force kill them
+		unix.Kill(p.pid, syscall.SIGKILL)
 
 		for wpid == 0 {
 			wpid, e = unix.Wait4(p.pid, &status, unix.WNOHANG, &rusage)
@@ -244,7 +321,9 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 func (p *process) ExitStatus() (rst int, rerr error) {
 	data, err := ioutil.ReadFile(filepath.Join(p.root, ExitStatusFile))
 	defer func() {
-		rst, rerr = p.handleSigkilledShim(rst, rerr)
+		if rerr != nil {
+			rst, rerr = p.handleSigkilledShim(rst, rerr)
+		}
 	}()
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -295,6 +374,40 @@ func (p *process) getPidFromFile() (int, error) {
 	}
 	p.pid = i
 	return i, nil
+}
+
+func (p *process) readStartTime() (string, error) {
+	return readProcStatField(p.pid, 22)
+}
+
+func (p *process) saveStartTime() error {
+	startTime, err := p.readStartTime()
+	if err != nil {
+		return err
+	}
+
+	p.startTime = startTime
+	return ioutil.WriteFile(filepath.Join(p.root, StartTimeFile), []byte(startTime), 0644)
+}
+
+func (p *process) isSameProcess() (bool, error) {
+	// for backward compat assume it's the same if startTime wasn't set
+	if p.startTime == "" {
+		return true, nil
+	}
+	if p.pid == 0 {
+		_, err := p.getPidFromFile()
+		if err != nil {
+			return false, err
+		}
+	}
+
+	startTime, err := p.readStartTime()
+	if err != nil {
+		return false, err
+	}
+
+	return startTime == p.startTime, nil
 }
 
 // Wait will reap the shim process

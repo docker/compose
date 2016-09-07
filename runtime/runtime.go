@@ -44,6 +44,9 @@ const (
 	// InitProcessID holds the special ID used for the very first
 	// container's process
 	InitProcessID = "init"
+	// StartTimeFile holds the name of the file in which the process
+	// start time is saved
+	StartTimeFile = "starttime"
 )
 
 // Checkpoint holds information regarding a container checkpoint
