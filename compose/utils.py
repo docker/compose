@@ -6,6 +6,7 @@ import hashlib
 import json
 import json.decoder
 import logging
+import ntpath
 
 import six
 
@@ -108,3 +109,11 @@ def microseconds_from_time_nano(time_nano):
 
 def build_string_dict(source_dict):
     return dict((k, str(v if v is not None else '')) for k, v in source_dict.items())
+
+
+def splitdrive(path):
+    if len(path) == 0:
+        return ('', '')
+    if path[0] in ['.', '\\', '/', '~']:
+        return ('', path)
+    return ntpath.splitdrive(path)

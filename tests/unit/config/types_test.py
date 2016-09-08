@@ -9,7 +9,6 @@ from compose.config.errors import ConfigurationError
 from compose.config.types import parse_extra_hosts
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import IS_WINDOWS_PLATFORM
 
 
 def test_parse_extra_hosts_list():
@@ -64,13 +63,36 @@ class TestVolumeSpec(object):
             VolumeSpec.parse('one:two:three:four')
         assert 'has incorrect format' in exc.exconly()
 
-    @pytest.mark.xfail((not IS_WINDOWS_PLATFORM), reason='does not have a drive')
     def test_parse_volume_windows_absolute_path(self):
         windows_path = "c:\\Users\\me\\Documents\\shiny\\config:\\opt\\shiny\\config:ro"
-        assert VolumeSpec.parse(windows_path) == (
+        assert VolumeSpec._parse_win32(windows_path) == (
             "/c/Users/me/Documents/shiny/config",
             "/opt/shiny/config",
             "ro"
+        )
+
+    def test_parse_volume_windows_internal_path(self):
+        windows_path = 'C:\\Users\\reimu\\scarlet:C:\\scarlet\\app:ro'
+        assert VolumeSpec._parse_win32(windows_path) == (
+            '/c/Users/reimu/scarlet',
+            '/c/scarlet/app',
+            'ro'
+        )
+
+    def test_parse_volume_windows_just_drives(self):
+        windows_path = 'E:\\:C:\\:ro'
+        assert VolumeSpec._parse_win32(windows_path) == (
+            '/e/',
+            '/c/',
+            'ro'
+        )
+
+    def test_parse_volume_windows_mixed_notations(self):
+        windows_path = '/c/Foo:C:\\bar'
+        assert VolumeSpec._parse_win32(windows_path) == (
+            '/c/Foo',
+            '/c/bar',
+            'rw'
         )
 
 

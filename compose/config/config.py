@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import functools
 import logging
-import ntpath
 import os
 import string
 import sys
@@ -16,6 +15,7 @@ from cached_property import cached_property
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..utils import build_string_dict
+from ..utils import splitdrive
 from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
@@ -940,13 +940,7 @@ def split_path_mapping(volume_path):
     path. Using splitdrive so windows absolute paths won't cause issues with
     splitting on ':'.
     """
-    # splitdrive is very naive, so handle special cases where we can be sure
-    # the first character is not a drive.
-    if (volume_path.startswith('.') or volume_path.startswith('~') or
-            volume_path.startswith('/')):
-        drive, volume_config = '', volume_path
-    else:
-        drive, volume_config = ntpath.splitdrive(volume_path)
+    drive, volume_config = splitdrive(volume_path)
 
     if ':' in volume_config:
         (host, container) = volume_config.split(':', 1)
