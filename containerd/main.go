@@ -214,7 +214,7 @@ func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Ser
 	l := sockets[0]
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(sv))
-	healthServer := health.NewHealthServer()
+	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, healthServer)
 
 	go func() {
