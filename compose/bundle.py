@@ -46,8 +46,9 @@ class NeedsPush(Exception):
 
 
 class NeedsPull(Exception):
-    def __init__(self, image_name):
+    def __init__(self, image_name, service_name):
         self.image_name = image_name
+        self.service_name = service_name
 
 
 class MissingDigests(Exception):
@@ -74,7 +75,7 @@ def get_image_digests(project, allow_push=False):
         except NeedsPush as e:
             needs_push.add(e.image_name)
         except NeedsPull as e:
-            needs_pull.add(e.image_name)
+            needs_pull.add(e.service_name)
 
     if needs_push or needs_pull:
         raise MissingDigests(needs_push, needs_pull)
@@ -109,7 +110,7 @@ def get_image_digest(service, allow_push=False):
         return image['RepoDigests'][0]
 
     if 'build' not in service.options:
-        raise NeedsPull(service.image_name)
+        raise NeedsPull(service.image_name, service.name)
 
     if not allow_push:
         raise NeedsPush(service.image_name)
