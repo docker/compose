@@ -11,19 +11,22 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
-type HealthServer struct {
+// Server implements `service Health`.
+type Server struct {
 	mu sync.Mutex
-	// statusMap stores the serving status of the services this HealthServer monitors.
+	// statusMap stores the serving status of the services this Server monitors.
 	statusMap map[string]healthpb.HealthCheckResponse_ServingStatus
 }
 
-func NewHealthServer() *HealthServer {
-	return &HealthServer{
+// NewServer returns a new Server.
+func NewServer() *Server {
+	return &Server{
 		statusMap: make(map[string]healthpb.HealthCheckResponse_ServingStatus),
 	}
 }
 
-func (s *HealthServer) Check(ctx context.Context, in *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
+// Check implements `service Health`.
+func (s *Server) Check(ctx context.Context, in *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if in.Service == "" {
@@ -42,7 +45,7 @@ func (s *HealthServer) Check(ctx context.Context, in *healthpb.HealthCheckReques
 
 // SetServingStatus is called when need to reset the serving status of a service
 // or insert a new service entry into the statusMap.
-func (s *HealthServer) SetServingStatus(service string, status healthpb.HealthCheckResponse_ServingStatus) {
+func (s *Server) SetServingStatus(service string, status healthpb.HealthCheckResponse_ServingStatus) {
 	s.mu.Lock()
 	s.statusMap[service] = status
 	s.mu.Unlock()
