@@ -122,3 +122,11 @@ def generate_user_agent():
     else:
         parts.append("{}/{}".format(p_system, p_release))
     return " ".join(parts)
+
+
+def unquote_path(s):
+    if not s:
+        return s
+    if s[0] == '"' and s[-1] == '"':
+        return s[1:-1]
+    return s
