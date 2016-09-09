@@ -14,13 +14,16 @@ from operator import attrgetter
 from . import errors
 from . import signals
 from .. import __version__
-from ..config import config
+from ..bundle import get_image_digests
+from ..bundle import MissingDigests
+from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
+from ..errors import StreamParseError
 from ..plugin import PluginError
 from ..plugin_manager import InvalidPluginError
 from ..plugin_manager import InvalidPluginFileTypeError
@@ -35,7 +38,8 @@ from ..service import BuildError
 from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
-from .command import get_config_path_from_options
+from ..service import OperationFailedError
+from .command import get_config_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
 from .docopt_command import get_handler
@@ -48,6 +52,7 @@ from .log_printer import LogPrinter
 from .utils import get_plugin_dir
 from .utils import get_version_info
 from .utils import yesno
+
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
@@ -69,7 +74,8 @@ def main():
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
         sys.exit(1)
-    except (UserError, NoSuchService, ConfigurationError, ProjectError) as e:
+    except (UserError, NoSuchService, ConfigurationError,
+            ProjectError, OperationFailedError) as e:
         log.error(e.msg)
         sys.exit(1)
     except BuildError as e:
@@ -84,7 +90,7 @@ def main():
     except PluginError as e:
         log.error(e.msg)
         sys.exit(1)
-    except errors.ConnectionError:
+    except (errors.ConnectionError, StreamParseError):
         sys.exit(1)
 
 
@@ -113,7 +119,7 @@ def perform_command(options, handler, command_options, plugin_manager):
         handler(command_options)
         return
 
-    if options['COMMAND'] == 'config':
+    if options['COMMAND'] in ('config', 'bundle'):
         command = TopLevelCommand(None, plugin_manager)
         handler(command, options, command_options)
         return
@@ -191,6 +197,7 @@ class TopLevelCommand(object):
 
     Commands:
       build              Build or rebuild services
+      bundle             Generate a Docker bundle from the Compose file
       config             Validate and view the compose file
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
@@ -203,7 +210,8 @@ class TopLevelCommand(object):
       plugin             Manages the plugins
       port               Print the public port for a port binding
       ps                 List containers
-      pull               Pulls service images
+      pull               Pull service images
+      push               Push service images
       restart            Restart services
       rm                 Remove stopped containers
       run                Run a one-off command
@@ -241,6 +249,75 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)))
 
+    def bundle(self, config_options, options):
+        """
+        Generate a Distributed Application Bundle (DAB) from the Compose file.
+
+        Images must have digests stored, which requires interaction with a
+        Docker registry. If digests aren't stored for all images, you can fetch
+        them with `docker-compose pull` or `docker-compose push`. To push images
+        automatically when bundling, pass `--push-images`. Only services with
+        a `build` option specified will have their images pushed.
+
+        Usage: bundle [options]
+
+        Options:
+            --push-images              Automatically push images for any services
+                                       which have a `build` option specified.
+
+            -o, --output PATH          Path to write the bundle file to.
+                                       Defaults to "<project name>.dab".
+        """
+        self.project = project_from_options('.', config_options)
+        compose_config = get_config_from_options(self.project_dir, config_options)
+
+        output = options["--output"]
+        if not output:
+            output = "{}.dab".format(self.project.name)
+
+        with errors.handle_connection_errors(self.project.client):
+            try:
+                image_digests = get_image_digests(
+                    self.project,
+                    allow_push=options['--push-images'],
+                )
+            except MissingDigests as e:
+                def list_images(images):
+                    return "\n".join("    {}".format(name) for name in sorted(images))
+
+                paras = ["Some images are missing digests."]
+
+                if e.needs_push:
+                    command_hint = (
+                        "Use `docker-compose push {}` to push them. "
+                        "You can do this automatically with `docker-compose bundle --push-images`."
+                        .format(" ".join(sorted(e.needs_push)))
+                    )
+                    paras += [
+                        "The following images can be pushed:",
+                        list_images(e.needs_push),
+                        command_hint,
+                    ]
+
+                if e.needs_pull:
+                    command_hint = (
+                        "Use `docker-compose pull {}` to pull them. "
+                        .format(" ".join(sorted(e.needs_pull)))
+                    )
+
+                    paras += [
+                        "The following images need to be pulled:",
+                        list_images(e.needs_pull),
+                        command_hint,
+                    ]
+
+                raise UserError("\n\n".join(paras))
+
+        with open(output, 'w') as f:
+            f.write(serialize_bundle(compose_config, image_digests))
+
+        log.info("Wrote bundle to {}".format(output))
+
     def config(self, config_options, options):
         """
         Validate and view the compose file.
@@ -253,13 +330,7 @@ class TopLevelCommand(object):
             --services      Print the service names, one per line.
 
         """
-        environment = Environment.from_env_file(self.project_dir)
-        config_path = get_config_path_from_options(
-            self.project_dir, config_options, environment
-        )
-        compose_config = config.load(
-            config.find(self.project_dir, config_path, environment)
-        )
+        compose_config = get_config_from_options(self.project_dir, config_options)
 
         if options['--quiet']:
             return
@@ -363,6 +434,13 @@ class TopLevelCommand(object):
         """
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
+        detach = options['-d']
+
+        if IS_WINDOWS_PLATFORM and not detach:
+            raise UserError(
+                "Interactive mode is not yet supported on Windows.\n"
+                "Please pass the -d flag when using `docker-compose exec`."
+            )
         try:
             container = service.get_container(number=index)
         except ValueError as e:
@@ -379,7 +457,7 @@ class TopLevelCommand(object):
 
         exec_id = container.create_exec(command, **create_exec_options)
 
-        if options['-d']:
+        if detach:
             container.start_exec(exec_id, tty=tty)
             return
 
@@ -607,6 +685,20 @@ class TopLevelCommand(object):
             ignore_pull_failures=options.get('--ignore-pull-failures')
         )
 
+    def push(self, options):
+        """
+        Pushes images for services.
+
+        Usage: push [options] [SERVICE...]
+
+        Options:
+            --ignore-push-failures  Push what it can and ignores images with push failures.
+        """
+        self.project.push(
+            service_names=options['SERVICE'],
+            ignore_push_failures=options.get('--ignore-push-failures')
+        )
+
     def rm(self, options):
         """
         Removes stopped service containers.
@@ -621,17 +713,14 @@ class TopLevelCommand(object):
         Options:
             -f, --force   Don't ask to confirm removal
             -v            Remove any anonymous volumes attached to containers
-            -a, --all     Also remove one-off containers created by
-                          docker-compose run
+            -a, --all     Deprecated - no effect.
         """
         if options.get('--all'):
-            one_off = OneOffFilter.include
-        else:
             log.warn(
-                'Not including one-off containers created by `docker-compose run`.\n'
-                'To include them, use `docker-compose rm --all`.\n'
-                'This will be the default behavior in the next version of Compose.\n')
-            one_off = OneOffFilter.exclude
+                '--all flag is obsolete. This is now the default behavior '
+                'of `docker-compose rm`'
+            )
+        one_off = OneOffFilter.include
 
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off
@@ -695,8 +784,10 @@ class TopLevelCommand(object):
                 'can not be used together'
             )
 
-        if options['COMMAND']:
+        if options['COMMAND'] is not None:
             command = [options['COMMAND']] + options['ARGS']
+        elif options['--entrypoint'] is not None:
+            command = []
         else:
             command = service.options.get('command')
 
@@ -919,7 +1010,9 @@ def build_container_options(options, detach, command):
     }
 
     if options['-e']:
-        container_options['environment'] = parse_environment(options['-e'])
+        container_options['environment'] = Environment.from_command_line(
+            parse_environment(options['-e'])
+        )
 
     if options['--entrypoint']:
         container_options['entrypoint'] = options.get('--entrypoint')

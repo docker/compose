@@ -5,5 +5,6 @@ set -ex
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
     pip install tox==2.1.1
 else
-    pip install --user tox==2.1.1
+    sudo pip install --upgrade pip tox==2.1.1 virtualenv
+    pip --version
 fi

@@ -28,7 +28,7 @@ from __future__ import unicode_literals
 import argparse
 import itertools
 import operator
-import re
+import sys
 from collections import namedtuple
 
 import requests
@@ -41,16 +41,8 @@ class Version(namedtuple('_Version', 'major minor patch rc')):
 
     @classmethod
     def parse(cls, version):
-        version = re.search(
-            r'v((\d+\.)?(\d+\.)?(\*|\d+)(-rc(\d+))?)',
-            version
-        ).group(1)
-
+        version = version.lstrip('v')
         version, _, rc = version.partition('-')
-
-        if version.count('.') is 1:
-            version += '.0'
-
         major, minor, patch = version.split('.', 3)
         return cls(int(major), int(minor), int(patch), rc)
 
@@ -112,6 +104,14 @@ def get_default(versions):
             return version
 
 
+def get_versions(tags):
+    for tag in tags:
+        try:
+            yield Version.parse(tag['name'])
+        except ValueError:
+            print("Skipping invalid tag: {name}".format(**tag), file=sys.stderr)
+
+
 def get_github_releases(project):
     """Query the Github API for a list of version tags and return them in
     sorted order.
@@ -121,7 +121,7 @@ def get_github_releases(project):
     url = '{}/{}/tags'.format(GITHUB_API, project)
     response = requests.get(url)
     response.raise_for_status()
-    versions = [Version.parse(tag['name']) for tag in response.json()]
+    versions = get_versions(response.json())
     return sorted(versions, reverse=True, key=operator.attrgetter('order'))
 
 
