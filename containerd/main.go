@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -212,6 +214,9 @@ func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Ser
 	l := sockets[0]
 	s := grpc.NewServer()
 	types.RegisterAPIServer(s, server.NewServer(sv))
+	healthServer := health.NewHealthServer()
+	grpc_health_v1.RegisterHealthServer(s, healthServer)
+
 	go func() {
 		logrus.Debugf("containerd: grpc api on %s", address)
 		if err := s.Serve(l); err != nil {
