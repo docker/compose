@@ -4,7 +4,9 @@ from __future__ import unicode_literals
 import itertools
 
 import pytest
+import requests
 import six
+from docker.errors import APIError
 from six.moves.queue import Queue
 
 from compose.cli.log_printer import build_log_generator
@@ -54,6 +56,26 @@ def test_wait_on_exit():
 
     expected = '{} exited with code {}\n'.format(mock_container.name, exit_status)
     assert expected == wait_on_exit(mock_container)
+
+
+def test_wait_on_exit_raises():
+    status_code = 500
+
+    def mock_wait():
+        resp = requests.Response()
+        resp.status_code = status_code
+        raise APIError('Bad server', resp)
+
+    mock_container = mock.Mock(
+        spec=Container,
+        name='cname',
+        wait=mock_wait
+    )
+
+    expected = 'Unexpected API error for {} (HTTP code {})\n'.format(
+        mock_container.name, status_code,
+    )
+    assert expected in wait_on_exit(mock_container)
 
 
 def test_build_no_log_generator(mock_container):
