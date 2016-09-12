@@ -17,6 +17,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/docker/containerd/api/grpc/types"
 	utils "github.com/docker/containerd/testutils"
@@ -60,10 +61,16 @@ func (cs *ContainerdSuite) getClient(socket string) error {
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout(bindParts[0], bindParts[1], timeout)
-		},
-		))
+		}),
+		grpc.WithBlock(),
+		grpc.WithTimeout(5*time.Second),
+	)
 	conn, err := grpc.Dial(socket, dialOpts...)
 	if err != nil {
+		return err
+	}
+	healthClient := grpc_health_v1.NewHealthClient(conn)
+	if _, err := healthClient.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{}); err != nil {
 		return err
 	}
 	cs.grpcClient = types.NewAPIClient(conn)
