@@ -631,7 +631,7 @@ func (c *container) waitForCreate(p *process, cmd *exec.Cmd) error {
 		}
 		err = p.saveStartTime()
 		if err != nil {
-			logrus.Warnf("containerd: unable to save %s:%s starttime: %v", p.container.id, p.id)
+			logrus.Warnf("containerd: unable to save %s:%s starttime: %v", p.container.id, p.id, err)
 		}
 		return nil
 	case <-time.After(c.timeout):
