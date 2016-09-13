@@ -32,7 +32,7 @@ class TestHandleConnectionErrors(object):
                     raise ConnectionError()
 
         _, args, _ = mock_logging.error.mock_calls[0]
-        assert "Couldn't connect to Docker daemon at" in args[0]
+        assert "Couldn't connect to Docker daemon" in args[0]
 
     def test_api_error_version_mismatch(self, mock_logging):
         with pytest.raises(errors.ConnectionError):
