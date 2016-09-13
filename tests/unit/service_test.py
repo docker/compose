@@ -334,6 +334,35 @@ class ServiceTest(unittest.TestCase):
             previous_container=prev_container)
         assert opts['environment'] == []
 
+    def test_get_container_create_options_with_healthcheck(self):
+        service = Service(
+            'foo',
+            image='foo',
+            client=self.mock_client,
+            healthcheck={
+                'retries': 3,
+                'command': 'exit 0',
+                'timeout': '5s',
+                'interval': '10s'
+            }
+        )
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        prev_container = mock.Mock(
+            id='ababab',
+            image_config={'ContainerConfig': {}})
+        prev_container.get.return_value = None
+
+        opts = service._get_container_create_options(
+            {},
+            1,
+            previous_container=prev_container)
+        assert opts['healthcheck'] == {
+            'Retries': 3,
+            'Interval': 10000000000,
+            'Test': ['CMD-SHELL', 'exit 0'],
+            'Timeout': 5000000000
+        }
+
     def test_get_container_not_found(self):
         self.mock_client.containers.return_value = []
         service = Service('foo', client=self.mock_client, image='foo')

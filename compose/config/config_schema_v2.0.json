@@ -82,6 +82,16 @@
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "domainname": {"type": "string"},
+        "healthcheck": {
+          "type": "object",
+          "properties": {
+            "interval": {"type":"string"},
+            "timeout": {"type":"string"},
+            "retries": {"type": "number"},
+            "command": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
         "entrypoint": {
           "oneOf": [
             {"type": "string"},

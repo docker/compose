@@ -10,6 +10,8 @@ from operator import attrgetter
 import enum
 import six
 from docker.errors import APIError
+from docker.utils import create_healthcheck
+from docker.utils import create_healthcheck_test_from_command
 from docker.utils import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
@@ -33,6 +35,7 @@ from .parallel import parallel_start
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+from compose.utils import duration_from_string
 
 
 log = logging.getLogger(__name__)
@@ -649,7 +652,21 @@ class Service(object):
             container_options['volumes'] = dict(
                 (v.internal, {}) for v in container_options['volumes'])
 
-        container_options['image'] = self.image_name
+        if 'healthcheck' in container_options:
+            healthcheck = container_options['healthcheck']
+
+            container_options['healthcheck'] = create_healthcheck(
+                test=create_healthcheck_test_from_command(healthcheck.get('command')),
+                interval=(
+                    duration_from_string(healthcheck.get('interval')) if 'interval' in healthcheck
+                    else None
+                ),
+                timeout=(
+                    duration_from_string(healthcheck.get('timeout')) if 'timeout' in healthcheck
+                    else None
+                ),
+                retries=healthcheck.get('retries')
+            )
 
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),

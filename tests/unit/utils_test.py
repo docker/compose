@@ -60,3 +60,12 @@ class TestJsonStream(object):
             {'three': 'four'},
             {'x': 2}
         ]
+
+
+class TestDurationFromString(object):
+
+    def test_with_seconds(self):
+        assert utils.duration_from_string('2s') == 2000000000
+
+    def test_with_minutes(self):
+        assert utils.duration_from_string('5m') == 300000000000

@@ -8,6 +8,7 @@ enum34==1.0.4; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
 ipaddress==1.0.16
 jsonschema==2.5.1
+pytimeparse==1.1.5
 requests==2.7.0
 six==1.7.3
 texttable==0.8.4
