@@ -144,3 +144,16 @@ class TLSConfigTestCase(unittest.TestCase):
         result = tls_config_from_options(options)
         assert isinstance(result, docker.tls.TLSConfig)
         assert result.assert_hostname is False
+
+    def test_tls_client_and_ca_quoted_paths(self):
+        options = {
+            '--tlscacert': '"{0}"'.format(self.ca_cert),
+            '--tlscert': '"{0}"'.format(self.client_cert),
+            '--tlskey': '"{0}"'.format(self.key),
+            '--tlsverify': True
+        }
+        result = tls_config_from_options(options)
+        assert isinstance(result, docker.tls.TLSConfig)
+        assert result.cert == (self.client_cert, self.key)
+        assert result.ca_cert == self.ca_cert
+        assert result.verify is True

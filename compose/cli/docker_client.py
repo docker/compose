@@ -11,15 +11,16 @@ from docker.utils import kwargs_from_env
 from ..const import HTTP_TIMEOUT
 from .errors import UserError
 from .utils import generate_user_agent
+from .utils import unquote_path
 
 log = logging.getLogger(__name__)
 
 
 def tls_config_from_options(options):
     tls = options.get('--tls', False)
-    ca_cert = options.get('--tlscacert')
-    cert = options.get('--tlscert')
-    key = options.get('--tlskey')
+    ca_cert = unquote_path(options.get('--tlscacert'))
+    cert = unquote_path(options.get('--tlscert'))
+    key = unquote_path(options.get('--tlskey'))
     verify = options.get('--tlsverify')
     skip_hostname_check = options.get('--skip-hostname-check', False)
 

@@ -852,6 +852,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8', '9.9.9.9'])
 
+    def test_mem_swappiness(self):
+        service = self.create_service('web', mem_swappiness=11)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.MemorySwappiness'), 11)
+
     def test_restart_always_value(self):
         service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)

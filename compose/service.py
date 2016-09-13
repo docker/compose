@@ -55,6 +55,7 @@ DOCKER_START_KEYS = [
     'mem_limit',
     'memswap_limit',
     'oom_score_adj',
+    'mem_swappiness',
     'pid',
     'privileged',
     'restart',
@@ -704,7 +705,8 @@ class Service(object):
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
             tmpfs=options.get('tmpfs'),
-            oom_score_adj=options.get('oom_score_adj')
+            oom_score_adj=options.get('oom_score_adj'),
+            mem_swappiness=options.get('mem_swappiness')
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):

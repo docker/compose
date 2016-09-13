@@ -154,6 +154,19 @@ class CLITestCase(DockerClientTestCase):
             returncode=0
         )
 
+    def test_host_not_reachable(self):
+        result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
+        assert "Couldn't connect to Docker daemon" in result.stderr
+
+    def test_host_not_reachable_volumes_from_container(self):
+        self.base_dir = 'tests/fixtures/volumes-from-container'
+
+        container = self.client.create_container('busybox', 'true', name='composetest_data_container')
+        self.addCleanup(self.client.remove_container, container)
+
+        result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
+        assert "Couldn't connect to Docker daemon" in result.stderr
+
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])
