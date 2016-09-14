@@ -228,11 +228,19 @@ func (p *process) Resize(w, h int) error {
 	return err
 }
 
+func (p *process) updateExitStatusFile(status int) (int, error) {
+	err := ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%d", status)), 0644)
+	return status, err
+}
+
 func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 	if p.cmd == nil || p.cmd.Process == nil {
 		e := unix.Kill(p.pid, 0)
 		if e == syscall.ESRCH {
-			return rst, rerr
+			logrus.Warnf("containerd: %s:%s (pid %d) does not exist", p.container.id, p.id, p.pid)
+			// The process died while containerd was down (probably of
+			// SIGKILL, but no way to be sure)
+			return p.updateExitStatusFile(255)
 		}
 
 		// If it's not the same process, just mark it stopped and set
@@ -243,9 +251,8 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 			p.state = Stopped
 			p.stateLock.Unlock()
 			// Create the file so we get the exit event generated once monitor kicks in
-			// without going to this all process again
-			rerr = ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte("255"), 0644)
-			return 255, nil
+			// without having to go through all this process again
+			return p.updateExitStatusFile(255)
 		}
 
 		ppid, err := readProcStatField(p.pid, 4)
@@ -263,11 +270,9 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
-
-			rst = 128 + int(syscall.SIGKILL)
 			// Create the file so we get the exit event generated once monitor kicks in
-			// without going to this all process again
-			rerr = ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%d", rst)), 0644)
+			// without having to go through all this process again
+			return p.updateExitStatusFile(128 + int(syscall.SIGKILL))
 		}
 
 		return rst, rerr
