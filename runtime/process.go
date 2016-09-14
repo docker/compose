@@ -229,6 +229,9 @@ func (p *process) Resize(w, h int) error {
 }
 
 func (p *process) updateExitStatusFile(status int) (int, error) {
+	p.stateLock.Lock()
+	p.state = Stopped
+	p.stateLock.Unlock()
 	err := ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%d", status)), 0644)
 	return status, err
 }
@@ -247,9 +250,6 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 		// the status to 255
 		if same, err := p.isSameProcess(); !same {
 			logrus.Warnf("containerd: %s:%s (pid %d) is not the same process anymore (%v)", p.container.id, p.id, p.pid, err)
-			p.stateLock.Lock()
-			p.state = Stopped
-			p.stateLock.Unlock()
 			// Create the file so we get the exit event generated once monitor kicks in
 			// without having to go through all this process again
 			return p.updateExitStatusFile(255)
@@ -262,13 +262,17 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 		if ppid == "1" {
 			logrus.Warnf("containerd: %s:%s shim died, killing associated process", p.container.id, p.id)
 			unix.Kill(p.pid, syscall.SIGKILL)
+			if err != nil && err != syscall.ESRCH {
+				return 255, fmt.Errorf("containerd: unable to SIGKILL %s:%s (pid %v): %v", p.container.id, p.id, p.pid, err)
+			}
+
 			// wait for the process to die
 			for {
 				e := unix.Kill(p.pid, 0)
 				if e == syscall.ESRCH {
 					break
 				}
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 			// Create the file so we get the exit event generated once monitor kicks in
 			// without having to go through all this process again
@@ -291,29 +295,8 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 	if shimStatus.Signaled() && shimStatus.Signal() == syscall.SIGKILL {
 		logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): shim was SIGKILL'ed reaping its child with pid %d", p.container.id, p.id, p.pid)
 
-		var (
-			status unix.WaitStatus
-			rusage unix.Rusage
-			wpid   int
-		)
-
-		// Some processes change their PR_SET_PDEATHSIG, so force kill them
-		unix.Kill(p.pid, syscall.SIGKILL)
-
-		for wpid == 0 {
-			wpid, e = unix.Wait4(p.pid, &status, unix.WNOHANG, &rusage)
-			if e != nil {
-				logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): Wait4(%d): %v", p.container.id, p.id, p.pid, rerr)
-				return rst, rerr
-			}
-		}
-
-		if wpid == p.pid {
-			rerr = nil
-			rst = 128 + int(shimStatus.Signal())
-		} else {
-			logrus.Errorf("containerd: ExitStatus(container: %s, process: %s): unexpected returned pid from wait4 %v (expected %v)", p.container.id, p.id, wpid, p.pid)
-		}
+		rerr = nil
+		rst = 128 + int(shimStatus.Signal())
 
 		p.stateLock.Lock()
 		p.state = Stopped
