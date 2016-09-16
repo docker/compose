@@ -81,6 +81,13 @@
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
+		"dns_opt": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"uniqueItems": true
+		},
         "domainname": {"type": "string"},
         "entrypoint": {
           "oneOf": [
