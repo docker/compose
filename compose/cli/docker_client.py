@@ -9,6 +9,7 @@ from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
 
 from ..const import HTTP_TIMEOUT
+from ..const import IS_WINDOWS_PLATFORM
 from .errors import UserError
 from .utils import generate_user_agent
 from .utils import unquote_path
@@ -70,5 +71,10 @@ def docker_client(environment, version=None, tls_config=None, host=None,
         kwargs['timeout'] = HTTP_TIMEOUT
 
     kwargs['user_agent'] = generate_user_agent()
+
+    if 'base_url' not in kwargs and IS_WINDOWS_PLATFORM:
+        # docker-py 1.10 defaults to using npipes, but we don't want that
+        # change in compose yet - use the default TCP connection instead.
+        kwargs['base_url'] = 'tcp://127.0.0.1:2375'
 
     return Client(**kwargs)
