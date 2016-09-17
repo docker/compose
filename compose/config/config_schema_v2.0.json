@@ -211,7 +211,16 @@
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "volume_driver": {"type": "string"},
         "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-        "working_dir": {"type": "string"}
+        "working_dir": {"type": "string"},
+        "overwrite": {
+          "type": "array",
+          "items": {
+            "type": ["string"],
+            "format": "overwrites"
+          },
+          "uniqueItems": true
+        },
+        "override_strategy": {"type": "string"}
       },
 
       "dependencies": {
