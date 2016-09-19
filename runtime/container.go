@@ -14,6 +14,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 )
 
 // Container defines the operations allowed on a container
@@ -480,12 +481,33 @@ func (c *container) createCmd(pid string, cmd *exec.Cmd, p *process) error {
 		}
 		return err
 	}
-	go func() {
-		err := p.cmd.Wait()
-		if err == nil {
-			p.cmdSuccess = true
-		}
-		close(p.cmdDoneCh)
+	// We need the pid file to have been written to run
+	defer func() {
+		go func() {
+			err := p.cmd.Wait()
+			if err == nil {
+				p.cmdSuccess = true
+			}
+
+			if same, err := p.isSameProcess(); same && p.pid > 0 {
+				// The process changed its PR_SET_PDEATHSIG, so force
+				// kill it
+				logrus.Infof("containerd: %s:%s (pid %v) has become an orphan, killing it", p.container.id, p.id, p.pid)
+				err = unix.Kill(p.pid, syscall.SIGKILL)
+				if err != nil && err != syscall.ESRCH {
+					logrus.Errorf("containerd: unable to SIGKILL %s:%s (pid %v): %v", p.container.id, p.id, p.pid, err)
+				} else {
+					for {
+						err = unix.Kill(p.pid, 0)
+						if err != nil {
+							break
+						}
+						time.Sleep(5 * time.Millisecond)
+					}
+				}
+			}
+			close(p.cmdDoneCh)
+		}()
 	}()
 	if err := c.waitForCreate(p, cmd); err != nil {
 		return err

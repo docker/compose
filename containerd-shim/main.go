@@ -106,7 +106,7 @@ func start(log *os.File) error {
 		case s := <-signals:
 			switch s {
 			case syscall.SIGCHLD:
-				exits, _ := osutils.Reap()
+				exits, _ := osutils.Reap(false)
 				for _, e := range exits {
 					// check to see if runtime is one of the processes that has exited
 					if e.Pid == p.pid() {
@@ -117,6 +117,9 @@ func start(log *os.File) error {
 			}
 			// runtime has exited so the shim can also exit
 			if exitShim {
+				// Wait for all the childs this process may have created
+				// (only needed for exec, but it won't hurt when done on init)
+				osutils.Reap(true)
 				// Let containerd take care of calling the runtime delete
 				f.Close()
 				p.Wait()

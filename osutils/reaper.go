@@ -12,13 +12,17 @@ type Exit struct {
 
 // Reap reaps all child processes for the calling process and returns their
 // exit information
-func Reap() (exits []Exit, err error) {
+func Reap(wait bool) (exits []Exit, err error) {
 	var (
 		ws  syscall.WaitStatus
 		rus syscall.Rusage
 	)
+	flag := syscall.WNOHANG
+	if wait {
+		flag = 0
+	}
 	for {
-		pid, err := syscall.Wait4(-1, &ws, syscall.WNOHANG, &rus)
+		pid, err := syscall.Wait4(-1, &ws, flag, &rus)
 		if err != nil {
 			if err == syscall.ECHILD {
 				return exits, nil

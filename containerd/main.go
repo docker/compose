@@ -23,7 +23,6 @@ import (
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/http/pprof"
-	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
 	"github.com/rcrowley/go-metrics"
@@ -160,7 +159,6 @@ func main() {
 func daemon(context *cli.Context) error {
 	s := make(chan os.Signal, 2048)
 	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
-	osutils.SetSubreaper(1)
 	sv, err := supervisor.New(
 		context.String("state-dir"),
 		context.String("runtime"),

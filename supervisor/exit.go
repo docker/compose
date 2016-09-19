@@ -73,13 +73,19 @@ func (s *Supervisor) execExit(t *ExecExitTask) error {
 	if err := container.RemoveProcess(t.PID); err != nil {
 		logrus.WithField("error", err).Error("containerd: find container for pid")
 	}
-	t.Process.Wait()
-	s.notifySubscribers(Event{
-		Timestamp: time.Now(),
-		ID:        t.ID,
-		Type:      StateExit,
-		PID:       t.PID,
-		Status:    t.Status,
-	})
+	// If the exec spawned children which are still using its IO
+	// waiting here will block until they die or close their IO
+	// descriptors.
+	// Hence, we use a go routine to avoid block all other operations
+	go func() {
+		t.Process.Wait()
+		s.notifySubscribers(Event{
+			Timestamp: time.Now(),
+			ID:        t.ID,
+			Type:      StateExit,
+			PID:       t.PID,
+			Status:    t.Status,
+		})
+	}()
 	return nil
 }
