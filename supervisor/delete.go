@@ -11,7 +11,7 @@ import (
 type DeleteTask struct {
 	baseTask
 	ID      string
-	Status  int
+	Status  uint32
 	PID     string
 	NoEvent bool
 	Process runtime.Process

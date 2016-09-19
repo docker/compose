@@ -63,7 +63,7 @@ type ExecExitTask struct {
 	baseTask
 	ID      string
 	PID     string
-	Status  int
+	Status  uint32
 	Process runtime.Process
 }
 

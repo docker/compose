@@ -186,7 +186,7 @@ type Event struct {
 	Type      string    `json:"type"`
 	Timestamp time.Time `json:"timestamp"`
 	PID       string    `json:"pid,omitempty"`
-	Status    int       `json:"status,omitempty"`
+	Status    uint32    `json:"status,omitempty"`
 }
 
 // Events returns an event channel that external consumers can use to receive updates

@@ -36,7 +36,7 @@ type Process interface {
 	ExitFD() int
 	// ExitStatus returns the exit status of the process or an error if it
 	// has not exited
-	ExitStatus() (int, error)
+	ExitStatus() (uint32, error)
 	// Spec returns the process spec that created the process
 	Spec() specs.ProcessSpec
 	// Signal sends the provided signal to the process
@@ -228,31 +228,31 @@ func (p *process) Resize(w, h int) error {
 	return err
 }
 
-func (p *process) updateExitStatusFile(status int) (int, error) {
+func (p *process) updateExitStatusFile(status uint32) (uint32, error) {
 	p.stateLock.Lock()
 	p.state = Stopped
 	p.stateLock.Unlock()
-	err := ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%d", status)), 0644)
+	err := ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%u", status)), 0644)
 	return status, err
 }
 
-func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
+func (p *process) handleSigkilledShim(rst uint32, rerr error) (uint32, error) {
 	if p.cmd == nil || p.cmd.Process == nil {
 		e := unix.Kill(p.pid, 0)
 		if e == syscall.ESRCH {
 			logrus.Warnf("containerd: %s:%s (pid %d) does not exist", p.container.id, p.id, p.pid)
 			// The process died while containerd was down (probably of
 			// SIGKILL, but no way to be sure)
-			return p.updateExitStatusFile(255)
+			return p.updateExitStatusFile(UnknownStatus)
 		}
 
 		// If it's not the same process, just mark it stopped and set
-		// the status to 255
+		// the status to the UnknownStatus value (i.e. 255)
 		if same, err := p.isSameProcess(); !same {
 			logrus.Warnf("containerd: %s:%s (pid %d) is not the same process anymore (%v)", p.container.id, p.id, p.pid, err)
 			// Create the file so we get the exit event generated once monitor kicks in
 			// without having to go through all this process again
-			return p.updateExitStatusFile(255)
+			return p.updateExitStatusFile(UnknownStatus)
 		}
 
 		ppid, err := readProcStatField(p.pid, 4)
@@ -263,7 +263,7 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 			logrus.Warnf("containerd: %s:%s shim died, killing associated process", p.container.id, p.id)
 			unix.Kill(p.pid, syscall.SIGKILL)
 			if err != nil && err != syscall.ESRCH {
-				return 255, fmt.Errorf("containerd: unable to SIGKILL %s:%s (pid %v): %v", p.container.id, p.id, p.pid, err)
+				return UnknownStatus, fmt.Errorf("containerd: unable to SIGKILL %s:%s (pid %v): %v", p.container.id, p.id, p.pid, err)
 			}
 
 			// wait for the process to die
@@ -276,7 +276,7 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 			}
 			// Create the file so we get the exit event generated once monitor kicks in
 			// without having to go through all this process again
-			return p.updateExitStatusFile(128 + int(syscall.SIGKILL))
+			return p.updateExitStatusFile(128 + uint32(syscall.SIGKILL))
 		}
 
 		return rst, rerr
@@ -296,7 +296,7 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 		logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): shim was SIGKILL'ed reaping its child with pid %d", p.container.id, p.id, p.pid)
 
 		rerr = nil
-		rst = 128 + int(shimStatus.Signal())
+		rst = 128 + uint32(shimStatus.Signal())
 
 		p.stateLock.Lock()
 		p.state = Stopped
@@ -306,7 +306,7 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 	return rst, rerr
 }
 
-func (p *process) ExitStatus() (rst int, rerr error) {
+func (p *process) ExitStatus() (rst uint32, rerr error) {
 	data, err := ioutil.ReadFile(filepath.Join(p.root, ExitStatusFile))
 	defer func() {
 		if rerr != nil {
@@ -315,17 +315,19 @@ func (p *process) ExitStatus() (rst int, rerr error) {
 	}()
 	if err != nil {
 		if os.IsNotExist(err) {
-			return -1, ErrProcessNotExited
+			return UnknownStatus, ErrProcessNotExited
 		}
-		return -1, err
+		return UnknownStatus, err
 	}
 	if len(data) == 0 {
-		return -1, ErrProcessNotExited
+		return UnknownStatus, ErrProcessNotExited
 	}
 	p.stateLock.Lock()
 	p.state = Stopped
 	p.stateLock.Unlock()
-	return strconv.Atoi(string(data))
+
+	i, err := strconv.ParseUint(string(data), 10, 32)
+	return uint32(i), err
 }
 
 func (p *process) Spec() specs.ProcessSpec {
