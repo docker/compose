@@ -46,8 +46,8 @@ func (p *testProcess) ExitFD() int {
 	return -1
 }
 
-func (p *testProcess) ExitStatus() (int, error) {
-	return -1, nil
+func (p *testProcess) ExitStatus() (uint32, error) {
+	return runtime.UnknownStatus, nil
 }
 
 func (p *testProcess) Container() runtime.Container {

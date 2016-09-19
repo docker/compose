@@ -47,6 +47,10 @@ const (
 	// StartTimeFile holds the name of the file in which the process
 	// start time is saved
 	StartTimeFile = "starttime"
+
+	// UnknownStatus is the value returned when a process exit
+	// status cannot be determined
+	UnknownStatus = 255
 )
 
 // Checkpoint holds information regarding a container checkpoint
