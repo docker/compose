@@ -257,7 +257,7 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
         assert yaml.load(result.stdout) == {
-            'version': '2.0',
+            'version': '2.1',
             'services': {
                 'net': {
                     'image': 'busybox',

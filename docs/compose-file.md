@@ -623,7 +623,7 @@ An example:
 
 #### link_local_ips
 
-> [Version 2.1 file format](#version-2.1) only.
+> [Added in version 2.1 file format](#version-21).
 
 Specify a list of link-local IPs. Link-local IPs are special IPs which belong
 to a well known subnet and are purely managed by the operator, usually

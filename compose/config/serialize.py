@@ -35,7 +35,7 @@ def denormalize_config(config):
 
     version = config.version
     if version not in (V2_0, V2_1):
-        version = V2_0
+        version = V2_1
 
     return {
         'version': version,
