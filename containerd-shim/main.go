@@ -117,11 +117,17 @@ func start(log *os.File) error {
 			}
 			// runtime has exited so the shim can also exit
 			if exitShim {
-				// Wait for all the childs this process may have created
-				// (only needed for exec, but it won't hurt when done on init)
-				osutils.Reap(true)
-				// Let containerd take care of calling the runtime delete
+				// Let containerd take care of calling the runtime
+				// delete.
+				// This is needed to be done first in order to ensure
+				// that the call to Reap does not block until all
+				// children of the container have died if init was not
+				// started in its own PID namespace.
 				f.Close()
+				// Wait for all the childs this process may have
+				// created (needed for exec and init processes when
+				// they join another pid namespace)
+				osutils.Reap(true)
 				p.Wait()
 				return nil
 			}
