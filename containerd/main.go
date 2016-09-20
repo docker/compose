@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -19,7 +20,7 @@ import (
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
-	"github.com/docker/containerd/api/http/pprof"
+	"github.com/docker/containerd/api/pprof"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
 )
@@ -120,7 +121,9 @@ func main() {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		if p := context.GlobalString("pprof-address"); len(p) > 0 {
-			pprof.Enable(p)
+			h := pprof.New()
+			http.Handle("/debug", h)
+			go http.ListenAndServe(p, nil)
 		}
 		if err := checkLimits(); err != nil {
 			return err
@@ -182,8 +185,6 @@ func daemon(context *cli.Context) error {
 }
 
 func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
-	// TODO: We should use TLS.
-	// TODO: Add an option for the SocketGroup.
 	sockets, err := listeners.Init(protocol, address, "", nil)
 	if err != nil {
 		return nil, err
