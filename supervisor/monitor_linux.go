@@ -56,7 +56,6 @@ func (m *Monitor) Monitor(p runtime.Process) error {
 	if err := archutils.EpollCtl(m.epollFd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
 		return err
 	}
-	EpollFdCounter.Inc(1)
 	m.receivers[fd] = p
 	return nil
 }
@@ -77,7 +76,6 @@ func (m *Monitor) MonitorOOM(c runtime.Container) error {
 	if err := archutils.EpollCtl(m.epollFd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
 		return err
 	}
-	EpollFdCounter.Inc(1)
 	m.receivers[fd] = o
 	return nil
 }
@@ -115,7 +113,6 @@ func (m *Monitor) start() {
 					if err := t.Close(); err != nil {
 						logrus.WithField("error", err).Error("containerd: close process IO")
 					}
-					EpollFdCounter.Dec(1)
 					m.exits <- t
 				}
 			case runtime.OOM:
@@ -125,7 +122,6 @@ func (m *Monitor) start() {
 					delete(m.receivers, fd)
 					// epoll will remove the fd from its set after it has been closed
 					t.Close()
-					EpollFdCounter.Dec(1)
 				} else {
 					m.ooms <- t.ContainerID()
 				}

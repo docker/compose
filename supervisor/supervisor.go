@@ -214,7 +214,6 @@ func (s *Supervisor) Events(from time.Time, storedOnly bool, id string) chan Eve
 	if storedOnly {
 		close(c)
 	} else {
-		EventSubscriberCounter.Inc(1)
 		s.subscribers[c] = struct{}{}
 	}
 	return c
@@ -227,7 +226,6 @@ func (s *Supervisor) Unsubscribe(sub chan Event) {
 	if _, ok := s.subscribers[sub]; ok {
 		delete(s.subscribers, sub)
 		close(sub)
-		EventSubscriberCounter.Dec(1)
 	}
 }
 
@@ -276,7 +274,6 @@ func (s *Supervisor) Machine() Machine {
 
 // SendTask sends the provided event the the supervisors main event loop
 func (s *Supervisor) SendTask(evt Task) {
-	TasksCounter.Inc(1)
 	s.tasks <- evt
 }
 
@@ -321,7 +318,6 @@ func (s *Supervisor) restore() error {
 			return err
 		}
 
-		ContainersCounter.Inc(1)
 		s.containers[id] = &containerInfo{
 			container: container,
 		}

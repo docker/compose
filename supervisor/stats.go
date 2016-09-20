@@ -1,10 +1,6 @@
 package supervisor
 
-import (
-	"time"
-
-	"github.com/docker/containerd/runtime"
-)
+import "github.com/docker/containerd/runtime"
 
 // StatsTask holds needed parameters to retrieve a container statistics
 type StatsTask struct {
@@ -14,7 +10,6 @@ type StatsTask struct {
 }
 
 func (s *Supervisor) stats(t *StatsTask) error {
-	start := time.Now()
 	i, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -28,7 +23,6 @@ func (s *Supervisor) stats(t *StatsTask) error {
 		}
 		t.ErrorCh() <- nil
 		t.Stat <- s
-		ContainerStatsTimer.UpdateSince(start)
 	}()
 	return errDeferredResponse
 }

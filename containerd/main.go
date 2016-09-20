@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -18,14 +16,12 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/http/pprof"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
-	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -44,11 +40,6 @@ var daemonFlags = []cli.Flag{
 		Name:  "state-dir",
 		Value: defaultStateDir,
 		Usage: "runtime state directory",
-	},
-	cli.DurationFlag{
-		Name:  "metrics-interval",
-		Value: 5 * time.Minute,
-		Usage: "interval for flushing metrics to the store",
 	},
 	cli.StringFlag{
 		Name:  "listen,l",
@@ -83,10 +74,6 @@ var daemonFlags = []cli.Flag{
 		Name:  "retain-count",
 		Value: 500,
 		Usage: "number of past events to keep in the event log",
-	},
-	cli.StringFlag{
-		Name:  "graphite-address",
-		Usage: "Address of graphite server",
 	},
 }
 
@@ -131,11 +118,6 @@ func main() {
 		setupDumpStacksTrap()
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
-			if context.GlobalDuration("metrics-interval") > 0 {
-				if err := debugMetrics(context.GlobalDuration("metrics-interval"), context.GlobalString("graphite-address")); err != nil {
-					return err
-				}
-			}
 		}
 		if p := context.GlobalString("pprof-address"); len(p) > 0 {
 			pprof.Enable(p)
@@ -245,26 +227,6 @@ func checkLimits() error {
 		}).Warn("containerd: low RLIMIT_NOFILE changing to max")
 		l.Cur = l.Max
 		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
-	}
-	return nil
-}
-
-func debugMetrics(interval time.Duration, graphiteAddr string) error {
-	for name, m := range supervisor.Metrics() {
-		if err := metrics.DefaultRegistry.Register(name, m); err != nil {
-			return err
-		}
-	}
-	processMetrics()
-	if graphiteAddr != "" {
-		addr, err := net.ResolveTCPAddr("tcp", graphiteAddr)
-		if err != nil {
-			return err
-		}
-		go graphite.Graphite(metrics.DefaultRegistry, 10e9, "metrics", addr)
-	} else {
-		l := log.New(os.Stdout, "[containerd] ", log.LstdFlags)
-		go metrics.Log(metrics.DefaultRegistry, interval, l)
 	}
 	return nil
 }

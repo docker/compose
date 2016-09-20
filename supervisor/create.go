@@ -2,7 +2,6 @@ package supervisor
 
 import (
 	"path/filepath"
-	"time"
 
 	"github.com/docker/containerd/runtime"
 )
@@ -25,7 +24,6 @@ type StartTask struct {
 }
 
 func (s *Supervisor) start(t *StartTask) error {
-	start := time.Now()
 	rt := s.runtime
 	rtArgs := s.runtimeArgs
 	if t.Runtime != "" {
@@ -49,7 +47,6 @@ func (s *Supervisor) start(t *StartTask) error {
 	s.containers[t.ID] = &containerInfo{
 		container: container,
 	}
-	ContainersCounter.Inc(1)
 	task := &startTask{
 		Err:           t.ErrorCh(),
 		Container:     container,
@@ -63,6 +60,5 @@ func (s *Supervisor) start(t *StartTask) error {
 	}
 
 	s.startTasks <- task
-	ContainerCreateTimer.UpdateSince(start)
 	return errDeferredResponse
 }

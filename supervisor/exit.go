@@ -14,7 +14,6 @@ type ExitTask struct {
 }
 
 func (s *Supervisor) exit(t *ExitTask) error {
-	start := time.Now()
 	proc := t.Process
 	status, err := proc.ExitStatus()
 	if err != nil {
@@ -52,9 +51,6 @@ func (s *Supervisor) exit(t *ExitTask) error {
 		Process: proc,
 	}
 	s.delete(ne)
-
-	ExitProcessTimer.UpdateSince(start)
-
 	return nil
 }
 

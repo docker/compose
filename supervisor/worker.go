@@ -40,7 +40,6 @@ type worker struct {
 func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.startTasks {
-		started := time.Now()
 		process, err := t.Container.Start(t.CheckpointPath, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -87,7 +86,6 @@ func (w *worker) Start() {
 				continue
 			}
 		}
-		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil
 		t.StartResponse <- StartResponse{
 			Container: t.Container,

@@ -21,7 +21,6 @@ type AddProcessTask struct {
 }
 
 func (s *Supervisor) addProcess(t *AddProcessTask) error {
-	start := time.Now()
 	ci, ok := s.containers[t.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -33,7 +32,6 @@ func (s *Supervisor) addProcess(t *AddProcessTask) error {
 	if err := s.monitorProcess(process); err != nil {
 		return err
 	}
-	ExecProcessTimer.UpdateSince(start)
 	t.StartResponse <- StartResponse{}
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
