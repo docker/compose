@@ -11,18 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/api/grpc/server"
-	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/pprof"
 	"github.com/docker/containerd/supervisor"
-	"github.com/docker/docker/pkg/listeners"
 )
 
 const (
@@ -78,45 +70,14 @@ var daemonFlags = []cli.Flag{
 	},
 }
 
-// DumpStacks dumps the runtime stack.
-func dumpStacks() {
-	var (
-		buf       []byte
-		stackSize int
-	)
-	bufferLen := 16384
-	for stackSize == len(buf) {
-		buf = make([]byte, bufferLen)
-		stackSize = runtime.Stack(buf, true)
-		bufferLen *= 2
-	}
-	buf = buf[:stackSize]
-	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
-}
-
-func setupDumpStacksTrap() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGUSR1)
-	go func() {
-		for range c {
-			dumpStacks()
-		}
-	}()
-}
-
 func main() {
 	logrus.SetFormatter(&logrus.TextFormatter{TimestampFormat: time.RFC3339Nano})
 	app := cli.NewApp()
 	app.Name = "containerd"
-	if containerd.GitCommit != "" {
-		app.Version = fmt.Sprintf("%s commit: %s", containerd.Version, containerd.GitCommit)
-	} else {
-		app.Version = containerd.Version
-	}
+	app.Version = getVersion()
 	app.Usage = usage
 	app.Flags = daemonFlags
 	app.Before = func(context *cli.Context) error {
-		setupDumpStacksTrap()
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
@@ -130,7 +91,6 @@ func main() {
 		}
 		return nil
 	}
-
 	app.Action = func(context *cli.Context) {
 		if err := daemon(context); err != nil {
 			logrus.Fatal(err)
@@ -142,8 +102,8 @@ func main() {
 }
 
 func daemon(context *cli.Context) error {
-	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	signals := make(chan os.Signal, 2048)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
 	sv, err := supervisor.New(
 		context.String("state-dir"),
 		context.String("runtime"),
@@ -164,8 +124,10 @@ func daemon(context *cli.Context) error {
 		return err
 	}
 	// Split the listen string of the form proto://addr
-	listenSpec := context.String("listen")
-	listenParts := strings.SplitN(listenSpec, "://", 2)
+	var (
+		listenSpec  = context.String("listen")
+		listenParts = strings.SplitN(listenSpec, "://", 2)
+	)
 	if len(listenParts) != 2 {
 		return fmt.Errorf("bad listen address format %s, expected proto://address", listenSpec)
 	}
@@ -173,61 +135,26 @@ func daemon(context *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	for ss := range s {
-		switch ss {
-		default:
-			logrus.Infof("stopping containerd after receiving %s", ss)
+	for s := range signals {
+		switch s {
+		case syscall.SIGUSR1:
+			var (
+				buf       []byte
+				stackSize int
+			)
+			bufferLen := 16384
+			for stackSize == len(buf) {
+				buf = make([]byte, bufferLen)
+				stackSize = runtime.Stack(buf, true)
+				bufferLen *= 2
+			}
+			buf = buf[:stackSize]
+			logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+		case syscall.SIGINT, syscall.SIGTERM:
+			logrus.Infof("stopping containerd after receiving %s", s)
 			server.Stop()
 			os.Exit(0)
 		}
-	}
-	return nil
-}
-
-func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
-	sockets, err := listeners.Init(protocol, address, "", nil)
-	if err != nil {
-		return nil, err
-	}
-	if len(sockets) != 1 {
-		return nil, fmt.Errorf("incorrect number of listeners")
-	}
-	l := sockets[0]
-	s := grpc.NewServer()
-	types.RegisterAPIServer(s, server.NewServer(sv))
-	healthServer := health.NewServer()
-	grpc_health_v1.RegisterHealthServer(s, healthServer)
-
-	go func() {
-		logrus.Debugf("containerd: grpc api on %s", address)
-		if err := s.Serve(l); err != nil {
-			logrus.WithField("error", err).Fatal("containerd: serve grpc")
-		}
-	}()
-	return s, nil
-}
-
-// getDefaultID returns the hostname for the instance host
-func getDefaultID() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-	return hostname
-}
-
-func checkLimits() error {
-	var l syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &l); err != nil {
-		return err
-	}
-	if l.Cur <= minRlimit {
-		logrus.WithFields(logrus.Fields{
-			"current": l.Cur,
-			"max":     l.Max,
-		}).Warn("containerd: low RLIMIT_NOFILE changing to max")
-		l.Cur = l.Max
-		return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &l)
 	}
 	return nil
 }
