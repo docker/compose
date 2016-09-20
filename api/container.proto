@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package "docker.containerkit.v1";
 
+import "types.proto"
+
 service ContainerService {
     rpc Create(CreateRequest) returns (CreateResponse) {
 
@@ -21,6 +23,12 @@ service ContainerService {
     rpc State(StateRequest) returns (StateResponse) {
 
     }
+    rpc Exec(ExecRequest) returns (ExecResponse) {
+
+    }
+    rpc Update(UpdateRequest) returns (UpdateResponse) {
+
+    }
 }
 
 message CreateRequest {
@@ -32,4 +40,73 @@ message CreateRequest {
 
 message CreateResponse {
 	Container container = 1;
+}
+
+message StartRequest {
+    string id = 1;
+}
+
+message StartResponse {
+
+}
+
+message StopRequest {
+    string id = 1;
+    uint32 signal = 2;
+    uint32 timeout = 3;
+}
+
+message StopResponse {
+
+}
+
+message DeleteRequest {
+    string id = 1;
+}
+
+message DeleteResponse {
+
+}
+
+message ListRequest {
+
+}
+
+message ListResponse {
+    repeated Container containers = 1;
+}
+
+message StateRequest {
+    string id = 1;
+}
+
+message StateResponse {
+    Container container = 1;
+}
+
+message ExecRequest {
+    string id = 1;
+	bool terminal = 2;
+	User user = 3; 
+	repeated string args = 4;
+	repeated string env = 5;
+	string cwd = 6; 
+	string pid = 7;
+	repeated string capabilities = 8;
+	string apparmorProfile = 9;
+	string selinuxLabel = 10;
+	bool noNewPrivileges = 11;
+	repeated Rlimit rlimits = 12;
+}
+
+message ExecResponse {
+
+}
+
+message UpdateRequest {
+    string id = 1;
+}
+
+message UpdateResponse {
+
 }

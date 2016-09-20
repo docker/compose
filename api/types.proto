@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package "docker.containerkit.v1";
+
+message Rlimit {
+	string type = 1;
+	uint64 soft = 2;
+	uint64 hard = 3;
+}
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additionalGids = 3; 
+}
