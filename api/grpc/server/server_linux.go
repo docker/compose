@@ -6,12 +6,9 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/specs"
 	"github.com/docker/containerd/supervisor"
-	"github.com/opencontainers/runc/libcontainer/system"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 )
-
-var clockTicksPerSecond = uint64(system.GetClockTicks())
 
 func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) (*types.AddProcessResponse, error) {
 	process := &specs.ProcessSpec{

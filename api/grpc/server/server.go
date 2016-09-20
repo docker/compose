@@ -1,12 +1,8 @@
 package server
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +11,7 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/grpc/types"
+	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/runtime"
 	"github.com/docker/containerd/supervisor"
 	"github.com/golang/protobuf/ptypes"
@@ -351,7 +348,7 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 		Timestamp:   tsp,
 		CgroupStats: &types.CgroupStats{},
 	}
-	systemUsage, _ := getSystemCPUUsage()
+	systemUsage, _ := osutils.GetSystemCPUUsage()
 	pbSt.CgroupStats.CpuStats = &types.CpuStats{
 		CpuUsage: &types.CpuUsage{
 			TotalUsage:        st.CPU.Usage.Total,
@@ -424,55 +421,6 @@ func convertBlkioEntryToPb(b []runtime.BlkioEntry) []*types.BlkioStatsEntry {
 		})
 	}
 	return pbEs
-}
-
-const nanoSecondsPerSecond = 1e9
-
-// getSystemCPUUsage returns the host system's cpu usage in
-// nanoseconds. An error is returned if the format of the underlying
-// file does not match.
-//
-// Uses /proc/stat defined by POSIX. Looks for the cpu
-// statistics line and then sums up the first seven fields
-// provided. See `man 5 proc` for details on specific field
-// information.
-func getSystemCPUUsage() (uint64, error) {
-	var line string
-	f, err := os.Open("/proc/stat")
-	if err != nil {
-		return 0, err
-	}
-	bufReader := bufio.NewReaderSize(nil, 128)
-	defer func() {
-		bufReader.Reset(nil)
-		f.Close()
-	}()
-	bufReader.Reset(f)
-	err = nil
-	for err == nil {
-		line, err = bufReader.ReadString('\n')
-		if err != nil {
-			break
-		}
-		parts := strings.Fields(line)
-		switch parts[0] {
-		case "cpu":
-			if len(parts) < 8 {
-				return 0, fmt.Errorf("bad format of cpu stats")
-			}
-			var totalClockTicks uint64
-			for _, i := range parts[1:8] {
-				v, err := strconv.ParseUint(i, 10, 64)
-				if err != nil {
-					return 0, fmt.Errorf("error parsing cpu stats")
-				}
-				totalClockTicks += v
-			}
-			return (totalClockTicks * nanoSecondsPerSecond) /
-				clockTicksPerSecond, nil
-		}
-	}
-	return 0, fmt.Errorf("bad stats format")
 }
 
 func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.StatsResponse, error) {
