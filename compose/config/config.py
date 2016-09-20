@@ -61,6 +61,7 @@ DOCKER_CONFIG_KEYS = [
     'env_file',
     'environment',
     'extra_hosts',
+    'group_add',
     'hostname',
     'image',
     'ipc',

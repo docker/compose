@@ -48,6 +48,7 @@ DOCKER_START_KEYS = [
     'dns_search',
     'env_file',
     'extra_hosts',
+    'group_add',
     'ipc',
     'read_only',
     'log_driver',
@@ -706,7 +707,8 @@ class Service(object):
             shm_size=options.get('shm_size'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
-            mem_swappiness=options.get('mem_swappiness')
+            mem_swappiness=options.get('mem_swappiness'),
+            group_add=options.get('group_add')
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
