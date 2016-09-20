@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package "docker.containerkit.v1";
+
+message NetworkStats {
+	string name = 1; // name of network interface
+	uint64 rx_bytes  = 2;
+	uint64 rx_Packets = 3;
+	uint64 Rx_errors  = 4;
+	uint64 Rx_dropped = 5;
+	uint64 Tx_bytes   = 6;
+	uint64 Tx_packets = 7;
+	uint64 Tx_errors  = 8;
+	uint64 Tx_dropped = 9;
+}
+
+message CpuStats {
+	CpuUsage cpu_usage = 1;
+	ThrottlingStats throttling_stats = 2;
+	uint64 system_usage = 3;
+}
+
+message CpuUsage {
+	uint64 total_usage = 1;
+	repeated uint64 percpu_usage = 2;
+	uint64 usage_in_kernelmode = 3;
+	uint64 usage_in_usermode = 4;
+}
+
+message ThrottlingStats {
+	uint64 periods = 1;
+	uint64 throttled_periods = 2;
+	uint64 throttled_time = 3;
+}
+
+message PidStats {
+	uint64 current = 1;
+	uint64 limit = 2;
+}
+
+message MemoryStats {
+	uint64 cache = 1;
+	MemoryUsage usage = 2;
+	MemoryUsage swap_usage = 3;
+	MemoryUsage kernel_usage = 4;
+	map<string, uint64> stats = 5;
+}
+
+message MemoryUsage {
+	uint64 usage = 1;
+	uint64 max_usage = 2;
+	uint64 failcnt = 3;
+	uint64 limit = 4;
+}
+
+message BlkioStats {
+	repeated BlkioEntry io_service_bytes_recursive = 1; 
+	repeated BlkioEntry io_serviced_recursive = 2;
+	repeated BlkioEntry io_queued_recursive = 3;
+	repeated BlkioEntry io_service_time_recursive = 4;
+	repeated BlkioEntry io_wait_time_recursive = 5;
+	repeated BlkioEntry io_merged_recursive = 6;
+	repeated BlkioEntry io_time_recursive = 7;
+	repeated BlkioEntry sectors_recursive = 8;
+}
+
+message BlkioEntry {
+	uint64 major = 1;
+	uint64 minor = 2;
+	string op = 3;
+	uint64 value = 4;
+}
+
+message HugetlbStats {
+	uint64 usage = 1;
+	uint64 max_usage = 2;
+	uint64 failcnt = 3;
+	uint64 limit = 4;
+}
