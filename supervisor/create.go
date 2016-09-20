@@ -24,22 +24,22 @@ type StartTask struct {
 }
 
 func (s *Supervisor) start(t *StartTask) error {
-	rt := s.runtime
-	rtArgs := s.runtimeArgs
+	rt := s.config.Runtime
+	rtArgs := s.config.RuntimeArgs
 	if t.Runtime != "" {
 		rt = t.Runtime
 		rtArgs = t.RuntimeArgs
 	}
 	container, err := runtime.New(runtime.ContainerOpts{
-		Root:        s.stateDir,
+		Root:        s.config.StateDir,
 		ID:          t.ID,
 		Bundle:      t.BundlePath,
 		Runtime:     rt,
 		RuntimeArgs: rtArgs,
-		Shim:        s.shim,
+		Shim:        s.config.ShimName,
 		Labels:      t.Labels,
 		NoPivotRoot: t.NoPivotRoot,
-		Timeout:     s.timeout,
+		Timeout:     s.config.Timeout,
 	})
 	if err != nil {
 		return err
@@ -58,7 +58,6 @@ func (s *Supervisor) start(t *StartTask) error {
 	if t.Checkpoint != nil {
 		task.CheckpointPath = filepath.Join(t.CheckpointDir, t.Checkpoint.Name)
 	}
-
 	s.startTasks <- task
 	return errDeferredResponse
 }

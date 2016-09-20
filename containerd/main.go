@@ -104,13 +104,14 @@ func main() {
 func daemon(context *cli.Context) error {
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
-	sv, err := supervisor.New(
-		context.String("state-dir"),
-		context.String("runtime"),
-		context.String("shim"),
-		context.StringSlice("runtime-args"),
-		context.Duration("start-timeout"),
-		context.Int("retain-count"))
+	sv, err := supervisor.New(supervisor.Config{
+		StateDir:         context.String("state-dir"),
+		Runtime:          context.String("runtime"),
+		ShimName:         context.String("shim"),
+		RuntimeArgs:      context.StringSlice("runtime-args"),
+		Timeout:          context.Duration("start-timeout"),
+		EventRetainCount: context.Int("retain-count"),
+	})
 	if err != nil {
 		return err
 	}
