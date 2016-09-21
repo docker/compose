@@ -1,6 +1,47 @@
 Change log
 ==========
 
+1.8.1 (2016-09-22)
+-----------------
+
+Bug Fixes
+
+- Fixed a bug where users using a credentials store were not able
+  to access their private images.
+
+- Fixed a bug where users using identity tokens to authenticate
+  were not able to access their private images.
+
+- Fixed a bug where an `HttpHeaders` entry in the docker configuration
+  file would cause Compose to crash when trying to build an image.
+
+- Fixed a few bugs related to the handling of Windows paths in volume
+  binding declarations.
+
+- Fixed a bug where Compose would sometimes crash while trying to
+  read a streaming response from the engine.
+
+- Fixed an issue where Compose would crash when encountering an API error
+  while streaming container logs.
+
+- Fixed an issue where Compose would erroneously try to output logs from
+  drivers not handled by the Engine's API.
+
+- Fixed a bug where options from the `docker-machine config` command would
+  not be properly interpreted by Compose.
+
+- Fixed a bug where the connection to the Docker Engine would
+  sometimes fail when running a large number of services simultaneously.
+
+- Fixed an issue where Compose would sometimes print a misleading
+  suggestion message when running the `bundle` command.
+
+- Fixed a bug where connection errors would not be handled properly by
+  Compose during the project initialization phase.
+
+- Fixed a bug where a misleading error would appear when encountering
+  a connection timeout.
+
 1.8.0 (2016-06-14)
 -----------------
 
