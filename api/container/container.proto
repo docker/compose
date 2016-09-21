@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package docker.containerkit.v1;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "github.com/docker/containerkit/api/types/mount/mount.proto";
+
+// TODO(stevvooe): Merge this with the other container.proto. Most of this is
+// scraped from swarmkit.
+
+message Container {
+	ContainerSpec container = 1;
+
+	// Runtime properties go here.
+}
+
+// Container specifies runtime parameters for a container.
+message ContainerSpec {
+	// name must be a unique name to identify the container.
+	//
+	// This can be used as a system identifier external to ContainerKit services.
+	string name = 1;
+
+	// Labels defines labels to be added to the container at creation time. If
+	// collisions with system labels occur, these labels will be overridden.
+	//
+	// This field *must* remain compatible with the Labels field of
+	// Annotations.
+	map<string, string> labels = 2;
+
+	repeated types.Mount mounts = 3 [(gogoproto.nullable) = false];
+
+	// Command to run the the container. The first element is a path to the
+	// executable and the following elements are treated as arguments.
+	//
+	// If command is empty, execution will fall back to the image's entrypoint.
+	//
+	// Command should only be used when overriding entrypoint.
+	repeated string command = 4;
+
+	// Args specifies arguments provided to the image's entrypoint.
+	//
+	// If Command and Args are provided, Args will be appended to Command.
+	repeated string args = 5;
+
+	// Env specifies the environment variables for the container in NAME=VALUE
+	// format. These must be compliant with  [IEEE Std
+	// 1003.1-2001](http://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap08.html).
+	repeated string env = 6;
+
+	// Dir defines the working directory to set for the container process.
+	string dir = 7;
+
+	// User specifies the user that should be employed to run the container.
+	//
+	// Note that the primary group may be specified by appending the group name
+	// or id to the user name, separated by a `:`. This syntax is
+	// `<user>:<group>`.
+	string user = 8;
+
+	// Groups specifies supplementary groups available to the user.
+	repeated string groups = 9;
+}
+
+

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package docker.containerkit.types;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "github.com/docker/containerkit/api/types/mount/mount.proto";
+
+// Images abstracts the graph driver and image store.
+//
+// The interface is to be able to request and manage images. The output,
+// provided as part of the Prepare step, is to expose a set of mounts that can
+// be used at container startup to run the image.
+service Images {
+	// Prepare declares that an image is required for use. A prepared image,
+	// complete with a set of mounts to use for the image will be provided.
+	rpc Prepare(PrepareRequest) returns (PrepareResponse);
+
+	// Cleanup instructs the images service to cleanup resources for the image.
+	rpc Cleanup(CleanupRequest) returns (CleanupResponse);
+
+	// Commit
+	rpc Commit(CommitRequest) returns (CommitResponse);
+
+	// NOTE(stevvooe): Placeholders for other operations here. Consider
+	// splitting this into a graphdriver like service (Prepare/Cleanup) and an
+	// image store service.
+	//
+	// Really, we want to separate image identification from CAS
+	// identification, so placing push/pull here may cause too much coupling.
+	// It might better to be able to import the layers here in the same way the
+	// graphdriver works, then only use the image metadata to maintain the link
+	// here.
+	//
+	// Basically, we want to avoid the tight coupling present between the image
+	// store and graphdriver in docker today.
+	//
+	// rpc Push(PushRequest) returns (stream PullRequest);
+	// rpc Pull(PullRequest) returns (stream PullResponse);
+}
+
+message PrepareRequest {
+	// Path specifies the filesystem path to target for the image preparation.
+	//
+	// These will influence the values of "target" in the emitted mounts. It
+	// must be unique per usage of the prepared mount and can only be prepared
+	// again after a call to cleanup.
+	string path = 3;
+
+	// name of the image to prepare.
+	string name = 2;
+}
+
+message PrepareResponse {
+	// Layers provides a list of mounts to use with container creation. The
+	// layers will be mounted, in order, assembling the root filesystem.
+	//
+	// Typically, these can be augmented with other mounts from the volume
+	// service, tmpfs, application-specific bind mounts or even mounts from
+	// other containers.
+	repeated types.Mount layers = 1;
+
+	// TODO(stevvooe): It is unclear whether or not we should integrate image
+	// metadata with this part of the service.
+}
+
+message CleanupRequest {
+	// Path cleans up the path used for the image. 
+	// ID identifies the prepared image to cleanup.
+	string path = 1;
+}
+
+message CleanupResponse { }
+
+// CommitRequest provides argument for the Commit RPC.
+message CommitRequest {
+	// Path to a prepared image to capture changes.
+	string path = 1;
+}
+
+message CommitResponse {
+	// name identifies the entity created as part of the image.
+	string name = 1; 
+}
