@@ -43,6 +43,15 @@ full details.
 This section contains a list of all configuration options supported by a service
 definition.
 
+### auto_up
+
+Specify whether a service should be started by `docker-compose up` by default.
+
+When set to `false` the service is only started when pulled in as a dependency by
+another service or explicitly given on the command line. Otherwise the service is
+also started when simply executing `docker-compose up`.
+When not given this option defaults to `true`.
+
 ### build
 
 Configuration options that are applied at build time.
