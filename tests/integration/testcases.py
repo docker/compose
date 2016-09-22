@@ -12,6 +12,7 @@ from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.config import V2_1
 from compose.config.environment import Environment
 from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
@@ -33,19 +34,36 @@ def get_links(container):
     return [format_link(link) for link in links]
 
 
-def engine_version_too_low_for_v2():
+def engine_max_version():
     if 'DOCKER_VERSION' not in os.environ:
-        return False
+        return V2_1
     version = os.environ['DOCKER_VERSION'].partition('-')[0]
-    return version_lt(version, '1.10')
+    if version_lt(version, '1.10'):
+        return V1
+    elif version_lt(version, '1.12'):
+        return V2_0
+    return V2_1
 
 
 def v2_only():
     def decorator(f):
         @functools.wraps(f)
         def wrapper(self, *args, **kwargs):
-            if engine_version_too_low_for_v2():
+            if engine_max_version() == V1:
                 skip("Engine version is too low")
+                return
+            return f(self, *args, **kwargs)
+        return wrapper
+
+    return decorator
+
+
+def v2_1_only():
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            if engine_max_version() in (V1, V2_0):
+                skip('Engine version is too low')
                 return
             return f(self, *args, **kwargs)
         return wrapper
@@ -56,11 +74,7 @@ def v2_only():
 class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if engine_version_too_low_for_v2():
-            version = API_VERSIONS[V1]
-        else:
-            version = API_VERSIONS[V2_0]
-
+        version = API_VERSIONS[engine_max_version()]
         cls.client = docker_client(Environment(), version)
 
     @classmethod

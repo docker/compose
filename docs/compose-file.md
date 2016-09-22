@@ -621,6 +621,31 @@ An example:
           - subnet: 2001:3984:3989::/64
             gateway: 2001:3984:3989::1
 
+#### link_local_ips
+
+> [Added in version 2.1 file format](#version-21).
+
+Specify a list of link-local IPs. Link-local IPs are special IPs which belong
+to a well known subnet and are purely managed by the operator, usually
+dependent on the architecture where they are deployed. Therefore they are not
+managed by docker (IPAM driver).
+
+Example usage:
+
+    version: '2.1'
+    services:
+      app:
+        image: busybox
+        command: top
+        networks:
+          app_net:
+            link_local_ips:
+              - 57.123.22.11
+              - 57.123.22.13
+    networks:
+      app_net:
+        driver: bridge
+
 ### pid
 
     pid: "host"
@@ -1054,6 +1079,15 @@ A more extended example, defining volumes and networks:
       back-tier:
         driver: bridge
 
+### Version 2.1
+
+An upgrade of [version 2](#version-2) that introduces new parameters only
+available with Docker Engine version **1.12.0+**
+
+Introduces:
+
+- [`link_local_ips`](#link_local_ips)
+- ...
 
 ### Upgrading
 
