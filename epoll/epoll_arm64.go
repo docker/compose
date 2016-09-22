@@ -1,6 +1,6 @@
 // +build linux,arm64
 
-package archutils
+package epoll
 
 // #include <sys/epoll.h>
 /*
