@@ -55,12 +55,16 @@ func (w *worker) Start() {
 			w.s.SendTask(evt)
 			continue
 		}
-		if err := w.s.monitor.MonitorOOM(t.Container); err != nil && err != runtime.ErrContainerExited {
+		oom, err := t.Container.OOM()
+		if err != nil {
+			logrus.WithField("error", err).Error("containerd: get oom FD")
+		}
+		if err := w.s.monitor.Add(oom); err != nil && err != runtime.ErrContainerExited {
 			if process.State() != runtime.Stopped {
 				logrus.WithField("error", err).Error("containerd: notify OOM events")
 			}
 		}
-		if err := w.s.monitorProcess(process); err != nil {
+		if err := w.s.monitor.Add(process); err != nil {
 			logrus.WithField("error", err).Error("containerd: add process to monitor")
 			t.Err <- err
 			evt := &DeleteTask{

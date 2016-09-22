@@ -29,7 +29,7 @@ func (s *Supervisor) addProcess(t *AddProcessTask) error {
 	if err != nil {
 		return err
 	}
-	if err := s.monitorProcess(process); err != nil {
+	if err := s.monitor.Add(process); err != nil {
 		return err
 	}
 	t.StartResponse <- StartResponse{}

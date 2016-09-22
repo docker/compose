@@ -67,7 +67,7 @@ type OOM interface {
 	io.Closer
 	FD() int
 	ContainerID() string
-	Flush()
+	Flush() error
 	Removed() bool
 }
 
@@ -692,9 +692,10 @@ func (o *oom) FD() int {
 	return o.eventfd
 }
 
-func (o *oom) Flush() {
+func (o *oom) Flush() error {
 	buf := make([]byte, 8)
-	syscall.Read(o.eventfd, buf)
+	_, err := syscall.Read(o.eventfd, buf)
+	return err
 }
 
 func (o *oom) Removed() bool {

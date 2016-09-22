@@ -1,15 +1,13 @@
 package supervisor
 
 import (
-	"encoding/json"
-	"io"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/monitor"
 	"github.com/docker/containerd/runtime"
 )
 
@@ -36,10 +34,11 @@ func New(c Config) (*Supervisor, error) {
 	if err != nil {
 		return nil, err
 	}
-	monitor, err := NewMonitor()
+	m, err := monitor.New()
 	if err != nil {
 		return nil, err
 	}
+	go m.Run()
 	s := &Supervisor{
 		config:      c,
 		containers:  make(map[string]*containerInfo),
@@ -47,106 +46,16 @@ func New(c Config) (*Supervisor, error) {
 		machine:     machine,
 		subscribers: make(map[chan Event]struct{}),
 		tasks:       make(chan Task, defaultBufferSize),
-		monitor:     monitor,
+		monitor:     m,
 	}
 	if err := setupEventLog(s, c.EventRetainCount); err != nil {
 		return nil, err
 	}
-	go s.exitHandler()
-	go s.oomHandler()
+	go s.monitorEventHandler()
 	if err := s.restore(); err != nil {
 		return nil, err
 	}
 	return s, nil
-}
-
-type containerInfo struct {
-	container runtime.Container
-}
-
-func setupEventLog(s *Supervisor, retainCount int) error {
-	if err := readEventLog(s); err != nil {
-		return err
-	}
-	logrus.WithField("count", len(s.eventLog)).Debug("containerd: read past events")
-	events := s.Events(time.Time{}, false, "")
-	return eventLogger(s, filepath.Join(s.config.StateDir, "events.log"), events, retainCount)
-}
-
-func eventLogger(s *Supervisor, path string, events chan Event, retainCount int) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-	go func() {
-		var (
-			count = len(s.eventLog)
-			enc   = json.NewEncoder(f)
-		)
-		for e := range events {
-			// if we have a specified retain count make sure the truncate the event
-			// log if it grows past the specified number of events to keep.
-			if retainCount > 0 {
-				if count > retainCount {
-					logrus.Debug("truncating event log")
-					// close the log file
-					if f != nil {
-						f.Close()
-					}
-					slice := retainCount - 1
-					l := len(s.eventLog)
-					if slice >= l {
-						slice = l
-					}
-					s.eventLock.Lock()
-					s.eventLog = s.eventLog[len(s.eventLog)-slice:]
-					s.eventLock.Unlock()
-					if f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755); err != nil {
-						logrus.WithField("error", err).Error("containerd: open event to journal")
-						continue
-					}
-					enc = json.NewEncoder(f)
-					count = 0
-					for _, le := range s.eventLog {
-						if err := enc.Encode(le); err != nil {
-							logrus.WithField("error", err).Error("containerd: write event to journal")
-						}
-					}
-				}
-			}
-			s.eventLock.Lock()
-			s.eventLog = append(s.eventLog, e)
-			s.eventLock.Unlock()
-			count++
-			if err := enc.Encode(e); err != nil {
-				logrus.WithField("error", err).Error("containerd: write event to journal")
-			}
-		}
-	}()
-	return nil
-}
-
-func readEventLog(s *Supervisor) error {
-	f, err := os.Open(filepath.Join(s.config.StateDir, "events.log"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	defer f.Close()
-	dec := json.NewDecoder(f)
-	for {
-		var e Event
-		if err := dec.Decode(&e); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		s.eventLog = append(s.eventLog, e)
-	}
-	return nil
 }
 
 // Supervisor represents a container supervisor
@@ -160,7 +69,7 @@ type Supervisor struct {
 	subscribers    map[chan Event]struct{}
 	machine        Machine
 	tasks          chan Task
-	monitor        *Monitor
+	monitor        *monitor.Monitor
 	eventLog       []Event
 	eventLock      sync.Mutex
 }
@@ -276,26 +185,37 @@ func (s *Supervisor) SendTask(evt Task) {
 	s.tasks <- evt
 }
 
-func (s *Supervisor) exitHandler() {
-	for p := range s.monitor.Exits() {
-		e := &ExitTask{
-			Process: p,
+func (s *Supervisor) monitorEventHandler() {
+	for e := range s.monitor.Events() {
+		switch t := e.(type) {
+		case runtime.Process:
+			if err := s.monitor.Remove(e); err != nil {
+				logrus.WithField("error", err).Error("containerd: remove process event FD from monitor")
+			}
+			if err := t.Close(); err != nil {
+				logrus.WithField("error", err).Error("containerd: close process event FD")
+			}
+			ev := &ExitTask{
+				Process: t,
+			}
+			s.SendTask(ev)
+		case runtime.OOM:
+			if t.Removed() {
+				if err := s.monitor.Remove(e); err != nil {
+					logrus.WithField("error", err).Error("containerd: remove oom event FD from monitor")
+				}
+				if err := t.Close(); err != nil {
+					logrus.WithField("error", err).Error("containerd: close oom event FD")
+				}
+				// don't send an event on the close of this FD
+				continue
+			}
+			ev := &OOMTask{
+				ID: t.ContainerID(),
+			}
+			s.SendTask(ev)
 		}
-		s.SendTask(e)
 	}
-}
-
-func (s *Supervisor) oomHandler() {
-	for id := range s.monitor.OOMs() {
-		e := &OOMTask{
-			ID: id,
-		}
-		s.SendTask(e)
-	}
-}
-
-func (s *Supervisor) monitorProcess(p runtime.Process) error {
-	return s.monitor.Monitor(p)
 }
 
 func (s *Supervisor) restore() error {
@@ -320,14 +240,18 @@ func (s *Supervisor) restore() error {
 		s.containers[id] = &containerInfo{
 			container: container,
 		}
-		if err := s.monitor.MonitorOOM(container); err != nil && err != runtime.ErrContainerExited {
+		oom, err := container.OOM()
+		if err != nil {
+			logrus.WithField("error", err).Error("containerd: get oom FD")
+		}
+		if err := s.monitor.Add(oom); err != nil && err != runtime.ErrContainerExited {
 			logrus.WithField("error", err).Error("containerd: notify OOM events")
 		}
 		logrus.WithField("id", id).Debug("containerd: container restored")
 		var exitedProcesses []runtime.Process
 		for _, p := range processes {
 			if p.State() == runtime.Running {
-				if err := s.monitorProcess(p); err != nil {
+				if err := s.monitor.Add(p); err != nil {
 					return err
 				}
 			} else {

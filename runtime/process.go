@@ -32,8 +32,8 @@ type Process interface {
 	Start() error
 	CloseStdin() error
 	Resize(int, int) error
-	// ExitFD returns the fd the provides an event when the process exits
-	ExitFD() int
+	// FD returns the fd the provides an event when the process exits
+	FD() int
 	// ExitStatus returns the exit status of the process or an error if it
 	// has not exited
 	ExitStatus() (uint32, error)
@@ -213,8 +213,8 @@ func (p *process) SystemPid() int {
 	return p.pid
 }
 
-// ExitFD returns the fd of the exit pipe
-func (p *process) ExitFD() int {
+// FD returns the fd of the exit pipe
+func (p *process) FD() int {
 	return int(p.exitPipe.Fd())
 }
 
