@@ -1720,3 +1720,15 @@ class CLITestCase(DockerClientTestCase):
             "BAZ=2",
         ])
         self.assertTrue(expected_env <= set(web.get('Config.Env')))
+
+    def test_images(self):
+        self.project.get_service('simple').create_container()
+        result = self.dispatch(['images'])
+        assert 'busybox' in result.stdout
+
+    def test_images_default_composefile(self):
+        self.base_dir = 'tests/fixtures/multiple-composefiles'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['images'])
+
+        self.assertIn('busybox', result.stdout)

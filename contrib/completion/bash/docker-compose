@@ -220,6 +220,16 @@ _docker_compose_help() {
 	COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
 }
 
+_docker_compose_images() {
+    case "$cur" in
+	-*)
+	    COMPREPLY=( $( compgen -W "--help -q" -- "$cur" ) )
+	    ;;
+	*)
+	    __docker_compose_services_all
+	    ;;
+    esac
+}
 
 _docker_compose_kill() {
 	case "$prev" in
