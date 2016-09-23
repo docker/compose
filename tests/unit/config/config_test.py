@@ -17,6 +17,7 @@ from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.config import V2_1
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
@@ -155,6 +156,8 @@ class ConfigTest(unittest.TestCase):
         for version in ['2', '2.0']:
             cfg = config.load(build_config_details({'version': version}))
             assert cfg.version == V2_0
+        cfg = config.load(build_config_details({'version': '2.1'}))
+        assert cfg.version == V2_1
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -182,7 +185,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
-                    {'version': '2.1'},
+                    {'version': '2.18'},
                     filename='filename.yml',
                 )
             )
@@ -343,6 +346,35 @@ class ConfigTest(unittest.TestCase):
                     }
                 }, 'working_dir', 'filename.yml')
             )
+
+    def test_load_config_link_local_ips_network(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'networks': {
+                            'foobar': {
+                                'aliases': ['foo', 'bar'],
+                                'link_local_ips': ['169.254.8.8']
+                            }
+                        }
+                    }
+                },
+                'networks': {'foobar': {}}
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file])
+        web_service = config.load(details).services[0]
+        assert web_service['networks'] == {
+            'foobar': {
+                'aliases': ['foo', 'bar'],
+                'link_local_ips': ['169.254.8.8']
+            }
+        }
 
     def test_load_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
@@ -1286,6 +1318,26 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'alpine',
                 'mem_swappiness': 10,
+            }
+        ]
+
+    def test_group_add_option(self):
+
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'group_add': ["docker", 777]
+                }
+             }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'group_add': ["docker", 777]
             }
         ]
 

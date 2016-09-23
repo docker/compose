@@ -867,6 +867,14 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.OomScoreAdj'), 500)
 
+    def test_group_add_value(self):
+        service = self.create_service('web', group_add=["root", "1"])
+        container = create_and_start_container(service)
+
+        host_container_groupadd = container.get('HostConfig.GroupAdd')
+        self.assertTrue("root" in host_container_groupadd)
+        self.assertTrue("1" in host_container_groupadd)
+
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart={
             'Name': 'on-failure',

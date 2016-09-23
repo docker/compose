@@ -6,6 +6,7 @@ from collections import namedtuple
 from itertools import cycle
 from threading import Thread
 
+from docker.errors import APIError
 from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
@@ -176,8 +177,14 @@ def build_log_generator(container, log_args):
 
 
 def wait_on_exit(container):
-    exit_code = container.wait()
-    return "%s exited with code %s\n" % (container.name, exit_code)
+    try:
+        exit_code = container.wait()
+        return "%s exited with code %s\n" % (container.name, exit_code)
+    except APIError as e:
+        return "Unexpected API error for %s (HTTP code %s)\nResponse body:\n%s\n" % (
+            container.name, e.response.status_code,
+            e.response.text or '[empty]'
+        )
 
 
 def start_producer_thread(thread_args):

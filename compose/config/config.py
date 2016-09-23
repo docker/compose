@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import functools
 import logging
-import ntpath
 import os
 import string
 import sys
@@ -15,7 +14,9 @@ from cached_property import cached_property
 
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
+from ..const import COMPOSEFILE_V2_1 as V2_1
 from ..utils import build_string_dict
+from ..utils import splitdrive
 from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
@@ -61,6 +62,7 @@ DOCKER_CONFIG_KEYS = [
     'env_file',
     'environment',
     'extra_hosts',
+    'group_add',
     'hostname',
     'image',
     'ipc',
@@ -173,7 +175,7 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '2':
             version = V2_0
 
-        if version != V2_0:
+        if version not in (V2_0, V2_1):
             raise ConfigurationError(
                 'Version in "{}" is unsupported. {}'
                 .format(self.filename, VERSION_EXPLANATION))
@@ -431,7 +433,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment,)
 
-    if config_file.version == V2_0:
+    if config_file.version in (V2_0, V2_1):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -955,13 +957,7 @@ def split_path_mapping(volume_path):
     path. Using splitdrive so windows absolute paths won't cause issues with
     splitting on ':'.
     """
-    # splitdrive is very naive, so handle special cases where we can be sure
-    # the first character is not a drive.
-    if (volume_path.startswith('.') or volume_path.startswith('~') or
-            volume_path.startswith('/')):
-        drive, volume_config = '', volume_path
-    else:
-        drive, volume_config = ntpath.splitdrive(volume_path)
+    drive, volume_config = splitdrive(volume_path)
 
     if ':' in volume_config:
         (host, container) = volume_config.split(':', 1)

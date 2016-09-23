@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v2.0.json",
+  "id": "config_schema_v2.1.json",
   "type": "object",
 
   "properties": {
@@ -35,17 +35,6 @@
       "patternProperties": {
         "^[a-zA-Z0-9._-]+$": {
           "$ref": "#/definitions/volume"
-        }
-      },
-      "additionalProperties": false
-    },
-
-    "plugins": {
-      "id": "#/properties/plugins",
-      "type": "object",
-      "patternProperties": {
-        "^[a-zA-Z0-9._-]+$": {
-          "$ref": "#/definitions/plugin"
         }
       },
       "additionalProperties": false
@@ -150,7 +139,6 @@
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
         "memswap_limit": {"type": ["number", "string"]},
-        "mem_swappiness": {"type": "integer"},
         "network_mode": {"type": "string"},
 
         "networks": {
@@ -166,7 +154,8 @@
                       "properties": {
                         "aliases": {"$ref": "#/definitions/list_of_strings"},
                         "ipv4_address": {"type": "string"},
-                        "ipv6_address": {"type": "string"}
+                        "ipv6_address": {"type": "string"},
+                        "link_local_ips": {"$ref": "#/definitions/list_of_strings"}
                       },
                       "additionalProperties": false
                     },
@@ -177,14 +166,6 @@
               "additionalProperties": false
             }
           ]
-        },
-        "oom_score_adj": {"type": "integer", "minimum": -1000, "maximum": 1000},
-        "group_add": {
-            "type": "array",
-            "items": {
-                "type": ["string", "number"]
-            },
-            "uniqueItems": true
         },
         "pid": {"type": ["string", "null"]},
 
@@ -265,8 +246,7 @@
             "name": {"type": "string"}
           },
           "additionalProperties": false
-        },
-        "internal": {"type": "boolean"}
+        }
       },
       "additionalProperties": false
     },
@@ -332,19 +312,6 @@
           "build": {
             "required": ["context"]
           }
-        }
-      }
-    },
-
-    "plugin": {
-      "id": "#/definitions/plugin",
-      "type": "object",
-      "properties": {
-        "version": {
-          "type": "string"
-        },
-        "options": {
-          "$ref": "#/definitions/list_or_dict"
         }
       }
     }

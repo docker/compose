@@ -48,6 +48,7 @@ DOCKER_START_KEYS = [
     'dns_search',
     'env_file',
     'extra_hosts',
+    'group_add',
     'ipc',
     'read_only',
     'log_driver',
@@ -477,7 +478,9 @@ class Service(object):
                 aliases=self._get_aliases(netdefs, container),
                 ipv4_address=netdefs.get('ipv4_address', None),
                 ipv6_address=netdefs.get('ipv6_address', None),
-                links=self._get_links(False))
+                links=self._get_links(False),
+                link_local_ips=netdefs.get('link_local_ips', None),
+            )
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
@@ -706,7 +709,8 @@ class Service(object):
             shm_size=options.get('shm_size'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
-            mem_swappiness=options.get('mem_swappiness')
+            mem_swappiness=options.get('mem_swappiness'),
+            group_add=options.get('group_add')
         )
 
     def build(self, no_cache=False, pull=False, force_rm=False):
