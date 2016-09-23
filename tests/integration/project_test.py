@@ -778,7 +778,8 @@ class ProjectTest(DockerClientTestCase):
             volumes={},
             networks={
                 'linklocaltest': {'driver': 'bridge'}
-            }
+            },
+            plugins=None,
         )
         project = Project.from_config(
             client=self.client,
