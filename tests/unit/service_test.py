@@ -495,6 +495,25 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(self.mock_client.build.call_count, 1)
         self.assertFalse(self.mock_client.build.call_args[1]['pull'])
 
+    def test_build_with_override_build_args(self):
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        build_args = [
+            'arg1=arg1_new_value',
+            'arg2=arg2_value'
+        ]
+        service = Service('foo', client=self.mock_client,
+                          build={'context': '.', 'args': {'arg1': 'arg1', 'arg2': 'arg2'}})
+        service.build(build_args=build_args)
+
+        called_build_args = self.mock_client.build.call_args[1]['buildargs']
+
+        for arg in called_build_args:
+            if "arg1=" in arg:
+                self.assertEquals(arg, 'arg1=arg1_new_value')
+
     def test_config_dict(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         service = Service(

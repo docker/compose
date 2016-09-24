@@ -546,6 +546,12 @@ def resolve_environment(service_dict, environment=None):
     return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))
 
 
+def merge_build_args(base, override, environment):
+    override_args = parse_build_arguments(override)
+    override_dict = dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(override_args))
+    base.update(override_dict)
+
+
 def resolve_build_args(build, environment):
     args = parse_build_arguments(build.get('args'))
     return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(args))
