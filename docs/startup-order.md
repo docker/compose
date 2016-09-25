@@ -50,7 +50,7 @@ script:
               - "80:8000"
             depends_on:
               - "db"
-            entrypoint: ./wait-for-it.sh db:5432
+            entrypoint: ./wait-for-it.sh db:5432 --  # -- is important
           db:
             image: postgres
 
