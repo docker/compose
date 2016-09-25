@@ -653,7 +653,7 @@ Example usage:
 Sets the PID mode to the host PID mode.  This turns on sharing between
 container and the host operating system the PID address space.  Containers
 launched with this flag will be able to access and manipulate other
-containers in the bare-metal machine's namespace and vise-versa.
+containers in the bare-metal machine's namespace and vice versa.
 
 ### ports
 
