@@ -7,6 +7,7 @@ import functools
 import json
 import logging
 import re
+import subprocess
 import sys
 from inspect import getdoc
 from operator import attrgetter
@@ -406,17 +407,34 @@ class TopLevelCommand(object):
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
 
-        if IS_WINDOWS_PLATFORM and not detach:
-            raise UserError(
-                "Interactive mode is not yet supported on Windows.\n"
-                "Please pass the -d flag when using `docker-compose exec`."
-            )
         try:
             container = service.get_container(number=index)
         except ValueError as e:
             raise UserError(str(e))
         command = [options['COMMAND']] + options['ARGS']
         tty = not options["-T"]
+
+        if IS_WINDOWS_PLATFORM and not detach:
+            args = ["docker", "exec"]
+
+            if options["-d"]:
+                args += ["--detach"]
+            else:
+                args += ["--interactive"]
+
+            if not options["-T"]:
+                args += ["--tty"]
+
+            if options["--privileged"]:
+                args += ["--privileged"]
+
+            if options["--user"]:
+                args += ["--user", options["--user"]]
+
+            args += [container.id]
+            args += command
+
+            sys.exit(subprocess.call(args))
 
         create_exec_options = {
             "privileged": options["--privileged"],
@@ -674,12 +692,6 @@ class TopLevelCommand(object):
         """
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
-
-        if IS_WINDOWS_PLATFORM and not detach:
-            raise UserError(
-                "Interactive mode is not yet supported on Windows.\n"
-                "Please pass the -d flag when using `docker-compose run`."
-            )
 
         if options['--publish'] and options['--service-ports']:
             raise UserError(
@@ -969,17 +981,21 @@ def run_one_off_container(container_options, project, service, options):
     signals.set_signal_handler_to_shutdown()
     try:
         try:
-            operation = RunOperation(
-                project.client,
-                container.id,
-                interactive=not options['-T'],
-                logs=False,
-            )
-            pty = PseudoTerminal(project.client, operation)
-            sockets = pty.sockets()
-            service.start_container(container)
-            pty.start(sockets)
-            exit_code = container.wait()
+            if IS_WINDOWS_PLATFORM:
+                args = ["docker", "start", "--attach", "--interactive", container.id]
+                exit_code = subprocess.call(args)
+            else:
+                operation = RunOperation(
+                    project.client,
+                    container.id,
+                    interactive=not options['-T'],
+                    logs=False,
+                )
+                pty = PseudoTerminal(project.client, operation)
+                sockets = pty.sockets()
+                service.start_container(container)
+                pty.start(sockets)
+                exit_code = container.wait()
         except signals.ShutdownException:
             project.client.stop(container.id)
             exit_code = 1
