@@ -1,4 +1,4 @@
-package containerd
+package containerkit
 
 // Mount is the lingua franca of the containerkit. A mount represents a
 // serialized mount syscall. Components either emit or consume mounts.
