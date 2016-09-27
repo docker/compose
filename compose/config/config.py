@@ -361,6 +361,9 @@ def load_mapping(config_files, get_func, entity_type):
                     config['driver_opts']
                 )
 
+            if 'labels' in config:
+                config['labels'] = parse_labels(config['labels'])
+
     return mapping
 
 

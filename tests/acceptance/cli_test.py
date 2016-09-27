@@ -22,6 +22,7 @@ from compose.project import OneOffFilter
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
+from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 
 
@@ -766,6 +767,46 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['-f', filename, 'up', '-d'])
         container = self.project.containers()[0]
         assert list(container.get('NetworkSettings.Networks')) == [network_name]
+
+    @v2_1_only()
+    def test_up_with_network_labels(self):
+        filename = 'network-label.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], returncode=0)
+
+        network_with_label = '{}_network_with_label'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        assert [n['Name'] for n in networks] == [network_with_label]
+
+        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+
+    @v2_1_only()
+    def test_up_with_volume_labels(self):
+        filename = 'volume-label.yml'
+
+        self.base_dir = 'tests/fixtures/volumes'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], returncode=0)
+
+        volume_with_label = '{}_volume_with_label'.format(self.project.name)
+
+        volumes = [
+            v for v in self.client.volumes().get('Volumes', [])
+            if v['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        assert [v['Name'] for v in volumes] == [volume_with_label]
+
+        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
 
     @v2_only()
     def test_up_no_services(self):

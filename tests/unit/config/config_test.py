@@ -376,6 +376,59 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_load_config_volume_and_network_labels(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                    },
+                },
+                'networks': {
+                    'with_label': {
+                        'labels': {
+                            'label_key': 'label_val'
+                        }
+                    }
+                },
+                'volumes': {
+                    'with_label': {
+                        'labels': {
+                            'label_key': 'label_val'
+                        }
+                    }
+                }
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file])
+        network_dict = config.load(details).networks
+        volume_dict = config.load(details).volumes
+
+        self.assertEqual(
+            network_dict,
+            {
+                'with_label': {
+                    'labels': {
+                        'label_key': 'label_val'
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(
+            volume_dict,
+            {
+                'with_label': {
+                    'labels': {
+                        'label_key': 'label_val'
+                    }
+                }
+            }
+        )
+
     def test_load_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:

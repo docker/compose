@@ -821,6 +821,42 @@ class ProjectTest(DockerClientTestCase):
 
         assert network['Internal'] is True
 
+    @v2_1_only()
+    def test_project_up_with_network_label(self):
+        self.require_api_version('1.23')
+
+        network_name = 'network_with_label'
+
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {network_name: None}
+            }],
+            volumes={},
+            networks={
+                network_name: {'labels': {'label_key': 'label_val'}}
+            }
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+
+        project.up()
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('composetest_')
+        ]
+
+        assert [n['Name'] for n in networks] == ['composetest_{}'.format(network_name)]
+
+        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+
     @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
@@ -846,6 +882,46 @@ class ProjectTest(DockerClientTestCase):
         volume_data = self.client.inspect_volume(full_vol_name)
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
+
+    @v2_1_only()
+    def test_project_up_with_volume_labels(self):
+        self.require_api_version('1.23')
+
+        volume_name = 'volume_with_label'
+
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'volumes': [VolumeSpec.parse('{}:/data'.format(volume_name))]
+            }],
+            volumes={
+                volume_name: {
+                    'labels': {
+                        'label_key': 'label_val'
+                    }
+                }
+            },
+            networks={},
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+
+        project.up()
+
+        volumes = [
+            v for v in self.client.volumes().get('Volumes', [])
+            if v['Name'].startswith('composetest_')
+        ]
+
+        assert [v['Name'] for v in volumes] == ['composetest_{}'.format(volume_name)]
+
+        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
 
     @v2_only()
     def test_project_up_logging_with_multiple_files(self):
