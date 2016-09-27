@@ -1,6 +1,13 @@
 package containerkit
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 var (
 	errNotImplemented = errors.New("not implemented")
@@ -96,7 +103,34 @@ var (
 // 	work, err := lm.Prepare(dst, parent)
 //  mountAll(work.Mounts())
 // 	work.Commit() || work.Rollback()
-type LayerManipulator struct{}
+//
+// TODO(stevvooe): LayerManipulator should be an interface with several
+// implementations, similar to graphdriver.
+type LayerManipulator struct {
+	root string // root provides paths for internal storage.
+
+	// just a simple overlay implementation.
+	active  map[string]activeLayer
+	parents map[string]string // diff to parent for all committed
+}
+
+type activeLayer struct {
+	parent   string
+	upperdir string
+	workdir  string
+}
+
+func NewLayerManipulator(root string) (*LayerManipulator, error) {
+	if err := os.MkdirAll(root, 0777); err != nil {
+		return nil, err
+	}
+
+	return &LayerManipulator{
+		root:    root,
+		active:  make(map[string]activeLayer),
+		parents: make(map[string]string),
+	}, nil
+}
 
 // Prepare returns a set of mounts such that dst can be used as a location for
 // reading and writing data. If parent is provided, the dst will be setup to
@@ -111,7 +145,61 @@ type LayerManipulator struct{}
 // Once the writes have completed, LayerManipulator.Commit or
 // LayerManipulator.Rollback should be called on dst.
 func (lm *LayerManipulator) Prepare(dst, parent string) ([]Mount, error) {
-	return nil, errNotImplemented
+	// we want to build up lowerdir, upperdir and workdir options for the
+	// overlay mount.
+	//
+	// lowerdir is a list of parent diffs, ordered from top to bottom (base
+	// layer to the "right").
+	//
+	// upperdir will become the diff location. This will be renamed to the
+	// location provided in commit.
+	//
+	// workdir needs to be there but it is not really clear why.
+	var opts []string
+
+	upperdir, err := ioutil.TempDir(lm.root, "diff-")
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, "upperdir="+upperdir)
+
+	workdir, err := ioutil.TempDir(lm.root, "work-")
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, "workdir="+workdir)
+
+	empty := filepath.Join(lm.root, "empty")
+	if err := os.MkdirAll(empty, 0777); err != nil {
+		return nil, err
+	}
+
+	lm.active[dst] = activeLayer{
+		parent:   parent,
+		upperdir: upperdir,
+		workdir:  workdir,
+	}
+
+	var parents []string
+	for parent != "" {
+		parents = append(parents, parent)
+		parent = lm.Parent(parent)
+	}
+
+	if len(parents) == 0 {
+		parents = []string{empty}
+	}
+
+	opts = append(opts, "lowerdir="+strings.Join(parents, ","))
+
+	return []Mount{
+		{
+			Type:    "overlay",
+			Source:  "none",
+			Target:  dst,
+			Options: opts,
+		},
+	}, nil
 }
 
 // Commit captures the changes between dst and its parent into the path
@@ -121,17 +209,48 @@ func (lm *LayerManipulator) Prepare(dst, parent string) ([]Mount, error) {
 // The contents of diff are opaque to the caller and may be specific to the
 // implementation of the layer backend.
 func (lm *LayerManipulator) Commit(diff, dst string) error {
-	return errNotImplemented
+	active, ok := lm.active[dst]
+	if !ok {
+		return fmt.Errorf("%q must be an active layer", dst)
+	}
+
+	// move upperdir into the diff dir
+	if err := os.Rename(active.upperdir, diff); err != nil {
+		return err
+	}
+
+	// Clean up the working directory; we may not want to do this if we want to
+	// support re-entrant calls to Commit.
+	if err := os.RemoveAll(active.workdir); err != nil {
+		return err
+	}
+
+	lm.parents[diff] = active.parent
+	delete(lm.active, dst) // remove from active, again, consider not doing this to support multiple commits.
+	// note that allowing multiple commits would require copy for overlay.
+
+	return nil
 }
 
 // Rollback can be called after prepare if the caller would like to abandon the
 // changeset.
 func (lm *LayerManipulator) Rollback(dst string) error {
-	return errNotImplemented
+	active, ok := lm.active[dst]
+	if !ok {
+		return fmt.Errorf("%q must be an active layer", dst)
+	}
+
+	var err error
+	err = os.RemoveAll(active.upperdir)
+	err = os.RemoveAll(active.workdir)
+
+	delete(lm.active, dst)
+	return err
 }
 
+// Parent returns the parent of the layer at diff.
 func (lm *LayerManipulator) Parent(diff string) string {
-	return ""
+	return lm.parents[diff]
 }
 
 type ChangeKind int
