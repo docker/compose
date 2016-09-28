@@ -13,19 +13,21 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-var RWM = "rwm"
-
-// "Hooks do optional work. Drivers do mandatory work"
-func main() {
-	if err := osutils.SetSubreaper(1); err != nil {
-		logrus.Fatal(err)
-	}
-	if err := runTest(); err != nil {
-		logrus.Fatal(err)
+// this demos how the graph/layer subsystem will create the rootfs and
+// provide it to the container, the Mount type ties the execution and
+// filesystem layers together
+func getContainerRootfs() containerkit.Mount {
+	return containerkit.Mount{
+		Type:   "bind",
+		Source: "/containers/redis/rootfs",
+		Options: []string{
+			"rbind",
+			"rw",
+		},
 	}
 }
 
-func runTest() error {
+func runContainer() error {
 	// create a new runc runtime that implements the ExecutionDriver interface
 	driver, err := runc.New("/run/runc", "/tmp/runc")
 	if err != nil {
@@ -35,16 +37,9 @@ func runTest() error {
 	container, err := containerkit.NewContainer(
 		"/var/lib/containerkit", /* container root */
 		"test",                  /* container id */
-		containerkit.Mount{
-			Type:   "bind",
-			Source: "/containers/redis/rootfs",
-			Options: []string{
-				"rbind",
-				"rw",
-			},
-		}, /* mount from the graph subsystem for the container */
-		spec("test"), /* the spec for the container */
-		driver,       /* the exec driver to use for the container */
+		getContainerRootfs(),    /* mount from the graph subsystem for the container */
+		spec("test"),            /* the spec for the container */
+		driver,                  /* the exec driver to use for the container */
 	)
 	if err != nil {
 		return err
@@ -66,36 +61,27 @@ func runTest() error {
 		return err
 	}
 
+	// start 10 exec processes giving the go var i to exec to stdout
 	for i := 0; i < 10; i++ {
 		process, err := container.NewProcess(&specs.Process{
 			Args: []string{
 				"echo", fmt.Sprintf("sup from itteration %d", i),
 			},
-			Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+			Env:             env,
 			Terminal:        false,
 			Cwd:             "/",
 			NoNewPrivileges: true,
-			Capabilities: []string{
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_FOWNER",
-				"CAP_CHOWN",
-				"CAP_MKNOD",
-				"CAP_FSETID",
-				"CAP_DAC_OVERRIDE",
-				"CAP_SETFCAP",
-				"CAP_SETPCAP",
-				"CAP_SETGID",
-				"CAP_SETUID",
-				"CAP_NET_BIND_SERVICE",
-			},
+			Capabilities:    caps,
 		})
+
 		process.Stdin = os.Stdin
 		process.Stdout = os.Stdout
 		process.Stderr = os.Stderr
+
 		if err := process.Start(); err != nil {
 			return err
 		}
+
 		procStatus, err := process.Wait()
 		if err != nil {
 			return err
@@ -119,6 +105,37 @@ func runTest() error {
 	return nil
 }
 
+// "Hooks do optional work. Drivers do mandatory work"
+func main() {
+	if err := osutils.SetSubreaper(1); err != nil {
+		logrus.Fatal(err)
+	}
+	if err := runContainer(); err != nil {
+		logrus.Fatal(err)
+	}
+}
+
+var (
+	RWM  = "rwm"
+	caps = []string{
+		"CAP_AUDIT_WRITE",
+		"CAP_KILL",
+		"CAP_FOWNER",
+		"CAP_CHOWN",
+		"CAP_MKNOD",
+		"CAP_FSETID",
+		"CAP_DAC_OVERRIDE",
+		"CAP_SETFCAP",
+		"CAP_SETPCAP",
+		"CAP_SETGID",
+		"CAP_SETUID",
+		"CAP_NET_BIND_SERVICE",
+	}
+	env = []string{
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+)
+
 // bla bla bla spec stuff
 func spec(id string) *specs.Spec {
 	cgpath := filepath.Join("/containerkit", id)
@@ -133,25 +150,12 @@ func spec(id string) *specs.Spec {
 			Readonly: false,
 		},
 		Process: specs.Process{
-			Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+			Env:             env,
 			Args:            []string{"sleep", "10"},
 			Terminal:        false,
 			Cwd:             "/",
 			NoNewPrivileges: true,
-			Capabilities: []string{
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_FOWNER",
-				"CAP_CHOWN",
-				"CAP_MKNOD",
-				"CAP_FSETID",
-				"CAP_DAC_OVERRIDE",
-				"CAP_SETFCAP",
-				"CAP_SETPCAP",
-				"CAP_SETGID",
-				"CAP_SETUID",
-				"CAP_NET_BIND_SERVICE",
-			},
+			Capabilities:    caps,
 		},
 		Hostname: "containerkit",
 		Mounts: []specs.Mount{
