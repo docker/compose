@@ -60,14 +60,6 @@ class DockerClientTestCase(unittest.TestCase):
         )
         self.assertEqual(client.headers['User-Agent'], expected)
 
-    @mock.patch.dict(os.environ)
-    def test_docker_client_default_windows_host(self):
-        with mock.patch('compose.cli.docker_client.IS_WINDOWS_PLATFORM', True):
-            if 'DOCKER_HOST' in os.environ:
-                del os.environ['DOCKER_HOST']
-            client = docker_client(os.environ)
-            assert client.base_url == 'http://127.0.0.1:2375'
-
 
 class TLSConfigTestCase(unittest.TestCase):
     ca_cert = 'tests/fixtures/tls/ca.pem'
