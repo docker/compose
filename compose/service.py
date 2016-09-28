@@ -682,7 +682,7 @@ class Service(object):
         logging_dict = options.get('logging', None)
         log_config = get_log_config(logging_dict)
 
-        return self.client.create_host_config(
+        host_config = self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=build_port_bindings(options.get('ports') or []),
             binds=options.get('binds'),
@@ -712,6 +712,12 @@ class Service(object):
             mem_swappiness=options.get('mem_swappiness'),
             group_add=options.get('group_add')
         )
+
+        # TODO: Add as an argument to create_host_config once it's supported
+        # in docker-py
+        host_config['Isolation'] = options.get('isolation')
+
+        return host_config
 
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
