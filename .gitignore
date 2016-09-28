@@ -1,4 +1,5 @@
 *.exe
+main
 /containerd/containerd
 /containerd-shim/containerd-shim
 /bin/

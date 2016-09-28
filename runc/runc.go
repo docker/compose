@@ -66,8 +66,11 @@ func (r *Runc) Exec(c *containerkit.Container, p *containerkit.Process) (contain
 	if err != nil {
 		return nil, err
 	}
-	cmd := r.command("exec", "--process", path, "--pid-file", pidFile, c.ID())
+	cmd := r.command("exec", "--detach", "--process", path, "--pid-file", pidFile, c.ID())
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = p.Stdin, p.Stdout, p.Stderr
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
 	data, err := ioutil.ReadFile(pidFile)
 	if err != nil {
 		return nil, err

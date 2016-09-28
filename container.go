@@ -100,9 +100,10 @@ func (c *Container) NewProcess(spec *specs.Process) (*Process, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	process := &Process{
-		s:    spec,
-		c:    c,
-		exec: true,
+		s:      spec,
+		c:      c,
+		exec:   true,
+		driver: c.driver,
 	}
 	c.processes = append(c.processes, process)
 	return process, nil
@@ -123,8 +124,9 @@ func (c *Container) Pid() int {
 // Wait will perform a blocking wait on the init process of the container
 func (c *Container) Wait() (uint32, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.init.Wait()
+	proc := c.init
+	c.mu.Unlock()
+	return proc.Wait()
 }
 
 // Signal will send the provided signal to the init process of the container

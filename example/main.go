@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -63,6 +64,43 @@ func runTest() error {
 	logrus.Info("start container")
 	if err := container.Start(); err != nil {
 		return err
+	}
+
+	for i := 0; i < 10; i++ {
+		process, err := container.NewProcess(&specs.Process{
+			Args: []string{
+				"echo", fmt.Sprintf("sup from itteration %d", i),
+			},
+			Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+			Terminal:        false,
+			Cwd:             "/",
+			NoNewPrivileges: true,
+			Capabilities: []string{
+				"CAP_AUDIT_WRITE",
+				"CAP_KILL",
+				"CAP_FOWNER",
+				"CAP_CHOWN",
+				"CAP_MKNOD",
+				"CAP_FSETID",
+				"CAP_DAC_OVERRIDE",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_NET_BIND_SERVICE",
+			},
+		})
+		process.Stdin = os.Stdin
+		process.Stdout = os.Stdout
+		process.Stderr = os.Stderr
+		if err := process.Start(); err != nil {
+			return err
+		}
+		procStatus, err := process.Wait()
+		if err != nil {
+			return err
+		}
+		logrus.Infof("process %d returned with %d", i, procStatus)
 	}
 
 	// wait for it to exit and get the exit status
