@@ -721,6 +721,51 @@ class ProjectTest(DockerClientTestCase):
         assert IPAMConfig.get('IPv4Address') == '172.16.100.100'
         assert IPAMConfig.get('IPv6Address') == 'fe80::1001:102'
 
+    @v2_1_only()
+    def test_up_with_enable_ipv6(self):
+        self.require_api_version('1.23')
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top',
+                'networks': {
+                    'static_test': {
+                        'ipv6_address': 'fe80::1001:102'
+                    }
+                },
+            }],
+            volumes={},
+            networks={
+                'static_test': {
+                    'driver': 'bridge',
+                    'enable_ipv6': True,
+                    'ipam': {
+                        'driver': 'default',
+                        'config': [
+                            {"subnet": "fe80::/64",
+                             "gateway": "fe80::1001:1"}
+                        ]
+                    }
+                }
+            }
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up(detached=True)
+        network = self.client.networks(names=['static_test'])[0]
+        service_container = project.get_service('web').containers()[0]
+
+        assert network['EnableIPv6'] is True
+        ipam_config = (service_container.inspect().get('NetworkSettings', {}).
+                       get('Networks', {}).get('composetest_static_test', {}).
+                       get('IPAMConfig', {}))
+        assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
+
     @v2_only()
     def test_up_with_network_static_addresses_missing_subnet(self):
         config_data = config.Config(
