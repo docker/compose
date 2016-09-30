@@ -9,18 +9,27 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/docker/containerkit"
 )
 
-func New(root, name, log string) (*OCIRuntime, error) {
-	if err := os.MkdirAll(root, 0711); err != nil {
+type Opts struct {
+	Name    string
+	Root    string
+	Args    []string
+	LogFile string
+}
+
+func New(opts Opts) (*OCIRuntime, error) {
+	if err := os.MkdirAll(opts.Root, 0711); err != nil {
 		return nil, err
 	}
 	return &OCIRuntime{
-		root: root,
-		log:  log,
-		name: name,
+		root: opts.Root,
+		log:  opts.LogFile,
+		name: opts.Name,
+		args: opts.Args,
 	}, nil
 }
 
@@ -32,6 +41,8 @@ type OCIRuntime struct {
 	name string
 	// log is the path to the log files for the containers
 	log string
+	// args specifies additional arguments to the OCI runtime
+	args []string
 }
 
 func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {
@@ -88,11 +99,34 @@ func (r *OCIRuntime) Exec(c *containerkit.Container, p *containerkit.Process) (c
 	return newProcess(i)
 }
 
+type state struct {
+	ID          string            `json:"id"`
+	Pid         int               `json:"pid"`
+	Status      string            `json:"status"`
+	Bundle      string            `json:"bundle"`
+	Rootfs      string            `json:"rootfs"`
+	Created     time.Time         `json:"created"`
+	Annotations map[string]string `json:"annotations"`
+}
+
+func (r *OCIRuntime) Load(id string) (containerkit.ProcessDelegate, error) {
+	data, err := r.command("state", id).Output()
+	if err != nil {
+		return nil, err
+	}
+	var s state
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+	return newProcess(s.Pid)
+}
+
 func (r *OCIRuntime) command(args ...string) *exec.Cmd {
-	return exec.Command(r.name, append([]string{
+	baseArgs := append([]string{
 		"--root", r.root,
 		"--log", r.log,
-	}, args...)...)
+	}, r.args...)
+	return exec.Command(r.name, append(baseArgs, args...)...)
 }
 
 func newProcess(pid int) (*process, error) {

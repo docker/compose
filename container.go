@@ -42,6 +42,43 @@ func NewContainer(root, id string, m Mount, s *specs.Spec, driver ExecutionDrive
 	}, nil
 }
 
+func LoadContainer(root, id string, driver ExecutionDriver) (*Container, error) {
+	path := filepath.Join(root, id)
+	spec, err := loadSpec(path)
+	if err != nil {
+		return nil, err
+	}
+	process, err := driver.Load(id)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: load exec processes
+	return &Container{
+		id:     id,
+		path:   path,
+		s:      spec,
+		driver: driver,
+		init: &Process{
+			d:      process,
+			driver: driver,
+		},
+	}, nil
+}
+
+func loadSpec(path string) (*specs.Spec, error) {
+	f, err := os.Open(filepath.Join(path, "config.json"))
+	if err != nil {
+		return nil, err
+	}
+	var s specs.Spec
+	err = json.NewDecoder(f).Decode(&s)
+	f.Close()
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 type Container struct {
 	mu   sync.Mutex
 	id   string

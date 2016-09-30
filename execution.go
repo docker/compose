@@ -11,4 +11,5 @@ type ExecutionDriver interface {
 	Start(*Container) error
 	Delete(*Container) error
 	Exec(*Container, *Process) (ProcessDelegate, error)
+	Load(id string) (ProcessDelegate, error)
 }

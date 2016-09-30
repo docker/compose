@@ -29,7 +29,11 @@ func getContainerRootfs() containerkit.Mount {
 
 func runContainer() error {
 	// create a new runc runtime that implements the ExecutionDriver interface
-	driver, err := oci.New("/run/runc", "runc", "/tmp/runc")
+	driver, err := oci.New(oci.Opts{
+		Root:    "/run/runc",
+		Name:    "runc",
+		LogFile: "/tmp/runc",
+	})
 	if err != nil {
 		return err
 	}
@@ -87,6 +91,15 @@ func runContainer() error {
 			return err
 		}
 		logrus.Infof("process %d returned with %d", i, procStatus)
+	}
+
+	container, err = containerkit.LoadContainer(
+		"/var/lib/containerkit", /* container root */
+		"test",                  /* container id */
+		driver,                  /* the exec driver to use for the container */
+	)
+	if err != nil {
+		return err
 	}
 
 	// wait for it to exit and get the exit status
@@ -151,7 +164,7 @@ func spec(id string) *specs.Spec {
 		},
 		Process: specs.Process{
 			Env:             env,
-			Args:            []string{"sleep", "10"},
+			Args:            []string{"sleep", "30"},
 			Terminal:        false,
 			Cwd:             "/",
 			NoNewPrivileges: true,
