@@ -8,8 +8,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerkit"
+	"github.com/docker/containerkit/oci"
 	"github.com/docker/containerkit/osutils"
-	"github.com/docker/containerkit/runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -29,7 +29,7 @@ func getContainerRootfs() containerkit.Mount {
 
 func runContainer() error {
 	// create a new runc runtime that implements the ExecutionDriver interface
-	driver, err := runc.New("/run/runc", "/tmp/runc")
+	driver, err := oci.New("/run/runc", "runc", "/tmp/runc")
 	if err != nil {
 		return err
 	}
