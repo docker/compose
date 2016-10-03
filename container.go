@@ -10,20 +10,34 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func NewContainer(root, id string, m Mount, s *specs.Spec, driver ExecutionDriver) (*Container, error) {
-	path := filepath.Join(root, id)
+type ContainerConfig interface {
+	ID() string
+	Root() string
+	Spec(*Mount) (*specs.Spec, error)
+}
+
+type GraphDriver interface {
+	Mount(id string) (*Mount, error)
+}
+
+func NewContainer(config ContainerConfig, graph GraphDriver, exec ExecutionDriver) (*Container, error) {
+	var (
+		id   = config.ID()
+		root = config.Root()
+		path = filepath.Join(root, id)
+	)
+	mount, err := graph.Mount(id)
+	if err != nil {
+		return nil, err
+	}
+	s, err := config.Spec(mount)
+	if err != nil {
+		return nil, err
+	}
+	// HACK: for runc to allow to use this path without a premounted rootfs
 	if err := os.MkdirAll(filepath.Join(path, s.Root.Path), 0711); err != nil {
 		return nil, err
 	}
-	// FIXME: find a better UI for this
-	s.Mounts = append([]specs.Mount{
-		{
-			Type:        m.Type,
-			Source:      m.Source,
-			Destination: "/",
-			Options:     m.Options,
-		},
-	}, s.Mounts...)
 	f, err := os.Create(filepath.Join(path, "config.json"))
 	if err != nil {
 		return nil, err
@@ -38,17 +52,21 @@ func NewContainer(root, id string, m Mount, s *specs.Spec, driver ExecutionDrive
 		id:     id,
 		path:   path,
 		s:      s,
-		driver: driver,
+		driver: exec,
 	}, nil
 }
 
-func LoadContainer(root, id string, driver ExecutionDriver) (*Container, error) {
-	path := filepath.Join(root, id)
+func LoadContainer(config ContainerConfig, exec ExecutionDriver) (*Container, error) {
+	var (
+		id   = config.ID()
+		root = config.Root()
+		path = filepath.Join(root, id)
+	)
 	spec, err := loadSpec(path)
 	if err != nil {
 		return nil, err
 	}
-	process, err := driver.Load(id)
+	process, err := exec.Load(id)
 	if err != nil {
 		return nil, err
 	}
@@ -57,10 +75,10 @@ func LoadContainer(root, id string, driver ExecutionDriver) (*Container, error) 
 		id:     id,
 		path:   path,
 		s:      spec,
-		driver: driver,
+		driver: exec,
 		init: &Process{
 			d:      process,
-			driver: driver,
+			driver: exec,
 		},
 	}, nil
 }
