@@ -120,6 +120,9 @@ func (c *Container) Create() error {
 	c.init = &Process{
 		d:      d,
 		driver: c.driver,
+		Stdin:  c.Stdin,
+		Stdout: c.Stdout,
+		Stderr: c.Stderr,
 	}
 	return nil
 }

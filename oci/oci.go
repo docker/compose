@@ -8,17 +8,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/docker/containerkit"
 )
 
 type Opts struct {
-	Name    string
-	Root    string
-	Args    []string
-	LogFile string
+	Name string
+	Root string
+	Args []string
 }
 
 func New(opts Opts) (*OCIRuntime, error) {
@@ -27,7 +25,6 @@ func New(opts Opts) (*OCIRuntime, error) {
 	}
 	return &OCIRuntime{
 		root: opts.Root,
-		log:  opts.LogFile,
 		name: opts.Name,
 		args: opts.Args,
 	}, nil
@@ -39,15 +36,17 @@ type OCIRuntime struct {
 	root string
 	// name is the name of the runtime, i.e. runc
 	name string
-	// log is the path to the log files for the containers
-	log string
 	// args specifies additional arguments to the OCI runtime
 	args []string
 }
 
+func (r *OCIRuntime) Name() string {
+	return r.name
+}
+
 func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {
 	pidFile := fmt.Sprintf("%s/%s.pid", filepath.Join(r.root, c.ID()), "init")
-	cmd := r.command("create", "--pid-file", pidFile, "--bundle", c.Path(), c.ID())
+	cmd := r.Command("create", "--pid-file", pidFile, "--bundle", c.Path(), c.ID())
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, c.Stdout, c.Stderr
 	if err := cmd.Run(); err != nil {
 		return nil, err
@@ -64,11 +63,11 @@ func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDele
 }
 
 func (r *OCIRuntime) Start(c *containerkit.Container) error {
-	return r.command("start", c.ID()).Run()
+	return r.Command("start", c.ID()).Run()
 }
 
 func (r *OCIRuntime) Delete(c *containerkit.Container) error {
-	return r.command("delete", c.ID()).Run()
+	return r.Command("delete", c.ID()).Run()
 }
 
 func (r *OCIRuntime) Exec(c *containerkit.Container, p *containerkit.Process) (containerkit.ProcessDelegate, error) {
@@ -83,7 +82,7 @@ func (r *OCIRuntime) Exec(c *containerkit.Container, p *containerkit.Process) (c
 	if err != nil {
 		return nil, err
 	}
-	cmd := r.command("exec", "--detach", "--process", path, "--pid-file", pidFile, c.ID())
+	cmd := r.Command("exec", "--detach", "--process", path, "--pid-file", pidFile, c.ID())
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = p.Stdin, p.Stdout, p.Stderr
 	if err := cmd.Run(); err != nil {
 		return nil, err
@@ -110,7 +109,7 @@ type state struct {
 }
 
 func (r *OCIRuntime) Load(id string) (containerkit.ProcessDelegate, error) {
-	data, err := r.command("state", id).Output()
+	data, err := r.Command("state", id).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -121,40 +120,9 @@ func (r *OCIRuntime) Load(id string) (containerkit.ProcessDelegate, error) {
 	return newProcess(s.Pid)
 }
 
-func (r *OCIRuntime) command(args ...string) *exec.Cmd {
+func (r *OCIRuntime) Command(args ...string) *exec.Cmd {
 	baseArgs := append([]string{
 		"--root", r.root,
-		"--log", r.log,
 	}, r.args...)
 	return exec.Command(r.name, append(baseArgs, args...)...)
-}
-
-func newProcess(pid int) (*process, error) {
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return nil, err
-	}
-	return &process{
-		proc: proc,
-	}, nil
-}
-
-type process struct {
-	proc *os.Process
-}
-
-func (p *process) Pid() int {
-	return p.proc.Pid
-}
-
-func (p *process) Wait() (uint32, error) {
-	state, err := p.proc.Wait()
-	if err != nil {
-		return 0, nil
-	}
-	return uint32(state.Sys().(syscall.WaitStatus).ExitStatus()), nil
-}
-
-func (p *process) Signal(s os.Signal) error {
-	return p.proc.Signal(s)
 }

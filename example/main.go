@@ -30,9 +30,8 @@ func getContainerRootfs() containerkit.Mount {
 func runContainer() error {
 	// create a new runc runtime that implements the ExecutionDriver interface
 	driver, err := oci.New(oci.Opts{
-		Root:    "/run/runc",
-		Name:    "runc",
-		LogFile: "/tmp/runc",
+		Root: "/run/runc",
+		Name: "runc",
 	})
 	if err != nil {
 		return err
