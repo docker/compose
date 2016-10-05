@@ -1,4 +1,4 @@
-package process
+package shim
 
 import (
 	"encoding/json"
@@ -16,13 +16,90 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerkit"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 
-var errInvalidPidInt = errors.New("containerd: process pid is invalid")
+var (
+	ErrContainerStartTimeout = errors.New("shim: container did not start before the specified timeout")
+	ErrContainerNotStarted   = errors.New("shim: container not started")
+	ErrProcessNotExited      = errors.New("containerd: process has not exited")
+	ErrShimExited            = errors.New("containerd: shim exited before container process was started")
+	errInvalidPidInt         = errors.New("shim: process pid is invalid")
+)
 
+const UnknownStatus = 255
+
+func newProcess(root string, noPivotRoot bool, checkpoint string, c *containerkit.Container, cmd *exec.Cmd) (*process, error) {
+	var (
+		spec                  = c.Spec()
+		stdin, stdout, stderr string
+	)
+	uid, gid, err := getRootIDs(spec)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range []struct {
+		path *string
+		v    interface{}
+	}{
+		{
+			path: &stdin,
+			v:    c.Stdin,
+		},
+		{
+			path: &stdout,
+			v:    c.Stdout,
+		},
+		{
+			path: &stderr,
+			v:    c.Stderr,
+		},
+	} {
+		p, err := getFifoPath(t.v)
+		if err != nil {
+			return nil, err
+		}
+		*t.path = p
+	}
+	p := &process{
+		root:        root,
+		cmd:         cmd,
+		done:        make(chan struct{}),
+		spec:        spec.Process,
+		exec:        false,
+		rootUid:     uid,
+		rootGid:     gid,
+		noPivotRoot: noPivotRoot,
+		checkpoint:  checkpoint,
+		stdin:       stdin,
+		stdout:      stdout,
+		stderr:      stderr,
+	}
+	f, err := os.Create(filepath.Join(root, "process.json"))
+	if err != nil {
+		return nil, err
+	}
+	err = json.NewEncoder(f).Encode(p)
+	f.Close()
+	if err != nil {
+		return nil, err
+	}
+	exit, err := getExitPipe(filepath.Join(root, "exit"))
+	if err != nil {
+		return nil, err
+	}
+	control, err := getControlPipe(filepath.Join(root, "control"))
+	if err != nil {
+		return nil, err
+	}
+	p.exit, p.control = exit, control
+	return p, nil
+}
+
+// TODO: control and exit fifo
 type process struct {
-	name         string
 	root         string
 	cmd          *exec.Cmd
 	done         chan struct{}
@@ -30,7 +107,100 @@ type process struct {
 	startTime    string
 	mu           sync.Mutex
 	containerPid int
-	timeout      time.Duration
+	exit         *os.File
+	control      *os.File
+
+	spec        specs.Process
+	noPivotRoot bool
+	exec        bool
+	rootUid     int
+	rootGid     int
+	checkpoint  string
+	stdin       string
+	stdout      string
+	stderr      string
+}
+
+type processState struct {
+	specs.Process
+	Exec        bool     `json:"exec"`
+	RootUID     int      `json:"rootUID"`
+	RootGID     int      `json:"rootGID"`
+	Checkpoint  string   `json:"checkpoint"`
+	NoPivotRoot bool     `json:"noPivotRoot"`
+	RuntimeArgs []string `json:"runtimeArgs"`
+	// Stdin fifo filepath
+	Stdin string `json:"stdin"`
+	// Stdout fifo filepath
+	Stdout string `json:"stdout"`
+	// Stderr fifo filepath
+	Stderr string `json:"stderr"`
+}
+
+func (p *process) MarshalJSON() ([]byte, error) {
+	ps := processState{
+		Process:     p.spec,
+		NoPivotRoot: p.noPivotRoot,
+		Checkpoint:  p.checkpoint,
+		RootUID:     p.rootUid,
+		RootGID:     p.rootGid,
+		Exec:        p.exec,
+		Stdin:       p.stdin,
+		Stdout:      p.stdout,
+		Stderr:      p.stderr,
+	}
+	return json.Marshal(ps)
+}
+
+func (p *process) UnmarshalJSON(b []byte) error {
+	var ps processState
+	if err := json.Unmarshal(b, &ps); err != nil {
+		return err
+	}
+	p.spec = ps.Process
+	p.noPivotRoot = ps.NoPivotRoot
+	p.rootGid = ps.RootGID
+	p.rootUid = ps.RootUID
+	p.checkpoint = ps.Checkpoint
+	p.exec = ps.Exec
+	p.stdin = ps.Stdin
+	p.stdout = ps.Stdout
+	p.stderr = ps.Stderr
+	// TODO: restore pid/exit/control and stuff ?
+	return nil
+}
+
+func (p *process) Pid() int {
+	return p.containerPid
+}
+
+func (p *process) Wait() (rst uint32, rerr error) {
+	var b []byte
+	if _, err := p.exit.Read(b); err != nil {
+		return 255, err
+	}
+	data, err := ioutil.ReadFile(filepath.Join(p.root, "exitStatus"))
+	defer func() {
+		if rerr != nil {
+			rst, rerr = p.handleSigkilledShim(rst, rerr)
+		}
+	}()
+	if err != nil {
+		if os.IsNotExist(err) {
+			return UnknownStatus, ErrProcessNotExited
+		}
+		return UnknownStatus, err
+	}
+	if len(data) == 0 {
+		return UnknownStatus, ErrProcessNotExited
+	}
+	i, err := strconv.ParseUint(string(data), 10, 32)
+	return uint32(i), err
+}
+
+func (p *process) Signal(s os.Signal) error {
+	_, err := fmt.Fprintf(p.control, "%d %d %d\n", 2, s, 0)
+	return err
 }
 
 // same checks if the process is the same process originally launched
@@ -39,7 +209,7 @@ func (p *process) same() (bool, error) {
 	if p.startTime == "" {
 		return true, nil
 	}
-	pid, err := p.readContainerPid()
+	pid, err := readPid(filepath.Join(p.root, "pid"))
 	if err != nil {
 		return false, nil
 	}
@@ -57,15 +227,15 @@ func (p *process) checkExited() {
 	}
 	if same, _ := p.same(); same && p.hasPid() {
 		// The process changed its PR_SET_PDEATHSIG, so force kill it
-		logrus.Infof("containerd: %s:%s (pid %v) has become an orphan, killing it", p.container.id, p.namae, p.containerPid)
+		logrus.Infof("containerd: (pid %v) has become an orphan, killing it", p.containerPid)
 		if err := unix.Kill(p.containerPid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
-			logrus.Errorf("containerd: unable to SIGKILL %s:%s (pid %v): %v", p.container.id, p.name, p.containerPid, err)
+			logrus.Errorf("containerd: unable to SIGKILL (pid %v): %v", p.containerPid, err)
 			close(p.done)
 			return
 		}
 		// wait for the container process to exit
 		for {
-			if err := unix.Kill(p.pid, 0); err != nil {
+			if err := unix.Kill(p.containerPid, 0); err != nil {
 				break
 			}
 			time.Sleep(5 * time.Millisecond)
@@ -92,9 +262,9 @@ type pidResponse struct {
 	err error
 }
 
-func (p *process) waitForCreate() error {
+func (p *process) waitForCreate(timeout time.Duration) error {
 	r := make(chan pidResponse, 1)
-	go readContainerPid(wc)
+	go p.readContainerPid(r)
 
 	select {
 	case resp := <-r:
@@ -104,24 +274,27 @@ func (p *process) waitForCreate() error {
 		p.setPid(resp.pid)
 		started, err := readProcessStartTime(resp.pid)
 		if err != nil {
-			logrus.Warnf("containerd: unable to save %s:%s starttime: %v", p.container.id, p.id, err)
+			logrus.Warnf("containerd: unable to save starttime: %v", err)
 		}
 		// TODO: save start time to disk or process state file
 		p.startTime = started
 		return nil
-	case <-time.After(c.timeout):
+	case <-time.After(timeout):
 		p.cmd.Process.Kill()
 		p.cmd.Wait()
 		return ErrContainerStartTimeout
 	}
 }
 
-func readContainerPid(r chan pidResponse, pidFile string) {
+func (p *process) readContainerPid(r chan pidResponse) {
+	pidFile := filepath.Join(p.root, "pid")
 	for {
-		pid, err := readContainerPid(pidFile)
+		pid, err := readPid(pidFile)
 		if err != nil {
 			if os.IsNotExist(err) || err == errInvalidPidInt {
-				if serr := checkErrorLogs(); serr != nil {
+				if serr := checkErrorLogs(p.cmd,
+					filepath.Join(p.root, "shim-log.json"),
+					filepath.Join(p.root, "log.json")); serr != nil {
 					r <- pidResponse{
 						err: err,
 					}
@@ -140,6 +313,45 @@ func readContainerPid(r chan pidResponse, pidFile string) {
 		}
 		break
 	}
+}
+
+func (p *process) handleSigkilledShim(rst uint32, rerr error) (uint32, error) {
+	if err := unix.Kill(p.containerPid, 0); err == syscall.ESRCH {
+		logrus.Warnf("containerd: (pid %d) does not exist", p.containerPid)
+		// The process died while containerd was down (probably of
+		// SIGKILL, but no way to be sure)
+		return UnknownStatus, writeExitStatus(filepath.Join(p.root, "exitStatus"), UnknownStatus)
+	}
+
+	// If it's not the same process, just mark it stopped and set
+	// the status to the UnknownStatus value (i.e. 255)
+	if same, _ := p.same(); !same {
+		// Create the file so we get the exit event generated once monitor kicks in
+		// without having to go through all this process again
+		return UnknownStatus, writeExitStatus(filepath.Join(p.root, "exitStatus"), UnknownStatus)
+	}
+	ppid, err := readProcStatField(p.containerPid, 4)
+	if err != nil {
+		return rst, fmt.Errorf("could not check process ppid: %v (%v)", err, rerr)
+	}
+	if ppid == "1" {
+		if err := unix.Kill(p.containerPid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
+			return UnknownStatus, fmt.Errorf(
+				"containerd: unable to SIGKILL (pid %v): %v", p.containerPid, err)
+		}
+		// wait for the process to die
+		for {
+			if err := unix.Kill(p.containerPid, 0); err == syscall.ESRCH {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		// Create the file so we get the exit event generated once monitor kicks in
+		// without having to go through all this process again
+		status := 128 + uint32(syscall.SIGKILL)
+		return status, writeExitStatus(filepath.Join(p.root, "exitStatus"), status)
+	}
+	return rst, rerr
 }
 
 func checkErrorLogs(cmd *exec.Cmd, shimLogPath, runtimeLogPath string) error {
@@ -200,7 +412,7 @@ func readProcStatField(pid int, field int) (string, error) {
 	return strings.Split(parts[1], ") ")[0], nil
 }
 
-func readContainerPid(pidFile string) (int, error) {
+func readPid(pidFile string) (int, error) {
 	data, err := ioutil.ReadFile(pidFile)
 	if err != nil {
 		return -1, nil
@@ -250,4 +462,24 @@ func readLogMessages(path string) ([]message, error) {
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+func getExitPipe(path string) (*os.File, error) {
+	if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+	// add NONBLOCK in case the other side has already closed or else
+	// this function would never return
+	return os.OpenFile(path, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
+}
+
+func getControlPipe(path string) (*os.File, error) {
+	if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+	return os.OpenFile(path, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+}
+
+func writeExitStatus(path string, status uint32) error {
+	return ioutil.WriteFile(path, []byte(fmt.Sprintf("%u", status)), 0644)
 }

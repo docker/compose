@@ -2,6 +2,7 @@ package oci
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/docker/containerkit"
 )
 
+var ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
+
 type Opts struct {
 	Name string
 	Root string
@@ -20,6 +23,9 @@ type Opts struct {
 }
 
 func New(opts Opts) (*OCIRuntime, error) {
+	if opts.Root == "" {
+		return nil, ErrRootEmpty
+	}
 	if err := os.MkdirAll(opts.Root, 0711); err != nil {
 		return nil, err
 	}
@@ -42,6 +48,10 @@ type OCIRuntime struct {
 
 func (r *OCIRuntime) Name() string {
 	return r.name
+}
+
+func (r *OCIRuntime) Args() []string {
+	return r.args
 }
 
 func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {

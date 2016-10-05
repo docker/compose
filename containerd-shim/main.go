@@ -139,6 +139,7 @@ func start(log *os.File) error {
 					p.stdinCloser.Close()
 				}
 			case 1:
+				// resize
 				if p.console == nil {
 					continue
 				}
@@ -147,6 +148,11 @@ func start(log *os.File) error {
 					Height: uint16(msg.Height),
 				}
 				term.SetWinsize(p.console.Fd(), &ws)
+			case 2:
+				// signal
+				if err := syscall.Kill(p.pid(), msg.Width); err != nil {
+					writeMessage(log, "warn", err)
+				}
 			}
 		}
 	}

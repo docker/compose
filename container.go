@@ -126,6 +126,11 @@ func (c *Container) Path() string {
 	return c.path
 }
 
+// Spec returns the OCI runtime spec for the container
+func (c *Container) Spec() *specs.Spec {
+	return c.s
+}
+
 // Create will create the container on the system by running the runtime's
 // initial setup and process waiting for the user process to be started
 func (c *Container) Create() error {
