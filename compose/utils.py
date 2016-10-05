@@ -5,11 +5,16 @@ import codecs
 import hashlib
 import json
 import json.decoder
+import logging
+import ntpath
 
 import six
 
+from .errors import StreamParseError
+
 
 json_decoder = json.JSONDecoder()
+log = logging.getLogger(__name__)
 
 
 def get_output_stream(stream):
@@ -60,13 +65,21 @@ def split_buffer(stream, splitter=None, decoder=lambda a: a):
             yield item
 
     if buffered:
-        yield decoder(buffered)
+        try:
+            yield decoder(buffered)
+        except Exception as e:
+            log.error(
+                'Compose tried decoding the following data chunk, but failed:'
+                '\n%s' % repr(buffered)
+            )
+            raise StreamParseError(e)
 
 
 def json_splitter(buffer):
     """Attempt to parse a json object from a buffer. If there is at least one
     object, return it and the rest of the buffer, otherwise return None.
     """
+    buffer = buffer.strip()
     try:
         obj, index = json_decoder.raw_decode(buffer)
         rest = buffer[json.decoder.WHITESPACE.match(buffer, index).end():]
@@ -96,3 +109,11 @@ def microseconds_from_time_nano(time_nano):
 
 def build_string_dict(source_dict):
     return dict((k, str(v if v is not None else '')) for k, v in source_dict.items())
+
+
+def splitdrive(path):
+    if len(path) == 0:
+        return ('', '')
+    if path[0] in ['.', '\\', '/', '~']:
+        return ('', path)
+    return ntpath.splitdrive(path)

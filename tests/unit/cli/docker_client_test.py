@@ -42,6 +42,14 @@ class DockerClientTestCase(unittest.TestCase):
         assert fake_log.error.call_count == 1
         assert '123' in fake_log.error.call_args[0][0]
 
+        with mock.patch('compose.cli.errors.log') as fake_log:
+            with pytest.raises(errors.ConnectionError):
+                with errors.handle_connection_errors(client):
+                    raise errors.ReadTimeout()
+
+        assert fake_log.error.call_count == 1
+        assert '123' in fake_log.error.call_args[0][0]
+
     def test_user_agent(self):
         client = docker_client(os.environ)
         expected = "docker-compose/{0} docker-py/{1} {2}/{3}".format(
@@ -51,6 +59,14 @@ class DockerClientTestCase(unittest.TestCase):
             platform.release()
         )
         self.assertEqual(client.headers['User-Agent'], expected)
+
+    @mock.patch.dict(os.environ)
+    def test_docker_client_default_windows_host(self):
+        with mock.patch('compose.cli.docker_client.IS_WINDOWS_PLATFORM', True):
+            if 'DOCKER_HOST' in os.environ:
+                del os.environ['DOCKER_HOST']
+            client = docker_client(os.environ)
+            assert client.base_url == 'http://127.0.0.1:2375'
 
 
 class TLSConfigTestCase(unittest.TestCase):
@@ -136,3 +152,16 @@ class TLSConfigTestCase(unittest.TestCase):
         result = tls_config_from_options(options)
         assert isinstance(result, docker.tls.TLSConfig)
         assert result.assert_hostname is False
+
+    def test_tls_client_and_ca_quoted_paths(self):
+        options = {
+            '--tlscacert': '"{0}"'.format(self.ca_cert),
+            '--tlscert': '"{0}"'.format(self.client_cert),
+            '--tlskey': '"{0}"'.format(self.key),
+            '--tlsverify': True
+        }
+        result = tls_config_from_options(options)
+        assert isinstance(result, docker.tls.TLSConfig)
+        assert result.cert == (self.client_cert, self.key)
+        assert result.ca_cert == self.ca_cert
+        assert result.verify is True

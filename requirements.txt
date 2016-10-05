@@ -1,14 +1,15 @@
 PyYAML==3.11
 backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.2.0
-docker-py==1.9.0
+docker-py==1.10.3
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
 ipaddress==1.0.16
 jsonschema==2.5.1
+pypiwin32==219; sys_platform == 'win32'
 requests==2.7.0
-six==1.7.3
+six==1.10.0
 texttable==0.8.4
 websocket-client==0.32.0

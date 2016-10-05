@@ -23,6 +23,7 @@ from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
+from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
@@ -75,7 +76,7 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
-    except errors.ConnectionError:
+    except (errors.ConnectionError, StreamParseError):
         sys.exit(1)
 
 
@@ -615,8 +616,7 @@ class TopLevelCommand(object):
         Options:
             -f, --force   Don't ask to confirm removal
             -v            Remove any anonymous volumes attached to containers
-            -a, --all     Obsolete. Also remove one-off containers created by
-                          docker-compose run
+            -a, --all     Deprecated - no effect.
         """
         if options.get('--all'):
             log.warn(

@@ -15,6 +15,10 @@ class TestJsonSplitter(object):
         data = '{"foo": "bar"}\n  \n{"next": "obj"}'
         assert utils.json_splitter(data) == ({'foo': 'bar'}, '{"next": "obj"}')
 
+    def test_json_splitter_leading_whitespace(self):
+        data = '\n   \r{"foo": "bar"}\n\n   {"next": "obj"}'
+        assert utils.json_splitter(data) == ({'foo': 'bar'}, '{"next": "obj"}')
+
 
 class TestStreamAsText(object):
 
@@ -42,4 +46,17 @@ class TestJsonStream(object):
             {},
             [1, 2, 3],
             [],
+        ]
+
+    def test_with_leading_whitespace(self):
+        stream = [
+            '\n  \r\n  {"one": "two"}{"x": 1}',
+            '  {"three": "four"}\t\t{"x": 2}'
+        ]
+        output = list(utils.json_stream(stream))
+        assert output == [
+            {'one': 'two'},
+            {'x': 1},
+            {'three': 'four'},
+            {'x': 2}
         ]
