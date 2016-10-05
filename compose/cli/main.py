@@ -24,6 +24,11 @@ from ..config.serialize import serialize_config
 from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
+from ..plugin import PluginError
+from ..plugin_manager import InvalidPluginError
+from ..plugin_manager import InvalidPluginFileTypeError
+from ..plugin_manager import PluginDoesNotExistError
+from ..plugin_manager import PluginManager
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
 from ..project import OneOffFilter
@@ -44,6 +49,7 @@ from .formatter import ConsoleWarningFormatter
 from .formatter import Formatter
 from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
+from .utils import get_plugin_dir
 from .utils import get_version_info
 from .utils import yesno
 
@@ -56,7 +62,12 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():
-    command = dispatch()
+    try:
+        command = dispatch()
+    except PluginError as e:
+        setup_logging()
+        log.error("Plugin error: %s", str(e))
+        sys.exit(1)
 
     try:
         command()
@@ -76,11 +87,15 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
+    except PluginError as e:
+        log.error(e.msg)
+        sys.exit(1)
     except (errors.ConnectionError, StreamParseError):
         sys.exit(1)
 
 
 def dispatch():
+    plugin_manager = PluginManager(get_plugin_dir())
     setup_logging()
     dispatcher = DocoptDispatcher(
         TopLevelCommand,
@@ -94,22 +109,35 @@ def dispatch():
         sys.exit(1)
 
     setup_console_handler(console_handler, options.get('--verbose'))
-    return functools.partial(perform_command, options, handler, command_options)
+    plugin_manager.load_config('.', options)
+    return functools.partial(perform_command, options, handler, command_options, plugin_manager)
 
 
-def perform_command(options, handler, command_options):
+def perform_command(options, handler, command_options, plugin_manager):
     if options['COMMAND'] in ('help', 'version'):
         # Skip looking up the compose file.
         handler(command_options)
         return
 
     if options['COMMAND'] in ('config', 'bundle'):
-        command = TopLevelCommand(None)
+        command = TopLevelCommand(None, plugin_manager)
         handler(command, options, command_options)
         return
 
+    none_project_commands = ['plugin']
+
+    for tlc_command in TopLevelCommand.__dict__:
+        if hasattr(getattr(TopLevelCommand, tlc_command), '__standalone__') and \
+           getattr(TopLevelCommand, tlc_command).__standalone__ is True:
+            none_project_commands.append(tlc_command)
+
+    if options['COMMAND'] in none_project_commands:
+        command = TopLevelCommand(None, plugin_manager)
+        handler(command, command_options)
+        return
+
     project = project_from_options('.', options)
-    command = TopLevelCommand(project)
+    command = TopLevelCommand(project, plugin_manager)
     with errors.handle_connection_errors(project.client):
         handler(command, command_options)
 
@@ -179,6 +207,7 @@ class TopLevelCommand(object):
       kill               Kill containers
       logs               View output from containers
       pause              Pause services
+      plugin             Manages the plugins
       port               Print the public port for a port binding
       ps                 List containers
       pull               Pull service images
@@ -194,9 +223,10 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, project_dir='.'):
+    def __init__(self, project, plugin_manager, project_dir='.'):
         self.project = project
-        self.project_dir = '.'
+        self.plugin_manager = plugin_manager
+        self.project_dir = project_dir
 
     def build(self, options):
         """
@@ -515,6 +545,73 @@ class TopLevelCommand(object):
         """
         containers = self.project.pause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to pause', 1)
+
+    def plugin(self, options):
+        """
+        Manages docker-compose plugins
+
+        Usage: plugin [list|install|update|config|uninstall] [PLUGIN]
+        """
+
+        if options['list']:
+            plugins = self.plugin_manager.get_plugins()
+
+            if len(plugins) <= 0:
+                print('No plugins installed.')
+            else:
+                headers = [
+                    'ID',
+                    'Name',
+                    'Description',
+                    'Version'
+                ]
+                rows = []
+
+                for plugin_name, plugin in plugins.items():
+                    rows.append([
+                        plugin.id,
+                        plugin.name,
+                        plugin.description,
+                        plugin.version
+                    ])
+
+                print(Formatter().table(headers, rows))
+        elif options['install']:
+            plugin_command(
+                self.plugin_manager,
+                'install_plugin',
+                options['PLUGIN'],
+                "Plugin '{}' successfully installed.",
+                "An error occurred during the installation of plugin '{}'."
+            )
+        elif options['uninstall']:
+            if self.plugin_manager.is_plugin_installed(options['PLUGIN']):
+                print("Going to remove plugin '{}'".format(options['PLUGIN']))
+
+                if options.get('--force') or yesno("Are you sure? [yN] ", default=False):
+                    self.plugin_manager.uninstall_plugin(options['PLUGIN'])
+            else:
+                log.error("Plugin '{}' isn't installed".format(options['PLUGIN']))
+                sys.exit(1)
+        elif options['config']:
+            plugin_command(
+                self.plugin_manager,
+                'configure_plugin',
+                options['PLUGIN'],
+                "Configuration of plugin '{}' successfully.",
+                "An error occurred during the configuration of plugin '{}'."
+            )
+        elif options['update']:
+            plugin_command(
+                self.plugin_manager,
+                'update_plugin',
+                options['PLUGIN'],
+                "Update of plugin '{}' successfully.",
+                "An error occurred during the update of plugin '{}'."
+            )
+        else:
+            subject = get_handler(self, 'plugin')
+            print(getdoc(subject))
 
     def port(self, options):
         """
@@ -1044,3 +1141,19 @@ def exit_if(condition, message, exit_code):
     if condition:
         log.error(message)
         raise SystemExit(exit_code)
+
+
+def plugin_command(plugin_manager, command, plugin_name, success_message, error_message):
+    try:
+        success = getattr(plugin_manager, command)(plugin_name)
+    except (PluginDoesNotExistError, InvalidPluginError, InvalidPluginFileTypeError) as e:
+        log.error(str(e))
+        sys.exit(1)
+
+    if success is True:
+        print(success_message.format(plugin_name))
+    elif success is False:
+        log.error(error_message.format(plugin_name))
+        sys.exit(1)
+    elif success is None:
+        print("Nothing to do.")

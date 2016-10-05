@@ -11,6 +11,9 @@ import sys
 import docker
 
 import compose
+from ..const import HOME_DIR
+from ..const import PLUGIN_DIR
+
 
 # WindowsError is not defined on non-win32 platforms. Avoid runtime errors by
 # defining it as OSError (its parent class) if missing.
@@ -122,6 +125,14 @@ def generate_user_agent():
     else:
         parts.append("{}/{}".format(p_system, p_release))
     return " ".join(parts)
+
+
+def get_user_home():
+    return os.path.expanduser("~")
+
+
+def get_plugin_dir():
+    return os.path.join(get_user_home(), HOME_DIR, PLUGIN_DIR)
 
 
 def unquote_path(s):

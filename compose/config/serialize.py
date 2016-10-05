@@ -42,6 +42,7 @@ def denormalize_config(config):
         'services': services,
         'networks': networks,
         'volumes': config.volumes,
+        'plugins': config.plugins,
     }
 
 

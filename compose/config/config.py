@@ -194,8 +194,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_networks(self):
         return {} if self.version == V1 else self.config.get('networks', {})
 
+    def get_plugins(self):
+        return {} if self.version == V1 else self.config.get('plugins', {})
 
-class Config(namedtuple('_Config', 'version services volumes networks')):
+
+class Config(namedtuple('_Config', 'version services volumes networks plugins')):
     """
     :param version: configuration version
     :type  version: int
@@ -205,6 +208,8 @@ class Config(namedtuple('_Config', 'version services volumes networks')):
     :type  volumes: :class:`dict`
     :param networks: Dictionary mapping network names to description dictionaries
     :type  networks: :class:`dict`
+    :param plugins: Dictionary mapping plugin names to description dictionaries
+    :type  plugins: :class:`dict`
     """
 
 
@@ -320,13 +325,16 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
+    plugins = load_mapping(
+        config_details.config_files, 'get_plugins', 'Plugins'
+    )
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    return Config(main_file.version, service_dicts, volumes, networks)
+    return Config(main_file.version, service_dicts, volumes, networks, plugins)
 
 
 def load_mapping(config_files, get_func, entity_type):
@@ -437,6 +445,11 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.filename,
             config_file.get_networks(),
             'network',
+            environment,)
+        processed_config['plugins'] = interpolate_config_section(
+            config_file.filename,
+            config_file.get_plugins(),
+            'plugin',
             environment,)
 
     if config_file.version == V1:
