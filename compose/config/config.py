@@ -413,31 +413,35 @@ def load_services(config_details, config_file):
     return build_services(service_config)
 
 
-def interpolate_config_section(filename, config, section, environment):
-    validate_config_section(filename, config, section)
-    return interpolate_environment_variables(config, section, environment)
+def interpolate_config_section(config_file, config, section, environment):
+    validate_config_section(config_file.filename, config, section)
+    return interpolate_environment_variables(
+            config_file.version,
+            config,
+            section,
+            environment)
 
 
 def process_config_file(config_file, environment, service_name=None):
     services = interpolate_config_section(
-        config_file.filename,
+        config_file,
         config_file.get_service_dicts(),
         'service',
-        environment,)
+        environment)
 
     if config_file.version in (V2_0, V2_1):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
-            config_file.filename,
+            config_file,
             config_file.get_volumes(),
             'volume',
-            environment,)
+            environment)
         processed_config['networks'] = interpolate_config_section(
-            config_file.filename,
+            config_file,
             config_file.get_networks(),
             'network',
-            environment,)
+            environment)
 
     if config_file.version == V1:
         processed_config = services
