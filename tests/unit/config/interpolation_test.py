@@ -113,6 +113,7 @@ def test_interpolate_with_value(defaults_interpolator):
 def test_interpolate_missing_with_default(defaults_interpolator):
     assert defaults_interpolator("ok ${missing:-def}") == "ok def"
     assert defaults_interpolator("ok ${missing-def}") == "ok def"
+    assert defaults_interpolator("ok ${BAR:-/non:-alphanumeric}") == "ok /non:-alphanumeric"
 
 
 def test_interpolate_with_empty_and_default_value(defaults_interpolator):
