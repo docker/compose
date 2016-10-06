@@ -31,12 +31,22 @@ var (
 
 const UnknownStatus = 255
 
-func newProcess(root string, noPivotRoot bool, checkpoint string, c *containerkit.Container, cmd *exec.Cmd) (*process, error) {
-	if err := os.Mkdir(root, 0711); err != nil {
-		return nil, err
-	}
+type processOpts struct {
+	root        string
+	noPivotRoot bool
+	checkpoint  string
+	c           *containerkit.Container
+	cmd         *exec.Cmd
+	exec        bool
+	spec        specs.Process
+	stdin       io.Reader
+	stdout      io.Writer
+	stderr      io.Writer
+}
+
+func newProcess(opts processOpts) (*process, error) {
 	var (
-		spec                  = c.Spec()
+		spec                  = opts.c.Spec()
 		stdin, stdout, stderr string
 	)
 	uid, gid, err := getRootIDs(spec)
@@ -49,15 +59,15 @@ func newProcess(root string, noPivotRoot bool, checkpoint string, c *containerki
 	}{
 		{
 			path: &stdin,
-			v:    c.Stdin,
+			v:    opts.stdin,
 		},
 		{
 			path: &stdout,
-			v:    c.Stdout,
+			v:    opts.stdout,
 		},
 		{
 			path: &stderr,
-			v:    c.Stderr,
+			v:    opts.stderr,
 		},
 	} {
 		p, err := getFifoPath(t.v)
@@ -67,20 +77,20 @@ func newProcess(root string, noPivotRoot bool, checkpoint string, c *containerki
 		*t.path = p
 	}
 	p := &process{
-		root:        root,
-		cmd:         cmd,
+		root:        opts.root,
+		cmd:         opts.cmd,
 		done:        make(chan struct{}),
-		spec:        spec.Process,
-		exec:        false,
+		spec:        opts.spec,
+		exec:        opts.exec,
 		rootUid:     uid,
 		rootGid:     gid,
-		noPivotRoot: noPivotRoot,
-		checkpoint:  checkpoint,
+		noPivotRoot: opts.noPivotRoot,
+		checkpoint:  opts.checkpoint,
 		stdin:       stdin,
 		stdout:      stdout,
 		stderr:      stderr,
 	}
-	f, err := os.Create(filepath.Join(root, "process.json"))
+	f, err := os.Create(filepath.Join(opts.root, "process.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -89,11 +99,11 @@ func newProcess(root string, noPivotRoot bool, checkpoint string, c *containerki
 	if err != nil {
 		return nil, err
 	}
-	exit, err := getExitPipe(filepath.Join(root, "exit"))
+	exit, err := getExitPipe(filepath.Join(opts.root, "exit"))
 	if err != nil {
 		return nil, err
 	}
-	control, err := getControlPipe(filepath.Join(root, "control"))
+	control, err := getControlPipe(filepath.Join(opts.root, "control"))
 	if err != nil {
 		return nil, err
 	}
@@ -199,6 +209,14 @@ func (p *process) FD() int {
 	return int(p.exit.Fd())
 }
 
+func (p *process) Close() error {
+	return p.exit.Close()
+}
+
+func (p *process) Remove() bool {
+	return true
+}
+
 func (p *process) Wait() (rst uint32, rerr error) {
 	<-p.done
 	data, err := ioutil.ReadFile(filepath.Join(p.root, "exitStatus"))
@@ -228,6 +246,8 @@ func (p *process) Signal(s os.Signal) error {
 // same checks if the process is the same process originally launched
 func (p *process) same() (bool, error) {
 	/// for backwards compat assume true if it is not set
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.startTime == "" {
 		return true, nil
 	}
@@ -245,14 +265,19 @@ func (p *process) same() (bool, error) {
 func (p *process) checkExited() {
 	err := p.cmd.Wait()
 	if err == nil {
+		p.mu.Lock()
+		if p.success {
+			p.mu.Unlock()
+			return
+		}
 		p.success = true
+		p.mu.Unlock()
 	}
 	if same, _ := p.same(); same && p.hasPid() {
 		// The process changed its PR_SET_PDEATHSIG, so force kill it
 		logrus.Infof("containerd: (pid %v) has become an orphan, killing it", p.pid)
 		if err := unix.Kill(p.pid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
 			logrus.Errorf("containerd: unable to SIGKILL (pid %v): %v", p.pid, err)
-			close(p.done)
 			return
 		}
 		// wait for the container process to exit
@@ -263,7 +288,6 @@ func (p *process) checkExited() {
 			time.Sleep(5 * time.Millisecond)
 		}
 	}
-	close(p.done)
 }
 
 func (p *process) hasPid() bool {
@@ -271,12 +295,6 @@ func (p *process) hasPid() bool {
 	r := p.pid > 0
 	p.mu.Unlock()
 	return r
-}
-
-func (p *process) setPid(pid int) {
-	p.mu.Lock()
-	p.pid = pid
-	p.mu.Unlock()
 }
 
 type pidResponse struct {
@@ -293,21 +311,30 @@ func (p *process) waitForCreate(timeout time.Duration) error {
 		if resp.err != nil {
 			return resp.err
 		}
-		p.setPid(resp.pid)
+		p.mu.Lock()
+		p.pid = resp.pid
 		started, err := readProcessStartTime(resp.pid)
 		if err != nil {
+			if os.IsNotExist(err) {
+				// process already exited
+				p.success = true
+				p.mu.Unlock()
+				return nil
+			}
 			logrus.Warnf("shim: unable to save starttime: %v", err)
 		}
 		p.startTime = started
 		f, err := os.Create(filepath.Join(p.root, "process.json"))
 		if err != nil {
-			logrus.Warnf("shim: unable to save starttime: %v", err)
+			logrus.Warnf("shim: unable to create process.json: %v", err)
+			p.mu.Unlock()
 			return nil
 		}
 		defer f.Close()
 		if err := json.NewEncoder(f).Encode(p); err != nil {
-			logrus.Warnf("shim: unable to save starttime: %v", err)
+			logrus.Warnf("shim: unable to encode process: %v", err)
 		}
+		p.mu.Unlock()
 		return nil
 	case <-time.After(timeout):
 		p.cmd.Process.Kill()

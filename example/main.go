@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -33,9 +35,9 @@ func runContainer() error {
 		return err
 	}
 	// setup some stdio for our container
-	container.Stdin = Stdin()
-	container.Stdout = Stdout()
-	container.Stderr = Stderr()
+	container.Stdin = Stdin("")
+	container.Stdout = Stdout("")
+	container.Stderr = Stderr("")
 
 	// go ahead and set the container in the create state and have it ready to start
 	logrus.Info("create container")
@@ -49,33 +51,36 @@ func runContainer() error {
 		return err
 	}
 
-	if exec {
-		// start 10 exec processes giving the go var i to exec to stdout
-		for i := 0; i < 10; i++ {
-			process, err := container.NewProcess(&specs.Process{
-				Args: []string{
-					"echo", fmt.Sprintf("sup from itteration %d", i),
-				},
-				Env:             env,
-				Terminal:        false,
-				Cwd:             "/",
-				NoNewPrivileges: true,
-				Capabilities:    caps,
-			})
+	for i := 0; i < exec; i++ {
+		process, err := container.NewProcess(&specs.Process{
+			Args: []string{
+				"sh", "-c",
+				"echo " + fmt.Sprintf("sup from itteration %d", i),
+			},
+			Env:             env,
+			Terminal:        false,
+			Cwd:             "/",
+			NoNewPrivileges: true,
+			Capabilities:    caps,
+		})
 
-			process.Stdin = os.Stdin
-			process.Stdout = os.Stdout
-			process.Stderr = os.Stderr
+		process.Stdin = Stdin(strconv.Itoa(i))
+		stdout := Stdout(strconv.Itoa(i))
 
-			if err := process.Start(); err != nil {
-				return err
-			}
-			procStatus, err := process.Wait()
-			if err != nil {
-				return err
-			}
-			logrus.Infof("process %d returned with %d", i, procStatus)
+		stderr := Stderr(strconv.Itoa(i))
+		go io.Copy(os.Stdout, stdout)
+		go io.Copy(os.Stdout, stderr)
+		process.Stdout = stdout
+		process.Stderr = stderr
+
+		if err := process.Start(); err != nil {
+			return err
 		}
+		procStatus, err := process.Wait()
+		if err != nil {
+			return err
+		}
+		logrus.Infof("process %d returned with %d", i, procStatus)
 	}
 
 	if load {
@@ -101,13 +106,13 @@ func runContainer() error {
 }
 
 var (
-	exec bool
+	exec int
 	load bool
 )
 
 // "Hooks do optional work. Drivers do mandatory work"
 func main() {
-	flag.BoolVar(&exec, "exec", false, "run the execs")
+	flag.IntVar(&exec, "exec", 0, "run n number of execs")
 	flag.BoolVar(&load, "load", false, "reload the container")
 	flag.Parse()
 	if err := osutils.SetSubreaper(1); err != nil {

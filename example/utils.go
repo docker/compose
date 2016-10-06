@@ -182,8 +182,8 @@ func (t *testConfig) Spec(m *containerkit.Mount) (*specs.Spec, error) {
 	}, nil
 }
 
-func Stdin() *os.File {
-	abs, err := filepath.Abs("stdin")
+func Stdin(n string) *os.File {
+	abs, err := filepath.Abs("stdin" + n)
 	if err != nil {
 		panic(err)
 	}
@@ -197,8 +197,8 @@ func Stdin() *os.File {
 	return f
 }
 
-func Stdout() *os.File {
-	abs, err := filepath.Abs("stdout")
+func Stdout(n string) *os.File {
+	abs, err := filepath.Abs("stdout" + n)
 	if err != nil {
 		panic(err)
 	}
@@ -212,8 +212,8 @@ func Stdout() *os.File {
 	return f
 }
 
-func Stderr() *os.File {
-	abs, err := filepath.Abs("stderr")
+func Stderr(n string) *os.File {
+	abs, err := filepath.Abs("stderr" + n)
 	if err != nil {
 		panic(err)
 	}

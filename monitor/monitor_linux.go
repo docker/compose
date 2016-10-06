@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"io"
 	"sync"
 	"syscall"
 
@@ -10,6 +11,9 @@ import (
 
 type Monitorable interface {
 	FD() int
+	// Remove returns true if the monitorable should be removed
+	// from the event monitor under the lock of when the event was received
+	Remove() bool
 }
 
 type Flusher interface {
@@ -63,6 +67,10 @@ func (m *Monitor) Add(ma Monitorable) error {
 func (m *Monitor) Remove(ma Monitorable) error {
 	m.m.Lock()
 	defer m.m.Unlock()
+	return m.remove(ma)
+}
+
+func (m *Monitor) remove(ma Monitorable) error {
 	fd := ma.FD()
 	delete(m.receivers, fd)
 	return syscall.EpollCtl(m.epollFd, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{
@@ -84,18 +92,28 @@ func (m *Monitor) Run() {
 			if err == syscall.EINTR {
 				continue
 			}
-			logrus.WithField("error", err).Fatal("containerd: epoll wait")
+			logrus.WithField("error", err).Fatal("shim: epoll wait")
 		}
 		for i := 0; i < n; i++ {
 			fd := int(events[i].Fd)
 			m.m.Lock()
 			r := m.receivers[fd]
-			m.m.Unlock()
 			if f, ok := r.(Flusher); ok {
 				if err := f.Flush(); err != nil {
-					logrus.WithField("error", err).Fatal("containerd: flush event FD")
+					logrus.WithField("error", err).Fatal("shim: flush event FD")
 				}
 			}
+			if r.Remove() {
+				if err := m.remove(r); err != nil {
+					logrus.WithField("error", err).Fatal("shim: remove event FD")
+				}
+			}
+			if f, ok := r.(io.Closer); ok {
+				if err := f.Close(); err != nil {
+					logrus.WithField("error", err).Fatal("shim: close event FD")
+				}
+			}
+			m.m.Unlock()
 			m.events <- r
 		}
 	}

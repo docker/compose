@@ -83,7 +83,7 @@ func start(log *os.File) error {
 	}
 	defer func() {
 		if err := p.Close(); err != nil {
-			writeMessage(log, "warn", err)
+			writeMessage(log, "warn", fmt.Errorf("close stdio %s", err))
 		}
 	}()
 	if err := p.create(); err != nil {
@@ -127,7 +127,6 @@ func start(log *os.File) error {
 				// Wait for all the childs this process may have
 				// created (needed for exec and init processes when
 				// they join another pid namespace)
-				osutils.Reap(true)
 				p.Wait()
 				return nil
 			}
@@ -151,7 +150,7 @@ func start(log *os.File) error {
 			case 2:
 				// signal
 				if err := syscall.Kill(p.pid(), syscall.Signal(msg.Width)); err != nil {
-					writeMessage(log, "warn", err)
+					writeMessage(log, "warn", fmt.Errorf("signal pid %d: %s", msg.Width, err))
 				}
 			}
 		}

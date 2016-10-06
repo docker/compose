@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/monitor"
 	"github.com/docker/containerd/oci"
 	"github.com/docker/containerkit"
@@ -104,6 +103,7 @@ func Load(root string) (*Shim, error) {
 		return nil, err
 	}
 	s.m = m
+	go s.startMonitor()
 	dirs, err := ioutil.ReadDir(root)
 	if err != nil {
 		return nil, err
@@ -204,6 +204,9 @@ func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, 
 		root = filepath.Join(s.root, "init")
 		cmd  = s.command(c.ID(), c.Path(), s.runtime.Name())
 	)
+	if err := os.Mkdir(root, 0711); err != nil {
+		return nil, err
+	}
 	// exec the shim inside the state directory setup with the process
 	// information for what is being run
 	cmd.Dir = root
@@ -211,17 +214,23 @@ func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	p, err := s.startCommand(c, cmd)
+	p, err := s.startCommand(processOpts{
+		spec:        c.Spec().Process,
+		root:        root,
+		noPivotRoot: s.noPivotRoot,
+		checkpoint:  s.checkpoint,
+		c:           c,
+		cmd:         cmd,
+		stdin:       c.Stdin,
+		stdout:      c.Stdout,
+		stderr:      c.Stderr,
+	})
 	if err != nil {
-		return nil, err
-	}
-	if err := s.m.Add(p); err != nil {
 		return nil, err
 	}
 	s.pmu.Lock()
 	s.processes["init"] = p
 	s.pmu.Unlock()
-
 	f, err := os.Create(filepath.Join(s.root, "state.json"))
 	if err != nil {
 		return nil, err
@@ -276,10 +285,38 @@ func (s *Shim) Delete(c *containerkit.Container) error {
 	return os.RemoveAll(s.root)
 }
 
-var errnotimpl = errors.New("NOT IMPL RIGHT NOW, CHILL")
-
 func (s *Shim) Exec(c *containerkit.Container, p *containerkit.Process) (containerkit.ProcessDelegate, error) {
-	return nil, errnotimpl
+	root, err := ioutil.TempDir(s.root, "")
+	if err != nil {
+		return nil, err
+	}
+	cmd := s.command(c.ID(), c.Path(), s.runtime.Name())
+	// exec the shim inside the state directory setup with the process
+	// information for what is being run
+	cmd.Dir = root
+	// make sure the shim is in a new process group
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+	sp, err := s.startCommand(processOpts{
+		exec:        true,
+		spec:        *p.Spec(),
+		root:        root,
+		noPivotRoot: s.noPivotRoot,
+		checkpoint:  s.checkpoint,
+		c:           c,
+		cmd:         cmd,
+		stdin:       p.Stdin,
+		stdout:      p.Stdout,
+		stderr:      p.Stderr,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.pmu.Lock()
+	s.processes[filepath.Base(root)] = sp
+	s.pmu.Unlock()
+	return sp, nil
 }
 
 func (s *Shim) Load(id string) (containerkit.ProcessDelegate, error) {
@@ -296,12 +333,15 @@ func (s *Shim) getContainerInit() (*process, error) {
 	return p, nil
 }
 
-func (s *Shim) startCommand(c *containerkit.Container, cmd *exec.Cmd) (*process, error) {
-	p, err := newProcess(filepath.Join(s.root, "init"), s.noPivotRoot, s.checkpoint, c, cmd)
+func (s *Shim) startCommand(opts processOpts) (*process, error) {
+	p, err := newProcess(opts)
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
+	if err := s.m.Add(p); err != nil {
+		return nil, err
+	}
+	if err := opts.cmd.Start(); err != nil {
 		close(p.done)
 		if checkShimNotFound(err) {
 			return nil, fmt.Errorf("%s not install on system", s.name)
@@ -323,12 +363,11 @@ func (s *Shim) command(args ...string) *exec.Cmd {
 }
 
 func (s *Shim) startMonitor() {
+	go s.m.Run()
+	defer s.m.Close()
 	for m := range s.m.Events() {
 		p := m.(*process)
 		close(p.done)
-		if err := s.m.Remove(p); err != nil {
-			logrus.Error(err)
-		}
 	}
 }
 
