@@ -99,6 +99,11 @@ func Load(root string) (*Shim, error) {
 	if err != nil {
 		return nil, err
 	}
+	m, err := monitor.New()
+	if err != nil {
+		return nil, err
+	}
+	s.m = m
 	dirs, err := ioutil.ReadDir(root)
 	if err != nil {
 		return nil, err
@@ -118,6 +123,9 @@ func Load(root string) (*Shim, error) {
 			return nil, err
 		}
 		s.processes[name] = &p
+		if err := s.m.Add(&p); err != nil {
+			return nil, err
+		}
 	}
 	return &s, nil
 }
@@ -225,7 +233,7 @@ func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, 
 }
 
 func (s *Shim) Start(c *containerkit.Container) error {
-	p, err := s.getContainerInit(c)
+	p, err := s.getContainerInit()
 	if err != nil {
 		return err
 	}
@@ -275,10 +283,10 @@ func (s *Shim) Exec(c *containerkit.Container, p *containerkit.Process) (contain
 }
 
 func (s *Shim) Load(id string) (containerkit.ProcessDelegate, error) {
-	return nil, errnotimpl
+	return s.getContainerInit()
 }
 
-func (s *Shim) getContainerInit(c *containerkit.Container) (*process, error) {
+func (s *Shim) getContainerInit() (*process, error) {
 	s.pmu.Lock()
 	p, ok := s.processes["init"]
 	s.pmu.Unlock()
