@@ -69,12 +69,12 @@ func start(log *os.File) error {
 	// open the exit pipe
 	f, err := os.OpenFile("exit", syscall.O_WRONLY, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("open exit fifo %s", err)
 	}
 	defer f.Close()
 	control, err := os.OpenFile("control", syscall.O_RDWR, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("open control fifo %s", err)
 	}
 	defer control.Close()
 	p, err := newProcess(flag.Arg(0), flag.Arg(1), flag.Arg(2))
@@ -150,7 +150,7 @@ func start(log *os.File) error {
 				term.SetWinsize(p.console.Fd(), &ws)
 			case 2:
 				// signal
-				if err := syscall.Kill(p.pid(), msg.Width); err != nil {
+				if err := syscall.Kill(p.pid(), syscall.Signal(msg.Width)); err != nil {
 					writeMessage(log, "warn", err)
 				}
 			}

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/docker/containerkit"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -176,4 +180,49 @@ func (t *testConfig) Spec(m *containerkit.Mount) (*specs.Spec, error) {
 			},
 		},
 	}, nil
+}
+
+func Stdin() *os.File {
+	abs, err := filepath.Abs("stdin")
+	if err != nil {
+		panic(err)
+	}
+	if err := unix.Mkfifo(abs, 0755); err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+	f, err := os.OpenFile(abs, syscall.O_RDWR, 0)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
+func Stdout() *os.File {
+	abs, err := filepath.Abs("stdout")
+	if err != nil {
+		panic(err)
+	}
+	if err := unix.Mkfifo(abs, 0755); err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+	f, err := os.OpenFile(abs, syscall.O_RDWR, 0)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
+func Stderr() *os.File {
+	abs, err := filepath.Abs("stderr")
+	if err != nil {
+		panic(err)
+	}
+	if err := unix.Mkfifo(abs, 0755); err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+	f, err := os.OpenFile(abs, syscall.O_RDWR, 0)
+	if err != nil {
+		panic(err)
+	}
+	return f
 }

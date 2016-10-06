@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,16 +41,21 @@ type Opts struct {
 	Name        string
 	RuntimeName string
 	RuntimeArgs []string
+	RuntimeRoot string
 	NoPivotRoot bool
 	Root        string
 	Timeout     time.Duration
 }
 
 func New(opts Opts) (*Shim, error) {
+	if err := os.MkdirAll(filepath.Dir(opts.Root), 0711); err != nil {
+		return nil, err
+	}
 	if err := os.Mkdir(opts.Root, 0711); err != nil {
 		return nil, err
 	}
 	r, err := oci.New(oci.Opts{
+		Root: opts.RuntimeRoot,
 		Name: opts.RuntimeName,
 		Args: opts.RuntimeArgs,
 	})
@@ -85,7 +91,26 @@ func Load(root string) (*Shim, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: read processes into memory
+	dirs, err := ioutil.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		name := d.Name()
+		if f, err = os.Open(filepath.Join(root, name, "process.json")); err != nil {
+			return nil, err
+		}
+		var p process
+		err = json.NewDecoder(f).Decode(&p)
+		f.Close()
+		if err != nil {
+			return nil, err
+		}
+		s.processes[name] = &p
+	}
 	return &s, nil
 }
 
@@ -152,10 +177,12 @@ func (s *Shim) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	s.runtime = r
+	s.processes = make(map[string]*process)
 	return nil
 }
 
 func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {
+	s.bundle = c.Path()
 	var (
 		root = filepath.Join(s.root, "init")
 		cmd  = s.command(c.ID(), c.Path(), s.runtime.Name())
@@ -174,8 +201,15 @@ func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, 
 	s.pmu.Lock()
 	s.processes["init"] = p
 	s.pmu.Unlock()
+
+	f, err := os.Create(filepath.Join(s.root, "state.json"))
+	if err != nil {
+		return nil, err
+	}
+	err = json.NewEncoder(f).Encode(s)
+	f.Close()
 	// ~TODO: oom and stats stuff here
-	return p, nil
+	return p, err
 }
 
 func (s *Shim) Start(c *containerkit.Container) error {
@@ -213,6 +247,23 @@ func (s *Shim) Start(c *containerkit.Container) error {
 		}
 	}
 	return nil
+}
+
+func (s *Shim) Delete(c *containerkit.Container) error {
+	if err := s.runtime.Delete(c); err != nil {
+		return err
+	}
+	return os.RemoveAll(s.root)
+}
+
+var errnotimpl = errors.New("NOT IMPL RIGHT NOW, CHILL")
+
+func (s *Shim) Exec(c *containerkit.Container, p *containerkit.Process) (containerkit.ProcessDelegate, error) {
+	return nil, errnotimpl
+}
+
+func (s *Shim) Load(id string) (containerkit.ProcessDelegate, error) {
+	return nil, errnotimpl
 }
 
 func (s *Shim) getContainerInit(c *containerkit.Container) (*process, error) {

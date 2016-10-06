@@ -39,9 +39,9 @@ type checkpoint struct {
 type processState struct {
 	specs.ProcessSpec
 	Exec           bool     `json:"exec"`
-	Stdin          string   `json:"containerdStdin"`
-	Stdout         string   `json:"containerdStdout"`
-	Stderr         string   `json:"containerdStderr"`
+	Stdin          string   `json:"stdin"`
+	Stdout         string   `json:"stdout"`
+	Stderr         string   `json:"stderr"`
 	RuntimeArgs    []string `json:"runtimeArgs"`
 	NoPivotRoot    bool     `json:"noPivotRoot"`
 	CheckpointPath string   `json:"checkpoint"`
@@ -74,7 +74,7 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 	}
 	s, err := loadProcess()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load process from json %s", err)
 	}
 	p.state = s
 	if s.CheckpointPath != "" {
@@ -86,7 +86,7 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 		p.checkpointPath = s.CheckpointPath
 	}
 	if err := p.openIO(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open IO for container %s", err)
 	}
 	return p, nil
 }
