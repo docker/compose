@@ -184,6 +184,7 @@ func (p *process) UnmarshalJSON(b []byte) error {
 	p.stderr = ps.Stderr
 	p.root = ps.Root
 	p.startTime = ps.StartTime
+	p.done = make(chan struct{})
 	pid, err := readPid(filepath.Join(p.root, "pid"))
 	if err != nil {
 		return err

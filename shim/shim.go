@@ -151,12 +151,14 @@ type Shim struct {
 }
 
 type state struct {
+	Root string `json:"root"`
 	// Bundle is the path to the container's bundle
 	Bundle string `json:"bundle"`
 	// OCI runtime binary name
 	Runtime string `json:"runtime"`
 	// OCI runtime args
 	RuntimeArgs []string `json:"runtimeArgs"`
+	RuntimeRoot string   `json:"runtimeRoot"`
 	// Shim binary name
 	Name string `json:"shim"`
 	/// NoPivotRoot option
@@ -171,8 +173,10 @@ func (s *Shim) MarshalJSON() ([]byte, error) {
 		Bundle:      s.bundle,
 		Runtime:     s.runtime.Name(),
 		RuntimeArgs: s.runtime.Args(),
+		RuntimeRoot: s.runtime.Root(),
 		NoPivotRoot: s.noPivotRoot,
 		Timeout:     s.timeout,
+		Root:        s.root,
 	}
 	return json.Marshal(st)
 }
@@ -182,6 +186,7 @@ func (s *Shim) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &st); err != nil {
 		return err
 	}
+	s.root = st.Root
 	s.name = st.Name
 	s.bundle = st.Bundle
 	s.timeout = st.Timeout
@@ -189,6 +194,7 @@ func (s *Shim) UnmarshalJSON(b []byte) error {
 	r, err := oci.New(oci.Opts{
 		Name: st.Runtime,
 		Args: st.RuntimeArgs,
+		Root: st.RuntimeRoot,
 	})
 	if err != nil {
 		return err

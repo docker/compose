@@ -54,6 +54,10 @@ func (r *OCIRuntime) Args() []string {
 	return r.args
 }
 
+func (r *OCIRuntime) Root() string {
+	return r.root
+}
+
 func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {
 	pidFile := fmt.Sprintf("%s/%s.pid", filepath.Join(r.root, c.ID()), "init")
 	cmd := r.Command("create", "--pid-file", pidFile, "--bundle", c.Path(), c.ID())

@@ -15,6 +15,33 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+func reloadContainer() error {
+	// create a new runtime runtime that implements the ExecutionDriver interface
+	runtime, err := shim.Load("/run/cshim/test")
+	if err != nil {
+		return err
+	}
+	dockerContainer := &testConfig{}
+	container, err := containerkit.LoadContainer(dockerContainer, runtime)
+	if err != nil {
+		return err
+	}
+	// wait for it to exit and get the exit status
+	logrus.Info("wait container")
+	status, err := container.Wait()
+	if err != nil {
+		return err
+	}
+
+	// delete the container after it is done
+	logrus.Info("delete container")
+	if container.Delete(); err != nil {
+		return err
+	}
+	logrus.Infof("exit status %d", status)
+	return nil
+}
+
 func runContainer() error {
 	// create a new runtime runtime that implements the ExecutionDriver interface
 	runtime, err := shim.New(shim.Opts{
@@ -84,9 +111,7 @@ func runContainer() error {
 	}
 
 	if load {
-		if container, err = containerkit.LoadContainer(dockerContainer, runtime); err != nil {
-			return err
-		}
+		return nil
 	}
 
 	// wait for it to exit and get the exit status
@@ -106,17 +131,25 @@ func runContainer() error {
 }
 
 var (
-	exec int
-	load bool
+	exec   int
+	load   bool
+	reload bool
 )
 
 // "Hooks do optional work. Drivers do mandatory work"
 func main() {
 	flag.IntVar(&exec, "exec", 0, "run n number of execs")
 	flag.BoolVar(&load, "load", false, "reload the container")
+	flag.BoolVar(&reload, "reload", false, "reload the container live")
 	flag.Parse()
 	if err := osutils.SetSubreaper(1); err != nil {
 		logrus.Fatal(err)
+	}
+	if reload {
+		if err := reloadContainer(); err != nil {
+			logrus.Fatal(err)
+		}
+		return
 	}
 	if err := runContainer(); err != nil {
 		logrus.Fatal(err)
