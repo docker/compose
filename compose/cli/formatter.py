@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 import os
 
+import six
 import texttable
 
 from compose.cli import colors
@@ -44,5 +45,7 @@ class ConsoleWarningFormatter(logging.Formatter):
         return ''
 
     def format(self, record):
+        if isinstance(record.msg, six.binary_type):
+            record.msg = record.msg.decode('utf-8')
         message = super(ConsoleWarningFormatter, self).format(record)
-        return self.get_level_message(record) + message
+        return '{0}{1}'.format(self.get_level_message(record), message)
