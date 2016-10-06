@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/monitor"
 	"github.com/docker/containerd/oci"
 	"github.com/docker/containerkit"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -62,13 +64,19 @@ func New(opts Opts) (*Shim, error) {
 	if err != nil {
 		return nil, err
 	}
+	m, err := monitor.New()
+	if err != nil {
+		return nil, err
+	}
 	s := &Shim{
 		root:      opts.Root,
 		name:      opts.Name,
 		timeout:   opts.Timeout,
 		runtime:   r,
 		processes: make(map[string]*process),
+		m:         m,
 	}
+	go s.startMonitor()
 	f, err := os.Create(filepath.Join(opts.Root, "state.json"))
 	if err != nil {
 		return nil, err
@@ -131,6 +139,7 @@ type Shim struct {
 	processes   map[string]*process
 	bundle      string
 	checkpoint  string
+	m           *monitor.Monitor
 }
 
 type state struct {
@@ -196,6 +205,9 @@ func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, 
 	}
 	p, err := s.startCommand(c, cmd)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.m.Add(p); err != nil {
 		return nil, err
 	}
 	s.pmu.Lock()
@@ -300,6 +312,16 @@ func (s *Shim) startCommand(c *containerkit.Container, cmd *exec.Cmd) (*process,
 
 func (s *Shim) command(args ...string) *exec.Cmd {
 	return exec.Command(s.name, args...)
+}
+
+func (s *Shim) startMonitor() {
+	for m := range s.m.Events() {
+		p := m.(*process)
+		close(p.done)
+		if err := s.m.Remove(p); err != nil {
+			logrus.Error(err)
+		}
+	}
 }
 
 // checkShimNotFound checks the error returned from a exec call to see if the binary

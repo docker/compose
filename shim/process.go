@@ -200,9 +200,7 @@ func (p *process) FD() int {
 }
 
 func (p *process) Wait() (rst uint32, rerr error) {
-	if _, err := ioutil.ReadAll(p.exit); err != nil {
-		return 255, err
-	}
+	<-p.done
 	data, err := ioutil.ReadFile(filepath.Join(p.root, "exitStatus"))
 	defer func() {
 		if rerr != nil {
