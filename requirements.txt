@@ -9,7 +9,7 @@ functools32==3.2.3.post2; python_version < '3.2'
 ipaddress==1.0.16
 jsonschema==2.5.1
 pypiwin32==219; sys_platform == 'win32'
-requests==2.7.0
+requests==2.11.1
 six==1.10.0
 texttable==0.8.4
 websocket-client==0.32.0
