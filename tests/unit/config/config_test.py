@@ -1330,7 +1330,7 @@ class ConfigTest(unittest.TestCase):
                     'image': 'alpine',
                     'group_add': ["docker", 777]
                 }
-             }
+            }
         }))
 
         assert actual.services == [
@@ -1427,6 +1427,162 @@ class ConfigTest(unittest.TestCase):
             'log_driver': 'something',
             'log_opt': {'foo': 'three'},
             'command': 'true',
+        }
+
+    def test_merge_logging_v2(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_override_driver(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_base_driver(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_drivers(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_override_options(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'driver': 'syslog'
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': None
+            }
         }
 
     def test_external_volume_config(self):

@@ -764,6 +764,8 @@ def merge_service_dicts(base, override, version):
     for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
 
+    md.merge_field('logging', merge_logging)
+
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
 
@@ -790,6 +792,16 @@ def merge_build(output, base, override):
     md.merge_scalar('context')
     md.merge_scalar('dockerfile')
     md.merge_mapping('args', parse_build_arguments)
+    return dict(md)
+
+
+def merge_logging(base, override):
+    md = MergeDict(base, override)
+    md.merge_scalar('driver')
+    if md.get('driver') == base.get('driver') or base.get('driver') is None:
+        md.merge_mapping('options', lambda m: m or {})
+    else:
+        md['options'] = override.get('options')
     return dict(md)
 
 
