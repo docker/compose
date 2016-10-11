@@ -651,7 +651,10 @@ def finalize_service(service_config, service_names, version, environment):
 
     if 'volumes' in service_dict:
         service_dict['volumes'] = [
-            VolumeSpec.parse(v) for v in service_dict['volumes']]
+            VolumeSpec.parse(
+                v, environment.get('COMPOSE_CONVERT_WINDOWS_PATHS')
+            ) for v in service_dict['volumes']
+        ]
 
     if 'net' in service_dict:
         network_mode = service_dict.pop('net')

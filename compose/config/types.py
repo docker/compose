@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import re
 from collections import namedtuple
 
 import six
@@ -13,6 +14,8 @@ from compose.config.config import V1
 from compose.config.errors import ConfigurationError
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import splitdrive
+
+win32_root_path_pattern = re.compile(r'^[A-Za-z]\:\\.*')
 
 
 class VolumeFromSpec(namedtuple('_VolumeFromSpec', 'source mode type')):
@@ -154,7 +157,7 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
         return cls(external, internal, mode)
 
     @classmethod
-    def _parse_win32(cls, volume_config):
+    def _parse_win32(cls, volume_config, normalize):
         # relative paths in windows expand to include the drive, eg C:\
         # so we join the first 2 parts back together to count as one
         mode = 'rw'
@@ -168,13 +171,13 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
 
         parts = separate_next_section(volume_config)
         if len(parts) == 1:
-            internal = normalize_path_for_engine(os.path.normpath(parts[0]))
+            internal = parts[0]
             external = None
         else:
             external = parts[0]
             parts = separate_next_section(parts[1])
-            external = normalize_path_for_engine(os.path.normpath(external))
-            internal = normalize_path_for_engine(os.path.normpath(parts[0]))
+            external = os.path.normpath(external)
+            internal = parts[0]
             if len(parts) > 1:
                 if ':' in parts[1]:
                     raise ConfigurationError(
@@ -183,15 +186,18 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
                     )
                 mode = parts[1]
 
+        if normalize:
+            external = normalize_path_for_engine(external) if external else None
+
         return cls(external, internal, mode)
 
     @classmethod
-    def parse(cls, volume_config):
+    def parse(cls, volume_config, normalize=False):
         """Parse a volume_config path and split it into external:internal[:mode]
         parts to be returned as a valid VolumeSpec.
         """
         if IS_WINDOWS_PLATFORM:
-            return cls._parse_win32(volume_config)
+            return cls._parse_win32(volume_config, normalize)
         else:
             return cls._parse_unix(volume_config)
 
@@ -201,7 +207,14 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
 
     @property
     def is_named_volume(self):
-        return self.external and not self.external.startswith(('.', '/', '~'))
+        res = self.external and not self.external.startswith(('.', '/', '~'))
+        if not IS_WINDOWS_PLATFORM:
+            return res
+
+        return (
+            res and not self.external.startswith('\\') and
+            not win32_root_path_pattern.match(self.external)
+        )
 
 
 class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
