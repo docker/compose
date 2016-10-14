@@ -93,6 +93,8 @@ def parse_restart_spec(restart_config):
 
 
 def serialize_restart_spec(restart_spec):
+    if not restart_spec:
+        return ''
     parts = [restart_spec['Name']]
     if restart_spec['MaximumRetryCount']:
         parts.append(six.text_type(restart_spec['MaximumRetryCount']))

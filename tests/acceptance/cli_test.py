@@ -236,6 +236,10 @@ class CLITestCase(DockerClientTestCase):
                     'image': 'busybox',
                     'restart': 'on-failure:5',
                 },
+                'restart-null': {
+                    'image': 'busybox',
+                    'restart': ''
+                },
             },
             'networks': {},
             'volumes': {},
