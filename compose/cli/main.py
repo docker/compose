@@ -6,6 +6,7 @@ import contextlib
 import functools
 import json
 import logging
+import pipes
 import re
 import subprocess
 import sys
@@ -415,7 +416,7 @@ class TopLevelCommand(object):
         tty = not options["-T"]
 
         if IS_WINDOWS_PLATFORM and not detach:
-            args = ["docker", "exec"]
+            args = ["exec"]
 
             if options["-d"]:
                 args += ["--detach"]
@@ -434,7 +435,7 @@ class TopLevelCommand(object):
             args += [container.id]
             args += command
 
-            sys.exit(subprocess.call(args))
+            sys.exit(call_docker(args))
 
         create_exec_options = {
             "privileged": options["--privileged"],
@@ -982,8 +983,7 @@ def run_one_off_container(container_options, project, service, options):
     try:
         try:
             if IS_WINDOWS_PLATFORM:
-                args = ["docker", "start", "--attach", "--interactive", container.id]
-                exit_code = subprocess.call(args)
+                exit_code = call_docker(["start", "--attach", "--interactive", container.id])
             else:
                 operation = RunOperation(
                     project.client,
@@ -1060,3 +1060,15 @@ def exit_if(condition, message, exit_code):
     if condition:
         log.error(message)
         raise SystemExit(exit_code)
+
+
+def call_docker(args):
+    try:
+        executable_path = subprocess.check_output(["which", "docker"]).strip()
+    except subprocess.CalledProcessError:
+        raise UserError(errors.docker_not_found_msg("Couldn't find `docker` binary."))
+
+    args = [executable_path] + args
+    log.debug(" ".join(map(pipes.quote, args)))
+
+    return subprocess.call(args)
