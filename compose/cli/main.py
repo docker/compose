@@ -215,6 +215,7 @@ class TopLevelCommand(object):
       scale              Set number of containers for a service
       start              Start services
       stop               Stop services
+      top                Display the running processes
       unpause            Unpause services
       up                 Create and start containers
       version            Show the Docker-Compose version information
@@ -799,6 +800,33 @@ class TopLevelCommand(object):
         timeout = timeout_from_opts(options)
         containers = self.project.restart(service_names=options['SERVICE'], timeout=timeout)
         exit_if(not containers, 'No containers to restart', 1)
+
+    def top(self, options):
+        """
+        Display the running processes
+
+        Usage: top [SERVICE...]
+
+        """
+        containers = sorted(
+            self.project.containers(service_names=options['SERVICE'], stopped=False) +
+            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+            key=attrgetter('name')
+        )
+
+        for idx, container in enumerate(containers):
+            if idx > 0:
+                print()
+
+            top_data = self.project.client.top(container.name)
+            headers = top_data.get("Titles")
+            rows = []
+
+            for process in top_data.get("Processes", []):
+                rows.append(process)
+
+            print(container.name)
+            print(Formatter().table(headers, rows))
 
     def unpause(self, options):
         """
