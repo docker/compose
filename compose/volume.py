@@ -12,17 +12,18 @@ log = logging.getLogger(__name__)
 
 class Volume(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 external_name=None):
+                 external_name=None, labels=None):
         self.client = client
         self.project = project
         self.name = name
         self.driver = driver
         self.driver_opts = driver_opts
         self.external_name = external_name
+        self.labels = labels
 
     def create(self):
         return self.client.create_volume(
-            self.full_name, self.driver, self.driver_opts
+            self.full_name, self.driver, self.driver_opts, labels=self.labels
         )
 
     def remove(self):
@@ -68,7 +69,8 @@ class ProjectVolumes(object):
                 name=vol_name,
                 driver=data.get('driver'),
                 driver_opts=data.get('driver_opts'),
-                external_name=data.get('external_name')
+                external_name=data.get('external_name'),
+                labels=data.get('labels')
             )
             for vol_name, data in config_volumes.items()
         }
