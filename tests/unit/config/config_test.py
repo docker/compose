@@ -351,7 +351,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile(
             'base.yaml',
             {
-                'version': '2.1',
+                'version': V2_1,
                 'services': {
                     'web': {
                         'image': 'example/web',
@@ -1338,6 +1338,25 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'alpine',
                 'group_add': ["docker", 777]
+            }
+        ]
+
+    def test_isolation_option(self):
+        actual = config.load(build_config_details({
+            'version': V2_1,
+            'services': {
+                'web': {
+                    'image': 'win10',
+                    'isolation': 'hyperv'
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'win10',
+                'isolation': 'hyperv',
             }
         ]
 

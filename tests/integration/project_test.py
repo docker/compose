@@ -839,6 +839,49 @@ class ProjectTest(DockerClientTestCase):
         assert 'LinkLocalIPs' in ipam_config
         assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
 
+    @v2_1_only()
+    def test_up_with_isolation(self):
+        self.require_api_version('1.24')
+        config_data = config.Config(
+            version=V2_1,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'isolation': 'default'
+            }],
+            volumes={},
+            networks={}
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up()
+        service_container = project.get_service('web').containers()[0]
+        assert service_container.inspect()['HostConfig']['Isolation'] == 'default'
+
+    @v2_1_only()
+    def test_up_with_invalid_isolation(self):
+        self.require_api_version('1.24')
+        config_data = config.Config(
+            version=V2_1,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'isolation': 'foobar'
+            }],
+            volumes={},
+            networks={}
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        with self.assertRaises(ProjectError):
+            project.up()
+
     @v2_only()
     def test_project_up_with_network_internal(self):
         self.require_api_version('1.23')
