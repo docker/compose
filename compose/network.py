@@ -15,7 +15,8 @@ log = logging.getLogger(__name__)
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 ipam=None, external_name=None, internal=False, enable_ipv6=False):
+                 ipam=None, external_name=None, internal=False, enable_ipv6=False,
+                 labels=None):
         self.client = client
         self.project = project
         self.name = name
@@ -71,7 +72,8 @@ class Network(object):
                 options=self.driver_opts,
                 ipam=self.ipam,
                 internal=self.internal,
-                enable_ipv6=self.enable_ipv6
+                enable_ipv6=self.enable_ipv6,
+                labels=self.labels,
             )
 
     def remove(self):
@@ -121,6 +123,7 @@ def build_networks(name, config_data, client):
             external_name=data.get('external_name'),
             internal=data.get('internal'),
             enable_ipv6=data.get('enable_ipv6'),
+            labels=data.get('labels'),
         )
         for network_name, data in network_config.items()
     }

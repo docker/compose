@@ -248,7 +248,8 @@
           },
           "additionalProperties": false
         },
-        "enable_ipv6": {"type": "boolean"}
+        "enable_ipv6": {"type": "boolean"},
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -270,6 +271,7 @@
             "name": {"type": "string"}
           }
         },
+        "labels": {"$ref": "#/definitions/list_or_dict"},
         "additionalProperties": false
       },
       "additionalProperties": false

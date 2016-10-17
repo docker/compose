@@ -361,6 +361,9 @@ def load_mapping(config_files, get_func, entity_type):
                     config['driver_opts']
                 )
 
+            if 'labels' in config:
+                config['labels'] = parse_labels(config['labels'])
+
     return mapping
 
 
@@ -416,10 +419,11 @@ def load_services(config_details, config_file):
 def interpolate_config_section(config_file, config, section, environment):
     validate_config_section(config_file.filename, config, section)
     return interpolate_environment_variables(
-            config_file.version,
-            config,
-            section,
-            environment)
+        config_file.version,
+        config,
+        section,
+        environment
+    )
 
 
 def process_config_file(config_file, environment, service_name=None):
