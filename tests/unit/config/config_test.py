@@ -1378,6 +1378,44 @@ class ConfigTest(unittest.TestCase):
             'extends': {'service': 'foo'}
         }
 
+    def test_merge_service_dicts_heterogeneous(self):
+        base = {
+            'volumes': ['.:/app'],
+            'ports': ['5432']
+        }
+        override = {
+            'image': 'alpine:edge',
+            'ports': [5432]
+        }
+        actual = config.merge_service_dicts_from_files(
+            base,
+            override,
+            DEFAULT_VERSION)
+        assert actual == {
+            'image': 'alpine:edge',
+            'volumes': ['.:/app'],
+            'ports': ['5432']
+        }
+
+    def test_merge_service_dicts_heterogeneous_2(self):
+        base = {
+            'volumes': ['.:/app'],
+            'ports': [5432]
+        }
+        override = {
+            'image': 'alpine:edge',
+            'ports': ['5432']
+        }
+        actual = config.merge_service_dicts_from_files(
+            base,
+            override,
+            DEFAULT_VERSION)
+        assert actual == {
+            'image': 'alpine:edge',
+            'volumes': ['.:/app'],
+            'ports': ['5432']
+        }
+
     def test_merge_build_args(self):
         base = {
             'build': {

@@ -778,6 +778,8 @@ def merge_service_dicts(base, override, version):
 
 
 def merge_unique_items_lists(base, override):
+    override = [str(o) for o in override]
+    base = [str(b) for b in base]
     return sorted(set().union(base, override))
 
 
