@@ -246,7 +246,8 @@
             "name": {"type": "string"}
           },
           "additionalProperties": false
-        }
+        },
+        "enable_ipv6": {"type": "boolean"}
       },
       "additionalProperties": false
     },
