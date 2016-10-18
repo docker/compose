@@ -670,6 +670,7 @@ class TopLevelCommand(object):
                                   to the host.
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
+            --volumes-from=[]     Mount volumes from the specified container(s)
             -w, --workdir=""      Working directory inside the container
         """
         service = self.project.get_service(options['SERVICE'])
@@ -932,6 +933,10 @@ def build_container_options(options, detach, command):
     if options['--publish']:
         container_options['ports'] = options.get('--publish')
 
+    if options['--volumes-from']:
+        container_options['volumes-from'] = options.get('--volumes-from')
+
+    print(options)
     if options['--name']:
         container_options['name'] = options['--name']
 
