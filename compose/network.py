@@ -26,6 +26,7 @@ class Network(object):
         self.external_name = external_name
         self.internal = internal
         self.enable_ipv6 = enable_ipv6
+        self.labels = labels
 
     def ensure(self):
         if self.external_name:
