@@ -17,6 +17,7 @@ from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
+from compose.config.config import V2_1
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
@@ -101,6 +102,10 @@ class ConfigTest(unittest.TestCase):
                                 {'subnet': '172.28.0.0/16'}
                             ]
                         }
+                    },
+                    'internal': {
+                        'driver': 'bridge',
+                        'internal': True
                     }
                 }
             }, 'working_dir', 'filename.yml')
@@ -140,6 +145,10 @@ class ConfigTest(unittest.TestCase):
                         {'subnet': '172.28.0.0/16'}
                     ]
                 }
+            },
+            'internal': {
+                'driver': 'bridge',
+                'internal': True
             }
         })
 
@@ -147,6 +156,8 @@ class ConfigTest(unittest.TestCase):
         for version in ['2', '2.0']:
             cfg = config.load(build_config_details({'version': version}))
             assert cfg.version == V2_0
+        cfg = config.load(build_config_details({'version': '2.1'}))
+        assert cfg.version == V2_1
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -174,7 +185,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
-                    {'version': '2.1'},
+                    {'version': '2.18'},
                     filename='filename.yml',
                 )
             )
@@ -335,6 +346,88 @@ class ConfigTest(unittest.TestCase):
                     }
                 }, 'working_dir', 'filename.yml')
             )
+
+    def test_load_config_link_local_ips_network(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': V2_1,
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'networks': {
+                            'foobar': {
+                                'aliases': ['foo', 'bar'],
+                                'link_local_ips': ['169.254.8.8']
+                            }
+                        }
+                    }
+                },
+                'networks': {'foobar': {}}
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file])
+        web_service = config.load(details).services[0]
+        assert web_service['networks'] == {
+            'foobar': {
+                'aliases': ['foo', 'bar'],
+                'link_local_ips': ['169.254.8.8']
+            }
+        }
+
+    def test_load_config_volume_and_network_labels(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                    },
+                },
+                'networks': {
+                    'with_label': {
+                        'labels': {
+                            'label_key': 'label_val'
+                        }
+                    }
+                },
+                'volumes': {
+                    'with_label': {
+                        'labels': {
+                            'label_key': 'label_val'
+                        }
+                    }
+                }
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file])
+        network_dict = config.load(details).networks
+        volume_dict = config.load(details).volumes
+
+        self.assertEqual(
+            network_dict,
+            {
+                'with_label': {
+                    'labels': {
+                        'label_key': 'label_val'
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(
+            volume_dict,
+            {
+                'with_label': {
+                    'labels': {
+                        'label_key': 'label_val'
+                    }
+                }
+            }
+        )
 
     def test_load_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
@@ -1243,6 +1336,83 @@ class ConfigTest(unittest.TestCase):
             }
         ]
 
+    def test_oom_score_adj_option(self):
+
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'oom_score_adj': 500
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'oom_score_adj': 500
+            }
+        ]
+
+    def test_swappiness_option(self):
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'mem_swappiness': 10,
+                }
+            }
+        }))
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'mem_swappiness': 10,
+            }
+        ]
+
+    def test_group_add_option(self):
+
+        actual = config.load(build_config_details({
+            'version': '2',
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'group_add': ["docker", 777]
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'alpine',
+                'group_add': ["docker", 777]
+            }
+        ]
+
+    def test_isolation_option(self):
+        actual = config.load(build_config_details({
+            'version': V2_1,
+            'services': {
+                'web': {
+                    'image': 'win10',
+                    'isolation': 'hyperv'
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'win10',
+                'isolation': 'hyperv',
+            }
+        ]
+
     def test_merge_service_dicts_from_files_with_extends_in_base(self):
         base = {
             'volumes': ['.:/app'],
@@ -1329,6 +1499,162 @@ class ConfigTest(unittest.TestCase):
             'log_driver': 'something',
             'log_opt': {'foo': 'three'},
             'command': 'true',
+        }
+
+    def test_merge_logging_v2(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_override_driver(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_base_driver(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_drivers(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'options': {
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '360',
+                    'pretty-print': 'on'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_override_options(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000',
+                    'timeout': '23'
+                }
+            }
+        }
+        override = {
+            'logging': {
+                'driver': 'syslog'
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': None
+            }
         }
 
     def test_external_volume_config(self):

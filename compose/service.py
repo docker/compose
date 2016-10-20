@@ -48,12 +48,15 @@ DOCKER_START_KEYS = [
     'dns_search',
     'env_file',
     'extra_hosts',
+    'group_add',
     'ipc',
     'read_only',
     'log_driver',
     'log_opt',
     'mem_limit',
     'memswap_limit',
+    'oom_score_adj',
+    'mem_swappiness',
     'pid',
     'privileged',
     'restart',
@@ -475,7 +478,9 @@ class Service(object):
                 aliases=self._get_aliases(netdefs, container),
                 ipv4_address=netdefs.get('ipv4_address', None),
                 ipv6_address=netdefs.get('ipv6_address', None),
-                links=self._get_links(False))
+                links=self._get_links(False),
+                link_local_ips=netdefs.get('link_local_ips', None),
+            )
 
     def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
         for c in self.duplicate_containers():
@@ -677,7 +682,7 @@ class Service(object):
         logging_dict = options.get('logging', None)
         log_config = get_log_config(logging_dict)
 
-        return self.client.create_host_config(
+        host_config = self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=build_port_bindings(options.get('ports') or []),
             binds=options.get('binds'),
@@ -703,7 +708,16 @@ class Service(object):
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
             tmpfs=options.get('tmpfs'),
+            oom_score_adj=options.get('oom_score_adj'),
+            mem_swappiness=options.get('mem_swappiness'),
+            group_add=options.get('group_add')
         )
+
+        # TODO: Add as an argument to create_host_config once it's supported
+        # in docker-py
+        host_config['Isolation'] = options.get('isolation')
+
+        return host_config
 
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
@@ -1103,6 +1117,8 @@ def format_environment(environment):
     def format_env(key, value):
         if value is None:
             return key
+        if isinstance(value, six.binary_type):
+            value = value.decode('utf-8')
         return '{key}={value}'.format(key=key, value=value)
     return [format_env(*item) for item in environment.items()]
 

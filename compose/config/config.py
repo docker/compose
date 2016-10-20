@@ -14,6 +14,7 @@ from cached_property import cached_property
 
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
+from ..const import COMPOSEFILE_V2_1 as V2_1
 from ..utils import build_string_dict
 from ..utils import splitdrive
 from .environment import env_vars_from_file
@@ -61,6 +62,7 @@ DOCKER_CONFIG_KEYS = [
     'env_file',
     'environment',
     'extra_hosts',
+    'group_add',
     'hostname',
     'image',
     'ipc',
@@ -69,7 +71,9 @@ DOCKER_CONFIG_KEYS = [
     'mac_address',
     'mem_limit',
     'memswap_limit',
+    'mem_swappiness',
     'net',
+    'oom_score_adj'
     'pid',
     'ports',
     'privileged',
@@ -171,7 +175,7 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '2':
             version = V2_0
 
-        if version != V2_0:
+        if version not in (V2_0, V2_1):
             raise ConfigurationError(
                 'Version in "{}" is unsupported. {}'
                 .format(self.filename, VERSION_EXPLANATION))
@@ -357,6 +361,9 @@ def load_mapping(config_files, get_func, entity_type):
                     config['driver_opts']
                 )
 
+            if 'labels' in config:
+                config['labels'] = parse_labels(config['labels'])
+
     return mapping
 
 
@@ -409,31 +416,36 @@ def load_services(config_details, config_file):
     return build_services(service_config)
 
 
-def interpolate_config_section(filename, config, section, environment):
-    validate_config_section(filename, config, section)
-    return interpolate_environment_variables(config, section, environment)
+def interpolate_config_section(config_file, config, section, environment):
+    validate_config_section(config_file.filename, config, section)
+    return interpolate_environment_variables(
+        config_file.version,
+        config,
+        section,
+        environment
+    )
 
 
 def process_config_file(config_file, environment, service_name=None):
     services = interpolate_config_section(
-        config_file.filename,
+        config_file,
         config_file.get_service_dicts(),
         'service',
-        environment,)
+        environment)
 
-    if config_file.version == V2_0:
+    if config_file.version in (V2_0, V2_1):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
-            config_file.filename,
+            config_file,
             config_file.get_volumes(),
             'volume',
-            environment,)
+            environment)
         processed_config['networks'] = interpolate_config_section(
-            config_file.filename,
+            config_file,
             config_file.get_networks(),
             'network',
-            environment,)
+            environment)
 
     if config_file.version == V1:
         processed_config = services
@@ -639,7 +651,10 @@ def finalize_service(service_config, service_names, version, environment):
 
     if 'volumes' in service_dict:
         service_dict['volumes'] = [
-            VolumeSpec.parse(v) for v in service_dict['volumes']]
+            VolumeSpec.parse(
+                v, environment.get('COMPOSE_CONVERT_WINDOWS_PATHS')
+            ) for v in service_dict['volumes']
+        ]
 
     if 'net' in service_dict:
         network_mode = service_dict.pop('net')
@@ -756,6 +771,8 @@ def merge_service_dicts(base, override, version):
     for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
 
+    md.merge_field('logging', merge_logging)
+
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
 
@@ -782,6 +799,16 @@ def merge_build(output, base, override):
     md.merge_scalar('context')
     md.merge_scalar('dockerfile')
     md.merge_mapping('args', parse_build_arguments)
+    return dict(md)
+
+
+def merge_logging(base, override):
+    md = MergeDict(base, override)
+    md.merge_scalar('driver')
+    if md.get('driver') == base.get('driver') or base.get('driver') is None:
+        md.merge_mapping('options', lambda m: m or {})
+    else:
+        md['options'] = override.get('options')
     return dict(md)
 
 

@@ -1,0 +1,13 @@
+version: "2"
+
+services:
+  web:
+    image: busybox
+    command: top
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+    internal: True

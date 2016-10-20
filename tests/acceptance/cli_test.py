@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
@@ -12,6 +13,7 @@ from collections import namedtuple
 from operator import attrgetter
 
 import py
+import six
 import yaml
 from docker import errors
 
@@ -22,6 +24,7 @@ from compose.project import OneOffFilter
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
+from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 
 
@@ -113,6 +116,8 @@ class CLITestCase(DockerClientTestCase):
             for n in networks:
                 if n['Name'].startswith('{}_'.format(self.project.name)):
                     self.client.remove_network(n['Name'])
+        if hasattr(self, '_project'):
+            del self._project
 
         super(CLITestCase, self).tearDown()
 
@@ -151,6 +156,19 @@ class CLITestCase(DockerClientTestCase):
              'up', '-d'],
             returncode=0
         )
+
+    def test_host_not_reachable(self):
+        result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
+        assert "Couldn't connect to Docker daemon" in result.stderr
+
+    def test_host_not_reachable_volumes_from_container(self):
+        self.base_dir = 'tests/fixtures/volumes-from-container'
+
+        container = self.client.create_container('busybox', 'true', name='composetest_data_container')
+        self.addCleanup(self.client.remove_container, container)
+
+        result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
+        assert "Couldn't connect to Docker daemon" in result.stderr
 
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
@@ -219,6 +237,10 @@ class CLITestCase(DockerClientTestCase):
                     'image': 'busybox',
                     'restart': 'on-failure:5',
                 },
+                'restart-null': {
+                    'image': 'busybox',
+                    'restart': ''
+                },
             },
             'networks': {},
             'volumes': {},
@@ -242,7 +264,7 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
         assert yaml.load(result.stdout) == {
-            'version': '2.0',
+            'version': '2.1',
             'services': {
                 'net': {
                     'image': 'busybox',
@@ -576,6 +598,24 @@ class CLITestCase(DockerClientTestCase):
         assert 'ahead' in front_aliases
 
     @v2_only()
+    def test_up_with_network_internal(self):
+        self.require_api_version('1.23')
+        filename = 'network-internal.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'up', '-d'], None)
+        internal_net = '{}_internal'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        # One network was created: internal
+        assert sorted(n['Name'] for n in networks) == [internal_net]
+
+        assert networks[0]['Internal'] is True
+
+    @v2_only()
     def test_up_with_network_static_addresses(self):
         filename = 'network-static-addresses.yml'
         ipv4_address = '172.16.100.100'
@@ -733,6 +773,46 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['-f', filename, 'up', '-d'])
         container = self.project.containers()[0]
         assert list(container.get('NetworkSettings.Networks')) == [network_name]
+
+    @v2_1_only()
+    def test_up_with_network_labels(self):
+        filename = 'network-label.yml'
+
+        self.base_dir = 'tests/fixtures/networks'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], returncode=0)
+
+        network_with_label = '{}_network_with_label'.format(self.project.name)
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        assert [n['Name'] for n in networks] == [network_with_label]
+
+        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+
+    @v2_1_only()
+    def test_up_with_volume_labels(self):
+        filename = 'volume-label.yml'
+
+        self.base_dir = 'tests/fixtures/volumes'
+        self._project = get_project(self.base_dir, [filename])
+
+        self.dispatch(['-f', filename, 'up', '-d'], returncode=0)
+
+        volume_with_label = '{}_volume_with_label'.format(self.project.name)
+
+        volumes = [
+            v for v in self.client.volumes().get('Volumes', [])
+            if v['Name'].startswith('{}_'.format(self.project.name))
+        ]
+
+        assert [v['Name'] for v in volumes] == [volume_with_label]
+
+        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
 
     @v2_only()
     def test_up_no_services(self):
@@ -1252,6 +1332,23 @@ class CLITestCase(DockerClientTestCase):
             self.project.client,
             'simplecomposefile_simple_run_1',
             'exited'))
+
+    @mock.patch.dict(os.environ)
+    def test_run_unicode_env_values_from_system(self):
+        value = 'ą, ć, ę, ł, ń, ó, ś, ź, ż'
+        if six.PY2:  # os.environ doesn't support unicode values in Py2
+            os.environ['BAR'] = value.encode('utf-8')
+        else:  # ... and doesn't support byte values in Py3
+            os.environ['BAR'] = value
+        self.base_dir = 'tests/fixtures/unicode-environment'
+        result = self.dispatch(['run', 'simple'])
+
+        if six.PY2:  # Can't retrieve output on Py3. See issue #3670
+            assert value == result.stdout.strip()
+
+        container = self.project.containers(one_off=OneOffFilter.only, stopped=True)[0]
+        environment = container.get('Config.Env')
+        assert 'FOO={}'.format(value) in environment
 
     @mock.patch.dict(os.environ)
     def test_run_env_values_from_system(self):

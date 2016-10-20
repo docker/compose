@@ -1,6 +1,61 @@
 Change log
 ==========
 
+1.9.0 (2016-10-20)
+-----------------
+
+**Breaking changes**
+
+- When using Compose with Docker Toolbox/Machine on Windows, volume paths are
+  no longer converted from `C:\Users` to `/c/Users`-style by default. To
+  re-enable this conversion so that your volumes keep working, set the
+  environment variable `COMPOSE_CONVERT_WINDOWS_PATHS=1`. Users of
+  Docker for Windows are not affected and do not need to set the variable.
+
+New Features
+
+- Interactive mode for `docker-compose run` and `docker-compose exec` is
+  now supported on Windows platforms. Please note that the `docker` binary
+  is required to be present on the system for this feature to work.
+
+- Introduced version 2.1 of the `docker-compose.yml` specification. This
+  version requires to be used with Docker Engine 1.12 or above.
+    - Added support for setting volume labels and network labels in
+  `docker-compose.yml`.
+    - Added support for the `isolation` parameter in service definitions.
+    - Added support for link-local IPs in the service networks definitions.
+    - Added support for shell-style inline defaults in variable interpolation.
+      The supported forms are `${FOO-default}` (fall back if FOO is unset) and
+      `${FOO:-default}` (fall back if FOO is unset or empty).
+
+- Added support for the `group_add` and `oom_score_adj` parameters in
+  service definitions.
+
+- Added support for the `internal` and `enable_ipv6` parameters in network
+  definitions.
+
+- Compose now defaults to using the `npipe` protocol on Windows.
+
+- Overriding a `logging` configuration will now properly merge the `options`
+  mappings if the `driver` values do not conflict.
+
+Bug Fixes
+
+- Fixed several bugs related to `npipe` protocol support on Windows.
+
+- Fixed an issue with Windows paths being incorrectly converted when
+  using Docker on Windows Server.
+
+- Fixed a bug where an empty `restart` value would sometimes result in an
+  exception being raised.
+
+- Fixed an issue where service logs containing unicode characters would
+  sometimes cause an error to occur.
+
+- Fixed a bug where unicode values in environment variables would sometimes
+  raise a unicode exception when retrieved.
+
+
 1.8.1 (2016-09-22)
 -----------------
 
@@ -41,6 +96,7 @@ Bug Fixes
 
 - Fixed a bug where a misleading error would appear when encountering
   a connection timeout.
+
 
 1.8.0 (2016-06-14)
 -----------------

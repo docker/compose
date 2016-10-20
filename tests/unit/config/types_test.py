@@ -63,35 +63,67 @@ class TestVolumeSpec(object):
             VolumeSpec.parse('one:two:three:four')
         assert 'has incorrect format' in exc.exconly()
 
-    def test_parse_volume_windows_absolute_path(self):
-        windows_path = "c:\\Users\\me\\Documents\\shiny\\config:\\opt\\shiny\\config:ro"
-        assert VolumeSpec._parse_win32(windows_path) == (
+    def test_parse_volume_windows_absolute_path_normalized(self):
+        windows_path = "c:\\Users\\me\\Documents\\shiny\\config:/opt/shiny/config:ro"
+        assert VolumeSpec._parse_win32(windows_path, True) == (
             "/c/Users/me/Documents/shiny/config",
             "/opt/shiny/config",
             "ro"
         )
 
-    def test_parse_volume_windows_internal_path(self):
+    def test_parse_volume_windows_absolute_path_native(self):
+        windows_path = "c:\\Users\\me\\Documents\\shiny\\config:/opt/shiny/config:ro"
+        assert VolumeSpec._parse_win32(windows_path, False) == (
+            "c:\\Users\\me\\Documents\\shiny\\config",
+            "/opt/shiny/config",
+            "ro"
+        )
+
+    def test_parse_volume_windows_internal_path_normalized(self):
         windows_path = 'C:\\Users\\reimu\\scarlet:C:\\scarlet\\app:ro'
-        assert VolumeSpec._parse_win32(windows_path) == (
+        assert VolumeSpec._parse_win32(windows_path, True) == (
             '/c/Users/reimu/scarlet',
-            '/c/scarlet/app',
+            'C:\\scarlet\\app',
             'ro'
         )
 
-    def test_parse_volume_windows_just_drives(self):
+    def test_parse_volume_windows_internal_path_native(self):
+        windows_path = 'C:\\Users\\reimu\\scarlet:C:\\scarlet\\app:ro'
+        assert VolumeSpec._parse_win32(windows_path, False) == (
+            'C:\\Users\\reimu\\scarlet',
+            'C:\\scarlet\\app',
+            'ro'
+        )
+
+    def test_parse_volume_windows_just_drives_normalized(self):
         windows_path = 'E:\\:C:\\:ro'
-        assert VolumeSpec._parse_win32(windows_path) == (
+        assert VolumeSpec._parse_win32(windows_path, True) == (
             '/e/',
-            '/c/',
+            'C:\\',
             'ro'
         )
 
-    def test_parse_volume_windows_mixed_notations(self):
-        windows_path = '/c/Foo:C:\\bar'
-        assert VolumeSpec._parse_win32(windows_path) == (
+    def test_parse_volume_windows_just_drives_native(self):
+        windows_path = 'E:\\:C:\\:ro'
+        assert VolumeSpec._parse_win32(windows_path, False) == (
+            'E:\\',
+            'C:\\',
+            'ro'
+        )
+
+    def test_parse_volume_windows_mixed_notations_normalized(self):
+        windows_path = 'C:\\Foo:/root/foo'
+        assert VolumeSpec._parse_win32(windows_path, True) == (
             '/c/Foo',
-            '/c/bar',
+            '/root/foo',
+            'rw'
+        )
+
+    def test_parse_volume_windows_mixed_notations_native(self):
+        windows_path = 'C:\\Foo:/root/foo'
+        assert VolumeSpec._parse_win32(windows_path, False) == (
+            'C:\\Foo',
+            '/root/foo',
             'rw'
         )
 

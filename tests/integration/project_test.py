@@ -13,6 +13,7 @@ from .testcases import DockerClientTestCase
 from compose.config import config
 from compose.config import ConfigurationError
 from compose.config.config import V2_0
+from compose.config.config import V2_1
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
@@ -21,6 +22,7 @@ from compose.container import Container
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
+from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 
 
@@ -719,6 +721,51 @@ class ProjectTest(DockerClientTestCase):
         assert IPAMConfig.get('IPv4Address') == '172.16.100.100'
         assert IPAMConfig.get('IPv6Address') == 'fe80::1001:102'
 
+    @v2_1_only()
+    def test_up_with_enable_ipv6(self):
+        self.require_api_version('1.23')
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top',
+                'networks': {
+                    'static_test': {
+                        'ipv6_address': 'fe80::1001:102'
+                    }
+                },
+            }],
+            volumes={},
+            networks={
+                'static_test': {
+                    'driver': 'bridge',
+                    'enable_ipv6': True,
+                    'ipam': {
+                        'driver': 'default',
+                        'config': [
+                            {"subnet": "fe80::/64",
+                             "gateway": "fe80::1001:1"}
+                        ]
+                    }
+                }
+            }
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up(detached=True)
+        network = self.client.networks(names=['static_test'])[0]
+        service_container = project.get_service('web').containers()[0]
+
+        assert network['EnableIPv6'] is True
+        ipam_config = (service_container.inspect().get('NetworkSettings', {}).
+                       get('Networks', {}).get('composetest_static_test', {}).
+                       get('IPAMConfig', {}))
+        assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
+
     @v2_only()
     def test_up_with_network_static_addresses_missing_subnet(self):
         config_data = config.Config(
@@ -756,6 +803,148 @@ class ProjectTest(DockerClientTestCase):
         with self.assertRaises(ProjectError):
             project.up()
 
+    @v2_1_only()
+    def test_up_with_network_link_local_ips(self):
+        config_data = config.Config(
+            version=V2_1,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {
+                    'linklocaltest': {
+                        'link_local_ips': ['169.254.8.8']
+                    }
+                }
+            }],
+            volumes={},
+            networks={
+                'linklocaltest': {'driver': 'bridge'}
+            }
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up()
+
+        service_container = project.get_service('web').containers()[0]
+        ipam_config = service_container.inspect().get(
+            'NetworkSettings', {}
+        ).get(
+            'Networks', {}
+        ).get(
+            'composetest_linklocaltest', {}
+        ).get('IPAMConfig', {})
+        assert 'LinkLocalIPs' in ipam_config
+        assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
+
+    @v2_1_only()
+    def test_up_with_isolation(self):
+        self.require_api_version('1.24')
+        config_data = config.Config(
+            version=V2_1,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'isolation': 'default'
+            }],
+            volumes={},
+            networks={}
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up()
+        service_container = project.get_service('web').containers()[0]
+        assert service_container.inspect()['HostConfig']['Isolation'] == 'default'
+
+    @v2_1_only()
+    def test_up_with_invalid_isolation(self):
+        self.require_api_version('1.24')
+        config_data = config.Config(
+            version=V2_1,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'isolation': 'foobar'
+            }],
+            volumes={},
+            networks={}
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        with self.assertRaises(ProjectError):
+            project.up()
+
+    @v2_only()
+    def test_project_up_with_network_internal(self):
+        self.require_api_version('1.23')
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {'internal': None},
+            }],
+            volumes={},
+            networks={
+                'internal': {'driver': 'bridge', 'internal': True},
+            },
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up()
+
+        network = self.client.networks(names=['composetest_internal'])[0]
+
+        assert network['Internal'] is True
+
+    @v2_1_only()
+    def test_project_up_with_network_label(self):
+        self.require_api_version('1.23')
+
+        network_name = 'network_with_label'
+
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {network_name: None}
+            }],
+            volumes={},
+            networks={
+                network_name: {'labels': {'label_key': 'label_val'}}
+            }
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+
+        project.up()
+
+        networks = [
+            n for n in self.client.networks()
+            if n['Name'].startswith('composetest_')
+        ]
+
+        assert [n['Name'] for n in networks] == ['composetest_{}'.format(network_name)]
+
+        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+
     @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
@@ -781,6 +970,46 @@ class ProjectTest(DockerClientTestCase):
         volume_data = self.client.inspect_volume(full_vol_name)
         self.assertEqual(volume_data['Name'], full_vol_name)
         self.assertEqual(volume_data['Driver'], 'local')
+
+    @v2_1_only()
+    def test_project_up_with_volume_labels(self):
+        self.require_api_version('1.23')
+
+        volume_name = 'volume_with_label'
+
+        config_data = config.Config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'volumes': [VolumeSpec.parse('{}:/data'.format(volume_name))]
+            }],
+            volumes={
+                volume_name: {
+                    'labels': {
+                        'label_key': 'label_val'
+                    }
+                }
+            },
+            networks={},
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+
+        project.up()
+
+        volumes = [
+            v for v in self.client.volumes().get('Volumes', [])
+            if v['Name'].startswith('composetest_')
+        ]
+
+        assert [v['Name'] for v in volumes] == ['composetest_{}'.format(volume_name)]
+
+        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
 
     @v2_only()
     def test_project_up_logging_with_multiple_files(self):

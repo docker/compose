@@ -593,12 +593,12 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
 
-    def test_start_container_stays_unpriviliged(self):
+    def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], False)
 
-    def test_start_container_becomes_priviliged(self):
+    def test_start_container_becomes_privileged(self):
         service = self.create_service('web', privileged=True)
         container = create_and_start_container(service).inspect()
         self.assertEqual(container['HostConfig']['Privileged'], True)
@@ -852,10 +852,28 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.Dns'), ['8.8.8.8', '9.9.9.9'])
 
+    def test_mem_swappiness(self):
+        service = self.create_service('web', mem_swappiness=11)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.MemorySwappiness'), 11)
+
     def test_restart_always_value(self):
         service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.RestartPolicy.Name'), 'always')
+
+    def test_oom_score_adj_value(self):
+        service = self.create_service('web', oom_score_adj=500)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.OomScoreAdj'), 500)
+
+    def test_group_add_value(self):
+        service = self.create_service('web', group_add=["root", "1"])
+        container = create_and_start_container(service)
+
+        host_container_groupadd = container.get('HostConfig.GroupAdd')
+        self.assertTrue("root" in host_container_groupadd)
+        self.assertTrue("1" in host_container_groupadd)
 
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart={

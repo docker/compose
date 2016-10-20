@@ -786,7 +786,7 @@ class ServiceVolumesTest(unittest.TestCase):
         self.mock_client = mock.create_autospec(docker.Client)
 
     def test_build_volume_binding(self):
-        binding = build_volume_binding(VolumeSpec.parse('/outside:/inside'))
+        binding = build_volume_binding(VolumeSpec.parse('/outside:/inside', True))
         assert binding == ('/inside', '/outside:/inside:rw')
 
     def test_get_container_data_volumes(self):
@@ -845,10 +845,10 @@ class ServiceVolumesTest(unittest.TestCase):
 
     def test_merge_volume_bindings(self):
         options = [
-            VolumeSpec.parse('/host/volume:/host/volume:ro'),
-            VolumeSpec.parse('/host/rw/volume:/host/rw/volume'),
-            VolumeSpec.parse('/new/volume'),
-            VolumeSpec.parse('/existing/volume'),
+            VolumeSpec.parse('/host/volume:/host/volume:ro', True),
+            VolumeSpec.parse('/host/rw/volume:/host/rw/volume', True),
+            VolumeSpec.parse('/new/volume', True),
+            VolumeSpec.parse('/existing/volume', True),
         ]
 
         self.mock_client.inspect_image.return_value = {
@@ -882,8 +882,8 @@ class ServiceVolumesTest(unittest.TestCase):
             'web',
             image='busybox',
             volumes=[
-                VolumeSpec.parse('/host/path:/data1'),
-                VolumeSpec.parse('/host/path:/data2'),
+                VolumeSpec.parse('/host/path:/data1', True),
+                VolumeSpec.parse('/host/path:/data2', True),
             ],
             client=self.mock_client,
         )
@@ -1007,7 +1007,7 @@ class ServiceVolumesTest(unittest.TestCase):
             'web',
             client=self.mock_client,
             image='busybox',
-            volumes=[VolumeSpec.parse(volume)],
+            volumes=[VolumeSpec.parse(volume, True)],
         ).create_container()
 
         assert self.mock_client.create_container.call_count == 1
