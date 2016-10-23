@@ -6,6 +6,7 @@ import contextlib
 import functools
 import json
 import logging
+import os
 import pipes
 import re
 import subprocess
@@ -436,6 +437,9 @@ class TopLevelCommand(object):
             args += command
 
             sys.exit(call_docker(args))
+
+        if tty and not os.isatty(sys.stdin.fileno()):
+            raise UserError("The input device is not a TTY, try using -T flag")
 
         create_exec_options = {
             "privileged": options["--privileged"],
