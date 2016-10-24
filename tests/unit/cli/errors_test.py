@@ -16,9 +16,9 @@ def mock_logging():
         yield mock_log
 
 
-def patch_call_silently(side_effect):
+def patch_find_executable(side_effect):
     return mock.patch(
-        'compose.cli.errors.call_silently',
+        'compose.cli.errors.find_executable',
         autospec=True,
         side_effect=side_effect)
 
@@ -27,7 +27,7 @@ class TestHandleConnectionErrors(object):
 
     def test_generic_connection_error(self, mock_logging):
         with pytest.raises(errors.ConnectionError):
-            with patch_call_silently([0, 1]):
+            with patch_find_executable(['/bin/docker', None]):
                 with handle_connection_errors(mock.Mock()):
                     raise ConnectionError()
 
