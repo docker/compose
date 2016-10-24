@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import contextlib
 import logging
 import socket
+from distutils.spawn import find_executable
 from textwrap import dedent
 
 from docker.errors import APIError
@@ -13,7 +14,6 @@ from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
-from .utils import call_silently
 from .utils import is_docker_for_mac_installed
 from .utils import is_mac
 from .utils import is_ubuntu
@@ -90,11 +90,11 @@ def exit_with_error(msg):
 
 
 def get_conn_error_message(url):
-    if call_silently(['which', 'docker']) != 0:
+    if find_executable('docker') is None:
         return docker_not_found_msg("Couldn't connect to Docker daemon.")
     if is_docker_for_mac_installed():
         return conn_error_docker_for_mac
-    if call_silently(['which', 'docker-machine']) == 0:
+    if find_executable('docker-machine') is not None:
         return conn_error_docker_machine
     return conn_error_generic.format(url=url)
 
