@@ -10,6 +10,7 @@ import pipes
 import re
 import subprocess
 import sys
+from distutils.spawn import find_executable
 from inspect import getdoc
 from operator import attrgetter
 
@@ -1063,9 +1064,8 @@ def exit_if(condition, message, exit_code):
 
 
 def call_docker(args):
-    try:
-        executable_path = subprocess.check_output(["which", "docker"]).strip()
-    except subprocess.CalledProcessError:
+    executable_path = find_executable('docker')
+    if not executable_path:
         raise UserError(errors.docker_not_found_msg("Couldn't find `docker` binary."))
 
     args = [executable_path] + args

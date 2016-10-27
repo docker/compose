@@ -538,6 +538,10 @@ def get_volumes_from(project, service_dict):
 def warn_for_swarm_mode(client):
     info = client.info()
     if info.get('Swarm', {}).get('LocalNodeState') == 'active':
+        if info.get('ServerVersion', '').startswith('ucp'):
+            # UCP does multi-node scheduling with traditional Compose files.
+            return
+
         log.warn(
             "The Docker Engine you're using is running in swarm mode.\n\n"
             "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
