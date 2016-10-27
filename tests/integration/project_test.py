@@ -826,9 +826,9 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data
         )
-        project.up()
+        project.up(detached=True)
 
-        service_container = project.get_service('web').containers()[0]
+        service_container = project.get_service('web').containers(stopped=True)[0]
         ipam_config = service_container.inspect().get(
             'NetworkSettings', {}
         ).get(
@@ -857,8 +857,8 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data
         )
-        project.up()
-        service_container = project.get_service('web').containers()[0]
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
         assert service_container.inspect()['HostConfig']['Isolation'] == 'default'
 
     @v2_1_only()
