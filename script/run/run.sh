@@ -35,7 +35,7 @@ if [ "$(pwd)" != '/' ]; then
     VOLUMES="-v $(pwd):$(pwd)"
 fi
 if [ -n "$COMPOSE_FILE" ]; then
-    compose_dir=$(dirname $COMPOSE_FILE)
+    compose_dir=$(realpath $(dirname $COMPOSE_FILE))
 fi
 # TODO: also check --file argument
 if [ -n "$compose_dir" ]; then
