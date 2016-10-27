@@ -21,23 +21,47 @@ def split_env(env):
     else:
         return env, None
 
+def strip_continuation(input):
+    return v[:-1].strip()
 
 def env_vars_from_file(filename):
     """
     Read in a line delimited file of environment variables.
+    Multi-line values can be continued with a trailing \ ala bash
     """
     if not os.path.exists(filename):
         raise ConfigurationError("Couldn't find env file: %s" % filename)
     elif not os.path.isfile(filename):
         raise ConfigurationError("%s is not a file." % (filename))
     env = {}
+
+    k = ""
+    v = ""
+    continued = false
+
     for line in codecs.open(filename, 'r', 'utf-8'):
         line = line.strip()
-        if line and not line.startswith('#'):
-            k, v = split_env(line)
-            env[k] = v
-    return env
 
+        if line and not line.startswith('#')
+          if not continued:
+            k, v = split_env(line)
+
+            if v.endswith("\"):
+              v = strip_continuation(v)
+              continued = true
+            else:
+              env[k] = v
+              continued = false
+          if continued:
+            if line.endswith("\"):
+              v = v + strip_continuation(line) + "\n"
+              continued = true
+            elif:
+              v = v + line + "\n"
+              env[k] = v
+              continued = false
+
+    return env
 
 class Environment(dict):
     def __init__(self, *args, **kwargs):
