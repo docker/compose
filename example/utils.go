@@ -5,34 +5,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
+	"github.com/docker/containerd/shim"
 	"github.com/docker/containerkit"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
-
-func NewBindDriver() containerkit.GraphDriver {
-	return &bindDriver{}
-}
-
-// this demos how the graph/layer subsystem will create the rootfs and
-// provide it to the container, the Mount type ties the execution and
-// filesystem layers together
-type bindDriver struct {
-}
-
-func (b *bindDriver) Mount(id string) (*containerkit.Mount, error) {
-	return &containerkit.Mount{
-		Target: "/",
-		Type:   "bind",
-		Source: "/containers/redis/rootfs",
-		Options: []string{
-			"rbind",
-			"rw",
-		},
-	}, nil
-}
 
 var (
 	RWM  = "rwm"
@@ -66,8 +46,32 @@ func (t *testConfig) Root() string {
 	return "/var/lib/containerkit"
 }
 
-func (t *testConfig) Spec(m *containerkit.Mount) (*specs.Spec, error) {
-	cgpath := filepath.Join("/containerkit", t.ID())
+func (t *testConfig) Runtime() (containerkit.Runtime, error) {
+	return shim.New(shim.Opts{
+		Root:        "/run/cshim/test",
+		Name:        "containerd-shim",
+		RuntimeName: "runc",
+		RuntimeRoot: "/run/runc",
+		Timeout:     5 * time.Second,
+	})
+	// TODO: support loading of runtime
+	// create a new runtime runtime that implements the ExecutionDriver interface
+	return shim.Load("/run/cshim/test")
+}
+
+func (t *testConfig) Spec() (*specs.Spec, error) {
+	var (
+		cgpath = filepath.Join("/containerkit", t.ID())
+		m      = &containerkit.Mount{
+			Target: "/",
+			Type:   "bind",
+			Source: "/containers/redis/rootfs",
+			Options: []string{
+				"rbind",
+				"rw",
+			},
+		}
+	)
 	return &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -156,15 +160,15 @@ func (t *testConfig) Spec(m *containerkit.Mount) (*specs.Spec, error) {
 		},
 		Linux: &specs.Linux{
 			CgroupsPath: &cgpath,
-			Resources: &specs.Resources{
-				Devices: []specs.DeviceCgroup{
+			Resources: &specs.LinuxResources{
+				Devices: []specs.LinuxDeviceCgroup{
 					{
 						Allow:  false,
 						Access: &RWM,
 					},
 				},
 			},
-			Namespaces: []specs.Namespace{
+			Namespaces: []specs.LinuxNamespace{
 				{
 					Type: "pid",
 				},

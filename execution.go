@@ -2,11 +2,9 @@ package containerkit
 
 import "errors"
 
-var (
-	ErrProcessSet = errors.New("containerkit: container process is already set")
-)
+var ErrProcessSet = errors.New("containerkit: container process is already set")
 
-type ExecutionDriver interface {
+type Runtime interface {
 	Create(*Container) (ProcessDelegate, error)
 	Start(*Container) error
 	Delete(*Container) error

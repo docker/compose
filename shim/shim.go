@@ -420,7 +420,7 @@ func getRootIDs(s *specs.Spec) (int, int, error) {
 	return uid, gid, nil
 }
 
-func hostIDFromMap(id uint32, mp []specs.IDMapping) int {
+func hostIDFromMap(id uint32, mp []specs.LinuxIDMapping) int {
 	for _, m := range mp {
 		if (id >= m.ContainerID) && (id <= (m.ContainerID + m.Size - 1)) {
 			return int(m.HostID + (id - m.ContainerID))

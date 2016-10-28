@@ -8,9 +8,7 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-var (
-	ErrNotExecProcess = errors.New("containerkit: process not an exec process")
-)
+var ErrNotExecProcess = errors.New("containerkit: process not an exec process")
 
 type ProcessDelegate interface {
 	Pid() int
@@ -26,7 +24,7 @@ type Process struct {
 	exec bool
 	s    *specs.Process
 
-	driver ExecutionDriver
+	driver Runtime
 	c      *Container
 	d      ProcessDelegate
 }

@@ -13,24 +13,17 @@ import (
 type ContainerConfig interface {
 	ID() string
 	Root() string
-	Spec(*Mount) (*specs.Spec, error)
+	Spec() (*specs.Spec, error)
+	Runtime() (Runtime, error)
 }
 
-type GraphDriver interface {
-	Mount(id string) (*Mount, error)
-}
-
-func NewContainer(config ContainerConfig, graph GraphDriver, exec ExecutionDriver) (*Container, error) {
+func NewContainer(config ContainerConfig) (*Container, error) {
 	var (
 		id   = config.ID()
 		root = config.Root()
 		path = filepath.Join(root, id)
 	)
-	mount, err := graph.Mount(id)
-	if err != nil {
-		return nil, err
-	}
-	s, err := config.Spec(mount)
+	s, err := config.Spec()
 	if err != nil {
 		return nil, err
 	}
@@ -48,15 +41,19 @@ func NewContainer(config ContainerConfig, graph GraphDriver, exec ExecutionDrive
 	if err != nil {
 		return nil, err
 	}
+	r, err := config.Runtime()
+	if err != nil {
+		return nil, err
+	}
 	return &Container{
 		id:     id,
 		path:   path,
 		s:      s,
-		driver: exec,
+		driver: r,
 	}, nil
 }
 
-func LoadContainer(config ContainerConfig, exec ExecutionDriver) (*Container, error) {
+func LoadContainer(config ContainerConfig) (*Container, error) {
 	var (
 		id   = config.ID()
 		root = config.Root()
@@ -66,7 +63,11 @@ func LoadContainer(config ContainerConfig, exec ExecutionDriver) (*Container, er
 	if err != nil {
 		return nil, err
 	}
-	process, err := exec.Load(id)
+	r, err := config.Runtime()
+	if err != nil {
+		return nil, err
+	}
+	process, err := r.Load(id)
 	if err != nil {
 		return nil, err
 	}
@@ -75,10 +76,10 @@ func LoadContainer(config ContainerConfig, exec ExecutionDriver) (*Container, er
 		id:     id,
 		path:   path,
 		s:      spec,
-		driver: exec,
+		driver: r,
 		init: &Process{
 			d:      process,
-			driver: exec,
+			driver: r,
 		},
 	}, nil
 }
@@ -103,7 +104,7 @@ type Container struct {
 	path string
 	s    *specs.Spec
 
-	driver ExecutionDriver
+	driver Runtime
 
 	Stdin  io.Reader
 	Stdout io.Writer

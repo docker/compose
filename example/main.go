@@ -6,23 +6,16 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/shim"
 	"github.com/docker/containerkit"
 	"github.com/docker/containerkit/osutils"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func reloadContainer() error {
-	// create a new runtime runtime that implements the ExecutionDriver interface
-	runtime, err := shim.Load("/run/cshim/test")
-	if err != nil {
-		return err
-	}
 	dockerContainer := &testConfig{}
-	container, err := containerkit.LoadContainer(dockerContainer, runtime)
+	container, err := containerkit.LoadContainer(dockerContainer)
 	if err != nil {
 		return err
 	}
@@ -44,20 +37,10 @@ func reloadContainer() error {
 
 func runContainer() error {
 	// create a new runtime runtime that implements the ExecutionDriver interface
-	runtime, err := shim.New(shim.Opts{
-		Root:        "/run/cshim/test",
-		Name:        "containerd-shim",
-		RuntimeName: "runc",
-		RuntimeRoot: "/run/runc",
-		Timeout:     5 * time.Second,
-	})
-	if err != nil {
-		return err
-	}
 	dockerContainer := &testConfig{}
 
 	// create a new container
-	container, err := containerkit.NewContainer(dockerContainer, NewBindDriver(), runtime)
+	container, err := containerkit.NewContainer(dockerContainer)
 	if err != nil {
 		return err
 	}
