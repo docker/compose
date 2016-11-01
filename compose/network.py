@@ -12,6 +12,10 @@ from .config import ConfigurationError
 
 log = logging.getLogger(__name__)
 
+OPTS_EXCEPTIONS = [
+    'com.docker.network.driver.overlay.vxlanid_list',
+]
+
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
@@ -111,6 +115,23 @@ def create_ipam_config_from_dict(ipam_dict):
             for config in ipam_dict.get('config', [])
         ],
     )
+
+
+def check_remote_network_config(remote, local):
+    if local.driver and remote['Driver'] != local.driver:
+        raise ConfigurationError(
+            'Network "{}" needs to be recreated - driver has changed'
+            .format(local.full_name)
+        )
+    local_opts = local.driver_opts or {}
+    for k in set.union(set(remote['Options'].keys()), set(local_opts.keys())):
+        if k in OPTS_EXCEPTIONS:
+            continue
+        if remote['Options'].get(k) != local_opts.get(k):
+            raise ConfigurationError(
+                'Network "{}" needs to be recreated - options have changed'
+                .format(local.full_name)
+            )
 
 
 def build_networks(name, config_data, client):
