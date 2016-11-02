@@ -1,6 +1,6 @@
 # containerkit
 
-containerkit is a collection of components for building a fully featured container runtime, storage, and distribution layers in higher level projects. 
+containerkit is a collection of components for building a fully featured container runtime, storage, and distribution layers in high level projects. 
 
 ## Scope and Principles
 
@@ -19,7 +19,7 @@ The execution layer and overlay filesystems can be used independently but if you
 
 ### Primitives
 
-containerkit should expose primitives to solve problems instead of higher level abstractions.
+containerkit should expose primitives to solve problems instead of building high level abstractions.
 A common example of this is how build is implemented.
 Instead of having a build API in containerkit we should expose the lower level primitives that allow things like build to work.
 Breaking up the filesystem APIs to allow snapshots, copy functionality, and mounts allow people implementing build at the higher levels more flexibility.
@@ -47,6 +47,12 @@ The table specifies whether or not the feature/component is in or out of scope.
 | networking     | Providing network functionality to containers along with configuring their network namespaces | in     |                                                                                                              |
 | build          | Building images as a first class API                                                          | out    | Build is a higher level tooling feature and can be implemented in many different ways on top of containerkit |
 | volumes        | Provide primitives for volumes and persistent storage                                         |        |                                                                                                              |
+
+containerkit is scoped to a single host.
+It can be used to builds things like a node agent that launches containers but does not have any concepts of a distributed system.
+
+Also things like service discovery are out of scope even though networking is in scope.
+containerkit should provide the primitives to create, add, remove, or manage network interfaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
 
 ## Copyright and license
 
