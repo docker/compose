@@ -7,7 +7,7 @@ containerkit is a collection of components for building a fully featured contain
 Having a clearly defined scope of a project is important for ensuring consistency and focus.
 These following criteria will be used when reviewing pull requests, features, and changes for the project before being accepted.
 
-1. Components 
+### Components 
 
 containerkit is a collection of components.
 These components can be used independently or together.
@@ -17,7 +17,7 @@ An example for this design can be seen with the overlay filesystems and the cont
 The execution layer and overlay filesystems can be used independently but if you were to use both, they share a common `Mount` struct that the filesystems produce and the execution layer consumes to start a container inside a root filesystem.
 
 
-2. Primitives
+### Primitives
 
 containerkit should expose primitives to solve problems instead of higher level abstractions.
 A common example of this is how build is implemented.
@@ -25,7 +25,7 @@ Instead of having a build API in containerkit we should expose the lower level p
 Breaking up the filesystem APIs to allow snapshots, copy functionality, and mounts allow people implementing build at the higher levels more flexibility.
 
 
-3. Extensibility and Defaults
+### Extensibility and Defaults
 
 For the various components in containerkit there should be defined extension points where implementations can be swapped for alternatives.
 The best example of this is that containerkit will use `runc` from OCI as the default runtime in the execution layer but for other runtimes conforming to the OCI Runtime specification they can be easily added to contianerkit.
@@ -34,7 +34,7 @@ containerkit will come with a default implementation for the various components.
 These defaults will be chosen my the maintainers of the project and should not change unless better tech for that component comes out.
 Additional implementations will not be accepted into the core repository and should be developed in a separate repository not maintained by the containerkit maintainers.
 
-4. Scope
+### Scope
 
 The following table specifies the various components of containerkit and general features of container runtimes.
 The table specifies whether or not the feature/component is in or out of scope.
