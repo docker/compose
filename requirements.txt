@@ -1,7 +1,7 @@
 PyYAML==3.11
 backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.2.0
-docker-py==1.10.5
+docker-py==1.10.6
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4; python_version < '3.4'

@@ -55,6 +55,9 @@ Bug Fixes
 - Fixed a bug where unicode values in environment variables would sometimes
   raise a unicode exception when retrieved.
 
+- Fixed an issue where Compose would incorrectly detect a configuration
+  mismatch for overlay networks.
+
 
 1.8.1 (2016-09-22)
 -----------------
