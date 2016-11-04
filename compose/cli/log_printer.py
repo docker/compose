@@ -103,7 +103,7 @@ class LogPrinter(object):
                     self.output.buffer.write(bytes)
                 else:
                     line = bytes.decode(self.output.encoding, 'strict')
-                    self.output.write(text)
+                    self.output.write(line)
             self.output.flush()
 
 
