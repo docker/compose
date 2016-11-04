@@ -2,17 +2,10 @@
 
 def image
 
-def checkDocs = { ->
-  wrappedNode(label: 'linux') {
-    deleteDir(); checkout(scm)
-    documentationChecker("docs")
-  }
-}
-
 def buildImage = { ->
-  wrappedNode(label: "linux && !zfs") {
+  wrappedNode(label: "linux && !zfs", cleanWorkspace: true) {
     stage("build image") {
-      deleteDir(); checkout(scm)
+      checkout(scm)
       def imageName = "dockerbuildbot/compose:${gitCommit()}"
       image = docker.image(imageName)
       try {
@@ -37,9 +30,9 @@ def runTests = { Map settings ->
   }
 
   { ->
-    wrappedNode(label: "linux && !zfs") {
+    wrappedNode(label: "linux && !zfs", cleanWorkspace: true) {
       stage("test python=${pythonVersions} / docker=${dockerVersions}") {
-        deleteDir(); checkout(scm)
+        checkout(scm)
         def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
         echo "Using local system's storage driver: ${storageDriver}"
         sh """docker run \\
@@ -62,19 +55,10 @@ def runTests = { Map settings ->
   }
 }
 
-def buildAndTest = { ->
-  buildImage()
-  // TODO: break this out into meaningful "DOCKER_VERSIONS" values instead of all
-  parallel(
-    failFast: true,
-    all_py27: runTests(pythonVersions: "py27", dockerVersions: "all"),
-    all_py34: runTests(pythonVersions: "py34", dockerVersions: "all"),
-  )
-}
-
-
+buildImage()
+// TODO: break this out into meaningful "DOCKER_VERSIONS" values instead of all
 parallel(
-  failFast: false,
-  docs: checkDocs,
-  test: buildAndTest
+  failFast: true,
+  all_py27: runTests(pythonVersions: "py27", dockerVersions: "all"),
+  all_py34: runTests(pythonVersions: "py34", dockerVersions: "all"),
 )
