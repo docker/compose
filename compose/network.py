@@ -53,14 +53,7 @@ class Network(object):
 
         try:
             data = self.inspect()
-            if self.driver and data['Driver'] != self.driver:
-                raise ConfigurationError(
-                    'Network "{}" needs to be recreated - driver has changed'
-                    .format(self.full_name))
-            if data['Options'] != (self.driver_opts or {}):
-                raise ConfigurationError(
-                    'Network "{}" needs to be recreated - options have changed'
-                    .format(self.full_name))
+            check_remote_network_config(data, self)
         except NotFound:
             driver_name = 'the default driver'
             if self.driver:
