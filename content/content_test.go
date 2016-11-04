@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	_ "crypto/sha256" // required for digest package
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -73,13 +74,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path, err := cs.GetPath(expected)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if path != filepath.Join(tmpdir, "blobs", expected.Algorithm().String(), expected.Hex()) {
-		t.Fatalf("unxpected path: %q", path)
-	}
+	path := checkBlobPath(t, cs, expected)
 
 	// read the data back, make sure its the same
 	pp, err := ioutil.ReadFile(path)
@@ -103,6 +98,27 @@ func checkCopy(t *testing.T, size int64, dst io.Writer, src io.Reader) {
 	if nn != size {
 		t.Fatal("incorrect number of bytes copied")
 	}
+}
+
+func checkBlobPath(t *testing.T, cs *ContentStore, dgst digest.Digest) string {
+	path, err := cs.GetPath(dgst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
+		t.Fatalf("unxpected path: %q", path)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("error stating blob path: %v", err)
+	}
+
+	// ensure that only read bits are set.
+	if ((fi.Mode() & os.ModePerm) & 0333) != 0 {
+		t.Fatalf("incorrect permissions: %v", fi.Mode())
+	}
+
+	return path
 }
 
 func dumpDir(root string) error {

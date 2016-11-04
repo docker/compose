@@ -40,50 +40,6 @@ func OpenContentStore(root string) (*ContentStore, error) {
 	}, nil
 }
 
-// OpenBlob opens the blob for reading identified by dgst.
-//
-// The opened blob may also implement seek. Callers can detect with io.Seeker.
-func OpenBlob(cs *ContentStore, dgst digest.Digest) (io.ReadCloser, error) {
-	path, err := cs.GetPath(dgst)
-	if err != nil {
-		return nil, err
-	}
-
-	fp, err := os.Open(path)
-	return fp, err
-}
-
-// WriteBlob writes data with the expected digest into the content store. If
-// expected already exists, the method returns immediately and the reader will
-// not be consumed.
-//
-// This is useful when the digest and size are known beforehand.
-//
-// Copy is buffered, so no need to wrap reader in buffered io.
-func WriteBlob(cs *ContentStore, r io.Reader, size int64, expected digest.Digest) error {
-	cw, err := cs.Begin(expected.Hex())
-	if err != nil {
-		return err
-	}
-	buf := bufPool.Get().([]byte)
-	defer bufPool.Put(buf)
-
-	nn, err := io.CopyBuffer(cw, r, buf)
-	if err != nil {
-		return err
-	}
-
-	if nn != size {
-		return errors.Errorf("failed size verification: %v != %v", nn, size)
-	}
-
-	if err := cw.Commit(size, expected); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
 	p := filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
 	if _, err := os.Stat(p); err != nil {
@@ -189,60 +145,4 @@ func (cs *ContentStore) ingestPaths(ref string) (string, string, error) {
 	}
 
 	return fp, filepath.Join(fp, "data"), nil
-}
-
-// ContentWriter represents a write transaction against the blob store.
-//
-//
-type ContentWriter struct {
-	cs       *ContentStore
-	fp       *os.File // opened data file
-	path     string   // path to writer dir
-	offset   int64
-	digester digest.Digester
-}
-
-func (cw *ContentWriter) Write(p []byte) (n int, err error) {
-	n, err = cw.fp.Write(p)
-	cw.digester.Hash().Write(p[:n])
-	return n, err
-}
-
-func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
-	if err := cw.fp.Sync(); err != nil {
-		return errors.Wrap(err, "sync failed")
-	}
-
-	fi, err := cw.fp.Stat()
-	if err != nil {
-		return errors.Wrap(err, "stat on data file failed")
-	}
-
-	if size != fi.Size() {
-		return errors.Errorf("failed size validation: %v != %v", fi.Size(), size)
-	}
-
-	dgst := cw.digester.Digest()
-	if expected != dgst {
-		return errors.Errorf("unexpected digest: %v != %v", dgst, expected)
-	}
-
-	apath := filepath.Join(cw.cs.root, "blobs", dgst.Algorithm().String())
-	if err := os.MkdirAll(apath, 0755); err != nil {
-		return err
-	}
-
-	dpath := filepath.Join(apath, dgst.Hex())
-
-	// clean up!!
-	defer os.RemoveAll(cw.path)
-	return os.Rename(filepath.Join(cw.path, "data"), dpath)
-}
-
-// Close the writer, leaving the progress in tact.
-//
-// If one needs to resume the transaction, a new writer can be obtained from
-// `ContentStore.Resume` using the same key.
-func (cw *ContentWriter) Close() error {
-	return cw.fp.Close()
 }
