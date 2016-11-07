@@ -34,6 +34,10 @@ containerkit will come with a default implementation for the various components.
 These defaults will be chosen my the maintainers of the project and should not change unless better tech for that component comes out.
 Additional implementations will not be accepted into the core repository and should be developed in a separate repository not maintained by the containerkit maintainers.
 
+### Stability 
+
+
+
 ### Scope
 
 The following table specifies the various components of containerkit and general features of container runtimes.
@@ -53,6 +57,12 @@ It can be used to builds things like a node agent that launches containers but d
 
 Also things like service discovery are out of scope even though networking is in scope.
 containerkit should provide the primitives to create, add, remove, or manage network interfaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
+
+### How is the scope changed?
+
+The scope of this project is a whitelist.
+If its not mentioned as being in scope, it is out of scope.  
+For the scope of this project to change it requires a 100% vote from all maintainers of the project.
 
 ## Copyright and license
 

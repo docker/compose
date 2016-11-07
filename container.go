@@ -12,7 +12,7 @@ import (
 
 type ContainerConfig interface {
 	ID() string
-	Root() string
+	Root() string // bundle path
 	Spec() (*specs.Spec, error)
 	Runtime() (Runtime, error)
 }
