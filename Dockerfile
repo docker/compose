@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
 ENV GO_VERSION 1.6.2
 RUN curl -sSL  "https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz" | tar -v -C /usr/local -xz
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
-ENV GOPATH /go:/go/src/github.com/docker/containerd/vendor
+ENV GOPATH /go:/go/src/github.com/docker/docker/containerkit/vendor
 
 ENV GO_TOOLS_COMMIT 823804e1ae08dbb14eb807afc7db9993bc9e3cc3
 # Grab Go's cover tool for dead-simple code coverage testing
@@ -37,7 +37,7 @@ RUN git clone https://github.com/golang/lint.git /go/src/github.com/golang/lint 
 	&& (cd /go/src/github.com/golang/lint && git checkout -q $GO_LINT_COMMIT) \
 	&& go install -v github.com/golang/lint/golint
 
-WORKDIR /go/src/github.com/docker/containerd
+WORKDIR /go/src/github.com/docker/docker/containerkit
 
 # install seccomp: the version shipped in trusty is too old
 ENV SECCOMP_VERSION 2.3.0
@@ -63,8 +63,8 @@ RUN set -x \
 	&& git checkout -q "$RUNC_COMMIT" \
 	&& make BUILDTAGS="seccomp apparmor selinux" && make install
 
-COPY . /go/src/github.com/docker/containerd
+COPY . /go/src/github.com/docker/docker/containerkit
 
-WORKDIR /go/src/github.com/docker/containerd
+WORKDIR /go/src/github.com/docker/docker/containerkit
 
 RUN make all install

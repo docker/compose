@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/monitor"
-	"github.com/docker/containerd/oci"
 	"github.com/docker/containerkit"
+	"github.com/docker/containerkit/monitor"
+	"github.com/docker/containerkit/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 

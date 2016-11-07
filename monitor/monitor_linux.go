@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/epoll"
+	"github.com/docker/containerkit/epoll"
 )
 
 type Monitorable interface {

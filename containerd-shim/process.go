@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/specs"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")
@@ -37,7 +37,7 @@ type checkpoint struct {
 }
 
 type processState struct {
-	specs.ProcessSpec
+	specs.Process
 	Exec           bool     `json:"exec"`
 	Stdin          string   `json:"stdin"`
 	Stdout         string   `json:"stdout"`

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/docker/containerd/osutils"
+	"github.com/docker/containerkit/osutils"
 	"github.com/docker/docker/pkg/term"
 )
 

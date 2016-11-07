@@ -1,9 +1,0 @@
-#!/bin/bash
-
-lint_error=$(golint ./... | grep -v vendor | grep -v .pb. | tee /dev/stderr)
-
-if [ "$lint_error" != "" ]; then
-	exit 1
-fi
-
-exit 0
