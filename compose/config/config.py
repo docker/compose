@@ -15,6 +15,7 @@ from cached_property import cached_property
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..const import COMPOSEFILE_V2_1 as V2_1
+from ..const import COMPOSEFILE_V3_0 as V3_0
 from ..utils import build_string_dict
 from ..utils import splitdrive
 from .environment import env_vars_from_file
@@ -175,7 +176,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '2':
             version = V2_0
 
-        if version not in (V2_0, V2_1):
+        if version == '3':
+            version = V3_0
+
+        if version not in (V2_0, V2_1, V3_0):
             raise ConfigurationError(
                 'Version in "{}" is unsupported. {}'
                 .format(self.filename, VERSION_EXPLANATION))
@@ -433,7 +437,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment)
 
-    if config_file.version in (V2_0, V2_1):
+    if config_file.version in (V2_0, V2_1, V3_0):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -446,9 +450,10 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-
-    if config_file.version == V1:
+    elif config_file.version == V1:
         processed_config = services
+    else:
+        raise Exception("Unsupported version: {}".format(repr(config_file.version)))
 
     config_file = config_file._replace(config=processed_config)
     validate_against_config_schema(config_file)
