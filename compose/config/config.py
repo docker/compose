@@ -771,7 +771,7 @@ def merge_service_dicts(base, override, version):
     for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
 
-    md.merge_field('logging', merge_logging)
+    md.merge_field('logging', merge_logging, default={})
 
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)

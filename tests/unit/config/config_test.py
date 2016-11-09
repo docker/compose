@@ -1657,6 +1657,51 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_logging_v2_no_base(self):
+        base = {
+            'image': 'alpine:edge'
+        }
+        override = {
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_override(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+        override = {}
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
