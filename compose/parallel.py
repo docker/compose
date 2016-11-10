@@ -248,7 +248,3 @@ def parallel_unpause(containers, options):
 
 def parallel_kill(containers, options):
     parallel_operation(containers, 'kill', options, 'Killing')
-
-
-def parallel_restart(containers, options):
-    parallel_operation(containers, 'restart', options, 'Restarting')

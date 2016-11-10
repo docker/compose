@@ -50,3 +50,7 @@ def test_invalid_with_space():
 
 def test_invalid_with_comma():
     assert timeparse.timeparse('5h,34m,56s') is None
+
+
+def test_invalid_with_empty_string():
+    assert timeparse.timeparse('') is None
