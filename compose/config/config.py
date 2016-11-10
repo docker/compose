@@ -330,6 +330,14 @@ def load(config_details):
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
+    services_using_deploy = [s for s in service_dicts if s.get('deploy')]
+    if services_using_deploy:
+        log.warn(
+            "Some services ({}) use the 'deploy' key, which will be ignored. "
+            "Compose does not support deploy configuration - use the experimental "
+            "`docker deploy` command to deploy to a swarm."
+            .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
+
     return Config(main_file.version, service_dicts, volumes, networks)
 
 
