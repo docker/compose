@@ -24,6 +24,7 @@ from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
+from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
 from tests import unittest
 
@@ -3169,6 +3170,54 @@ class BuildPathTest(unittest.TestCase):
                     'invalidurl': {'build': invalid_url},
                 }, '.', None))
             assert 'build path' in exc.exconly()
+
+
+class HealthcheckTest(unittest.TestCase):
+    def test_healthcheck(self):
+        service_dict = make_service_dict(
+            'test',
+            {'healthcheck': {
+                'test': ['CMD', 'true'],
+                'interval': '1s',
+                'timeout': '1m',
+                'retries': 3,
+            }},
+            '.',
+        )
+
+        assert service_dict['healthcheck'] == {
+            'test': ['CMD', 'true'],
+            'interval': nanoseconds_from_time_seconds(1),
+            'timeout': nanoseconds_from_time_seconds(60),
+            'retries': 3,
+        }
+
+    def test_disable(self):
+        service_dict = make_service_dict(
+            'test',
+            {'healthcheck': {
+                'disable': True,
+            }},
+            '.',
+        )
+
+        assert service_dict['healthcheck'] == {
+            'test': ['NONE'],
+        }
+
+    def test_disable_with_other_config_is_invalid(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            make_service_dict(
+                'invalid-healthcheck',
+                {'healthcheck': {
+                    'disable': True,
+                    'interval': '1s',
+                }},
+                '.',
+            )
+
+        assert 'invalid-healthcheck' in excinfo.exconly()
+        assert 'disable' in excinfo.exconly()
 
 
 class GetDefaultConfigFilesTestCase(unittest.TestCase):

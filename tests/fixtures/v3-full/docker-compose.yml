@@ -29,7 +29,7 @@ services:
         constraints: [node=foo]
 
     healthcheck:
-      command: cat /etc/passwd
+      test: cat /etc/passwd
       interval: 10s
       timeout: 1s
       retries: 5

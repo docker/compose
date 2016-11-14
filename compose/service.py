@@ -17,7 +17,6 @@ from docker.utils.ports import split_port
 
 from . import __version__
 from . import progress_stream
-from . import timeparse
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
@@ -35,6 +34,7 @@ from .parallel import parallel_start
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+from .utils import parse_seconds_float
 
 
 log = logging.getLogger(__name__)
@@ -450,7 +450,7 @@ class Service(object):
     def stop_timeout(self, timeout):
         if timeout is not None:
             return timeout
-        timeout = timeparse.timeparse(self.options.get('stop_grace_period') or '')
+        timeout = parse_seconds_float(self.options.get('stop_grace_period'))
         if timeout is not None:
             return timeout
         return DEFAULT_TIMEOUT
