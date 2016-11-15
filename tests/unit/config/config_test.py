@@ -2493,6 +2493,15 @@ class EnvTest(unittest.TestCase):
             {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'},
         )
 
+    def test_environment_overrides_env_file(self):
+        self.assertEqual(
+            resolve_environment({
+                'environment': {'FOO': 'baz'},
+                'env_file': ['tests/fixtures/env/one.env'],
+            }),
+            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz'},
+        )
+
     def test_resolve_environment_with_multiple_env_files(self):
         service_dict = {
             'env_file': [
