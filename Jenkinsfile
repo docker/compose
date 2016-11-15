@@ -3,7 +3,7 @@
 def image
 
 def buildImage = { ->
-  wrappedNode(label: "linux && !zfs", cleanWorkspace: true) {
+  wrappedNode(label: "ubuntu && !zfs", cleanWorkspace: true) {
     stage("build image") {
       checkout(scm)
       def imageName = "dockerbuildbot/compose:${gitCommit()}"
@@ -30,7 +30,7 @@ def runTests = { Map settings ->
   }
 
   { ->
-    wrappedNode(label: "linux && !zfs", cleanWorkspace: true) {
+    wrappedNode(label: "ubuntu && !zfs", cleanWorkspace: true) {
       stage("test python=${pythonVersions} / docker=${dockerVersions}") {
         checkout(scm)
         def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
