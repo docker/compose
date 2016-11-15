@@ -330,12 +330,13 @@ class CLITestCase(DockerClientTestCase):
     def test_pull_with_ignore_pull_failures(self):
         result = self.dispatch([
             '-f', 'ignore-pull-failures.yml',
-            'pull', '--ignore-pull-failures'])
+            'pull', '--ignore-pull-failures']
+        )
 
         assert 'Pulling simple (busybox:latest)...' in result.stderr
         assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
-        assert 'Error: image library/nonexisting-image' in result.stderr
-        assert 'not found' in result.stderr
+        assert ('repository nonexisting-image not found' in result.stderr or
+                'image library/nonexisting-image:latest not found' in result.stderr)
 
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
