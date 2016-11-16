@@ -285,6 +285,9 @@ type Change struct {
 	Path string
 }
 
+// TODO(stevvooe): Make this change emit through a Walk-like interface. We can
+// see this patten used in several tar'ing methods in pkg/archive.
+
 // Changes returns the list of changes from the diff's parent.
 func (lm *LayerManipulator) Changes(diff string) ([]Change, error) {
 	return nil, errNotImplemented

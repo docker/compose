@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/docker/distribution/digest"
+	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
 )
 
@@ -40,6 +41,9 @@ func OpenContentStore(root string) (*ContentStore, error) {
 	}, nil
 }
 
+// TODO(stevvooe): Work out how we can export the status of an ongoing download.
+// TODO(stevvooe): Allow querying the set of blobs in the blob store.
+
 func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
 	p := filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
 	if _, err := os.Stat(p); err != nil {
@@ -61,7 +65,7 @@ func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
 //
 // TODO(stevvooe): Figure out minimum common set of characters, basically common
 func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
-	path, data, err := cs.ingestPaths(ref)
+	path, data, lock, err := cs.ingestPaths(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +73,10 @@ func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
 	// use single path mkdir for this to ensure ref is only base path, in
 	// addition to validation above.
 	if err := os.Mkdir(path, 0755); err != nil {
+		return nil, err
+	}
+
+	if err := tryLock(lock); err != nil {
 		return nil, err
 	}
 
@@ -87,26 +95,35 @@ func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
 	return &ContentWriter{
 		cs:       cs,
 		fp:       fp,
+		lock:     lock,
 		path:     path,
 		digester: digest.Canonical.New(),
 	}, nil
 }
 
 func (cs *ContentStore) Resume(ref string) (*ContentWriter, error) {
-	path, data, err := cs.ingestPaths(ref)
+	path, data, lock, err := cs.ingestPaths(ref)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := tryLock(lock); err != nil {
 		return nil, err
 	}
 
 	digester := digest.Canonical.New()
 
-	// slow slow slow!!, send to goroutine
+	// slow slow slow!!, send to goroutine or use resumable hashes
 	fp, err := os.Open(data)
-	offset, err := io.Copy(digester.Hash(), fp)
 	if err != nil {
 		return nil, err
 	}
 	defer fp.Close()
+
+	offset, err := io.Copy(digester.Hash(), fp)
+	if err != nil {
+		return nil, err
+	}
 
 	fp1, err := os.OpenFile(data, os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -120,29 +137,35 @@ func (cs *ContentStore) Resume(ref string) (*ContentWriter, error) {
 	return &ContentWriter{
 		cs:       cs,
 		fp:       fp1,
+		lock:     lock,
 		path:     path,
 		offset:   offset,
 		digester: digester,
 	}, nil
 }
 
-func (cs *ContentStore) ingestPaths(ref string) (string, string, error) {
+func (cs *ContentStore) ingestPaths(ref string) (string, string, lockfile.Lockfile, error) {
 	cref := filepath.Clean(ref)
 	if cref != ref {
-		return "", "", errors.Errorf("invalid path after clean")
+		return "", "", "", errors.Errorf("invalid path after clean")
 	}
 
 	fp := filepath.Join(cs.root, "ingest", ref)
 
 	// ensure we don't escape root
 	if !strings.HasPrefix(fp, cs.root) {
-		return "", "", errors.Errorf("path %q escapes root", ref)
+		return "", "", "", errors.Errorf("path %q escapes root", ref)
 	}
 
 	// ensure we are just a single path component
 	if ref != filepath.Base(fp) {
-		return "", "", errors.Errorf("ref must be a single path component")
+		return "", "", "", errors.Errorf("ref must be a single path component")
 	}
 
-	return fp, filepath.Join(fp, "data"), nil
+	lock, err := lockfile.New(filepath.Join(fp, "lock"))
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "error creating lockfile")
+	}
+
+	return fp, filepath.Join(fp, "data"), lock, nil
 }

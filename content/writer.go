@@ -1,10 +1,12 @@
 package content
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/docker/distribution/digest"
+	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
 )
 
@@ -14,7 +16,8 @@ import (
 type ContentWriter struct {
 	cs       *ContentStore
 	fp       *os.File // opened data file
-	path     string   // path to writer dir
+	lock     lockfile.Lockfile
+	path     string // path to writer dir
 	offset   int64
 	digester digest.Digester
 }
@@ -52,6 +55,10 @@ func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
 		return errors.Errorf("failed size validation: %v != %v", fi.Size(), size)
 	}
 
+	if err := cw.fp.Close(); err != nil {
+		return errors.Wrap(err, "failed closing ingest")
+	}
+
 	dgst := cw.digester.Digest()
 	if expected != dgst {
 		return errors.Errorf("unexpected digest: %v != %v", dgst, expected)
@@ -77,6 +84,8 @@ func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
 		return err
 	}
 
+	unlock(cw.lock)
+	cw.fp = nil
 	return nil
 }
 
@@ -87,6 +96,14 @@ func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
 // `ContentStore.Resume` using the same key. The write can then be continued
 // from it was left off.
 func (cw *ContentWriter) Close() (err error) {
-	cw.fp.Sync()
-	return cw.fp.Close()
+	if err := unlock(cw.lock); err != nil {
+		log.Printf("unlock failed: %v", err)
+	}
+
+	if cw.fp != nil {
+		cw.fp.Sync()
+		return cw.fp.Close()
+	}
+
+	return nil
 }

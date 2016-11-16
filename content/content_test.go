@@ -47,6 +47,13 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// make sure that second resume also fails
+	if _, err = cs.Resume("myref"); err == nil {
+		// TODO(stevvooe): This also works across processes. Need to find a way
+		// to test that, as well.
+		t.Fatal("no error on second resume")
+	}
+
 	p := make([]byte, 4<<20)
 	if _, err := rand.Read(p); err != nil {
 		t.Fatal(err)
