@@ -24,7 +24,6 @@ from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
-from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -726,7 +725,7 @@ class TopLevelCommand(object):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
 
         for s in options['SERVICE=NUM']:
             if '=' not in s:
@@ -760,7 +759,7 @@ class TopLevelCommand(object):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
         self.project.stop(service_names=options['SERVICE'], timeout=timeout)
 
     def restart(self, options):
@@ -773,7 +772,7 @@ class TopLevelCommand(object):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
         containers = self.project.restart(service_names=options['SERVICE'], timeout=timeout)
         exit_if(not containers, 'No containers to restart', 1)
 
@@ -831,7 +830,7 @@ class TopLevelCommand(object):
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
 
@@ -894,6 +893,11 @@ def convergence_strategy_from_opts(options):
         return ConvergenceStrategy.never
 
     return ConvergenceStrategy.changed
+
+
+def timeout_from_opts(options):
+    timeout = options.get('--timeout')
+    return None if timeout is None else int(timeout)
 
 
 def image_type_from_opt(flag, value):

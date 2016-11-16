@@ -17,6 +17,7 @@ from docker.utils.ports import split_port
 
 from . import __version__
 from . import progress_stream
+from . import timeparse
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
@@ -169,7 +170,7 @@ class Service(object):
             self.start_container_if_stopped(c, **options)
         return containers
 
-    def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
+    def scale(self, desired_num, timeout=None):
         """
         Adjusts the number of containers to the specified number and ensures
         they are running.
@@ -196,7 +197,7 @@ class Service(object):
             return container
 
         def stop_and_remove(container):
-            container.stop(timeout=timeout)
+            container.stop(timeout=self.stop_timeout(timeout))
             container.remove()
 
         running_containers = self.containers(stopped=False)
@@ -374,7 +375,7 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 timeout=DEFAULT_TIMEOUT,
+                                 timeout=None,
                                  detached=False,
                                  start=True):
         (action, containers) = plan
@@ -421,7 +422,7 @@ class Service(object):
     def recreate_container(
             self,
             container,
-            timeout=DEFAULT_TIMEOUT,
+            timeout=None,
             attach_logs=False,
             start_new_container=True):
         """Recreate a container.
@@ -432,7 +433,7 @@ class Service(object):
         """
         log.info("Recreating %s" % container.name)
 
-        container.stop(timeout=timeout)
+        container.stop(timeout=self.stop_timeout(timeout))
         container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container,
@@ -445,6 +446,14 @@ class Service(object):
             self.start_container(new_container)
         container.remove()
         return new_container
+
+    def stop_timeout(self, timeout):
+        if timeout is not None:
+            return timeout
+        timeout = timeparse.timeparse(self.options.get('stop_grace_period') or '')
+        if timeout is not None:
+            return timeout
+        return DEFAULT_TIMEOUT
 
     def start_container_if_stopped(self, container, attach_logs=False, quiet=False):
         if not container.is_running:
@@ -483,10 +492,10 @@ class Service(object):
                 link_local_ips=netdefs.get('link_local_ips', None),
             )
 
-    def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
+    def remove_duplicate_containers(self, timeout=None):
         for c in self.duplicate_containers():
             log.info('Removing %s' % c.name)
-            c.stop(timeout=timeout)
+            c.stop(timeout=self.stop_timeout(timeout))
             c.remove()
 
     def duplicate_containers(self):
