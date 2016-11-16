@@ -285,6 +285,61 @@ class CLITestCase(DockerClientTestCase):
             'volumes': {},
         }
 
+    def test_config_v3(self):
+        self.base_dir = 'tests/fixtures/v3-full'
+        result = self.dispatch(['config'])
+
+        assert yaml.load(result.stdout) == {
+            'version': '3.0',
+            'networks': {},
+            'volumes': {},
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'deploy': {
+                        'mode': 'replicated',
+                        'replicas': 6,
+                        'labels': ['FOO=BAR'],
+                        'update_config': {
+                            'parallelism': 3,
+                            'delay': '10s',
+                            'failure_action': 'continue',
+                            'monitor': '60s',
+                            'max_failure_ratio': 0.3,
+                        },
+                        'resources': {
+                            'limits': {
+                                'cpus': '0.001',
+                                'memory': '50M',
+                            },
+                            'reservations': {
+                                    'cpus': '0.0001',
+                                    'memory': '20M',
+                            },
+                        },
+                        'restart_policy': {
+                            'condition': 'on_failure',
+                            'delay': '5s',
+                            'max_attempts': 3,
+                            'window': '120s',
+                        },
+                        'placement': {
+                            'constraints': ['node=foo'],
+                        },
+                    },
+
+                    'healthcheck': {
+                        'command': 'cat /etc/passwd',
+                        'interval': '10s',
+                        'timeout': '1s',
+                        'retries': 5,
+                    },
+
+                    'stop_grace_period': '20s',
+                },
+            },
+        }
+
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
