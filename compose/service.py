@@ -10,6 +10,7 @@ from operator import attrgetter
 import enum
 import six
 from docker.errors import APIError
+from docker.errors import NotFound
 from docker.utils import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
@@ -829,12 +830,11 @@ class Service(object):
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
         log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
-        output = self.client.pull(repo, tag=tag, stream=True)
-
         try:
+            output = self.client.pull(repo, tag=tag, stream=True)
             return progress_stream.get_digest_from_pull(
                 stream_output(output, sys.stdout))
-        except StreamOutputError as e:
+        except (StreamOutputError, NotFound) as e:
             if not ignore_pull_failures:
                 raise
             else:

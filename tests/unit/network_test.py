@@ -37,7 +37,9 @@ class NetworkTest(unittest.TestCase):
     def test_check_remote_network_config_driver_mismatch(self):
         net = Network(None, 'compose_test', 'net1', 'overlay')
         with pytest.raises(ConfigurationError):
-            check_remote_network_config({'Driver': 'bridge', 'Options': {}}, net)
+            check_remote_network_config(
+                {'Driver': 'bridge', 'Options': {}}, net
+            )
 
     def test_check_remote_network_config_options_mismatch(self):
         net = Network(None, 'compose_test', 'net1', 'overlay')
@@ -45,3 +47,9 @@ class NetworkTest(unittest.TestCase):
             check_remote_network_config({'Driver': 'overlay', 'Options': {
                 'com.docker.network.driver.foo': 'baz'
             }}, net)
+
+    def test_check_remote_network_config_null_remote(self):
+        net = Network(None, 'compose_test', 'net1', 'overlay')
+        check_remote_network_config(
+            {'Driver': 'overlay', 'Options': None}, net
+        )

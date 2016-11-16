@@ -111,16 +111,17 @@ def create_ipam_config_from_dict(ipam_dict):
 
 
 def check_remote_network_config(remote, local):
-    if local.driver and remote['Driver'] != local.driver:
+    if local.driver and remote.get('Driver') != local.driver:
         raise ConfigurationError(
             'Network "{}" needs to be recreated - driver has changed'
             .format(local.full_name)
         )
     local_opts = local.driver_opts or {}
-    for k in set.union(set(remote['Options'].keys()), set(local_opts.keys())):
+    remote_opts = remote.get('Options') or {}
+    for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
         if k in OPTS_EXCEPTIONS:
             continue
-        if remote['Options'].get(k) != local_opts.get(k):
+        if remote_opts.get(k) != local_opts.get(k):
             raise ConfigurationError(
                 'Network "{}" needs to be recreated - options have changed'
                 .format(local.full_name)
