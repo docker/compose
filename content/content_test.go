@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/docker/distribution/digest"
@@ -52,6 +53,21 @@ func TestContentWriter(t *testing.T) {
 		// TODO(stevvooe): This also works across processes. Need to find a way
 		// to test that, as well.
 		t.Fatal("no error on second resume")
+	}
+
+	// we should also see this as an active ingestion
+	ingestions, err := cs.Active()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(ingestions, []Status{
+		{
+			Ref:  "myref",
+			Size: 0,
+		},
+	}) {
+		t.Fatalf("unexpected ingestion set: %v", ingestions)
 	}
 
 	p := make([]byte, 4<<20)

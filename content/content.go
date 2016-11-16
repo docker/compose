@@ -41,7 +41,62 @@ func OpenContentStore(root string) (*ContentStore, error) {
 	}, nil
 }
 
-// TODO(stevvooe): Work out how we can export the status of an ongoing download.
+type Status struct {
+	Ref  string
+	Size int64
+	Meta interface{}
+}
+
+func (cs *ContentStore) Stat(ref string) (Status, error) {
+	dfi, err := os.Stat(filepath.Join(cs.root, "ingest", ref, "data"))
+	if err != nil {
+		return Status{}, err
+	}
+
+	return Status{
+		Ref:  ref,
+		Size: dfi.Size(),
+	}, nil
+}
+
+func (cs *ContentStore) Active() ([]Status, error) {
+	ip := filepath.Join(cs.root, "ingest")
+
+	fp, err := os.Open(ip)
+	if err != nil {
+		return nil, err
+	}
+
+	fis, err := fp.Readdir(-1)
+	if err != nil {
+		return nil, err
+	}
+
+	var active []Status
+	for _, fi := range fis {
+		stat, err := cs.Stat(fi.Name())
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+
+			// TODO(stevvooe): This is a common error if uploads are being
+			// completed while making this listing. Need to consider taking a
+			// lock on the whole store to coordinate this aspect.
+			//
+			// Another option is to cleanup downloads asynchronously and
+			// coordinate this method with the cleanup process.
+			//
+			// For now, we just skip them, as they really don't exist.
+			continue
+		}
+
+		active = append(active, stat)
+	}
+
+	return active, nil
+}
+
 // TODO(stevvooe): Allow querying the set of blobs in the blob store.
 
 func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
