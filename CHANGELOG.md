@@ -814,7 +814,7 @@ Fig has been renamed to Docker Compose, or just Compose for short. This has seve
 
 - The command you type is now `docker-compose`, not `fig`.
 - You should rename your fig.yml to docker-compose.yml.
-- If you’re installing via PyPi, the package is now `docker-compose`, so install it with `pip install docker-compose`.
+- If you’re installing via PyPI, the package is now `docker-compose`, so install it with `pip install docker-compose`.
 
 Besides that, there’s a lot of new stuff in this release:
 
