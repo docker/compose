@@ -7,7 +7,7 @@ RUN     apk -U add \
 COPY    requirements.txt /code/requirements.txt
 RUN     pip install -r /code/requirements.txt
 
-ADD     dist/docker-compose-release.tar.gz /code/docker-compose
+ADD     dist/docker-compose-release-py2.py3-none-any.whl /code/docker-compose
 RUN     pip install --no-deps /code/docker-compose/docker-compose-*
 
 ENTRYPOINT ["/usr/bin/docker-compose"]

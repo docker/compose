@@ -4,10 +4,12 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import codecs
+import logging
 import os
 import re
 import sys
 
+import pkg_resources
 from setuptools import find_packages
 from setuptools import setup
 
@@ -49,7 +51,25 @@ tests_require = [
 
 if sys.version_info[:2] < (3, 4):
     tests_require.append('mock >= 1.0.1')
-    install_requires.append('enum34 >= 1.0.4, < 2')
+
+extras_require = {
+    ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2']
+}
+
+
+try:
+    if 'bdist_wheel' not in sys.argv:
+        for key, value in extras_require.items():
+            if key.startswith(':') and pkg_resources.evaluate_marker(key[1:]):
+                install_requires.extend(value)
+except Exception:
+    logging.getLogger(__name__).exception(
+        'Something went wrong calculating platform specific dependencies, so '
+        "you're getting them all!"
+    )
+    for key, value in extras_require.items():
+        if key.startswith(':'):
+            install_requires.extend(value)
 
 
 setup(
@@ -63,6 +83,7 @@ setup(
     include_package_data=True,
     test_suite='nose.collector',
     install_requires=install_requires,
+    extras_require=extras_require,
     tests_require=tests_require,
     entry_points="""
     [console_scripts]
