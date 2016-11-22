@@ -559,9 +559,7 @@ def warn_for_swarm_mode(client):
             "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
             "All containers will be scheduled on the current node.\n\n"
             "To deploy your application across the swarm, "
-            "use the bundle feature of the Docker experimental build.\n\n"
-            "More info:\n"
-            "https://docs.docker.com/compose/bundles\n"
+            "use `docker stack deploy`.\n"
         )
 
 

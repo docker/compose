@@ -334,8 +334,8 @@ def load(config_details):
     if services_using_deploy:
         log.warn(
             "Some services ({}) use the 'deploy' key, which will be ignored. "
-            "Compose does not support deploy configuration - use the experimental "
-            "`docker deploy` command to deploy to a swarm."
+            "Compose does not support deploy configuration - use "
+            "`docker stack deploy` to deploy to a swarm."
             .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
 
     return Config(main_file.version, service_dicts, volumes, networks)
