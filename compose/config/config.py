@@ -87,6 +87,7 @@ DOCKER_CONFIG_KEYS = [
     'secrets',
     'security_opt',
     'shm_size',
+    'pids_limit',
     'stdin_open',
     'stop_signal',
     'sysctls',
