@@ -82,6 +82,7 @@ DOCKER_CONFIG_KEYS = [
     'restart',
     'security_opt',
     'shm_size',
+    'pids_limit',
     'stdin_open',
     'stop_signal',
     'tty',

@@ -112,6 +112,13 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(container.get('HostConfig.ShmSize'), 67108864)
 
+    def test_create_container_with_pids_limit(self):
+        self.require_api_version('1.23')
+        service = self.create_service('db', pids_limit=10)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.PidsLimit'), 10)
+
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
         service = self.create_service('db', extra_hosts=extra_hosts)
