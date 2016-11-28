@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+service Containers {
+    // container level rpcs
+    rpc Create(CreateRequest) returns (CreateResponse);
+    rpc Start(StartRequest) returns (StartResponse);
+    rpc Delete(DeleteRequest) returns (DeleteResponse);
+    rpc State(StateRequest) returns (StateResponse);
+
+    // container level action rpcs
+    rpc Update(UpdateRequest) returns (UpdateResponse);
+    rpc Pause(PauseRequest) returns (PauseResponse);
+    rpc Resume(ResumeRequest) returns (ResumeResponse);
+
+    // process level rpcs
+    rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
+    rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
+    rpc ProcessState(ProcessStateRequest) returns (ProcessStateResponse);
+    rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse);
+    rpc DeleteProcess(DeleteProcessRequest) returns (DeleteProcessResponse);
+
+    // agg rpcs
+    rpc List(ListRequest) returns (ListResponse);
+    rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+    rpc Events(EventsRequest) returns (stream EventsResponse);
+}
+
+message Container {
+    string id = 1;
+    repeated Mount mounts = 2;
+    Process process = 3;
+    optional string config_path = 4;
+}
+
+message Process {
+    repeated string args = 1;
+    repeated string env = 2;
+    User user = 3;
+    string cwd = 4;
+    bool terminal = 5;
+    string stdin = 6;
+    string stdout = 7;
+    string stderr = 8;
+}
+
+message Mount {
+
+}
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additionalGids = 3; 
+}
+
+message CreateRequest {
+    Container container = 1;
+}
+
+message CreateResponse {
+}
+
+message StartRequest {
+    string id = 1;
+}
+
+message StartResponse {
+
+}
+
+message StopRequest {
+    string id = 1;
+    uint32 signal = 2;
+    uint32 timeout = 3;
+}
+
+message StopResponse {
+
+}
+
+message DeleteRequest {
+    string id = 1;
+}
+
+message DeleteResponse {
+
+}
+
+message ListRequest {
+
+}
+
+message ListResponse {
+    repeated Container containers = 1;
+}
+
+message StateRequest {
+    string id = 1;
+}
+
+message StateResponse {
+    Container container = 1;
+}
+
+message ExecRequest {
+    string container_id = 1;
+    string id = 2;
+    Process process = 3;
+}
+
+message ExecResponse {
+
+}
+
+message UpdateRequest {
+    string id = 1;
+}
+
+message UpdateResponse {
+
+}
