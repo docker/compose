@@ -1,4 +1,4 @@
-package containerkit
+package snapshot
 
 import (
 	"errors"
@@ -7,39 +7,41 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/docker/containerkit"
 )
 
 var (
 	errNotImplemented = errors.New("not implemented")
 )
 
-// LayerManipulator provides an API for allocating, snapshotting and mounting
+// Manager provides an API for allocating, snapshotting and mounting
 // abstract, layer-based filesytems. The model works by building up sets of
 // directories with parent-child relationships.
 //
 // These differ from the concept of the graphdriver in that the
-// LayerManipulator has no knowledge of images or containers. Users simply
+// Manager has no knowledge of images or containers. Users simply
 // prepare and commit directories. We also avoid the integration between graph
 // driver's and the tar format used to represent the changesets.
 //
 // Importing a Layer
 //
-// To import a layer, we simply have the LayerManipulator provide a list of
+// To import a layer, we simply have the Manager provide a list of
 // mounts to be applied such that our dst will capture a changeset. We start
 // out by getting a path to the layer tar file and creating a temp location to
 // unpack it to:
 //
 //	layerPath, tmpLocation := getLayerPath(), mkTmpDir() // just a path to layer tar file.
 //
-// We then use a LayerManipulator to prepare the temporary location as a
+// We then use a Manager to prepare the temporary location as a
 // snapshot point:
 //
-// 	lm := NewLayerManipulator()
+// 	lm := NewManager()
 //	mounts, err := lm.Prepare(tmpLocation, "")
 // 	if err != nil { ... }
 //
 // Note that we provide "" as the parent, since we are applying the diff to an
-// empty directory. We get back a list of mounts from LayerManipulator.Prepare.
+// empty directory. We get back a list of mounts from Manager.Prepare.
 // Before proceeding, we perform all these mounts:
 //
 //	if err := MountAll(mounts); err != nil { ... }
@@ -67,14 +69,14 @@ var (
 // 	diffPath := filepath.Join("/layers", digest) // name location for the uncompressed layer digest
 //	if err := lm.Commit(diffPath, tmpLocation); err != nil { ... }
 //
-// Now, we have a layer in the LayerManipulator that can be accessed with the
+// Now, we have a layer in the Manager that can be accessed with the
 // opaque diffPath provided during commit.
 //
 // Importing the Next Layer
 //
 // Making a layer depend on the above is identical to the process described
 // above except that the parent is provided as diffPath when calling
-// LayerManipulator.Prepare:
+// Manager.Prepare:
 //
 // 	mounts, err := lm.Prepare(tmpLocation, parentDiffPath)
 //
@@ -82,7 +84,7 @@ var (
 //
 // Running a Container
 //
-// To run a container, we simply provide LayerManipulator.Prepare the diffPath
+// To run a container, we simply provide Manager.Prepare the diffPath
 // of the image we want to start the container from. After mounting, the
 // prepared path can be used directly as the container's filesystem:
 //
@@ -90,12 +92,12 @@ var (
 //
 // The returned mounts can then be passed directly to the container runtime. If
 // one would like to create a new image from the filesystem,
-// LayerManipulator.Commit is called:
+// Manager.Commit is called:
 //
 // 	if err := lm.Commit(newImageDiff, containerRootFS); err != nil { ... }
 //
-// Alternatively, for most container runs, LayerManipulator.Rollback will be
-// called to signal LayerManipulator to abandon the changes.
+// Alternatively, for most container runs, Manager.Rollback will be
+// called to signal Manager to abandon the changes.
 //
 // TODO(stevvooe): Consider an alternate API that provides an active object to
 // represent the lifecycle:
@@ -104,9 +106,9 @@ var (
 //  mountAll(work.Mounts())
 // 	work.Commit() || work.Rollback()
 //
-// TODO(stevvooe): LayerManipulator should be an interface with several
+// TODO(stevvooe): Manager should be an interface with several
 // implementations, similar to graphdriver.
-type LayerManipulator struct {
+type Manager struct {
 	root string // root provides paths for internal storage.
 
 	// just a simple overlay implementation.
@@ -120,12 +122,12 @@ type activeLayer struct {
 	workdir  string
 }
 
-func NewLayerManipulator(root string) (*LayerManipulator, error) {
+func NewManager(root string) (*Manager, error) {
 	if err := os.MkdirAll(root, 0777); err != nil {
 		return nil, err
 	}
 
-	return &LayerManipulator{
+	return &Manager{
 		root:    root,
 		active:  make(map[string]activeLayer),
 		parents: make(map[string]string),
@@ -142,9 +144,9 @@ func NewLayerManipulator(root string) (*LayerManipulator, error) {
 // working directory for any associated activity, such as running a container
 // or importing a layer.
 //
-// Once the writes have completed, LayerManipulator.Commit or
-// LayerManipulator.Rollback should be called on dst.
-func (lm *LayerManipulator) Prepare(dst, parent string) ([]Mount, error) {
+// Once the writes have completed, Manager.Commit or
+// Manager.Rollback should be called on dst.
+func (lm *Manager) Prepare(dst, parent string) ([]containerkit.Mount, error) {
 	// we want to build up lowerdir, upperdir and workdir options for the
 	// overlay mount.
 	//
@@ -208,7 +210,7 @@ func (lm *LayerManipulator) Prepare(dst, parent string) ([]Mount, error) {
 //
 // The contents of diff are opaque to the caller and may be specific to the
 // implementation of the layer backend.
-func (lm *LayerManipulator) Commit(diff, dst string) error {
+func (lm *Manager) Commit(diff, dst string) error {
 	active, ok := lm.active[dst]
 	if !ok {
 		return fmt.Errorf("%q must be an active layer", dst)
@@ -234,7 +236,7 @@ func (lm *LayerManipulator) Commit(diff, dst string) error {
 
 // Rollback can be called after prepare if the caller would like to abandon the
 // changeset.
-func (lm *LayerManipulator) Rollback(dst string) error {
+func (lm *Manager) Rollback(dst string) error {
 	active, ok := lm.active[dst]
 	if !ok {
 		return fmt.Errorf("%q must be an active layer", dst)
@@ -249,7 +251,7 @@ func (lm *LayerManipulator) Rollback(dst string) error {
 }
 
 // Parent returns the parent of the layer at diff.
-func (lm *LayerManipulator) Parent(diff string) string {
+func (lm *Manager) Parent(diff string) string {
 	return lm.parents[diff]
 }
 
@@ -289,6 +291,6 @@ type Change struct {
 // see this patten used in several tar'ing methods in pkg/archive.
 
 // Changes returns the list of changes from the diff's parent.
-func (lm *LayerManipulator) Changes(diff string) ([]Change, error) {
+func (lm *Manager) Changes(diff string) ([]Change, error) {
 	return nil, errNotImplemented
 }

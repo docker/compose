@@ -1,4 +1,4 @@
-package containerkit
+package snapshot
 
 import (
 	"io/ioutil"
@@ -8,10 +8,10 @@ import (
 	"testing"
 )
 
-// TestLayerManipulatorBasic implements something similar to the conceptual
+// TestSnapshotManagerBasic implements something similar to the conceptual
 // examples we've discussed thus far. It does perform mounts, so you must run
 // as root.
-func TestLayerManipulatorBasic(t *testing.T) {
+func TestSnapshotManagerBasic(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "test-layman-")
 	if err != nil {
 		t.Fatal(err)
@@ -20,7 +20,7 @@ func TestLayerManipulatorBasic(t *testing.T) {
 
 	root := filepath.Join(tmpDir, "root")
 
-	lm, err := NewLayerManipulator(root)
+	lm, err := NewManager(root)
 	if err != nil {
 		t.Fatal(err)
 	}
