@@ -1,6 +1,6 @@
 // +build linux,arm64
 
-package epoll
+package sys
 
 // #include <sys/epoll.h>
 /*
