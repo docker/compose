@@ -3,35 +3,32 @@ syntax = "proto3";
 package containerd.v1;
 
 service Containers {
-    // container level rpcs
     rpc Create(CreateRequest) returns (CreateResponse);
     rpc Start(StartRequest) returns (StartResponse);
     rpc Delete(DeleteRequest) returns (DeleteResponse);
     rpc State(StateRequest) returns (StateResponse);
-
-    // container level action rpcs
     rpc Update(UpdateRequest) returns (UpdateResponse);
     rpc Pause(PauseRequest) returns (PauseResponse);
     rpc Resume(ResumeRequest) returns (ResumeResponse);
 
-    // process level rpcs
+    rpc ContainerList(ContainerListRequest) returns (ContainerListResponse);
+
     rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
     rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
     rpc ProcessState(ProcessStateRequest) returns (ProcessStateResponse);
-    rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse);
+    rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse)
     rpc DeleteProcess(DeleteProcessRequest) returns (DeleteProcessResponse);
+    rpc ProcessList(ProcessListRequest) returns (ProcessListResponse);
 
-    // agg rpcs
-    rpc List(ListRequest) returns (ListResponse);
-    rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
     rpc Events(EventsRequest) returns (stream EventsResponse);
 }
 
 message Container {
     string id = 1;
-    repeated Mount mounts = 2;
-    Process process = 3;
-    optional string config_path = 4;
+    string image = 2;
+    repeated string tags = 3;
+    Process process = 4;
+    optional string container_spec = 5;
 }
 
 message Process {
@@ -56,10 +53,15 @@ message User {
 }
 
 message CreateRequest {
-    Container container = 1;
+    string id = 1;
+    Process process = 2;
+    repeated Mount mounts = 3;
+    optional string config_path = 4;
+    repeated string tags = 5;
 }
 
 message CreateResponse {
+    Container container = 1;
 }
 
 message StartRequest {
@@ -67,17 +69,7 @@ message StartRequest {
 }
 
 message StartResponse {
-
-}
-
-message StopRequest {
-    string id = 1;
-    uint32 signal = 2;
-    uint32 timeout = 3;
-}
-
-message StopResponse {
-
+    State state = 1;
 }
 
 message DeleteRequest {
@@ -88,11 +80,11 @@ message DeleteResponse {
 
 }
 
-message ListRequest {
-
+message ListContainerRequest {
+    repeated string tags = 1;    
 }
 
-message ListResponse {
+message ContainerListResponse {
     repeated Container containers = 1;
 }
 
@@ -102,22 +94,4 @@ message StateRequest {
 
 message StateResponse {
     Container container = 1;
-}
-
-message ExecRequest {
-    string container_id = 1;
-    string id = 2;
-    Process process = 3;
-}
-
-message ExecResponse {
-
-}
-
-message UpdateRequest {
-    string id = 1;
-}
-
-message UpdateResponse {
-
 }
