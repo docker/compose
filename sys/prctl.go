@@ -3,7 +3,7 @@
 // Package osutils provide access to the Get Child and Set Child prctl
 // flags.
 // See http://man7.org/linux/man-pages/man2/prctl.2.html
-package osutils
+package sys
 
 import (
 	"syscall"

@@ -1,6 +1,6 @@
 // +build linux
 
-package osutils
+package sys
 
 import (
 	"bufio"

@@ -1,6 +1,6 @@
 // +build !windows
 
-package osutils
+package sys
 
 import "syscall"
 

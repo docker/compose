@@ -1,6 +1,6 @@
 // +build solaris
 
-package osutils
+package sys
 
 import (
 	"errors"
