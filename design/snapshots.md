@@ -48,14 +48,15 @@ The _Snapshot Manager_ provides an API for allocating, snapshotting and mounting
 abstract, layer-based filesytems. The model works by building up sets of
 directories with parent-child relationships, known as _Snapshots_.
 
-Creating _snapshots_ is a transactional operation. Each _Snapshot_ may have a
-parent snapshot. When one starts a transaction on an existing snapshot, the
-result may only be used as a parent _after_ being committed.
+Every snapshot is represented by an opaque `diff` directory, which acts as a
+handle to the snapshot. It may contain driver specifc data, including changeset
+data, parent information and arbitrary metadata.
 
-Every snapshot has an associated `diff` directory, which contains driver
-specific data. This may include parent information and changeset data,
-depending on the implementation. We define the empty string as the ancestor of
-all snapshots, which corresponds to the empty snapshot.
+The `diff` directory for a _snapshot_ is created with a transactional
+operation. Each _snapshot_ may have one parent snapshot. When one starts a
+transaction on an existing snapshot, the result may only be used as a parent
+_after_ being committed.  The empty string `diff` directory is a handle to the
+empty snapshot, which is the ancestor of all snapshots.
 
 The `target` directory represents the active snapshot location. The driver may
 maintain internal metadata associated with the `target` but the contents is
@@ -94,6 +95,16 @@ unmounted before calling these methods.
 As snapshots are imported into the container system, a "graph" of snapshots and
 their parents will form. Queries over this graph must be a supported operation.
 Subsequently, each snapshot ends up representing 
+
+### Path Management
+
+No path layout for snapshot locations is imposed on the caller. The paths used
+by the snapshot drivers are largely under control of the caller. This provides
+the most flexibility in using the snapshot system but requires discipline when
+deciding which paths to use and which ones to avoid.
+
+We may provide a helper component to manage `diff` path layout when working
+with OCI and docker images.
 
 ## How snapshots work
 
