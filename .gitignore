@@ -7,3 +7,4 @@ main
 /hack/benchmark
 /output
 /example/example
+/cli/containerd/containerd
