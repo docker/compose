@@ -1,4 +1,4 @@
-package containerkit
+package containerd
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-var ErrNotExecProcess = errors.New("containerkit: process not an exec process")
+var ErrNotExecProcess = errors.New("process not an exec process")
 
 type ProcessDelegate interface {
 	Pid() int

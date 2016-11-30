@@ -1,8 +1,8 @@
-package containerkit
+package containerd
 
 import "errors"
 
-var ErrProcessSet = errors.New("containerkit: container process is already set")
+var ErrProcessSet = errors.New("container process is already set")
 
 type Runtime interface {
 	Create(*Container) (ProcessDelegate, error)

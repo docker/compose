@@ -1,9 +1,9 @@
-package containerkit
+package containerd
 
 import "fmt"
 
 // VersionMajor holds the release major number
-const VersionMajor = 2
+const VersionMajor = 1
 
 // VersionMinor holds the release minor number
 const VersionMinor = 0

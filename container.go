@@ -1,4 +1,4 @@
-package containerkit
+package containerd
 
 import (
 	"encoding/json"
