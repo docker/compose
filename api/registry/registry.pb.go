@@ -49,7 +49,9 @@ var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
-const _ = proto.GoGoProtoPackageIsVersion1
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 type PullRequest struct {
 	Uri  string          `protobuf:"bytes,1,opt,name=uri,proto3" json:"uri,omitempty"`
@@ -286,11 +288,12 @@ func valueToGoStringRegistry(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
-func extensionToGoStringRegistry(e map[int32]github_com_gogo_protobuf_proto.Extension) string {
+func extensionToGoStringRegistry(m github_com_gogo_protobuf_proto.Message) string {
+	e := github_com_gogo_protobuf_proto.GetUnsafeExtensionsMap(m)
 	if e == nil {
 		return "nil"
 	}
-	s := "map[int32]proto.Extension{"
+	s := "proto.NewUnsafeXXX_InternalExtensions(map[int32]proto.Extension{"
 	keys := make([]int, 0, len(e))
 	for k := range e {
 		keys = append(keys, int(k))
@@ -300,13 +303,17 @@ func extensionToGoStringRegistry(e map[int32]github_com_gogo_protobuf_proto.Exte
 	for _, k := range keys {
 		ss = append(ss, strconv.Itoa(k)+": "+e[int32(k)].GoString())
 	}
-	s += strings.Join(ss, ",") + "}"
+	s += strings.Join(ss, ",") + "})"
 	return s
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
 var _ grpc.ClientConn
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Registry service
 
@@ -418,40 +425,58 @@ func RegisterRegistryServer(s *grpc.Server, srv RegistryServer) {
 	s.RegisterService(&_Registry_serviceDesc, srv)
 }
 
-func _Registry_Pull_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _Registry_Pull_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PullRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(RegistryServer).Pull(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(RegistryServer).Pull(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.Registry/Pull",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegistryServer).Pull(ctx, req.(*PullRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-func _Registry_Push_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _Registry_Push_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PushRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(RegistryServer).Push(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(RegistryServer).Push(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.Registry/Push",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegistryServer).Push(ctx, req.(*PushRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-func _Registry_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _Registry_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(RegistryServer).Delete(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(RegistryServer).Delete(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.Registry/Delete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegistryServer).Delete(ctx, req.(*DeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Registry_Status_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -475,16 +500,22 @@ func (x *registryStatusServer) Send(m *StatusResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Registry_Cancel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _Registry_Cancel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CancelRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(RegistryServer).Cancel(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(RegistryServer).Cancel(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.Registry/Cancel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegistryServer).Cancel(ctx, req.(*CancelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 var _Registry_serviceDesc = grpc.ServiceDesc{
@@ -515,34 +546,35 @@ var _Registry_serviceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
+	Metadata: "registry.proto",
 }
 
-func (m *PullRequest) Marshal() (data []byte, err error) {
+func (m *PullRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PullRequest) MarshalTo(data []byte) (int, error) {
+func (m *PullRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Uri) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintRegistry(data, i, uint64(len(m.Uri)))
-		i += copy(data[i:], m.Uri)
+		i = encodeVarintRegistry(dAtA, i, uint64(len(m.Uri)))
+		i += copy(dAtA[i:], m.Uri)
 	}
 	if m.Auth != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintRegistry(data, i, uint64(m.Auth.Size()))
-		n1, err := m.Auth.MarshalTo(data[i:])
+		i = encodeVarintRegistry(dAtA, i, uint64(m.Auth.Size()))
+		n1, err := m.Auth.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -551,33 +583,33 @@ func (m *PullRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PullResponse) Marshal() (data []byte, err error) {
+func (m *PullResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PullResponse) MarshalTo(data []byte) (int, error) {
+func (m *PullResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.ID) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintRegistry(data, i, uint64(len(m.ID)))
-		i += copy(data[i:], m.ID)
+		i = encodeVarintRegistry(dAtA, i, uint64(len(m.ID)))
+		i += copy(dAtA[i:], m.ID)
 	}
 	if len(m.Layers) > 0 {
 		for _, msg := range m.Layers {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintRegistry(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintRegistry(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -587,17 +619,17 @@ func (m *PullResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PushRequest) Marshal() (data []byte, err error) {
+func (m *PushRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PushRequest) MarshalTo(data []byte) (int, error) {
+func (m *PushRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -605,17 +637,17 @@ func (m *PushRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PushResponse) Marshal() (data []byte, err error) {
+func (m *PushResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PushResponse) MarshalTo(data []byte) (int, error) {
+func (m *PushResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -623,17 +655,17 @@ func (m *PushResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *StatusRequest) Marshal() (data []byte, err error) {
+func (m *StatusRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *StatusRequest) MarshalTo(data []byte) (int, error) {
+func (m *StatusRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -641,17 +673,17 @@ func (m *StatusRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *StatusResponse) Marshal() (data []byte, err error) {
+func (m *StatusResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *StatusResponse) MarshalTo(data []byte) (int, error) {
+func (m *StatusResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -659,17 +691,17 @@ func (m *StatusResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *DeleteRequest) Marshal() (data []byte, err error) {
+func (m *DeleteRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *DeleteRequest) MarshalTo(data []byte) (int, error) {
+func (m *DeleteRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -677,17 +709,17 @@ func (m *DeleteRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *DeleteResponse) Marshal() (data []byte, err error) {
+func (m *DeleteResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *DeleteResponse) MarshalTo(data []byte) (int, error) {
+func (m *DeleteResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -695,17 +727,17 @@ func (m *DeleteResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CancelRequest) Marshal() (data []byte, err error) {
+func (m *CancelRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *CancelRequest) MarshalTo(data []byte) (int, error) {
+func (m *CancelRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -713,17 +745,17 @@ func (m *CancelRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CancelResponse) Marshal() (data []byte, err error) {
+func (m *CancelResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *CancelResponse) MarshalTo(data []byte) (int, error) {
+func (m *CancelResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -731,90 +763,90 @@ func (m *CancelResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *Layer) Marshal() (data []byte, err error) {
+func (m *Layer) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Layer) MarshalTo(data []byte) (int, error) {
+func (m *Layer) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.ID) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintRegistry(data, i, uint64(len(m.ID)))
-		i += copy(data[i:], m.ID)
+		i = encodeVarintRegistry(dAtA, i, uint64(len(m.ID)))
+		i += copy(dAtA[i:], m.ID)
 	}
 	if m.Size_ != 0 {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintRegistry(data, i, uint64(m.Size_))
+		i = encodeVarintRegistry(dAtA, i, uint64(m.Size_))
 	}
 	return i, nil
 }
 
-func (m *Authentication) Marshal() (data []byte, err error) {
+func (m *Authentication) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Authentication) MarshalTo(data []byte) (int, error) {
+func (m *Authentication) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Username) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintRegistry(data, i, uint64(len(m.Username)))
-		i += copy(data[i:], m.Username)
+		i = encodeVarintRegistry(dAtA, i, uint64(len(m.Username)))
+		i += copy(dAtA[i:], m.Username)
 	}
 	if len(m.Password) > 0 {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintRegistry(data, i, uint64(len(m.Password)))
-		i += copy(data[i:], m.Password)
+		i = encodeVarintRegistry(dAtA, i, uint64(len(m.Password)))
+		i += copy(dAtA[i:], m.Password)
 	}
 	return i, nil
 }
 
-func encodeFixed64Registry(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Registry(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Registry(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Registry(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintRegistry(data []byte, offset int, v uint64) int {
+func encodeVarintRegistry(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *PullRequest) Size() (n int) {
@@ -1059,8 +1091,8 @@ func valueToStringRegistry(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *PullRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PullRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1072,7 +1104,7 @@ func (m *PullRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1100,7 +1132,7 @@ func (m *PullRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1115,7 +1147,7 @@ func (m *PullRequest) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Uri = string(data[iNdEx:postIndex])
+			m.Uri = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1129,7 +1161,7 @@ func (m *PullRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1146,13 +1178,13 @@ func (m *PullRequest) Unmarshal(data []byte) error {
 			if m.Auth == nil {
 				m.Auth = &Authentication{}
 			}
-			if err := m.Auth.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Auth.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1171,8 +1203,8 @@ func (m *PullRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PullResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PullResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1184,7 +1216,7 @@ func (m *PullResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1212,7 +1244,7 @@ func (m *PullResponse) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1227,7 +1259,7 @@ func (m *PullResponse) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ID = string(data[iNdEx:postIndex])
+			m.ID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1241,7 +1273,7 @@ func (m *PullResponse) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1256,13 +1288,13 @@ func (m *PullResponse) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Layers = append(m.Layers, &Layer{})
-			if err := m.Layers[len(m.Layers)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Layers[len(m.Layers)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1281,8 +1313,8 @@ func (m *PullResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PushRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PushRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1294,7 +1326,7 @@ func (m *PushRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1312,7 +1344,7 @@ func (m *PushRequest) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1331,8 +1363,8 @@ func (m *PushRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PushResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PushResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1344,7 +1376,7 @@ func (m *PushResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1362,7 +1394,7 @@ func (m *PushResponse) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1381,8 +1413,8 @@ func (m *PushResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *StatusRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *StatusRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1394,7 +1426,7 @@ func (m *StatusRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1412,7 +1444,7 @@ func (m *StatusRequest) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1431,8 +1463,8 @@ func (m *StatusRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *StatusResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *StatusResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1444,7 +1476,7 @@ func (m *StatusResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1462,7 +1494,7 @@ func (m *StatusResponse) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1481,8 +1513,8 @@ func (m *StatusResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *DeleteRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *DeleteRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1494,7 +1526,7 @@ func (m *DeleteRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1512,7 +1544,7 @@ func (m *DeleteRequest) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1531,8 +1563,8 @@ func (m *DeleteRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *DeleteResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *DeleteResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1544,7 +1576,7 @@ func (m *DeleteResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1562,7 +1594,7 @@ func (m *DeleteResponse) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1581,8 +1613,8 @@ func (m *DeleteResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *CancelRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *CancelRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1594,7 +1626,7 @@ func (m *CancelRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1612,7 +1644,7 @@ func (m *CancelRequest) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1631,8 +1663,8 @@ func (m *CancelRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *CancelResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *CancelResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1644,7 +1676,7 @@ func (m *CancelResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1662,7 +1694,7 @@ func (m *CancelResponse) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1681,8 +1713,8 @@ func (m *CancelResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Layer) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Layer) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1694,7 +1726,7 @@ func (m *Layer) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1722,7 +1754,7 @@ func (m *Layer) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1737,7 +1769,7 @@ func (m *Layer) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ID = string(data[iNdEx:postIndex])
+			m.ID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
@@ -1751,7 +1783,7 @@ func (m *Layer) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Size_ |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1760,7 +1792,7 @@ func (m *Layer) Unmarshal(data []byte) error {
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1779,8 +1811,8 @@ func (m *Layer) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Authentication) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Authentication) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1792,7 +1824,7 @@ func (m *Authentication) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1820,7 +1852,7 @@ func (m *Authentication) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1835,7 +1867,7 @@ func (m *Authentication) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Username = string(data[iNdEx:postIndex])
+			m.Username = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1849,7 +1881,7 @@ func (m *Authentication) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1864,11 +1896,11 @@ func (m *Authentication) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Password = string(data[iNdEx:postIndex])
+			m.Password = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRegistry(data[iNdEx:])
+			skippy, err := skipRegistry(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1887,8 +1919,8 @@ func (m *Authentication) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipRegistry(data []byte) (n int, err error) {
-	l := len(data)
+func skipRegistry(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -1899,7 +1931,7 @@ func skipRegistry(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1917,7 +1949,7 @@ func skipRegistry(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -1934,7 +1966,7 @@ func skipRegistry(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1957,7 +1989,7 @@ func skipRegistry(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -1968,7 +2000,7 @@ func skipRegistry(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipRegistry(data[start:])
+				next, err := skipRegistry(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -1992,33 +2024,35 @@ var (
 	ErrIntOverflowRegistry   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() { proto.RegisterFile("registry.proto", fileDescriptorRegistry) }
+
 var fileDescriptorRegistry = []byte{
-	// 418 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x74, 0x93, 0xd1, 0x8e, 0xd2, 0x40,
-	0x14, 0x86, 0x6d, 0xa9, 0x0d, 0x1e, 0xa4, 0x92, 0x09, 0x31, 0xa4, 0x02, 0x9a, 0x5e, 0x79, 0x61,
-	0xaa, 0xc0, 0x03, 0x18, 0x11, 0xa3, 0x26, 0x5e, 0x98, 0xd1, 0x17, 0x18, 0x61, 0x02, 0x4d, 0x6a,
-	0x07, 0x67, 0xa6, 0x6e, 0xd8, 0xab, 0x7d, 0x3c, 0x2e, 0xf7, 0x72, 0xaf, 0x36, 0x0b, 0xfb, 0x02,
-	0xfb, 0x08, 0x3b, 0x33, 0x6d, 0x81, 0x52, 0xb8, 0x38, 0xc9, 0xcc, 0x39, 0x7f, 0xbe, 0x39, 0xfd,
-	0xff, 0x14, 0x3c, 0x4e, 0xe7, 0x91, 0x90, 0x7c, 0x15, 0x2e, 0x39, 0x93, 0x0c, 0x35, 0xa7, 0x2c,
-	0x91, 0x24, 0x4a, 0x28, 0x9f, 0x85, 0xff, 0x07, 0x7e, 0x7b, 0xce, 0xe6, 0xcc, 0x4c, 0xde, 0xeb,
-	0x53, 0x26, 0x0a, 0x30, 0x34, 0x7e, 0xa6, 0x71, 0x8c, 0xe9, 0xbf, 0x94, 0x0a, 0x89, 0x5a, 0x50,
-	0x4b, 0x79, 0xd4, 0xb1, 0xde, 0x58, 0x6f, 0x9f, 0x61, 0x7d, 0x44, 0x03, 0x70, 0x48, 0x2a, 0x17,
-	0x1d, 0x5b, 0xb5, 0x1a, 0xc3, 0x5e, 0x58, 0x82, 0x86, 0x9f, 0xd4, 0x88, 0x26, 0x32, 0x9a, 0x12,
-	0x19, 0xb1, 0x04, 0x1b, 0x69, 0xf0, 0x1b, 0x9e, 0x67, 0x4c, 0xb1, 0x64, 0x89, 0xa0, 0xe8, 0x25,
-	0xd8, 0xd1, 0x2c, 0x63, 0x8e, 0xdd, 0xed, 0xed, 0x6b, 0xfb, 0xfb, 0x04, 0xab, 0x0e, 0x7a, 0x07,
-	0x6e, 0x4c, 0x56, 0x94, 0x0b, 0x05, 0xaf, 0x29, 0x78, 0xfb, 0x08, 0xfe, 0x43, 0x0f, 0x71, 0xae,
-	0x09, 0x9a, 0x7a, 0x53, 0xb1, 0xc8, 0x37, 0x0d, 0x3c, 0xfd, 0x88, 0xbe, 0x66, 0x8f, 0x04, 0x2f,
-	0xa0, 0xf9, 0x4b, 0x12, 0x99, 0x8a, 0x42, 0xd0, 0x02, 0xaf, 0x68, 0xec, 0x25, 0x13, 0x1a, 0x53,
-	0x49, 0x0f, 0x24, 0x45, 0x63, 0x2f, 0xf9, 0x4c, 0x92, 0x29, 0x8d, 0x0f, 0x24, 0x45, 0x23, 0x97,
-	0x8c, 0xe0, 0xa9, 0x59, 0xec, 0xec, 0x67, 0x21, 0x70, 0x44, 0x74, 0x49, 0x8d, 0x63, 0x0e, 0x36,
-	0xe7, 0xe0, 0x1b, 0x78, 0x65, 0xab, 0x90, 0x0f, 0xf5, 0x54, 0x50, 0x9e, 0x90, 0xbf, 0x34, 0xb7,
-	0x7b, 0x77, 0xd7, 0xb3, 0x25, 0x11, 0xe2, 0x82, 0xf1, 0x99, 0xa1, 0xa8, 0x59, 0x71, 0x1f, 0xde,
-	0xdb, 0x50, 0xc7, 0x79, 0xd0, 0xe8, 0x23, 0x38, 0xda, 0x69, 0xe4, 0x1f, 0x39, 0x77, 0x10, 0xa9,
-	0xff, 0xea, 0xe4, 0x2c, 0x8f, 0xc6, 0x00, 0xc4, 0xe2, 0x04, 0x60, 0xe7, 0xf4, 0x09, 0xc0, 0xde,
-	0x76, 0xf4, 0x05, 0xdc, 0xcc, 0x42, 0xd4, 0x3d, 0x92, 0x95, 0xac, 0xf6, 0x7b, 0x67, 0xa6, 0x39,
-	0xe6, 0x2b, 0xb8, 0x59, 0x58, 0x15, 0x4c, 0x29, 0xd4, 0x0a, 0xa6, 0x9c, 0xf0, 0x07, 0x4b, 0xef,
-	0x93, 0xe5, 0x55, 0x01, 0x95, 0x72, 0xad, 0x80, 0xca, 0x21, 0x8f, 0xbb, 0xeb, 0x4d, 0xff, 0xc9,
-	0x8d, 0xaa, 0x87, 0x4d, 0xdf, 0xba, 0xda, 0xf6, 0xad, 0xb5, 0xaa, 0x6b, 0x55, 0x77, 0xaa, 0xfe,
-	0xb8, 0xe6, 0xdf, 0x19, 0x3d, 0x06, 0x00, 0x00, 0xff, 0xff, 0x1d, 0xe2, 0x86, 0x58, 0x72, 0x03,
-	0x00, 0x00,
+	// 424 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x74, 0x93, 0x4f, 0x8e, 0xd3, 0x30,
+	0x14, 0xc6, 0xc7, 0x99, 0x10, 0xcd, 0xbc, 0xd2, 0x30, 0xb2, 0x46, 0xa8, 0x0a, 0x33, 0xa1, 0xca,
+	0xaa, 0x0b, 0x14, 0x98, 0xf6, 0x00, 0x88, 0x52, 0x04, 0x48, 0x2c, 0x90, 0xe1, 0x02, 0xa6, 0xb1,
+	0x1a, 0x4b, 0x21, 0x2e, 0xb6, 0x03, 0x2a, 0x2b, 0x8e, 0xd7, 0x25, 0x4b, 0x56, 0x88, 0x86, 0x0b,
+	0x70, 0x04, 0x64, 0x27, 0x69, 0x9b, 0xa6, 0xdd, 0xbd, 0x3f, 0x9f, 0x7e, 0x7e, 0xf9, 0x3e, 0x05,
+	0x7c, 0xc9, 0x16, 0x5c, 0x69, 0xb9, 0x8a, 0x97, 0x52, 0x68, 0x81, 0xfb, 0x73, 0x91, 0x6b, 0xca,
+	0x73, 0x26, 0x93, 0xf8, 0xeb, 0x5d, 0x70, 0xbd, 0x10, 0x0b, 0x61, 0x37, 0x4f, 0x4d, 0x55, 0x89,
+	0x22, 0x02, 0xbd, 0xf7, 0x45, 0x96, 0x11, 0xf6, 0xa5, 0x60, 0x4a, 0xe3, 0x2b, 0x38, 0x2f, 0x24,
+	0x1f, 0xa0, 0x21, 0x1a, 0x5d, 0x12, 0x53, 0xe2, 0x3b, 0x70, 0x69, 0xa1, 0xd3, 0x81, 0x33, 0x44,
+	0xa3, 0xde, 0xf8, 0x36, 0x6e, 0x41, 0xe3, 0x17, 0x85, 0x4e, 0x59, 0xae, 0xf9, 0x9c, 0x6a, 0x2e,
+	0x72, 0x62, 0xa5, 0xd1, 0x47, 0xb8, 0x5f, 0x31, 0xd5, 0x52, 0xe4, 0x8a, 0xe1, 0x87, 0xe0, 0xf0,
+	0xa4, 0x62, 0x4e, 0xbd, 0xf2, 0xf7, 0x63, 0xe7, 0xed, 0x8c, 0x38, 0x3c, 0xc1, 0x4f, 0xc0, 0xcb,
+	0xe8, 0x8a, 0x49, 0x35, 0x70, 0x86, 0xe7, 0xa3, 0xde, 0xf8, 0xfa, 0x00, 0xfe, 0xce, 0x2c, 0x49,
+	0xad, 0x89, 0xfa, 0xe6, 0x52, 0x95, 0xd6, 0x97, 0x46, 0xbe, 0x79, 0xc4, 0xb4, 0xd5, 0x23, 0xd1,
+	0x03, 0xe8, 0x7f, 0xd0, 0x54, 0x17, 0xaa, 0x11, 0x5c, 0x81, 0xdf, 0x0c, 0x76, 0x92, 0x19, 0xcb,
+	0x98, 0x66, 0x7b, 0x92, 0x66, 0xb0, 0x93, 0xbc, 0xa4, 0xf9, 0x9c, 0x65, 0x7b, 0x92, 0x66, 0x50,
+	0x4b, 0x26, 0x70, 0xcf, 0x1e, 0x76, 0xf2, 0xb3, 0x30, 0xb8, 0x8a, 0x7f, 0x67, 0xd6, 0x31, 0x97,
+	0xd8, 0x3a, 0x7a, 0x03, 0x7e, 0xdb, 0x2a, 0x1c, 0xc0, 0x45, 0xa1, 0x98, 0xcc, 0xe9, 0x67, 0x56,
+	0xdb, 0xbd, 0xed, 0xcd, 0x6e, 0x49, 0x95, 0xfa, 0x26, 0x64, 0x62, 0x29, 0x97, 0x64, 0xdb, 0x8f,
+	0xff, 0x3a, 0x70, 0x41, 0xea, 0xa0, 0xf1, 0x73, 0x70, 0x8d, 0xd3, 0x38, 0x38, 0x70, 0x6e, 0x2f,
+	0xd2, 0xe0, 0xd1, 0xd1, 0x5d, 0x1d, 0x8d, 0x05, 0xa8, 0xf4, 0x08, 0x60, 0xeb, 0xf4, 0x11, 0xc0,
+	0xce, 0x76, 0xfc, 0x0a, 0xbc, 0xca, 0x42, 0x7c, 0x73, 0x20, 0x6b, 0x59, 0x1d, 0xdc, 0x9e, 0xd8,
+	0xd6, 0x98, 0xd7, 0xe0, 0x55, 0x61, 0x75, 0x30, 0xad, 0x50, 0x3b, 0x98, 0x76, 0xc2, 0xcf, 0x90,
+	0xb9, 0xa7, 0xca, 0xab, 0x03, 0x6a, 0xe5, 0xda, 0x01, 0xb5, 0x43, 0x9e, 0xde, 0xac, 0x37, 0xe1,
+	0xd9, 0xaf, 0x4d, 0x78, 0xf6, 0x6f, 0x13, 0xa2, 0x1f, 0x65, 0x88, 0xd6, 0x65, 0x88, 0x7e, 0x96,
+	0x21, 0xfa, 0x53, 0x86, 0xe8, 0x93, 0x67, 0xff, 0x9d, 0xc9, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff,
+	0x1d, 0xe2, 0x86, 0x58, 0x72, 0x03, 0x00, 0x00,
 }
