@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerkit/epoll"
+	"github.com/docker/containerd/sys"
 )
 
 type Monitorable interface {
@@ -23,7 +23,7 @@ type Flusher interface {
 // New returns a new process monitor that emits events whenever the
 // state of the fd refering to a process changes
 func New() (*Monitor, error) {
-	fd, err := epoll.EpollCreate1(0)
+	fd, err := sys.EpollCreate1(0)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (m *Monitor) Add(ma Monitorable) error {
 		Fd:     int32(fd),
 		Events: syscall.EPOLLHUP,
 	}
-	if err := epoll.EpollCtl(m.epollFd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
+	if err := sys.EpollCtl(m.epollFd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
 		return err
 	}
 	m.receivers[fd] = ma
@@ -87,7 +87,7 @@ func (m *Monitor) Close() error {
 func (m *Monitor) Run() {
 	var events [128]syscall.EpollEvent
 	for {
-		n, err := epoll.EpollWait(m.epollFd, events[:], -1)
+		n, err := sys.EpollWait(m.epollFd, events[:], -1)
 		if err != nil {
 			if err == syscall.EINTR {
 				continue

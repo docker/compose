@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/docker/containerkit/osutils"
+	"github.com/docker/containerd/sys"
 	"github.com/docker/docker/pkg/term"
 )
 
@@ -63,7 +63,7 @@ func start(log *os.File) error {
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals)
 	// set the shim as the subreaper for all orphaned processes created by the container
-	if err := osutils.SetSubreaper(1); err != nil {
+	if err := sys.SetSubreaper(1); err != nil {
 		return err
 	}
 	// open the exit pipe
@@ -106,7 +106,7 @@ func start(log *os.File) error {
 		case s := <-signals:
 			switch s {
 			case syscall.SIGCHLD:
-				exits, _ := osutils.Reap(false)
+				exits, _ := sys.Reap(false)
 				for _, e := range exits {
 					// check to see if runtime is one of the processes that has exited
 					if e.Pid == p.pid() {

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/containerkit"
+	"github.com/docker/containerd"
 )
 
 var (
@@ -146,7 +146,7 @@ func NewManager(root string) (*Manager, error) {
 //
 // Once the writes have completed, Manager.Commit or
 // Manager.Rollback should be called on dst.
-func (lm *Manager) Prepare(dst, parent string) ([]containerkit.Mount, error) {
+func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	// we want to build up lowerdir, upperdir and workdir options for the
 	// overlay mount.
 	//
@@ -194,7 +194,7 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerkit.Mount, error) {
 
 	opts = append(opts, "lowerdir="+strings.Join(parents, ","))
 
-	return []Mount{
+	return []containerd.Mount{
 		{
 			Type:    "overlay",
 			Source:  "none",

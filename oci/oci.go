@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/docker/containerkit"
+	"github.com/docker/containerd"
 )
 
 var ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
@@ -58,7 +58,7 @@ func (r *OCIRuntime) Root() string {
 	return r.root
 }
 
-func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {
+func (r *OCIRuntime) Create(c *containerd.Container) (containerd.ProcessDelegate, error) {
 	pidFile := fmt.Sprintf("%s/%s.pid", filepath.Join(r.root, c.ID()), "init")
 	cmd := r.Command("create", "--pid-file", pidFile, "--bundle", c.Path(), c.ID())
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, c.Stdout, c.Stderr
@@ -76,15 +76,15 @@ func (r *OCIRuntime) Create(c *containerkit.Container) (containerkit.ProcessDele
 	return newProcess(i)
 }
 
-func (r *OCIRuntime) Start(c *containerkit.Container) error {
+func (r *OCIRuntime) Start(c *containerd.Container) error {
 	return r.Command("start", c.ID()).Run()
 }
 
-func (r *OCIRuntime) Delete(c *containerkit.Container) error {
+func (r *OCIRuntime) Delete(c *containerd.Container) error {
 	return r.Command("delete", c.ID()).Run()
 }
 
-func (r *OCIRuntime) Exec(c *containerkit.Container, p *containerkit.Process) (containerkit.ProcessDelegate, error) {
+func (r *OCIRuntime) Exec(c *containerd.Container, p *containerd.Process) (containerd.ProcessDelegate, error) {
 	f, err := ioutil.TempFile(filepath.Join(r.root, c.ID()), "process")
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ type state struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
-func (r *OCIRuntime) Load(id string) (containerkit.ProcessDelegate, error) {
+func (r *OCIRuntime) Load(id string) (containerd.ProcessDelegate, error) {
 	data, err := r.Command("state", id).Output()
 	if err != nil {
 		return nil, err

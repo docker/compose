@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerkit"
-	"github.com/docker/containerkit/monitor"
-	"github.com/docker/containerkit/oci"
+	"github.com/docker/containerd"
+	"github.com/docker/containerd/monitor"
+	"github.com/docker/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -204,7 +204,7 @@ func (s *Shim) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, error) {
+func (s *Shim) Create(c *containerd.Container) (containerd.ProcessDelegate, error) {
 	s.bundle = c.Path()
 	var (
 		root = filepath.Join(s.root, "init")
@@ -247,7 +247,7 @@ func (s *Shim) Create(c *containerkit.Container) (containerkit.ProcessDelegate, 
 	return p, err
 }
 
-func (s *Shim) Start(c *containerkit.Container) error {
+func (s *Shim) Start(c *containerd.Container) error {
 	p, err := s.getContainerInit()
 	if err != nil {
 		return err
@@ -284,14 +284,14 @@ func (s *Shim) Start(c *containerkit.Container) error {
 	return nil
 }
 
-func (s *Shim) Delete(c *containerkit.Container) error {
+func (s *Shim) Delete(c *containerd.Container) error {
 	if err := s.runtime.Delete(c); err != nil {
 		return err
 	}
 	return os.RemoveAll(s.root)
 }
 
-func (s *Shim) Exec(c *containerkit.Container, p *containerkit.Process) (containerkit.ProcessDelegate, error) {
+func (s *Shim) Exec(c *containerd.Container, p *containerd.Process) (containerd.ProcessDelegate, error) {
 	root, err := ioutil.TempDir(s.root, "")
 	if err != nil {
 		return nil, err
@@ -325,7 +325,7 @@ func (s *Shim) Exec(c *containerkit.Container, p *containerkit.Process) (contain
 	return sp, nil
 }
 
-func (s *Shim) Load(id string) (containerkit.ProcessDelegate, error) {
+func (s *Shim) Load(id string) (containerd.ProcessDelegate, error) {
 	return s.getContainerInit()
 }
 

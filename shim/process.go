@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerkit"
+	"github.com/docker/containerd"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
@@ -35,7 +35,7 @@ type processOpts struct {
 	root        string
 	noPivotRoot bool
 	checkpoint  string
-	c           *containerkit.Container
+	c           *containerd.Container
 	cmd         *exec.Cmd
 	exec        bool
 	spec        specs.Process
