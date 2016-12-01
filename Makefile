@@ -22,6 +22,8 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 # time.
 GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
 
+PROTOS=$(shell cd api ; find -name '*.proto')
+
 .PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall
 .DEFAULT: default
 
@@ -46,7 +48,10 @@ setup: ## install dependencies
 
 generate: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "🐳 $@"
-	@PATH=${ROOTDIR}/bin:${PATH} go generate -x ${PACKAGES}
+	@for p in $(PROTOS) ; do \
+		PATH=${ROOTDIR}/bin:${PATH} protoc -I.:../../../github.com/gogo/protobuf --gogoctrd_out=plugins=grpc,import_path=github.com/docker/containerd/api,Mgogoproto/gogo.proto=github.com/gogo/protobuf/gogoproto,Mgoogle/protobuf/descriptor.proto=github.com/gogo/protobuf/protoc-gen-gogo/descriptor:. api/$$p ; \
+	done
+
 
 checkprotos: generate ## check if protobufs needs to be generated again
 	@echo "🐳 $@"
@@ -133,4 +138,3 @@ coverage-integration: ## generate coverprofiles from the integration tests
 
 help: ## this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
-
