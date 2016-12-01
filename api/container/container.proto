@@ -3,178 +3,178 @@ syntax = "proto3";
 package containerd.v1;
 
 service Containers {
-    rpc Create(CreateRequest) returns (CreateResponse);
-    rpc Start(StartRequest) returns (StartResponse);
-    rpc Delete(DeleteRequest) returns (DeleteResponse);
-    rpc State(StateRequest) returns (StateResponse);
-    rpc Update(UpdateRequest) returns (UpdateResponse);
-    rpc Pause(PauseRequest) returns (PauseResponse);
-    rpc Resume(ResumeRequest) returns (ResumeResponse);
+	rpc Create(CreateRequest) returns (CreateResponse);
+	rpc Start(StartRequest) returns (StartResponse);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc State(StateRequest) returns (StateResponse);
+	rpc Update(UpdateRequest) returns (UpdateResponse);
+	rpc Pause(PauseRequest) returns (PauseResponse);
+	rpc Resume(ResumeRequest) returns (ResumeResponse);
 
-    rpc ContainerList(ContainerListRequest) returns (ContainerListResponse);
+	rpc ContainerList(ContainerListRequest) returns (ContainerListResponse);
 
-    rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
-    rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
-    rpc ProcessState(ProcessStateRequest) returns (ProcessStateResponse);
-    rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse);
-    rpc DeleteProcess(DeleteProcessRequest) returns (DeleteProcessResponse);
-    rpc ProcessList(ProcessListRequest) returns (ProcessListResponse);
+	rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
+	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
+	rpc ProcessState(ProcessStateRequest) returns (ProcessStateResponse);
+	rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse);
+	rpc DeleteProcess(DeleteProcessRequest) returns (DeleteProcessResponse);
+	rpc ProcessList(ProcessListRequest) returns (ProcessListResponse);
 
-    rpc Events(EventsRequest) returns (stream EventsResponse);
+	rpc Events(EventsRequest) returns (stream EventsResponse);
 }
 
 message Container {
-    string id = 1;
-    repeated Mount mounts = 2;
-    string owner = 3;
-    Process process = 4;
+	string id = 1 [(gogoproto.customname) = "ID"];
+	repeated Mount mounts = 2;
+	string owner = 3;
+	Process process = 4;
 }
 
 message Process {
-    uint64 pid = 1;
-    repeated string args = 2;
-    repeated string env = 3;
-    User user = 4;
-    string cwd = 5;
-    bool terminal = 6;
+	uint64 pid = 1;
+	repeated string args = 2;
+	repeated string env = 3;
+	User user = 4;
+	string cwd = 5;
+	bool terminal = 6;
 }
 
 message ProcessSpec {
-    repeated string args = 1;
-    repeated string env = 2;
-    User user = 3;
-    string cwd = 4;
-    bool terminal = 5;
-    string stdin = 6;
-    string stdout = 7;
-    string stderr = 8;
+	repeated string args = 1;
+	repeated string env = 2;
+	User user = 3;
+	string cwd = 4;
+	bool terminal = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
 }
 
 message Mount {
-    string source = 1;
-    string target = 2;
-    string type = 3;
-    repeated string options = 4;
+	string source = 1;
+	string target = 2;
+	string type = 3;
+	repeated string options = 4;
 }
 
 message User {
 	uint32 uid = 1;
 	uint32 gid = 2;
-    repeated uint32 additionalGids = 3;
+	repeated uint32 additionalGids = 3;
 }
 
 message CreateRequest {
-    string id = 1;
-    ProcessSpec process = 2;
-    repeated Mount mounts = 3;
-    string owner = 4;
-    string config_path = 5;
+	string id = 1 [(gogoproto.customname) = "ID"];
+	ProcessSpec process = 2;
+	repeated Mount mounts = 3;
+	string owner = 4;
+	string config_path = 5;
 }
 
 message CreateResponse {
-    Container container = 1;
+	Container container = 1;
 }
 
 message StartRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message State {
 }
 
 message StartResponse {
-    State state = 1;
+	State state = 1;
 }
 
 message DeleteRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message DeleteResponse {
 }
 
 message ContainerListRequest {
-    repeated string owner = 1;
+	repeated string owner = 1;
 }
 
 message ContainerListResponse {
-    repeated Container containers = 1;
+	repeated Container containers = 1;
 }
 
 message StateRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message StateResponse {
-    Container container = 1;
+	Container container = 1;
 }
 
 message UpdateRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message UpdateResponse {
 }
 
 message PauseRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message PauseResponse {
 }
 
 message ResumeRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message ResumeResponse {
 }
 
 message CreateProcessRequest {
-    string id = 1;
-    ProcessSpec spec = 2;
+	string id = 1 [(gogoproto.customname) = "ID"];
+	ProcessSpec spec = 2;
 }
 
 message CreateProcessResponse {
 }
 
 message StartProcessRequest {
-    string cid = 1;
-    string pid = 2;
+	string cid = 1;
+	string pid = 2;
 }
 
 message StartProcessResponse {
-    uint32 pid = 1;
+	uint32 pid = 1;
 }
 
 message ProcessStateRequest {
-    string cid = 1;
-    string pid = 2;
+	string cid = 1;
+	string pid = 2;
 }
 
 message ProcessStateResponse {
-    State state = 1;
+	State state = 1;
 }
 
 message SignalProcessRequest {
-    string cid = 1;
-    string pid = 2;
-    uint32 signal = 3;
+	string cid = 1;
+	string pid = 2;
+	uint32 signal = 3;
 }
 
 message SignalProcessResponse {
 }
 
 message DeleteProcessRequest {
-    string cid = 1;
-    string pid = 2;
+	string cid = 1;
+	string pid = 2;
 }
 
 message DeleteProcessResponse {
 }
 
 message ProcessListRequest {
-    string id = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message ProcessListResponse {
