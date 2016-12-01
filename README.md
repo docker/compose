@@ -1,7 +1,8 @@
 # containerd
 
-containerd is a daemon for managing images and containers on a single host.
-It is built to be multi-tenant and handle multiple clients for container runtime needs.
+containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is a available as a daemon for Linux and Windows,  which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
+
+Containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
 ## Features
 
@@ -10,6 +11,7 @@ It is built to be multi-tenant and handle multiple clients for container runtime
 * Image push and pull support
 * Container runtime and lifecycle support
 * Network primitives for creation, modification, and deletion of interfaces
+* Management of network namespaces containers to join existing namespaces
 * Multi-tenant supported with CAS storage for global images
 
 ## Scope and Principles
@@ -57,20 +59,22 @@ Each major version will be supported for 1 year with bug fixes and security patc
 The following table specifies the various components of containerd and general features of container runtimes.
 The table specifies whether or not the feature/component is in or out of scope.
 
-| Name           | Description                                                                                   | In/Out | Reason                                                                                                       |
-|----------------|-----------------------------------------------------------------------------------------------|--------|--------------------------------------------------------------------------------------------------------------|
-| execution      | Provide an extensible execution layer for executing a container                               | in     |                                                                                                              |
-| cow filesystem | Built in functionality for overlay, aufs, and other copy on write filesystems for containers  | in     |                                                                                                              |
-| distribution   | Having the ability to push, pull, package, and sign images                                    | in     |                                                                                                              |
-| networking     | Providing network functionality to containers along with configuring their network namespaces | in     |                                                                                                              |
-| build          | Building images as a first class API                                                          | out    | Build is a higher level tooling feature and can be implemented in many different ways on top of containerd |
-| volumes        | Provide primitives for volumes and persistent storage                                         |        |                                                                                                              |
+| Name | Description | In/Out | Reason |
+|------------------------------|--------------------------------------------------------------------------------------------------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| execution | Provide an extensible execution layer for executing a container | in | Create,start, stop pause, resume exec, signal, delete |
+| cow filesystem | Built in functionality for overlay, aufs, and other copy on write filesystems for containers | in |  |
+| distribution | Having the ability to push and pull images as well as operations on images as a first class api object | in | Containerd will fully support the management and retrieval of images |
+| low-level networking drivers | Providing network functionality to containers along with configuring their network namespaces | in | Network support will be added via interface and network namespace operations, not service discovery and service abstractions. |
+| build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerkit |
+| volumes | Volume management for external data | out | The api supports mounts, binds, etc where all volumes type systems can be built on top of. |
+| logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit.,There is no io copying of container STDIO in containerd. |
 
-containerd is scoped to a single host.
+
+containerd is scoped to a single host and makes asumptions based on that fact.
 It can be used to builds things like a node agent that launches containers but does not have any concepts of a distributed system.
 
 Also things like service discovery are out of scope even though networking is in scope.
-containerd should provide the primitives to create, add, remove, or manage network interfaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
+containerd should provide the primitives to create, add, remove, or manage network interfaces and network namespaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
 
 ### How is the scope changed?
 
