@@ -1,10 +1,10 @@
 package log
 
 import (
+	"context"
 	"path"
 
 	"github.com/Sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 var (
