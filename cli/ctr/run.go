@@ -59,9 +59,7 @@ var runCommand = cli.Command{
 				Stdout: os.Stdout.Name(),
 				Stderr: os.Stderr.Name(),
 			},
-			Tags: []string{
-				"ctr",
-			},
+			Owner: "ctr",
 		})
 		defer client.Containers.Delete(container)
 		if err := client.Networks.Attach(config.Network, container); err != nil {

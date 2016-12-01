@@ -16,7 +16,7 @@ service Containers {
     rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
     rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
     rpc ProcessState(ProcessStateRequest) returns (ProcessStateResponse);
-    rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse)
+    rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse);
     rpc DeleteProcess(DeleteProcessRequest) returns (DeleteProcessResponse);
     rpc ProcessList(ProcessListRequest) returns (ProcessListResponse);
 
@@ -26,17 +26,17 @@ service Containers {
 message Container {
     string id = 1;
     repeated Mount mounts = 2;
-    repeated string tags = 3;
+    string owner = 3;
     Process process = 4;
 }
 
 message Process {
     uint64 pid = 1;
-    repeated string args = 1;
-    repeated string env = 2;
-    User user = 3;
-    string cwd = 4;
-    bool terminal = 5;
+    repeated string args = 2;
+    repeated string env = 3;
+    User user = 4;
+    string cwd = 5;
+    bool terminal = 6;
 }
 
 message ProcessSpec {
@@ -51,21 +51,24 @@ message ProcessSpec {
 }
 
 message Mount {
-
+    string source = 1;
+    string target = 2;
+    string type = 3;
+    repeated string options = 4;
 }
 
 message User {
 	uint32 uid = 1;
 	uint32 gid = 2;
-	repeated uint32 additionalGids = 3; 
+    repeated uint32 additionalGids = 3;
 }
 
 message CreateRequest {
     string id = 1;
     ProcessSpec process = 2;
     repeated Mount mounts = 3;
-    repeated string tags = 4;
-    optional string config_path = 5;
+    string owner = 4;
+    string config_path = 5;
 }
 
 message CreateResponse {
@@ -74,6 +77,9 @@ message CreateResponse {
 
 message StartRequest {
     string id = 1;
+}
+
+message State {
 }
 
 message StartResponse {
@@ -85,11 +91,10 @@ message DeleteRequest {
 }
 
 message DeleteResponse {
-
 }
 
-message ListContainerRequest {
-    repeated string tags = 1;    
+message ContainerListRequest {
+    repeated string owner = 1;
 }
 
 message ContainerListResponse {
@@ -102,4 +107,81 @@ message StateRequest {
 
 message StateResponse {
     Container container = 1;
+}
+
+message UpdateRequest {
+    string id = 1;
+}
+
+message UpdateResponse {
+}
+
+message PauseRequest {
+    string id = 1;
+}
+
+message PauseResponse {
+}
+
+message ResumeRequest {
+    string id = 1;
+}
+
+message ResumeResponse {
+}
+
+message CreateProcessRequest {
+    string id = 1;
+    ProcessSpec spec = 2;
+}
+
+message CreateProcessResponse {
+}
+
+message StartProcessRequest {
+    string cid = 1;
+    string pid = 2;
+}
+
+message StartProcessResponse {
+    uint32 pid = 1;
+}
+
+message ProcessStateRequest {
+    string cid = 1;
+    string pid = 2;
+}
+
+message ProcessStateResponse {
+    State state = 1;
+}
+
+message SignalProcessRequest {
+    string cid = 1;
+    string pid = 2;
+    uint32 signal = 3;
+}
+
+message SignalProcessResponse {
+}
+
+message DeleteProcessRequest {
+    string cid = 1;
+    string pid = 2;
+}
+
+message DeleteProcessResponse {
+}
+
+message ProcessListRequest {
+    string id = 1;
+}
+
+message ProcessListResponse {
+}
+
+message EventsRequest {
+}
+
+message EventsResponse {
 }
