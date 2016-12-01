@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 )
 
@@ -38,6 +40,11 @@ high performance container runtime
 			Usage: "socket path for containerd's GRPC server",
 			Value: "/run/containerd/containerd.sock",
 		},
+		cli.StringFlag{
+			Name:  "metrics-address, m",
+			Usage: "tcp address to serve metrics on",
+			Value: "127.0.0.1:7897",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -49,23 +56,21 @@ high performance container runtime
 		signals := make(chan os.Signal, 2048)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
 
+		if address := context.GlobalString("metrics-address"); address != "" {
+			go serveMetrics(address)
+		}
+
 		path := context.GlobalString("socket")
 		if path == "" {
 			return fmt.Errorf("--socket path cannot be empty")
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
-			return err
-		}
-		if err := syscall.Unlink(path); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		l, err := net.Listen("unix", path)
+		l, err := createUnixSocket(path)
 		if err != nil {
 			return err
 		}
 
 		server := grpc.NewServer()
-		go serve(server, l)
+		go serveGRPC(server, l)
 
 		for s := range signals {
 			switch s {
@@ -83,7 +88,25 @@ high performance container runtime
 	}
 }
 
-func serve(server *grpc.Server, l net.Listener) {
+func createUnixSocket(path string) (net.Listener, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
+		return nil, err
+	}
+	if err := syscall.Unlink(path); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	return net.Listen("unix", path)
+}
+
+func serveMetrics(address string) {
+	m := http.NewServeMux()
+	m.Handle("/metrics", metrics.Handler())
+	if err := http.ListenAndServe(address, m); err != nil {
+		logrus.WithError(err).Fatal("containerd: metrics server failure")
+	}
+}
+
+func serveGRPC(server *grpc.Server, l net.Listener) {
 	defer l.Close()
 	if err := server.Serve(l); err != nil {
 		l.Close()
