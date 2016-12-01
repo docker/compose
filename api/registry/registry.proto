@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package containerd.v1;
 
+import "gogoproto/gogo.proto";
+
 service Registry {
 	// Pull an image from a registry
 	rpc Pull(PullRequest) returns (PullResponse);
@@ -25,6 +27,18 @@ message PullResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	repeated Layer layers = 2;
 }
+
+message PushRequest {}
+message PushResponse {}
+
+message StatusRequest {}
+message StatusResponse {}
+
+message DeleteRequest {}
+message DeleteResponse {}
+
+message CancelRequest{}
+message CancelResponse{}
 
 message Layer {
 	string id = 1 [(gogoproto.customname) = "ID"];

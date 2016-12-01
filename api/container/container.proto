@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package containerd.v1;
 
+import "gogoproto/gogo.proto";
+
 service Containers {
 	rpc Create(CreateRequest) returns (CreateResponse);
 	rpc Start(StartRequest) returns (StartResponse);
