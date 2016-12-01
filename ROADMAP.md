@@ -11,23 +11,23 @@ The following are the different status the various phases of development can be 
 
 ## Phase 1
 
-#### Status: In Progress
+**Status:** In Progress
 
 ### GRPC API 
 
-**Document:**
+**Documents:**
 
 We are going from a top down design for filling out this missing pieces of containerd and design of the API.
 
 ### Design
 
-**Document:** 
+**Documents:** 
 
 The high level design work is needed so that the architecture of containerd stays consistent throughout the development process.
 
 ### Build & Test Process
 
-**Document:**
+**Documents:**
 
 We need to have a simple build and test process for new developers to bootstrap their environments.
 Because containerd will be the base of many high level systems we need to have a simple build process that does
@@ -40,13 +40,15 @@ It will include porting over existing "graph drivers" from Docker Engine and fin
 
 This will also include moving the existing execution code support OCI's Runtime Spec and the existing containerd execution code.
 
-#### Status: In Design
+**Status:** In Design
 
 ### Execution
 
+The execution layer is responsible for the create of containers and the management and supervision of processes.
+
 ### Storage
 
-**Document:** https://github.com/docker/containerkit/blob/master/design/snapshots.md
+**Documents:** https://github.com/docker/containerkit/blob/master/design/snapshots.md
 
 ## Phase 3
 
@@ -54,16 +56,18 @@ Phase 3 involves porting the network drivers from libnetwork and finding a good 
 
 This also includes getting support for the OCI Image spec built into containerd.
 
-#### Status: Not Started
+**Status:** Not Started
 
 ### Distribution
 
 ### Networking
 
+The networking component will allow the management of network namespaces and interface creation and attachment to namespaces.
+
 ## Phase 4
 
 Phase 4 includes work on helping with the releases and packaging of containerd for various distros.
 
-#### Status: Not Started
+**Status:** Not Started
 
 ### Release Process & Tools
