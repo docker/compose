@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package containerd.v1;
 
+import "api/mount/mount.proto";
 import "gogoproto/gogo.proto";
 
 service Execution {
@@ -50,13 +51,6 @@ message ProcessSpec {
 	string stdin = 6;
 	string stdout = 7;
 	string stderr = 8;
-}
-
-message Mount {
-	string source = 1;
-	string target = 2;
-	string type = 3;
-	repeated string options = 4;
 }
 
 message User {

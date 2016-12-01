@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "gogoproto/gogo.proto";
+
+message Mount {
+	string type = 1;
+	string target = 2;
+	string source = 3;
+	repeated string options = 4;
+} 
