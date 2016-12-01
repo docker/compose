@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/execution/oci"
 	"github.com/docker/containerd/monitor"
-	"github.com/docker/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
