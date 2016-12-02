@@ -13,6 +13,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	api "github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/services/execution"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 )
@@ -34,6 +36,16 @@ high performance container runtime
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output in logs",
+		},
+		cli.StringFlag{
+			Name:  "root",
+			Usage: "containerd state directory",
+			Value: "/run/containerd",
+		},
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "default runtime for execution",
+			Value: "runc",
 		},
 		cli.StringFlag{
 			Name:  "socket, s",
@@ -69,7 +81,17 @@ high performance container runtime
 			return err
 		}
 
+		execService, err := execution.New(execution.Opts{
+			Root:    context.GlobalString("root"),
+			Runtime: context.GlobalString("runtime"),
+		})
+		if err != nil {
+			return err
+		}
+
 		server := grpc.NewServer()
+		api.RegisterExecutionServiceServer(server, execService)
+		api.RegisterContainerServiceServer(server, execService)
 		go serveGRPC(server, l)
 
 		for s := range signals {

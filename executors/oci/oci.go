@@ -5,35 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/executors"
 )
 
 var ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
 
-type Opts struct {
-	Name string
-	Root string
-	Args []string
+func init() {
+	executors.Register("oci", New)
+	executors.Register("runc", New)
 }
 
-func New(opts Opts) (*OCIRuntime, error) {
-	if opts.Root == "" {
-		return nil, ErrRootEmpty
-	}
-	if err := os.MkdirAll(opts.Root, 0711); err != nil {
-		return nil, err
-	}
+func New() *OCIRuntime {
 	return &OCIRuntime{
 		root: opts.Root,
 		name: opts.Name,
 		args: opts.Args,
-	}, nil
+	}
 }
 
 type OCIRuntime struct {
