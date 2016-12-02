@@ -60,7 +60,9 @@ func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
 	}
 
 	dgst := cw.digester.Digest()
-	if expected != dgst {
+	// TODO(stevvooe): Correctly handle missing expected digest or allow no
+	// expected digest at commit time.
+	if expected != "" && expected != dgst {
 		return errors.Errorf("unexpected digest: %v != %v", dgst, expected)
 	}
 

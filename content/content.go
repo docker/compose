@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/containerd/log"
 	"github.com/docker/distribution/digest"
 	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
@@ -98,6 +99,44 @@ func (cs *ContentStore) Active() ([]Status, error) {
 }
 
 // TODO(stevvooe): Allow querying the set of blobs in the blob store.
+
+func (cs *ContentStore) Walk(fn func(path string, dgst digest.Digest) error) error {
+	root := filepath.Join(cs.root, "blobs")
+	var alg digest.Algorithm
+	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if !fi.IsDir() && !alg.Available() {
+			return nil
+		}
+
+		// TODO(stevvooe): There are few more cases with subdirs that should be
+		// handled in case the layout gets corrupted. This isn't strict enough
+		// an may spew bad data.
+
+		if path == root {
+			return nil
+		} else if filepath.Dir(path) == root {
+			alg = digest.Algorithm(filepath.Base(path))
+
+			if !alg.Available() {
+				alg = ""
+				return filepath.SkipDir
+			}
+
+			// descending into a hash directory
+			return nil
+		}
+
+		dgst := digest.NewDigestFromHex(alg.String(), filepath.Base(path))
+		if err := dgst.Validate(); err != nil {
+			// log error but don't report
+			log.L.WithError(err).WithField("path", path).Error("invalid digest for blob path")
+			// if we see this, it could mean some sort of corruption of the
+			// store or extra paths not expected previously.
+		}
+
+		return fn(path, dgst)
+	})
+}
 
 func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
 	p := filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())

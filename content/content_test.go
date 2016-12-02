@@ -8,21 +8,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	mrand "math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/docker/distribution/digest"
 )
 
 func TestContentWriter(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "TestContentWriter-")
-
-	cs, err := OpenContentStore(tmpdir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpdir, cs, cleanup := contentStoreEnv(t)
+	defer cleanup()
 
 	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
 		t.Fatal("ingest dir should be created", err)
@@ -112,7 +110,76 @@ func TestContentWriter(t *testing.T) {
 	dumpDir(tmpdir)
 }
 
-func checkCopy(t *testing.T, size int64, dst io.Writer, src io.Reader) {
+func TestWalkBlobs(t *testing.T) {
+	_, cs, cleanup := contentStoreEnv(t)
+	defer cleanup()
+
+	const (
+		nblobs  = 4 << 10
+		maxsize = 4 << 10
+	)
+
+	var (
+		blobs    = map[digest.Digest][]byte{}
+		expected = map[digest.Digest]struct{}{}
+		found    = map[digest.Digest]struct{}{}
+	)
+
+	for i := 0; i < nblobs; i++ {
+		p := make([]byte, mrand.Intn(maxsize))
+
+		if _, err := rand.Read(p); err != nil {
+			t.Fatal(err)
+		}
+
+		dgst := checkWrite(t, cs, p)
+		blobs[dgst] = p
+		expected[dgst] = struct{}{}
+	}
+
+	if err := cs.Walk(func(path string, dgst digest.Digest) error {
+		found[dgst] = struct{}{}
+		if checked := checkBlobPath(t, cs, dgst); checked != path {
+			t.Fatalf("blob path did not match: %v != %v", path, checked)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(expected, found) {
+		t.Fatalf("expected did not match found: %v != %v", found, expected)
+	}
+}
+
+func contentStoreEnv(t interface {
+	Fatal(args ...interface{})
+}) (string, *ContentStore, func()) {
+	pc, _, _, ok := runtime.Caller(1)
+	if !ok {
+		t.Fatal("failed to resolve caller")
+	}
+	fn := runtime.FuncForPC(pc)
+
+	tmpdir, err := ioutil.TempDir("", filepath.Base(fn.Name())+"-")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cs, err := OpenContentStore(tmpdir)
+	if err != nil {
+		os.RemoveAll(tmpdir)
+		t.Fatal(err)
+	}
+
+	return tmpdir, cs, func() {
+		os.RemoveAll(tmpdir)
+	}
+}
+
+func checkCopy(t interface {
+	Fatal(args ...interface{})
+}, size int64, dst io.Writer, src io.Reader) {
 	nn, err := io.Copy(dst, src)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +193,7 @@ func checkCopy(t *testing.T, size int64, dst io.Writer, src io.Reader) {
 func checkBlobPath(t *testing.T, cs *ContentStore, dgst digest.Digest) string {
 	path, err := cs.GetPath(dgst)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, dgst)
 	}
 	if path != filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
 		t.Fatalf("unxpected path: %q", path)
@@ -142,6 +209,15 @@ func checkBlobPath(t *testing.T, cs *ContentStore, dgst digest.Digest) string {
 	}
 
 	return path
+}
+
+func checkWrite(t *testing.T, cs *ContentStore, p []byte) digest.Digest {
+	dgst := digest.FromBytes(p)
+	if err := WriteBlob(cs, bytes.NewReader(p), int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+
+	return dgst
 }
 
 func dumpDir(root string) error {
