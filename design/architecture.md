@@ -17,7 +17,7 @@ representation of a runtime container. _Bundles_ are mutable and can be passed
 to other systems for modification or packed up and distributed. In practice, it
 is simply a directory on the filesystem. 
 
-![Architecture](architecture.svg)
+![Architecture](architecture.png)
 
 Note that while these architecteral ideas are important to understanding the
 system, code layout may not reflect the exact architecture. These ideas should
@@ -67,7 +67,7 @@ components:
 As discussed above, the concept of a _bundle_ is central to containerd. Below
 is a diagram illustrating the data flow for bundle creation.
 
-![data-flow](data-flow.svg)
+![data-flow](data-flow.png)
 
 Let's take pulling an image as a demonstrated example:
 
