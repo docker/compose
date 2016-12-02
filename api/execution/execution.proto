@@ -2,16 +2,17 @@ syntax = "proto3";
 
 package containerd.v1;
 
+import "api/mount/mount.proto";
 import "gogoproto/gogo.proto";
 
-service Containers {
-	rpc Create(CreateRequest) returns (CreateResponse);
-	rpc Start(StartRequest) returns (StartResponse);
-	rpc Delete(DeleteRequest) returns (DeleteResponse);
-	rpc State(StateRequest) returns (StateResponse);
-	rpc Update(UpdateRequest) returns (UpdateResponse);
-	rpc Pause(PauseRequest) returns (PauseResponse);
-	rpc Resume(ResumeRequest) returns (ResumeResponse);
+service Execution {
+	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
+	rpc StartContainer(StartContainerRequest) returns (StartContainerResponse);
+	rpc DeleteContainer(DeleteContainerRequest) returns (DeleteContainerResponse);
+	rpc StateContainer(StateContainerRequest) returns (StateContainerResponse);
+	rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse);
+	rpc PauseContainer(PauseContainerRequest) returns (PauseContainerResponse);
+	rpc ResumeContainer(ResumeContainerRequest) returns (ResumeContainerResponse);
 
 	rpc ContainerList(ContainerListRequest) returns (ContainerListResponse);
 
@@ -52,20 +53,13 @@ message ProcessSpec {
 	string stderr = 8;
 }
 
-message Mount {
-	string source = 1;
-	string target = 2;
-	string type = 3;
-	repeated string options = 4;
-}
-
 message User {
 	uint32 uid = 1;
 	uint32 gid = 2;
 	repeated uint32 additionalGids = 3;
 }
 
-message CreateRequest {
+message CreateContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	ProcessSpec process = 2;
 	repeated Mount mounts = 3;
@@ -73,26 +67,26 @@ message CreateRequest {
 	string config_path = 5;
 }
 
-message CreateResponse {
+message CreateContainerResponse {
 	Container container = 1;
 }
 
-message StartRequest {
+message StartContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message State {
 }
 
-message StartResponse {
+message StartContainerResponse {
 	State state = 1;
 }
 
-message DeleteRequest {
+message DeleteContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message DeleteResponse {
+message DeleteContainerResponse {
 }
 
 message ContainerListRequest {
@@ -103,33 +97,33 @@ message ContainerListResponse {
 	repeated Container containers = 1;
 }
 
-message StateRequest {
+message StateContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message StateResponse {
+message StateContainerResponse {
 	Container container = 1;
 }
 
-message UpdateRequest {
+message UpdateContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message UpdateResponse {
+message UpdateContainerResponse {
 }
 
-message PauseRequest {
+message PauseContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message PauseResponse {
+message PauseContainerResponse {
 }
 
-message ResumeRequest {
+message ResumeContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message ResumeResponse {
+message ResumeContainerResponse {
 }
 
 message CreateProcessRequest {
