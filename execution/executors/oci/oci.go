@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/executors"
 )
 
@@ -21,11 +22,9 @@ func init() {
 	executors.Register("runc", New)
 }
 
-func New() *OCIRuntime {
+func New(root string) *OCIRuntime {
 	return &OCIRuntime{
-		root: opts.Root,
-		name: opts.Name,
-		args: opts.Args,
+		root: root,
 	}
 }
 
@@ -33,48 +32,58 @@ type OCIRuntime struct {
 	// root holds runtime state information for the containers
 	// launched by the runtime
 	root string
-	// name is the name of the runtime, i.e. runc
-	name string
-	// args specifies additional arguments to the OCI runtime
-	args []string
 }
 
-func (r *OCIRuntime) Name() string {
-	return r.name
-}
-
-func (r *OCIRuntime) Args() []string {
-	return r.args
-}
-
-func (r *OCIRuntime) Root() string {
-	return r.root
-}
-
-func (r *OCIRuntime) Create(c *containerd.Container) (containerd.ProcessDelegate, error) {
-	pidFile := fmt.Sprintf("%s/%s.pid", filepath.Join(r.root, c.ID()), "init")
-	cmd := r.Command("create", "--pid-file", pidFile, "--bundle", c.Path(), c.ID())
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, c.Stdout, c.Stderr
+func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (*execution.Container, error) {
+	// /run/runc/redis/1/pid
+	pidFile := filepath.Join(r.root, id, "1", "pid")
+	cmd := command(r.root, "create",
+		"--pid-file", pidFile,
+		"--bundle", o.Bundle,
+		id,
+	)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = o.Stdin, o.Stdout, o.Stderr
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
+	// TODO: kill on error
 	data, err := ioutil.ReadFile(pidFile)
 	if err != nil {
 		return nil, err
 	}
-	i, err := strconv.Atoi(string(data))
+	pid, err := strconv.Atoi(string(data))
 	if err != nil {
 		return nil, err
 	}
-	return newProcess(i)
+	container := execution.NewContainer(r)
+	container.ID = id
+	container.Root = filepath.Join(r.root, id)
+	container.Bundle = o.Bundle
+	process, err := container.CreateProcess(nil)
+	if err != nil {
+		return nil, err
+	}
+	process.Pid = pid
+	process.Stdin = o.Stdin
+	process.Stdout = o.Stdout
+	process.Stderr = o.Stderr
+	return container, nil
 }
 
-func (r *OCIRuntime) Start(c *containerd.Container) error {
-	return r.Command("start", c.ID()).Run()
+func (r *OCIRuntime) Load(id string) (containerd.ProcessDelegate, error) {
+	data, err := r.Command("state", id).Output()
+	if err != nil {
+		return nil, err
+	}
+	var s state
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+	return newProcess(s.Pid)
 }
 
-func (r *OCIRuntime) Delete(c *containerd.Container) error {
-	return r.Command("delete", c.ID()).Run()
+func (r *OCIRuntime) Delete(id string) error {
+	return command(r.root, "delete", id).Run()
 }
 
 func (r *OCIRuntime) Exec(c *containerd.Container, p *containerd.Process) (containerd.ProcessDelegate, error) {
@@ -115,21 +124,8 @@ type state struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
-func (r *OCIRuntime) Load(id string) (containerd.ProcessDelegate, error) {
-	data, err := r.Command("state", id).Output()
-	if err != nil {
-		return nil, err
-	}
-	var s state
-	if err := json.Unmarshal(data, &s); err != nil {
-		return nil, err
-	}
-	return newProcess(s.Pid)
-}
-
-func (r *OCIRuntime) Command(args ...string) *exec.Cmd {
-	baseArgs := append([]string{
-		"--root", r.root,
-	}, r.args...)
-	return exec.Command(r.name, append(baseArgs, args...)...)
+func command(root, args ...string) *exec.Cmd {
+	return exec.Command("runc", append(
+		[]string{"--root", root},
+		args...)...)
 }

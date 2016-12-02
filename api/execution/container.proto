@@ -20,10 +20,11 @@ service ContainerService {
 }
 
 message CreateProcessRequest {
-    Process process = 1;
-    string stdin = 2;
-	string stdout = 3;
-	string stderr = 4;
+    string container_id = 1;
+    Process process = 2;
+    string stdin = 3;
+	string stdout = 4;
+	string stderr = 5;
 }
 
 message CreateProcessResponse {
@@ -45,6 +46,8 @@ message Process {
 	User user = 5;
 	string cwd = 6;
 	bool terminal = 7;
+    Status status = 8;
+    uint32 exit_status = 9;
 }
 
 enum Status {
