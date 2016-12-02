@@ -2,84 +2,26 @@ syntax = "proto3";
 
 package containerd.v1;
 
-import "api/mount/mount.proto";
+import "container.proto";
+import "empty.proto";
 import "gogoproto/gogo.proto";
 
-service Execution {
-	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
-	rpc StartContainer(StartContainerRequest) returns (StartContainerResponse);
-	rpc DeleteContainer(DeleteContainerRequest) returns (DeleteContainerResponse);
-	rpc StateContainer(StateContainerRequest) returns (StateContainerResponse);
-	rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse);
-	rpc PauseContainer(PauseContainerRequest) returns (PauseContainerResponse);
-	rpc ResumeContainer(ResumeContainerRequest) returns (ResumeContainerResponse);
-
-	rpc ContainerList(ContainerListRequest) returns (ContainerListResponse);
-
-	rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
-	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
-	rpc ProcessState(ProcessStateRequest) returns (ProcessStateResponse);
-	rpc SignalProcess(SignalProcessRequest) returns (SignalProcessResponse);
-	rpc DeleteProcess(DeleteProcessRequest) returns (DeleteProcessResponse);
-	rpc ProcessList(ProcessListRequest) returns (ProcessListResponse);
-
-	rpc Events(EventsRequest) returns (stream EventsResponse);
-}
-
-message Container {
-	string id = 1 [(gogoproto.customname) = "ID"];
-	repeated Mount mounts = 2;
-	string owner = 3;
-	Process process = 4;
-}
-
-message Process {
-	uint64 pid = 1;
-	repeated string args = 2;
-	repeated string env = 3;
-	User user = 4;
-	string cwd = 5;
-	bool terminal = 6;
-}
-
-message ProcessSpec {
-	repeated string args = 1;
-	repeated string env = 2;
-	User user = 3;
-	string cwd = 4;
-	bool terminal = 5;
-	string stdin = 6;
-	string stdout = 7;
-	string stderr = 8;
-}
-
-message User {
-	uint32 uid = 1;
-	uint32 gid = 2;
-	repeated uint32 additionalGids = 3;
+service ExecutionService{
+	rpc Create(CreateContainerRequest) returns (CreateContainerResponse);
+	rpc Delete(DeleteContainerRequest) returns (Empty);
+	rpc List(ListContainersRequest) returns (ListContainersResponse);
 }
 
 message CreateContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	ProcessSpec process = 2;
-	repeated Mount mounts = 3;
-	string owner = 4;
-	string config_path = 5;
+    string bundle_path = 2;
+    string stdin = 3;
+	string stdout = 4;
+	string stderr = 5;
 }
 
 message CreateContainerResponse {
 	Container container = 1;
-}
-
-message StartContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message State {
-}
-
-message StartContainerResponse {
-	State state = 1;
 }
 
 message DeleteContainerRequest {
@@ -89,95 +31,10 @@ message DeleteContainerRequest {
 message DeleteContainerResponse {
 }
 
-message ContainerListRequest {
+message ListContainersRequest {
 	repeated string owner = 1;
 }
 
-message ContainerListResponse {
+message ListContainersResponse {
 	repeated Container containers = 1;
-}
-
-message StateContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message StateContainerResponse {
-	Container container = 1;
-}
-
-message UpdateContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message UpdateContainerResponse {
-}
-
-message PauseContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message PauseContainerResponse {
-}
-
-message ResumeContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message ResumeContainerResponse {
-}
-
-message CreateProcessRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-	ProcessSpec spec = 2;
-}
-
-message CreateProcessResponse {
-}
-
-message StartProcessRequest {
-	string cid = 1;
-	string pid = 2;
-}
-
-message StartProcessResponse {
-	uint32 pid = 1;
-}
-
-message ProcessStateRequest {
-	string cid = 1;
-	string pid = 2;
-}
-
-message ProcessStateResponse {
-	State state = 1;
-}
-
-message SignalProcessRequest {
-	string cid = 1;
-	string pid = 2;
-	uint32 signal = 3;
-}
-
-message SignalProcessResponse {
-}
-
-message DeleteProcessRequest {
-	string cid = 1;
-	string pid = 2;
-}
-
-message DeleteProcessResponse {
-}
-
-message ProcessListRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message ProcessListResponse {
-}
-
-message EventsRequest {
-}
-
-message EventsResponse {
 }

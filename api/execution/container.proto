@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "empty.proto";
+import "gogoproto/gogo.proto";
+
+service ContainerService {
+	rpc Get(GetContainerRequest) returns (GetContainerResponse);
+	rpc Update(UpdateContainerRequest) returns (Empty);
+	rpc Pause(PauseContainerRequest) returns (Empty);
+	rpc Resume(ResumeContainerRequest) returns (Empty);
+
+    rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
+	rpc GetProcess(GetProcessRequest) returns (GetProcessResponse);
+	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
+	rpc SignalProcess(SignalProcessRequest) returns (Empty);
+	rpc DeleteProcess(DeleteProcessRequest) returns (Empty);
+	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+}
+
+message CreateProcessRequest {
+    Process process = 1;
+    string stdin = 2;
+	string stdout = 3;
+	string stderr = 4;
+}
+
+message CreateProcessResponse {
+    Process process = 1;
+}
+
+message Container {
+	string id = 1 [(gogoproto.customname) = "ID"];
+    string bundle_path = 2;
+    Process process = 3;
+    Status status = 4;
+}
+
+message Process {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint64 pid = 2;
+	repeated string args = 3;
+	repeated string env = 4;
+	User user = 5;
+	string cwd = 6;
+	bool terminal = 7;
+}
+
+enum Status {
+    CREATED = 0;
+    RUNNING = 1;
+    STOPPED = 2;
+    PAUSED = 3;
+}
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additionalGids = 3;
+}
+
+message GetContainerRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message GetContainerResponse {
+	Container container = 1;
+}
+
+message UpdateContainerRequest {
+	Container container = 1;
+    string bundle_path = 2;
+}
+
+message PauseContainerRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message ResumeContainerRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message StartProcessRequest {
+    Process process = 1;
+}
+
+message StartProcessResponse {
+    Process process = 1;
+}
+
+message GetProcessRequest {
+    Container container = 1;
+    string process_id = 2;
+}
+
+message GetProcessResponse {
+    Process process = 1;
+}
+
+message SignalProcessRequest {
+    Process process = 1;
+	uint32 signal = 2;
+}
+
+message DeleteProcessRequest {
+    Process process = 1;
+}
+
+message ListProcessesRequest {
+    Container container = 1;
+}
+
+message ListProcessesResponse {
+    repeated Process processes = 1;
+}
+
+
