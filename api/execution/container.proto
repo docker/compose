@@ -2,20 +2,20 @@ syntax = "proto3";
 
 package containerd.v1;
 
-import "empty.proto";
+import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 
 service ContainerService {
 	rpc Get(GetContainerRequest) returns (GetContainerResponse);
-	rpc Update(UpdateContainerRequest) returns (Empty);
-	rpc Pause(PauseContainerRequest) returns (Empty);
-	rpc Resume(ResumeContainerRequest) returns (Empty);
+	rpc Update(UpdateContainerRequest) returns (google.protobuf.Empty);
+	rpc Pause(PauseContainerRequest) returns (google.protobuf.Empty);
+	rpc Resume(ResumeContainerRequest) returns (google.protobuf.Empty);
 
     rpc CreateProcess(CreateProcessRequest) returns (CreateProcessResponse);
 	rpc GetProcess(GetProcessRequest) returns (GetProcessResponse);
 	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
-	rpc SignalProcess(SignalProcessRequest) returns (Empty);
-	rpc DeleteProcess(DeleteProcessRequest) returns (Empty);
+	rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
+	rpc DeleteProcess(DeleteProcessRequest) returns (google.protobuf.Empty);
 	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
 }
 

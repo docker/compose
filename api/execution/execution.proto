@@ -3,12 +3,12 @@ syntax = "proto3";
 package containerd.v1;
 
 import "container.proto";
-import "empty.proto";
+import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 
 service ExecutionService{
 	rpc Create(CreateContainerRequest) returns (CreateContainerResponse);
-	rpc Delete(DeleteContainerRequest) returns (Empty);
+	rpc Delete(DeleteContainerRequest) returns (google.protobuf.Empty);
 	rpc List(ListContainersRequest) returns (ListContainersResponse);
 }
 
