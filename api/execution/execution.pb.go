@@ -16,8 +16,8 @@
 		DeleteContainerResponse
 		ListContainersRequest
 		ListContainersResponse
-		CreateProcessRequest
-		CreateProcessResponse
+		StartProcessRequest
+		StartProcessResponse
 		Container
 		Process
 		User
@@ -26,8 +26,6 @@
 		UpdateContainerRequest
 		PauseContainerRequest
 		ResumeContainerRequest
-		StartProcessRequest
-		StartProcessResponse
 		GetProcessRequest
 		GetProcessResponse
 		SignalProcessRequest

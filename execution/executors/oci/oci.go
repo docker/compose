@@ -1,16 +1,14 @@
 package oci
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os/exec"
+	"os"
 	"path/filepath"
-	"strconv"
-	"time"
+	"syscall"
 
-	"github.com/docker/containerd"
+	"github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/executors"
 )
@@ -25,107 +23,178 @@ func init() {
 func New(root string) *OCIRuntime {
 	return &OCIRuntime{
 		root: root,
+		Runc: &runc.Runc{
+			Root: filepath.Join(root, "runc"),
+		},
 	}
 }
 
 type OCIRuntime struct {
 	// root holds runtime state information for the containers
-	// launched by the runtime
 	root string
+	runc *runc.Runc
 }
 
 func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (*execution.Container, error) {
+	var err error
+
+	stateDir, err := NewStateDir(r.root, id)
+	if err != nil {
+		return nil, err
+	}
+
+	initStateDir, err := stateDir.NewProcess()
+	if err != nil {
+		return nil, err
+	}
+
 	// /run/runc/redis/1/pid
-	pidFile := filepath.Join(r.root, id, "1", "pid")
-	cmd := command(r.root, "create",
-		"--pid-file", pidFile,
-		"--bundle", o.Bundle,
-		id,
-	)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = o.Stdin, o.Stdout, o.Stderr
-	if err := cmd.Run(); err != nil {
-		return nil, err
-	}
-	// TODO: kill on error
-	data, err := ioutil.ReadFile(pidFile)
+	pidFile := filepath.Join(initStateDir, "pid")
+	err = r.runc.Create(id, o.Bundle, &runc.CreateOpts{
+		Pidfile: pidfile,
+		Stdin:   o.Stdin,
+		Stdout:  o.Stdout,
+		Stderr:  o.Stderr,
+	})
 	if err != nil {
 		return nil, err
 	}
-	pid, err := strconv.Atoi(string(data))
+	pid, err := runc.ReadPifFile(pidfile)
 	if err != nil {
 		return nil, err
 	}
-	container := execution.NewContainer(r)
-	container.ID = id
-	container.Root = filepath.Join(r.root, id)
-	container.Bundle = o.Bundle
-	process, err := container.CreateProcess(nil)
+	process, err := newProcess(pid)
 	if err != nil {
 		return nil, err
 	}
-	process.Pid = pid
-	process.Stdin = o.Stdin
-	process.Stdout = o.Stdout
-	process.Stderr = o.Stderr
+
+	container := &execution.Container{
+		ID:       id,
+		Bundle:   o.Bundle,
+		StateDir: stateDir,
+	}
+	container.AddProcess(process)
+
 	return container, nil
 }
 
-func (r *OCIRuntime) Load(id string) (containerd.ProcessDelegate, error) {
-	data, err := r.Command("state", id).Output()
+func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
+	container := &execution.Container{
+		ID:       runcC.ID,
+		Bundle:   runcC.Bundle,
+		StateDir: StateDir(filepath.Join(r.root, runcC.ID)),
+	}
+
+	process, err := newProcess(runcC.Pid)
 	if err != nil {
 		return nil, err
 	}
-	var s state
-	if err := json.Unmarshal(data, &s); err != nil {
+	container.AddProcess(process)
+
+	// /run/containerd/container-id/processess/process-id
+	dirs, err := ioutil.ReadDir(filepath.Join(container.Root))
+	if err != nil {
 		return nil, err
 	}
-	return newProcess(s.Pid)
+
+	return container, nil
 }
 
-func (r *OCIRuntime) Delete(id string) error {
-	return command(r.root, "delete", id).Run()
+func (r *OCIRuntime) List() ([]*execution.Container, error) {
+	runcCs, err := r.runc.List()
+	if err != nil {
+		return nil, err
+	}
+
+	containers := make([]*execution.Container)
+	for _, c := range runcCs {
+		container, err := r.load(c)
+		if err != nil {
+			return nil, err
+		}
+		containers = append(containers, container)
+	}
+
+	return containers, nil
 }
 
-func (r *OCIRuntime) Exec(c *containerd.Container, p *containerd.Process) (containerd.ProcessDelegate, error) {
-	f, err := ioutil.TempFile(filepath.Join(r.root, c.ID()), "process")
+func (r *OCIRuntime) Load(id string) (*execution.Container, error) {
+	runcC, err := r.runc.State(id)
 	if err != nil {
 		return nil, err
 	}
-	path := f.Name()
-	pidFile := fmt.Sprintf("%s/%s.pid", filepath.Join(r.root, c.ID()), filepath.Base(path))
-	err = json.NewEncoder(f).Encode(p.Spec())
-	f.Close()
-	if err != nil {
-		return nil, err
-	}
-	cmd := r.Command("exec", "--detach", "--process", path, "--pid-file", pidFile, c.ID())
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = p.Stdin, p.Stdout, p.Stderr
-	if err := cmd.Run(); err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(pidFile)
-	if err != nil {
-		return nil, err
-	}
-	i, err := strconv.Atoi(string(data))
-	if err != nil {
-		return nil, err
-	}
-	return newProcess(i)
+
+	return r.load(runcC)
 }
 
-type state struct {
-	ID          string            `json:"id"`
-	Pid         int               `json:"pid"`
-	Status      string            `json:"status"`
-	Bundle      string            `json:"bundle"`
-	Rootfs      string            `json:"rootfs"`
-	Created     time.Time         `json:"created"`
-	Annotations map[string]string `json:"annotations"`
+func (r *OCIRuntime) Delete(c *execution.Container) error {
+	if err := r.runc.Delete(c.ID); err != nil {
+		return err
+	}
+	c.StateDir.Delete()
+	return nil
 }
 
-func command(root, args ...string) *exec.Cmd {
-	return exec.Command("runc", append(
-		[]string{"--root", root},
-		args...)...)
+func (r *OCIRuntime) Pause(c *execution.Container) error {
+	return r.runc.Pause(c.ID)
+}
+
+func (r *OCIRuntime) Resume(c *execution.Container) error {
+	return r.runc.Resume(c.ID)
+}
+
+func (r *OCIRuntime) StartProcess(c *execution.Container, o CreateProcessOpts) (execution.Process, error) {
+	var err error
+
+	processStateDir, err := c.StateDir.NewProcess()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			c.StateDir.DeleteProcess(filepath.Base(processStateDir))
+		}
+	}()
+
+	pidFile := filepath.Join(processStateDir, id)
+	err := r.runc.ExecProcess(c.ID, o.spec, &runc.ExecOpts{
+		PidFile: pidfile,
+		Detach:  true,
+		Stdin:   o.stdin,
+		Stdout:  o.stdout,
+		Stderr:  o.stderr,
+	})
+	if err != nil {
+		return nil, err
+	}
+	pid, err := runc.ReadPidFile(pidfile)
+	if err != nil {
+		return nil, err
+	}
+
+	process, err := newProcess(pid)
+	if err != nil {
+		return nil, err
+	}
+
+	container.AddProcess(process)
+
+	return process, nil
+}
+
+func (r *OCIRuntime) SignalProcess(c *execution.Container, id string, sig os.Signal) error {
+	process := c.GetProcess(id)
+	if process == nil {
+		return fmt.Errorf("Make a Process Not Found error")
+	}
+	return syscall.Kill(int(process.Pid()), os.Signal)
+}
+
+func (r *OCIRuntime) GetProcess(c *execution.Container, id string) process {
+	return c.GetProcess(id)
+}
+
+func (r *OCIRuntime) DeleteProcess(c *execution.Container, id string) error {
+	c.StateDir.DeleteProcess(id)
+	return nil
 }

@@ -1,13 +1,13 @@
 package executors
 
-import "github.com/docker/containerd"
+import "github.com/docker/containerd/execution"
 
-var executors = make(map[string]func() containerd.Executor)
+var executors = make(map[string]func() execution.Executor)
 
-func Register(name string, e func() containerd.Executor) {
+func Register(name string, e func() execution.Executor) {
 	executors[name] = e
 }
 
-func Get(name string) func() containerd.Executor {
+func Get(name string) func() execution.Executor {
 	return executors[name]
 }

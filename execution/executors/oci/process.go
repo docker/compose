@@ -3,9 +3,11 @@ package oci
 import (
 	"os"
 	"syscall"
+
+	"github.com/docker/containerd/execution"
 )
 
-func newProcess(pid int) (*process, error) {
+func newProcess(pid int) (execution.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return nil, err

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,7 +14,7 @@ import (
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/services/execution"
-	metrics "github.com/docker/go-metrics"
+	// metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 )
 
@@ -26,10 +25,10 @@ func main() {
 	app.Usage = `
                     __        _                     __
   _________  ____  / /_____ _(_)___  ___  _________/ /
- / ___/ __ \/ __ \/ __/ __ ` + "`" + `/ / __ \/ _ \/ ___/ __  / 
-/ /__/ /_/ / / / / /_/ /_/ / / / / /  __/ /  / /_/ /  
-\___/\____/_/ /_/\__/\__,_/_/_/ /_/\___/_/   \__,_/   
-                                                      
+ / ___/ __ \/ __ \/ __/ __ ` + "`" + `/ / __ \/ _ \/ ___/ __  /
+/ /__/ /_/ / / / / /_/ /_/ / / / / /  __/ /  / /_/ /
+\___/\____/_/ /_/\__/\__,_/_/_/ /_/\___/_/   \__,_/
+
 high performance container runtime
 `
 	app.Flags = []cli.Flag{
@@ -68,9 +67,9 @@ high performance container runtime
 		signals := make(chan os.Signal, 2048)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
 
-		if address := context.GlobalString("metrics-address"); address != "" {
-			go serveMetrics(address)
-		}
+		// if address := context.GlobalString("metrics-address"); address != "" {
+		// 	go serveMetrics(address)
+		// }
 
 		path := context.GlobalString("socket")
 		if path == "" {
@@ -120,13 +119,13 @@ func createUnixSocket(path string) (net.Listener, error) {
 	return net.Listen("unix", path)
 }
 
-func serveMetrics(address string) {
-	m := http.NewServeMux()
-	m.Handle("/metrics", metrics.Handler())
-	if err := http.ListenAndServe(address, m); err != nil {
-		logrus.WithError(err).Fatal("containerd: metrics server failure")
-	}
-}
+// func serveMetrics(address string) {
+// 	m := http.NewServeMux()
+// 	m.Handle("/metrics", metrics.Handler())
+// 	if err := http.ListenAndServe(address, m); err != nil {
+// 		logrus.WithError(err).Fatal("containerd: metrics server failure")
+// 	}
+// }
 
 func serveGRPC(server *grpc.Server, l net.Listener) {
 	defer l.Close()

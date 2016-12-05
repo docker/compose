@@ -14,8 +14,8 @@ service ExecutionService{
 
 message CreateContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
-    string bundle_path = 2;
-    string stdin = 3;
+	string bundle_path = 2;
+	string stdin = 3;
 	string stdout = 4;
 	string stderr = 5;
 }
@@ -38,5 +38,3 @@ message ListContainersRequest {
 message ListContainersResponse {
 	repeated Container containers = 1;
 }
-
-

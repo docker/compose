@@ -1,11 +1,14 @@
 package execution
 
 import (
-	"context"
+	"fmt"
 
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/execution"
-	"github.com/docker/containerd/executors"
+	"github.com/docker/containerd/execution/executors"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/net/context"
 )
 
 type Opts struct {
@@ -14,7 +17,7 @@ type Opts struct {
 }
 
 func New(o Opts) (*Service, error) {
-	executor := executors.Get(o.Runtime)(o.Root)
+	executor := executors.Get(o.Runtime)()
 	return &Service{
 		o:        o,
 		executor: executor,
@@ -28,34 +31,46 @@ type Service struct {
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
 	// TODO: write io and bundle path to dir
-	container, err := s.executor.Create(r.ID, r.BundlePath, &IO{})
+	// TODO: open IOs
+	container, err := s.executor.Create(r.ID, execution.CreateOpts{
+		Bundle: r.BundlePath,
+		// Stdin:  r.Stdin,
+		// Stdout: r.Stdout,
+		// Stderr: r.Stderr,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.supervisor.Add(container.InitProcess())
+	s.supervisor.Add(container)
 
 	return &api.CreateContainerResponse{
 		Container: toGRPCContainer(container),
 	}, nil
 }
 
-func (s *Service) Delete(ctx context.Context, r *api.DeleteContainerRequest) (*api.Empty, error) {
-	if err := s.executor.Delete(r.ID); err != nil {
+func (s *Service) Delete(ctx context.Context, r *api.DeleteContainerRequest) (*google_protobuf.Empty, error) {
+	container, err := s.executor.Load(r.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = s.executor.Delete(container); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (s *Service) List(ctx context.Context, r *api.ListContainerRequest) (*api.ListContainerResponse, error) {
+func (s *Service) List(ctx context.Context, r *api.ListContainersRequest) (*api.ListContainersResponse, error) {
 	containers, err := s.executor.List()
 	if err != nil {
 		return nil, err
 	}
+	resp := &api.ListContainersResponse{}
 	for _, c := range containers {
-		r.Containers = append(r.Containers, toGRPCContainer(c))
+		resp.Containers = append(resp.Containers, toGRPCContainer(c))
 	}
-	return r, nil
+	return resp, nil
 }
 func (s *Service) Get(ctx context.Context, r *api.GetContainerRequest) (*api.GetContainerResponse, error) {
 	container, err := s.executor.Load(r.ID)
@@ -67,111 +82,94 @@ func (s *Service) Get(ctx context.Context, r *api.GetContainerRequest) (*api.Get
 	}, nil
 }
 
-func (s *Service) Update(ctx context.Context, r *api.UpdateContainerRequest) (*api.Empty, error) {
+func (s *Service) Update(ctx context.Context, r *api.UpdateContainerRequest) (*google_protobuf.Empty, error) {
 	return nil, nil
 }
 
-func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*api.Empty, error) {
+func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*google_protobuf.Empty, error) {
 	container, err := s.executor.Load(r.ID)
 	if err != nil {
 		return nil, err
 	}
-	return nil, container.Pause()
+	return nil, s.executor.Pause(container)
 }
 
-func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*api.Empty, error) {
+func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*google_protobuf.Empty, error) {
 	container, err := s.executor.Load(r.ID)
 	if err != nil {
 		return nil, err
 	}
-	return nil, container.Resume()
+	return nil, s.executor.Resume(container)
 }
 
-func (s *Service) CreateProcess(ctx context.Context, r *api.CreateProcessRequest) (*api.CreateProcessResponse, error) {
-	container, err := s.executor.Load(r.ID)
+func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
+	container, err := s.executor.Load(r.ContainerId)
 	if err != nil {
 		return nil, err
 	}
 
-	process, err := container.CreateProcess(r.Process)
+	// TODO: generate spec
+	var spec specs.Process
+	// TODO: open IOs
+	process, err := s.executor.StartProcess(container, execution.CreateProcessOpts{
+		Spec: spec,
+		// Stdin:  r.Stdin,
+		// Stdout: r.Stdout,
+		// Stderr: r.Stderr,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	s.supervisor.Add(process)
 
-	r.Process.Pid = process.Pid()
-	return &api.CreateProcessResponse{
-		Process: r.Process,
+	return &api.StartProcessResponse{
+		Process: toGRPCProcess(process),
 	}, nil
 }
 
 // containerd managed execs + system pids forked in container
 func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*api.GetProcessResponse, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(r.Container.ID)
 	if err != nil {
 		return nil, err
 	}
-	process, err := container.Process(r.ProcessId)
-	if err != nil {
-		return nil, err
+	process := s.executor.GetProcess(r.Pid)
+	if process == nil {
+		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
 	}
 	return &api.GetProcessResponse{
-		Process: process,
+		Process: toGRPCProcess(process),
 	}, nil
 }
 
-func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
-	container, err := s.executor.Load(r.ID)
+func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest) (*google_protobuf.Empty, error) {
+	container, err := s.executor.Load(r.Container.ID)
 	if err != nil {
 		return nil, err
 	}
-	process, err := container.Process(r.Process.ID)
-	if err != nil {
-		return nil, err
-	}
-	if err := process.Start(); err != nil {
-		return nil, err
-	}
-	return &api.StartProcessRequest{
-		Process: process,
-	}, nil
+	return nil, s.executor.SignalProcess(container, r.Process.ID, r.Signal)
 }
 
-func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest) (*api.Empty, error) {
-	container, err := s.executor.Load(r.ID)
+func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
+	container, err := s.executor.Load(r.Container.ID)
 	if err != nil {
 		return nil, err
 	}
-	process, err := container.Process(r.Process.ID)
-	if err != nil {
-		return nil, err
-	}
-	return nil, process.Signal(r.Signal)
-}
-
-func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*api.Empty, error) {
-	container, err := s.executor.Load(r.ID)
-	if err != nil {
-		return nil, err
-	}
-	if err := container.DeleteProcess(r.Process.ID); err != nil {
+	if err := s.executor.DeleteProcess(container, r.Process.ID); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
 func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(r.Container.ID)
 	if err != nil {
 		return nil, err
 	}
-	processes, err := container.Processes()
-	if err != nil {
-		return nil, err
-	}
+	processes := container.Processes()
 	return &api.ListProcessesResponse{
-		Processes: processes,
+		Processes: toGRPCProcesses(processes),
 	}, nil
 }
 
