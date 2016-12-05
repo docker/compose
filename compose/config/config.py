@@ -86,6 +86,7 @@ DOCKER_CONFIG_KEYS = [
     'stop_signal',
     'tty',
     'user',
+    'userns_mode',
     'volume_driver',
     'volumes',
     'volumes_from',
