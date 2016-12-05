@@ -10,15 +10,9 @@ import (
 
 	"github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd/execution"
-	"github.com/docker/containerd/executors"
 )
 
 var ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
-
-func init() {
-	executors.Register("oci", New)
-	executors.Register("runc", New)
-}
 
 func New(root string) *OCIRuntime {
 	return &OCIRuntime{

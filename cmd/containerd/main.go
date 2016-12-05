@@ -13,7 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/execution"
-	"github.com/docker/containerd/services/execution"
+	"github.com/docker/containerd/execution"
 	// metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 )

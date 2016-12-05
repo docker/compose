@@ -4,35 +4,32 @@ import (
 	"fmt"
 
 	api "github.com/docker/containerd/api/execution"
-	"github.com/docker/containerd/execution"
-	"github.com/docker/containerd/execution/executors"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 )
 
-type Opts struct {
+type ServiceOpts struct {
 	Root    string
 	Runtime string
 }
 
-func New(o Opts) (*Service, error) {
-	executor := executors.Get(o.Runtime)()
+func New(opts ServiceOpts, executor Executor) (*Service, error) {
 	return &Service{
-		o:        o,
+		o:        opts,
 		executor: executor,
 	}, nil
 }
 
 type Service struct {
-	o        Opts
-	executor execution.Executor
+	o        ServiceOpts
+	executor Executor
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
 	// TODO: write io and bundle path to dir
 	// TODO: open IOs
-	container, err := s.executor.Create(r.ID, execution.CreateOpts{
+	container, err := s.executor.Create(r.ID, CreateOpts{
 		Bundle: r.BundlePath,
 		// Stdin:  r.Stdin,
 		// Stdout: r.Stdout,
@@ -111,7 +108,7 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 	// TODO: generate spec
 	var spec specs.Process
 	// TODO: open IOs
-	process, err := s.executor.StartProcess(container, execution.CreateProcessOpts{
+	process, err := s.executor.StartProcess(container, CreateProcessOpts{
 		Spec: spec,
 		// Stdin:  r.Stdin,
 		// Stdout: r.Stdout,
