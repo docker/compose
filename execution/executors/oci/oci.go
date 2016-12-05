@@ -29,21 +29,19 @@ type OCIRuntime struct {
 	runc *runc.Runc
 }
 
-func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (*execution.Container, error) {
-	var err error
-
-	stateDir, err := NewStateDir(r.root, id)
-	if err != nil {
+func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execution.Container, err error) {
+	if container, err = execution.NewContainer(r.root, id, o.Bundle); err != nil {
 		return nil, err
 	}
-
-	initStateDir, err := stateDir.NewProcess()
-	if err != nil {
-		return nil, err
-	}
-
-	// /run/runc/redis/1/pid
-	pidFile := filepath.Join(initStateDir, "pid")
+	defer func() {
+		if err != nil {
+			container.StateDir().Delete()
+		}
+	}()
+	var (
+		initDir = container.StateDir().NewProcess()
+		pidFile = filepath.Join(initDir, "pid")
+	)
 	err = r.runc.Create(id, o.Bundle, &runc.CreateOpts{
 		Pidfile: pidfile,
 		Stdin:   o.Stdin,
@@ -55,40 +53,40 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (*execution.Conta
 	}
 	pid, err := runc.ReadPifFile(pidfile)
 	if err != nil {
+		// TODO: kill the container if we are going to return
 		return nil, err
 	}
-	process, err := newProcess(pid)
+	process, err := newProcess(filepath.Base(initDir), pid)
 	if err != nil {
 		return nil, err
 	}
 
-	container := &execution.Container{
-		ID:       id,
-		Bundle:   o.Bundle,
-		StateDir: stateDir,
-	}
-	container.AddProcess(process)
+	container.AddProcess(process, true)
 
 	return container, nil
 }
 
 func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
-	container := &execution.Container{
-		ID:       runcC.ID,
-		Bundle:   runcC.Bundle,
-		StateDir: StateDir(filepath.Join(r.root, runcC.ID)),
-	}
+	container := execution.LoadContainer(
+		execution.StateDir(filepath.Join(r.root, runcC.ID)),
+		runcC.ID,
+		runcC.Bundle,
+	)
 
-	process, err := newProcess(runcC.Pid)
+	dirs, err := ioutil.ReadDir(filepath.Join(container.StateDir().Processes()))
 	if err != nil {
 		return nil, err
 	}
-	container.AddProcess(process)
-
-	// /run/containerd/container-id/processess/process-id
-	dirs, err := ioutil.ReadDir(filepath.Join(container.Root))
-	if err != nil {
-		return nil, err
+	for _, d := range dirs {
+		pid, err := runc.ReadPidFile(filepath.Join(d, "pid"))
+		if err != nil {
+			return nil, err
+		}
+		process, err := newProcess(filepath.Base(d), pid)
+		if err != nil {
+			return nil, err
+		}
+		container.AddProcess(process, pid == runcC.Pid)
 	}
 
 	return container, nil
@@ -171,7 +169,7 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o CreateProcessOpts) (
 		return nil, err
 	}
 
-	container.AddProcess(process)
+	container.AddProcess(process, false)
 
 	return process, nil
 }

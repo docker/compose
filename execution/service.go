@@ -99,6 +99,14 @@ func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*g
 	return nil, s.executor.Resume(container)
 }
 
+func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*google_protobuf.Empty, error) {
+	container, err := s.executor.Load(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, s.executor.Start(container)
+}
+
 func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
 	container, err := s.executor.Load(r.ContainerId)
 	if err != nil {
@@ -117,7 +125,6 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 	if err != nil {
 		return nil, err
 	}
-
 	s.supervisor.Add(process)
 
 	return &api.StartProcessResponse{

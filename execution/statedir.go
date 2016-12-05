@@ -12,17 +12,13 @@ type StateDir string
 
 func NewStateDir(root, id string) (StateDir, error) {
 	path := filepath.Join(root, id)
-	err := os.Mkdir(path, 0700)
-	if err != nil {
+	if err := os.Mkdir(path, 0700); err != nil {
 		return "", err
 	}
-
-	err = os.Mkdir(filepath.Join(path, processesDir), 0700)
-	if err != nil {
+	if err := os.Mkdir(filepath.Join(path, processesDir), 0700); err != nil {
 		os.RemoveAll(path)
 		return "", err
 	}
-
 	return StateDir(path), err
 }
 
@@ -30,15 +26,8 @@ func (s StateDir) Delete() error {
 	return os.RemoveAll(string(s))
 }
 
-func (s StateDir) NewProcess(id string) (string, error) {
-	// TODO: generate id
-	newPath := filepath.Join(string(s), "1")
-	err := os.Mkdir(newPath, 0755)
-	if err != nil {
-		return "", err
-	}
-
-	return newPath, nil
+func (s StateDir) NewProcess() (string, error) {
+	return ioutil.TempDir(s.processDir(), "")
 }
 
 func (s StateDir) ProcessDir(id string) string {
@@ -46,23 +35,25 @@ func (s StateDir) ProcessDir(id string) string {
 }
 
 func (s StateDir) DeleteProcess(id string) error {
-	return os.RemoveAll(filepath.Join(string(s), id))
+	return os.RemoveAll(filepath.Join(s.processDir(), id))
 }
 
 func (s StateDir) Processes() ([]string, error) {
-	basepath := filepath.Join(string(s), processesDir)
-	dirs, err := ioutil.ReadDir(basepath)
+	procsDir := s.processDir()
+	dirs, err := ioutil.ReadDir(procsDir)
 	if err != nil {
 		return nil, err
 	}
 
 	paths := make([]string, 0)
 	for _, d := range dirs {
-
 		if d.IsDir() {
-			paths = append(paths, filepath.Join(basepath, d.Name()))
+			paths = append(paths, filepath.Join(procsDir, d.Name()))
 		}
 	}
-
 	return paths, nil
+}
+
+func (s StateDir) processDir() string {
+	return filepath.Join(string(s), processesDir)
 }

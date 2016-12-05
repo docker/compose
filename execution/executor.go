@@ -29,6 +29,7 @@ type Executor interface {
 	List() ([]*Container, error)
 	Load(id string) (*Container, error)
 	Delete(*Container) error
+	Start(*Container) error
 
 	StartProcess(*Container, CreateProcessOpts) (Process, error)
 	SignalProcess(*Container, os.Signal) error

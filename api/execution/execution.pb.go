@@ -16,6 +16,7 @@
 		DeleteContainerResponse
 		ListContainersRequest
 		ListContainersResponse
+		StartContainerRequest
 		StartProcessRequest
 		StartProcessResponse
 		Container

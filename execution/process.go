@@ -1,18 +1,11 @@
 package execution
 
-import (
-	"os"
-
-	"github.com/opencontainers/runtime-spec/specs-go"
-)
+import "os"
 
 type Process interface {
 	ID() string
 	Pid() int64
-	Spec() *specs.Process
-
-	Start() error
-	Status() (Status, error)
+	//Spec() *specs.Process
 	Wait() (uint32, error)
 	Signal(os.Signal) error
 }

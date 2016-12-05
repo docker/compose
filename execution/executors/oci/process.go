@@ -7,18 +7,24 @@ import (
 	"github.com/docker/containerd/execution"
 )
 
-func newProcess(pid int) (execution.Process, error) {
+func newProcess(id string, pid int) (execution.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return nil, err
 	}
 	return &process{
+		id:   id,
 		proc: proc,
 	}, nil
 }
 
 type process struct {
+	id   string
 	proc *os.Process
+}
+
+func (p *process) ID() string {
+	return p.id
 }
 
 func (p *process) Pid() int {
@@ -30,6 +36,7 @@ func (p *process) Wait() (uint32, error) {
 	if err != nil {
 		return 0, nil
 	}
+	// TODO: implement kill-all if we are the init pid
 	return uint32(state.Sys().(syscall.WaitStatus).ExitStatus()), nil
 }
 

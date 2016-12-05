@@ -10,12 +10,17 @@ service ContainerService {
 	rpc Update(UpdateContainerRequest) returns (google.protobuf.Empty);
 	rpc Pause(PauseContainerRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeContainerRequest) returns (google.protobuf.Empty);
+    rpc Start(StartContainerRequest) returns (google.protobuf.Empty);
 
 	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
 	rpc GetProcess(GetProcessRequest) returns (GetProcessResponse);
 	rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
 	rpc DeleteProcess(DeleteProcessRequest) returns (google.protobuf.Empty);
 	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+}
+
+message StartContainerRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message StartProcessRequest {
