@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
+
+	gocontext "context"
 
 	"github.com/BurntSushi/toml"
+	"github.com/docker/containerd/api/execution"
 	"github.com/urfave/cli"
 )
 
@@ -28,6 +30,12 @@ type runConfig struct {
 var runCommand = cli.Command{
 	Name:  "run",
 	Usage: "run a container",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "bundle, b",
+			Usage: "path to the container's bundle",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		var config runConfig
 		if _, err := toml.DecodeFile(context.Args().First(), &config); err != nil {
@@ -35,49 +43,42 @@ var runCommand = cli.Command{
 		}
 		id := context.Args().Get(1)
 		if id == "" {
-			return fmt.Errorf("containerd must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
-		client, err := getClient(context)
+		executionService, err := getExecutionService(context)
 		if err != nil {
 			return err
 		}
-		clone, err := client.Images.Clone(config.Image)
+		containerService, err := getContainerService(context)
 		if err != nil {
 			return err
 		}
-		container, err := client.Containers.Create(CreateRequest{
-			Id:     id,
-			Mounts: clone.Mounts,
-			Process: Process{
-				Args:   config.Args,
-				Env:    config.Env,
-				Cwd:    config.Cwd,
-				Uid:    config.Uid,
-				Gid:    config.Gid,
-				Tty:    config.Tty,
-				Stdin:  os.Stdin.Name(),
-				Stdout: os.Stdout.Name(),
-				Stderr: os.Stderr.Name(),
-			},
-			Owner: "ctr",
+		cr, err := executionService.Create(gocontext.Background(), &execution.CreateContainerRequest{
+			ID:         id,
+			BundlePath: context.String("bundle"),
 		})
-		defer client.Containers.Delete(container)
-		if err := client.Networks.Attach(config.Network, container); err != nil {
-			return err
-		}
-		if err := client.Containers.Start(container); err != nil {
-			return err
-		}
-		go forwarSignals(client.Containers.SignalProcess, container.Process)
-		events, err := client.Containers.Events(container.Id)
 		if err != nil {
 			return err
 		}
-		for event := range events {
-			if event.Type == "exit" {
-				os.Exit(event.Status)
-			}
+		if _, err := containerService.Start(gocontext.Background(), &execution.StartContainerRequest{
+			ID: cr.Container.ID,
+		}); err != nil {
+			return err
+		}
+		// wait for it to die
+		if _, err := executionService.Delete(gocontext.Background(), &execution.DeleteContainerRequest{
+			ID: cr.Container.ID,
+		}); err != nil {
+			return err
 		}
 		return nil
 	},
+}
+
+func getExecutionService(context *cli.Context) (execution.ExecutionServiceClient, error) {
+	return nil, nil
+}
+
+func getContainerService(context *cli.Context) (execution.ContainerServiceClient, error) {
+	return nil, nil
 }
