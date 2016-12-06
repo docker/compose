@@ -19,7 +19,7 @@ func NewStateDir(root, id string) (StateDir, error) {
 		os.RemoveAll(path)
 		return "", err
 	}
-	return StateDir(path), err
+	return StateDir(path), nil
 }
 
 func (s StateDir) Delete() error {

@@ -27,8 +27,8 @@ func (p *process) ID() string {
 	return p.id
 }
 
-func (p *process) Pid() int {
-	return p.proc.Pid
+func (p *process) Pid() int64 {
+	return int64(p.proc.Pid)
 }
 
 func (p *process) Wait() (uint32, error) {

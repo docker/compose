@@ -15,7 +15,7 @@ func NewContainer(stateRoot, id, bundle string) (*Container, error) {
 	}, nil
 }
 
-func LoadContainer(dir StateDir, id, bundle string, initPid int) *Container {
+func LoadContainer(dir StateDir, id, bundle string, initPid int64) *Container {
 	return &Container{
 		id:        id,
 		stateDir:  dir,
@@ -29,7 +29,7 @@ type Container struct {
 	id       string
 	bundle   string
 	stateDir StateDir
-	initPid  int
+	initPid  int64
 
 	processes map[string]Process
 }
@@ -52,7 +52,7 @@ func (c *Container) Wait() (uint32, error) {
 			return p.Wait()
 		}
 	}
-	return nil, fmt.Errorf("no init process")
+	return 0, fmt.Errorf("no init process")
 }
 
 func (c *Container) AddProcess(p Process, isInit bool) {

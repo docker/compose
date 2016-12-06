@@ -32,6 +32,6 @@ type Executor interface {
 	Start(*Container) error
 
 	StartProcess(*Container, CreateProcessOpts) (Process, error)
-	SignalProcess(*Container, os.Signal) error
+	SignalProcess(*Container, string, os.Signal) error
 	DeleteProcess(*Container, string) error
 }

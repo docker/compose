@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"syscall"
 
 	api "github.com/docker/containerd/api/execution"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -9,21 +10,15 @@ import (
 	"golang.org/x/net/context"
 )
 
-type ServiceOpts struct {
-	Root    string
-	Runtime string
-}
-
-func New(opts ServiceOpts, executor Executor) (*Service, error) {
+func New(executor Executor) (*Service, error) {
 	return &Service{
-		o:        opts,
 		executor: executor,
 	}, nil
 }
 
 type Service struct {
-	o        ServiceOpts
-	executor Executor
+	executor   Executor
+	supervisor *Supervisor
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
@@ -138,7 +133,7 @@ func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*ap
 	if err != nil {
 		return nil, err
 	}
-	process := s.executor.GetProcess(r.Pid)
+	process := container.GetProcess(r.ProcessId)
 	if process == nil {
 		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
 	}
@@ -152,7 +147,11 @@ func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.executor.SignalProcess(container, r.Process.ID, r.Signal)
+	process := container.GetProcess(r.Process.ID)
+	if process == nil {
+		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
+	}
+	return nil, process.Signal(syscall.Signal(r.Signal))
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
@@ -181,3 +180,25 @@ var (
 	_ = (api.ExecutionServiceServer)(&Service{})
 	_ = (api.ContainerServiceServer)(&Service{})
 )
+
+func toGRPCContainer(container *Container) *api.Container {
+	return &api.Container{
+		ID:         container.ID(),
+		BundlePath: container.Bundle(),
+	}
+}
+
+func toGRPCProcesses(processes []Process) []*api.Process {
+	var out []*api.Process
+	for _, p := range processes {
+		out = append(out, toGRPCProcess(p))
+	}
+	return out
+}
+
+func toGRPCProcess(process Process) *api.Process {
+	return &api.Process{
+		ID:  process.ID(),
+		Pid: process.Pid(),
+	}
+}

@@ -38,7 +38,6 @@ message StartProcessResponse {
 message Container {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle_path = 2;
-	Process process = 3;
 	Status status = 4;
 }
 
@@ -50,8 +49,7 @@ message Process {
 	User user = 5;
 	string cwd = 6;
 	bool terminal = 7;
-	Status status = 8;
-	uint32 exit_status = 9;
+	uint32 exit_status = 8;
 }
 
 enum Status {
@@ -90,7 +88,7 @@ message ResumeContainerRequest {
 
 message GetProcessRequest {
 	Container container = 1;
-	int64 pid = 2;
+	string process_id = 2;
 }
 
 message GetProcessResponse {

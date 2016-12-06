@@ -14,6 +14,7 @@ import (
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/execution"
+	"github.com/docker/containerd/execution/executors/oci"
 	// metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 )
@@ -80,10 +81,13 @@ high performance container runtime
 			return err
 		}
 
-		execService, err := execution.New(execution.Opts{
-			Root:    context.GlobalString("root"),
-			Runtime: context.GlobalString("runtime"),
-		})
+		var executor execution.Executor
+		switch context.GlobalString("runtime") {
+		case "runc":
+			executor = oci.New(context.GlobalString("root"))
+		}
+
+		execService, err := execution.New(executor)
 		if err != nil {
 			return err
 		}
