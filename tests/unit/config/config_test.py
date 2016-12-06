@@ -1787,6 +1787,17 @@ class ConfigTest(unittest.TestCase):
             config.load(config_details)
         assert 'has neither an image nor a build context' in exc.exconly()
 
+    def test_invalid_restart_policy(self):
+        with self.assertRaises(ConfigurationError):
+            config.load(
+                build_config_details({
+                    'version': '2',
+                    'services': {
+                        'web': {'image': 'busybox', 'restart': 'unleeess-stoppped'},
+                    },
+                })
+            )
+
 
 class NetworkModeTest(unittest.TestCase):
     def test_network_mode_standard(self):
