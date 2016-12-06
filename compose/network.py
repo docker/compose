@@ -6,6 +6,7 @@ import logging
 from docker.errors import NotFound
 from docker.types import IPAMConfig
 from docker.types import IPAMPool
+from docker.utils import version_gte
 
 from .config import ConfigurationError
 
@@ -72,6 +73,7 @@ class Network(object):
                 internal=self.internal,
                 enable_ipv6=self.enable_ipv6,
                 labels=self.labels,
+                attachable=version_gte(self.client._version, '1.24') or None
             )
 
     def remove(self):
