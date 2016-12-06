@@ -98,7 +98,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.name_without_project, "custom_name_of_container")
 
     def test_inspect_if_not_inspected(self):
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(docker.APIClient)
         container = Container(mock_client, dict(Id="the_id"))
 
         container.inspect_if_not_inspected()

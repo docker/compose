@@ -15,7 +15,7 @@ from compose.config.config import Config
 def mock_service():
     return mock.create_autospec(
         service.Service,
-        client=mock.create_autospec(docker.Client),
+        client=mock.create_autospec(docker.APIClient),
         options={})
 
 
