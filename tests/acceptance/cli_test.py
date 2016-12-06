@@ -850,8 +850,8 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         assert [n['Name'] for n in networks] == [network_with_label]
-
-        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+        assert 'label_key' in networks[0]['Labels']
+        assert networks[0]['Labels']['label_key'] == 'label_val'
 
     @v2_1_only()
     def test_up_with_volume_labels(self):
@@ -870,8 +870,8 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         assert [v['Name'] for v in volumes] == [volume_with_label]
-
-        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
+        assert 'label_key' in volumes[0]['Labels']
+        assert volumes[0]['Labels']['label_key'] == 'label_val'
 
     @v2_only()
     def test_up_no_services(self):

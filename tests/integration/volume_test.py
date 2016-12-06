@@ -4,6 +4,8 @@ from __future__ import unicode_literals
 from docker.errors import DockerException
 
 from .testcases import DockerClientTestCase
+from compose.const import LABEL_PROJECT
+from compose.const import LABEL_VOLUME
 from compose.volume import Volume
 
 
@@ -94,3 +96,11 @@ class VolumeTest(DockerClientTestCase):
         assert vol.exists() is False
         vol.create()
         assert vol.exists() is True
+
+    def test_volume_default_labels(self):
+        vol = self.create_volume('volume01')
+        vol.create()
+        vol_data = vol.inspect()
+        labels = vol_data['Labels']
+        assert labels[LABEL_VOLUME] == vol.name
+        assert labels[LABEL_PROJECT] == vol.project
