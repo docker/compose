@@ -45,11 +45,11 @@ def engine_max_version():
     return V2_1
 
 
-def v2_only():
+def build_version_required_decorator(ignored_versions):
     def decorator(f):
         @functools.wraps(f)
         def wrapper(self, *args, **kwargs):
-            if engine_max_version() == V1:
+            if engine_max_version() in ignored_versions:
                 skip("Engine version is too low")
                 return
             return f(self, *args, **kwargs)
@@ -58,17 +58,16 @@ def v2_only():
     return decorator
 
 
-def v2_1_only():
-    def decorator(f):
-        @functools.wraps(f)
-        def wrapper(self, *args, **kwargs):
-            if engine_max_version() in (V1, V2_0):
-                skip('Engine version is too low')
-                return
-            return f(self, *args, **kwargs)
-        return wrapper
+def v2_only():
+    return build_version_required_decorator((V1,))
 
-    return decorator
+
+def v2_1_only():
+    return build_version_required_decorator((V1, V2_0))
+
+
+def v3_only():
+    return build_version_required_decorator((V1, V2_0, V2_1))
 
 
 class DockerClientTestCase(unittest.TestCase):
