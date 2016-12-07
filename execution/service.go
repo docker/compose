@@ -10,6 +10,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+var emptyResponse = &google_protobuf.Empty{}
+
 func New(executor Executor) (*Service, error) {
 	return &Service{
 		executor: executor,
@@ -23,12 +25,13 @@ type Service struct {
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
 	// TODO: write io and bundle path to dir
-	// TODO: open IOs
+	var err error
+
 	container, err := s.executor.Create(r.ID, CreateOpts{
 		Bundle: r.BundlePath,
-		// Stdin:  r.Stdin,
-		// Stdout: r.Stdout,
-		// Stderr: r.Stderr,
+		Stdin:  r.Stdin,
+		Stdout: r.Stdout,
+		Stderr: r.Stderr,
 	})
 	if err != nil {
 		return nil, err
@@ -44,13 +47,13 @@ func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*a
 func (s *Service) Delete(ctx context.Context, r *api.DeleteContainerRequest) (*google_protobuf.Empty, error) {
 	container, err := s.executor.Load(r.ID)
 	if err != nil {
-		return nil, err
+		return emptyResponse, err
 	}
 
 	if err = s.executor.Delete(container); err != nil {
-		return nil, err
+		return emptyResponse, err
 	}
-	return nil, nil
+	return emptyResponse, nil
 }
 
 func (s *Service) List(ctx context.Context, r *api.ListContainersRequest) (*api.ListContainersResponse, error) {
@@ -75,7 +78,7 @@ func (s *Service) Get(ctx context.Context, r *api.GetContainerRequest) (*api.Get
 }
 
 func (s *Service) Update(ctx context.Context, r *api.UpdateContainerRequest) (*google_protobuf.Empty, error) {
-	return nil, nil
+	return emptyResponse, nil
 }
 
 func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*google_protobuf.Empty, error) {
@@ -83,7 +86,7 @@ func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*goo
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.executor.Pause(container)
+	return emptyResponse, s.executor.Pause(container)
 }
 
 func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*google_protobuf.Empty, error) {
@@ -91,7 +94,7 @@ func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*g
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.executor.Resume(container)
+	return emptyResponse, s.executor.Resume(container)
 }
 
 func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*google_protobuf.Empty, error) {
@@ -99,7 +102,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*goo
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.executor.Start(container)
+	return emptyResponse, s.executor.Start(container)
 }
 
 func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
@@ -110,12 +113,11 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 
 	// TODO: generate spec
 	var spec specs.Process
-	// TODO: open IOs
 	process, err := s.executor.StartProcess(container, CreateProcessOpts{
-		Spec: spec,
-		// Stdin:  r.Stdin,
-		// Stdout: r.Stdout,
-		// Stderr: r.Stderr,
+		Spec:   spec,
+		Stdin:  r.Stdin,
+		Stdout: r.Stdout,
+		Stderr: r.Stderr,
 	})
 	if err != nil {
 		return nil, err
@@ -145,24 +147,24 @@ func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*ap
 func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest) (*google_protobuf.Empty, error) {
 	container, err := s.executor.Load(r.Container.ID)
 	if err != nil {
-		return nil, err
+		return emptyResponse, err
 	}
 	process := container.GetProcess(r.Process.ID)
 	if process == nil {
 		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
 	}
-	return nil, process.Signal(syscall.Signal(r.Signal))
+	return emptyResponse, process.Signal(syscall.Signal(r.Signal))
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
 	container, err := s.executor.Load(r.Container.ID)
 	if err != nil {
-		return nil, err
+		return emptyResponse, err
 	}
 	if err := s.executor.DeleteProcess(container, r.Process.ID); err != nil {
-		return nil, err
+		return emptyResponse, err
 	}
-	return nil, nil
+	return emptyResponse, nil
 }
 
 func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {
@@ -182,10 +184,23 @@ var (
 )
 
 func toGRPCContainer(container *Container) *api.Container {
-	return &api.Container{
+	c := &api.Container{
 		ID:         container.ID(),
 		BundlePath: container.Bundle(),
 	}
+	status := container.Status()
+	switch status {
+	case "created":
+		c.Status = api.Status_CREATED
+	case "running":
+		c.Status = api.Status_RUNNING
+	case "stopped":
+		c.Status = api.Status_STOPPED
+	case "paused":
+		c.Status = api.Status_PAUSED
+	}
+
+	return c
 }
 
 func toGRPCProcesses(processes []Process) []*api.Process {

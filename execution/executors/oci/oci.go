@@ -19,6 +19,7 @@ func New(root string) *OCIRuntime {
 		runc: &runc.Runc{
 			Root: filepath.Join(root, "runc"),
 		},
+		ios: make(map[string]runc.IO),
 	}
 }
 
@@ -26,17 +27,61 @@ type OCIRuntime struct {
 	// root holds runtime state information for the containers
 	root string
 	runc *runc.Runc
+
+	// We need to keep track of the created IO for
+	ios map[string]runc.IO
+}
+
+func closeRuncIO(io runc.IO) {
+	if io.Stdin != nil {
+		io.Stdin.(*os.File).Close()
+	}
+	if io.Stdout != nil {
+		io.Stdout.(*os.File).Close()
+	}
+	if io.Stderr != nil {
+		io.Stderr.(*os.File).Close()
+	}
+}
+
+func getRuncIO(stdin, stdout, stderr string) (io runc.IO, err error) {
+	defer func() {
+		if err != nil {
+			closeRuncIO(io)
+		}
+	}()
+	if io.Stdin, err = os.OpenFile(stdin, os.O_RDONLY, 0); err != nil {
+		return
+	}
+	if io.Stdout, err = os.OpenFile(stdout, os.O_WRONLY, 0); err != nil {
+		return
+	}
+	if io.Stderr, err = os.OpenFile(stderr, os.O_WRONLY, 0); err != nil {
+		return
+	}
+	return
 }
 
 func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execution.Container, err error) {
-	if container, err = execution.NewContainer(r.root, id, o.Bundle); err != nil {
+	io, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
+	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			container.StateDir().Delete()
+			closeRuncIO(io)
 		}
 	}()
+
+	if container, err = execution.NewContainer(r.root, id, o.Bundle, "created"); err != nil {
+		return nil, err
+	}
+	defer func(c *execution.Container) {
+		if err != nil {
+			c.StateDir().Delete()
+		}
+	}(container)
+
 	initDir, err := container.StateDir().NewProcess()
 	if err != nil {
 		return nil, err
@@ -44,18 +89,20 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 	pidFile := filepath.Join(initDir, "pid")
 	err = r.runc.Create(id, o.Bundle, &runc.CreateOpts{
 		PidFile: pidFile,
-		IO: runc.IO{
-			Stdin:  o.Stdin,
-			Stdout: o.Stdout,
-			Stderr: o.Stderr,
-		},
+		IO:      io,
 	})
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			r.runc.Kill(id, int(syscall.SIGKILL))
+			r.runc.Delete(id)
+		}
+	}()
+
 	pid, err := runc.ReadPidFile(pidFile)
 	if err != nil {
-		// TODO: kill the container if we are going to return
 		return nil, err
 	}
 	process, err := newProcess(filepath.Base(initDir), pid)
@@ -64,6 +111,8 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 	}
 
 	container.AddProcess(process, true)
+
+	r.ios[id] = io
 
 	return container, nil
 }
@@ -85,6 +134,7 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		execution.StateDir(filepath.Join(r.root, runcC.ID)),
 		runcC.ID,
 		runcC.Bundle,
+		runcC.Status,
 		int64(runcC.Pid),
 	)
 
@@ -135,10 +185,13 @@ func (r *OCIRuntime) Load(id string) (*execution.Container, error) {
 }
 
 func (r *OCIRuntime) Delete(c *execution.Container) error {
-	if err := r.runc.Delete(c.ID()); err != nil {
+	id := c.ID()
+	if err := r.runc.Delete(id); err != nil {
 		return err
 	}
 	c.StateDir().Delete()
+	closeRuncIO(r.ios[id])
+	delete(r.ios, id)
 	return nil
 }
 
@@ -151,6 +204,16 @@ func (r *OCIRuntime) Resume(c *execution.Container) error {
 }
 
 func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.CreateProcessOpts) (p execution.Process, err error) {
+	io, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			closeRuncIO(io)
+		}
+	}()
+
 	processStateDir, err := c.StateDir().NewProcess()
 	if err != nil {
 		return nil, err
@@ -165,11 +228,7 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.CreateProc
 	if err := r.runc.ExecProcess(c.ID(), o.Spec, &runc.ExecOpts{
 		PidFile: pidFile,
 		Detach:  true,
-		IO: runc.IO{
-			Stdin:  o.Stdin,
-			Stdout: o.Stdout,
-			Stderr: o.Stderr,
-		},
+		IO:      io,
 	}); err != nil {
 		return nil, err
 	}
@@ -185,6 +244,8 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.CreateProc
 
 	c.AddProcess(process, false)
 
+	r.ios[fmt.Sprintf("%s-%s", c.ID(), process.ID())] = io
+
 	return process, nil
 }
 
@@ -197,5 +258,8 @@ func (r *OCIRuntime) SignalProcess(c *execution.Container, id string, sig os.Sig
 }
 
 func (r *OCIRuntime) DeleteProcess(c *execution.Container, id string) error {
+	ioID := fmt.Sprintf("%s-%s", c.ID(), id)
+	closeRuncIO(r.ios[ioID])
+	delete(r.ios, ioID)
 	return c.StateDir().DeleteProcess(id)
 }

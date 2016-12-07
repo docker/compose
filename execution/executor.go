@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"io"
 	"os"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -9,16 +8,16 @@ import (
 
 type CreateOpts struct {
 	Bundle string
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Stdin  string
+	Stdout string
+	Stderr string
 }
 
 type CreateProcessOpts struct {
 	Spec   specs.Process
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Stdin  string
+	Stdout string
+	Stderr string
 }
 
 type Executor interface {

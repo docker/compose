@@ -2,7 +2,7 @@ package execution
 
 import "fmt"
 
-func NewContainer(stateRoot, id, bundle string) (*Container, error) {
+func NewContainer(stateRoot, id, bundle, status string) (*Container, error) {
 	stateDir, err := NewStateDir(stateRoot, id)
 	if err != nil {
 		return nil, err
@@ -11,16 +11,18 @@ func NewContainer(stateRoot, id, bundle string) (*Container, error) {
 		id:        id,
 		bundle:    bundle,
 		stateDir:  stateDir,
+		status:    status,
 		processes: make(map[string]Process),
 	}, nil
 }
 
-func LoadContainer(dir StateDir, id, bundle string, initPid int64) *Container {
+func LoadContainer(dir StateDir, id, bundle, status string, initPid int64) *Container {
 	return &Container{
 		id:        id,
 		stateDir:  dir,
 		bundle:    bundle,
 		initPid:   initPid,
+		status:    status,
 		processes: make(map[string]Process),
 	}
 }
@@ -30,12 +32,17 @@ type Container struct {
 	bundle   string
 	stateDir StateDir
 	initPid  int64
+	status   string
 
 	processes map[string]Process
 }
 
 func (c *Container) ID() string {
 	return c.id
+}
+
+func (c *Container) Status() string {
+	return c.status
 }
 
 func (c *Container) Bundle() string {
