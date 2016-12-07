@@ -1,0 +1,69 @@
+package gc
+
+type color uint8
+
+const (
+	white = iota
+	gray
+	black
+)
+
+func tricolor(roots []string, all []string, refs map[string][]string) []string {
+	// all objects white -> default value of color
+	state := make(map[string]color, len(all))
+	var (
+		grays     []string
+		reachable []string
+	)
+
+	grays = append(grays, roots...)
+	// root-set objects gray.
+	for _, ro := range roots {
+		state[ro] = gray
+	}
+
+	// (Repeat this as long as there are gray coloured objects) Pick a gray
+	// object. Colour all objects referenced to from that gray object gray too.
+	// (Except those who are black). And colour itself black.
+
+	// Pick any gray object
+	for id := findcolor(state, gray); id != ""; id = findcolor(state, gray) {
+		// mark all the referenced objects as gray
+		for _, target := range refs[id] {
+			if state[target] == white {
+				state[target] = gray
+			}
+		}
+		state[id] = black
+	}
+
+	// All black objects are now reachable, and all white objects are
+	// unreachable. Free those that are white!
+	var whites []string
+	for _, obj := range all {
+		if state[obj] == white {
+			whites = append(whites, obj)
+		}
+	}
+
+	return whites
+}
+
+func findcolor(cs map[string]color, q color) string {
+	// TODO(stevvooe): Super-inefficient!
+	for id, c := range cs {
+		if c == q {
+			return id
+		}
+	}
+
+	return ""
+}
+
+// type colorset struct {
+// 	state map[string]color
+// }
+
+// func (cs *colorset) mark(id string, c color) {
+// 	cs.state[id] = c
+// }
