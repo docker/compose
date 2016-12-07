@@ -26,6 +26,7 @@ from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
+from tests.integration.testcases import v3_only
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -285,6 +286,7 @@ class CLITestCase(DockerClientTestCase):
             'volumes': {},
         }
 
+    @v3_only()
     def test_config_v3(self):
         self.base_dir = 'tests/fixtures/v3-full'
         result = self.dispatch(['config'])
