@@ -94,7 +94,6 @@ high performance container runtime
 
 		server := grpc.NewServer()
 		api.RegisterExecutionServiceServer(server, execService)
-		api.RegisterContainerServiceServer(server, execService)
 		go serveGRPC(server, l)
 
 		for s := range signals {

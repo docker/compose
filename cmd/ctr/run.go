@@ -61,10 +61,6 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		containerService, err := getContainerService(context)
-		if err != nil {
-			return err
-		}
 
 		tmpDir, err := getTempDir(id)
 		if err != nil {
@@ -90,7 +86,7 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		if _, err := containerService.Start(gocontext.Background(), &execution.StartContainerRequest{
+		if _, err := executionService.Start(gocontext.Background(), &execution.StartContainerRequest{
 			ID: cr.Container.ID,
 		}); err != nil {
 			return err
@@ -98,7 +94,7 @@ var runCommand = cli.Command{
 
 		// wait for it to die
 		for {
-			gcr, err := containerService.Get(gocontext.Background(), &execution.GetContainerRequest{
+			gcr, err := executionService.Get(gocontext.Background(), &execution.GetContainerRequest{
 				ID: cr.Container.ID,
 			})
 			if err != nil {
@@ -208,14 +204,6 @@ func getExecutionService(context *cli.Context) (execution.ExecutionServiceClient
 		return nil, err
 	}
 	return execution.NewExecutionServiceClient(conn), nil
-}
-
-func getContainerService(context *cli.Context) (execution.ContainerServiceClient, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return execution.NewContainerServiceClient(conn), nil
 }
 
 func getTempDir(id string) (string, error) {

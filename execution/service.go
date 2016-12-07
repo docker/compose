@@ -180,7 +180,6 @@ func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest
 
 var (
 	_ = (api.ExecutionServiceServer)(&Service{})
-	_ = (api.ContainerServiceServer)(&Service{})
 )
 
 func toGRPCContainer(container *Container) *api.Container {
