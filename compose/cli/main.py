@@ -988,6 +988,7 @@ def run_one_off_container(container_options, project, service, options):
     try:
         try:
             if IS_WINDOWS_PLATFORM:
+                service.connect_container_to_networks(container)
                 exit_code = call_docker(["start", "--attach", "--interactive", container.id])
             else:
                 operation = RunOperation(
