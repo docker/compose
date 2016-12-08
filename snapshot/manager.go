@@ -1,7 +1,6 @@
 package snapshot
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,10 +8,6 @@ import (
 	"strings"
 
 	"github.com/docker/containerd"
-)
-
-var (
-	errNotImplemented = errors.New("not implemented")
 )
 
 // Manager provides an API for allocating, snapshotting and mounting
@@ -204,6 +199,18 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	}, nil
 }
 
+// View behaves identically to Prepare except the result may not be commited
+// back to the snappshot manager.
+//
+// Whether or not these are readonly mounts is implementation specific, but the
+// caller may write to dst freely.
+//
+// Calling Commit on dst will result in an error. Calling Rollback on dst
+// should be done to cleanup resources.
+func (lm *Manager) View(dst, parent string) ([]containerd.Mount, error) {
+	panic("not implemented")
+}
+
 // Commit captures the changes between dst and its parent into the path
 // provided by diff. The path diff can then be used with the layer
 // manipulator's other methods to access the diff content.
@@ -292,5 +299,5 @@ type Change struct {
 
 // Changes returns the list of changes from the diff's parent.
 func (lm *Manager) Changes(diff string) ([]Change, error) {
-	return nil, errNotImplemented
+	panic("not implemented")
 }
