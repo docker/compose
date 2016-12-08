@@ -256,9 +256,10 @@ func (cs *ContentStore) ingestPaths(ref string) (string, string, lockfile.Lockfi
 		return "", "", "", errors.Errorf("ref must be a single path component")
 	}
 
-	lock, err := lockfile.New(filepath.Join(fp, "lock"))
+	lockfilePath := filepath.Join(fp, "lock")
+	lock, err := lockfile.New(lockfilePath)
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "error creating lockfile")
+		return "", "", "", errors.Wrapf(err, "error creating lockfile %v", lockfilePath)
 	}
 
 	return fp, filepath.Join(fp, "data"), lock, nil
