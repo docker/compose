@@ -139,6 +139,9 @@ func NewManager(root string) (*Manager, error) {
 // working directory for any associated activity, such as running a container
 // or importing a layer.
 //
+// The implementation may choose to write data directly to dst, opting to
+// return no mounts instead.
+//
 // Once the writes have completed, Manager.Commit or
 // Manager.Rollback should be called on dst.
 func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
@@ -171,6 +174,7 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 		return nil, err
 	}
 
+	// TODO(stevvooe): Write this metadata to disk to make it useful.
 	lm.active[dst] = activeLayer{
 		parent:   parent,
 		upperdir: upperdir,

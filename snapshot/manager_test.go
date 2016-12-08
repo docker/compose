@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/docker/containerd"
 )
 
 // TestSnapshotManagerBasic implements something similar to the conceptual
@@ -44,10 +46,10 @@ func TestSnapshotManagerBasic(t *testing.T) {
 			t.Fatalf("expected mount target to be prefixed with tmpDir: %q does not startwith %q", mount.Target, preparing)
 		}
 
-		t.Log(MountCommand(mount))
+		t.Log(containerd.MountCommand(mount))
 	}
 
-	if err := MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,7 +80,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,7 +89,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 			t.Fatalf("expected mount target to be prefixed with tmpDir: %q does not startwith %q", mount.Target, next)
 		}
 
-		t.Log(MountCommand(mount))
+		t.Log(containerd.MountCommand(mount))
 	}
 
 	if err := ioutil.WriteFile(filepath.Join(next, "bar"), []byte("bar\n"), 0777); err != nil {
