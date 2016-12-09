@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "google/protobuf/empty.proto";
+import "gogoproto/gogo.proto";
+
+service ShimService {
+    rpc Create(CreateRequest) returns (google.protobuf.Empty);
+    rpc Exec(ExecRequest) returns (google.protobuf.Empty);
+    rpc State(StateRequest) returns (StateResponse);
+    rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+}
+
+message PtyRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+    uint32 width = 2;
+    uint32 height = 3;
+}
