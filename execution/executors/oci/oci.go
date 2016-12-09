@@ -1,6 +1,7 @@
 package oci
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -77,7 +78,7 @@ func setupConsole(rio runc.IO) (*os.File, string, error) {
 	return master, console, nil
 }
 
-func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execution.Container, err error) {
+func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOpts) (container *execution.Container, err error) {
 	rio, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
 	if err != nil {
 		return nil, err
@@ -115,7 +116,7 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 		return nil, err
 	}
 	pidFile := filepath.Join(initDir, "pid")
-	err = r.runc.Create(id, o.Bundle, &runc.CreateOpts{
+	err = r.runc.Create(ctx, id, o.Bundle, &runc.CreateOpts{
 		PidFile: pidFile,
 		Console: consolePath,
 		IO:      rio,
@@ -125,8 +126,8 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 	}
 	defer func() {
 		if err != nil {
-			r.runc.Kill(id, int(syscall.SIGKILL))
-			r.runc.Delete(id)
+			r.runc.Kill(ctx, id, int(syscall.SIGKILL))
+			r.runc.Delete(ctx, id)
 		}
 	}()
 
@@ -146,12 +147,12 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 	return container, nil
 }
 
-func (r *OCIRuntime) Start(c *execution.Container) error {
-	return r.runc.Start(c.ID())
+func (r *OCIRuntime) Start(ctx context.Context, c *execution.Container) error {
+	return r.runc.Start(ctx, c.ID())
 }
 
-func (r *OCIRuntime) Status(c *execution.Container) (execution.Status, error) {
-	state, err := r.runc.State(c.ID())
+func (r *OCIRuntime) Status(ctx context.Context, c *execution.Container) (execution.Status, error) {
+	state, err := r.runc.State(ctx, c.ID())
 	if err != nil {
 		return "", err
 	}
@@ -190,8 +191,8 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 	return container, nil
 }
 
-func (r *OCIRuntime) List() ([]*execution.Container, error) {
-	runcCs, err := r.runc.List()
+func (r *OCIRuntime) List(ctx context.Context) ([]*execution.Container, error) {
+	runcCs, err := r.runc.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +209,8 @@ func (r *OCIRuntime) List() ([]*execution.Container, error) {
 	return containers, nil
 }
 
-func (r *OCIRuntime) Load(id string) (*execution.Container, error) {
-	runcC, err := r.runc.State(id)
+func (r *OCIRuntime) Load(ctx context.Context, id string) (*execution.Container, error) {
+	runcC, err := r.runc.State(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -217,9 +218,9 @@ func (r *OCIRuntime) Load(id string) (*execution.Container, error) {
 	return r.load(runcC)
 }
 
-func (r *OCIRuntime) Delete(c *execution.Container) error {
+func (r *OCIRuntime) Delete(ctx context.Context, c *execution.Container) error {
 	id := c.ID()
-	if err := r.runc.Delete(id); err != nil {
+	if err := r.runc.Delete(ctx, id); err != nil {
 		return err
 	}
 	c.StateDir().Delete()
@@ -228,15 +229,15 @@ func (r *OCIRuntime) Delete(c *execution.Container) error {
 	return nil
 }
 
-func (r *OCIRuntime) Pause(c *execution.Container) error {
-	return r.runc.Pause(c.ID())
+func (r *OCIRuntime) Pause(ctx context.Context, c *execution.Container) error {
+	return r.runc.Pause(ctx, c.ID())
 }
 
-func (r *OCIRuntime) Resume(c *execution.Container) error {
-	return r.runc.Resume(c.ID())
+func (r *OCIRuntime) Resume(ctx context.Context, c *execution.Container) error {
+	return r.runc.Resume(ctx, c.ID())
 }
 
-func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.StartProcessOpts) (p execution.Process, err error) {
+func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o execution.StartProcessOpts) (p execution.Process, err error) {
 	rio, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
 	if err != nil {
 		return nil, err
@@ -271,7 +272,7 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.StartProce
 	}()
 
 	pidFile := filepath.Join(processStateDir, "pid")
-	if err := r.runc.ExecProcess(c.ID(), o.Spec, &runc.ExecOpts{
+	if err := r.runc.Exec(ctx, c.ID(), o.Spec, &runc.ExecOpts{
 		PidFile: pidFile,
 		Detach:  false,
 		Console: consolePath,
@@ -297,7 +298,7 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.StartProce
 	return process, nil
 }
 
-func (r *OCIRuntime) SignalProcess(c *execution.Container, id string, sig os.Signal) error {
+func (r *OCIRuntime) SignalProcess(ctx context.Context, c *execution.Container, id string, sig os.Signal) error {
 	process := c.GetProcess(id)
 	if process == nil {
 		return fmt.Errorf("Make a Process Not Found error")
@@ -305,7 +306,7 @@ func (r *OCIRuntime) SignalProcess(c *execution.Container, id string, sig os.Sig
 	return syscall.Kill(int(process.Pid()), sig.(syscall.Signal))
 }
 
-func (r *OCIRuntime) DeleteProcess(c *execution.Container, id string) error {
+func (r *OCIRuntime) DeleteProcess(ctx context.Context, c *execution.Container, id string) error {
 	ioID := fmt.Sprintf("%s-%s", c.ID(), id)
 	closeRuncIO(r.ios[ioID])
 	delete(r.ios, ioID)

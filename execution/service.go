@@ -30,7 +30,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*a
 	// TODO: write io and bundle path to dir
 	var err error
 
-	container, err := s.executor.Create(r.ID, CreateOpts{
+	container, err := s.executor.Create(ctx, r.ID, CreateOpts{
 		Bundle:  r.BundlePath,
 		Console: r.Console,
 		Stdin:   r.Stdin,
@@ -49,19 +49,19 @@ func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*a
 }
 
 func (s *Service) Delete(ctx context.Context, r *api.DeleteContainerRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(ctx, r.ID)
 	if err != nil {
 		return emptyResponse, err
 	}
 
-	if err = s.executor.Delete(container); err != nil {
+	if err = s.executor.Delete(ctx, container); err != nil {
 		return emptyResponse, err
 	}
 	return emptyResponse, nil
 }
 
 func (s *Service) List(ctx context.Context, r *api.ListContainersRequest) (*api.ListContainersResponse, error) {
-	containers, err := s.executor.List()
+	containers, err := s.executor.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (s *Service) List(ctx context.Context, r *api.ListContainersRequest) (*api.
 	return resp, nil
 }
 func (s *Service) Get(ctx context.Context, r *api.GetContainerRequest) (*api.GetContainerResponse, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,31 +86,31 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateContainerRequest) (*g
 }
 
 func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
-	return emptyResponse, s.executor.Pause(container)
+	return emptyResponse, s.executor.Pause(ctx, container)
 }
 
 func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
-	return emptyResponse, s.executor.Resume(container)
+	return emptyResponse, s.executor.Resume(ctx, container)
 }
 
 func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(r.ID)
+	container, err := s.executor.Load(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
-	return emptyResponse, s.executor.Start(container)
+	return emptyResponse, s.executor.Start(ctx, container)
 }
 
 func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
-	container, err := s.executor.Load(r.ContainerId)
+	container, err := s.executor.Load(ctx, r.ContainerId)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 		NoNewPrivileges: true,
 	}
 
-	process, err := s.executor.StartProcess(container, StartProcessOpts{
+	process, err := s.executor.StartProcess(ctx, container, StartProcessOpts{
 		Spec:    spec,
 		Console: r.Console,
 		Stdin:   r.Stdin,
@@ -147,7 +147,7 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 
 // containerd managed execs + system pids forked in container
 func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*api.GetProcessResponse, error) {
-	container, err := s.executor.Load(r.Container.ID)
+	container, err := s.executor.Load(ctx, r.Container.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*ap
 }
 
 func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(r.Container.ID)
+	container, err := s.executor.Load(ctx, r.Container.ID)
 	if err != nil {
 		return emptyResponse, err
 	}
@@ -173,18 +173,18 @@ func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(r.Container.ID)
+	container, err := s.executor.Load(ctx, r.Container.ID)
 	if err != nil {
 		return emptyResponse, err
 	}
-	if err := s.executor.DeleteProcess(container, r.Process.ID); err != nil {
+	if err := s.executor.DeleteProcess(ctx, container, r.Process.ID); err != nil {
 		return emptyResponse, err
 	}
 	return emptyResponse, nil
 }
 
 func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {
-	container, err := s.executor.Load(r.Container.ID)
+	container, err := s.executor.Load(ctx, r.Container.ID)
 	if err != nil {
 		return nil, err
 	}
