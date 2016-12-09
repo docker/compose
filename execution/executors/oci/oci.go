@@ -111,11 +111,11 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}(container)
 
-	initDir, err := container.StateDir().NewProcess()
+	initProcID, initStateDir, err := container.StateDir().NewProcess()
 	if err != nil {
 		return nil, err
 	}
-	pidFile := filepath.Join(initDir, "pid")
+	pidFile := filepath.Join(initStateDir, "pid")
 	err = r.runc.Create(ctx, id, o.Bundle, &runc.CreateOpts{
 		PidFile: pidFile,
 		Console: consolePath,
@@ -135,7 +135,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 	if err != nil {
 		return nil, err
 	}
-	process, err := newProcess(filepath.Base(initDir), pid)
+	process, err := newProcess(initProcID, pid)
 	if err != nil {
 		return nil, err
 	}
@@ -261,17 +261,17 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		}()
 	}
 
-	processStateDir, err := c.StateDir().NewProcess()
+	procID, procStateDir, err := c.StateDir().NewProcess()
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			c.StateDir().DeleteProcess(filepath.Base(processStateDir))
+			c.StateDir().DeleteProcess(procID)
 		}
 	}()
 
-	pidFile := filepath.Join(processStateDir, "pid")
+	pidFile := filepath.Join(procStateDir, "pid")
 	if err := r.runc.Exec(ctx, c.ID(), o.Spec, &runc.ExecOpts{
 		PidFile: pidFile,
 		Detach:  false,
@@ -286,7 +286,7 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		return nil, err
 	}
 
-	process, err := newProcess(filepath.Base(processStateDir), pid)
+	process, err := newProcess(procID, pid)
 	if err != nil {
 		return nil, err
 	}

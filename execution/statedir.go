@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const processesDir = "processes"
+const processesDirName = "processes"
 
 type StateDir string
 
@@ -15,7 +15,7 @@ func NewStateDir(root, id string) (StateDir, error) {
 	if err := os.Mkdir(path, 0700); err != nil {
 		return "", err
 	}
-	if err := os.Mkdir(filepath.Join(path, processesDir), 0700); err != nil {
+	if err := os.Mkdir(StateDir(path).processesDir(), 0700); err != nil {
 		os.RemoveAll(path)
 		return "", err
 	}
@@ -26,20 +26,25 @@ func (s StateDir) Delete() error {
 	return os.RemoveAll(string(s))
 }
 
-func (s StateDir) NewProcess() (string, error) {
-	return ioutil.TempDir(s.processDir(), "")
+func (s StateDir) NewProcess() (id, dir string, err error) {
+	dir, err = ioutil.TempDir(s.processesDir(), "")
+	if err != nil {
+		return "", "", err
+	}
+
+	return filepath.Base(dir), dir, err
 }
 
 func (s StateDir) ProcessDir(id string) string {
-	return filepath.Join(string(s), id)
+	return filepath.Join(s.processesDir(), id)
 }
 
 func (s StateDir) DeleteProcess(id string) error {
-	return os.RemoveAll(filepath.Join(s.processDir(), id))
+	return os.RemoveAll(filepath.Join(s.processesDir(), id))
 }
 
 func (s StateDir) Processes() ([]string, error) {
-	procsDir := s.processDir()
+	procsDir := s.processesDir()
 	dirs, err := ioutil.ReadDir(procsDir)
 	if err != nil {
 		return nil, err
@@ -54,6 +59,6 @@ func (s StateDir) Processes() ([]string, error) {
 	return paths, nil
 }
 
-func (s StateDir) processDir() string {
-	return filepath.Join(string(s), processesDir)
+func (s StateDir) processesDir() string {
+	return filepath.Join(string(s), processesDirName)
 }
