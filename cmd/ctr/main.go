@@ -14,12 +14,12 @@ func main() {
 	app.Name = "ctr"
 	app.Version = containerd.Version
 	app.Usage = `
-        __      
+		__
   _____/ /______
  / ___/ __/ ___/
-/ /__/ /_/ /    
-\___/\__/_/     
-                
+/ /__/ /_/ /
+\___/\__/_/
+
 containerd client
 `
 	app.Flags = []cli.Flag{
@@ -35,6 +35,7 @@ containerd client
 	}
 	app.Commands = []cli.Command{
 		runCommand,
+		execCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

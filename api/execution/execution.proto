@@ -30,9 +30,10 @@ message StartContainerRequest {
 message CreateContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle_path = 2;
-	string stdin = 3;
-	string stdout = 4;
-	string stderr = 5;
+	bool console = 3;
+	string stdin = 4;
+	string stdout = 5;
+	string stderr = 6;
 }
 
 message CreateContainerResponse {
@@ -54,9 +55,10 @@ message ListContainersResponse {
 message StartProcessRequest {
 	string container_id = 1;
 	Process process = 2;
-	string stdin = 3;
-	string stdout = 4;
-	string stderr = 5;
+	bool console = 3;
+	string stdin = 4;
+	string stdout = 5;
+	string stderr = 6;
 }
 
 message StartProcessResponse {

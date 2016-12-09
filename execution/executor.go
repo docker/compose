@@ -7,17 +7,19 @@ import (
 )
 
 type CreateOpts struct {
-	Bundle string
-	Stdin  string
-	Stdout string
-	Stderr string
+	Bundle  string
+	Console bool
+	Stdin   string
+	Stdout  string
+	Stderr  string
 }
 
-type CreateProcessOpts struct {
-	Spec   specs.Process
-	Stdin  string
-	Stdout string
-	Stderr string
+type StartProcessOpts struct {
+	Spec    specs.Process
+	Console bool
+	Stdin   string
+	Stdout  string
+	Stderr  string
 }
 
 type Executor interface {
@@ -30,7 +32,7 @@ type Executor interface {
 	Delete(*Container) error
 	Start(*Container) error
 
-	StartProcess(*Container, CreateProcessOpts) (Process, error)
+	StartProcess(*Container, StartProcessOpts) (Process, error)
 	SignalProcess(*Container, string, os.Signal) error
 	DeleteProcess(*Container, string) error
 }

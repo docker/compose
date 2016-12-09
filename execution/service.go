@@ -10,7 +10,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-var emptyResponse = &google_protobuf.Empty{}
+var (
+	emptyResponse      = &google_protobuf.Empty{}
+	ErrProcessNotFound = fmt.Errorf("Process not found")
+)
 
 func New(executor Executor) (*Service, error) {
 	return &Service{
@@ -28,10 +31,11 @@ func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*a
 	var err error
 
 	container, err := s.executor.Create(r.ID, CreateOpts{
-		Bundle: r.BundlePath,
-		Stdin:  r.Stdin,
-		Stdout: r.Stdout,
-		Stderr: r.Stderr,
+		Bundle:  r.BundlePath,
+		Console: r.Console,
+		Stdin:   r.Stdin,
+		Stdout:  r.Stdout,
+		Stderr:  r.Stderr,
 	})
 	if err != nil {
 		return nil, err
@@ -112,12 +116,24 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 	}
 
 	// TODO: generate spec
-	var spec specs.Process
-	process, err := s.executor.StartProcess(container, CreateProcessOpts{
-		Spec:   spec,
-		Stdin:  r.Stdin,
-		Stdout: r.Stdout,
-		Stderr: r.Stderr,
+	spec := specs.Process{
+		Terminal: r.Process.Terminal,
+		ConsoleSize: specs.Box{
+			80,
+			80,
+		},
+		Args:            r.Process.Args,
+		Env:             r.Process.Env,
+		Cwd:             r.Process.Cwd,
+		NoNewPrivileges: true,
+	}
+
+	process, err := s.executor.StartProcess(container, StartProcessOpts{
+		Spec:    spec,
+		Console: r.Console,
+		Stdin:   r.Stdin,
+		Stdout:  r.Stdout,
+		Stderr:  r.Stderr,
 	})
 	if err != nil {
 		return nil, err
@@ -137,7 +153,7 @@ func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*ap
 	}
 	process := container.GetProcess(r.ProcessId)
 	if process == nil {
-		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
+		return nil, ErrProcessNotFound
 	}
 	return &api.GetProcessResponse{
 		Process: toGRPCProcess(process),

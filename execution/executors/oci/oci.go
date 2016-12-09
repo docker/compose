@@ -3,6 +3,7 @@ package oci
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -62,16 +63,43 @@ func getRuncIO(stdin, stdout, stderr string) (io runc.IO, err error) {
 	return
 }
 
+func setupConsole(rio runc.IO) (*os.File, string, error) {
+	master, console, err := newConsole(0, 0)
+	if err != nil {
+		return nil, "", err
+	}
+	go io.Copy(master, rio.Stdin)
+	go func() {
+		io.Copy(rio.Stdout, master)
+		master.Close()
+	}()
+
+	return master, console, nil
+}
+
 func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execution.Container, err error) {
-	io, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
+	rio, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			closeRuncIO(io)
+			closeRuncIO(rio)
 		}
 	}()
+	consolePath := ""
+	if o.Console {
+		master, console, err := setupConsole(rio)
+		if err != nil {
+			return nil, err
+		}
+		consolePath = console
+		defer func() {
+			if err != nil {
+				master.Close()
+			}
+		}()
+	}
 
 	if container, err = execution.NewContainer(r.root, id, o.Bundle, "created"); err != nil {
 		return nil, err
@@ -89,7 +117,8 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 	pidFile := filepath.Join(initDir, "pid")
 	err = r.runc.Create(id, o.Bundle, &runc.CreateOpts{
 		PidFile: pidFile,
-		IO:      io,
+		Console: consolePath,
+		IO:      rio,
 	})
 	if err != nil {
 		return nil, err
@@ -112,7 +141,7 @@ func (r *OCIRuntime) Create(id string, o execution.CreateOpts) (container *execu
 
 	container.AddProcess(process, true)
 
-	r.ios[id] = io
+	r.ios[id] = rio
 
 	return container, nil
 }
@@ -145,6 +174,10 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 	for _, d := range dirs {
 		pid, err := runc.ReadPidFile(filepath.Join(d, "pid"))
 		if err != nil {
+			if os.IsNotExist(err) {
+				// Process died in between
+				continue
+			}
 			return nil, err
 		}
 		process, err := newProcess(filepath.Base(d), pid)
@@ -203,16 +236,29 @@ func (r *OCIRuntime) Resume(c *execution.Container) error {
 	return r.runc.Resume(c.ID())
 }
 
-func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.CreateProcessOpts) (p execution.Process, err error) {
-	io, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
+func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.StartProcessOpts) (p execution.Process, err error) {
+	rio, err := getRuncIO(o.Stdin, o.Stdout, o.Stderr)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			closeRuncIO(io)
+			closeRuncIO(rio)
 		}
 	}()
+	consolePath := ""
+	if o.Console {
+		master, console, err := setupConsole(rio)
+		if err != nil {
+			return nil, err
+		}
+		consolePath = console
+		defer func() {
+			if err != nil {
+				master.Close()
+			}
+		}()
+	}
 
 	processStateDir, err := c.StateDir().NewProcess()
 	if err != nil {
@@ -227,8 +273,10 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.CreateProc
 	pidFile := filepath.Join(processStateDir, "pid")
 	if err := r.runc.ExecProcess(c.ID(), o.Spec, &runc.ExecOpts{
 		PidFile: pidFile,
-		Detach:  true,
-		IO:      io,
+		Detach:  false,
+		Console: consolePath,
+		Cwd:     o.Spec.Cwd,
+		IO:      rio,
 	}); err != nil {
 		return nil, err
 	}
@@ -244,7 +292,7 @@ func (r *OCIRuntime) StartProcess(c *execution.Container, o execution.CreateProc
 
 	c.AddProcess(process, false)
 
-	r.ios[fmt.Sprintf("%s-%s", c.ID(), process.ID())] = io
+	r.ios[fmt.Sprintf("%s-%s", c.ID(), process.ID())] = rio
 
 	return process, nil
 }
