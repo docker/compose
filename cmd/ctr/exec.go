@@ -46,7 +46,7 @@ var execCommand = cli.Command{
 		defer os.RemoveAll(tmpDir)
 
 		sOpts := &execution.StartProcessRequest{
-			ContainerId: id,
+			ContainerID: id,
 			Process: &execution.Process{
 				Cwd:      context.String("cwd"),
 				Terminal: context.Bool("tty"),
@@ -70,10 +70,8 @@ var execCommand = cli.Command{
 		}
 
 		_, err = executionService.DeleteProcess(gocontext.Background(), &execution.DeleteProcessRequest{
-			Container: &execution.Container{
-				ID: id,
-			},
-			Process: sr.Process,
+			ContainerID: id,
+			ProcessID:   sr.Process.ID,
 		})
 		if err != nil {
 			return err

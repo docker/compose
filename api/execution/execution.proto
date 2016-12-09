@@ -53,7 +53,7 @@ message ListContainersResponse {
 }
 
 message StartProcessRequest {
-	string container_id = 1;
+	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
 	Process process = 2;
 	bool console = 3;
 	string stdin = 4;
@@ -104,7 +104,7 @@ message GetContainerResponse {
 }
 
 message UpdateContainerRequest {
-	Container container = 1;
+	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
 	string bundle_path = 2;
 }
 
@@ -117,8 +117,8 @@ message ResumeContainerRequest {
 }
 
 message GetProcessRequest {
-	Container container = 1;
-	string process_id = 2;
+	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
+	string process_id = 2 [(gogoproto.customname) = "ProcessID"];
 }
 
 message GetProcessResponse {
@@ -126,18 +126,18 @@ message GetProcessResponse {
 }
 
 message SignalProcessRequest {
-	Container container = 1;
-	Process process = 2;
+	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
+	string process_id = 2 [(gogoproto.customname) = "ProcessID"];
 	uint32 signal = 3;
 }
 
 message DeleteProcessRequest {
-	Container container = 1;
-	Process process = 2;
+	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
+	string process_id = 2 [(gogoproto.customname) = "ProcessID"];
 }
 
 message ListProcessesRequest {
-	Container container = 1;
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
 message ListProcessesResponse {

@@ -110,7 +110,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*goo
 }
 
 func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
-	container, err := s.executor.Load(ctx, r.ContainerId)
+	container, err := s.executor.Load(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +147,11 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 
 // containerd managed execs + system pids forked in container
 func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*api.GetProcessResponse, error) {
-	container, err := s.executor.Load(ctx, r.Container.ID)
+	container, err := s.executor.Load(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	process := container.GetProcess(r.ProcessId)
+	process := container.GetProcess(r.ProcessID)
 	if process == nil {
 		return nil, ErrProcessNotFound
 	}
@@ -161,11 +161,11 @@ func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*ap
 }
 
 func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(ctx, r.Container.ID)
+	container, err := s.executor.Load(ctx, r.ContainerID)
 	if err != nil {
 		return emptyResponse, err
 	}
-	process := container.GetProcess(r.Process.ID)
+	process := container.GetProcess(r.ProcessID)
 	if process == nil {
 		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
 	}
@@ -173,18 +173,18 @@ func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
-	container, err := s.executor.Load(ctx, r.Container.ID)
+	container, err := s.executor.Load(ctx, r.ContainerID)
 	if err != nil {
 		return emptyResponse, err
 	}
-	if err := s.executor.DeleteProcess(ctx, container, r.Process.ID); err != nil {
+	if err := s.executor.DeleteProcess(ctx, container, r.ProcessID); err != nil {
 		return emptyResponse, err
 	}
 	return emptyResponse, nil
 }
 
 func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {
-	container, err := s.executor.Load(ctx, r.Container.ID)
+	container, err := s.executor.Load(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
