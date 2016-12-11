@@ -14,23 +14,24 @@ import (
 
 var ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
 
-func New(root string) *OCIRuntime {
+func New(root string) (*OCIRuntime, error) {
+	err := SetSubreaper(1)
+	if err != nil {
+		return nil, err
+	}
 	return &OCIRuntime{
 		root: root,
 		runc: &runc.Runc{
 			Root: filepath.Join(root, "runc"),
 		},
 		ios: make(map[string]OIO),
-	}
+	}, nil
 }
 
 type OCIRuntime struct {
-	// root holds runtime state information for the containers
 	root string
 	runc *runc.Runc
-
-	// We need to keep track of the created IO for
-	ios map[string]OIO
+	ios  map[string]OIO // ios tracks created process io for cleanup purpose on delete
 }
 
 func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOpts) (container *execution.Container, err error) {
@@ -44,7 +45,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}()
 
-	if container, err = execution.NewContainer(r.root, id, o.Bundle, "created"); err != nil {
+	if container, err = execution.NewContainer(r.root, id, o.Bundle); err != nil {
 		return nil, err
 	}
 	defer func(c *execution.Container) {
@@ -141,11 +142,16 @@ func (r *OCIRuntime) List(ctx context.Context) ([]*execution.Container, error) {
 
 	var containers []*execution.Container
 	for _, c := range runcCs {
-		container, err := r.load(c)
-		if err != nil {
-			return nil, err
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			container, err := r.load(c)
+			if err != nil {
+				return nil, err
+			}
+			containers = append(containers, container)
 		}
-		containers = append(containers, container)
 	}
 
 	return containers, nil

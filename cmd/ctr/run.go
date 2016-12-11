@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	gocontext "context"
 
 	"github.com/docker/containerd/api/execution"
+	execEvents "github.com/docker/containerd/execution"
+	"github.com/nats-io/go-nats"
 	"github.com/urfave/cli"
 )
 
@@ -56,6 +57,27 @@ var runCommand = cli.Command{
 			return err
 		}
 
+		// setup our event subscriber
+		nc, err := nats.Connect(nats.DefaultURL)
+		if err != nil {
+			return err
+		}
+		nec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
+		if err != nil {
+			nc.Close()
+			return err
+		}
+		defer nec.Close()
+
+		evCh := make(chan *execEvents.ContainerExitEvent, 64)
+		sub, err := nec.Subscribe(execEvents.ContainersEventsSubjectSubscriber, func(e *execEvents.ContainerExitEvent) {
+			evCh <- e
+		})
+		if err != nil {
+			return err
+		}
+		defer sub.Unsubscribe()
+
 		tmpDir, err := getTempDir(id)
 		if err != nil {
 			return err
@@ -87,18 +109,17 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		// wait for it to die
+		var ec uint32
 		for {
-			gcr, err := executionService.Get(gocontext.Background(), &execution.GetContainerRequest{
-				ID: cr.Container.ID,
-			})
-			if err != nil {
-				return err
-			}
-			if gcr.Container.Status != execution.Status_RUNNING {
+			e, more := <-evCh
+			if !more {
 				break
 			}
-			time.Sleep(100 * time.Millisecond)
+
+			if e.ID == cr.Container.ID && e.PID == cr.InitProcess.ID {
+				ec = e.StatusCode
+				break
+			}
 		}
 
 		if _, err := executionService.Delete(gocontext.Background(), &execution.DeleteContainerRequest{
@@ -109,6 +130,8 @@ var runCommand = cli.Command{
 
 		// Ensure we read all io
 		fwg.Wait()
+
+		os.Exit(int(ec))
 
 		return nil
 	},

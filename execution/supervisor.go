@@ -7,6 +7,6 @@ type waiter interface {
 	Wait() (uint32, error)
 }
 
-func (s *Supervisor) Add(w waiter) {
-
+func (s *Supervisor) Monitor(w waiter, cb func(uint32, error)) {
+	go cb(w.Wait())
 }

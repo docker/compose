@@ -2,7 +2,7 @@ package execution
 
 import "fmt"
 
-func NewContainer(stateRoot, id, bundle, status string) (*Container, error) {
+func NewContainer(stateRoot, id, bundle string) (*Container, error) {
 	stateDir, err := NewStateDir(stateRoot, id)
 	if err != nil {
 		return nil, err
@@ -11,7 +11,7 @@ func NewContainer(stateRoot, id, bundle, status string) (*Container, error) {
 		id:        id,
 		bundle:    bundle,
 		stateDir:  stateDir,
-		status:    status,
+		status:    "created",
 		processes: make(map[string]Process),
 	}, nil
 }

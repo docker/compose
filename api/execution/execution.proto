@@ -38,6 +38,7 @@ message CreateContainerRequest {
 
 message CreateContainerResponse {
 	Container container = 1;
+	Process initProcess = 2;
 }
 
 message DeleteContainerRequest {
