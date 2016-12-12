@@ -49,13 +49,5 @@ func (o OIO) cleanup() {
 	if o.master != nil {
 		o.master.Close()
 	}
-	if o.rio.Stdin != nil {
-		o.rio.Stdin.(*os.File).Close()
-	}
-	if o.rio.Stdout != nil {
-		o.rio.Stdout.(*os.File).Close()
-	}
-	if o.rio.Stderr != nil {
-		o.rio.Stderr.(*os.File).Close()
-	}
+	o.rio.Close()
 }
