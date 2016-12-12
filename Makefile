@@ -25,10 +25,7 @@ GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
 .PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall
 .DEFAULT: default
 
-dust:
-	@echo "This Makefile is under construction. Pardon our dust"
-
-all: check binaries test integration ## run fmt, vet, lint, build the binaries and run the tests
+all: binaries
 
 check: fmt vet lint ineffassign ## run fmt, vet, lint, ineffassign
 
