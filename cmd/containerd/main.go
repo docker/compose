@@ -13,14 +13,17 @@ import (
 	"strings"
 	"syscall"
 
+	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/execution/executors/oci"
+	"github.com/docker/containerd/log"
 	metrics "github.com/docker/go-metrics"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/nats-io/go-nats"
@@ -85,22 +88,10 @@ high performance container runtime
 			go serveMetrics(address)
 		}
 
-		eventsURL, err := url.Parse(context.GlobalString("events-address"))
+		s, err := startNATSServer(context)
 		if err != nil {
-			return err
+			return nil
 		}
-
-		no := stand.DefaultNatsServerOptions
-		nOpts := &no
-		nOpts.NoSigs = true
-		parts := strings.Split(eventsURL.Host, ":")
-		nOpts.Host = parts[0]
-		if len(parts) == 2 {
-			nOpts.Port, err = strconv.Atoi(parts[1])
-		} else {
-			nOpts.Port = nats.DefaultPort
-		}
-		s := stand.RunServerWithOpts(nil, nOpts)
 		defer s.Shutdown()
 
 		path := context.GlobalString("socket")
@@ -121,24 +112,31 @@ high performance container runtime
 			}
 		}
 
-		// Start events listener
-		nc, err := nats.Connect(context.GlobalString("events-address"))
+		// Get events publisher
+		nec, err := getNATSPublisher(context)
 		if err != nil {
-			return err
-		}
-		nec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
-		if err != nil {
-			nc.Close()
 			return err
 		}
 		defer nec.Close()
 
-		execService, err := execution.New(executor, nec)
+		execService, err := execution.New(executor)
 		if err != nil {
 			return err
 		}
 
-		server := grpc.NewServer()
+		// Intercept the GRPC call in order to populate the correct module path
+		interceptor := func(ctx gocontext.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+			ctx = log.WithModule(ctx, "containerd")
+			switch info.Server.(type) {
+			case api.ExecutionServiceServer:
+				ctx = log.WithModule(ctx, "execution")
+				ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
+			default:
+				fmt.Println("Unknown type: %#v", info.Server)
+			}
+			return handler(ctx, req)
+		}
+		server := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
 		api.RegisterExecutionServiceServer(server, execService)
 		go serveGRPC(server, l)
 
@@ -200,4 +198,49 @@ func dumpStacks() {
 	}
 	buf = buf[:stackSize]
 	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+func startNATSServer(context *cli.Context) (e *stand.StanServer, err error) {
+	eventsURL, err := url.Parse(context.GlobalString("events-address"))
+	if err != nil {
+		return nil, err
+	}
+
+	no := stand.DefaultNatsServerOptions
+	nOpts := &no
+	nOpts.NoSigs = true
+	parts := strings.Split(eventsURL.Host, ":")
+	nOpts.Host = parts[0]
+	if len(parts) == 2 {
+		nOpts.Port, err = strconv.Atoi(parts[1])
+	} else {
+		nOpts.Port = nats.DefaultPort
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			e = nil
+			if _, ok := r.(error); !ok {
+				err = fmt.Errorf("failed to start NATS server: %v", r)
+			} else {
+				err = r.(error)
+			}
+		}
+	}()
+	s := stand.RunServerWithOpts(nil, nOpts)
+
+	return s, nil
+}
+
+func getNATSPublisher(context *cli.Context) (*nats.EncodedConn, error) {
+	nc, err := nats.Connect(context.GlobalString("events-address"))
+	if err != nil {
+		return nil, err
+	}
+	nec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
+	if err != nil {
+		nc.Close()
+		return nil, err
+	}
+
+	return nec, nil
 }

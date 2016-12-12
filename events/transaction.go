@@ -18,6 +18,7 @@ func nexttxID() int64 {
 }
 
 type transaction struct {
+	ctx        context.Context
 	id         int64
 	parent     *transaction // if nil, no parent transaction
 	finish     sync.Once
@@ -25,17 +26,18 @@ type transaction struct {
 }
 
 // begin creates a sub-transaction.
-func (tx *transaction) begin(poster Poster) *transaction {
+func (tx *transaction) begin(ctx context.Context, poster Poster) *transaction {
 	id := nexttxID()
 
 	child := &transaction{
+		ctx:    ctx,
 		id:     id,
 		parent: tx,
 		start:  time.Now(),
 	}
 
 	// post the transaction started event
-	poster.Post(child.makeTransactionEvent("begin")) // tranactions are really just events
+	poster.Post(ctx, child.makeTransactionEvent("begin")) // tranactions are really just events
 
 	return child
 }
@@ -44,7 +46,7 @@ func (tx *transaction) begin(poster Poster) *transaction {
 func (tx *transaction) commit(poster Poster) {
 	tx.finish.Do(func() {
 		tx.end = time.Now()
-		poster.Post(tx.makeTransactionEvent("commit"))
+		poster.Post(tx.ctx, tx.makeTransactionEvent("commit"))
 	})
 }
 
@@ -53,7 +55,7 @@ func (tx *transaction) rollback(poster Poster, cause error) {
 		tx.end = time.Now()
 		event := tx.makeTransactionEvent("rollback")
 		event = fmt.Sprintf("%s error=%q", event, cause.Error())
-		poster.Post(event)
+		poster.Post(tx.ctx, event)
 	})
 }
 
@@ -84,7 +86,7 @@ func getTx(ctx context.Context) (*transaction, bool) {
 func WithTx(pctx context.Context) (ctx context.Context, commit func(), rollback func(err error)) {
 	poster := G(pctx)
 	parent, _ := getTx(pctx)
-	tx := parent.begin(poster)
+	tx := parent.begin(pctx, poster)
 
 	return context.WithValue(pctx, txKey{}, tx), func() {
 			tx.commit(poster)

@@ -12,7 +12,9 @@ import (
 	"github.com/docker/containerd/execution"
 )
 
-var ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
+var (
+	ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
+)
 
 func New(root string) (*OCIRuntime, error) {
 	err := SetSubreaper(1)

@@ -1,8 +1,11 @@
 package execution
 
+import "time"
+
 type ContainerEvent struct {
-	ID     string
-	Action string
+	Timestamp time.Time
+	ID        string
+	Action    string
 }
 
 type ContainerExitEvent struct {
@@ -16,6 +19,6 @@ const (
 )
 
 const (
-	containerEventsSubjectFormat        = "containerd.execution.container.%s"
-	containerProcessEventsSubjectFormat = "containerd.execution.container.%s.%s"
+	containerEventsTopicFormat        = "container.%s"
+	containerProcessEventsTopicFormat = "container.%s.%s"
 )

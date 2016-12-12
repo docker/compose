@@ -3,10 +3,11 @@ package execution
 import (
 	"fmt"
 	"syscall"
+	"time"
 
 	api "github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/events"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/nats-io/go-nats"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 )
@@ -16,17 +17,15 @@ var (
 	ErrProcessNotFound = fmt.Errorf("Process not found")
 )
 
-func New(executor Executor, nec *nats.EncodedConn) (*Service, error) {
+func New(executor Executor) (*Service, error) {
 	return &Service{
 		executor: executor,
-		nec:      nec,
 	}, nil
 }
 
 type Service struct {
 	executor   Executor
 	supervisor *Supervisor
-	nec        *nats.EncodedConn
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
@@ -46,7 +45,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*a
 	procs := container.Processes()
 	initProcess := procs[0]
 
-	s.monitorProcess(container, initProcess)
+	s.monitorProcess(ctx, container, initProcess)
 
 	return &api.CreateContainerResponse{
 		Container:   toGRPCContainer(container),
@@ -145,7 +144,7 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 		return nil, err
 	}
 
-	s.monitorProcess(container, process)
+	s.monitorProcess(ctx, container, process)
 
 	return &api.StartProcessResponse{
 		Process: toGRPCProcess(process),
@@ -205,27 +204,21 @@ var (
 	_ = (api.ExecutionServiceServer)(&Service{})
 )
 
-func (s *Service) publishEvent(name string, v interface{}) {
-	if s.nec == nil {
-		return
-	}
-
-	err := s.nec.Publish(name, v)
-	if err != nil {
-		// TODO: Use logrus?
-		fmt.Println("Failed to publish '%s:%#v': %v", name, v, err)
-	}
+func (s *Service) publishEvent(ctx context.Context, topic string, v interface{}) {
+	ctx = events.WithTopic(ctx, topic)
+	events.GetPoster(ctx).Post(ctx, v)
 }
 
-func (s *Service) monitorProcess(container *Container, process Process) {
+func (s *Service) monitorProcess(ctx context.Context, container *Container, process Process) {
 	go func() {
 		status, err := process.Wait()
 		if err == nil {
-			subject := GetContainerProcessEventSubject(container.ID(), process.ID())
-			s.publishEvent(subject, &ContainerExitEvent{
+			topic := GetContainerProcessEventTopic(container.ID(), process.ID())
+			s.publishEvent(ctx, topic, &ContainerExitEvent{
 				ContainerEvent: ContainerEvent{
-					ID:     container.ID(),
-					Action: "exit",
+					Timestamp: time.Now(),
+					ID:        container.ID(),
+					Action:    "exit",
 				},
 				PID:        process.ID(),
 				StatusCode: status,
@@ -234,12 +227,12 @@ func (s *Service) monitorProcess(container *Container, process Process) {
 	}()
 }
 
-func GetContainerEventSubject(id string) string {
-	return fmt.Sprintf(containerEventsSubjectFormat, id)
+func GetContainerEventTopic(id string) string {
+	return fmt.Sprintf(containerEventsTopicFormat, id)
 }
 
-func GetContainerProcessEventSubject(containerID, processID string) string {
-	return fmt.Sprintf(containerProcessEventsSubjectFormat, containerID, processID)
+func GetContainerProcessEventTopic(containerID, processID string) string {
+	return fmt.Sprintf(containerProcessEventsTopicFormat, containerID, processID)
 }
 
 func toGRPCContainer(container *Container) *api.Container {

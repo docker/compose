@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
