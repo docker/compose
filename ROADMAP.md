@@ -9,6 +9,8 @@ The following are the different status the various phases of development can be 
 * Completed - the development work has been completed
 * Stable - the apis for the phase are feature complete and considered stable
 
+We would like to follow the roadmap and develop the components one by one to completion before starting the next phase.  If PRs are opened for another phase before the previous phase has been completed they will be closed as we are not ready for them at that time.
+
 ## Phase 1
 
 **Status:** In Progress
@@ -42,13 +44,17 @@ This will also include moving the existing execution code support OCI's Runtime 
 
 **Status:** In Design
 
-### Execution
+### Runtime
 
-The execution layer is responsible for the create of containers and the management and supervision of processes.
+The runtime layer is responsible for the create of containers and the management and supervision of processes.
 
 ### Storage
 
 **Documents:** https://github.com/docker/containerkit/blob/master/design/snapshots.md
+
+The current graph drivers were built when we only had overlay filesystems like aufs.
+We forced the model to be designed around overlay filesystems and this introduced a lot of complexity for snapshotting graph drivers like btrfs and devicemapper thin-p.
+Our current approach is to model our storage layer after snapshotting drivers instead of overlay drivers as we can get the same results and its cleaner and more robust to have an overlay filesytem model snapshots than it is to have a snapshot filesystem model overlay filesystems.
 
 ## Phase 3
 
