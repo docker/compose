@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/docker/containerd"
 )
@@ -24,12 +25,14 @@ func NewOverlayfs(root string) (*Overlayfs, error) {
 		}
 	}
 	return &Overlayfs{
-		root: root,
+		root:  root,
+		cache: newCache(),
 	}, nil
 }
 
 type Overlayfs struct {
-	root string
+	root  string
+	cache *cache
 }
 
 func (o *Overlayfs) Prepare(key string, parentName string) ([]containerd.Mount, error) {
@@ -45,7 +48,7 @@ func (o *Overlayfs) Prepare(key string, parentName string) ([]containerd.Mount, 
 			return nil, err
 		}
 	}
-	return active.mounts()
+	return active.mounts(o.cache)
 }
 
 func (o *Overlayfs) Commit(key string, name string) error {
@@ -112,21 +115,20 @@ func (a *activeDir) commit(name string) error {
 	return os.Rename(a.path, filepath.Join(a.snapshotsDir, name))
 }
 
-func (a *activeDir) mounts() ([]containerd.Mount, error) {
+func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 	var (
-		parentLink = filepath.Join(a.path, "parent")
-		parents    []string
+		parents []string
+		err     error
+		current = a.path
 	)
 	for {
-		snapshot, err := os.Readlink(parentLink)
-		if err != nil {
+		if current, err = c.get(current); err != nil {
 			if os.IsNotExist(err) {
 				break
 			}
 			return nil, err
 		}
-		parents = append(parents, filepath.Join(snapshot, "fs"))
-		parentLink = filepath.Join(snapshot, "parent")
+		parents = append(parents, filepath.Join(current, "fs"))
 	}
 	if len(parents) == 0 {
 		// if we only have one layer/no parents then just return a bind mount as overlay
@@ -154,4 +156,29 @@ func (a *activeDir) mounts() ([]containerd.Mount, error) {
 			Options: options,
 		},
 	}, nil
+}
+
+func newCache() *cache {
+	return &cache{
+		parents: make(map[string]string),
+	}
+}
+
+type cache struct {
+	mu      sync.Mutex
+	parents map[string]string
+}
+
+func (c *cache) get(path string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	parentRoot, ok := c.parents[path]
+	if !ok {
+		link, err := os.Readlink(filepath.Join(path, "parent"))
+		if err != nil {
+			return "", err
+		}
+		c.parents[path], parentRoot = link, link
+	}
+	return parentRoot, nil
 }
