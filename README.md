@@ -1,6 +1,6 @@
 # containerd
 
-containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is a available as a daemon for Linux and Windows,  which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
+containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
 
 Containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
@@ -19,7 +19,7 @@ Containerd is designed to be embedded into a larger system, rather than being us
 Having a clearly defined scope of a project is important for ensuring consistency and focus.
 These following criteria will be used when reviewing pull requests, features, and changes for the project before being accepted.
 
-### Components 
+### Components
 
 Components should not have tight dependencies on each other so that they are unable to be used independently.
 The APIs for images and containers should be designed in a way that when used together the components have a natural flow but still be useful independently.
@@ -47,11 +47,11 @@ Additional implementations will not be accepted into the core repository and sho
 
 Containerd will be released with a 1.0 when feature complete and this version will be supported for 1 year with security and bug fixes applied and released.
 
-The upgrade path for containerd is that the 0.0.x patch relases are always backward compatible with its major and minor version.
+The upgrade path for containerd is that the 0.0.x patch releases are always backward compatible with its major and minor version.
 Minor (0.x.0) version will always be compatible with the previous minor release. i.e. 1.2.0 is backwards compatible with 1.1.0 and 1.1.0 is compatible with 1.0.0.
-There is no compatiability guarentes with upgrades from two minor relases.  i.e. 1.0.0 to 1.2.0.
+There is no compatibility guarantees with upgrades from two minor releases. i.e. 1.0.0 to 1.2.0.
 
-There are not backwards compatability guarentes with upgrades to major versions.  i.e 1.0.0 to 2.0.0.
+There are not backwards compatibility guarantees with upgrades to major versions. i.e 1.0.0 to 2.0.0.
 Each major version will be supported for 1 year with bug fixes and security patches.
 
 ### Scope
@@ -70,7 +70,7 @@ The table specifies whether or not the feature/component is in or out of scope.
 | logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit.,There is no io copying of container STDIO in containerd. |
 
 
-containerd is scoped to a single host and makes asumptions based on that fact.
+containerd is scoped to a single host and makes assumptions based on that fact.
 It can be used to builds things like a node agent that launches containers but does not have any concepts of a distributed system.
 
 Also things like service discovery are out of scope even though networking is in scope.
@@ -79,7 +79,7 @@ containerd should provide the primitives to create, add, remove, or manage netwo
 ### How is the scope changed?
 
 The scope of this project is a whitelist.
-If its not mentioned as being in scope, it is out of scope.  
+If it's not mentioned as being in scope, it is out of scope.  
 For the scope of this project to change it requires a 100% vote from all maintainers of the project.
 
 ## Copyright and license

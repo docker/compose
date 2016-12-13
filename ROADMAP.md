@@ -15,7 +15,7 @@ We would like to follow the roadmap and develop the components one by one to com
 
 **Status:** In Progress
 
-### GRPC API 
+### GRPC API
 
 **Documents:**
 
@@ -23,7 +23,7 @@ We are going from a top down design for filling out this missing pieces of conta
 
 ### Design
 
-**Documents:** 
+**Documents:**
 
 The high level design work is needed so that the architecture of containerd stays consistent throughout the development process.
 
@@ -46,7 +46,7 @@ This will also include moving the existing execution code support OCI's Runtime 
 
 ### Runtime
 
-The runtime layer is responsible for the create of containers and the management and supervision of processes.
+The runtime layer is responsible for the creation of containers and their management, and supervision of the processes inside those containers.
 
 ### Storage
 
@@ -72,8 +72,11 @@ The networking component will allow the management of network namespaces and int
 
 ## Phase 4
 
-Phase 4 includes work on helping with the releases and packaging of containerd for various distros.
+Phase 4 involves graduating to version 1.0, and shifting the focus from features to maintenance. Graduating to 1.0 implies:
+
+- Completing all of the above phases.
+- Covering the functionalities required by a majority of container-centric platforms.
+- Offering feature parity, to the extent of technical possibilities, across Linux and Windows.
+- Demonstrating that containerd fulfills the requirements of at least one higher-level platforms through its complete integration as an upstream.
 
 **Status:** Not Started
-
-### Release Process & Tools
