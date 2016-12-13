@@ -67,7 +67,7 @@ func TestOverlayfsCommit(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit(key, "base"); err != nil {
+	if err := o.Commit("base", key); err != nil {
 		t.Error(err)
 		return
 	}
@@ -90,7 +90,7 @@ func TestOverlayfsOverlayMount(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit(key, "base"); err != nil {
+	if err := o.Commit("base", key); err != nil {
 		t.Error(err)
 		return
 	}
@@ -150,7 +150,7 @@ func TestOverlayfsOverlayRead(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit(key, "base"); err != nil {
+	if err := o.Commit("base", key); err != nil {
 		t.Error(err)
 		return
 	}

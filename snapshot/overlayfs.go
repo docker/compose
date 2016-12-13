@@ -51,7 +51,7 @@ func (o *Overlayfs) Prepare(key string, parentName string) ([]containerd.Mount, 
 	return active.mounts(o.cache)
 }
 
-func (o *Overlayfs) Commit(key string, name string) error {
+func (o *Overlayfs) Commit(name, key string) error {
 	active := o.getActive(key)
 	return active.commit(name)
 }
