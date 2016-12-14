@@ -1,6 +1,6 @@
 # containerd
 
-containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
+Containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
 
 Containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
@@ -29,7 +29,7 @@ The execution layer and overlay filesystems can be used independently but if you
 
 ### Primitives
 
-containerd should expose primitives to solve problems instead of building high level abstractions in the API.
+Containerd should expose primitives to solve problems instead of building high level abstractions in the API.
 A common example of this is how build would be implemented.
 Instead of having a build API in containerd we should expose the lower level primitives that allow things required in build to work.
 Breaking up the filesystem APIs to allow snapshots, copy functionality, and mounts allow people implementing build at the higher levels more flexibility.
@@ -39,11 +39,11 @@ Breaking up the filesystem APIs to allow snapshots, copy functionality, and moun
 For the various components in containerd there should be defined extension points where implementations can be swapped for alternatives.
 The best example of this is that containerd will use `runc` from OCI as the default runtime in the execution layer but other runtimes conforming to the OCI Runtime specification they can be easily added to containerd.
 
-containerd will come with a default implementation for the various components.
+Containerd will come with a default implementation for the various components.
 These defaults will be chosen my the maintainers of the project and should not change unless better tech for that component comes out.
 Additional implementations will not be accepted into the core repository and should be developed in a separate repository not maintained by the containerd maintainers.
 
-### Releases 
+### Releases
 
 Containerd will be released with a 1.0 when feature complete and this version will be supported for 1 year with security and bug fixes applied and released.
 
@@ -70,11 +70,13 @@ The table specifies whether or not the feature/component is in or out of scope.
 | logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit.,There is no io copying of container STDIO in containerd. |
 
 
-containerd is scoped to a single host and makes assumptions based on that fact.
+Containerd is scoped to a single host and makes assumptions based on that fact.
 It can be used to builds things like a node agent that launches containers but does not have any concepts of a distributed system.
 
+Containerd is designed to be embedded into a larger system, hence it only includes a barebone CLI (`ctr`) specifically for development and debugging purpose, with no mandate to be human-friendly, and no guarantee of interface stability over time.
+
 Also things like service discovery are out of scope even though networking is in scope.
-containerd should provide the primitives to create, add, remove, or manage network interfaces and network namespaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
+Containerd should provide the primitives to create, add, remove, or manage network interfaces and network namespaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
 
 ### How is the scope changed?
 
