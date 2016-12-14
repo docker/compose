@@ -4,6 +4,21 @@ containerd is an industry-standard container runtime with an emphasis on simplic
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
+### State of the Project
+
+containerd currently has two active branches.
+There is a [v0.2.x](https://github.com/docker/containerd/tree/v0.2.x) branch for the current release of containerd that is being consumed by Docker and others and the master branch is the development branch for the 1.0 roadmap and feature set.
+Any PR or issue that is intended for the current v0.2.x release should be tagged with the same `v0.2.x` tag.
+
+### Communication
+
+For async communication and long running discussions please use issues and pull requests on the github repo.
+This will be the best place to discuss design and implementation.
+
+For sync communication we have a community slack with a #containerd channel that everyone is welcome to join and chat about development.
+
+**Slack:** https://community.docker.com/registrations/groups/4316
+
 ## Features
 
 * OCI Image Spec support
