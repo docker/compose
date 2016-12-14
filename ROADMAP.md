@@ -50,7 +50,7 @@ The runtime layer is responsible for the creation of containers and their manage
 
 ### Storage
 
-**Documents:** https://github.com/docker/containerkit/blob/master/design/snapshots.md
+**Documents:** https://github.com/docker/containerd/blob/master/design/snapshots.md
 
 The current graph drivers were built when we only had overlay filesystems like aufs.
 We forced the model to be designed around overlay filesystems and this introduced a lot of complexity for snapshotting graph drivers like btrfs and devicemapper thin-p.
