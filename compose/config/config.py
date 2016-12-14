@@ -17,6 +17,7 @@ from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..const import COMPOSEFILE_V2_1 as V2_1
 from ..const import COMPOSEFILE_V3_0 as V3_0
 from ..utils import build_string_dict
+from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
 from .environment import env_vars_from_file
 from .environment import Environment
@@ -65,6 +66,7 @@ DOCKER_CONFIG_KEYS = [
     'extra_hosts',
     'group_add',
     'hostname',
+    'healthcheck',
     'image',
     'ipc',
     'labels',
@@ -642,11 +644,38 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
+    if 'healthcheck' in service_dict:
+        service_dict['healthcheck'] = process_healthcheck(
+            service_dict['healthcheck'], service_config.name)
+
     for field in ['dns', 'dns_search', 'tmpfs']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
     return service_dict
+
+
+def process_healthcheck(raw, service_name):
+    hc = {}
+
+    if raw.get('disable'):
+        if len(raw) > 1:
+            raise ConfigurationError(
+                'Service "{}" defines an invalid healthcheck: '
+                '"disable: true" cannot be combined with other options'
+                .format(service_name))
+        hc['test'] = ['NONE']
+    elif 'test' in raw:
+        hc['test'] = raw['test']
+
+    if 'interval' in raw:
+        hc['interval'] = parse_nanoseconds_int(raw['interval'])
+    if 'timeout' in raw:
+        hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+    if 'retries' in raw:
+        hc['retries'] = raw['retries']
+
+    return hc
 
 
 def finalize_service(service_config, service_names, version, environment):

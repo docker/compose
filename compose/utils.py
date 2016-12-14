@@ -11,6 +11,7 @@ import ntpath
 import six
 
 from .errors import StreamParseError
+from .timeparse import timeparse
 
 
 json_decoder = json.JSONDecoder()
@@ -105,6 +106,21 @@ def json_hash(obj):
 
 def microseconds_from_time_nano(time_nano):
     return int(time_nano % 1000000000 / 1000)
+
+
+def nanoseconds_from_time_seconds(time_seconds):
+    return time_seconds * 1000000000
+
+
+def parse_seconds_float(value):
+    return timeparse(value or '')
+
+
+def parse_nanoseconds_int(value):
+    parsed = timeparse(value or '')
+    if parsed is None:
+        return None
+    return int(parsed * 1000000000)
 
 
 def build_string_dict(source_dict):

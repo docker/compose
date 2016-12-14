@@ -205,12 +205,13 @@
         "interval": {"type":"string"},
         "timeout": {"type":"string"},
         "retries": {"type": "number"},
-        "command": {
+        "test": {
           "oneOf": [
             {"type": "string"},
             {"type": "array", "items": {"type": "string"}}
           ]
-        }
+        },
+        "disable": {"type": "boolean"}
       },
       "additionalProperties": false
     },

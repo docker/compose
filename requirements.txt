@@ -1,11 +1,11 @@
 PyYAML==3.11
 backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.2.0
-docker-py==1.10.6
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
+git+https://github.com/docker/docker-py.git@2ff7371ae7703033f981e1b137a3be0caf7a4f9c#egg=docker-py
 ipaddress==1.0.16
 jsonschema==2.5.1
 pypiwin32==219; sys_platform == 'win32'

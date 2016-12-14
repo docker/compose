@@ -21,6 +21,7 @@ from .. import mock
 from compose.cli.command import get_project
 from compose.container import Container
 from compose.project import OneOffFilter
+from compose.utils import nanoseconds_from_time_seconds
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
@@ -331,9 +332,9 @@ class CLITestCase(DockerClientTestCase):
                     },
 
                     'healthcheck': {
-                        'command': 'cat /etc/passwd',
-                        'interval': '10s',
-                        'timeout': '1s',
+                        'test': 'cat /etc/passwd',
+                        'interval': 10000000000,
+                        'timeout': 1000000000,
                         'retries': 5,
                     },
 
@@ -926,6 +927,49 @@ class CLITestCase(DockerClientTestCase):
 
         assert foo_container.get('HostConfig.NetworkMode') == \
             'container:{}'.format(bar_container.id)
+
+    def test_up_with_healthcheck(self):
+        def wait_on_health_status(container, status):
+            def condition():
+                container.inspect()
+                return container.get('State.Health.Status') == status
+
+            return wait_on_condition(condition, delay=0.5)
+
+        self.base_dir = 'tests/fixtures/healthcheck'
+        self.dispatch(['up', '-d'], None)
+
+        passes = self.project.get_service('passes')
+        passes_container = passes.containers()[0]
+
+        assert passes_container.get('Config.Healthcheck') == {
+            "Test": ["CMD-SHELL", "/bin/true"],
+            "Interval": nanoseconds_from_time_seconds(1),
+            "Timeout": nanoseconds_from_time_seconds(30*60),
+            "Retries": 1,
+        }
+
+        wait_on_health_status(passes_container, 'healthy')
+
+        fails = self.project.get_service('fails')
+        fails_container = fails.containers()[0]
+
+        assert fails_container.get('Config.Healthcheck') == {
+            "Test": ["CMD", "/bin/false"],
+            "Interval": nanoseconds_from_time_seconds(2.5),
+            "Retries": 2,
+        }
+
+        wait_on_health_status(fails_container, 'unhealthy')
+
+        disabled = self.project.get_service('disabled')
+        disabled_container = disabled.containers()[0]
+
+        assert disabled_container.get('Config.Healthcheck') == {
+            "Test": ["NONE"],
+        }
+
+        assert 'Health' not in disabled_container.get('State')
 
     def test_up_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
