@@ -29,7 +29,7 @@ checklist with requirements. If solutions are proposed, alternatives should be
 listed and eliminated. Even if the criteria for elimination of a solution is
 frivelous, say so.
 
-Larger arcs typically work best with design documents, similar to those found
+Larger changes typically work best with design documents, similar to those found
 in `design/`. These are focused on providing context to the design at the time
 the feature was conceived and can inform future documentation contributions.
 
