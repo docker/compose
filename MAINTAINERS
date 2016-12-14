@@ -1,4 +1,4 @@
-# Containerd project maintainers file
+# containerd project maintainers file
 #
 # This file describes who runs the containerd project and how.
 # This is a living document - if you see something out of date or missing,
@@ -104,7 +104,7 @@ by a pull request removing them.
 	title = "The Benevolent dictator for life (BDFL)"
 
 	text = """
-Containerd follows the timeless, highly efficient and totally unfair system
+containerd follows the timeless, highly efficient and totally unfair system
 known as [Benevolent dictator for
 life](https://en.wikipedia.org/wiki/Benevolent_Dictator_for_Life), with yours
 truly, Solomon Hykes, in the role of BDFL. This means that all decisions are
@@ -137,7 +137,7 @@ BDFL daily routine:
 	text = """
 Short answer: EVERYTHING IS A PULL REQUEST.
 
-Containerd is an open-source project with an open design philosophy. This means
+containerd is an open-source project with an open design philosophy. This means
 that the repository is the source of truth for EVERY aspect of the project,
 including its philosophy, design, road map, and APIs. *If it's part of the
 project, it's in the repo. If it's in the repo, it's part of the project.*
