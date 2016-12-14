@@ -9,7 +9,7 @@ import (
 
 type OIO struct {
 	master  *os.File // master holds a fd to the created pty if any
-	console string   // console holds the path the the slave linked to master
+	console string   // console holds the path to the slave linked to master
 	rio     runc.IO  // rio holds the open fifos for stdios
 }
 
