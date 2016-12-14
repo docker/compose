@@ -134,6 +134,7 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 	}
 
 	process, err := s.executor.StartProcess(ctx, container, StartProcessOpts{
+		ID:      r.Process.ID,
 		Spec:    spec,
 		Console: r.Console,
 		Stdin:   r.Stdin,

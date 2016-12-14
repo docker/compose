@@ -12,6 +12,10 @@ import (
 	"github.com/docker/containerd/execution"
 )
 
+const (
+	initProcessID = "init"
+)
+
 var (
 	ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
 )
@@ -56,7 +60,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}(container)
 
-	initProcID, initStateDir, err := container.StateDir().NewProcess()
+	initStateDir, err := container.StateDir().NewProcess(initProcessID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +84,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 	if err != nil {
 		return nil, err
 	}
-	process, err := newProcess(initProcID, pid)
+	process, err := newProcess(container, initProcessID, pid)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +130,7 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 			}
 			return nil, err
 		}
-		process, err := newProcess(filepath.Base(d), pid)
+		process, err := newProcess(container, filepath.Base(d), pid)
 		if err != nil {
 			return nil, err
 		}
@@ -198,13 +202,13 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		}
 	}()
 
-	procID, procStateDir, err := c.StateDir().NewProcess()
+	procStateDir, err := c.StateDir().NewProcess(o.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			c.StateDir().DeleteProcess(procID)
+			c.StateDir().DeleteProcess(o.ID)
 		}
 	}()
 
@@ -223,7 +227,7 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		return nil, err
 	}
 
-	process, err := newProcess(procID, pid)
+	process, err := newProcess(c, o.ID, pid)
 	if err != nil {
 		return nil, err
 	}

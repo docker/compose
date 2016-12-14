@@ -3,6 +3,7 @@ package execution
 import "os"
 
 type Process interface {
+	Container() *Container
 	ID() string
 	Pid() int64
 	//Spec() *specs.Process

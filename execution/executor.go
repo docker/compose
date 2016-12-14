@@ -16,6 +16,7 @@ type CreateOpts struct {
 }
 
 type StartProcessOpts struct {
+	ID      string
 	Spec    specs.Process
 	Console bool
 	Stdin   string

@@ -7,20 +7,26 @@ import (
 	"github.com/docker/containerd/execution"
 )
 
-func newProcess(id string, pid int) (execution.Process, error) {
+func newProcess(c *execution.Container, id string, pid int) (execution.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return nil, err
 	}
 	return &process{
+		c:    c,
 		id:   id,
 		proc: proc,
 	}, nil
 }
 
 type process struct {
+	c    *execution.Container
 	id   string
 	proc *os.Process
+}
+
+func (p *process) Container() *execution.Container {
+	return p.c
 }
 
 func (p *process) ID() string {

@@ -26,13 +26,13 @@ func (s StateDir) Delete() error {
 	return os.RemoveAll(string(s))
 }
 
-func (s StateDir) NewProcess() (id, dir string, err error) {
-	dir, err = ioutil.TempDir(s.processesDir(), "")
-	if err != nil {
-		return "", "", err
+func (s StateDir) NewProcess(id string) (dir string, err error) {
+	dir = filepath.Join(s.processesDir(), id)
+	if err = os.Mkdir(dir, 0700); err != nil {
+		return "", err
 	}
 
-	return filepath.Base(dir), dir, err
+	return dir, nil
 }
 
 func (s StateDir) ProcessDir(id string) string {
