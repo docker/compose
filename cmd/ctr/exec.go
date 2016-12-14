@@ -19,6 +19,10 @@ var execCommand = cli.Command{
 			Usage: "target container id",
 		},
 		cli.StringFlag{
+			Name:  "pid, p",
+			Usage: "new process id",
+		},
+		cli.StringFlag{
 			Name:  "cwd, c",
 			Usage: "current working directory for the process",
 		},
@@ -48,6 +52,7 @@ var execCommand = cli.Command{
 		sOpts := &execution.StartProcessRequest{
 			ContainerID: id,
 			Process: &execution.Process{
+				ID:       context.String("pid"),
 				Cwd:      context.String("cwd"),
 				Terminal: context.Bool("tty"),
 				Args:     context.Args(),
