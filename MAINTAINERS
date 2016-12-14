@@ -10,11 +10,11 @@
 
 [Rules]
 
-    [Rules.maintainers]
+	[Rules.maintainers]
 
-        title = "What is a maintainer?"
+	title = "What is a maintainer?"
 
-        text = """
+	text = """
 There are different types of maintainers, with different responsibilities, but
 all maintainers have 3 things in common:
 
@@ -30,11 +30,11 @@ or the reliability of a release process. But those things distinguish a good
 project from a great one.
 """
 
-    [Rules.adding-maintainers]
+	[Rules.adding-maintainers]
 
-        title = "How are maintainers added?"
+	title = "How are maintainers added?"
 
-        text = """
+	text = """
 Maintainers are first and foremost contributors that have shown they are
 committed to the long term success of a project. Contributors wanting to become
 maintainers are expected to be deeply involved in contributing code, pull
@@ -61,11 +61,11 @@ MAINTAINERS file. The candidate becomes a maintainer once the pull request is
 merged.
 """
 
-    [Rules.stepping-down-policy]
+	[Rules.stepping-down-policy]
 
-        title = "Stepping down policy"
+	title = "Stepping down policy"
 
-        text = """
+	text = """
 Life priorities, interests, and passions can change. If you're a maintainer but
 feel you must remove yourself from the list, inform other maintainers that you
 intend to step down, and if possible, help find someone to pick up your work.
@@ -75,11 +75,11 @@ After you've informed other maintainers, create a pull request to remove
 yourself from the MAINTAINERS file.
 """
 
-    [Rules.inactive-maintainers]
+	[Rules.inactive-maintainers]
 
-        title = "Removal of inactive maintainers"
+	title = "Removal of inactive maintainers"
 
-        text = """
+	text = """
 Similar to the procedure for adding new maintainers, existing maintainers can
 be removed from the list if they do not show significant activity on the
 project. Periodically, the maintainers review the list of maintainers and their
@@ -99,11 +99,11 @@ discussed with them among the other maintainers so that they are not surprised
 by a pull request removing them.
 """
 
-    [Rules.bdfl]
+	[Rules.bdfl]
 
-        title = "The Benevolent dictator for life (BDFL)"
+	title = "The Benevolent dictator for life (BDFL)"
 
-        text = """
+	text = """
 Containerd follows the timeless, highly efficient and totally unfair system
 known as [Benevolent dictator for
 life](https://en.wikipedia.org/wiki/Benevolent_Dictator_for_Life), with yours
@@ -124,17 +124,17 @@ congress for a counter-example.
 BDFL daily routine:
 
 * Is the project governance stuck in a deadlock or irreversibly fragmented?
-    * If yes: refactor the project governance
+	* If yes: refactor the project governance
 * Are there issues or conflicts escalated by maintainers?
-    * If yes: resolve them
+	* If yes: resolve them
 * Go back to polishing that crown.
 """
 
-    [Rules.decisions]
+	[Rules.decisions]
 
-        title = "How are decisions made?"
+	title = "How are decisions made?"
 
-        text = """
+	text = """
 Short answer: EVERYTHING IS A PULL REQUEST.
 
 Containerd is an open-source project with an open design philosophy. This means
@@ -157,11 +157,11 @@ All decisions affecting containerd, big and small, follow the same 3 steps:
 of the pull request and which areas of the project it affects.
 """
 
-    [Rules.DCO]
+	[Rules.DCO]
 
-    title = "Helping contributors with the DCO"
+	title = "Helping contributors with the DCO"
 
-    text = """
+	text = """
 The [DCO or `Sign your work`](
 https://github.com/docker/containerd/blob/master/CONTRIBUTING.md#sign-your-work)
 requirement is not intended as a roadblock or speed bump.
@@ -179,33 +179,33 @@ change the existing contribution - i.e., a spelling change.
 When you add someone's DCO, please also add your own to keep a log.
 """
 
-    [Rules."no direct push"]
+	[Rules."no direct push"]
 
-    title = "I'm a maintainer. Should I make pull requests too?"
+	title = "I'm a maintainer. Should I make pull requests too?"
 
-    text = """
+	text = """
 Yes. Nobody should ever push to master directly. All changes should be
 made through a pull request.
 """
 
-    [Rules.meta]
+	[Rules.meta]
 
-    title = "How is this process changed?"
+	title = "How is this process changed?"
 
-    text = "Just like everything else: by making a pull request :)"
+	text = "Just like everything else: by making a pull request :)"
 
 # Current project roles
 [Roles]
 
-    [Roles.bdfl]
+	[Roles.bdfl]
 
-    person = "shykes"
+	person = "shykes"
 
-    [Roles."Chief Architect"]
+	[Roles."Chief Architect"]
 
-    person = "crosbymichael"
+	person = "crosbymichael"
 
-    text = """
+	text = """
 The chief architect is responsible for the overall integrity of the technical
 architecture across all subsystems, and the consistency of APIs and UI.
 
@@ -213,11 +213,11 @@ Changes to UI, public APIs and overall architecture must be approved by the
 chief architect.
 """
 
-    [Roles."Chief Maintainer"]
+	[Roles."Chief Maintainer"]
 
-    person = "crosbymichael"
+	person = "crosbymichael"
 
-    text = """
+	text = """
 The chief maintainer is responsible for all aspects of quality for the project
 including code reviews, usability, stability, security, performance, etc.  The
 most important function of the chief maintainer is to lead by example. On the
@@ -241,37 +241,37 @@ example and you'll be fine".
 
 [People]
 
-    [People.crosbymichael]
-        Name = "Michael Crosby"
-        Email = "crosbymichael@gmail.com"
-        GitHub = "crosbymichael"
+	[People.crosbymichael]
+	Name = "Michael Crosby"
+	Email = "crosbymichael@gmail.com"
+	GitHub = "crosbymichael"
 
-    [People.dqminh]
-        Name = "Daniel, Dao Quang Minh"
-        Email = "dqminh89@gmail.com"
-        GitHub = "dqminh"
+	[People.dqminh]
+	Name = "Daniel, Dao Quang Minh"
+	Email = "dqminh89@gmail.com"
+	GitHub = "dqminh"
 
-    [People.estesp]
-        Name = "Phil Estes"
-        Email = "estesp@linux.vnet.ibm.com"
-        GitHub = "estesp"
+	[People.estesp]
+	Name = "Phil Estes"
+	Email = "estesp@linux.vnet.ibm.com"
+	GitHub = "estesp"
 
-    [People.hqhq]
-        Name = "Qiang Huang"
-        Email = "h.huangqiang@huawei.com"
-        GitHub = "hqhq"
+	[People.hqhq]
+	Name = "Qiang Huang"
+	Email = "h.huangqiang@huawei.com"
+	GitHub = "hqhq"
 
-    [People.jhowardmsft]
-        Name = "John Howard"
-        Email = "jhoward@microsoft.com"
-        GitHub = "jhowardmsft"
+	[People.jhowardmsft]
+	Name = "John Howard"
+	Email = "jhoward@microsoft.com"
+	GitHub = "jhowardmsft"
 
-    [People.mlaventure]
-        Name = "Kenfe-Mickaël Laventure"
-        Email = "mickael.laventure@docker.com"
-        GitHub = "mlaventure"
+	[People.mlaventure]
+	Name = "Kenfe-Mickaël Laventure"
+	Email = "mickael.laventure@docker.com"
+	GitHub = "mlaventure"
 
-    [People.stevvooe]
-        Name = "Stephen Day"
-        Email = "stephen.day@docker.com"
-        GitHub = "stevvooe"
+	[People.stevvooe]
+	Name = "Stephen Day"
+	Email = "stephen.day@docker.com"
+	GitHub = "stevvooe"
