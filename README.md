@@ -55,7 +55,7 @@ For the various components in containerd there should be defined extension point
 The best example of this is that containerd will use `runc` from OCI as the default runtime in the execution layer but other runtimes conforming to the OCI Runtime specification they can be easily added to containerd.
 
 containerd will come with a default implementation for the various components.
-These defaults will be chosen my the maintainers of the project and should not change unless better tech for that component comes out.
+These defaults will be chosen by the maintainers of the project and should not change unless better tech for that component comes out.
 Additional implementations will not be accepted into the core repository and should be developed in a separate repository not maintained by the containerd maintainers.
 
 ### Releases
