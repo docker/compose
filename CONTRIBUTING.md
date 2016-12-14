@@ -58,7 +58,7 @@ package, it might make sense to have the package in a separate commit then have
 a subsequent commit that uses it.
 
 Remember, you're telling part of the story with the commit message. Don't make
-your chapter wierd.
+your chapter weird.
 
 ## Sign your work
 
