@@ -65,7 +65,7 @@ The table specifies whether or not the feature/component is in or out of scope.
 | cow filesystem | Built in functionality for overlay, aufs, and other copy on write filesystems for containers | in |  |
 | distribution | Having the ability to push and pull images as well as operations on images as a first class api object | in | containerd will fully support the management and retrieval of images |
 | low-level networking drivers | Providing network functionality to containers along with configuring their network namespaces | in | Network support will be added via interface and network namespace operations, not service discovery and service abstractions. |
-| build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerkit |
+| build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerd |
 | volumes | Volume management for external data | out | The api supports mounts, binds, etc where all volumes type systems can be built on top of. |
 | logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit.,There is no io copying of container STDIO in containerd. |
 

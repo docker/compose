@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-// Mount is the lingua franca of the containerkit. A mount represents a
+// Mount is the lingua franca of containerd. A mount represents a
 // serialized mount syscall. Components either emit or consume mounts.
 type Mount struct {
 	// Type specifies the host-specific of the mount.
