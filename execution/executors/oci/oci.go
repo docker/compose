@@ -16,6 +16,11 @@ const (
 	initProcessID = "init"
 )
 
+const (
+	PidFilename       = "pid"
+	StartTimeFilename = "starttime"
+)
+
 var (
 	ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
 )
@@ -64,7 +69,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 	if err != nil {
 		return nil, err
 	}
-	pidFile := filepath.Join(initStateDir, "pid")
+	pidFile := filepath.Join(initStateDir, PidFilename)
 	err = r.runc.Create(ctx, id, o.Bundle, &runc.CreateOpts{
 		PidFile: pidFile,
 		Console: oio.console,
@@ -80,11 +85,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}()
 
-	pid, err := runc.ReadPidFile(pidFile)
-	if err != nil {
-		return nil, err
-	}
-	process, err := newProcess(container, initProcessID, pid)
+	process, err := newProcess(container, initProcessID, initStateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -122,19 +123,11 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		return nil, err
 	}
 	for _, d := range dirs {
-		pid, err := runc.ReadPidFile(filepath.Join(d, "pid"))
-		if err != nil {
-			if os.IsNotExist(err) {
-				// Process died in between
-				continue
-			}
-			return nil, err
-		}
-		process, err := newProcess(container, filepath.Base(d), pid)
+		process, err := newProcess(container, filepath.Base(d), d)
 		if err != nil {
 			return nil, err
 		}
-		container.AddProcess(process, pid == runcC.Pid)
+		container.AddProcess(process, process.Pid() == int64(runcC.Pid))
 	}
 
 	return container, nil
@@ -212,7 +205,7 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		}
 	}()
 
-	pidFile := filepath.Join(procStateDir, "pid")
+	pidFile := filepath.Join(procStateDir, PidFilename)
 	if err := r.runc.Exec(ctx, c.ID(), o.Spec, &runc.ExecOpts{
 		PidFile: pidFile,
 		Detach:  false,
@@ -222,12 +215,8 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 	}); err != nil {
 		return nil, err
 	}
-	pid, err := runc.ReadPidFile(pidFile)
-	if err != nil {
-		return nil, err
-	}
 
-	process, err := newProcess(c, o.ID, pid)
+	process, err := newProcess(c, o.ID, procStateDir)
 	if err != nil {
 		return nil, err
 	}

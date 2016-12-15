@@ -2,19 +2,49 @@ package oci
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"syscall"
 
+	"github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd/execution"
+	starttime "github.com/opencontainers/runc/libcontainer/system"
 )
 
-func newProcess(c *execution.Container, id string, pid int) (execution.Process, error) {
+func newProcess(c *execution.Container, id, stateDir string) (execution.Process, error) {
+	pid, err := runc.ReadPidFile(filepath.Join(stateDir, PidFilename))
+	if err != nil {
+		return nil, err
+	}
 	status := execution.Running
 	if err := syscall.Kill(pid, 0); err != nil {
 		if err == syscall.ESRCH {
 			status = execution.Stopped
 		} else {
 			return nil, err
+		}
+	}
+	if status == execution.Running {
+		stime, err := starttime.GetProcessStartTime(pid)
+		switch {
+		case os.IsNotExist(err):
+			status = execution.Stopped
+		case err != nil:
+			return nil, err
+		default:
+			b, err := ioutil.ReadFile(filepath.Join(stateDir, StartTimeFilename))
+			switch {
+			case os.IsNotExist(err):
+				err = ioutil.WriteFile(filepath.Join(stateDir, StartTimeFilename), []byte(stime), 0600)
+				if err != nil {
+					return nil, err
+				}
+			case err != nil:
+				return nil, err
+			case string(b) != stime:
+				status = execution.Stopped
+			}
 		}
 	}
 	return &process{
