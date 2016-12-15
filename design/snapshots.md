@@ -7,7 +7,7 @@ filesystem, make changes then save the changeset back to a new layer.
 Historically, these have been tightly integrated into the Docker daemon as a
 component called the `graphdriver`. The `graphdriver` allows one to run the
 docker daemon on several different operating systems while still maintaining
-roughly similar snapshot semantics for committing and distribution changes to
+roughly similar snapshot semantics for committing and distributing changes to
 images.
 
 The `graphdriver` is deeply integrated with the import and export of images,
@@ -35,7 +35,7 @@ In the past, the `graphdriver` component has provided quite a lot of
 funcionality in Docker. This includes serialization, hashing, unpacking,
 packing, mounting.
 
-This _snapshot manager_ will only provide mount-oriented oriented snapshot
+This _snapshot manager_ will only provide mount-oriented snapshot
 access with minimal metadata. Serialization, hashing, unpacking, packing and
 mounting are not included in this design, opting for common implementations
 between graphdrivers, rather than specialized ones. This is less of a problem
