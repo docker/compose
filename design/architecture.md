@@ -19,7 +19,7 @@ is simply a directory on the filesystem.
 
 ![Architecture](architecture.png)
 
-Note that while these architecteral ideas are important to understanding the
+Note that while these architectural ideas are important to understanding the
 system, code layout may not reflect the exact architecture. These ideas should
 be used as a guide for placing functionality and behavior and understanding the
 thought behind the design.
