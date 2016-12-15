@@ -8,4 +8,6 @@ const (
 	Running Status = "running"
 	Stopped Status = "stopped"
 	Deleted Status = "deleted"
+
+	UnknownStatusCode = 255
 )

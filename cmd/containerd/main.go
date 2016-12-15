@@ -119,7 +119,10 @@ high performance container runtime
 		}
 		defer nec.Close()
 
-		execService, err := execution.New(executor)
+		ctx := log.WithModule(gocontext.Background(), "containerd")
+		ctx = log.WithModule(ctx, "execution")
+		ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
+		execService, err := execution.New(ctx, executor)
 		if err != nil {
 			return err
 		}

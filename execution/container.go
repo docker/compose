@@ -42,6 +42,12 @@ func (c *Container) ID() string {
 }
 
 func (c *Container) Status() Status {
+	for _, p := range c.processes {
+		if p.Pid() == c.initPid {
+			c.status = p.Status()
+			break
+		}
+	}
 	return c.status
 }
 

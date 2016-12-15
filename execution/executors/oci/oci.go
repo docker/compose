@@ -85,7 +85,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}()
 
-	process, err := newProcess(container, initProcessID, initStateDir)
+	process, err := newProcess(initProcessID, initStateDir, execution.Created)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		return nil, err
 	}
 	for _, d := range dirs {
-		process, err := newProcess(container, filepath.Base(d), d)
+		process, err := newProcess(filepath.Base(d), d, execution.Running)
 		if err != nil {
 			return nil, err
 		}
@@ -216,7 +216,7 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		return nil, err
 	}
 
-	process, err := newProcess(c, o.ID, procStateDir)
+	process, err := newProcess(o.ID, procStateDir, execution.Running)
 	if err != nil {
 		return nil, err
 	}

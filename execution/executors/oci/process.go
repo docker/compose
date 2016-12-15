@@ -12,12 +12,11 @@ import (
 	starttime "github.com/opencontainers/runc/libcontainer/system"
 )
 
-func newProcess(c *execution.Container, id, stateDir string) (execution.Process, error) {
+func newProcess(id, stateDir string, status execution.Status) (execution.Process, error) {
 	pid, err := runc.ReadPidFile(filepath.Join(stateDir, PidFilename))
 	if err != nil {
 		return nil, err
 	}
-	status := execution.Running
 	if err := syscall.Kill(pid, 0); err != nil {
 		if err == syscall.ESRCH {
 			status = execution.Stopped
@@ -25,7 +24,7 @@ func newProcess(c *execution.Container, id, stateDir string) (execution.Process,
 			return nil, err
 		}
 	}
-	if status == execution.Running {
+	if status != execution.Stopped {
 		stime, err := starttime.GetProcessStartTime(pid)
 		switch {
 		case os.IsNotExist(err):
@@ -48,22 +47,18 @@ func newProcess(c *execution.Container, id, stateDir string) (execution.Process,
 		}
 	}
 	return &process{
-		c:      c,
-		id:     id,
-		pid:    pid,
-		status: status,
+		id:       id,
+		pid:      pid,
+		status:   status,
+		exitCode: execution.UnknownStatusCode,
 	}, nil
 }
 
 type process struct {
-	c      *execution.Container
-	id     string
-	pid    int
-	status execution.Status
-}
-
-func (p *process) Container() *execution.Container {
-	return p.c
+	id       string
+	pid      int
+	status   execution.Status
+	exitCode uint32
 }
 
 func (p *process) ID() string {
@@ -75,22 +70,24 @@ func (p *process) Pid() int64 {
 }
 
 func (p *process) Wait() (uint32, error) {
-	if p.status == execution.Running {
+	if p.status != execution.Stopped {
 		var wstatus syscall.WaitStatus
 		_, err := syscall.Wait4(p.pid, &wstatus, 0, nil)
 		if err != nil {
-			return 255, nil
+			// This process doesn't belong to us
+			p.exitCode = execution.UnknownStatusCode
+			return p.exitCode, nil
 		}
-		// TODO: implement kill-all if we are the init pid
+		// TODO: implement kill-all if we are the init pid?
 		p.status = execution.Stopped
-		return uint32(wstatus.ExitStatus()), nil
+		p.exitCode = uint32(wstatus.ExitStatus())
 	}
+	return p.exitCode, nil
 
-	return 255, execution.ErrProcessNotFound
 }
 
 func (p *process) Signal(s os.Signal) error {
-	if p.status == execution.Running {
+	if p.status != execution.Stopped {
 		sig, ok := s.(syscall.Signal)
 		if !ok {
 			return fmt.Errorf("invalid signal %v", s)
