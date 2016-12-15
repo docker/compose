@@ -13,7 +13,7 @@ service ShimService {
 }
 
 message PtyRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+    string id = 1 [(gogoproto.customname) = "ID"];
     uint32 width = 2;
     uint32 height = 3;
 }
