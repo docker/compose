@@ -113,7 +113,7 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		execution.StateDir(filepath.Join(r.root, runcC.ID)),
 		runcC.ID,
 		runcC.Bundle,
-		runcC.Status,
+		execution.Status(runcC.Status),
 		int64(runcC.Pid),
 	)
 

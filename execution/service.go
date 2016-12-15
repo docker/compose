@@ -13,8 +13,7 @@ import (
 )
 
 var (
-	emptyResponse      = &google_protobuf.Empty{}
-	ErrProcessNotFound = fmt.Errorf("Process not found")
+	emptyResponse = &google_protobuf.Empty{}
 )
 
 func New(executor Executor) (*Service, error) {
@@ -24,8 +23,7 @@ func New(executor Executor) (*Service, error) {
 }
 
 type Service struct {
-	executor   Executor
-	supervisor *Supervisor
+	executor Executor
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {

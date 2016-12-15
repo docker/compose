@@ -9,4 +9,5 @@ type Process interface {
 	//Spec() *specs.Process
 	Wait() (uint32, error)
 	Signal(os.Signal) error
+	Status() Status
 }

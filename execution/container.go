@@ -11,12 +11,12 @@ func NewContainer(stateRoot, id, bundle string) (*Container, error) {
 		id:        id,
 		bundle:    bundle,
 		stateDir:  stateDir,
-		status:    "created",
+		status:    Created,
 		processes: make(map[string]Process),
 	}, nil
 }
 
-func LoadContainer(dir StateDir, id, bundle, status string, initPid int64) *Container {
+func LoadContainer(dir StateDir, id, bundle string, status Status, initPid int64) *Container {
 	return &Container{
 		id:        id,
 		stateDir:  dir,
@@ -32,7 +32,7 @@ type Container struct {
 	bundle   string
 	stateDir StateDir
 	initPid  int64
-	status   string
+	status   Status
 
 	processes map[string]Process
 }
@@ -41,7 +41,7 @@ func (c *Container) ID() string {
 	return c.id
 }
 
-func (c *Container) Status() string {
+func (c *Container) Status() Status {
 	return c.status
 }
 
