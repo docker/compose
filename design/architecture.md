@@ -81,6 +81,6 @@ Let's take pulling an image as a demonstrated example:
    controller_ can use the image manifest and config to prepare the execution
    configuration. Part of this is entering mounts into the execution config
    from the _snapshot_ module.
-4. The prepared bundle is then passed off to the _runtime_ subssystem for
+4. The prepared bundle is then passed off to the _runtime_ subsystem for
    execution. It reads the bundle configuration to create a running container.
 
