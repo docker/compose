@@ -11,7 +11,7 @@ import enum
 import six
 from docker.errors import APIError
 from docker.errors import NotFound
-from docker.utils import LogConfig
+from docker.types import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 

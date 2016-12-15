@@ -19,7 +19,7 @@ from compose.service import Service
 
 class ProjectTest(unittest.TestCase):
     def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
+        self.mock_client = mock.create_autospec(docker.APIClient)
 
     def test_from_config(self):
         config = Config(

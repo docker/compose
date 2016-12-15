@@ -4,8 +4,8 @@ from __future__ import unicode_literals
 import logging
 
 from docker.errors import NotFound
-from docker.utils import create_ipam_config
-from docker.utils import create_ipam_pool
+from docker.types import IPAMConfig
+from docker.types import IPAMPool
 
 from .config import ConfigurationError
 
@@ -96,10 +96,10 @@ def create_ipam_config_from_dict(ipam_dict):
     if not ipam_dict:
         return None
 
-    return create_ipam_config(
+    return IPAMConfig(
         driver=ipam_dict.get('driver'),
         pool_configs=[
-            create_ipam_pool(
+            IPAMPool(
                 subnet=config.get('subnet'),
                 iprange=config.get('ip_range'),
                 gateway=config.get('gateway'),
