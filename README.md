@@ -82,11 +82,11 @@ The table specifies whether or not the feature/component is in or out of scope.
 | low-level networking drivers | Providing network functionality to containers along with configuring their network namespaces | in | Network support will be added via interface and network namespace operations, not service discovery and service abstractions. |
 | build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerd |
 | volumes | Volume management for external data | out | The api supports mounts, binds, etc where all volumes type systems can be built on top of. |
-| logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit.,There is no io copying of container STDIO in containerd. |
+| logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit. There is no io copying of container STDIO in containerd. |
 
 
 containerd is scoped to a single host and makes assumptions based on that fact.
-It can be used to builds things like a node agent that launches containers but does not have any concepts of a distributed system.
+It can be used to build things like a node agent that launches containers but does not have any concepts of a distributed system.
 
 containerd is designed to be embedded into a larger system, hence it only includes a barebone CLI (`ctr`) specifically for development and debugging purpose, with no mandate to be human-friendly, and no guarantee of interface stability over time.
 
