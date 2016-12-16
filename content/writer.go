@@ -25,7 +25,7 @@ type ContentWriter struct {
 // Write p to the transaction.
 //
 // Note that writes are unbuffered to the backing file. When writing, it is
-// recommended to wrap in a bufio.Writer or, preferrably, use io.CopyBuffer.
+// recommended to wrap in a bufio.Writer or, preferably, use io.CopyBuffer.
 func (cw *ContentWriter) Write(p []byte) (n int, err error) {
 	n, err = cw.fp.Write(p)
 	cw.digester.Hash().Write(p[:n])

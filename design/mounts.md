@@ -1,11 +1,11 @@
 # Mounts
 
-Mounts are the main interaction mechansim in containerD. Container systems of
+Mounts are the main interaction mechanism in containerd. Container systems of
 the past typically end up having several disparate components independently
 perform mounts, resulting in complex lifecycle management and buggy behavior
 when coordinating large mount stacks.
 
-In containerD, we intend to keep mount syscalls isolated to the container
+In containerd, we intend to keep mount syscalls isolated to the container
 runtime component, opting to have various components produce a serialized
 representation of the mount. This ensures that the mounts are performed as a
 unit and unmounted as a unit.

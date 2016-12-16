@@ -45,7 +45,7 @@ interface.
 ## Architecture
 
 The _Snapshot Manager_ provides an API for allocating, snapshotting and mounting
-abstract, layer-based filesytems. The model works by building up sets of
+abstract, layer-based filesystems. The model works by building up sets of
 directories with parent-child relationships, known as _Snapshots_.
 
 Every snapshot is represented by an opaque `diff` directory, which acts as a
