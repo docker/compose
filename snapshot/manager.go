@@ -11,7 +11,7 @@ import (
 )
 
 // Manager provides an API for allocating, snapshotting and mounting
-// abstract, layer-based filesytems. The model works by building up sets of
+// abstract, layer-based filesystems. The model works by building up sets of
 // directories with parent-child relationships.
 //
 // These differ from the concept of the graphdriver in that the
@@ -203,7 +203,7 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	}, nil
 }
 
-// View behaves identically to Prepare except the result may not be commited
+// View behaves identically to Prepare except the result may not be committed
 // back to the snappshot manager.
 //
 // Whether or not these are readonly mounts is implementation specific, but the
