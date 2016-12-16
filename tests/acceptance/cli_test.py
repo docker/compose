@@ -316,8 +316,8 @@ class CLITestCase(DockerClientTestCase):
                                 'memory': '50M',
                             },
                             'reservations': {
-                                    'cpus': '0.0001',
-                                    'memory': '20M',
+                                'cpus': '0.0001',
+                                'memory': '20M',
                             },
                         },
                         'restart_policy': {
@@ -928,6 +928,7 @@ class CLITestCase(DockerClientTestCase):
         assert foo_container.get('HostConfig.NetworkMode') == \
             'container:{}'.format(bar_container.id)
 
+    @v3_only()
     def test_up_with_healthcheck(self):
         def wait_on_health_status(container, status):
             def condition():
@@ -945,7 +946,7 @@ class CLITestCase(DockerClientTestCase):
         assert passes_container.get('Config.Healthcheck') == {
             "Test": ["CMD-SHELL", "/bin/true"],
             "Interval": nanoseconds_from_time_seconds(1),
-            "Timeout": nanoseconds_from_time_seconds(30*60),
+            "Timeout": nanoseconds_from_time_seconds(30 * 60),
             "Retries": 1,
         }
 
