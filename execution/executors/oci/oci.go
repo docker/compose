@@ -37,6 +37,9 @@ type OCIRuntime struct {
 }
 
 func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOpts) (container *execution.Container, err error) {
+	if o.Bundle == "" {
+		return nil, errors.New("bundle path cannot be an empty string")
+	}
 	oio, err := newOIO(o.Stdin, o.Stdout, o.Stderr, o.Console)
 	if err != nil {
 		return nil, err
