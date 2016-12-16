@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	gocontext "context"
 
@@ -110,15 +111,23 @@ var runCommand = cli.Command{
 		}
 
 		var ec uint32
+	eventLoop:
 		for {
-			e, more := <-evCh
-			if !more {
-				break
-			}
+			select {
+			case e, more := <-evCh:
+				if !more {
+					fmt.Println("No More!")
+					break eventLoop
+				}
 
-			if e.ID == cr.Container.ID && e.PID == cr.InitProcess.ID {
-				ec = e.StatusCode
-				break
+				if e.ID == cr.Container.ID && e.PID == cr.InitProcess.ID {
+					ec = e.StatusCode
+					break eventLoop
+				}
+			case <-time.After(1 * time.Second):
+				if nec.Conn.Status() != nats.CONNECTED {
+					break eventLoop
+				}
 			}
 		}
 

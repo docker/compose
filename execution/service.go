@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 	"time"
 
@@ -13,19 +14,54 @@ import (
 )
 
 var (
-	emptyResponse      = &google_protobuf.Empty{}
-	ErrProcessNotFound = fmt.Errorf("Process not found")
+	emptyResponse = &google_protobuf.Empty{}
 )
 
-func New(executor Executor) (*Service, error) {
-	return &Service{
+func New(ctx context.Context, executor Executor) (*Service, error) {
+	svc := &Service{
 		executor: executor,
-	}, nil
+	}
+
+	// List existing container, some of them may have died away if
+	// we've been restarted
+	containers, err := executor.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range containers {
+		status := c.Status()
+		if status == Stopped || status == Deleted {
+			// generate exit event for all processes, (generate event for init last)
+			processes := c.Processes()
+			processes = append(processes[1:], processes[0])
+			for _, p := range c.Processes() {
+				if p.Status() != Stopped {
+					p.Signal(os.Kill)
+				}
+				sc, err := p.Wait()
+				if err != nil {
+					sc = UnknownStatusCode
+				}
+				topic := GetContainerProcessEventTopic(c.ID(), p.ID())
+				svc.publishEvent(ctx, topic, &ContainerExitEvent{
+					ContainerEvent: ContainerEvent{
+						Timestamp: time.Now(),
+						ID:        c.ID(),
+						Action:    "exit",
+					},
+					PID:        p.ID(),
+					StatusCode: sc,
+				})
+			}
+		}
+	}
+
+	return svc, nil
 }
 
 type Service struct {
-	executor   Executor
-	supervisor *Supervisor
+	executor Executor
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
@@ -134,6 +170,7 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 	}
 
 	process, err := s.executor.StartProcess(ctx, container, StartProcessOpts{
+		ID:      r.Process.ID,
 		Spec:    spec,
 		Console: r.Console,
 		Stdin:   r.Stdin,

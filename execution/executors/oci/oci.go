@@ -12,6 +12,15 @@ import (
 	"github.com/docker/containerd/execution"
 )
 
+const (
+	initProcessID = "init"
+)
+
+const (
+	PidFilename       = "pid"
+	StartTimeFilename = "starttime"
+)
+
 var (
 	ErrRootEmpty = errors.New("oci: runtime root cannot be an empty string")
 )
@@ -59,11 +68,11 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}(container)
 
-	initProcID, initStateDir, err := container.StateDir().NewProcess()
+	initStateDir, err := container.StateDir().NewProcess(initProcessID)
 	if err != nil {
 		return nil, err
 	}
-	pidFile := filepath.Join(initStateDir, "pid")
+	pidFile := filepath.Join(initStateDir, PidFilename)
 	err = r.runc.Create(ctx, id, o.Bundle, &runc.CreateOpts{
 		PidFile: pidFile,
 		Console: oio.console,
@@ -79,11 +88,7 @@ func (r *OCIRuntime) Create(ctx context.Context, id string, o execution.CreateOp
 		}
 	}()
 
-	pid, err := runc.ReadPidFile(pidFile)
-	if err != nil {
-		return nil, err
-	}
-	process, err := newProcess(initProcID, pid)
+	process, err := newProcess(initProcessID, initStateDir, execution.Created)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +117,7 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		execution.StateDir(filepath.Join(r.root, runcC.ID)),
 		runcC.ID,
 		runcC.Bundle,
-		runcC.Status,
+		execution.Status(runcC.Status),
 		int64(runcC.Pid),
 	)
 
@@ -121,19 +126,11 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		return nil, err
 	}
 	for _, d := range dirs {
-		pid, err := runc.ReadPidFile(filepath.Join(d, "pid"))
-		if err != nil {
-			if os.IsNotExist(err) {
-				// Process died in between
-				continue
-			}
-			return nil, err
-		}
-		process, err := newProcess(filepath.Base(d), pid)
+		process, err := newProcess(filepath.Base(d), d, execution.Running)
 		if err != nil {
 			return nil, err
 		}
-		container.AddProcess(process, pid == runcC.Pid)
+		container.AddProcess(process, process.Pid() == int64(runcC.Pid))
 	}
 
 	return container, nil
@@ -201,17 +198,17 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 		}
 	}()
 
-	procID, procStateDir, err := c.StateDir().NewProcess()
+	procStateDir, err := c.StateDir().NewProcess(o.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			c.StateDir().DeleteProcess(procID)
+			c.StateDir().DeleteProcess(o.ID)
 		}
 	}()
 
-	pidFile := filepath.Join(procStateDir, "pid")
+	pidFile := filepath.Join(procStateDir, PidFilename)
 	if err := r.runc.Exec(ctx, c.ID(), o.Spec, &runc.ExecOpts{
 		PidFile: pidFile,
 		Detach:  false,
@@ -221,12 +218,8 @@ func (r *OCIRuntime) StartProcess(ctx context.Context, c *execution.Container, o
 	}); err != nil {
 		return nil, err
 	}
-	pid, err := runc.ReadPidFile(pidFile)
-	if err != nil {
-		return nil, err
-	}
 
-	process, err := newProcess(procID, pid)
+	process, err := newProcess(o.ID, procStateDir, execution.Running)
 	if err != nil {
 		return nil, err
 	}
