@@ -925,7 +925,7 @@ def is_url(build_path):
 
 
 def validate_paths(service_dict, command):
-    if 'build' in service_dict and command in ('build',):
+    if 'build' in service_dict and command in (None, 'build'):
         build = service_dict.get('build', {})
 
         if isinstance(build, six.string_types):
