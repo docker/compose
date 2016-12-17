@@ -54,7 +54,8 @@ def get_config_path_from_options(base_dir, options, environment):
 
     config_files = environment.get('COMPOSE_FILE')
     if config_files:
-        return config_files.split(os.pathsep)
+        pathsep = environment.get('COMPOSE_FILE_SEPARATOR', os.pathsep)
+        return config_files.split(pathsep)
     return None
 
 
