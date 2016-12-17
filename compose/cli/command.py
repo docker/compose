@@ -33,7 +33,8 @@ def project_from_options(project_dir, options):
         verbose=options.get('--verbose'),
         host=host,
         tls_config=tls_config_from_options(options),
-        environment=environment
+        environment=environment,
+        command=options.get('COMMAND', None),
     )
 
 
@@ -93,14 +94,14 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_config=None, environment=None):
+                host=None, tls_config=None, environment=None, command=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
-    config_data = config.load(config_details)
+    config_data = config.load(config_details, command=command)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',
