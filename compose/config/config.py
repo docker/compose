@@ -298,7 +298,7 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
-def load(config_details):
+def load(config_details, command=None):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
@@ -320,7 +320,7 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
-    service_dicts = load_services(config_details, main_file)
+    service_dicts = load_services(config_details, main_file, command)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
@@ -367,7 +367,7 @@ def load_mapping(config_files, get_func, entity_type):
     return mapping
 
 
-def load_services(config_details, config_file):
+def load_services(config_details, config_file, command):
     def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
             config_details.working_dir,
@@ -380,7 +380,8 @@ def load_services(config_details, config_file):
         service_dict = process_service(resolver.run())
 
         service_config = service_config._replace(config=service_dict)
-        validate_service(service_config, service_names, config_file.version)
+        validate_service(service_config, service_names, config_file.version,
+                         command)
         service_dict = finalize_service(
             service_config,
             service_names,
@@ -585,10 +586,10 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'depends_on' cannot be extended" % error_prefix)
 
 
-def validate_service(service_config, service_names, version):
+def validate_service(service_config, service_names, version, command):
     service_dict, service_name = service_config.config, service_config.name
     validate_service_constraints(service_dict, service_name, version)
-    validate_paths(service_dict)
+    validate_paths(service_dict, command=command)
 
     validate_ulimits(service_config)
     validate_network_mode(service_config, service_names)
@@ -923,8 +924,8 @@ def is_url(build_path):
     return build_path.startswith(DOCKER_VALID_URL_PREFIXES)
 
 
-def validate_paths(service_dict):
-    if 'build' in service_dict:
+def validate_paths(service_dict, command):
+    if 'build' in service_dict and command in ('build',):
         build = service_dict.get('build', {})
 
         if isinstance(build, six.string_types):
