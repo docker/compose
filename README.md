@@ -1,4 +1,5 @@
 # containerd
+[![Build Status](https://travis-ci.org/docker/containerd.svg?branch=master)](https://travis-ci.org/docker/containerd)
 
 containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
 
