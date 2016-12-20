@@ -921,8 +921,8 @@ class ConfigTest(unittest.TestCase):
                 'image': 'example/web',
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
                 'depends_on': {
-                    'db': {'condition': 'container_start'},
-                    'other': {'condition': 'container_start'},
+                    'db': {'condition': 'service_started'},
+                    'other': {'condition': 'service_started'},
                 },
             },
             {
@@ -3059,7 +3059,7 @@ class ExtendsTest(unittest.TestCase):
         """)
         services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
         assert service_sort(services)[2]['depends_on'] == {
-            'other': {'condition': 'container_start'}
+            'other': {'condition': 'service_started'}
         }
 
 

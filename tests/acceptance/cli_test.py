@@ -928,7 +928,7 @@ class CLITestCase(DockerClientTestCase):
         assert foo_container.get('HostConfig.NetworkMode') == \
             'container:{}'.format(bar_container.id)
 
-    @v2_1_only()
+    @v3_only()
     def test_up_with_healthcheck(self):
         def wait_on_health_status(container, status):
             def condition():
