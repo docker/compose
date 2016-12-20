@@ -86,6 +86,7 @@ DOCKER_CONFIG_KEYS = [
     'shm_size',
     'stdin_open',
     'stop_signal',
+    'sysctls',
     'tty',
     'user',
     'userns_mode',
@@ -645,19 +646,24 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
-    if 'healthcheck' in service_dict:
-        service_dict['healthcheck'] = process_healthcheck(
-            service_dict['healthcheck'], service_config.name)
+    if 'sysctls' in service_dict:
+        service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
 
     for field in ['dns', 'dns_search', 'tmpfs']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
+    service_dict = process_healthcheck(service_dict, service_config.name)
+
     return service_dict
 
 
-def process_healthcheck(raw, service_name):
+def process_healthcheck(service_dict, service_name):
+    if 'healthcheck' not in service_dict:
+        return service_dict
+
     hc = {}
+    raw = service_dict['healthcheck']
 
     if raw.get('disable'):
         if len(raw) > 1:
@@ -676,7 +682,8 @@ def process_healthcheck(raw, service_name):
     if 'retries' in raw:
         hc['retries'] = raw['retries']
 
-    return hc
+    service_dict['healthcheck'] = hc
+    return service_dict
 
 
 def finalize_service(service_config, service_names, version, environment):
@@ -800,6 +807,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('ulimits', parse_ulimits)
     md.merge_mapping('networks', parse_networks)
+    md.merge_mapping('sysctls', parse_sysctls)
     md.merge_sequence('links', ServiceLink.parse)
 
     for field in ['volumes', 'devices']:
@@ -874,11 +882,11 @@ def merge_environment(base, override):
     return env
 
 
-def split_label(label):
-    if '=' in label:
-        return label.split('=', 1)
+def split_kv(kvpair):
+    if '=' in kvpair:
+        return kvpair.split('=', 1)
     else:
-        return label, ''
+        return kvpair, ''
 
 
 def parse_dict_or_list(split_func, type_name, arguments):
@@ -899,8 +907,9 @@ def parse_dict_or_list(split_func, type_name, arguments):
 
 parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
 parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
-parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
+parse_labels = functools.partial(parse_dict_or_list, split_kv, 'labels')
 parse_networks = functools.partial(parse_dict_or_list, lambda k: (k, None), 'networks')
+parse_sysctls = functools.partial(parse_dict_or_list, split_kv, 'sysctls')
 
 
 def parse_ulimits(ulimits):
