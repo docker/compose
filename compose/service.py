@@ -64,6 +64,7 @@ DOCKER_START_KEYS = [
     'restart',
     'security_opt',
     'shm_size',
+    'sysctls',
     'userns_mode',
     'volumes_from',
 ]
@@ -718,6 +719,7 @@ class Service(object):
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
+            sysctls=options.get('sysctls'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
             mem_swappiness=options.get('mem_swappiness'),
