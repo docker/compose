@@ -227,7 +227,10 @@ class Project(object):
         services = self.get_services(service_names)
 
         def get_deps(service):
-            return {self.get_service(dep) for dep in service.get_dependency_names()}
+            return {
+                (self.get_service(dep), config)
+                for dep, config in service.get_dependency_configs().items()
+            }
 
         parallel.parallel_execute(
             services,
@@ -243,7 +246,7 @@ class Project(object):
 
         def get_deps(container):
             # actually returning inversed dependencies
-            return {other for other in containers
+            return {(other, None) for other in containers
                     if container.service in
                     self.get_service(other.service).get_dependency_names()}
 
@@ -394,7 +397,10 @@ class Project(object):
             )
 
         def get_deps(service):
-            return {self.get_service(dep) for dep in service.get_dependency_names()}
+            return {
+                (self.get_service(dep), config)
+                for dep, config in service.get_dependency_configs().items()
+            }
 
         results, errors = parallel.parallel_execute(
             services,

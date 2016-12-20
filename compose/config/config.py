@@ -649,12 +649,22 @@ def process_service(service_config):
     if 'sysctls' in service_dict:
         service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
 
+    service_dict = process_depends_on(service_dict)
+
     for field in ['dns', 'dns_search', 'tmpfs']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
     service_dict = process_healthcheck(service_dict, service_config.name)
 
+    return service_dict
+
+
+def process_depends_on(service_dict):
+    if 'depends_on' in service_dict and not isinstance(service_dict['depends_on'], dict):
+        service_dict['depends_on'] = dict([
+            (svc, {'condition': 'service_started'}) for svc in service_dict['depends_on']
+        ])
     return service_dict
 
 
@@ -665,7 +675,7 @@ def process_healthcheck(service_dict, service_name):
     hc = {}
     raw = service_dict['healthcheck']
 
-    if raw.get('disable'):
+    if raw.get('disable') or raw.get('disabled'):
         if len(raw) > 1:
             raise ConfigurationError(
                 'Service "{}" defines an invalid healthcheck: '
