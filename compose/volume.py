@@ -4,8 +4,11 @@ from __future__ import unicode_literals
 import logging
 
 from docker.errors import NotFound
+from docker.utils import version_lt
 
 from .config import ConfigurationError
+from .const import LABEL_PROJECT
+from .const import LABEL_VOLUME
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +26,7 @@ class Volume(object):
 
     def create(self):
         return self.client.create_volume(
-            self.full_name, self.driver, self.driver_opts, labels=self.labels
+            self.full_name, self.driver, self.driver_opts, labels=self._labels
         )
 
     def remove(self):
@@ -52,6 +55,17 @@ class Volume(object):
         if self.external_name:
             return self.external_name
         return '{0}_{1}'.format(self.project, self.name)
+
+    @property
+    def _labels(self):
+        if version_lt(self.client._version, '1.23'):
+            return None
+        labels = self.labels.copy() if self.labels else {}
+        labels.update({
+            LABEL_PROJECT: self.project,
+            LABEL_VOLUME: self.name,
+        })
+        return labels
 
 
 class ProjectVolumes(object):

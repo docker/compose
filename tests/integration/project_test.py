@@ -942,8 +942,8 @@ class ProjectTest(DockerClientTestCase):
         ]
 
         assert [n['Name'] for n in networks] == ['composetest_{}'.format(network_name)]
-
-        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+        assert 'label_key' in networks[0]['Labels']
+        assert networks[0]['Labels']['label_key'] == 'label_val'
 
     @v2_only()
     def test_project_up_volumes(self):
@@ -1009,7 +1009,8 @@ class ProjectTest(DockerClientTestCase):
 
         assert [v['Name'] for v in volumes] == ['composetest_{}'.format(volume_name)]
 
-        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
+        assert 'label_key' in volumes[0]['Labels']
+        assert volumes[0]['Labels']['label_key'] == 'label_val'
 
     @v2_only()
     def test_project_up_logging_with_multiple_files(self):
