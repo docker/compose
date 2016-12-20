@@ -192,6 +192,7 @@
           }
         },
         "user": {"type": "string"},
+        "userns_mode": {"type": "string"},
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "working_dir": {"type": "string"}
       },

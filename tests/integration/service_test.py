@@ -30,6 +30,7 @@ from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import Service
+from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 
 
@@ -841,6 +842,18 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', pid='host')
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.PidMode'), 'host')
+
+    @v2_1_only()
+    def test_userns_mode_none_defined(self):
+        service = self.create_service('web', userns_mode=None)
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.UsernsMode'), '')
+
+    @v2_1_only()
+    def test_userns_mode_host(self):
+        service = self.create_service('web', userns_mode='host')
+        container = create_and_start_container(service)
+        self.assertEqual(container.get('HostConfig.UsernsMode'), 'host')
 
     def test_dns_no_value(self):
         service = self.create_service('web')
