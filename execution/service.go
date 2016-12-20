@@ -160,8 +160,8 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 	spec := specs.Process{
 		Terminal: r.Process.Terminal,
 		ConsoleSize: specs.Box{
-			80,
-			80,
+			Height: 80,
+			Width:  80,
 		},
 		Args:            r.Process.Args,
 		Env:             r.Process.Env,

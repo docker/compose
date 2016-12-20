@@ -32,12 +32,12 @@ func TestBtrfs(t *testing.T) {
 
 	for _, mount := range mounts {
 		if mount.Type != "btrfs" {
-			t.Fatal("wrong mount type: %v != btrfs", mount.Type)
+			t.Fatalf("wrong mount type: %v != btrfs", mount.Type)
 		}
 
 		// assumes the first, maybe incorrect in the future
 		if !strings.HasPrefix(mount.Options[0], "subvolid=") {
-			t.Fatal("no subvolid option in %v", mount.Options)
+			t.Fatalf("no subvolid option in %v", mount.Options)
 		}
 	}
 
