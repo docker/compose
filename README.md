@@ -36,7 +36,7 @@ These following criteria will be used when reviewing pull requests, features, an
 
 ### Components
 
-Components should not have tight dependencies on each other so that they are unable to be used independently.
+Components should not have tight dependencies on each other so that they are able to be used independently.
 The APIs for images and containers should be designed in a way that when used together the components have a natural flow but still be useful independently.
 
 An example for this design can be seen with the overlay filesystems and the container execution layer.
@@ -81,7 +81,7 @@ The table specifies whether or not the feature/component is in or out of scope.
 | distribution | Having the ability to push and pull images as well as operations on images as a first class API object | in | containerd will fully support the management and retrieval of images |
 | low-level networking drivers | Providing network functionality to containers along with configuring their network namespaces | in | Network support will be added via interface and network namespace operations, not service discovery and service abstractions. |
 | build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerd |
-| volumes | Volume management for external data | out | The API supports mounts, binds, etc where all volumes type systems can be built on top of. |
+| volumes | Volume management for external data | out | The API supports mounts, binds, etc where all volumes type systems can be built on top of containerd. |
 | logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit. There is no io copying of container STDIO in containerd. |
 
 
