@@ -270,7 +270,7 @@
         "cpus": {"type": "string"},
         "memory": {"type": "string"}
       },
-      "additionaProperties": false
+      "additionalProperties": false
     },
 
     "network": {
