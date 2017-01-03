@@ -78,10 +78,10 @@ The table specifies whether or not the feature/component is in or out of scope.
 |------------------------------|--------------------------------------------------------------------------------------------------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | execution | Provide an extensible execution layer for executing a container | in | Create,start, stop pause, resume exec, signal, delete |
 | cow filesystem | Built in functionality for overlay, aufs, and other copy on write filesystems for containers | in |  |
-| distribution | Having the ability to push and pull images as well as operations on images as a first class api object | in | containerd will fully support the management and retrieval of images |
+| distribution | Having the ability to push and pull images as well as operations on images as a first class API object | in | containerd will fully support the management and retrieval of images |
 | low-level networking drivers | Providing network functionality to containers along with configuring their network namespaces | in | Network support will be added via interface and network namespace operations, not service discovery and service abstractions. |
 | build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerd |
-| volumes | Volume management for external data | out | The api supports mounts, binds, etc where all volumes type systems can be built on top of. |
+| volumes | Volume management for external data | out | The API supports mounts, binds, etc where all volumes type systems can be built on top of. |
 | logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit. There is no io copying of container STDIO in containerd. |
 
 
@@ -91,7 +91,7 @@ It can be used to build things like a node agent that launches containers but do
 containerd is designed to be embedded into a larger system, hence it only includes a barebone CLI (`ctr`) specifically for development and debugging purpose, with no mandate to be human-friendly, and no guarantee of interface stability over time.
 
 Also things like service discovery are out of scope even though networking is in scope.
-containerd should provide the primitives to create, add, remove, or manage network interfaces and network namespaces for a container but ip allocation, discovery, and DNS should be handled at higher layers.
+containerd should provide the primitives to create, add, remove, or manage network interfaces and network namespaces for a container but IP allocation, discovery, and DNS should be handled at higher layers.
 
 ### How is the scope changed?
 
