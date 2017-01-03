@@ -10,6 +10,7 @@ import (
 
 	"github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd/execution"
+	"github.com/docker/containerd/sys"
 )
 
 const (
@@ -26,10 +27,13 @@ var (
 )
 
 func New(root string) (*OCIRuntime, error) {
-	err := SetSubreaper(1)
+	err := sys.SetSubreaper(1)
 	if err != nil {
 		return nil, err
 	}
+	go func() {
+		syscall.Wait4(-1, nil, 0, nil)
+	}()
 	return &OCIRuntime{
 		root: root,
 		runc: &runc.Runc{
@@ -243,5 +247,6 @@ func (r *OCIRuntime) DeleteProcess(ctx context.Context, c *execution.Container, 
 	ioID := fmt.Sprintf("%s-%s", c.ID(), id)
 	r.ios[ioID].cleanup()
 	delete(r.ios, ioID)
+	c.RemoveProcess(id)
 	return c.StateDir().DeleteProcess(id)
 }
