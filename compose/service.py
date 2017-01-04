@@ -28,6 +28,8 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
+from .errors import HealthCheckFailed
+from .errors import NoHealthCheckConfigured
 from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .parallel import parallel_start
@@ -68,6 +70,9 @@ DOCKER_START_KEYS = [
     'userns_mode',
     'volumes_from',
 ]
+
+CONDITION_STARTED = 'service_started'
+CONDITION_HEALTHY = 'service_healthy'
 
 
 class BuildError(Exception):
@@ -533,10 +538,38 @@ class Service(object):
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name
-        return (self.get_linked_service_names() +
-                self.get_volumes_from_names() +
-                ([net_name] if net_name else []) +
-                self.options.get('depends_on', []))
+        return (
+            self.get_linked_service_names() +
+            self.get_volumes_from_names() +
+            ([net_name] if net_name else []) +
+            list(self.options.get('depends_on', {}).keys())
+        )
+
+    def get_dependency_configs(self):
+        net_name = self.network_mode.service_name
+        configs = dict(
+            [(name, None) for name in self.get_linked_service_names()]
+        )
+        configs.update(dict(
+            [(name, None) for name in self.get_volumes_from_names()]
+        ))
+        configs.update({net_name: None} if net_name else {})
+        configs.update(self.options.get('depends_on', {}))
+        for svc, config in self.options.get('depends_on', {}).items():
+            if config['condition'] == CONDITION_STARTED:
+                configs[svc] = lambda s: True
+            elif config['condition'] == CONDITION_HEALTHY:
+                configs[svc] = lambda s: s.is_healthy()
+            else:
+                # The config schema already prevents this, but it might be
+                # bypassed if Compose is called programmatically.
+                raise ValueError(
+                    'depends_on condition "{}" is invalid.'.format(
+                        config['condition']
+                    )
+                )
+
+        return configs
 
     def get_linked_service_names(self):
         return [service.name for (service, _) in self.links]
@@ -870,6 +903,24 @@ class Service(object):
                 raise
             else:
                 log.error(six.text_type(e))
+
+    def is_healthy(self):
+        """ Check that all containers for this service report healthy.
+            Returns false if at least one healthcheck is pending.
+            If an unhealthy container is detected, raise a HealthCheckFailed
+            exception.
+        """
+        result = True
+        for ctnr in self.containers():
+            ctnr.inspect()
+            status = ctnr.get('State.Health.Status')
+            if status is None:
+                raise NoHealthCheckConfigured(self.name)
+            elif status == 'starting':
+                result = False
+            elif status == 'unhealthy':
+                raise HealthCheckFailed(ctnr.short_id)
+        return result
 
 
 def short_id_alias_exists(container, network):

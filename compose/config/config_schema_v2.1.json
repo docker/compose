@@ -77,7 +77,28 @@
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
-        "depends_on": {"$ref": "#/definitions/list_of_strings"},
+        "depends_on": {
+          "oneOf": [
+            {"$ref": "#/definitions/list_of_strings"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-zA-Z0-9._-]+$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition": {
+                      "type": "string",
+                      "enum": ["service_started", "service_healthy"]
+                    }
+                  },
+                  "required": ["condition"]
+                }
+              }
+            }
+          ]
+        },
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
@@ -120,6 +141,7 @@
 
         "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+        "healthcheck": {"$ref": "#/definitions/healthcheck"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
@@ -229,6 +251,24 @@
         "memswap_limit": ["mem_limit"]
       },
       "additionalProperties": false
+    },
+
+    "healthcheck": {
+      "id": "#/definitions/healthcheck",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disabled": {"type": "boolean"},
+        "interval": {"type": "string"},
+        "retries": {"type": "number"},
+        "test": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
+        "timeout": {"type": "string"}
+      }
     },
 
     "network": {

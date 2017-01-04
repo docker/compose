@@ -920,7 +920,10 @@ class ConfigTest(unittest.TestCase):
                 'build': {'context': os.path.abspath('/')},
                 'image': 'example/web',
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
-                'depends_on': ['db', 'other'],
+                'depends_on': {
+                    'db': {'condition': 'service_started'},
+                    'other': {'condition': 'service_started'},
+                },
             },
             {
                 'name': 'db',
@@ -3055,7 +3058,9 @@ class ExtendsTest(unittest.TestCase):
                 image: example
         """)
         services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
-        assert service_sort(services)[2]['depends_on'] == ['other']
+        assert service_sort(services)[2]['depends_on'] == {
+            'other': {'condition': 'service_started'}
+        }
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')

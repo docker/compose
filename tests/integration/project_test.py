@@ -19,6 +19,8 @@ from compose.config.types import VolumeSpec
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.errors import HealthCheckFailed
+from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
@@ -1375,3 +1377,115 @@ class ProjectTest(DockerClientTestCase):
             ctnr for ctnr in project._labeled_containers()
             if ctnr.labels.get(LABEL_SERVICE) == 'service1'
         ]) == 0
+
+    @v2_1_only()
+    def test_project_up_healthy_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'healthcheck': {
+                        'test': 'exit 0',
+                        'retries': 1,
+                        'timeout': '10s',
+                        'interval': '0.1s'
+                    },
+                },
+                'svc2': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_healthy'},
+                    }
+                }
+            }
+        }
+        config_data = build_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        containers = project.containers()
+        assert len(containers) == 2
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        assert 'svc1' in svc2.get_dependency_names()
+        assert svc1.is_healthy()
+
+    @v2_1_only()
+    def test_project_up_unhealthy_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'healthcheck': {
+                        'test': 'exit 1',
+                        'retries': 1,
+                        'timeout': '10s',
+                        'interval': '0.1s'
+                    },
+                },
+                'svc2': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_healthy'},
+                    }
+                }
+            }
+        }
+        config_data = build_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with pytest.raises(HealthCheckFailed):
+            project.up()
+        containers = project.containers()
+        assert len(containers) == 1
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        assert 'svc1' in svc2.get_dependency_names()
+        with pytest.raises(HealthCheckFailed):
+            svc1.is_healthy()
+
+    @v2_1_only()
+    def test_project_up_no_healthcheck_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'healthcheck': {
+                        'disabled': True
+                    },
+                },
+                'svc2': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_healthy'},
+                    }
+                }
+            }
+        }
+        config_data = build_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with pytest.raises(NoHealthCheckConfigured):
+            project.up()
+        containers = project.containers()
+        assert len(containers) == 1
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        assert 'svc1' in svc2.get_dependency_names()
+        with pytest.raises(NoHealthCheckConfigured):
+            svc1.is_healthy()
