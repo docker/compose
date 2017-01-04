@@ -1,4 +1,4 @@
-#!bash
+#!/bin/bash
 #
 # bash completion for docker-compose
 #
