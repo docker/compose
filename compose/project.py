@@ -104,6 +104,11 @@ class Project(object):
                     for volume_spec in service_dict.get('volumes', [])
                 ]
 
+            secrets = get_secrets(
+                service_dict['name'],
+                service_dict.get('secrets') or [],
+                config_data.secrets)
+
             project.services.append(
                 Service(
                     service_dict.pop('name'),
@@ -114,6 +119,7 @@ class Project(object):
                     links=links,
                     network_mode=network_mode,
                     volumes_from=volumes_from,
+                    secrets=secrets,
                     **service_dict)
             )
 
@@ -551,6 +557,27 @@ def get_volumes_from(project, service_dict):
                 spec.source))
 
     return [build_volume_from(vf) for vf in volumes_from]
+
+
+def get_secrets(service, service_secrets, secret_defs):
+    secrets = []
+
+    for secret in service_secrets:
+        secret_def = secret_defs.get(secret.source)
+        if not secret_def:
+            raise ConfigurationError(
+                "Service \"{service}\" uses an undefined secret \"{secret}\" "
+                .format(service=service, secret=secret.source))
+
+        if secret_def.get('external_name'):
+            log.warn("Service \"{service}\" uses secret \"{secret}\" which is external. "
+                     "External secrets are not available to containers created by "
+                     "docker-compose.".format(service=service, secret=secret.source))
+            continue
+
+        secrets.append({'secret': secret, 'file': secret_def.get('file')})
+
+    return secrets
 
 
 def warn_for_swarm_mode(client):

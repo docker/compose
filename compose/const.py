@@ -16,6 +16,8 @@ LABEL_VERSION = 'com.docker.compose.version'
 LABEL_VOLUME = 'com.docker.compose.volume'
 LABEL_CONFIG_HASH = 'com.docker.compose.config-hash'
 
+SECRETS_PATH = '/run/secrets'
+
 COMPOSEFILE_V1 = '1'
 COMPOSEFILE_V2_0 = '2.0'
 COMPOSEFILE_V2_1 = '2.1'

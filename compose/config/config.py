@@ -334,8 +334,7 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
-    secrets = load_mapping(
-        config_details.config_files, 'get_secrets', 'Secrets')
+    secrets = load_secrets(config_details.config_files, config_details.working_dir)
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
@@ -364,21 +363,11 @@ def load_mapping(config_files, get_func, entity_type):
 
             external = config.get('external')
             if external:
-                if len(config.keys()) > 1:
-                    raise ConfigurationError(
-                        '{} {} declared as external but specifies'
-                        ' additional attributes ({}). '.format(
-                            entity_type,
-                            name,
-                            ', '.join([k for k in config.keys() if k != 'external'])
-                        )
-                    )
+                validate_external(entity_type, name, config)
                 if isinstance(external, dict):
                     config['external_name'] = external.get('name')
                 else:
                     config['external_name'] = name
-
-            mapping[name] = config
 
             if 'driver_opts' in config:
                 config['driver_opts'] = build_string_dict(
@@ -387,6 +376,39 @@ def load_mapping(config_files, get_func, entity_type):
 
             if 'labels' in config:
                 config['labels'] = parse_labels(config['labels'])
+
+    return mapping
+
+
+def validate_external(entity_type, name, config):
+    if len(config.keys()) <= 1:
+        return
+
+    raise ConfigurationError(
+        "{} {} declared as external but specifies additional attributes "
+        "({}).".format(
+            entity_type, name, ', '.join(k for k in config if k != 'external')))
+
+
+def load_secrets(config_files, working_dir):
+    mapping = {}
+
+    for config_file in config_files:
+        for name, config in config_file.get_secrets().items():
+            mapping[name] = config or {}
+            if not config:
+                continue
+
+            external = config.get('external')
+            if external:
+                validate_external('Secret', name, config)
+                if isinstance(external, dict):
+                    config['external_name'] = external.get('name')
+                else:
+                    config['external_name'] = name
+
+            if 'file' in config:
+                config['file'] = expand_path(working_dir, config['file'])
 
     return mapping
 

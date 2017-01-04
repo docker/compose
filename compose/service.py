@@ -17,6 +17,7 @@ from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 
 from . import __version__
+from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
@@ -139,6 +140,7 @@ class Service(object):
         volumes_from=None,
         network_mode=None,
         networks=None,
+        secrets=None,
         **options
     ):
         self.name = name
@@ -149,6 +151,7 @@ class Service(object):
         self.volumes_from = volumes_from or []
         self.network_mode = network_mode or NetworkMode(None)
         self.networks = networks or {}
+        self.secrets = secrets or []
         self.options = options
 
     def __repr__(self):
@@ -692,9 +695,14 @@ class Service(object):
         override_options['binds'] = binds
         container_options['environment'].update(affinity)
 
-        if 'volumes' in container_options:
-            container_options['volumes'] = dict(
-                (v.internal, {}) for v in container_options['volumes'])
+        container_options['volumes'] = dict(
+            (v.internal, {}) for v in container_options.get('volumes') or {})
+
+        secret_volumes = self.get_secret_volumes()
+        if secret_volumes:
+            override_options['binds'].extend(v.repr() for v in secret_volumes)
+            container_options['volumes'].update(
+                (v.internal, {}) for v in secret_volumes)
 
         container_options['image'] = self.image_name
 
@@ -764,6 +772,15 @@ class Service(object):
         host_config['Isolation'] = options.get('isolation')
 
         return host_config
+
+    def get_secret_volumes(self):
+        def build_spec(secret):
+            target = '{}/{}'.format(
+                const.SECRETS_PATH,
+                secret['secret'].target or secret['secret'].source)
+            return VolumeSpec(secret['file'], target, 'ro')
+
+        return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
