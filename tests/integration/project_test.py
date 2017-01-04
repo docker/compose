@@ -1463,7 +1463,7 @@ class ProjectTest(DockerClientTestCase):
                     'image': 'busybox:latest',
                     'command': 'top',
                     'healthcheck': {
-                        'disabled': True
+                        'disable': True
                     },
                 },
                 'svc2': {

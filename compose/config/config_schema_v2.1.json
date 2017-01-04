@@ -258,7 +258,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "disabled": {"type": "boolean"},
+        "disable": {"type": "boolean"},
         "interval": {"type": "string"},
         "retries": {"type": "number"},
         "test": {

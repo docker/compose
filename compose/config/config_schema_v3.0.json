@@ -202,10 +202,11 @@
 
     "healthcheck": {
       "id": "#/definitions/healthcheck",
-      "type": ["object", "null"],
+      "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "interval": {"type":"string"},
-        "timeout": {"type":"string"},
+        "disable": {"type": "boolean"},
+        "interval": {"type": "string"},
         "retries": {"type": "number"},
         "test": {
           "oneOf": [
@@ -213,9 +214,8 @@
             {"type": "array", "items": {"type": "string"}}
           ]
         },
-        "disable": {"type": "boolean"}
-      },
-      "additionalProperties": false
+        "timeout": {"type": "string"}
+      }
     },
     "deployment": {
       "id": "#/definitions/deployment",
