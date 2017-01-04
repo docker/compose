@@ -21,11 +21,13 @@ from .. import mock
 from compose.cli.command import get_project
 from compose.container import Container
 from compose.project import OneOffFilter
+from compose.utils import nanoseconds_from_time_seconds
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
+from tests.integration.testcases import v3_only
 
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
@@ -283,6 +285,62 @@ class CLITestCase(DockerClientTestCase):
             },
             'networks': {},
             'volumes': {},
+        }
+
+    @v3_only()
+    def test_config_v3(self):
+        self.base_dir = 'tests/fixtures/v3-full'
+        result = self.dispatch(['config'])
+
+        assert yaml.load(result.stdout) == {
+            'version': '3.0',
+            'networks': {},
+            'volumes': {},
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'deploy': {
+                        'mode': 'replicated',
+                        'replicas': 6,
+                        'labels': ['FOO=BAR'],
+                        'update_config': {
+                            'parallelism': 3,
+                            'delay': '10s',
+                            'failure_action': 'continue',
+                            'monitor': '60s',
+                            'max_failure_ratio': 0.3,
+                        },
+                        'resources': {
+                            'limits': {
+                                'cpus': '0.001',
+                                'memory': '50M',
+                            },
+                            'reservations': {
+                                'cpus': '0.0001',
+                                'memory': '20M',
+                            },
+                        },
+                        'restart_policy': {
+                            'condition': 'on_failure',
+                            'delay': '5s',
+                            'max_attempts': 3,
+                            'window': '120s',
+                        },
+                        'placement': {
+                            'constraints': ['node=foo'],
+                        },
+                    },
+
+                    'healthcheck': {
+                        'test': 'cat /etc/passwd',
+                        'interval': 10000000000,
+                        'timeout': 1000000000,
+                        'retries': 5,
+                    },
+
+                    'stop_grace_period': '20s',
+                },
+            },
         }
 
     def test_ps(self):
@@ -792,8 +850,8 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         assert [n['Name'] for n in networks] == [network_with_label]
-
-        assert networks[0]['Labels'] == {'label_key': 'label_val'}
+        assert 'label_key' in networks[0]['Labels']
+        assert networks[0]['Labels']['label_key'] == 'label_val'
 
     @v2_1_only()
     def test_up_with_volume_labels(self):
@@ -812,8 +870,8 @@ class CLITestCase(DockerClientTestCase):
         ]
 
         assert [v['Name'] for v in volumes] == [volume_with_label]
-
-        assert volumes[0]['Labels'] == {'label_key': 'label_val'}
+        assert 'label_key' in volumes[0]['Labels']
+        assert volumes[0]['Labels']['label_key'] == 'label_val'
 
     @v2_only()
     def test_up_no_services(self):
@@ -869,6 +927,50 @@ class CLITestCase(DockerClientTestCase):
 
         assert foo_container.get('HostConfig.NetworkMode') == \
             'container:{}'.format(bar_container.id)
+
+    @v3_only()
+    def test_up_with_healthcheck(self):
+        def wait_on_health_status(container, status):
+            def condition():
+                container.inspect()
+                return container.get('State.Health.Status') == status
+
+            return wait_on_condition(condition, delay=0.5)
+
+        self.base_dir = 'tests/fixtures/healthcheck'
+        self.dispatch(['up', '-d'], None)
+
+        passes = self.project.get_service('passes')
+        passes_container = passes.containers()[0]
+
+        assert passes_container.get('Config.Healthcheck') == {
+            "Test": ["CMD-SHELL", "/bin/true"],
+            "Interval": nanoseconds_from_time_seconds(1),
+            "Timeout": nanoseconds_from_time_seconds(30 * 60),
+            "Retries": 1,
+        }
+
+        wait_on_health_status(passes_container, 'healthy')
+
+        fails = self.project.get_service('fails')
+        fails_container = fails.containers()[0]
+
+        assert fails_container.get('Config.Healthcheck') == {
+            "Test": ["CMD", "/bin/false"],
+            "Interval": nanoseconds_from_time_seconds(2.5),
+            "Retries": 2,
+        }
+
+        wait_on_health_status(fails_container, 'unhealthy')
+
+        disabled = self.project.get_service('disabled')
+        disabled_container = disabled.containers()[0]
+
+        assert disabled_container.get('Config.Healthcheck') == {
+            "Test": ["NONE"],
+        }
+
+        assert 'Health' not in disabled_container.get('State')
 
     def test_up_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'

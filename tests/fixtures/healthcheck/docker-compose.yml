@@ -1,0 +1,24 @@
+version: "3"
+services:
+  passes:
+    image: busybox
+    command: top
+    healthcheck:
+      test: "/bin/true"
+      interval: 1s
+      timeout: 30m
+      retries: 1
+
+  fails:
+    image: busybox
+    command: top
+    healthcheck:
+      test: ["CMD", "/bin/false"]
+      interval: 2.5s
+      retries: 2
+
+  disabled:
+    image: busybox
+    command: top
+    healthcheck:
+      disable: true

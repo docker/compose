@@ -15,7 +15,9 @@ from cached_property import cached_property
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..const import COMPOSEFILE_V2_1 as V2_1
+from ..const import COMPOSEFILE_V3_0 as V3_0
 from ..utils import build_string_dict
+from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
 from .environment import env_vars_from_file
 from .environment import Environment
@@ -64,6 +66,7 @@ DOCKER_CONFIG_KEYS = [
     'extra_hosts',
     'group_add',
     'hostname',
+    'healthcheck',
     'image',
     'ipc',
     'labels',
@@ -83,8 +86,10 @@ DOCKER_CONFIG_KEYS = [
     'shm_size',
     'stdin_open',
     'stop_signal',
+    'sysctls',
     'tty',
     'user',
+    'userns_mode',
     'volume_driver',
     'volumes',
     'volumes_from',
@@ -175,7 +180,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '2':
             version = V2_0
 
-        if version not in (V2_0, V2_1):
+        if version == '3':
+            version = V3_0
+
+        if version not in (V2_0, V2_1, V3_0):
             raise ConfigurationError(
                 'Version in "{}" is unsupported. {}'
                 .format(self.filename, VERSION_EXPLANATION))
@@ -326,6 +334,14 @@ def load(config_details):
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
+    services_using_deploy = [s for s in service_dicts if s.get('deploy')]
+    if services_using_deploy:
+        log.warn(
+            "Some services ({}) use the 'deploy' key, which will be ignored. "
+            "Compose does not support deploy configuration - use "
+            "`docker stack deploy` to deploy to a swarm."
+            .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
+
     return Config(main_file.version, service_dicts, volumes, networks)
 
 
@@ -433,7 +449,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment)
 
-    if config_file.version in (V2_0, V2_1):
+    if config_file.version in (V2_0, V2_1, V3_0):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -446,9 +462,10 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-
-    if config_file.version == V1:
+    elif config_file.version == V1:
         processed_config = services
+    else:
+        raise Exception("Unsupported version: {}".format(repr(config_file.version)))
 
     config_file = config_file._replace(config=processed_config)
     validate_against_config_schema(config_file)
@@ -629,10 +646,53 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
+    if 'sysctls' in service_dict:
+        service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
+
+    service_dict = process_depends_on(service_dict)
+
     for field in ['dns', 'dns_search', 'tmpfs']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
+    service_dict = process_healthcheck(service_dict, service_config.name)
+
+    return service_dict
+
+
+def process_depends_on(service_dict):
+    if 'depends_on' in service_dict and not isinstance(service_dict['depends_on'], dict):
+        service_dict['depends_on'] = dict([
+            (svc, {'condition': 'service_started'}) for svc in service_dict['depends_on']
+        ])
+    return service_dict
+
+
+def process_healthcheck(service_dict, service_name):
+    if 'healthcheck' not in service_dict:
+        return service_dict
+
+    hc = {}
+    raw = service_dict['healthcheck']
+
+    if raw.get('disable'):
+        if len(raw) > 1:
+            raise ConfigurationError(
+                'Service "{}" defines an invalid healthcheck: '
+                '"disable: true" cannot be combined with other options'
+                .format(service_name))
+        hc['test'] = ['NONE']
+    elif 'test' in raw:
+        hc['test'] = raw['test']
+
+    if 'interval' in raw:
+        hc['interval'] = parse_nanoseconds_int(raw['interval'])
+    if 'timeout' in raw:
+        hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+    if 'retries' in raw:
+        hc['retries'] = raw['retries']
+
+    service_dict['healthcheck'] = hc
     return service_dict
 
 
@@ -757,6 +817,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('ulimits', parse_ulimits)
     md.merge_mapping('networks', parse_networks)
+    md.merge_mapping('sysctls', parse_sysctls)
     md.merge_sequence('links', ServiceLink.parse)
 
     for field in ['volumes', 'devices']:
@@ -831,11 +892,11 @@ def merge_environment(base, override):
     return env
 
 
-def split_label(label):
-    if '=' in label:
-        return label.split('=', 1)
+def split_kv(kvpair):
+    if '=' in kvpair:
+        return kvpair.split('=', 1)
     else:
-        return label, ''
+        return kvpair, ''
 
 
 def parse_dict_or_list(split_func, type_name, arguments):
@@ -856,8 +917,9 @@ def parse_dict_or_list(split_func, type_name, arguments):
 
 parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
 parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
-parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
+parse_labels = functools.partial(parse_dict_or_list, split_kv, 'labels')
 parse_networks = functools.partial(parse_dict_or_list, lambda k: (k, None), 'networks')
+parse_sysctls = functools.partial(parse_dict_or_list, split_kv, 'sysctls')
 
 
 def parse_ulimits(ulimits):

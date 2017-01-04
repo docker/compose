@@ -4,10 +4,14 @@ from __future__ import unicode_literals
 import logging
 
 from docker.errors import NotFound
-from docker.utils import create_ipam_config
-from docker.utils import create_ipam_pool
+from docker.types import IPAMConfig
+from docker.types import IPAMPool
+from docker.utils import version_gte
+from docker.utils import version_lt
 
 from .config import ConfigurationError
+from .const import LABEL_NETWORK
+from .const import LABEL_PROJECT
 
 
 log = logging.getLogger(__name__)
@@ -71,7 +75,8 @@ class Network(object):
                 ipam=self.ipam,
                 internal=self.internal,
                 enable_ipv6=self.enable_ipv6,
-                labels=self.labels,
+                labels=self._labels,
+                attachable=version_gte(self.client._version, '1.24') or None,
             )
 
     def remove(self):
@@ -91,15 +96,26 @@ class Network(object):
             return self.external_name
         return '{0}_{1}'.format(self.project, self.name)
 
+    @property
+    def _labels(self):
+        if version_lt(self.client._version, '1.23'):
+            return None
+        labels = self.labels.copy() if self.labels else {}
+        labels.update({
+            LABEL_PROJECT: self.project,
+            LABEL_NETWORK: self.name,
+        })
+        return labels
+
 
 def create_ipam_config_from_dict(ipam_dict):
     if not ipam_dict:
         return None
 
-    return create_ipam_config(
+    return IPAMConfig(
         driver=ipam_dict.get('driver'),
         pool_configs=[
-            create_ipam_pool(
+            IPAMPool(
                 subnet=config.get('subnet'),
                 iprange=config.get('ip_range'),
                 gateway=config.get('gateway'),

@@ -32,12 +32,11 @@ def stream_output(output, stream):
         if not image_id:
             continue
 
-        if image_id in lines:
-            diff = len(lines) - lines[image_id]
-        else:
+        if image_id not in lines:
             lines[image_id] = len(lines)
             stream.write("\n")
-            diff = 0
+
+        diff = len(lines) - lines[image_id]
 
         # move cursor up `diff` rows
         stream.write("%c[%dA" % (27, diff))

@@ -18,11 +18,13 @@ from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.config import V2_1
+from compose.config.config import V3_0
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
+from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
 from tests import unittest
 
@@ -156,8 +158,13 @@ class ConfigTest(unittest.TestCase):
         for version in ['2', '2.0']:
             cfg = config.load(build_config_details({'version': version}))
             assert cfg.version == V2_0
+
         cfg = config.load(build_config_details({'version': '2.1'}))
         assert cfg.version == V2_1
+
+        for version in ['3', '3.0']:
+            cfg = config.load(build_config_details({'version': version}))
+            assert cfg.version == V3_0
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -913,7 +920,10 @@ class ConfigTest(unittest.TestCase):
                 'build': {'context': os.path.abspath('/')},
                 'image': 'example/web',
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
-                'depends_on': ['db', 'other'],
+                'depends_on': {
+                    'db': {'condition': 'service_started'},
+                    'other': {'condition': 'service_started'},
+                },
             },
             {
                 'name': 'db',
@@ -3048,7 +3058,9 @@ class ExtendsTest(unittest.TestCase):
                 image: example
         """)
         services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
-        assert service_sort(services)[2]['depends_on'] == ['other']
+        assert service_sort(services)[2]['depends_on'] == {
+            'other': {'condition': 'service_started'}
+        }
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
@@ -3163,6 +3175,54 @@ class BuildPathTest(unittest.TestCase):
                     'invalidurl': {'build': invalid_url},
                 }, '.', None))
             assert 'build path' in exc.exconly()
+
+
+class HealthcheckTest(unittest.TestCase):
+    def test_healthcheck(self):
+        service_dict = make_service_dict(
+            'test',
+            {'healthcheck': {
+                'test': ['CMD', 'true'],
+                'interval': '1s',
+                'timeout': '1m',
+                'retries': 3,
+            }},
+            '.',
+        )
+
+        assert service_dict['healthcheck'] == {
+            'test': ['CMD', 'true'],
+            'interval': nanoseconds_from_time_seconds(1),
+            'timeout': nanoseconds_from_time_seconds(60),
+            'retries': 3,
+        }
+
+    def test_disable(self):
+        service_dict = make_service_dict(
+            'test',
+            {'healthcheck': {
+                'disable': True,
+            }},
+            '.',
+        )
+
+        assert service_dict['healthcheck'] == {
+            'test': ['NONE'],
+        }
+
+    def test_disable_with_other_config_is_invalid(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            make_service_dict(
+                'invalid-healthcheck',
+                {'healthcheck': {
+                    'disable': True,
+                    'interval': '1s',
+                }},
+                '.',
+            )
+
+        assert 'invalid-healthcheck' in excinfo.exconly()
+        assert 'disable' in excinfo.exconly()
 
 
 class GetDefaultConfigFilesTestCase(unittest.TestCase):

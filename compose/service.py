@@ -11,7 +11,7 @@ import enum
 import six
 from docker.errors import APIError
 from docker.errors import NotFound
-from docker.utils import LogConfig
+from docker.types import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 
@@ -28,12 +28,15 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
+from .errors import HealthCheckFailed
+from .errors import NoHealthCheckConfigured
 from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+from .utils import parse_seconds_float
 
 
 log = logging.getLogger(__name__)
@@ -63,8 +66,13 @@ DOCKER_START_KEYS = [
     'restart',
     'security_opt',
     'shm_size',
+    'sysctls',
+    'userns_mode',
     'volumes_from',
 ]
+
+CONDITION_STARTED = 'service_started'
+CONDITION_HEALTHY = 'service_healthy'
 
 
 class BuildError(Exception):
@@ -169,7 +177,7 @@ class Service(object):
             self.start_container_if_stopped(c, **options)
         return containers
 
-    def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
+    def scale(self, desired_num, timeout=None):
         """
         Adjusts the number of containers to the specified number and ensures
         they are running.
@@ -196,7 +204,7 @@ class Service(object):
             return container
 
         def stop_and_remove(container):
-            container.stop(timeout=timeout)
+            container.stop(timeout=self.stop_timeout(timeout))
             container.remove()
 
         running_containers = self.containers(stopped=False)
@@ -374,7 +382,7 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 timeout=DEFAULT_TIMEOUT,
+                                 timeout=None,
                                  detached=False,
                                  start=True):
         (action, containers) = plan
@@ -421,7 +429,7 @@ class Service(object):
     def recreate_container(
             self,
             container,
-            timeout=DEFAULT_TIMEOUT,
+            timeout=None,
             attach_logs=False,
             start_new_container=True):
         """Recreate a container.
@@ -432,7 +440,7 @@ class Service(object):
         """
         log.info("Recreating %s" % container.name)
 
-        container.stop(timeout=timeout)
+        container.stop(timeout=self.stop_timeout(timeout))
         container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container,
@@ -445,6 +453,14 @@ class Service(object):
             self.start_container(new_container)
         container.remove()
         return new_container
+
+    def stop_timeout(self, timeout):
+        if timeout is not None:
+            return timeout
+        timeout = parse_seconds_float(self.options.get('stop_grace_period'))
+        if timeout is not None:
+            return timeout
+        return DEFAULT_TIMEOUT
 
     def start_container_if_stopped(self, container, attach_logs=False, quiet=False):
         if not container.is_running:
@@ -483,10 +499,10 @@ class Service(object):
                 link_local_ips=netdefs.get('link_local_ips', None),
             )
 
-    def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
+    def remove_duplicate_containers(self, timeout=None):
         for c in self.duplicate_containers():
             log.info('Removing %s' % c.name)
-            c.stop(timeout=timeout)
+            c.stop(timeout=self.stop_timeout(timeout))
             c.remove()
 
     def duplicate_containers(self):
@@ -522,10 +538,38 @@ class Service(object):
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name
-        return (self.get_linked_service_names() +
-                self.get_volumes_from_names() +
-                ([net_name] if net_name else []) +
-                self.options.get('depends_on', []))
+        return (
+            self.get_linked_service_names() +
+            self.get_volumes_from_names() +
+            ([net_name] if net_name else []) +
+            list(self.options.get('depends_on', {}).keys())
+        )
+
+    def get_dependency_configs(self):
+        net_name = self.network_mode.service_name
+        configs = dict(
+            [(name, None) for name in self.get_linked_service_names()]
+        )
+        configs.update(dict(
+            [(name, None) for name in self.get_volumes_from_names()]
+        ))
+        configs.update({net_name: None} if net_name else {})
+        configs.update(self.options.get('depends_on', {}))
+        for svc, config in self.options.get('depends_on', {}).items():
+            if config['condition'] == CONDITION_STARTED:
+                configs[svc] = lambda s: True
+            elif config['condition'] == CONDITION_HEALTHY:
+                configs[svc] = lambda s: s.is_healthy()
+            else:
+                # The config schema already prevents this, but it might be
+                # bypassed if Compose is called programmatically.
+                raise ValueError(
+                    'depends_on condition "{}" is invalid.'.format(
+                        config['condition']
+                    )
+                )
+
+        return configs
 
     def get_linked_service_names(self):
         return [service.name for (service, _) in self.links]
@@ -708,10 +752,12 @@ class Service(object):
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
+            sysctls=options.get('sysctls'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
             mem_swappiness=options.get('mem_swappiness'),
-            group_add=options.get('group_add')
+            group_add=options.get('group_add'),
+            userns_mode=options.get('userns_mode')
         )
 
         # TODO: Add as an argument to create_host_config once it's supported
@@ -857,6 +903,24 @@ class Service(object):
                 raise
             else:
                 log.error(six.text_type(e))
+
+    def is_healthy(self):
+        """ Check that all containers for this service report healthy.
+            Returns false if at least one healthcheck is pending.
+            If an unhealthy container is detected, raise a HealthCheckFailed
+            exception.
+        """
+        result = True
+        for ctnr in self.containers():
+            ctnr.inspect()
+            status = ctnr.get('State.Health.Status')
+            if status is None:
+                raise NoHealthCheckConfigured(self.name)
+            elif status == 'starting':
+                result = False
+            elif status == 'unhealthy':
+                raise HealthCheckFailed(ctnr.short_id)
+        return result
 
 
 def short_id_alias_exists(container, network):

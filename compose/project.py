@@ -14,7 +14,6 @@ from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
 from .config.sort_services import get_service_name_from_network_mode
-from .const import DEFAULT_TIMEOUT
 from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
@@ -228,7 +227,10 @@ class Project(object):
         services = self.get_services(service_names)
 
         def get_deps(service):
-            return {self.get_service(dep) for dep in service.get_dependency_names()}
+            return {
+                (self.get_service(dep), config)
+                for dep, config in service.get_dependency_configs().items()
+            }
 
         parallel.parallel_execute(
             services,
@@ -244,13 +246,13 @@ class Project(object):
 
         def get_deps(container):
             # actually returning inversed dependencies
-            return {other for other in containers
+            return {(other, None) for other in containers
                     if container.service in
                     self.get_service(other.service).get_dependency_names()}
 
         parallel.parallel_execute(
             containers,
-            operator.methodcaller('stop', **options),
+            self.build_container_operation_with_timeout_func('stop', options),
             operator.attrgetter('name'),
             'Stopping',
             get_deps)
@@ -291,7 +293,12 @@ class Project(object):
 
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
-        parallel.parallel_restart(containers, options)
+
+        parallel.parallel_execute(
+            containers,
+            self.build_container_operation_with_timeout_func('restart', options),
+            operator.attrgetter('name'),
+            'Restarting')
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False):
@@ -365,7 +372,7 @@ class Project(object):
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
            do_build=BuildAction.none,
-           timeout=DEFAULT_TIMEOUT,
+           timeout=None,
            detached=False,
            remove_orphans=False):
 
@@ -390,7 +397,10 @@ class Project(object):
             )
 
         def get_deps(service):
-            return {self.get_service(dep) for dep in service.get_dependency_names()}
+            return {
+                (self.get_service(dep), config)
+                for dep, config in service.get_dependency_configs().items()
+            }
 
         results, errors = parallel.parallel_execute(
             services,
@@ -506,6 +516,14 @@ class Project(object):
         dep_services.append(service)
         return acc + dep_services
 
+    def build_container_operation_with_timeout_func(self, operation, options):
+        def container_operation_with_timeout(container):
+            if options.get('timeout') is None:
+                service = self.get_service(container.service)
+                options['timeout'] = service.stop_timeout(None)
+            return getattr(container, operation)(**options)
+        return container_operation_with_timeout
+
 
 def get_volumes_from(project, service_dict):
     volumes_from = service_dict.pop('volumes_from', None)
@@ -547,9 +565,7 @@ def warn_for_swarm_mode(client):
             "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
             "All containers will be scheduled on the current node.\n\n"
             "To deploy your application across the swarm, "
-            "use the bundle feature of the Docker experimental build.\n\n"
-            "More info:\n"
-            "https://docs.docker.com/compose/bundles\n"
+            "use `docker stack deploy`.\n"
         )
 
 

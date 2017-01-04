@@ -1,6 +1,46 @@
 Change log
 ==========
 
+1.10.0 (2017-01-18)
+-------------------
+
+### New Features
+
+#### Compose file version 3.0
+
+- Introduced version 3.0 of the `docker-compose.yml` specification. This
+  version requires to be used with Docker Engine 1.13 or above and is
+  specifically designed to work with the `docker stack` commands.
+
+  - Added support for the `stop_grace_period` option in service definitions.
+
+#### Compose file version 2.1 and up
+
+- Healthcheck configuration can now be done in the service definition using
+  the `healthcheck` parameter
+
+- Containers dependencies can now be set up to wait on positive healthchecks
+  when declared using `depends_on`. See the documentation for the updated
+  syntax.
+  **Note:** This feature will not be ported to version 3 Compose files.
+
+- Added support for the `sysctls` parameter in service definitions
+
+- Added support for the `userns_mode` parameter in service definitions
+
+- Compose now adds identifying labels to networks and volumes it creates
+
+### Bugfixes
+
+- Colored output now works properly on Windows.
+
+- Fixed a bug where docker-compose run would fail to set up link aliases
+  in interactive mode on Windows.
+
+- Networks created by Compose are now always made attachable
+  (Compose files v2.1 and up).
+
+
 1.9.0 (2016-11-16)
 -----------------
 
@@ -814,7 +854,7 @@ Fig has been renamed to Docker Compose, or just Compose for short. This has seve
 
 - The command you type is now `docker-compose`, not `fig`.
 - You should rename your fig.yml to docker-compose.yml.
-- If you’re installing via PyPi, the package is now `docker-compose`, so install it with `pip install docker-compose`.
+- If you’re installing via PyPI, the package is now `docker-compose`, so install it with `pip install docker-compose`.
 
 Besides that, there’s a lot of new stuff in this release:
 

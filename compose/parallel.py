@@ -165,13 +165,14 @@ def feed_queue(objects, func, get_deps, results, state):
     for obj in pending:
         deps = get_deps(obj)
 
-        if any(dep in state.failed for dep in deps):
+        if any(dep[0] in state.failed for dep in deps):
             log.debug('{} has upstream errors - not processing'.format(obj))
             results.put((obj, None, UpstreamError()))
             state.failed.add(obj)
         elif all(
-            dep not in objects or dep in state.finished
-            for dep in deps
+            dep not in objects or (
+                dep in state.finished and (not ready_check or ready_check(dep))
+            ) for dep, ready_check in deps
         ):
             log.debug('Starting producer thread for {}'.format(obj))
             t = Thread(target=producer, args=(obj, func, results))
@@ -248,7 +249,3 @@ def parallel_unpause(containers, options):
 
 def parallel_kill(containers, options):
     parallel_operation(containers, 'kill', options, 'Killing')
-
-
-def parallel_restart(containers, options):
-    parallel_operation(containers, 'restart', options, 'Restarting')

@@ -25,7 +25,7 @@ deps = {
 
 
 def get_deps(obj):
-    return deps[obj]
+    return [(dep, None) for dep in deps[obj]]
 
 
 def test_parallel_execute():
