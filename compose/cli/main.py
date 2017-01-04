@@ -417,26 +417,7 @@ class TopLevelCommand(object):
         tty = not options["-T"]
 
         if IS_WINDOWS_PLATFORM and not detach:
-            args = ["exec"]
-
-            if options["-d"]:
-                args += ["--detach"]
-            else:
-                args += ["--interactive"]
-
-            if not options["-T"]:
-                args += ["--tty"]
-
-            if options["--privileged"]:
-                args += ["--privileged"]
-
-            if options["--user"]:
-                args += ["--user", options["--user"]]
-
-            args += [container.id]
-            args += command
-
-            sys.exit(call_docker(args))
+            exec_command_docker(container, options, command)
 
         if tty and not os.isatty(sys.stdin.fileno()):
             raise UserError("The input device is not a TTY, try using -T flag")
@@ -1081,3 +1062,26 @@ def call_docker(args):
     log.debug(" ".join(map(pipes.quote, args)))
 
     return subprocess.call(args)
+
+
+def exec_command_docker(container, options, command):
+    args = ["exec"]
+
+    if options["-d"]:
+        args += ["--detach"]
+    else:
+        args += ["--interactive"]
+
+    if not options["-T"]:
+        args += ["--tty"]
+
+    if options["--privileged"]:
+        args += ["--privileged"]
+
+    if options["--user"]:
+        args += ["--user", options["--user"]]
+
+    args += [container.id]
+    args += command
+
+    sys.exit(call_docker(args))
