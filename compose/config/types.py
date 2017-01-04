@@ -10,8 +10,8 @@ from collections import namedtuple
 
 import six
 
-from compose.config.config import V1
-from compose.config.errors import ConfigurationError
+from ..const import COMPOSEFILE_V1 as V1
+from .errors import ConfigurationError
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import splitdrive
 
@@ -234,3 +234,22 @@ class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
     @property
     def merge_field(self):
         return self.alias
+
+
+class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
+
+    @classmethod
+    def parse(cls, spec):
+        if isinstance(spec, six.string_types):
+            return cls(spec, None, None, None, None)
+        return cls(
+            spec.get('source'),
+            spec.get('target'),
+            spec.get('uid'),
+            spec.get('gid'),
+            spec.get('mode'),
+        )
+
+    @property
+    def merge_field(self):
+        return self.source

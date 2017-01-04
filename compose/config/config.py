@@ -12,10 +12,12 @@ import six
 import yaml
 from cached_property import cached_property
 
+from . import types
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..const import COMPOSEFILE_V2_1 as V2_1
 from ..const import COMPOSEFILE_V3_0 as V3_0
+from ..const import COMPOSEFILE_V3_1 as V3_1
 from ..utils import build_string_dict
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
@@ -82,6 +84,7 @@ DOCKER_CONFIG_KEYS = [
     'privileged',
     'read_only',
     'restart',
+    'secrets',
     'security_opt',
     'shm_size',
     'stdin_open',
@@ -202,8 +205,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_networks(self):
         return {} if self.version == V1 else self.config.get('networks', {})
 
+    def get_secrets(self):
+        return {} if self.version < V3_1 else self.config.get('secrets', {})
 
-class Config(namedtuple('_Config', 'version services volumes networks')):
+
+class Config(namedtuple('_Config', 'version services volumes networks secrets')):
     """
     :param version: configuration version
     :type  version: int
@@ -328,6 +334,8 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
+    secrets = load_mapping(
+        config_details.config_files, 'get_secrets', 'Secrets')
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
@@ -342,7 +350,7 @@ def load(config_details):
             "`docker stack deploy` to deploy to a swarm."
             .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
 
-    return Config(main_file.version, service_dicts, volumes, networks)
+    return Config(main_file.version, service_dicts, volumes, networks, secrets)
 
 
 def load_mapping(config_files, get_func, entity_type):
@@ -820,6 +828,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('sysctls', parse_sysctls)
     md.merge_mapping('depends_on', parse_depends_on)
     md.merge_sequence('links', ServiceLink.parse)
+    md.merge_sequence('secrets', types.ServiceSecret.parse)
 
     for field in ['volumes', 'devices']:
         md.merge_field(field, merge_path_mappings)

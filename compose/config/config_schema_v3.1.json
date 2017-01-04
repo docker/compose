@@ -46,7 +46,7 @@
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9._-]+$": {
-          "$ref": "#/definitions/secrets"
+          "$ref": "#/definitions/secret"
         }
       },
       "additionalProperties": false
@@ -188,8 +188,8 @@
                 "properties": {
                   "source": {"type": "string"},
                   "target": {"type": "string"},
-                  "uid": {"type": "number"},
-                  "gid": {"type": "number"},
+                  "uid": {"type": "string"},
+                  "gid": {"type": "string"},
                   "mode": {"type": "number"}
                 }
               }
