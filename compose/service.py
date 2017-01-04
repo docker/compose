@@ -10,6 +10,7 @@ from operator import attrgetter
 import enum
 import six
 from docker.errors import APIError
+from docker.errors import ImageNotFound
 from docker.errors import NotFound
 from docker.types import LogConfig
 from docker.utils.ports import build_port_bindings
@@ -323,11 +324,8 @@ class Service(object):
     def image(self):
         try:
             return self.client.inspect_image(self.image_name)
-        except APIError as e:
-            if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                raise NoSuchImageError("Image '{}' not found".format(self.image_name))
-            else:
-                raise
+        except ImageNotFound:
+            raise NoSuchImageError("Image '{}' not found".format(self.image_name))
 
     @property
     def image_name(self):
