@@ -675,7 +675,7 @@ def process_healthcheck(service_dict, service_name):
     hc = {}
     raw = service_dict['healthcheck']
 
-    if raw.get('disable') or raw.get('disabled'):
+    if raw.get('disable'):
         if len(raw) > 1:
             raise ConfigurationError(
                 'Service "{}" defines an invalid healthcheck: '
