@@ -135,7 +135,7 @@ high performance container runtime
 				ctx = log.WithModule(ctx, "execution")
 				ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
 			default:
-				fmt.Println("Unknown type: %#v", info.Server)
+				fmt.Printf("Unknown type: %#v\n", info.Server)
 			}
 			return handler(ctx, req)
 		}
