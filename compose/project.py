@@ -106,7 +106,7 @@ class Project(object):
 
             secrets = get_secrets(
                 service_dict['name'],
-                service_dict.get('secrets') or [],
+                service_dict.pop('secrets', None) or [],
                 config_data.secrets)
 
             project.services.append(
