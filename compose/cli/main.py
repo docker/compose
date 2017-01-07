@@ -564,6 +564,7 @@ class TopLevelCommand(object):
 
         Options:
             -q    Only display IDs
+            -a   Show not started containers (default shows running and stopped)
         """
         containers = sorted(
             self.project.containers(service_names=options['SERVICE'], stopped=True) +
@@ -591,6 +592,12 @@ class TopLevelCommand(object):
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
+            if options['-a']:
+                not_started = [s for s in self.project.get_services()
+                               if s.get_container_name(1) not in [c.name for c in containers]]
+                for service in not_started:
+                    rows.append([service.get_container_name(1), '', 'Not started', ''])
+
             print(Formatter().table(headers, rows))
 
     def pull(self, options):

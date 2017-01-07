@@ -343,10 +343,15 @@ class CLITestCase(DockerClientTestCase):
             },
         }
 
+    def test_ps_not_started(self):
+        result = self.dispatch(['ps', '-a'])
+        assert 1 == result.stdout.count('simplecomposefile_simple_1')
+        self.assertIn('Not started', result.stdout)
+
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
-        assert 'simplecomposefile_simple_1' in result.stdout
+        assert 1 == result.stdout.count('simplecomposefile_simple_1')
 
     def test_ps_default_composefile(self):
         self.base_dir = 'tests/fixtures/multiple-composefiles'
