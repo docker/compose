@@ -127,7 +127,10 @@ class CLITestCase(unittest.TestCase):
         _, _, call_kwargs = mock_run_operation.mock_calls[0]
         assert call_kwargs['logs'] is False
 
-    def test_run_service_with_restart_always(self):
+    @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
+    @mock.patch('compose.cli.main.RunOperation', autospec=True)
+    @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    def test_run_service_with_restart_always(self, mock_pseudo_terminal, mock_run_operation):
         mock_client = mock.create_autospec(docker.APIClient)
 
         project = Project.from_config(
@@ -164,21 +167,22 @@ class CLITestCase(unittest.TestCase):
         )
 
         command = TopLevelCommand(project)
-        command.run({
-            'SERVICE': 'service',
-            'COMMAND': None,
-            '-e': [],
-            '--user': None,
-            '--no-deps': None,
-            '-d': True,
-            '-T': None,
-            '--entrypoint': None,
-            '--service-ports': None,
-            '--publish': [],
-            '--rm': True,
-            '--name': None,
-            '--workdir': None,
-        })
+        with pytest.raises(SystemExit):
+            command.run({
+                'SERVICE': 'service',
+                'COMMAND': None,
+                '-e': [],
+                '--user': None,
+                '--no-deps': None,
+                '-d': False,
+                '-T': None,
+                '--entrypoint': None,
+                '--service-ports': None,
+                '--publish': [],
+                '--rm': True,
+                '--name': None,
+                '--workdir': None,
+            })
 
         self.assertFalse(
             mock_client.create_host_config.call_args[1].get('restart_policy')
@@ -207,5 +211,31 @@ class CLITestCase(unittest.TestCase):
                 '--service-ports': True,
                 '--publish': ['80:80'],
                 '--rm': None,
+                '--name': None,
+            })
+
+    def test_command_run_detatched_remove_together(self):
+        project = Project.from_config(
+            name='composetest',
+            client=None,
+            config_data=build_config({
+                'service': {'image': 'busybox'},
+            }),
+        )
+        command = TopLevelCommand(project)
+
+        with self.assertRaises(UserError):
+            command.run({
+                'SERVICE': 'service',
+                'COMMAND': None,
+                '-e': [],
+                '--user': None,
+                '--no-deps': None,
+                '-d': True,
+                '-T': None,
+                '--entrypoint': None,
+                '--service-ports': False,
+                '--publish': [],
+                '--rm': True,
                 '--name': None,
             })

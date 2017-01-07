@@ -700,6 +700,11 @@ class TopLevelCommand(object):
                 'can not be used together'
             )
 
+        if options['-d'] and options['--rm']:
+            raise UserError(
+                'Conflicting options: --rm and -d '
+            )
+
         if options['COMMAND'] is not None:
             command = [options['COMMAND']] + options['ARGS']
         elif options['--entrypoint'] is not None:
