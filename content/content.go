@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/docker/containerd/log"
-	"github.com/docker/distribution/digest"
 	"github.com/nightlyone/lockfile"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -191,7 +191,7 @@ func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
 		fp:       fp,
 		lock:     lock,
 		path:     path,
-		digester: digest.Canonical.New(),
+		digester: digest.Canonical.Digester(),
 	}, nil
 }
 
@@ -205,7 +205,7 @@ func (cs *ContentStore) Resume(ref string) (*ContentWriter, error) {
 		return nil, err
 	}
 
-	digester := digest.Canonical.New()
+	digester := digest.Canonical.Digester()
 
 	// slow slow slow!!, send to goroutine or use resumable hashes
 	fp, err := os.Open(data)

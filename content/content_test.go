@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 )
 
 func TestContentWriter(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/distribution/digest"
 	"github.com/nightlyone/lockfile"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
