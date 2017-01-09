@@ -143,7 +143,7 @@ Bug Fixes
 - Fixed a bug in Windows environment where volume mappings of the
   host's root directory would be parsed incorrectly.
 
-- Fixed a bug where `docker-compose config` would ouput an invalid
+- Fixed a bug where `docker-compose config` would output an invalid
   Compose file if external networks were specified.
 
 - Fixed an issue where unset buildargs would be assigned a string
