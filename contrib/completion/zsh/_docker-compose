@@ -115,7 +115,12 @@ __docker-compose_get_services() {
         if [[ ${services[@]} == *"${line[${begin[CONTAINER ID]},${end[CONTAINER ID]}]%% ##}"* ]]; then
             names=(${(ps:,:)${${line[${begin[NAMES]},-1]}%% *}})
             for name in $names; do
-                s="${${name%_*}#*_}:${(l:15:: :::)${${line[${begin[CREATED]},${end[CREATED]}]/ ago/}%% ##}}"
+                local last=${name##*_}
+                local dir=${PWD##*/}
+                if [ ! -z "${last##*[!0-9]*}" ] && [ "${name%%_*}" = "$dir" ] ; then
+                    name=${${name%_*}#*_}
+                fi
+                s="${name}:${(l:15:: :::)${${line[${begin[CREATED]},${end[CREATED]}]/ ago/}%% ##}}"
                 s="$s, ${line[${begin[CONTAINER ID]},${end[CONTAINER ID]}]%% ##}"
                 s="$s, ${${${line[${begin[IMAGE]},${end[IMAGE]}]}/:/\\:}%% ##}"
                 if [[ ${line[${begin[STATUS]},${end[STATUS]}]} = Exit* ]]; then
