@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
