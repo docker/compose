@@ -53,7 +53,9 @@ if sys.version_info[:2] < (3, 4):
     tests_require.append('mock >= 1.0.1')
 
 extras_require = {
-    ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2']
+    ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
+    ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5'],
+    ':python_version < "3.3"': ['ipaddress >= 1.0.16'],
 }
 
 
@@ -64,8 +66,8 @@ try:
                 install_requires.extend(value)
 except Exception:
     logging.getLogger(__name__).exception(
-        'Something went wrong calculating platform specific dependencies, so '
-        "you're getting them all!"
+        'Failed to compute platform dependencies. All dependencies will be '
+        'installed as a result.'
     )
     for key, value in extras_require.items():
         if key.startswith(':'):
