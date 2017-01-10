@@ -55,7 +55,7 @@ high performance container runtime
 		},
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "default runtime for execution",
+			Usage: "runtime for execution",
 			Value: "runc",
 		},
 		cli.StringFlag{
@@ -103,13 +103,18 @@ high performance container runtime
 			return err
 		}
 
-		var executor execution.Executor
-		switch context.GlobalString("runtime") {
+		var (
+			executor execution.Executor
+			runtime  = context.GlobalString("runtime")
+		)
+		switch runtime {
 		case "runc":
 			executor, err = oci.New(context.GlobalString("root"))
 			if err != nil {
 				return err
 			}
+		default:
+			return fmt.Errorf("oci: runtime %q not implemented", runtime)
 		}
 
 		// Get events publisher
