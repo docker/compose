@@ -12,8 +12,6 @@ Change log
   version requires to be used with Docker Engine 1.13 or above and is
   specifically designed to work with the `docker stack` commands.
 
-  - Added support for the `stop_grace_period` option in service definitions.
-
 #### Compose file version 2.1 and up
 
 - Healthcheck configuration can now be done in the service definition using
@@ -30,6 +28,10 @@ Change log
 
 - Compose now adds identifying labels to networks and volumes it creates
 
+#### Compose file version 2.0 and up
+
+- Added support for the `stop_grace_period` option in service definitions.
+
 ### Bugfixes
 
 - Colored output now works properly on Windows.
@@ -39,6 +41,12 @@ Change log
 
 - Networks created by Compose are now always made attachable
   (Compose files v2.1 and up).
+
+- Fixed a bug where falsy values of `COMPOSE_CONVERT_WINDOWS_PATHS`
+  (`0`, `false`, empty value) were being interpreted as true.
+
+- Fixed a bug where forward slashes in some .dockerignore patterns weren't
+  being parsed correctly on Windows
 
 
 1.9.0 (2016-11-16)
