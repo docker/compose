@@ -182,7 +182,7 @@ __docker-compose_commands() {
 }
 
 __docker-compose_subcommand() {
-    local opts_help opts_force_recreate opts_no_recreate opts_no_build opts_remove_orphans opts_timeout opts_no_color opts_no_deps
+    local opts_help opts_force_recreate opts_no_recreate opts_no_build opts_remove_orphans opts_timeout opts_no_color opts_no_deps opts_no_stream
 
     opts_help='(: -)--help[Print usage]'
     opts_force_recreate="(--no-recreate)--force-recreate[Recreate containers even if their configuration and image haven't changed. Incompatible with --no-recreate.]"
@@ -192,6 +192,7 @@ __docker-compose_subcommand() {
     opts_timeout=('(-t --timeout)'{-t,--timeout}"[Specify a shutdown timeout in seconds. (default: 10)]:seconds: ")
     opts_no_color='--no-color[Produce monochrome output.]'
     opts_no_deps="--no-deps[Don't start linked services.]"
+    opts_no_stream="--no-stream[Disable streaming stats and only pull the first result.]"
 
     integer ret=1
 
@@ -334,6 +335,12 @@ __docker-compose_subcommand() {
             _arguments \
                 $opts_help \
                 '*:stopped services:__docker-compose_stoppedservices' && ret=0
+            ;;
+         (stats)
+            _arguments \
+                $opts_help \
+                $opts_no_stream \
+                '*:running services:__docker-compose_runningservices' && ret=0
             ;;
         (stop|restart)
             _arguments \

@@ -29,6 +29,23 @@ class Formatter(object):
 
         return table.draw()
 
+    def clear(self):
+        return u"\u001b[2J" + u"\u001b[0;0H"
+
+    def percentage(self, n):
+        return str(round(n, 2)) + "%"
+
+    def sizeof(self, num, suffix='B', binary=True):
+        units = ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi'] if binary \
+            else ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']
+        base = 1024.0 if binary else 1000.0
+        for unit in units:
+            if abs(num) < base:
+                return "%3.2f %s%s" % (num, unit, suffix)
+            num /= base
+        lastUnit = 'Yi' if binary else 'Y'
+        return "%.2f %s%s" % (num, lastUnit, suffix)
+
 
 class ConsoleWarningFormatter(logging.Formatter):
     """A logging.Formatter which prints WARNING and ERROR messages with

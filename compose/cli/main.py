@@ -49,7 +49,6 @@ from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import yesno
 
-
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
 
@@ -190,6 +189,7 @@ class TopLevelCommand(object):
       run                Run a one-off command
       scale              Set number of containers for a service
       start              Start services
+      stats              Display a live stream of container(s) resource usage statistics
       stop               Stop services
       unpause            Unpause services
       up                 Create and start containers
@@ -373,6 +373,7 @@ class TopLevelCommand(object):
         Options:
             --json      Output events as a stream of json objects
         """
+
         def format_event(event):
             attributes = ["%s=%s" % item for item in event['attributes'].items()]
             return ("{time} {type} {action} {id} ({attrs})").format(
@@ -878,6 +879,38 @@ class TopLevelCommand(object):
             print(__version__)
         else:
             print(get_version_info('full'))
+
+    def stats(self, options):
+        """
+        Display a live stream of container(s) resource usage statistics.
+
+        Usage: stats [options] [SERVICE...]
+
+        Options:
+            --no-stream   Disable streaming stats and only pull the first result
+        """
+
+        stream = not options['--no-stream']
+        headers = ["Container", "Cpu %", "Mem Usage / Limit", "Net I/O", "Block I/O"]
+
+        stats_gen = self.project.generate_containers_stats(stream=stream,
+                                                           service_names=options['SERVICE'])
+        f = Formatter()
+        for containers_stats in stats_gen:
+            rows = []
+            for container_stats in containers_stats:
+                (net_i, net_o) = container_stats.calculate_net_io()
+                (block_i, block_o) = container_stats.calculate_block_io()
+                rows.append([container_stats.container.name,
+                             f.percentage(container_stats.calculate_cpu_percent_unix()),
+                             f.sizeof(container_stats.calculate_mem_usage()) + " / " + f.sizeof(
+                                 container_stats.calculate_mem_limit()),
+                             f.sizeof(net_i, binary=False) + " / " + f.sizeof(net_o, binary=False),
+                             f.sizeof(block_i, binary=False) + " / " + f.sizeof(block_o, binary=False)
+                             ])
+            if stream:
+                print(f.clear(), )
+            print(f.table(headers, rows), )
 
 
 def convergence_strategy_from_opts(options):

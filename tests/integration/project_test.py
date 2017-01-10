@@ -24,6 +24,7 @@ from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
+from compose.stats import Stats
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 
@@ -1489,3 +1490,30 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         with pytest.raises(NoHealthCheckConfigured):
             svc1.is_healthy()
+
+    def test_generate_containers_stats(self):
+        web = self.create_service('web')
+        db = self.create_service('db')
+        project = Project('composetest', [web, db], self.client)
+        project.up()
+
+        containers_stats_gen = project.generate_containers_stats()
+        containers_stats = containers_stats_gen.next()
+
+        self.assertEqual(len(containers_stats), 2)
+        self.assertIn('composetest_web_1', [s.container.name for s in containers_stats])
+        self.assertIn('composetest_db_1', [s.container.name for s in containers_stats])
+        for stats in containers_stats:
+            self.assertTrue(stats.container)
+            self.assertIsInstance(stats, Stats)
+            self.assertGreaterEqual(stats.calculate_cpu_percent_unix(), 0)
+            self.assertGreater(stats.calculate_mem_usage(), 0)
+            self.assertGreater(stats.calculate_mem_limit(), 0)
+
+    def test_generate_containers_stats_none(self):
+        web = self.create_service('web')
+        db = self.create_service('db')
+        project = Project('composetest', [web, db], self.client)
+
+        with pytest.raises(ProjectError):
+            project.generate_containers_stats().next()

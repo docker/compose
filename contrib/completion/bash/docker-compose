@@ -416,6 +416,18 @@ _docker_compose_start() {
 }
 
 
+_docker_compose_stats() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help --no-stream" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_running
+			;;
+	esac
+}
+
+
 _docker_compose_stop() {
 	case "$prev" in
 		--timeout|-t)
@@ -498,6 +510,7 @@ _docker_compose() {
 		run
 		scale
 		start
+		stats
 		stop
 		unpause
 		up

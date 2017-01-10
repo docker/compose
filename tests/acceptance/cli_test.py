@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 import datetime
 import json
 import os
+import re
 import signal
 import subprocess
 import time
@@ -1525,6 +1526,31 @@ class CLITestCase(DockerClientTestCase):
     def test_start_no_containers(self):
         result = self.dispatch(['start'], returncode=1)
         assert 'No containers to start' in result.stderr
+
+    def test_stats(self):
+        self.dispatch(['up', '-d'], None)
+        result = self.dispatch(['stats', '--no-stream'], None)
+        self.assertIn('Cpu', result.stdout)
+        self.assertIn('Mem', result.stdout)
+        self.assertIn('Net', result.stdout)
+        self.assertIn('Block', result.stdout)
+
+        def assert_service_line(name):
+            container_name = 'simplecomposefile_'+name+'_1'
+            binary_size_unit = '(KiB|MiB|GiB|B)'
+            size_unit = '(KB|MB|GB|B)'
+            num = '(\d+\.\d+)'
+            regexp = re.compile(
+                '^' + container_name
+                + '\s*' + num + '%'
+                + '\s*' + num + ' ' + binary_size_unit + ' / ' + num + ' ' + binary_size_unit
+                + '\s*' + num + ' ' + size_unit + ' / ' + num + ' ' + size_unit
+                + '\s*' + num + ' ' + size_unit + ' / ' + num + ' ' + size_unit,
+                flags=re.MULTILINE)
+            self.assertRegexpMatches(result.stdout, regexp)
+
+        assert_service_line('simple')
+        assert_service_line('another')
 
     @v2_only()
     def test_up_logging(self):

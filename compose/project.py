@@ -28,6 +28,7 @@ from .service import ConvergenceStrategy
 from .service import NetworkMode
 from .service import Service
 from .service import ServiceNetworkMode
+from .stats import Stats
 from .utils import microseconds_from_time_nano
 from .volume import ProjectVolumes
 
@@ -523,6 +524,22 @@ class Project(object):
                 options['timeout'] = service.stop_timeout(None)
             return getattr(container, operation)(**options)
         return container_operation_with_timeout
+
+    def generate_containers_stats(self, stream=True, service_names=None):
+        containers = sorted(
+            self.containers(service_names=service_names, stopped=False) +
+            self.containers(service_names=service_names, one_off=OneOffFilter.only),
+            key=operator.attrgetter('name'))
+        if not containers:
+            raise ProjectError("No containers running")
+        container_stats_calls = [(container,
+                                  self.client.stats(container.name, stream=stream, decode=True))
+                                 for container in containers]
+        done = False
+        while not done:
+            yield [Stats(container, stats_data.next() if stream else stats_data)
+                   for (container, stats_data) in container_stats_calls]
+            done = not stream
 
 
 def get_volumes_from(project, service_dict):
