@@ -2,7 +2,7 @@ PyYAML==3.11
 backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.2.0
 colorama==0.3.7
-docker==2.0.0
+docker==2.0.1
 dockerpty==0.4.1
 docopt==0.6.1
 enum34==1.0.4; python_version < '3.4'
