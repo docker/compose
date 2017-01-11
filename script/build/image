@@ -12,5 +12,4 @@ VERSION="$(python setup.py --version)"
 
 ./script/build/write-git-sha
 python setup.py sdist bdist_wheel
-cp dist/docker-compose-$VERSION-py2.py3-none-any.whl dist/docker-compose-release-py2.py3-none-any.whl
-docker build -t docker/compose:$TAG -f Dockerfile.run .
+docker build --build-arg version=$VERSION -t docker/compose:$TAG -f Dockerfile.run .
