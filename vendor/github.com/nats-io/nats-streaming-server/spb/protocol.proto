@@ -1,0 +1,71 @@
+// Copyright 2016 Apcera Inc. All rights reserved.
+//
+// Uses https://github.com/gogo/protobuf
+// compiled via `protoc -I=. -I=$GOPATH/src  --gogofaster_out=. protocol.proto`
+
+syntax = "proto3";
+package spb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// SubState represents the state of a Subscription
+message SubState {
+  uint64        ID             = 1;  // Subscription ID assigned by the SubStore interface
+  string        clientID       = 2;  // ClientID
+  string        qGroup         = 3;  // Optional queue group
+  string        inbox          = 4;  // Inbox subject to deliver messages on
+  string        ackInbox       = 5;  // Inbox for acks
+  int32         maxInFlight    = 6;  // Maximum inflight messages without an ack allowed
+  int32         ackWaitInSecs  = 7;  // Timeout for receiving an ack from the client
+  string        durableName    = 8;  // Optional durable name which survives client restarts
+  uint64        lastSent       = 9;  // Start position
+  bool          isDurable      =10;  // Indicate durability for this subscriber
+}
+
+// SubStateDelete marks a Subscription as deleted
+message SubStateDelete {
+  uint64        ID = 1; // Subscription ID being deleted
+}
+
+// SubStateUpdate represents a subscription update (either Msg or Ack)
+message SubStateUpdate {
+  uint64 ID 	 = 1; // Subscription ID
+  uint64 seqno = 2; // Sequence of the message (pending or ack'ed)
+}
+
+// ServerInfo contains basic information regarding the Server
+message ServerInfo {
+  string ClusterID   = 1; // Cluster ID
+  string Discovery   = 2; // Subject server receives connect requests on.
+  string Publish     = 3; // Subject prefix server receives published messages on.
+  string Subscribe   = 4; // Subject server receives subscription requests on.
+  string Unsubscribe = 5; // Subject server receives unsubscribe requests on.
+  string Close       = 6; // Subject server receives close requests on.
+  string SubClose    = 7; // Subject server receives subscription close requests on.
+}
+
+// ClientInfo contains information related to a Client
+message ClientInfo {
+  string ID      = 1; // Client ID
+  string HbInbox = 2; // The inbox heartbeats are sent to
+}
+
+message ClientDelete {
+  string ID = 1; // ID of the client being unregistered
+}
+
+message CtrlMsg {
+  enum Type {
+    SubUnsubscribe = 0; // Subscription Unsubscribe request.
+    SubClose       = 1; // Subscription Close request.
+    ConnClose      = 2; // Connection Close request.
+  }
+  Type    MsgType  = 1; // Type of the control message.
+  string  ServerID = 2; // Allows a server to detect if it is the intended receipient.
+  bytes   Data     = 3; // Optional bytes that carries context information.
+}
