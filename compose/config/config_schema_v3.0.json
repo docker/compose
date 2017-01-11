@@ -169,8 +169,8 @@
         "shm_size": {"type": ["number", "string"]},
         "sysctls": {"$ref": "#/definitions/list_or_dict"},
         "stdin_open": {"type": "boolean"},
-        "stop_signal": {"type": "string"},
         "stop_grace_period": {"type": "string", "format": "duration"},
+        "stop_signal": {"type": "string"},
         "tmpfs": {"$ref": "#/definitions/string_or_list"},
         "tty": {"type": "boolean"},
         "ulimits": {
@@ -270,7 +270,7 @@
         "cpus": {"type": "string"},
         "memory": {"type": "string"}
       },
-      "additionaProperties": false
+      "additionalProperties": false
     },
 
     "network": {
