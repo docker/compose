@@ -35,7 +35,7 @@ func New(ctx context.Context, executor Executor) (*Service, error) {
 			// generate exit event for all processes, (generate event for init last)
 			processes := c.Processes()
 			processes = append(processes[1:], processes[0])
-			for _, p := range c.Processes() {
+			for _, p := range processes {
 				if p.Status() != Stopped {
 					p.Signal(os.Kill)
 				}
