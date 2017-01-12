@@ -22,6 +22,7 @@ from compose.config.config import V3_0
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
+from compose.config.serialize import denormalize_service_dict
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import nanoseconds_from_time_seconds
@@ -3269,3 +3270,33 @@ def get_config_filename_for_files(filenames, subdir=None):
         return os.path.basename(filename)
     finally:
         shutil.rmtree(project_dir)
+
+
+class SerializeTest(unittest.TestCase):
+    def test_denormalize_depends_on_v3(self):
+        service_dict = {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': {
+                'service2': {'condition': 'service_started'},
+                'service3': {'condition': 'service_started'},
+            }
+        }
+
+        assert denormalize_service_dict(service_dict, V3_0) == {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': ['service2', 'service3']
+        }
+
+    def test_denormalize_depends_on_v2_1(self):
+        service_dict = {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': {
+                'service2': {'condition': 'service_started'},
+                'service3': {'condition': 'service_started'},
+            }
+        }
+
+        assert denormalize_service_dict(service_dict, V2_1) == service_dict
