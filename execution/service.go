@@ -31,11 +31,11 @@ func New(ctx context.Context, executor Executor) (*Service, error) {
 
 	for _, c := range containers {
 		status := c.Status()
-		if status == Stopped || status == Deleted {
-			// generate exit event for all processes, (generate event for init last)
-			processes := c.Processes()
-			processes = append(processes[1:], processes[0])
-			for _, p := range processes {
+		// generate exit event for all processes, (generate event for init last)
+		processes := c.Processes()
+		processes = append(processes[1:], processes[0])
+		for _, p := range c.processes {
+			if status == Stopped || status == Deleted {
 				if p.Status() != Stopped {
 					p.Signal(os.Kill)
 				}
@@ -53,6 +53,8 @@ func New(ctx context.Context, executor Executor) (*Service, error) {
 					PID:        p.ID(),
 					StatusCode: sc,
 				})
+			} else {
+				svc.monitorProcess(ctx, c, p)
 			}
 		}
 	}
@@ -156,7 +158,6 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 		return nil, err
 	}
 
-	// TODO: generate spec
 	spec := specs.Process{
 		Terminal: r.Process.Terminal,
 		ConsoleSize: specs.Box{
