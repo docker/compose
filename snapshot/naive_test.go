@@ -15,7 +15,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir)
 
 	t.Log(tmpDir)
 	root := filepath.Join(tmpDir, "root")

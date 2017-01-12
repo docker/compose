@@ -18,7 +18,13 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// defer os.RemoveAll(tmpDir)
+	defer func() {
+		t.Log("Removing", tmpDir)
+		err := os.RemoveAll(tmpDir)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	root := filepath.Join(tmpDir, "root")
 
@@ -52,14 +58,13 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
+	defer unmountAll(t, mounts)
 
 	if err := ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
 	os.MkdirAll(preparing+"/a/b/c", 0755)
-
-	// defer os.Remove(filepath.Join(tmpDir, "foo"))
 
 	committed := filepath.Join(lm.root, "committed")
 
@@ -83,6 +88,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
+	defer unmountAll(t, mounts)
 
 	for _, mount := range mounts {
 		if !strings.HasPrefix(mount.Target, next) {

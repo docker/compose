@@ -53,11 +53,7 @@ func TestBtrfs(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
-	defer func(mounts []containerd.Mount) {
-		for _, mount := range mounts {
-			unmount(t, mount.Target)
-		}
-	}(mounts)
+	defer unmountAll(t, mounts)
 
 	// write in some data
 	if err := ioutil.WriteFile(filepath.Join(mounts[0].Target, "foo"), []byte("content"), 0777); err != nil {
@@ -93,11 +89,7 @@ func TestBtrfs(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
-	defer func(mounts []containerd.Mount) {
-		for _, mount := range mounts {
-			unmount(t, mount.Target)
-		}
-	}(mounts)
+	defer unmountAll(t, mounts)
 
 	// TODO(stevvooe): Verify contents of "foo"
 	if err := ioutil.WriteFile(filepath.Join(mounts[0].Target, "bar"), []byte("content"), 0777); err != nil {
@@ -212,15 +204,5 @@ func removeBtrfsLoopbackDevice(t *testing.T, device *testDevice) {
 	err = os.RemoveAll(device.mountPoint)
 	if err != nil {
 		t.Error(err)
-	}
-}
-
-func unmount(t *testing.T, mountPoint string) {
-	t.Log("unmount", mountPoint)
-	umount := exec.Command("umount", mountPoint)
-	err := umount.Run()
-	if err != nil {
-
-		t.Error("Could not umount", mountPoint, err)
 	}
 }
