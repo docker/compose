@@ -23,54 +23,56 @@ import (
 
 var grpcConn *grpc.ClientConn
 
-func prepareStdio(in, out, err string) (*sync.WaitGroup, error) {
-	var (
-		wg sync.WaitGroup
+func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, error) {
+	var wg sync.WaitGroup
+	ctx := gocontext.Background()
 
-		dst   io.Writer
-		src   io.Reader
-		close func()
-	)
-
-	for _, f := range []struct {
-		name   string
-		flags  int
-		src    bool
-		reader io.Reader
-		writer io.Writer
-	}{
-		{in, syscall.O_WRONLY | syscall.O_CREAT | syscall.O_NONBLOCK, false, os.Stdin, nil},
-		{out, syscall.O_RDONLY | syscall.O_CREAT | syscall.O_NONBLOCK, true, nil, os.Stdout},
-		{err, syscall.O_RDONLY | syscall.O_CREAT | syscall.O_NONBLOCK, true, nil, os.Stderr},
-	} {
-		ff, err := fifo.OpenFifo(gocontext.Background(), f.name, f.flags, 0700)
+	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+	if err != nil {
+		return nil, err
+	}
+	defer func(c io.Closer) {
 		if err != nil {
-			return nil, err
+			c.Close()
 		}
-		defer func(c io.Closer) {
-			if err != nil {
-				c.Close()
-			}
-		}(ff)
+	}(f)
+	go func(w io.Writer) {
+		io.Copy(w, os.Stdin)
+		f.Close()
+	}(f)
 
-		if f.src {
-			src = ff
-			dst = f.writer
-			close = func() {
-				ff.Close()
-				wg.Done()
-			}
-			wg.Add(1)
-		} else {
-			src = f.reader
-			dst = ff
-			close = func() { ff.Close() }
+	f, err = fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+	if err != nil {
+		return nil, err
+	}
+	defer func(c io.Closer) {
+		if err != nil {
+			c.Close()
 		}
+	}(f)
+	wg.Add(1)
+	go func(r io.Reader) {
+		io.Copy(os.Stdout, r)
+		f.Close()
+		wg.Done()
+	}(f)
 
-		go func(dst io.Writer, src io.Reader, close func()) {
-			io.Copy(dst, src)
-			close()
-		}(dst, src, close)
+	f, err = fifo.OpenFifo(ctx, stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+	if err != nil {
+		return nil, err
+	}
+	defer func(c io.Closer) {
+		if err != nil {
+			c.Close()
+		}
+	}(f)
+	if !console {
+		wg.Add(1)
+		go func(r io.Reader) {
+			io.Copy(os.Stderr, r)
+			f.Close()
+			wg.Done()
+		}(f)
 	}
 
 	return &wg, nil

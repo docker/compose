@@ -14,7 +14,7 @@ PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PROJECT_ROOT}/integration
 
 # Project binaries.
-COMMANDS=ctr containerd protoc-gen-gogoctrd
+COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # TODO(stevvooe): This will set version from git tag, but overrides major,
@@ -22,7 +22,7 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 # time.
 GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
 
-.PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall
+.PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall vendor
 .DEFAULT: default
 
 all: binaries
@@ -128,6 +128,9 @@ coverage-integration: ## generate coverprofiles from the integration tests
 	@echo "🐳 $@"
 	go test -race -tags "${DOCKER_BUILDTAGS}" -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE}
 
+vendor:
+	@echo "🐳 $@"
+	@vndr
+
 help: ## this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
-
