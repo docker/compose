@@ -60,17 +60,11 @@ Our current approach is to model our storage layer after snapshotting drivers in
 
 ## Phase 3
 
-Phase 3 involves porting the network drivers from libnetwork and finding a good middle ground between the abstractions of libnetwork and the CNI spec.
-
-This also includes getting support for the OCI Image spec built into containerd.
+This phase includes getting support for the OCI Image spec built into containerd.
 
 **Status:** Not Started
 
 ### Distribution
-
-### Networking
-
-The networking component will allow the management of network namespaces and interface creation and attachment to namespaces.
 
 ## Phase 4
 

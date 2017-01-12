@@ -26,7 +26,6 @@ For sync communication we have a community slack with a #containerd channel that
 * OCI Runtime Spec support
 * Image push and pull support
 * Container runtime and lifecycle support
-* Network primitives for creation, modification, and deletion of interfaces
 * Management of network namespaces containers to join existing namespaces
 * Multi-tenant supported with CAS storage for global images
 
@@ -80,7 +79,7 @@ The table specifies whether or not the feature/component is in or out of scope.
 | execution | Provide an extensible execution layer for executing a container | in | Create,start, stop pause, resume exec, signal, delete |
 | cow filesystem | Built in functionality for overlay, aufs, and other copy on write filesystems for containers | in |  |
 | distribution | Having the ability to push and pull images as well as operations on images as a first class API object | in | containerd will fully support the management and retrieval of images |
-| low-level networking drivers | Providing network functionality to containers along with configuring their network namespaces | in | Network support will be added via interface and network namespace operations, not service discovery and service abstractions. |
+| networking | creation and management of network interfaces | out | Networking will be handled and provided to containerd via higher level systems. |
 | build | Building images as a first class API | out | Build is a higher level tooling feature and can be implemented in many different ways on top of containerd |
 | volumes | Volume management for external data | out | The API supports mounts, binds, etc where all volumes type systems can be built on top of containerd. |
 | logging | Persisting container logs | out | Logging can be build on top of containerd because the container’s STDIO will be provided to the clients and they can persist any way they see fit. There is no io copying of container STDIO in containerd. |
