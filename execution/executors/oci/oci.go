@@ -122,7 +122,6 @@ func (r *OCIRuntime) load(runcC *runc.Container) (*execution.Container, error) {
 		runcC.ID,
 		runcC.Bundle,
 		execution.Status(runcC.Status),
-		int64(runcC.Pid),
 	)
 
 	dirs, err := container.StateDir().Processes()

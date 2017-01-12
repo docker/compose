@@ -21,6 +21,7 @@ import (
 	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/execution/executors/oci"
+	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
@@ -103,6 +104,16 @@ high performance container runtime
 			return err
 		}
 
+		// Get events publisher
+		nec, err := getNATSPublisher(context)
+		if err != nil {
+			return err
+		}
+		defer nec.Close()
+		ctx := log.WithModule(gocontext.Background(), "containerd")
+		ctx = log.WithModule(ctx, "execution")
+		ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
+
 		var (
 			executor execution.Executor
 			runtime  = context.GlobalString("runtime")
@@ -113,20 +124,20 @@ high performance container runtime
 			if err != nil {
 				return err
 			}
+		case "shim":
+			root := filepath.Join(context.GlobalString("root"), "shim")
+			err = os.Mkdir(root, 0700)
+			if err != nil && !os.IsExist(err) {
+				return err
+			}
+			executor, err = shim.New(log.WithModule(ctx, "shim"), root, "containerd-shim", "runc", nil)
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("oci: runtime %q not implemented", runtime)
 		}
 
-		// Get events publisher
-		nec, err := getNATSPublisher(context)
-		if err != nil {
-			return err
-		}
-		defer nec.Close()
-
-		ctx := log.WithModule(gocontext.Background(), "containerd")
-		ctx = log.WithModule(ctx, "execution")
-		ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
 		execService, err := execution.New(ctx, executor)
 		if err != nil {
 			return err

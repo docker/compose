@@ -28,7 +28,6 @@ type Executor interface {
 	Create(ctx context.Context, id string, o CreateOpts) (*Container, error)
 	Pause(context.Context, *Container) error
 	Resume(context.Context, *Container) error
-	Status(context.Context, *Container) (Status, error)
 	List(context.Context) ([]*Container, error)
 	Load(ctx context.Context, id string) (*Container, error)
 	Delete(context.Context, *Container) error

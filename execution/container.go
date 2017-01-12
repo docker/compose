@@ -16,12 +16,11 @@ func NewContainer(stateRoot, id, bundle string) (*Container, error) {
 	}, nil
 }
 
-func LoadContainer(dir StateDir, id, bundle string, status Status, initPid int64) *Container {
+func LoadContainer(dir StateDir, id, bundle string, status Status) *Container {
 	return &Container{
 		id:        id,
 		stateDir:  dir,
 		bundle:    bundle,
-		initPid:   initPid,
 		status:    status,
 		processes: make(map[string]Process),
 	}
