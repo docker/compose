@@ -2,6 +2,8 @@
 
 This is a high level roadmap for the project that outlines what is currently being worked on, what comes next, and where you can help.
 
+For a more up to date look please review the milestones on [github](https://github.com/docker/containerd/milestones).
+
 The following are the different status the various phases of development can be in:
 * Not Started - no work or thinking has been done towards the goal
 * In Design - design work has started for the component and you can find design documents in the `design` folder
