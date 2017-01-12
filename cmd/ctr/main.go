@@ -37,6 +37,7 @@ containerd client
 		runCommand,
 		execCommand,
 		eventsCommand,
+		deleteCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
