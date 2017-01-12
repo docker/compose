@@ -20,6 +20,26 @@ For sync communication we have a community slack with a #containerd channel that
 
 **Slack:** https://community.docker.com/registrations/groups/4316
 
+### Developer Quick-Start
+
+To build the daemon and `ctr` simple test client, the following build system dependencies are required:
+
+* Go 1.7.x or above
+* Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases)
+
+For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.1.0 release for a 64-bit Linux host:
+
+```
+$ wget -c https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip
+$ sudo unzip protoc-3.1.0-linux-x86_64.zip -d /usr/local
+```
+
+With the required dependencies installed, the `Makefile` target named **binaries** will compile the `ctr` and `containerd` binaries and place them in the `bin/` directory. Using `sudo make install` will place the binaries in `/usr/local/bin`. When making any changes to the gRPC API, `make generate` will use the installed `protoc` compiler to regenerate the API generated code packages.
+
+Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vndr) which uses a simple config file, `vendor.conf`, to provide the URL and version or hash details for each vendored import. After modifying `vendor.conf` run the `vndr` tool to update the `vendor/` directory contents. Combining the `vendor.conf` update with the changeset in `vendor/` after running `vndr` should become a single commit for a PR which relies on vendored updates.
+
+Containerd will by default use `runc` found via the $PATH as the OCI-compliant runtime. You can specify the runtime directly with the `runtime` flag when starting containerd. However you specify the runtime, the expectation is that during the pre-release development cycle for containerd, the supported version of `runc` will track the current master branch of [`opencontainers/runc`](https://github.com/opencontainers/runc).
+
 ## Features
 
 * OCI Image Spec support
