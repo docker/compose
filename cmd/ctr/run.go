@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/containerd/api/execution"
 	execEvents "github.com/docker/containerd/execution"
+	"github.com/docker/docker/pkg/term"
 	"github.com/nats-io/go-nats"
 	"github.com/urfave/cli"
 )
@@ -98,6 +99,21 @@ var runCommand = cli.Command{
 			Stderr:     filepath.Join(tmpDir, "stderr"),
 		}
 
+		var oldState *term.State
+		restoreTerm := func() {
+			if oldState != nil {
+				term.RestoreTerminal(os.Stdin.Fd(), oldState)
+			}
+		}
+
+		if crOpts.Console {
+			oldState, err = term.SetRawTerminal(os.Stdin.Fd())
+			if err != nil {
+				return err
+			}
+			defer restoreTerm()
+		}
+
 		fwg, err := prepareStdio(crOpts.Stdin, crOpts.Stdout, crOpts.Stderr, crOpts.Console)
 		if err != nil {
 			return err
@@ -143,6 +159,7 @@ var runCommand = cli.Command{
 		// Ensure we read all io
 		fwg.Wait()
 
+		restoreTerm()
 		os.Exit(int(ec))
 
 		return nil
