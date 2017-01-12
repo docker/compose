@@ -85,9 +85,13 @@ var runCommand = cli.Command{
 		}
 		defer os.RemoveAll(tmpDir)
 
+		bundle, err := filepath.Abs(context.String("bundle"))
+		if err != nil {
+			return err
+		}
 		crOpts := &execution.CreateContainerRequest{
 			ID:         id,
-			BundlePath: context.String("bundle"),
+			BundlePath: bundle,
 			Console:    context.Bool("tty"),
 			Stdin:      filepath.Join(tmpDir, "stdin"),
 			Stdout:     filepath.Join(tmpDir, "stdout"),
@@ -116,7 +120,6 @@ var runCommand = cli.Command{
 			select {
 			case e, more := <-evCh:
 				if !more {
-					fmt.Println("No More!")
 					break eventLoop
 				}
 
