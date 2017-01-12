@@ -14,7 +14,7 @@ PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PROJECT_ROOT}/integration
 
 # Project binaries.
-COMMANDS=ctr containerd protoc-gen-gogoctrd
+COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # TODO(stevvooe): This will set version from git tag, but overrides major,
@@ -130,4 +130,3 @@ coverage-integration: ## generate coverprofiles from the integration tests
 
 help: ## this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
-
