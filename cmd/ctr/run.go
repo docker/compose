@@ -98,7 +98,7 @@ var runCommand = cli.Command{
 			Stderr:     filepath.Join(tmpDir, "stderr"),
 		}
 
-		fwg, err := prepareStdio(crOpts.Stdin, crOpts.Stdout, crOpts.Stderr)
+		fwg, err := prepareStdio(crOpts.Stdin, crOpts.Stdout, crOpts.Stderr, crOpts.Console)
 		if err != nil {
 			return err
 		}

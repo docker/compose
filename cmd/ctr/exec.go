@@ -64,7 +64,7 @@ var execCommand = cli.Command{
 			Console: context.Bool("tty"),
 		}
 
-		fwg, err := prepareStdio(sOpts.Stdin, sOpts.Stdout, sOpts.Stderr)
+		fwg, err := prepareStdio(sOpts.Stdin, sOpts.Stdout, sOpts.Stderr, sOpts.Console)
 		if err != nil {
 			return err
 		}
