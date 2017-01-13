@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/snapshot/testutil"
 )
 
 // TestSnapshotManagerBasic implements something similar to the conceptual
@@ -58,7 +59,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
-	defer unmountAll(t, mounts)
+	defer testutil.UnmountAll(t, mounts)
 
 	if err := ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
@@ -88,7 +89,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
-	defer unmountAll(t, mounts)
+	defer testutil.UnmountAll(t, mounts)
 
 	for _, mount := range mounts {
 		if !strings.HasPrefix(mount.Target, next) {

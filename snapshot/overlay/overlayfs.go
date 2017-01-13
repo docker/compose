@@ -1,4 +1,4 @@
-package snapshot
+package overlay
 
 import (
 	"crypto/md5"
