@@ -22,6 +22,9 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 # time.
 GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
 
+# Flags passed to `go test`
+TESTFLAGS ?=-parallel 8 -race
+
 .PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall vendor
 .DEFAULT: default
 
@@ -82,15 +85,15 @@ ineffassign: ## run ineffassign
 
 build: ## build the go packages
 	@echo "🐳 $@"
-	@go build -i -tags "${DOCKER_BUILDTAGS}" -v ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+	@go build -i -v ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests
 	@echo "🐳 $@"
-	@go test -parallel 8 -race -tags "${DOCKER_BUILDTAGS}" $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
+	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
 
 integration: ## run integration tests
 	@echo "🐳 $@"
-	@go test -parallel 8 -race -tags "${DOCKER_BUILDTAGS}" ${INTEGRATION_PACKAGE}
+	@go test ${TESTFLAGS} ${INTEGRATION_PACKAGE}
 
 FORCE:
 
@@ -99,7 +102,7 @@ bin/%: cmd/% FORCE
 	@test $$(go list) = "${PROJECT_ROOT}" || \
 		(echo "👹 Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PROJECT_ROOT}" && false)
 	@echo "🐳 $@"
-	@go build -i -tags "${DOCKER_BUILDTAGS}" -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./$<
+	@go build -i -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./$<
 
 binaries: $(BINARIES) ## build binaries
 	@echo "🐳 $@"
@@ -120,13 +123,13 @@ uninstall:
 coverage: ## generate coverprofiles from the unit tests
 	@echo "🐳 $@"
 	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
-		go test -i -race -tags "${DOCKER_BUILDTAGS}" -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
-		go test -race -tags "${DOCKER_BUILDTAGS}" -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
+		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
+		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
 	done )
 
 coverage-integration: ## generate coverprofiles from the integration tests
 	@echo "🐳 $@"
-	go test -race -tags "${DOCKER_BUILDTAGS}" -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE}
+	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE}
 
 vendor:
 	@echo "🐳 $@"
