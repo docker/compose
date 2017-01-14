@@ -26,10 +26,13 @@ yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
-def denormalize_config(config):
+def denormalize_config(config, image_digests=None):
     result = {'version': V2_1 if config.version == V1 else config.version}
     denormalized_services = [
-        denormalize_service_dict(service_dict, config.version)
+        denormalize_service_dict(
+            service_dict,
+            config.version,
+            image_digests[service_dict['name']] if image_digests else None)
         for service_dict in config.services
     ]
     result['services'] = {
@@ -51,9 +54,9 @@ def denormalize_config(config):
     return result
 
 
-def serialize_config(config):
+def serialize_config(config, image_digests=None):
     return yaml.safe_dump(
-        denormalize_config(config),
+        denormalize_config(config, image_digests),
         default_flow_style=False,
         indent=2,
         width=80)
@@ -78,8 +81,11 @@ def serialize_ns_time_value(value):
     return '{0}{1}'.format(*result)
 
 
-def denormalize_service_dict(service_dict, version):
+def denormalize_service_dict(service_dict, version, image_digest=None):
     service_dict = service_dict.copy()
+
+    if image_digest:
+        service_dict['image'] = image_digest
 
     if 'restart' in service_dict:
         service_dict['restart'] = types.serialize_restart_spec(
