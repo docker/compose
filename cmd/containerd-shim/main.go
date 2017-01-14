@@ -108,7 +108,7 @@ func start(log *os.File) error {
 		return nil
 	}
 	var exitShim bool
-	for {
+	for !exitShim {
 		select {
 		case s := <-signals:
 			switch s {
@@ -121,18 +121,6 @@ func start(log *os.File) error {
 						writeInt("exitStatus", e.Status)
 					}
 				}
-			}
-			// runtime has exited so the shim can also exit
-			if exitShim {
-				// kill all processes in the container incase it was not running in
-				// its own PID namespace
-				p.killAll()
-				// wait for all the processes and IO to finish
-				p.Wait()
-				// delete the container from the runtime
-				p.delete()
-				// the close of the exit fifo will happen when the shim exits
-				return nil
 			}
 		case msg := <-msgC:
 			switch msg.Type {
@@ -153,6 +141,17 @@ func start(log *os.File) error {
 			}
 		}
 	}
+
+	// runtime has exited so the shim can also exit
+
+	// kill all processes in the container incase it was not running in
+	// its own PID namespace
+	p.killAll()
+	// wait for all the processes and IO to finish
+	p.Wait()
+	// delete the container from the runtime
+	p.delete()
+	// the close of the exit fifo will happen when the shim exits
 	return nil
 }
 
