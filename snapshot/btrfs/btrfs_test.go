@@ -1,4 +1,4 @@
-package snapshot
+package btrfs
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/snapshot/testutil"
 	btrfs "github.com/stevvooe/go-btrfs"
 )
 
@@ -53,7 +54,7 @@ func TestBtrfs(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
-	defer unmountAll(t, mounts)
+	defer testutil.UnmountAll(t, mounts)
 
 	// write in some data
 	if err := ioutil.WriteFile(filepath.Join(mounts[0].Target, "foo"), []byte("content"), 0777); err != nil {
@@ -89,7 +90,7 @@ func TestBtrfs(t *testing.T) {
 	if err := containerd.MountAll(mounts...); err != nil {
 		t.Fatal(err)
 	}
-	defer unmountAll(t, mounts)
+	defer testutil.UnmountAll(t, mounts)
 
 	// TODO(stevvooe): Verify contents of "foo"
 	if err := ioutil.WriteFile(filepath.Join(mounts[0].Target, "bar"), []byte("content"), 0777); err != nil {
@@ -182,7 +183,7 @@ func setupBtrfsLoopbackDevice(t *testing.T) *testDevice {
 // file holding the disk image.
 func removeBtrfsLoopbackDevice(t *testing.T, device *testDevice) {
 	// unmount
-	unmount(t, device.mountPoint)
+	testutil.Unmount(t, device.mountPoint)
 
 	// detach device
 	t.Log("Removing loop device")

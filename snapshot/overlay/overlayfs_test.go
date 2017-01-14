@@ -1,4 +1,4 @@
-package snapshot
+package overlay
 
 import (
 	"io/ioutil"

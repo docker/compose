@@ -1,6 +1,7 @@
-package snapshot
+package btrfs
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,6 @@ func (lm *Btrfs) Prepare(key, parent string) ([]containerd.Mount, error) {
 
 	dir := filepath.Join(active, hash(key))
 
-	fmt.Println("dir", dir)
 	if parent == "" {
 		// create new subvolume
 		// btrfs subvolume create /dir
@@ -68,4 +68,8 @@ func (lm *Btrfs) Commit(name, key string) error {
 	}
 
 	return btrfs.SubvolDelete(dir)
+}
+
+func hash(k string) string {
+	return fmt.Sprintf("%x", sha256.Sum224([]byte(k)))
 }

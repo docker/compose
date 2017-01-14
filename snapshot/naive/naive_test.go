@@ -1,4 +1,4 @@
-package snapshot
+package naive
 
 import (
 	"io/ioutil"
