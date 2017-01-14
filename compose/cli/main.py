@@ -313,13 +313,56 @@ class TopLevelCommand(object):
         Usage: config [options]
 
         Options:
-            -q, --quiet     Only validate the configuration, don't print
-                            anything.
-            --services      Print the service names, one per line.
-            --volumes       Print the volume names, one per line.
+            --resolve-image-digests  Pin image tags to digests.
+            -q, --quiet              Only validate the configuration, don't print
+                                     anything.
+            --services               Print the service names, one per line.
+            --volumes                Print the volume names, one per line.
 
         """
+
         compose_config = get_config_from_options(self.project_dir, config_options)
+        image_digests = None
+
+        if options['--resolve-image-digests']:
+            self.project = project_from_options('.', config_options)
+
+            with errors.handle_connection_errors(self.project.client):
+                try:
+                    image_digests = get_image_digests(
+                        self.project,
+                        allow_push=False
+                    )
+                except MissingDigests as e:
+                    def list_images(images):
+                        return "\n".join("    {}".format(name) for name in sorted(images))
+
+                    paras = ["Some images are missing digests."]
+
+                    if e.needs_push:
+                        command_hint = (
+                            "Use `docker-compose push {}` to push them. "
+                            .format(" ".join(sorted(e.needs_push)))
+                        )
+                        paras += [
+                            "The following images can be pushed:",
+                            list_images(e.needs_push),
+                            command_hint,
+                        ]
+
+                    if e.needs_pull:
+                        command_hint = (
+                            "Use `docker-compose pull {}` to pull them. "
+                            .format(" ".join(sorted(e.needs_pull)))
+                        )
+
+                        paras += [
+                            "The following images need to be pulled:",
+                            list_images(e.needs_pull),
+                            command_hint,
+                        ]
+
+                    raise UserError("\n\n".join(paras))
 
         if options['--quiet']:
             return
@@ -332,7 +375,7 @@ class TopLevelCommand(object):
             print('\n'.join(volume for volume in compose_config.volumes))
             return
 
-        print(serialize_config(compose_config))
+        print(serialize_config(compose_config, image_digests))
 
     def create(self, options):
         """
