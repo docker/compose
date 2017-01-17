@@ -95,12 +95,12 @@ integration: ## run integration tests
 	@echo "🐳 $@"
 	@go test ${TESTFLAGS} ${INTEGRATION_PACKAGE}
 
-FORCE:
 
 # Build a binary from a cmd.
-bin/%: cmd/% FORCE
+# TODO: improve dependency using `go list -f {{.Deps}}`
+bin/%: cmd/% $(shell find . -type f -name '*.go')
 	@test $$(go list) = "${PROJECT_ROOT}" || \
-		(echo "👹 Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PROJECT_ROOT}" && false)
+		(echo "👹 Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PROJECT_ROOT}.\nHint: If you are running \`sudo make install\` after modifying the code, please run \`make\` first." && false)
 	@echo "🐳 $@"
 	@go build -i -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./$<
 
