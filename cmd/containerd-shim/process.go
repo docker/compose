@@ -36,7 +36,7 @@ type checkpoint struct {
 }
 
 type processState struct {
-	Terminal    bool     `json:terminal`
+	Terminal    bool     `json:"terminal"`
 	Exec        bool     `json:"exec"`
 	Stdin       string   `json:"containerdStdin"`
 	Stdout      string   `json:"containerdStdout"`
