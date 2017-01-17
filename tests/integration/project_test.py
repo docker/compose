@@ -1443,7 +1443,7 @@ class ProjectTest(DockerClientTestCase):
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
         )
-        with pytest.raises(HealthCheckFailed):
+        with pytest.raises(ProjectError):
             project.up()
         containers = project.containers()
         assert len(containers) == 1
@@ -1479,7 +1479,7 @@ class ProjectTest(DockerClientTestCase):
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
         )
-        with pytest.raises(NoHealthCheckConfigured):
+        with pytest.raises(ProjectError):
             project.up()
         containers = project.containers()
         assert len(containers) == 1
