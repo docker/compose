@@ -197,7 +197,6 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 		{
 			Type:    "overlay",
 			Source:  "none",
-			Target:  dst,
 			Options: opts,
 		},
 	}, nil

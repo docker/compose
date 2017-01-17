@@ -163,7 +163,7 @@ func TestOverlayfsOverlayRead(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := containerd.MountFS(mounts, dest); err != nil {
+	if err := containerd.MountAll(mounts, dest); err != nil {
 		t.Error(err)
 		return
 	}

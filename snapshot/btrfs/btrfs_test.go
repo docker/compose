@@ -27,11 +27,12 @@ func TestBtrfs(t *testing.T) {
 	}
 	defer os.RemoveAll(root)
 
+	target := filepath.Join(root, "test")
 	sm, err := NewBtrfs(device.deviceName, root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mounts, err := sm.Prepare(filepath.Join(root, "test"), "")
+	mounts, err := sm.Prepare(target, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,16 +49,16 @@ func TestBtrfs(t *testing.T) {
 		}
 	}
 
-	if err := os.MkdirAll(mounts[0].Target, 0755); err != nil {
+	if err := os.MkdirAll(target, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := containerd.MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts, target); err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.UnmountAll(t, mounts)
+	defer testutil.Unmount(t, target)
 
 	// write in some data
-	if err := ioutil.WriteFile(filepath.Join(mounts[0].Target, "foo"), []byte("content"), 0777); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,26 +79,27 @@ func TestBtrfs(t *testing.T) {
 		}
 	}()
 
-	mounts, err = sm.Prepare(filepath.Join(root, "test2"), filepath.Join(root, "snapshots/committed"))
+	target = filepath.Join(root, "test2")
+	mounts, err = sm.Prepare(target, filepath.Join(root, "snapshots/committed"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(root, "test2"), 0755); err != nil {
+	if err := os.MkdirAll(target, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := containerd.MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts, target); err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.UnmountAll(t, mounts)
+	defer testutil.Unmount(t, target)
 
 	// TODO(stevvooe): Verify contents of "foo"
-	if err := ioutil.WriteFile(filepath.Join(mounts[0].Target, "bar"), []byte("content"), 0777); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(target, "bar"), []byte("content"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := sm.Commit(filepath.Join(root, "snapshots/committed2"), filepath.Join(root, "test2")); err != nil {
+	if err := sm.Commit(filepath.Join(root, "snapshots/committed2"), target); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
