@@ -36,9 +36,9 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 			c.Close()
 		}
 	}(f)
-	go func(w io.Writer) {
+	go func(w io.WriteCloser) {
 		io.Copy(w, os.Stdin)
-		f.Close()
+		w.Close()
 	}(f)
 
 	f, err = fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
@@ -51,9 +51,9 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 		}
 	}(f)
 	wg.Add(1)
-	go func(r io.Reader) {
+	go func(r io.ReadCloser) {
 		io.Copy(os.Stdout, r)
-		f.Close()
+		r.Close()
 		wg.Done()
 	}(f)
 
@@ -68,9 +68,9 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 	}(f)
 	if !console {
 		wg.Add(1)
-		go func(r io.Reader) {
+		go func(r io.ReadCloser) {
 			io.Copy(os.Stderr, r)
-			f.Close()
+			r.Close()
 			wg.Done()
 		}(f)
 	}
