@@ -56,9 +56,16 @@ def denormalize_service_dict(service_dict, version):
     service_dict = service_dict.copy()
 
     if 'restart' in service_dict:
-        service_dict['restart'] = types.serialize_restart_spec(service_dict['restart'])
+        service_dict['restart'] = types.serialize_restart_spec(
+            service_dict['restart']
+        )
 
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
+
+    if 'depends_on' in service_dict and version != V2_1:
+        service_dict['depends_on'] = sorted([
+            svc for svc in service_dict['depends_on'].keys()
+        ])
 
     return service_dict
