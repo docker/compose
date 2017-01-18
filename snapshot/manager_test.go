@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/docker/containerd"
@@ -48,18 +47,10 @@ func TestSnapshotManagerBasic(t *testing.T) {
 		t.Fatal("expected mounts to have entries")
 	}
 
-	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Target, preparing) {
-			t.Fatalf("expected mount target to be prefixed with tmpDir: %q does not startwith %q", mount.Target, preparing)
-		}
-
-		t.Log(containerd.MountCommand(mount))
-	}
-
-	if err := containerd.MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts, preparing); err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.UnmountAll(t, mounts)
+	defer testutil.Unmount(t, preparing)
 
 	if err := ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
@@ -86,18 +77,10 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := containerd.MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts, next); err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.UnmountAll(t, mounts)
-
-	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Target, next) {
-			t.Fatalf("expected mount target to be prefixed with tmpDir: %q does not startwith %q", mount.Target, next)
-		}
-
-		t.Log(containerd.MountCommand(mount))
-	}
+	defer testutil.Unmount(t, next)
 
 	if err := ioutil.WriteFile(filepath.Join(next, "bar"), []byte("bar\n"), 0777); err != nil {
 		t.Fatal(err)

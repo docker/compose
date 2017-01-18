@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/docker/containerd"
@@ -35,15 +34,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Target, preparing) {
-			t.Fatalf("expected mount target to be prefixed with tmpDir: %q does not startwith %q", mount.Target, preparing)
-		}
-
-		t.Log(containerd.MountCommand(mount))
-	}
-
-	if err := containerd.MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts, preparing); err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,16 +65,8 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := containerd.MountAll(mounts...); err != nil {
+	if err := containerd.MountAll(mounts, next); err != nil {
 		t.Fatal(err)
-	}
-
-	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Target, next) {
-			t.Fatalf("expected mount target to be prefixed with tmpDir: %q does not startwith %q", mount.Target, next)
-		}
-
-		t.Log(containerd.MountCommand(mount))
 	}
 
 	if err := ioutil.WriteFile(filepath.Join(next, "bar"), []byte("bar\n"), 0777); err != nil {

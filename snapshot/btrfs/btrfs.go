@@ -50,8 +50,6 @@ func (lm *Btrfs) Prepare(key, parent string) ([]containerd.Mount, error) {
 		{
 			Type:   "btrfs",
 			Source: lm.device, // device?
-			Target: key,
-
 			// NOTE(stevvooe): While it would be nice to use to uuids for
 			// mounts, they don't work reliably if the uuids are missing.
 			Options: []string{fmt.Sprintf("subvolid=%d", info.ID)},
