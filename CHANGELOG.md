@@ -1,6 +1,54 @@
 Change log
 ==========
 
+1.10.0 (2017-01-18)
+-------------------
+
+### New Features
+
+#### Compose file version 3.0
+
+- Introduced version 3.0 of the `docker-compose.yml` specification. This
+  version requires to be used with Docker Engine 1.13 or above and is
+  specifically designed to work with the `docker stack` commands.
+
+#### Compose file version 2.1 and up
+
+- Healthcheck configuration can now be done in the service definition using
+  the `healthcheck` parameter
+
+- Containers dependencies can now be set up to wait on positive healthchecks
+  when declared using `depends_on`. See the documentation for the updated
+  syntax.
+  **Note:** This feature will not be ported to version 3 Compose files.
+
+- Added support for the `sysctls` parameter in service definitions
+
+- Added support for the `userns_mode` parameter in service definitions
+
+- Compose now adds identifying labels to networks and volumes it creates
+
+#### Compose file version 2.0 and up
+
+- Added support for the `stop_grace_period` option in service definitions.
+
+### Bugfixes
+
+- Colored output now works properly on Windows.
+
+- Fixed a bug where docker-compose run would fail to set up link aliases
+  in interactive mode on Windows.
+
+- Networks created by Compose are now always made attachable
+  (Compose files v2.1 and up).
+
+- Fixed a bug where falsy values of `COMPOSE_CONVERT_WINDOWS_PATHS`
+  (`0`, `false`, empty value) were being interpreted as true.
+
+- Fixed a bug where forward slashes in some .dockerignore patterns weren't
+  being parsed correctly on Windows
+
+
 1.9.0 (2016-11-16)
 -----------------
 
