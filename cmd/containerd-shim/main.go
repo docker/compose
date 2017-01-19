@@ -27,7 +27,7 @@ type controlMessage struct {
 }
 
 // containerd-shim is a small shim that sits in front of a runtime implementation
-// that allows it to be repartented to init and handle reattach from the caller.
+// that allows it to be reparented to init and handle reattach from the caller.
 //
 // the cwd of the shim should be the path to the state directory where the shim
 // can locate fifos and other information.

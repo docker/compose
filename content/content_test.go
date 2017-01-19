@@ -196,7 +196,7 @@ func checkBlobPath(t *testing.T, cs *ContentStore, dgst digest.Digest) string {
 		t.Fatal(err, dgst)
 	}
 	if path != filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
-		t.Fatalf("unxpected path: %q", path)
+		t.Fatalf("unexpected path: %q", path)
 	}
 	fi, err := os.Stat(path)
 	if err != nil {

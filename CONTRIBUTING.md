@@ -19,7 +19,7 @@ summarily closed.
 While pull requests are the methodology for submitting changes to code, changes
 are much more likely to be accepted if they are accompanied by additional
 engineering work. While we don't define this explicitly, most of these goals
-are accomplished through communication of the design goals and subsqeuent
+are accomplished through communication of the design goals and subsequent
 solutions. Often times, it helps to first state the problem before presenting
 solutions.
 
@@ -27,7 +27,7 @@ Typically, the best methods of accomplishing this are to submit an issue,
 stating the problem. This issue can include a problem statement and a
 checklist with requirements. If solutions are proposed, alternatives should be
 listed and eliminated. Even if the criteria for elimination of a solution is
-frivelous, say so.
+frivolous, say so.
 
 Larger changes typically work best with design documents, similar to those found
 in `design/`. These are focused on providing context to the design at the time

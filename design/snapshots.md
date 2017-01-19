@@ -32,7 +32,7 @@ graphdrivers, minimizing the need to new code and sprawling tests.
 ## Scope
 
 In the past, the `graphdriver` component has provided quite a lot of
-funcionality in Docker. This includes serialization, hashing, unpacking,
+functionality in Docker. This includes serialization, hashing, unpacking,
 packing, mounting.
 
 This _snapshot manager_ will only provide mount-oriented snapshot
@@ -49,7 +49,7 @@ abstract, layer-based filesystems. The model works by building up sets of
 directories with parent-child relationships, known as _Snapshots_.
 
 Every snapshot is represented by an opaque `diff` directory, which acts as a
-handle to the snapshot. It may contain driver specifc data, including changeset
+handle to the snapshot. It may contain driver specific data, including changeset
 data, parent information and arbitrary metadata.
 
 The `diff` directory for a _snapshot_ is created with a transactional

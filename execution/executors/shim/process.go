@@ -260,7 +260,7 @@ func (p *process) isAlive() bool {
 		return false
 	}
 
-	// check that we have the same startttime
+	// check that we have the same starttime
 	stime, err := starttime.GetProcessStartTime(int(p.pid))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -286,10 +286,10 @@ func waitForPid(ctx context.Context, abortCh chan syscall.WaitStatus, root strin
 			return
 		case wait := <-abortCh:
 			if wait.Signaled() {
-				err = errors.Errorf("shim died prematurarily: %v", wait.Signal())
+				err = errors.Errorf("shim died prematurely: %v", wait.Signal())
 				return
 			}
-			err = errors.Errorf("shim exited prematurarily with exit code %v", wait.ExitStatus())
+			err = errors.Errorf("shim exited prematurely with exit code %v", wait.ExitStatus())
 			return
 		default:
 		}

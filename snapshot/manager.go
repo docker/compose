@@ -203,7 +203,7 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 }
 
 // View behaves identically to Prepare except the result may not be committed
-// back to the snappshot manager.
+// back to the snapshot manager.
 //
 // Whether or not these are readonly mounts is implementation specific, but the
 // caller may write to dst freely.

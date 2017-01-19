@@ -40,7 +40,7 @@ may be exported for access via corresponding _services_.
 
 ## Modules
 
-In addition to the subsystems have, we have sevaral components that may cross
+In addition to the subsystems have, we have several components that may cross
 subsystem boundaries, referened to as components. We have the following
 components:
 
@@ -71,7 +71,7 @@ is a diagram illustrating the data flow for bundle creation.
 
 Let's take pulling an image as a demonstrated example:
 
-1. Instruct the Distribution layer to pull a particuler image. The distribution
+1. Instruct the Distribution layer to pull a particular image. The distribution
    layer places the image content into the _content store_. The image name and
    root manifest pointers are registered with the metadata store.
 2. Once the image is pulled, the user can instruct the bundle controller to

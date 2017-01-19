@@ -1,5 +1,5 @@
 // Package gc experiments with providing central gc tooling to ensure
-// deterministic resource removaol within containerd.
+// deterministic resource removal within containerd.
 //
 // For now, we just have a single exported implementation that can be used
 // under certain use cases.

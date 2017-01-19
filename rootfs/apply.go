@@ -79,7 +79,7 @@ func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent dig
 // for each layer if they don't exist, keyed by their chain id. If the snapshot
 // already exists, it will be skipped.
 //
-// If sucessful, the chainID for the top-level layer is returned. That
+// If successful, the chainID for the top-level layer is returned. That
 // identifier can be used to check out a snapshot.
 func Prepare(snapshots Snaphotter, mounter Mounter, layers []ocispec.Descriptor,
 	// TODO(stevvooe): The following functions are candidate for internal

@@ -211,7 +211,7 @@ func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest
 	}
 	process := container.GetProcess(r.ProcessID)
 	if process == nil {
-		return nil, fmt.Errorf("Make me a constant! Process not foumd!")
+		return nil, fmt.Errorf("Make me a constant! Process not found!")
 	}
 	return emptyResponse, process.Signal(syscall.Signal(r.Signal))
 }
