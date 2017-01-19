@@ -13,6 +13,7 @@ from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.config import V2_1
+from compose.config.config import V3_0
 from compose.config.environment import Environment
 from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
@@ -36,13 +37,15 @@ def get_links(container):
 
 def engine_max_version():
     if 'DOCKER_VERSION' not in os.environ:
-        return V2_1
+        return V3_0
     version = os.environ['DOCKER_VERSION'].partition('-')[0]
     if version_lt(version, '1.10'):
         return V1
     elif version_lt(version, '1.12'):
         return V2_0
-    return V2_1
+    elif version_lt(version, '1.13'):
+        return V2_1
+    return V3_0
 
 
 def build_version_required_decorator(ignored_versions):
