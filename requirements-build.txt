@@ -1,1 +1,3 @@
-pyinstaller==3.1.1
+#pyinstaller==3.1.1
+# pyinstaller 3.1.1 with fix for signals
+git+https://github.com/dnephin/pyinstaller.git@9e8cad86e6f19f16ad9aec4e16bc5c57454cb072#egg=pyinstaller
