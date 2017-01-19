@@ -3177,6 +3177,39 @@ class BuildPathTest(unittest.TestCase):
                 }, '.', None))
             assert 'build path' in exc.exconly()
 
+    def test_extra_hosts_with_multiple_files_v2(self):
+        config1 = config.ConfigFile(
+            'config1.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'extra_hosts':['foo:1.2.3.4']
+                    }
+                }
+            })
+        config2 = config.ConfigFile(
+            'config2.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'extra_hosts':['bar:5.6.7.8']
+                    }
+                }
+            })
+        details = config.ConfigDetails('.', [config1, config2])
+
+        service_dicts = config.load(details).services
+        expected = [{
+                 'image': 'example/web',
+                 'extra_hosts': {'foo':'1.2.3.4', 'bar':'5.6.7.8'},
+                 'name': 'web'
+            }]
+        assert service_sort(service_dicts) == service_sort(expected)
+
 
 class HealthcheckTest(unittest.TestCase):
     def test_healthcheck(self):
