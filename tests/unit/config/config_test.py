@@ -1713,6 +1713,40 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_depends_on_no_override(self):
+        base = {
+            'image': 'busybox',
+            'depends_on': {
+                'app1': {'condition': 'service_started'},
+                'app2': {'condition': 'service_healthy'}
+            }
+        }
+        override = {}
+        actual = config.merge_service_dicts(base, override, V2_1)
+        assert actual == base
+
+    def test_merge_depends_on_mixed_syntax(self):
+        base = {
+            'image': 'busybox',
+            'depends_on': {
+                'app1': {'condition': 'service_started'},
+                'app2': {'condition': 'service_healthy'}
+            }
+        }
+        override = {
+            'depends_on': ['app3']
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_1)
+        assert actual == {
+            'image': 'busybox',
+            'depends_on': {
+                'app1': {'condition': 'service_started'},
+                'app2': {'condition': 'service_healthy'},
+                'app3': {'condition': 'service_started'}
+            }
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
