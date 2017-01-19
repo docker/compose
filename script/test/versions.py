@@ -5,7 +5,7 @@ version tags for recent releases, or the default release.
 
 The default release is the most recent non-RC version.
 
-Recent is a list of unqiue major.minor versions, where each is the most
+Recent is a list of unique major.minor versions, where each is the most
 recent version in the series.
 
 For example, if the list of versions is:
