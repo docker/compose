@@ -35,6 +35,11 @@ func newProcess(ctx context.Context, o newProcessOpts) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			o.container.StateDir().DeleteProcess(o.ID)
+		}
+	}()
 
 	exitPipe, controlPipe, err := getControlPipes(procStateDir)
 	if err != nil {
