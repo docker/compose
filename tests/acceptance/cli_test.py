@@ -262,6 +262,20 @@ class CLITestCase(DockerClientTestCase):
             }
         }
 
+    def test_config_external_volume(self):
+        self.base_dir = 'tests/fixtures/volumes'
+        result = self.dispatch(['-f', 'external-volumes.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'volumes' in json_result
+        assert json_result['volumes'] == {
+            'foo': {
+                'external': True
+            },
+            'bar': {
+                'external': {'name': 'some_bar'}
+            }
+        }
+
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
