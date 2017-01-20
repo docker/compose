@@ -35,3 +35,7 @@ services:
       retries: 5
 
     stop_grace_period: 20s
+volumes:
+  foobar:
+    labels:
+      com.docker.compose.test: 'true'
