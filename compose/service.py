@@ -22,6 +22,7 @@ from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
+from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -769,9 +770,9 @@ class Service(object):
 
         build_opts = self.options.get('build', {})
         path = build_opts.get('context')
-        # python2 os.path() doesn't support unicode, so we need to encode it to
-        # a byte string
-        if not six.PY3:
+        # python2 os.stat() doesn't support unicode on some UNIX, so we
+        # encode it to a bytestring to be safe
+        if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
 
         build_output = self.client.build(
