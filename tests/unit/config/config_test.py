@@ -23,6 +23,7 @@ from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.serialize import denormalize_service_dict
+from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import nanoseconds_from_time_seconds
@@ -3334,3 +3335,38 @@ class SerializeTest(unittest.TestCase):
         }
 
         assert denormalize_service_dict(service_dict, V2_1) == service_dict
+
+    def test_serialize_time(self):
+        data = {
+            9: '9ns',
+            9000: '9us',
+            9000000: '9ms',
+            90000000: '90ms',
+            900000000: '900ms',
+            999999999: '999999999ns',
+            1000000000: '1s',
+            60000000000: '1m',
+            60000000001: '60000000001ns',
+            9000000000000: '150m',
+            90000000000000: '25h',
+        }
+
+        for k, v in data.items():
+            assert serialize_ns_time_value(k) == v
+
+    def test_denormalize_healthcheck(self):
+        service_dict = {
+            'image': 'test',
+            'healthcheck': {
+                'test': 'exit 1',
+                'interval': '1m40s',
+                'timeout': '30s',
+                'retries': 5
+            }
+        }
+        processed_service = config.process_service(config.ServiceConfig(
+            '.', 'test', 'test', service_dict
+        ))
+        denormalized_service = denormalize_service_dict(processed_service, V2_1)
+        assert denormalized_service['healthcheck']['interval'] == '100s'
+        assert denormalized_service['healthcheck']['timeout'] == '30s'

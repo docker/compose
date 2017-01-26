@@ -353,8 +353,8 @@ class CLITestCase(DockerClientTestCase):
 
                     'healthcheck': {
                         'test': 'cat /etc/passwd',
-                        'interval': 10000000000,
-                        'timeout': 1000000000,
+                        'interval': '10s',
+                        'timeout': '1s',
                         'retries': 5,
                     },
 
