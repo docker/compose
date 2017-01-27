@@ -1151,6 +1151,8 @@ class ProjectTest(DockerClientTestCase):
 
     @v3_only()
     def test_project_up_with_secrets(self):
+        create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
+
         config_data = build_config(
             version=V3_1,
             services=[{
@@ -1181,7 +1183,7 @@ class ProjectTest(DockerClientTestCase):
         container, = containers
 
         output = container.logs()
-        assert output == "This is the secret\n"
+        assert output == b"This is the secret\n"
 
     @v2_only()
     def test_initialize_volumes_invalid_volume_driver(self):
@@ -1428,7 +1430,7 @@ class ProjectTest(DockerClientTestCase):
                 }
             }
         }
-        config_data = build_config(config_dict)
+        config_data = load_config(config_dict)
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
         )
@@ -1465,7 +1467,7 @@ class ProjectTest(DockerClientTestCase):
                 }
             }
         }
-        config_data = build_config(config_dict)
+        config_data = load_config(config_dict)
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
         )
@@ -1501,7 +1503,7 @@ class ProjectTest(DockerClientTestCase):
                 }
             }
         }
-        config_data = build_config(config_dict)
+        config_data = load_config(config_dict)
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
         )
@@ -1515,3 +1517,30 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         with pytest.raises(NoHealthCheckConfigured):
             svc1.is_healthy()
+
+
+def create_host_file(client, filename):
+    dirname = os.path.dirname(filename)
+
+    with open(filename, 'r') as fh:
+        content = fh.read()
+
+    container = client.create_container(
+        'busybox:latest',
+        ['sh', '-c', 'echo -n "{}" > {}'.format(content, filename)],
+        volumes={dirname: {}},
+        host_config=client.create_host_config(
+            binds={dirname: {'bind': dirname, 'ro': False}},
+            network_mode='none',
+        ),
+    )
+    try:
+        client.start(container)
+        exitcode = client.wait(container)
+
+        if exitcode != 0:
+            output = client.logs(container)
+            raise Exception(
+                "Container exited with code {}:\n{}".format(exitcode, output))
+    finally:
+        client.remove_container(container, force=True)
