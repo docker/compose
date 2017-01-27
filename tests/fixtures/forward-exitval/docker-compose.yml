@@ -1,0 +1,6 @@
+simple:
+  image: busybox:latest
+  command: sh -c "echo hello && tail -f /dev/null"
+another:
+  image: busybox:latest
+  command: /bin/false
