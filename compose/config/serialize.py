@@ -32,6 +32,11 @@ def denormalize_config(config):
         if 'external_name' in net_conf:
             del net_conf['external_name']
 
+    volumes = config.volumes.copy()
+    for vol_name, vol_conf in volumes.items():
+        if 'external_name' in vol_conf:
+            del vol_conf['external_name']
+
     version = config.version
     if version == V1:
         version = V2_1
@@ -40,7 +45,7 @@ def denormalize_config(config):
         'version': version,
         'services': services,
         'networks': networks,
-        'volumes': config.volumes,
+        'volumes': volumes,
     }
 
 
@@ -52,13 +57,49 @@ def serialize_config(config):
         width=80)
 
 
+def serialize_ns_time_value(value):
+    result = (value, 'ns')
+    table = [
+        (1000., 'us'),
+        (1000., 'ms'),
+        (1000., 's'),
+        (60., 'm'),
+        (60., 'h')
+    ]
+    for stage in table:
+        tmp = value / stage[0]
+        if tmp == int(value / stage[0]):
+            value = tmp
+            result = (int(value), stage[1])
+        else:
+            break
+    return '{0}{1}'.format(*result)
+
+
 def denormalize_service_dict(service_dict, version):
     service_dict = service_dict.copy()
 
     if 'restart' in service_dict:
-        service_dict['restart'] = types.serialize_restart_spec(service_dict['restart'])
+        service_dict['restart'] = types.serialize_restart_spec(
+            service_dict['restart']
+        )
 
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
+
+    if 'depends_on' in service_dict and version != V2_1:
+        service_dict['depends_on'] = sorted([
+            svc for svc in service_dict['depends_on'].keys()
+        ])
+
+    if 'healthcheck' in service_dict:
+        if 'interval' in service_dict['healthcheck']:
+            service_dict['healthcheck']['interval'] = serialize_ns_time_value(
+                service_dict['healthcheck']['interval']
+            )
+        if 'timeout' in service_dict['healthcheck']:
+            service_dict['healthcheck']['timeout'] = serialize_ns_time_value(
+                service_dict['healthcheck']['timeout']
+            )
 
     return service_dict

@@ -713,7 +713,7 @@ def finalize_service(service_config, service_names, version, environment):
     if 'volumes' in service_dict:
         service_dict['volumes'] = [
             VolumeSpec.parse(
-                v, environment.get('COMPOSE_CONVERT_WINDOWS_PATHS')
+                v, environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
             ) for v in service_dict['volumes']
         ]
 
@@ -819,6 +819,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('ulimits', parse_ulimits)
     md.merge_mapping('networks', parse_networks)
     md.merge_mapping('sysctls', parse_sysctls)
+    md.merge_mapping('depends_on', parse_depends_on)
     md.merge_sequence('links', ServiceLink.parse)
 
     for field in ['volumes', 'devices']:
@@ -826,7 +827,7 @@ def merge_service_dicts(base, override, version):
 
     for field in [
         'ports', 'cap_add', 'cap_drop', 'expose', 'external_links',
-        'security_opt', 'volumes_from', 'depends_on',
+        'security_opt', 'volumes_from',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 
@@ -921,6 +922,9 @@ parse_environment = functools.partial(parse_dict_or_list, split_env, 'environmen
 parse_labels = functools.partial(parse_dict_or_list, split_kv, 'labels')
 parse_networks = functools.partial(parse_dict_or_list, lambda k: (k, None), 'networks')
 parse_sysctls = functools.partial(parse_dict_or_list, split_kv, 'sysctls')
+parse_depends_on = functools.partial(
+    parse_dict_or_list, lambda k: (k, {'condition': 'service_started'}), 'depends_on'
+)
 
 
 def parse_ulimits(ulimits):
