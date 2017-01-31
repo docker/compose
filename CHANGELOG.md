@@ -1,6 +1,29 @@
 Change log
 ==========
 
+1.10.1 (2017-02-01)
+------------------
+
+### Bugfixes
+
+- Fixed an issue where presence of older versions of the docker-py
+  package would cause unexpected crashes while running Compose
+
+- Fixed an issue where healthcheck dependencies would be lost when
+  using multiple compose files for a project
+
+- Fixed a few issues that made the output of the `config` command
+  invalid
+
+- Fixed an issue where adding volume labels to v3 Compose files would
+  result in an error
+
+- Fixed an issue on Windows where build context paths containing unicode
+  characters were being improperly encoded
+
+- Fixed a bug where Compose would occasionally crash while streaming logs
+  when containers would stop or restart
+
 1.10.0 (2017-01-18)
 -------------------
 
