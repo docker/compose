@@ -308,6 +308,7 @@
           },
           "additionalProperties": false
         },
+        "internal": {"type": "boolean"},
         "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
@@ -328,10 +329,11 @@
           "type": ["boolean", "object"],
           "properties": {
             "name": {"type": "string"}
-          }
-        }
+          },
+          "additionalProperties": false
+        },
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
-      "labels": {"$ref": "#/definitions/list_or_dict"},
       "additionalProperties": false
     },
 

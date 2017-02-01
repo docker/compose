@@ -295,7 +295,13 @@ class CLITestCase(DockerClientTestCase):
         assert yaml.load(result.stdout) == {
             'version': '3.0',
             'networks': {},
-            'volumes': {},
+            'volumes': {
+                'foobar': {
+                    'labels': {
+                        'com.docker.compose.test': 'true',
+                    },
+                },
+            },
             'services': {
                 'web': {
                     'image': 'busybox',
@@ -333,8 +339,8 @@ class CLITestCase(DockerClientTestCase):
 
                     'healthcheck': {
                         'test': 'cat /etc/passwd',
-                        'interval': 10000000000,
-                        'timeout': 1000000000,
+                        'interval': '10s',
+                        'timeout': '1s',
                         'retries': 5,
                     },
 

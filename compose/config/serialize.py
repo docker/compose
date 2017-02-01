@@ -52,6 +52,25 @@ def serialize_config(config):
         width=80)
 
 
+def serialize_ns_time_value(value):
+    result = (value, 'ns')
+    table = [
+        (1000., 'us'),
+        (1000., 'ms'),
+        (1000., 's'),
+        (60., 'm'),
+        (60., 'h')
+    ]
+    for stage in table:
+        tmp = value / stage[0]
+        if tmp == int(value / stage[0]):
+            value = tmp
+            result = (int(value), stage[1])
+        else:
+            break
+    return '{0}{1}'.format(*result)
+
+
 def denormalize_service_dict(service_dict, version):
     service_dict = service_dict.copy()
 
@@ -67,5 +86,15 @@ def denormalize_service_dict(service_dict, version):
         service_dict['depends_on'] = sorted([
             svc for svc in service_dict['depends_on'].keys()
         ])
+
+    if 'healthcheck' in service_dict:
+        if 'interval' in service_dict['healthcheck']:
+            service_dict['healthcheck']['interval'] = serialize_ns_time_value(
+                service_dict['healthcheck']['interval']
+            )
+        if 'timeout' in service_dict['healthcheck']:
+            service_dict['healthcheck']['timeout'] = serialize_ns_time_value(
+                service_dict['healthcheck']['timeout']
+            )
 
     return service_dict
