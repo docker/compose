@@ -386,9 +386,17 @@ _docker-compose() {
     integer ret=1
     typeset -A opt_args
 
+    local file_description
+
+    if [[ -n ${words[(r)-f]} || -n ${words[(r)--file]} ]] ; then
+        file_description="Specify an override docker-compose file (default: docker-compose.override.yml)"
+    else
+        file_description="Specify an alternate docker-compose file (default: docker-compose.yml)"
+    fi
+
     _arguments -C \
         '(- :)'{-h,--help}'[Get help]' \
-        '(-f --file)'{-f,--file}'[Specify an alternate docker-compose file (default: docker-compose.yml)]:file:_files -g "*.yml"' \
+        '*'{-f,--file}"[${file_description}]:file:_files -g '*.yml'" \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
         '--verbose[Show more output]' \
         '(- :)'{-v,--version}'[Print version and exit]' \
