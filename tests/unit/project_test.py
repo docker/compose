@@ -36,6 +36,7 @@ class ProjectTest(unittest.TestCase):
             ],
             networks=None,
             volumes=None,
+            secrets=None,
         )
         project = Project.from_config(
             name='composetest',
@@ -64,6 +65,7 @@ class ProjectTest(unittest.TestCase):
             ],
             networks=None,
             volumes=None,
+            secrets=None,
         )
         project = Project.from_config('composetest', config, None)
         self.assertEqual(len(project.services), 2)
@@ -170,6 +172,7 @@ class ProjectTest(unittest.TestCase):
                 }],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
         assert project.get_service('test')._get_volumes_from() == [container_id + ":rw"]
@@ -202,6 +205,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
         assert project.get_service('test')._get_volumes_from() == [container_name + ":rw"]
@@ -227,6 +231,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
         with mock.patch.object(Service, 'containers') as mock_return:
@@ -360,6 +365,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
         service = project.get_service('test')
@@ -384,6 +390,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
         service = project.get_service('test')
@@ -417,6 +424,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
 
@@ -437,6 +445,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
 
@@ -457,6 +466,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks={'custom': {}},
                 volumes=None,
+                secrets=None,
             ),
         )
 
@@ -487,6 +497,7 @@ class ProjectTest(unittest.TestCase):
                 }],
                 networks=None,
                 volumes=None,
+                secrets=None,
             ),
         )
         self.assertEqual([c.id for c in project.containers()], ['1'])
@@ -503,6 +514,7 @@ class ProjectTest(unittest.TestCase):
                 }],
                 networks={'default': {}},
                 volumes={'data': {}},
+                secrets=None,
             ),
         )
         self.mock_client.remove_network.side_effect = NotFound(None, None, 'oops')

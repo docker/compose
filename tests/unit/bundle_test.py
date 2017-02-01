@@ -77,7 +77,8 @@ def test_to_bundle():
         version=2,
         services=services,
         volumes={'special': {}},
-        networks={'extra': {}})
+        networks={'extra': {}},
+        secrets={})
 
     with mock.patch('compose.bundle.log.warn', autospec=True) as mock_log:
         output = bundle.to_bundle(config, image_digests)
