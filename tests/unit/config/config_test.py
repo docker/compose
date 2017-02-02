@@ -1748,6 +1748,24 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_pid(self):
+        # Regression: https://github.com/docker/compose/issues/4184
+        base = {
+            'image': 'busybox',
+            'pid': 'host'
+        }
+
+        override = {
+            'labels': {'com.docker.compose.test': 'yes'}
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'busybox',
+            'pid': 'host',
+            'labels': {'com.docker.compose.test': 'yes'}
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
