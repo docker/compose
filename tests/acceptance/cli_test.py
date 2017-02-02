@@ -1907,3 +1907,23 @@ class CLITestCase(DockerClientTestCase):
             "BAZ=2",
         ])
         self.assertTrue(expected_env <= set(web.get('Config.Env')))
+
+    def test_top_services_not_running(self):
+        self.base_dir = 'tests/fixtures/top'
+        result = self.dispatch(['top'])
+        assert len(result.stdout) == 0
+
+    def test_top_services_running(self):
+        self.base_dir = 'tests/fixtures/top'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['top'])
+
+        self.assertIn('top_service_a', result.stdout)
+        self.assertIn('top_service_b', result.stdout)
+        self.assertNotIn('top_not_a_service', result.stdout)
+
+    def test_top_processes_running(self):
+        self.base_dir = 'tests/fixtures/top'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['top'])
+        assert result.stdout.count("top") == 4

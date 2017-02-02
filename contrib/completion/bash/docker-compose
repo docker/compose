@@ -434,6 +434,18 @@ _docker_compose_stop() {
 }
 
 
+_docker_compose_top() {
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_running
+			;;
+	esac
+}
+
+
 _docker_compose_unpause() {
 	case "$cur" in
 		-*)
@@ -499,6 +511,7 @@ _docker_compose() {
 		scale
 		start
 		stop
+		top
 		unpause
 		up
 		version

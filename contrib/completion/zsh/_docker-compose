@@ -341,6 +341,11 @@ __docker-compose_subcommand() {
                 $opts_timeout \
                 '*:running services:__docker-compose_runningservices' && ret=0
             ;;
+        (top)
+            _arguments \
+                $opts_help \
+                '*:running services:__docker-compose_runningservices' && ret=0
+            ;;
         (unpause)
             _arguments \
                 $opts_help \
