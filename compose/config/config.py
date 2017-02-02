@@ -716,9 +716,15 @@ def process_healthcheck(service_dict, service_name):
         hc['test'] = raw['test']
 
     if 'interval' in raw:
-        hc['interval'] = parse_nanoseconds_int(raw['interval'])
+        if not isinstance(raw['interval'], six.integer_types):
+            hc['interval'] = parse_nanoseconds_int(raw['interval'])
+        else:  # Conversion has been done previously
+            hc['interval'] = raw['interval']
     if 'timeout' in raw:
-        hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+        if not isinstance(raw['timeout'], six.integer_types):
+            hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+        else:  # Conversion has been done previously
+            hc['timeout'] = raw['timeout']
     if 'retries' in raw:
         hc['retries'] = raw['retries']
 

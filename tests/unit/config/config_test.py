@@ -3098,6 +3098,19 @@ class ExtendsTest(unittest.TestCase):
             'other': {'condition': 'service_started'}
         }
 
+    def test_extends_with_healthcheck(self):
+        service_dicts = load_from_filename('tests/fixtures/extends/healthcheck-2.yml')
+        assert service_sort(service_dicts) == [{
+            'name': 'demo',
+            'image': 'foobar:latest',
+            'healthcheck': {
+                'test': ['CMD', '/health.sh'],
+                'interval': 10000000000,
+                'timeout': 5000000000,
+                'retries': 36,
+            }
+        }]
+
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ExpandPathTest(unittest.TestCase):
