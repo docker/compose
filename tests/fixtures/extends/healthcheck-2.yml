@@ -1,0 +1,6 @@
+version: '2.1'
+services:
+  demo:
+    extends:
+      file: healthcheck-1.yml
+      service: demo
