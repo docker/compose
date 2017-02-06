@@ -12,10 +12,12 @@ import six
 import yaml
 from cached_property import cached_property
 
+from . import types
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..const import COMPOSEFILE_V2_1 as V2_1
 from ..const import COMPOSEFILE_V3_0 as V3_0
+from ..const import COMPOSEFILE_V3_1 as V3_1
 from ..utils import build_string_dict
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
@@ -76,12 +78,13 @@ DOCKER_CONFIG_KEYS = [
     'memswap_limit',
     'mem_swappiness',
     'net',
-    'oom_score_adj'
+    'oom_score_adj',
     'pid',
     'ports',
     'privileged',
     'read_only',
     'restart',
+    'secrets',
     'security_opt',
     'shm_size',
     'stdin_open',
@@ -202,8 +205,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_networks(self):
         return {} if self.version == V1 else self.config.get('networks', {})
 
+    def get_secrets(self):
+        return {} if self.version < V3_1 else self.config.get('secrets', {})
 
-class Config(namedtuple('_Config', 'version services volumes networks')):
+
+class Config(namedtuple('_Config', 'version services volumes networks secrets')):
     """
     :param version: configuration version
     :type  version: int
@@ -328,6 +334,7 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
+    secrets = load_secrets(config_details.config_files, config_details.working_dir)
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
@@ -342,7 +349,7 @@ def load(config_details):
             "`docker stack deploy` to deploy to a swarm."
             .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
 
-    return Config(main_file.version, service_dicts, volumes, networks)
+    return Config(main_file.version, service_dicts, volumes, networks, secrets)
 
 
 def load_mapping(config_files, get_func, entity_type):
@@ -356,21 +363,11 @@ def load_mapping(config_files, get_func, entity_type):
 
             external = config.get('external')
             if external:
-                if len(config.keys()) > 1:
-                    raise ConfigurationError(
-                        '{} {} declared as external but specifies'
-                        ' additional attributes ({}). '.format(
-                            entity_type,
-                            name,
-                            ', '.join([k for k in config.keys() if k != 'external'])
-                        )
-                    )
+                validate_external(entity_type, name, config)
                 if isinstance(external, dict):
                     config['external_name'] = external.get('name')
                 else:
                     config['external_name'] = name
-
-            mapping[name] = config
 
             if 'driver_opts' in config:
                 config['driver_opts'] = build_string_dict(
@@ -379,6 +376,39 @@ def load_mapping(config_files, get_func, entity_type):
 
             if 'labels' in config:
                 config['labels'] = parse_labels(config['labels'])
+
+    return mapping
+
+
+def validate_external(entity_type, name, config):
+    if len(config.keys()) <= 1:
+        return
+
+    raise ConfigurationError(
+        "{} {} declared as external but specifies additional attributes "
+        "({}).".format(
+            entity_type, name, ', '.join(k for k in config if k != 'external')))
+
+
+def load_secrets(config_files, working_dir):
+    mapping = {}
+
+    for config_file in config_files:
+        for name, config in config_file.get_secrets().items():
+            mapping[name] = config or {}
+            if not config:
+                continue
+
+            external = config.get('external')
+            if external:
+                validate_external('Secret', name, config)
+                if isinstance(external, dict):
+                    config['external_name'] = external.get('name')
+                else:
+                    config['external_name'] = name
+
+            if 'file' in config:
+                config['file'] = expand_path(working_dir, config['file'])
 
     return mapping
 
@@ -686,9 +716,15 @@ def process_healthcheck(service_dict, service_name):
         hc['test'] = raw['test']
 
     if 'interval' in raw:
-        hc['interval'] = parse_nanoseconds_int(raw['interval'])
+        if not isinstance(raw['interval'], six.integer_types):
+            hc['interval'] = parse_nanoseconds_int(raw['interval'])
+        else:  # Conversion has been done previously
+            hc['interval'] = raw['interval']
     if 'timeout' in raw:
-        hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+        if not isinstance(raw['timeout'], six.integer_types):
+            hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+        else:  # Conversion has been done previously
+            hc['timeout'] = raw['timeout']
     if 'retries' in raw:
         hc['retries'] = raw['retries']
 
@@ -820,6 +856,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('sysctls', parse_sysctls)
     md.merge_mapping('depends_on', parse_depends_on)
     md.merge_sequence('links', ServiceLink.parse)
+    md.merge_sequence('secrets', types.ServiceSecret.parse)
 
     for field in ['volumes', 'devices']:
         md.merge_field(field, merge_path_mappings)

@@ -1748,6 +1748,24 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_pid(self):
+        # Regression: https://github.com/docker/compose/issues/4184
+        base = {
+            'image': 'busybox',
+            'pid': 'host'
+        }
+
+        override = {
+            'labels': {'com.docker.compose.test': 'yes'}
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'busybox',
+            'pid': 'host',
+            'labels': {'com.docker.compose.test': 'yes'}
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -3097,6 +3115,19 @@ class ExtendsTest(unittest.TestCase):
         assert service_sort(services)[2]['depends_on'] == {
             'other': {'condition': 'service_started'}
         }
+
+    def test_extends_with_healthcheck(self):
+        service_dicts = load_from_filename('tests/fixtures/extends/healthcheck-2.yml')
+        assert service_sort(service_dicts) == [{
+            'name': 'demo',
+            'image': 'foobar:latest',
+            'healthcheck': {
+                'test': ['CMD', '/health.sh'],
+                'interval': 10000000000,
+                'timeout': 5000000000,
+                'retries': 36,
+            }
+        }]
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')

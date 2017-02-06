@@ -41,9 +41,9 @@ def engine_max_version():
     version = os.environ['DOCKER_VERSION'].partition('-')[0]
     if version_lt(version, '1.10'):
         return V1
-    elif version_lt(version, '1.12'):
+    if version_lt(version, '1.12'):
         return V2_0
-    elif version_lt(version, '1.13'):
+    if version_lt(version, '1.13'):
         return V2_1
     return V3_0
 
@@ -52,8 +52,9 @@ def build_version_required_decorator(ignored_versions):
     def decorator(f):
         @functools.wraps(f)
         def wrapper(self, *args, **kwargs):
-            if engine_max_version() in ignored_versions:
-                skip("Engine version is too low")
+            max_version = engine_max_version()
+            if max_version in ignored_versions:
+                skip("Engine version %s is too low" % max_version)
                 return
             return f(self, *args, **kwargs)
         return wrapper

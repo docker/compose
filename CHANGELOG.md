@@ -1,6 +1,30 @@
 Change log
 ==========
 
+1.11.0 (2017-02-08)
+-------------------
+
+### New Features
+
+#### Compose file version 3.1
+
+- Introduced version 3.1 of the `docker-compose.yml` specification. This
+  version requires Docker Engine 1.13.0 or above. It introduces support
+  for secrets. See the documentation for more information
+
+#### Compose file version 2.0 and up
+
+- Introduced the `docker-compose top` command that displays processes running
+  for the different services managed by Compose.
+
+### Bugfixes
+
+- Fixed a bug where extending a service defining a healthcheck dictionary
+  would cause `docker-compose` to error out.
+
+- Fixed an issue where the `pid` entry in a service definition was being
+  ignored when using multiple Compose files.
+
 1.10.1 (2017-02-01)
 ------------------
 
@@ -214,7 +238,7 @@ Bug Fixes
 - Fixed a bug in Windows environment where volume mappings of the
   host's root directory would be parsed incorrectly.
 
-- Fixed a bug where `docker-compose config` would ouput an invalid
+- Fixed a bug where `docker-compose config` would output an invalid
   Compose file if external networks were specified.
 
 - Fixed an issue where unset buildargs would be assigned a string

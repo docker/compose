@@ -262,6 +262,20 @@ class CLITestCase(DockerClientTestCase):
             }
         }
 
+    def test_config_external_volume(self):
+        self.base_dir = 'tests/fixtures/volumes'
+        result = self.dispatch(['-f', 'external-volumes.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'volumes' in json_result
+        assert json_result['volumes'] == {
+            'foo': {
+                'external': True
+            },
+            'bar': {
+                'external': {'name': 'some_bar'}
+            }
+        }
+
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
@@ -1893,3 +1907,23 @@ class CLITestCase(DockerClientTestCase):
             "BAZ=2",
         ])
         self.assertTrue(expected_env <= set(web.get('Config.Env')))
+
+    def test_top_services_not_running(self):
+        self.base_dir = 'tests/fixtures/top'
+        result = self.dispatch(['top'])
+        assert len(result.stdout) == 0
+
+    def test_top_services_running(self):
+        self.base_dir = 'tests/fixtures/top'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['top'])
+
+        self.assertIn('top_service_a', result.stdout)
+        self.assertIn('top_service_b', result.stdout)
+        self.assertNotIn('top_not_a_service', result.stdout)
+
+    def test_top_processes_running(self):
+        self.base_dir = 'tests/fixtures/top'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['top'])
+        assert result.stdout.count("top") == 4

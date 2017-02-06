@@ -32,6 +32,11 @@ def denormalize_config(config):
         if 'external_name' in net_conf:
             del net_conf['external_name']
 
+    volumes = config.volumes.copy()
+    for vol_name, vol_conf in volumes.items():
+        if 'external_name' in vol_conf:
+            del vol_conf['external_name']
+
     version = config.version
     if version == V1:
         version = V2_1
@@ -40,7 +45,7 @@ def denormalize_config(config):
         'version': version,
         'services': services,
         'networks': networks,
-        'volumes': config.volumes,
+        'volumes': volumes,
     }
 
 
