@@ -620,7 +620,7 @@ Bug Fixes:
     if at least one container is using the network.
 
 -   When printings logs during `up` or `logs`, flush the output buffer after
-    each line to prevent buffering issues from hideing logs.
+    each line to prevent buffering issues from hiding logs.
 
 -   Recreate a container if one of its dependencies is being created.
     Previously a container was only recreated if it's dependencies already
