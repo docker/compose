@@ -1,0 +1,6 @@
+simple:
+  image: busybox:latest
+  command: top
+digest:
+  image: busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d
+  command: top
