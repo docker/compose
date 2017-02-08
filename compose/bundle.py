@@ -202,7 +202,7 @@ def convert_service_to_bundle(name, service_dict, image_digest):
     return container_config
 
 
-# See https://github.com/docker/swarmkit/blob//agent/exec/container/container.go#L95
+# See https://github.com/docker/swarmkit/blob/agent/exec/container/container.go#L95
 def set_command_and_args(config, entrypoint, command):
     if isinstance(entrypoint, six.string_types):
         entrypoint = split_command(entrypoint)
