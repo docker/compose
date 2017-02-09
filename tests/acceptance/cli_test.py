@@ -1074,6 +1074,7 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
     def test_up_handles_abort_on_container_exit(self):
+        self.base_dir = 'tests/fixtures/simple-composefile'
         proc = start_process(self.base_dir, ['up', '--abort-on-container-exit'])
         wait_on_condition(ContainerCountCondition(self.project, 2))
         self.project.stop(['simple'])
