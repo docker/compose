@@ -1,6 +1,14 @@
 Change log
 ==========
 
+1.11.1 (2017-02-09)
+-------------------
+
+### Bugfixes
+
+- Fixed a bug where the 3.1 file format was not being recognized as valid
+  by the Compose parser
+
 1.11.0 (2017-02-08)
 -------------------
 

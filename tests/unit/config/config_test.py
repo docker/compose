@@ -19,6 +19,7 @@ from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.config import V2_1
 from compose.config.config import V3_0
+from compose.config.config import V3_1
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
@@ -167,6 +168,9 @@ class ConfigTest(unittest.TestCase):
         for version in ['3', '3.0']:
             cfg = config.load(build_config_details({'version': version}))
             assert cfg.version == V3_0
+
+        cfg = config.load(build_config_details({'version': '3.1'}))
+        assert cfg.version == V3_1
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
