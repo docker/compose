@@ -763,6 +763,11 @@ def finalize_service(service_config, service_names, version, environment):
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
 
+    if 'secrets' in service_dict:
+        service_dict['secrets'] = [
+            types.ServiceSecret.parse(s) for s in service_dict['secrets']
+        ]
+
     normalize_build(service_dict, service_config.working_dir, environment)
 
     service_dict['name'] = service_config.name
