@@ -26,6 +26,7 @@ from compose.config.errors import VERSION_EXPLANATION
 from compose.config.serialize import denormalize_service_dict
 from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
+from compose.config.validation import validate_against_config_schema
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
@@ -3154,6 +3155,60 @@ class ExpandPathTest(unittest.TestCase):
             result = config.expand_path(self.working_dir, test_path)
 
         self.assertEqual(result, user_path + 'otherdir/somefile')
+
+
+class ExtraConfigTest(unittest.TestCase):
+    def write_config_and_get_services(self, tmpdir, content):
+        tmpdir.join('docker-compose.yml').write(content)
+        with tmpdir.as_cwd():
+            config_file = config.ConfigFile.from_filename('docker-compose.yml')
+        validate_against_config_schema(config_file)
+        return config_file.get_service_dicts()
+
+    def test_extra_config_with_anchors(self):
+        tmpdir = py.test.ensuretemp('config_test')
+        self.addCleanup(tmpdir.remove)
+        for version in (V2_0, V2_1, V3_0, V3_1):
+            service_dicts = self.write_config_and_get_services(
+                tmpdir,
+                '\n'.join(
+                    (
+                        'version: "{}"'.format(version),
+                        'extra:',
+                        '  db_env: &db_env',
+                        '    PGUSER: postgres',
+                        '    PGDATABASE: postgres',
+                        'services:',
+                        '  db:',
+                        '    image: postgres:9.6',
+                        '    environment: *db_env',
+                        '  ui:',
+                        '    image: nginx',
+                        '    environment:',
+                        '      <<: *db_env',
+                        '      PGHOST: db',
+                    )
+                )
+            )
+
+            expected = {
+                'db': {
+                    'image': 'postgres:9.6',
+                    'environment': {
+                        'PGUSER': 'postgres',
+                        'PGDATABASE': 'postgres',
+                    },
+                },
+                'ui': {
+                    'image': 'nginx',
+                    'environment': {
+                        'PGUSER': 'postgres',
+                        'PGDATABASE': 'postgres',
+                        'PGHOST': 'db',
+                    },
+                },
+            }
+            self.assertEqual(service_dicts, expected)
 
 
 class VolumePathTest(unittest.TestCase):
