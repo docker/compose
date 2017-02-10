@@ -914,7 +914,13 @@ class TopLevelCommand(object):
 
             if cascade_stop:
                 print("Aborting on container exit...")
+                exit_code = 0
+                for e in self.project.containers(service_names=options['SERVICE'], stopped=True):
+                    if not e.is_running:
+                        if not e.exit_code == 0:
+                            exit_code = 1
                 self.project.stop(service_names=service_names, timeout=timeout)
+                sys.exit(exit_code)
 
     @classmethod
     def version(cls, options):
