@@ -35,7 +35,7 @@ A `docker-compose.yml` looks like this:
         image: redis
 
 For more information about the Compose file, see the
-[Compose file reference](https://github.com/docker/docker.github.io/blob/master/compose/compose-file.md)
+[Compose file reference](https://github.com/docker/docker.github.io/blob/master/compose/compose-file/compose-versioning.md)
 
 Compose has commands for managing the whole lifecycle of your application:
 
