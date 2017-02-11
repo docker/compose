@@ -13,6 +13,7 @@ import pytest
 
 from ...helpers import build_config_details
 from compose.config import config
+from compose.config import types
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
@@ -1848,6 +1849,91 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
         assert 'has neither an image nor a build context' in exc.exconly()
+
+    def test_load_secrets(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'secrets': [
+                            'one',
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+                'secrets': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        details = config.ConfigDetails('.', [base_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'secrets': [
+                    types.ServiceSecret('one', None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
+
+    def test_load_secrets_multi_file(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'secrets': ['one'],
+                    },
+                },
+                'secrets': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        override_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'secrets': [
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'secrets': [
+                    types.ServiceSecret('one', None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
 
 
 class NetworkModeTest(unittest.TestCase):
