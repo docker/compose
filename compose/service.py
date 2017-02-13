@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+import os
 import re
 import sys
 from collections import namedtuple
@@ -896,7 +897,11 @@ class Service(object):
             log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
         try:
             output = self.client.pull(repo, tag=tag, stream=True)
-            if not silent:
+            if silent:
+                with open(os.devnull, 'w') as devnull:
+                    return progress_stream.get_digest_from_pull(
+                        stream_output(output, devnull))
+            else:
                 return progress_stream.get_digest_from_pull(
                     stream_output(output, sys.stdout))
         except (StreamOutputError, NotFound) as e:

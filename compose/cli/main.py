@@ -607,7 +607,7 @@ class TopLevelCommand(object):
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
-            in_parallel=options.get('--parallel')
+            parallel_pull=options.get('--parallel')
         )
 
     def push(self, options):

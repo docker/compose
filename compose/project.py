@@ -454,10 +454,10 @@ class Project(object):
 
         return plans
 
-    def pull(self, service_names=None, ignore_pull_failures=False, in_parallel=False):
+    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False):
         services = self.get_services(service_names, include_deps=False)
 
-        if in_parallel:
+        if parallel_pull:
             def pull_service(service):
                 service.pull(ignore_pull_failures, True)
 
