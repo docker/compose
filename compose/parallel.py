@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 import operator
 import sys
+from threading import Semaphore
 from threading import Thread
 
 from docker.errors import APIError
@@ -23,7 +24,7 @@ log = logging.getLogger(__name__)
 STOP = object()
 
 
-def parallel_execute(objects, func, get_name, msg, get_deps=None):
+def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
     """Runs func on objects in parallel while ensuring that func is
     ran on object only after it is ran on all its dependencies.
 
@@ -37,7 +38,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
     for obj in objects:
         writer.initialize(get_name(obj))
 
-    events = parallel_execute_iter(objects, func, get_deps)
+    events = parallel_execute_iter(objects, func, get_deps, limit)
 
     errors = {}
     results = []
@@ -94,7 +95,15 @@ class State(object):
         return set(self.objects) - self.started - self.finished - self.failed
 
 
-def parallel_execute_iter(objects, func, get_deps):
+class NoLimit(object):
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *ex):
+        pass
+
+
+def parallel_execute_iter(objects, func, get_deps, limit):
     """
     Runs func on objects in parallel while ensuring that func is
     ran on object only after it is ran on all its dependencies.
@@ -113,11 +122,16 @@ def parallel_execute_iter(objects, func, get_deps):
     if get_deps is None:
         get_deps = _no_deps
 
+    if limit is None:
+        limiter = NoLimit()
+    else:
+        limiter = Semaphore(limit)
+
     results = Queue()
     state = State(objects)
 
     while True:
-        feed_queue(objects, func, get_deps, results, state)
+        feed_queue(objects, func, get_deps, results, state, limiter)
 
         try:
             event = results.get(timeout=0.1)
@@ -141,19 +155,20 @@ def parallel_execute_iter(objects, func, get_deps):
         yield event
 
 
-def producer(obj, func, results):
+def producer(obj, func, results, limiter):
     """
     The entry point for a producer thread which runs func on a single object.
     Places a tuple on the results queue once func has either returned or raised.
     """
-    try:
-        result = func(obj)
-        results.put((obj, result, None))
-    except Exception as e:
-        results.put((obj, None, e))
+    with limiter:
+        try:
+            result = func(obj)
+            results.put((obj, result, None))
+        except Exception as e:
+            results.put((obj, None, e))
 
 
-def feed_queue(objects, func, get_deps, results, state):
+def feed_queue(objects, func, get_deps, results, state, limiter):
     """
     Starts producer threads for any objects which are ready to be processed
     (i.e. they have no dependencies which haven't been successfully processed).
@@ -177,7 +192,7 @@ def feed_queue(objects, func, get_deps, results, state):
                 ) for dep, ready_check in deps
             ):
                 log.debug('Starting producer thread for {}'.format(obj))
-                t = Thread(target=producer, args=(obj, func, results))
+                t = Thread(target=producer, args=(obj, func, results, limiter))
                 t.daemon = True
                 t.start()
                 state.started.add(obj)
@@ -199,7 +214,7 @@ class UpstreamError(Exception):
 class ParallelStreamWriter(object):
     """Write out messages for operations happening in parallel.
 
-    Each operation has it's own line, and ANSI code characters are used
+    Each operation has its own line, and ANSI code characters are used
     to jump to the correct line, and write over the line.
     """
 

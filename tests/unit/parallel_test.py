@@ -82,7 +82,7 @@ def test_parallel_execute_with_upstream_errors():
     events = [
         (obj, result, type(exception))
         for obj, result, exception
-        in parallel_execute_iter(objects, process, get_deps)
+        in parallel_execute_iter(objects, process, get_deps, None)
     ]
 
     assert (cache, None, type(None)) in events

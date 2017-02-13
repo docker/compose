@@ -463,7 +463,8 @@ class Project(object):
             services,
             pull_service,
             operator.attrgetter('name'),
-            'Pulling')
+            'Pulling',
+            limit=5)
 
     def push(self, service_names=None, ignore_push_failures=False):
         for service in self.get_services(service_names, include_deps=False):
