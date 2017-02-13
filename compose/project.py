@@ -456,7 +456,7 @@ class Project(object):
 
     def pull(self, service_names=None, ignore_pull_failures=False):
         def pull_service(service):
-            service.pull(ignore_pull_failures)
+            service.pull(ignore_pull_failures, True)
 
         services = self.get_services(service_names, include_deps=False)
         parallel.parallel_execute(

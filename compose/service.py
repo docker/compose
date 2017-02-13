@@ -886,17 +886,19 @@ class Service(object):
 
         return any(has_host_port(binding) for binding in self.options.get('ports', []))
 
-    def pull(self, ignore_pull_failures=False):
+    def pull(self, ignore_pull_failures=False, silent=False):
         if 'image' not in self.options:
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
-        log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
+        if not silent:
+            log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
         try:
             output = self.client.pull(repo, tag=tag, stream=True)
-            return progress_stream.get_digest_from_pull(
-                stream_output(output, sys.stdout))
+            if not silent:
+                return progress_stream.get_digest_from_pull(
+                    stream_output(output, sys.stdout))
         except (StreamOutputError, NotFound) as e:
             if not ignore_pull_failures:
                 raise
