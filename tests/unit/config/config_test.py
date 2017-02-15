@@ -54,6 +54,10 @@ def service_sort(services):
     return sorted(services, key=itemgetter('name'))
 
 
+def secret_sort(secrets):
+    return sorted(secrets, key=itemgetter('source'))
+
+
 class ConfigTest(unittest.TestCase):
     def test_load(self):
         service_dicts = config.load(
@@ -1770,6 +1774,38 @@ class ConfigTest(unittest.TestCase):
             'pid': 'host',
             'labels': {'com.docker.compose.test': 'yes'}
         }
+
+    def test_merge_different_secrets(self):
+        base = {
+            'image': 'busybox',
+            'secrets': [
+                {'source': 'src.txt'}
+            ]
+        }
+        override = {'secrets': ['other-src.txt']}
+
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert secret_sort(actual['secrets']) == secret_sort([
+            {'source': 'src.txt'},
+            {'source': 'other-src.txt'}
+        ])
+
+    def test_merge_secrets_override(self):
+        base = {
+            'image': 'busybox',
+            'secrets': ['src.txt'],
+        }
+        override = {
+            'secrets': [
+                {
+                    'source': 'src.txt',
+                    'target': 'data.txt',
+                    'mode': 0o400
+                }
+            ]
+        }
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert actual['secrets'] == override['secrets']
 
     def test_external_volume_config(self):
         config_details = build_config_details({
@@ -3491,3 +3527,24 @@ class SerializeTest(unittest.TestCase):
         denormalized_service = denormalize_service_dict(processed_service, V2_1)
         assert denormalized_service['healthcheck']['interval'] == '100s'
         assert denormalized_service['healthcheck']['timeout'] == '30s'
+
+    def test_denormalize_secrets(self):
+        service_dict = {
+            'name': 'web',
+            'image': 'example/web',
+            'secrets': [
+                types.ServiceSecret('one', None, None, None, None),
+                types.ServiceSecret('source', 'target', '100', '200', 0o777),
+            ],
+        }
+        denormalized_service = denormalize_service_dict(service_dict, V3_1)
+        assert secret_sort(denormalized_service['secrets']) == secret_sort([
+            {'source': 'one'},
+            {
+                'source': 'source',
+                'target': 'target',
+                'uid': '100',
+                'gid': '200',
+                'mode': 0o777,
+            },
+        ])

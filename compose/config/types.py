@@ -256,8 +256,5 @@ class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
 
     def repr(self):
         return dict(
-            source=self.source,
-            target=self.target,
-            uid=self.uid,
-            gid=self.gid,
-            mode=self.mode)
+            [(k, v) for k, v in self._asdict().items() if v is not None]
+        )

@@ -102,4 +102,7 @@ def denormalize_service_dict(service_dict, version):
                 service_dict['healthcheck']['timeout']
             )
 
+    if 'secrets' in service_dict:
+        service_dict['secrets'] = map(lambda s: s.repr(), service_dict['secrets'])
+
     return service_dict
