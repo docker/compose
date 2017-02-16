@@ -14,30 +14,6 @@ from distutils.spawn import find_executable
 from inspect import getdoc
 from operator import attrgetter
 
-
-# Attempt to detect https://github.com/docker/compose/issues/4344
-try:
-    # A regular import statement causes PyInstaller to freak out while
-    # trying to load pip. This way it is simply ignored.
-    pip = __import__('pip')
-    pip_packages = pip.get_installed_distributions()
-    if 'docker-py' in [pkg.project_name for pkg in pip_packages]:
-        from .colors import red
-        print(
-            red('ERROR:'),
-            "Dependency conflict: an older version of the 'docker-py' package "
-            "is polluting the namespace. "
-            "Run the following command to remedy the issue:\n"
-            "pip uninstall docker docker-py; pip install docker",
-            file=sys.stderr
-        )
-        sys.exit(1)
-except ImportError:
-    # pip is not available, which indicates it's probably the binary
-    # distribution of Compose which is not affected
-    pass
-
-
 from . import errors
 from . import signals
 from .. import __version__
