@@ -184,7 +184,7 @@ class CLITestCase(unittest.TestCase):
             mock_client.create_host_config.call_args[1].get('restart_policy')
         )
 
-    def test_command_manula_and_service_ports_together(self):
+    def test_command_manual_and_service_ports_together(self):
         project = Project.from_config(
             name='composetest',
             client=None,
