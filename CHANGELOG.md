@@ -1,6 +1,27 @@
 Change log
 ==========
 
+1.11.2 (2017-02-17)
+-------------------
+
+### Bugfixes
+
+- Fixed a bug that was preventing secrets configuration from being
+  loaded properly
+
+- Fixed a bug where the `docker-compose config` command would fail
+  if the config file contained secrets definitions
+
+- Fixed an issue where Compose on some linux distributions would
+  pick up and load an outdated version of the requests library
+
+- Fixed an issue where socket-type files inside a build folder
+  would cause `docker-compose` to crash when trying to build that
+  service
+
+- Fixed an issue where recursive wildcard patterns `**` were not being
+  recognized in `.dockerignore` files.
+
 1.11.1 (2017-02-09)
 -------------------
 
