@@ -1828,6 +1828,14 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 1)
         self.assertIn("FOO=1", containers[0].get('Config.Env'))
 
+    def test_volumes_from_given_by_cli(self):
+        self.base_dir = 'tests/fixtures/volume-path'
+        self.dispatch(['up', '-d'], None)
+        source_volume_container = self.project.containers(stopped=True)[0]
+
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['run', '--volumes-from', source_volume_container.id, 'simple'], None)
+
     @mock.patch.dict(os.environ)
     def test_home_and_env_var_in_volume_path(self):
         os.environ['VOLUME_NAME'] = 'my-volume'
