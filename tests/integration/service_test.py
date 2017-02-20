@@ -32,6 +32,7 @@ from compose.service import NetworkMode
 from compose.service import Service
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
+from tests.integration.testcases import v3_only
 
 
 def create_and_start_container(service, **override_options):
@@ -945,6 +946,20 @@ class ServiceTest(DockerClientTestCase):
             'DOO': 'dah'
         }.items():
             self.assertEqual(env[k], v)
+
+    @v3_only()
+    def test_build_with_cachefrom(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('cache_from',
+                                      build={'context': base_dir,
+                                             'cache_from': ['build1']})
+        service.build()
+        assert service.image()
 
     @mock.patch.dict(os.environ)
     def test_resolve_env(self):
