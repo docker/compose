@@ -446,6 +446,7 @@ class ServiceTest(unittest.TestCase):
             nocache=False,
             rm=True,
             buildargs=None,
+            cache_from=None,
         )
 
     def test_ensure_image_exists_no_build(self):
@@ -482,6 +483,7 @@ class ServiceTest(unittest.TestCase):
             nocache=False,
             rm=True,
             buildargs=None,
+            cache_from=None,
         )
 
     def test_build_does_not_pull(self):
