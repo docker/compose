@@ -18,7 +18,7 @@
 
 
 __docker_compose_q() {
-	docker-compose 2>/dev/null $daemon_options "$@"
+	docker-compose 2>/dev/null "${daemon_options[@]}" "$@"
 }
 
 # Transforms a multiline list of strings into a single line string
