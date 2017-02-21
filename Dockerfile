@@ -17,9 +17,9 @@ RUN set -ex; \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.8.3 \
-        -o /usr/local/bin/docker && \
-    chmod +x /usr/local/bin/docker
+RUN curl https://get.docker.com/builds/Linux/x86_64/docker-1.13.1.tgz | \
+        tar -C /usr/local/bin -xz --strip-components=1 && \
+    chmod +x /usr/local/bin/docker*
 
 # Build Python 2.7.13 from source
 RUN set -ex; \
