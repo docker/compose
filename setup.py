@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
+from __future__ import print_function
 from __future__ import unicode_literals
 
 import codecs
-import logging
 import os
 import re
 import sys
@@ -37,7 +37,7 @@ install_requires = [
     'requests >= 2.6.1, != 2.11.0, < 2.12',
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.32.0, < 1.0',
-    'docker >= 2.0.2, < 3.0',
+    'docker >= 2.1.0, < 3.0',
     'dockerpty >= 0.4.1, < 0.5',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
@@ -64,11 +64,9 @@ try:
         for key, value in extras_require.items():
             if key.startswith(':') and pkg_resources.evaluate_marker(key[1:]):
                 install_requires.extend(value)
-except Exception:
-    logging.getLogger(__name__).exception(
-        'Failed to compute platform dependencies. All dependencies will be '
-        'installed as a result.'
-    )
+except Exception as e:
+    print("Failed to compute platform dependencies: {}. ".format(e) +
+          "All dependencies will be installed as a result.", file=sys.stderr)
     for key, value in extras_require.items():
         if key.startswith(':'):
             install_requires.extend(value)
