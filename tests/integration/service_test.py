@@ -594,6 +594,20 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
 
+    @v2_only()
+    def test_build_with_cachefrom(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('cachefrom',
+                                      build={'context': base_dir,
+                                             'cachefrom': ['build1']})
+        service.build()
+        assert service.image()
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()

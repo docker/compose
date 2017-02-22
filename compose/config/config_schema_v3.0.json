@@ -58,9 +58,10 @@
             {
               "type": "object",
               "properties": {
+                "args": {"$ref": "#/definitions/list_or_dict"},
+                "cachefrom": {"$ref": "#/definitions/list_of_strings"},
                 "context": {"type": "string"},
-                "dockerfile": {"type": "string"},
-                "args": {"$ref": "#/definitions/list_or_dict"}
+                "dockerfile": {"type": "string"}
               },
               "additionalProperties": false
             }

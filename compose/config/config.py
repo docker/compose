@@ -101,6 +101,7 @@ DOCKER_CONFIG_KEYS = [
 
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
+    'cachefrom',
     'container_name',
     'dockerfile',
     'log_driver',

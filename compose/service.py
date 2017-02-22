@@ -802,6 +802,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             buildargs=build_opts.get('args', None),
+            cachefrom=build_opts.get('cachefrom', None),
         )
 
         try:
