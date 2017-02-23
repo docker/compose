@@ -302,7 +302,7 @@ class ProjectTest(unittest.TestCase):
             return {
                 'Id': cid,
                 'Config': {'Labels': labels},
-                'Name': '/project_%s_1' % name,
+                'Name': '/project-%s-1' % name,
             }
 
         self.mock_client.inspect_container.side_effect = get_container
@@ -319,7 +319,7 @@ class ProjectTest(unittest.TestCase):
                 'action': 'create',
                 'id': 'abcde',
                 'attributes': {
-                    'name': 'project_web_1',
+                    'name': 'project-web-1',
                     'image': 'example/image',
                 },
                 'time': dt_with_microseconds(1420092061, 2),
@@ -331,7 +331,7 @@ class ProjectTest(unittest.TestCase):
                 'action': 'attach',
                 'id': 'abcde',
                 'attributes': {
-                    'name': 'project_web_1',
+                    'name': 'project-web-1',
                     'image': 'example/image',
                 },
                 'time': dt_with_microseconds(1420092061, 3),
@@ -343,7 +343,7 @@ class ProjectTest(unittest.TestCase):
                 'action': 'create',
                 'id': 'ababa',
                 'attributes': {
-                    'name': 'project_db_1',
+                    'name': 'project-db-1',
                     'image': 'example/db',
                 },
                 'time': dt_with_microseconds(1420092061, 4),

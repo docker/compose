@@ -22,7 +22,7 @@ class ContainerTest(unittest.TestCase):
             "Ports": None,
             "SizeRw": 0,
             "SizeRootFs": 0,
-            "Names": ["/composetest_db_1", "/composetest_web_1/db"],
+            "Names": ["/composetest-db-1", "/composetest-web-1/db"],
             "NetworkSettings": {
                 "Ports": {},
             },
@@ -44,7 +44,7 @@ class ContainerTest(unittest.TestCase):
             {
                 "Id": self.container_id,
                 "Image": "busybox:latest",
-                "Name": "/composetest_db_1",
+                "Name": "/composetest-db-1",
             })
 
     def test_from_ps_prefixed(self):
@@ -59,7 +59,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.dictionary, {
             "Id": self.container_id,
             "Image": "busybox:latest",
-            "Name": "/composetest_db_1",
+            "Name": "/composetest-db-1",
         })
 
     def test_environment(self):
@@ -85,12 +85,12 @@ class ContainerTest(unittest.TestCase):
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
-        self.assertEqual(container.name, "composetest_db_1")
+        self.assertEqual(container.name, "composetest-db-1")
 
     def test_name_without_project(self):
-        self.container_dict['Name'] = "/composetest_web_7"
+        self.container_dict['Name'] = "/composetest-web-7"
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.name_without_project, "web_7")
+        self.assertEqual(container.name_without_project, "web-7")
 
     def test_name_without_project_custom_container_name(self):
         self.container_dict['Name'] = "/custom_name_of_container"
@@ -183,16 +183,16 @@ class GetContainerNameTestCase(unittest.TestCase):
 
     def test_get_container_name(self):
         self.assertIsNone(get_container_name({}))
-        self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
+        self.assertEqual(get_container_name({'Name': 'myproject-db-1'}), 'myproject-db-1')
         self.assertEqual(
-            get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}),
-            'myproject_db_1')
+            get_container_name({'Names': ['/myproject-db-1', '/myproject-web-1/db']}),
+            'myproject-db-1')
         self.assertEqual(
             get_container_name({
                 'Names': [
-                    '/swarm-host-1/myproject_db_1',
-                    '/swarm-host-1/myproject_web_1/db'
+                    '/swarm-host-1/myproject-db-1',
+                    '/swarm-host-1/myproject-web-1/db'
                 ]
             }),
-            'myproject_db_1'
+            'myproject-db-1'
         )

@@ -366,16 +366,16 @@ class CLITestCase(DockerClientTestCase):
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
-        assert 'simplecomposefile_simple_1' in result.stdout
+        assert 'simplecomposefile-simple-1' in result.stdout
 
     def test_ps_default_composefile(self):
         self.base_dir = 'tests/fixtures/multiple-composefiles'
         self.dispatch(['up', '-d'])
         result = self.dispatch(['ps'])
 
-        self.assertIn('multiplecomposefiles_simple_1', result.stdout)
-        self.assertIn('multiplecomposefiles_another_1', result.stdout)
-        self.assertNotIn('multiplecomposefiles_yetanother_1', result.stdout)
+        self.assertIn('multiplecomposefiles-simple-1', result.stdout)
+        self.assertIn('multiplecomposefiles-another-1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-yetanother_1', result.stdout)
 
     def test_ps_alternate_composefile(self):
         config_path = os.path.abspath(
@@ -386,9 +386,9 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['-f', 'compose2.yml', 'up', '-d'])
         result = self.dispatch(['-f', 'compose2.yml', 'ps'])
 
-        self.assertNotIn('multiplecomposefiles_simple_1', result.stdout)
-        self.assertNotIn('multiplecomposefiles_another_1', result.stdout)
-        self.assertIn('multiplecomposefiles_yetanother_1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-simple-1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-another-1', result.stdout)
+        self.assertIn('multiplecomposefiles-yetanother_1', result.stdout)
 
     def test_pull(self):
         result = self.dispatch(['pull'])
@@ -1627,7 +1627,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'hello' in result.stdout
         assert 'test' in result.stdout
         assert 'logscomposefile_another_1 exited with code 0' in result.stdout
-        assert 'logscomposefile_simple_1 exited with code 137' in result.stdout
+        assert 'logscomposefile-simple-1 exited with code 137' in result.stdout
 
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
@@ -1812,7 +1812,7 @@ class CLITestCase(DockerClientTestCase):
         container, = self.project.containers()
         expected_template = (
             ' container {} {} (image=busybox:latest, '
-            'name=simplecomposefile_simple_1)')
+            'name=simplecomposefile-simple-1)')
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
