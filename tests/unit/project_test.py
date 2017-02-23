@@ -178,7 +178,7 @@ class ProjectTest(unittest.TestCase):
         assert project.get_service('test')._get_volumes_from() == [container_id + ":rw"]
 
     def test_use_volumes_from_service_no_container(self):
-        container_name = 'test_vol_1'
+        container_name = test_vol_-1'
         self.mock_client.containers.return_value = [
             {
                 "Name": container_name,
@@ -397,7 +397,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(service.network_mode.mode, 'container:' + container_id)
 
     def test_use_net_from_service(self):
-        container_name = 'test_aaa_1'
+        container_name = 'test-aaa-1'
         self.mock_client.containers.return_value = [
             {
                 "Name": container_name,

@@ -452,7 +452,7 @@ class ServiceTest(DockerClientTestCase):
 
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')
-        web = self.create_service('web', links=[(db, 'custom_link_name')])
+        web = self.create_service('web', links=[(db, 'custom-link-name')])
 
         create_and_start_container(db)
         create_and_start_container(db)
@@ -463,7 +463,7 @@ class ServiceTest(DockerClientTestCase):
             set([
                 'composetest-db-1', 'db-1',
                 'composetest-db-2', 'db-2',
-                'custom_link_name'])
+                'custom-link-name'])
         )
 
     def test_start_container_with_external_links(self):
@@ -547,7 +547,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("FROM busybox\n")
 
         self.create_service('web', build={'context': base_dir}).build()
-        assert self.client.inspect_image('composetest_web')
+        assert self.client.inspect_image('composetest-web')
 
     def test_build_non_ascii_filename(self):
         base_dir = tempfile.mkdtemp()
@@ -560,7 +560,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("hello world\n")
 
         self.create_service('web', build={'context': text_type(base_dir)}).build()
-        assert self.client.inspect_image('composetest_web')
+        assert self.client.inspect_image('composetest-web')
 
     def test_build_with_image_name(self):
         base_dir = tempfile.mkdtemp()
@@ -1079,7 +1079,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(set(service.containers(stopped=True)), set([original]))
         self.assertEqual(set(service.duplicate_containers()), set())
 
-        options['name'] = 'temporary_container_name'
+        options['name'] = 'temporary-container-name'
         duplicate = Container.create(service.client, **options)
 
         self.assertEqual(set(service.containers(stopped=True)), set([original, duplicate]))

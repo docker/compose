@@ -93,16 +93,16 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(container.name_without_project, "web-7")
 
     def test_name_without_project_custom_container_name(self):
-        self.container_dict['Name'] = "/custom_name_of_container"
+        self.container_dict['Name'] = "/custom-name-of-container"
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.name_without_project, "custom_name_of_container")
+        self.assertEqual(container.name_without_project, "custom-name-of-container")
 
     def test_inspect_if_not_inspected(self):
         mock_client = mock.create_autospec(docker.APIClient)
-        container = Container(mock_client, dict(Id="the_id"))
+        container = Container(mock_client, dict(Id="the-id"))
 
         container.inspect_if_not_inspected()
-        mock_client.inspect_container.assert_called_once_with("the_id")
+        mock_client.inspect_container.assert_called_once_with("the-id")
         self.assertEqual(container.dictionary,
                          mock_client.inspect_container.return_value)
         self.assertTrue(container.has_been_inspected)
@@ -138,12 +138,12 @@ class ContainerTest(unittest.TestCase):
         container = Container(None, {
             "Status": "Up 8 seconds",
             "HostConfig": {
-                "VolumesFrom": ["volume_id"]
+                "VolumesFrom": ["volume-id"]
             },
         }, has_been_inspected=True)
 
         self.assertEqual(container.get('Status'), "Up 8 seconds")
-        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id"])
+        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume-id"])
         self.assertEqual(container.get('Foo.Bar.DoesNotExist'), None)
 
     def test_short_id(self):

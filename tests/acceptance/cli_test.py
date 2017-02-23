@@ -166,7 +166,7 @@ class CLITestCase(DockerClientTestCase):
     def test_host_not_reachable_volumes_from_container(self):
         self.base_dir = 'tests/fixtures/volumes-from-container'
 
-        container = self.client.create_container('busybox', 'true', name='composetest_data_container')
+        container = self.client.create_container('busybox', 'true', name='composetest-data-container')
         self.addCleanup(self.client.remove_container, container)
 
         result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
@@ -567,18 +567,18 @@ class CLITestCase(DockerClientTestCase):
         assert len(self.project.containers(one_off=OneOffFilter.only, stopped=True)) == 2
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
-        assert 'Stopping v2full_web_1' in result.stderr
-        assert 'Stopping v2full_other_1' in result.stderr
-        assert 'Stopping v2full_web_run_2' in result.stderr
-        assert 'Removing v2full_web_1' in result.stderr
-        assert 'Removing v2full_other_1' in result.stderr
-        assert 'Removing v2full_web_run_1' in result.stderr
-        assert 'Removing v2full_web_run_2' in result.stderr
-        assert 'Removing volume v2full_data' in result.stderr
-        assert 'Removing image v2full_web' in result.stderr
+        assert 'Stopping v2full-web-1' in result.stderr
+        assert 'Stopping v2full-other-1' in result.stderr
+        assert 'Stopping v2full-web-run-2' in result.stderr
+        assert 'Removing v2full-web-1' in result.stderr
+        assert 'Removing v2full-other-1' in result.stderr
+        assert 'Removing v2full-web-run-1' in result.stderr
+        assert 'Removing v2full-web-run-2' in result.stderr
+        assert 'Removing volume v2full-data' in result.stderr
+        assert 'Removing image v2full-web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
-        assert 'Removing network v2full_default' in result.stderr
-        assert 'Removing network v2full_front' in result.stderr
+        assert 'Removing network v2full-default' in result.stderr
+        assert 'Removing network v2full-front' in result.stderr
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
@@ -773,7 +773,7 @@ class CLITestCase(DockerClientTestCase):
 
     @v2_only()
     def test_up_with_network_mode(self):
-        c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
+        c = self.client.create_container('busybox', 'top', name='composetest-network-mode-container')
         self.addCleanup(self.client.remove_container, c, force=True)
         self.client.start(c)
         container_mode_source = 'container:{}'.format(c['Id'])
@@ -1149,7 +1149,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_run_without_command(self):
         self.base_dir = 'tests/fixtures/commands-composefile'
-        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
+        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest-test')
 
         self.dispatch(['run', 'implicit'])
         service = self.project.get_service('implicit')
