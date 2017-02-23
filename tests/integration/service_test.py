@@ -48,7 +48,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(foo)
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, 'composetest_foo_1')
+        self.assertEqual(foo.containers()[0].name, 'composetest-foo-1')
         self.assertEqual(len(bar.containers()), 0)
 
         create_and_start_container(bar)
@@ -70,18 +70,18 @@ class ServiceTest(DockerClientTestCase):
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
         create_and_start_container(service)
-        self.assertEqual(service.containers()[0].name, 'composetest_web_1')
+        self.assertEqual(service.containers()[0].name, 'composetest-web-1')
 
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'composetest_db_run_1')
+        self.assertEqual(container.name, 'composetest-db-run-1')
 
     def test_create_container_with_one_off_when_existing_container_is_running(self):
         db = self.create_service('db')
         db.start()
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'composetest_db_run_1')
+        self.assertEqual(container.name, 'composetest-db-run-1')
 
     def test_create_container_with_unspecified_volume(self):
         service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
