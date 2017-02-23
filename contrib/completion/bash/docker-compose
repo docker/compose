@@ -571,4 +571,4 @@ _docker_compose() {
 	return 0
 }
 
-complete -F _docker_compose docker-compose
+complete -F _docker_compose docker-compose docker-compose.exe
