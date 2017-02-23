@@ -1918,8 +1918,8 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         result = self.dispatch(['top'])
 
-        self.assertIn('top_service_a', result.stdout)
-        self.assertIn('top_service_b', result.stdout)
+        self.assertIn('top-service-a', result.stdout)
+        self.assertIn('top-service-b', result.stdout)
         self.assertNotIn('top_not_a_service', result.stdout)
 
     def test_top_processes_running(self):
