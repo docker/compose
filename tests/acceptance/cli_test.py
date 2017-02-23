@@ -375,7 +375,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertIn('multiplecomposefiles-simple-1', result.stdout)
         self.assertIn('multiplecomposefiles-another-1', result.stdout)
-        self.assertNotIn('multiplecomposefiles-yetanother_1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-yetanother-1', result.stdout)
 
     def test_ps_alternate_composefile(self):
         config_path = os.path.abspath(
@@ -388,7 +388,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertNotIn('multiplecomposefiles-simple-1', result.stdout)
         self.assertNotIn('multiplecomposefiles-another-1', result.stdout)
-        self.assertIn('multiplecomposefiles-yetanother_1', result.stdout)
+        self.assertIn('multiplecomposefiles-yetanother-1', result.stdout)
 
     def test_pull(self):
         result = self.dispatch(['pull'])
@@ -574,11 +574,11 @@ class CLITestCase(DockerClientTestCase):
         assert 'Removing v2full-other-1' in result.stderr
         assert 'Removing v2full-web-run-1' in result.stderr
         assert 'Removing v2full-web-run-2' in result.stderr
-        assert 'Removing volume v2full-data' in result.stderr
-        assert 'Removing image v2full-web' in result.stderr
+        assert 'Removing volume v2full_data' in result.stderr
+        assert 'Removing image v2full_web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
-        assert 'Removing network v2full-default' in result.stderr
-        assert 'Removing network v2full-front' in result.stderr
+        assert 'Removing network v2full_default' in result.stderr
+        assert 'Removing network v2full_front' in result.stderr
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
@@ -1617,7 +1617,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d', 'another'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'logscomposefile_another_1',
+            'logscomposefile-another-1',
             'exited'))
 
         self.dispatch(['kill', 'simple'])
@@ -1626,7 +1626,7 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'hello' in result.stdout
         assert 'test' in result.stdout
-        assert 'logscomposefile_another_1 exited with code 0' in result.stdout
+        assert 'logscomposefile-another-1 exited with code 0' in result.stdout
         assert 'logscomposefile-simple-1 exited with code 137' in result.stdout
 
     def test_logs_default(self):
@@ -1899,7 +1899,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(
             set(get_links(web)),
-            set(['db', 'mydb_1', 'extends_mydb_1']))
+            set(['db', 'mydb-1', 'extends-mydb-1']))
 
         expected_env = set([
             "FOO=1",
