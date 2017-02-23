@@ -178,7 +178,7 @@ class ProjectTest(unittest.TestCase):
         assert project.get_service('test')._get_volumes_from() == [container_id + ":rw"]
 
     def test_use_volumes_from_service_no_container(self):
-        container_name = test_vol_-1'
+        container_name = 'test-vol-1'
         self.mock_client.containers.return_value = [
             {
                 "Name": container_name,
