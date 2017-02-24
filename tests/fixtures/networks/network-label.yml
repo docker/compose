@@ -1,0 +1,13 @@
+version: "2.1"
+
+services:
+  web:
+    image: busybox
+    command: top
+    networks:
+      - network_with_label
+
+networks:
+  network_with_label:
+    labels:
+      - "label_key=label_val"

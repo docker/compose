@@ -14,7 +14,6 @@ from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
 from .config.sort_services import get_service_name_from_network_mode
-from .const import DEFAULT_TIMEOUT
 from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
@@ -105,6 +104,11 @@ class Project(object):
                     for volume_spec in service_dict.get('volumes', [])
                 ]
 
+            secrets = get_secrets(
+                service_dict['name'],
+                service_dict.pop('secrets', None) or [],
+                config_data.secrets)
+
             project.services.append(
                 Service(
                     service_dict.pop('name'),
@@ -115,6 +119,7 @@ class Project(object):
                     links=links,
                     network_mode=network_mode,
                     volumes_from=volumes_from,
+                    secrets=secrets,
                     **service_dict)
             )
 
@@ -228,7 +233,10 @@ class Project(object):
         services = self.get_services(service_names)
 
         def get_deps(service):
-            return {self.get_service(dep) for dep in service.get_dependency_names()}
+            return {
+                (self.get_service(dep), config)
+                for dep, config in service.get_dependency_configs().items()
+            }
 
         parallel.parallel_execute(
             services,
@@ -244,13 +252,13 @@ class Project(object):
 
         def get_deps(container):
             # actually returning inversed dependencies
-            return {other for other in containers
+            return {(other, None) for other in containers
                     if container.service in
                     self.get_service(other.service).get_dependency_names()}
 
         parallel.parallel_execute(
             containers,
-            operator.methodcaller('stop', **options),
+            self.build_container_operation_with_timeout_func('stop', options),
             operator.attrgetter('name'),
             'Stopping',
             get_deps)
@@ -291,7 +299,12 @@ class Project(object):
 
     def restart(self, service_names=None, **options):
         containers = self.containers(service_names, stopped=True)
-        parallel.parallel_restart(containers, options)
+
+        parallel.parallel_execute(
+            containers,
+            self.build_container_operation_with_timeout_func('restart', options),
+            operator.attrgetter('name'),
+            'Restarting')
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False):
@@ -352,7 +365,7 @@ class Project(object):
 
             # TODO: get labels from the API v1.22 , see github issue 2618
             try:
-                # this can fail if the conatiner has been removed
+                # this can fail if the container has been removed
                 container = Container.from_id(self.client, event['id'])
             except APIError:
                 continue
@@ -365,7 +378,7 @@ class Project(object):
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
            do_build=BuildAction.none,
-           timeout=DEFAULT_TIMEOUT,
+           timeout=None,
            detached=False,
            remove_orphans=False):
 
@@ -390,7 +403,10 @@ class Project(object):
             )
 
         def get_deps(service):
-            return {self.get_service(dep) for dep in service.get_dependency_names()}
+            return {
+                (self.get_service(dep), config)
+                for dep, config in service.get_dependency_configs().items()
+            }
 
         results, errors = parallel.parallel_execute(
             services,
@@ -506,6 +522,14 @@ class Project(object):
         dep_services.append(service)
         return acc + dep_services
 
+    def build_container_operation_with_timeout_func(self, operation, options):
+        def container_operation_with_timeout(container):
+            if options.get('timeout') is None:
+                service = self.get_service(container.service)
+                options['timeout'] = service.stop_timeout(None)
+            return getattr(container, operation)(**options)
+        return container_operation_with_timeout
+
 
 def get_volumes_from(project, service_dict):
     volumes_from = service_dict.pop('volumes_from', None)
@@ -535,17 +559,46 @@ def get_volumes_from(project, service_dict):
     return [build_volume_from(vf) for vf in volumes_from]
 
 
+def get_secrets(service, service_secrets, secret_defs):
+    secrets = []
+
+    for secret in service_secrets:
+        secret_def = secret_defs.get(secret.source)
+        if not secret_def:
+            raise ConfigurationError(
+                "Service \"{service}\" uses an undefined secret \"{secret}\" "
+                .format(service=service, secret=secret.source))
+
+        if secret_def.get('external_name'):
+            log.warn("Service \"{service}\" uses secret \"{secret}\" which is external. "
+                     "External secrets are not available to containers created by "
+                     "docker-compose.".format(service=service, secret=secret.source))
+            continue
+
+        if secret.uid or secret.gid or secret.mode:
+            log.warn("Service \"{service}\" uses secret \"{secret}\" with uid, "
+                     "gid, or mode. These fields are not supported by this "
+                     "implementation of the Compose file".format(
+                        service=service, secret=secret.source))
+
+        secrets.append({'secret': secret, 'file': secret_def.get('file')})
+
+    return secrets
+
+
 def warn_for_swarm_mode(client):
     info = client.info()
     if info.get('Swarm', {}).get('LocalNodeState') == 'active':
+        if info.get('ServerVersion', '').startswith('ucp'):
+            # UCP does multi-node scheduling with traditional Compose files.
+            return
+
         log.warn(
             "The Docker Engine you're using is running in swarm mode.\n\n"
             "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
             "All containers will be scheduled on the current node.\n\n"
             "To deploy your application across the swarm, "
-            "use the bundle feature of the Docker experimental build.\n\n"
-            "More info:\n"
-            "https://docs.docker.com/compose/bundles\n"
+            "use `docker stack deploy`.\n"
         )
 
 

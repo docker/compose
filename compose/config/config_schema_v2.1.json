@@ -88,7 +88,28 @@
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
-        "depends_on": {"$ref": "#/definitions/list_of_strings"},
+        "depends_on": {
+          "oneOf": [
+            {"$ref": "#/definitions/list_of_strings"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-zA-Z0-9._-]+$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition": {
+                      "type": "string",
+                      "enum": ["service_started", "service_healthy"]
+                    }
+                  },
+                  "required": ["condition"]
+                }
+              }
+            }
+          ]
+        },
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
@@ -131,9 +152,11 @@
 
         "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+        "healthcheck": {"$ref": "#/definitions/healthcheck"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
+        "isolation": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
@@ -150,6 +173,7 @@
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
         "memswap_limit": {"type": ["number", "string"]},
+        "mem_swappiness": {"type": "integer"},
         "network_mode": {"type": "string"},
 
         "networks": {
@@ -178,6 +202,14 @@
             }
           ]
         },
+        "oom_score_adj": {"type": "integer", "minimum": -1000, "maximum": 1000},
+        "group_add": {
+            "type": "array",
+            "items": {
+                "type": ["string", "number"]
+            },
+            "uniqueItems": true
+        },
         "pid": {"type": ["string", "null"]},
 
         "ports": {
@@ -194,7 +226,9 @@
         "restart": {"type": "string"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "shm_size": {"type": ["number", "string"]},
+        "sysctls": {"$ref": "#/definitions/list_or_dict"},
         "stdin_open": {"type": "boolean"},
+        "stop_grace_period": {"type": "string", "format": "duration"},
         "stop_signal": {"type": "string"},
         "tmpfs": {"$ref": "#/definitions/string_or_list"},
         "tty": {"type": "boolean"},
@@ -218,6 +252,7 @@
           }
         },
         "user": {"type": "string"},
+        "userns_mode": {"type": "string"},
         "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "volume_driver": {"type": "string"},
         "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
@@ -228,6 +263,24 @@
         "memswap_limit": ["mem_limit"]
       },
       "additionalProperties": false
+    },
+
+    "healthcheck": {
+      "id": "#/definitions/healthcheck",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disable": {"type": "boolean"},
+        "interval": {"type": "string"},
+        "retries": {"type": "number"},
+        "test": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
+        "timeout": {"type": "string"}
+      }
     },
 
     "network": {
@@ -257,7 +310,10 @@
             "name": {"type": "string"}
           },
           "additionalProperties": false
-        }
+        },
+        "internal": {"type": "boolean"},
+        "enable_ipv6": {"type": "boolean"},
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -277,9 +333,10 @@
           "type": ["boolean", "object"],
           "properties": {
             "name": {"type": "string"}
-          }
+          },
+          "additionalProperties": false
         },
-        "additionalProperties": false
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },

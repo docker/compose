@@ -1,0 +1,13 @@
+version: "2.1"
+
+services:
+  web:
+    image: busybox
+    command: top
+    volumes:
+      - volume_with_label:/data
+
+volumes:
+  volume_with_label:
+    labels:
+      - "label_key=label_val"

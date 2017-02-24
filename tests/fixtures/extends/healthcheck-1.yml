@@ -1,0 +1,9 @@
+version: '2.1'
+services:
+  demo:
+    image: foobar:latest
+    healthcheck:
+      test: ["CMD", "/health.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 36

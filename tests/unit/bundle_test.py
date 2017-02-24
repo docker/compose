@@ -15,7 +15,7 @@ from compose.config.config import Config
 def mock_service():
     return mock.create_autospec(
         service.Service,
-        client=mock.create_autospec(docker.Client),
+        client=mock.create_autospec(docker.APIClient),
         options={})
 
 
@@ -78,6 +78,7 @@ def test_to_bundle():
         services=services,
         volumes={'special': {}},
         networks={'extra': {}},
+        secrets={},
         plugins=None)
 
     with mock.patch('compose.bundle.log.warn', autospec=True) as mock_log:

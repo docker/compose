@@ -12,8 +12,8 @@ import docker
 
 import compose
 from ..const import HOME_DIR
+from ..const import IS_WINDOWS_PLATFORM
 from ..const import PLUGIN_DIR
-
 
 # WindowsError is not defined on non-win32 platforms. Avoid runtime errors by
 # defining it as OSError (its parent class) if missing.
@@ -74,6 +74,10 @@ def is_mac():
 
 def is_ubuntu():
     return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
+
+
+def is_windows():
+    return IS_WINDOWS_PLATFORM
 
 
 def get_version_info(scope):

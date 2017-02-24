@@ -203,6 +203,7 @@
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "shm_size": {"type": ["number", "string"]},
         "stdin_open": {"type": "boolean"},
+        "stop_grace_period": {"type": "string", "format": "duration"},
         "stop_signal": {"type": "string"},
         "tmpfs": {"$ref": "#/definitions/string_or_list"},
         "tty": {"type": "boolean"},
@@ -286,9 +287,9 @@
           "type": ["boolean", "object"],
           "properties": {
             "name": {"type": "string"}
-          }
-        },
-        "additionalProperties": false
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

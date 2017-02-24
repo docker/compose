@@ -4,18 +4,27 @@ from __future__ import unicode_literals
 import logging
 
 from docker.errors import NotFound
-from docker.utils import create_ipam_config
-from docker.utils import create_ipam_pool
+from docker.types import IPAMConfig
+from docker.types import IPAMPool
+from docker.utils import version_gte
+from docker.utils import version_lt
 
 from .config import ConfigurationError
+from .const import LABEL_NETWORK
+from .const import LABEL_PROJECT
 
 
 log = logging.getLogger(__name__)
 
+OPTS_EXCEPTIONS = [
+    'com.docker.network.driver.overlay.vxlanid_list',
+]
+
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 ipam=None, external_name=None, internal=False):
+                 ipam=None, external_name=None, internal=False, enable_ipv6=False,
+                 labels=None):
         self.client = client
         self.project = project
         self.name = name
@@ -24,6 +33,8 @@ class Network(object):
         self.ipam = create_ipam_config_from_dict(ipam)
         self.external_name = external_name
         self.internal = internal
+        self.enable_ipv6 = enable_ipv6
+        self.labels = labels
 
     def ensure(self):
         if self.external_name:
@@ -46,14 +57,7 @@ class Network(object):
 
         try:
             data = self.inspect()
-            if self.driver and data['Driver'] != self.driver:
-                raise ConfigurationError(
-                    'Network "{}" needs to be recreated - driver has changed'
-                    .format(self.full_name))
-            if data['Options'] != (self.driver_opts or {}):
-                raise ConfigurationError(
-                    'Network "{}" needs to be recreated - options have changed'
-                    .format(self.full_name))
+            check_remote_network_config(data, self)
         except NotFound:
             driver_name = 'the default driver'
             if self.driver:
@@ -70,6 +74,9 @@ class Network(object):
                 options=self.driver_opts,
                 ipam=self.ipam,
                 internal=self.internal,
+                enable_ipv6=self.enable_ipv6,
+                labels=self._labels,
+                attachable=version_gte(self.client._version, '1.24') or None,
             )
 
     def remove(self):
@@ -89,15 +96,26 @@ class Network(object):
             return self.external_name
         return '{0}_{1}'.format(self.project, self.name)
 
+    @property
+    def _labels(self):
+        if version_lt(self.client._version, '1.23'):
+            return None
+        labels = self.labels.copy() if self.labels else {}
+        labels.update({
+            LABEL_PROJECT: self.project,
+            LABEL_NETWORK: self.name,
+        })
+        return labels
+
 
 def create_ipam_config_from_dict(ipam_dict):
     if not ipam_dict:
         return None
 
-    return create_ipam_config(
+    return IPAMConfig(
         driver=ipam_dict.get('driver'),
         pool_configs=[
-            create_ipam_pool(
+            IPAMPool(
                 subnet=config.get('subnet'),
                 iprange=config.get('ip_range'),
                 gateway=config.get('gateway'),
@@ -106,6 +124,24 @@ def create_ipam_config_from_dict(ipam_dict):
             for config in ipam_dict.get('config', [])
         ],
     )
+
+
+def check_remote_network_config(remote, local):
+    if local.driver and remote.get('Driver') != local.driver:
+        raise ConfigurationError(
+            'Network "{}" needs to be recreated - driver has changed'
+            .format(local.full_name)
+        )
+    local_opts = local.driver_opts or {}
+    remote_opts = remote.get('Options') or {}
+    for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
+        if k in OPTS_EXCEPTIONS:
+            continue
+        if remote_opts.get(k) != local_opts.get(k):
+            raise ConfigurationError(
+                'Network "{}" needs to be recreated - options have changed'
+                .format(local.full_name)
+            )
 
 
 def build_networks(name, config_data, client):
@@ -118,6 +154,8 @@ def build_networks(name, config_data, client):
             ipam=data.get('ipam'),
             external_name=data.get('external_name'),
             internal=data.get('internal'),
+            enable_ipv6=data.get('enable_ipv6'),
+            labels=data.get('labels'),
         )
         for network_name, data in network_config.items()
     }

@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import contextlib
 import logging
 import socket
+from distutils.spawn import find_executable
 from textwrap import dedent
 
 from docker.errors import APIError
@@ -13,10 +14,10 @@ from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
-from .utils import call_silently
 from .utils import is_docker_for_mac_installed
 from .utils import is_mac
 from .utils import is_ubuntu
+from .utils import is_windows
 
 
 log = logging.getLogger(__name__)
@@ -89,38 +90,35 @@ def exit_with_error(msg):
 
 
 def get_conn_error_message(url):
-    if call_silently(['which', 'docker']) != 0:
-        if is_mac():
-            return docker_not_found_mac
-        if is_ubuntu():
-            return docker_not_found_ubuntu
-        return docker_not_found_generic
+    if find_executable('docker') is None:
+        return docker_not_found_msg("Couldn't connect to Docker daemon.")
     if is_docker_for_mac_installed():
         return conn_error_docker_for_mac
-    if call_silently(['which', 'docker-machine']) == 0:
+    if find_executable('docker-machine') is not None:
         return conn_error_docker_machine
     return conn_error_generic.format(url=url)
 
 
-docker_not_found_mac = """
-    Couldn't connect to Docker daemon. You might need to install Docker:
-
-    https://docs.docker.com/engine/installation/mac/
-"""
+def docker_not_found_msg(problem):
+    return "{} You might need to install Docker:\n\n{}".format(
+        problem, docker_install_url())
 
 
-docker_not_found_ubuntu = """
-    Couldn't connect to Docker daemon. You might need to install Docker:
+def docker_install_url():
+    if is_mac():
+        return docker_install_url_mac
+    elif is_ubuntu():
+        return docker_install_url_ubuntu
+    elif is_windows():
+        return docker_install_url_windows
+    else:
+        return docker_install_url_generic
 
-    https://docs.docker.com/engine/installation/ubuntulinux/
-"""
 
-
-docker_not_found_generic = """
-    Couldn't connect to Docker daemon. You might need to install Docker:
-
-    https://docs.docker.com/engine/installation/
-"""
+docker_install_url_mac = "https://docs.docker.com/engine/installation/mac/"
+docker_install_url_ubuntu = "https://docs.docker.com/engine/installation/ubuntulinux/"
+docker_install_url_windows = "https://docs.docker.com/engine/installation/windows/"
+docker_install_url_generic = "https://docs.docker.com/engine/installation/"
 
 
 conn_error_docker_machine = """

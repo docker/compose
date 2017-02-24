@@ -12,3 +12,6 @@ services:
   on-failure-5:
     image: busybox
     restart: "on-failure:5"
+  restart-null:
+    image: busybox
+    restart: ""

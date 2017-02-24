@@ -1,5 +1,6 @@
 
 FROM    alpine:3.4
+ARG     version
 RUN     apk -U add \
             python \
             py-pip
@@ -7,7 +8,7 @@ RUN     apk -U add \
 COPY    requirements.txt /code/requirements.txt
 RUN     pip install -r /code/requirements.txt
 
-ADD     dist/docker-compose-release.tar.gz /code/docker-compose
-RUN     pip install --no-deps /code/docker-compose/docker-compose-*
+COPY     dist/docker_compose-${version}-py2.py3-none-any.whl /code/
+RUN     pip install --no-deps /code/docker_compose-${version}-py2.py3-none-any.whl
 
 ENTRYPOINT ["/usr/bin/docker-compose"]

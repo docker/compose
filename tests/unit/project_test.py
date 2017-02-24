@@ -19,7 +19,7 @@ from compose.service import Service
 
 class ProjectTest(unittest.TestCase):
     def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
+        self.mock_client = mock.create_autospec(docker.APIClient)
 
     def test_from_config(self):
         config = Config(
@@ -36,6 +36,7 @@ class ProjectTest(unittest.TestCase):
             ],
             networks=None,
             volumes=None,
+            secrets=None,
             plugins=None,
         )
         project = Project.from_config(
@@ -65,6 +66,7 @@ class ProjectTest(unittest.TestCase):
             ],
             networks=None,
             volumes=None,
+            secrets=None,
             plugins=None,
         )
         project = Project.from_config('composetest', config, None)
@@ -172,6 +174,7 @@ class ProjectTest(unittest.TestCase):
                 }],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -205,6 +208,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -231,6 +235,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -365,6 +370,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -390,6 +396,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -424,6 +431,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -445,6 +453,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -466,6 +475,7 @@ class ProjectTest(unittest.TestCase):
                 ],
                 networks={'custom': {}},
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -497,6 +507,7 @@ class ProjectTest(unittest.TestCase):
                 }],
                 networks=None,
                 volumes=None,
+                secrets=None,
                 plugins=None,
             ),
         )
@@ -514,6 +525,7 @@ class ProjectTest(unittest.TestCase):
                 }],
                 networks={'default': {}},
                 volumes={'data': {}},
+                secrets=None,
                 plugins=None,
             ),
         )

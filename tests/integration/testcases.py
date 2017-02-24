@@ -13,6 +13,7 @@ from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.config import V2_1
+from compose.config.config import V3_0
 from compose.config.environment import Environment
 from compose.const import API_VERSIONS
 from compose.const import LABEL_PROJECT
@@ -36,39 +37,41 @@ def get_links(container):
 
 def engine_max_version():
     if 'DOCKER_VERSION' not in os.environ:
-        return V2_1
+        return V3_0
     version = os.environ['DOCKER_VERSION'].partition('-')[0]
     if version_lt(version, '1.10'):
         return V1
-    elif version_lt(version, '1.12'):
+    if version_lt(version, '1.12'):
         return V2_0
-    return V2_1
+    if version_lt(version, '1.13'):
+        return V2_1
+    return V3_0
+
+
+def build_version_required_decorator(ignored_versions):
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            max_version = engine_max_version()
+            if max_version in ignored_versions:
+                skip("Engine version %s is too low" % max_version)
+                return
+            return f(self, *args, **kwargs)
+        return wrapper
+
+    return decorator
 
 
 def v2_only():
-    def decorator(f):
-        @functools.wraps(f)
-        def wrapper(self, *args, **kwargs):
-            if engine_max_version() == V1:
-                skip("Engine version is too low")
-                return
-            return f(self, *args, **kwargs)
-        return wrapper
-
-    return decorator
+    return build_version_required_decorator((V1,))
 
 
 def v2_1_only():
-    def decorator(f):
-        @functools.wraps(f)
-        def wrapper(self, *args, **kwargs):
-            if engine_max_version() in (V1, V2_0):
-                skip('Engine version is too low')
-                return
-            return f(self, *args, **kwargs)
-        return wrapper
+    return build_version_required_decorator((V1, V2_0))
 
-    return decorator
+
+def v3_only():
+    return build_version_required_decorator((V1, V2_0, V2_1))
 
 
 class DockerClientTestCase(unittest.TestCase):

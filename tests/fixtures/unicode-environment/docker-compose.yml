@@ -1,0 +1,7 @@
+version: '2'
+services:
+  simple:
+    image: busybox:latest
+    command: sh -c 'echo $$FOO'
+    environment:
+      FOO: ${BAR}

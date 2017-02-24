@@ -39,6 +39,7 @@ def test_compose_patch_class():
 def fnc_to_patch(string):
     return string
 
+
 fnc_to_patch.__standalone__ = True
 
 
