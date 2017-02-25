@@ -89,3 +89,18 @@ def test_parallel_execute_with_upstream_errors():
     assert (data_volume, None, APIError) in events
     assert (db, None, UpstreamError) in events
     assert (web, None, UpstreamError) in events
+
+
+def test_parallel_execute_alignment(capsys):
+    results, errors = parallel_execute(
+        objects=["short", "a very long name"],
+        func=lambda x: x,
+        get_name=six.text_type,
+        msg="Aligning",
+    )
+
+    assert errors == {}
+
+    _, err = capsys.readouterr()
+    a, b = err.split('\n')[:2]
+    assert a.index('...') == b.index('...')
