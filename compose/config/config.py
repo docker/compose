@@ -203,8 +203,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_secrets(self):
         return {} if self.version < V3_1 else self.config.get('secrets', {})
 
+    def get_plugins(self):
+        return {} if self.version == V1 else self.config.get('plugins', {})
 
-class Config(namedtuple('_Config', 'version services volumes networks secrets')):
+
+class Config(namedtuple('_Config', 'version services volumes networks secrets plugins')):
     """
     :param version: configuration version
     :type  version: int
@@ -214,6 +217,8 @@ class Config(namedtuple('_Config', 'version services volumes networks secrets'))
     :type  volumes: :class:`dict`
     :param networks: Dictionary mapping network names to description dictionaries
     :type  networks: :class:`dict`
+    :param plugins: Dictionary mapping plugin names to description dictionaries
+    :type  plugins: :class:`dict`
     """
 
 
@@ -330,6 +335,9 @@ def load(config_details):
         config_details.config_files, 'get_networks', 'Network'
     )
     secrets = load_secrets(config_details.config_files, config_details.working_dir)
+    plugins = load_mapping(
+        config_details.config_files, 'get_plugins', 'Plugins'
+    )
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
@@ -344,7 +352,7 @@ def load(config_details):
             "`docker stack deploy` to deploy to a swarm."
             .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
 
-    return Config(main_file.version, service_dicts, volumes, networks, secrets)
+    return Config(main_file.version, service_dicts, volumes, networks, secrets, plugins)
 
 
 def load_mapping(config_files, get_func, entity_type):
@@ -486,6 +494,11 @@ def process_config_file(config_file, environment, service_name=None):
             config_file,
             config_file.get_networks(),
             'network',
+            environment)
+        processed_config['plugins'] = interpolate_config_section(
+            config_file,
+            config_file.get_plugins(),
+            'plugin',
             environment)
     elif config_file.version == V1:
         processed_config = services

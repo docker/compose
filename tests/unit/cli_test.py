@@ -20,6 +20,7 @@ from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
 from compose.const import IS_WINDOWS_PLATFORM
+from compose.plugin_manager import PluginManager
 from compose.project import Project
 
 
@@ -105,7 +106,8 @@ class CLITestCase(unittest.TestCase):
                 'service': {'image': 'busybox'}
             }),
         )
-        command = TopLevelCommand(project)
+        plugin_manager = PluginManager('')
+        command = TopLevelCommand(project, plugin_manager)
 
         with pytest.raises(SystemExit):
             command.run({
@@ -140,8 +142,8 @@ class CLITestCase(unittest.TestCase):
                 }
             }),
         )
-
-        command = TopLevelCommand(project)
+        plugin_manager = PluginManager('')
+        command = TopLevelCommand(project, plugin_manager)
         command.run({
             'SERVICE': 'service',
             'COMMAND': None,
@@ -162,8 +164,8 @@ class CLITestCase(unittest.TestCase):
             mock_client.create_host_config.call_args[1]['restart_policy']['Name'],
             'always'
         )
-
-        command = TopLevelCommand(project)
+        plugin_manager = PluginManager('')
+        command = TopLevelCommand(project, plugin_manager)
         command.run({
             'SERVICE': 'service',
             'COMMAND': None,
@@ -192,7 +194,8 @@ class CLITestCase(unittest.TestCase):
                 'service': {'image': 'busybox'},
             }),
         )
-        command = TopLevelCommand(project)
+        plugin_manager = PluginManager('')
+        command = TopLevelCommand(project, plugin_manager)
 
         with self.assertRaises(UserError):
             command.run({

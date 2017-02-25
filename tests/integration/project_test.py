@@ -594,6 +594,7 @@ class ProjectTest(DockerClientTestCase):
                 'bar': {'driver': None},
                 'baz': {},
             },
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -650,6 +651,7 @@ class ProjectTest(DockerClientTestCase):
                     },
                 },
             },
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -711,7 +713,8 @@ class ProjectTest(DockerClientTestCase):
                         ]
                     }
                 }
-            }
+            },
+            plugins=None
         )
         project = Project.from_config(
             client=self.client,
@@ -802,6 +805,7 @@ class ProjectTest(DockerClientTestCase):
                     },
                 },
             },
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -828,7 +832,8 @@ class ProjectTest(DockerClientTestCase):
             }],
             networks={
                 'linklocaltest': {'driver': 'bridge'}
-            }
+            },
+            plugins=None,
         )
         project = Project.from_config(
             client=self.client,
@@ -900,6 +905,7 @@ class ProjectTest(DockerClientTestCase):
             networks={
                 'internal': {'driver': 'bridge', 'internal': True},
             },
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -960,6 +966,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'local'}},
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -1113,6 +1120,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={vol_name: {}},
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -1137,6 +1145,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={vol_name: {}},
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -1197,6 +1206,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'foobar'}},
+            plugins=None,
         )
 
         project = Project.from_config(
@@ -1219,6 +1229,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'local'}},
+            plugins=None,
         )
         project = Project.from_config(
             name='composetest',
@@ -1257,6 +1268,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'local'}},
+            plugins=None,
         )
         project = Project.from_config(
             name='composetest',
@@ -1297,6 +1309,7 @@ class ProjectTest(DockerClientTestCase):
             volumes={
                 vol_name: {'external': True, 'external_name': vol_name}
             },
+            plugins=None,
         )
         project = Project.from_config(
             name='composetest',
@@ -1321,6 +1334,7 @@ class ProjectTest(DockerClientTestCase):
             volumes={
                 vol_name: {'external': True, 'external_name': vol_name}
             },
+            plugins=None,
         )
         project = Project.from_config(
             name='composetest',

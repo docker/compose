@@ -15,6 +15,8 @@ LABEL_NETWORK = 'com.docker.compose.network'
 LABEL_VERSION = 'com.docker.compose.version'
 LABEL_VOLUME = 'com.docker.compose.volume'
 LABEL_CONFIG_HASH = 'com.docker.compose.config-hash'
+HOME_DIR = '.docker-compose'
+PLUGIN_DIR = 'plugins'
 
 SECRETS_PATH = '/run/secrets'
 

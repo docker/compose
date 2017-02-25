@@ -50,6 +50,17 @@
         }
       },
       "additionalProperties": false
+    },
+
+    "plugins": {
+      "id": "#/properties/plugins",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/plugin"
+        }
+      },
+      "additionalProperties": false
     }
   },
 
@@ -422,6 +433,19 @@
           "build": {
             "required": ["context"]
           }
+        }
+      }
+    },
+
+    "plugin": {
+      "id": "#/definitions/plugin",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/list_or_dict"
         }
       }
     }
