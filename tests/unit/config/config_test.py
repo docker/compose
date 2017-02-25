@@ -554,6 +554,20 @@ class ConfigTest(unittest.TestCase):
             excinfo.exconly()
         )
 
+    def test_config_invalid_service_name_raise_validation_error(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2',
+                    'services': {
+                        'test_app': {'build': '.'},
+                        'mong\\o': {'image': 'mongo'},
+                    }
+                })
+            )
+
+            assert 'Invalid service name \'mong\\o\'' in excinfo.exconly()
+
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
             'base.yaml',
