@@ -38,7 +38,8 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
 
     writer = ParallelStreamWriter(stream, msg)
     for obj in objects:
-        writer.initialize(get_name(obj))
+        writer.add_object(get_name(obj))
+    writer.write_initial()
 
     events = parallel_execute_iter(objects, func, get_deps, limit)
 
@@ -224,12 +225,18 @@ class ParallelStreamWriter(object):
         self.stream = stream
         self.msg = msg
         self.lines = []
+        self.width = 0
 
-    def initialize(self, obj_index):
+    def add_object(self, obj_index):
+        self.lines.append(obj_index)
+        self.width = max(self.width, len(obj_index))
+
+    def write_initial(self):
         if self.msg is None:
             return
-        self.lines.append(obj_index)
-        self.stream.write("{} {} ... \r\n".format(self.msg, obj_index))
+        for line in self.lines:
+            self.stream.write("{} {:<{width}} ... \r\n".format(self.msg, line,
+                              width=self.width))
         self.stream.flush()
 
     def write(self, obj_index, status):
@@ -241,7 +248,8 @@ class ParallelStreamWriter(object):
         self.stream.write("%c[%dA" % (27, diff))
         # erase
         self.stream.write("%c[2K\r" % 27)
-        self.stream.write("{} {} ... {}\r".format(self.msg, obj_index, status))
+        self.stream.write("{} {:<{width}} ... {}\r".format(self.msg, obj_index,
+                          status, width=self.width))
         # move back down
         self.stream.write("%c[%dB" % (27, diff))
         self.stream.flush()
