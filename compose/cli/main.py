@@ -854,22 +854,19 @@ class TopLevelCommand(object):
                                        running. (default: 10)
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
-            --forward-exitval SERVICE  Return the exit value of the selected service container.
+            --exit-code-from SERVICE   Return the exit code of the selected service container.
                                        Requires --abort-on-container-exit.
         """
         start_deps = not options['--no-deps']
+        exit_value_from = exitval_from_opts(options, self.project)
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
-        forward_exitval = container_exitval_from_opts(options)
 
         if detached and cascade_stop:
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
-
-        if forward_exitval and not cascade_stop:
-            raise UserError("--forward-exitval requires --abort-on-container-exit.")
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             to_attach = self.project.up(
@@ -884,11 +881,11 @@ class TopLevelCommand(object):
             if detached:
                 return
 
-            all_containers = filter_containers_to_service_names(to_attach, service_names)
+            attached_containers = filter_containers_to_service_names(to_attach, service_names)
 
             log_printer = log_printer_from_project(
                 self.project,
-                all_containers,
+                attached_containers,
                 options['--no-color'],
                 {'follow': True},
                 cascade_stop,
@@ -899,22 +896,31 @@ class TopLevelCommand(object):
             if cascade_stop:
                 print("Aborting on container exit...")
                 self.project.stop(service_names=service_names, timeout=timeout)
-                if forward_exitval:
-                    def is_us(container):
-                        return container.name_without_project == forward_exitval
-                    candidates = filter(is_us, all_containers)
+                if exit_value_from:
+                    candidates = filter(
+                        lambda c: c.service == exit_value_from,
+                        attached_containers)
                     if not candidates:
                         log.error('No containers matching the spec "%s" were run.',
-                                  forward_exitval)
+                                  exit_value_from)
                         sys.exit(2)
                     if len(candidates) > 1:
-                        log.error('Multiple (%d) containers matching the spec "%s" '
-                                  'were found; cannot forward exit code because we '
-                                  'do not know which one to.', len(candidates),
-                                  forward_exitval)
-                        sys.exit(2)
-                    exit_code = candidates[0].inspect()['State']['ExitCode']
-                    sys.exit(exit_code)
+                        exit_values = []
+                        for candidate in candidates:
+                            exit_val = candidate.inspect()['State']['ExitCode']
+                            if exit_val:
+                                exit_values.append(exit_val)
+                        if exit_values:
+                            log.warn('Multiple (%d) containers matching the service name "%s" '
+                                     'were found and at least one exited nonzero; returning '
+                                     'the first non-zero exit code. See above for detailed '
+                                     'exit statuses.', len(candidates), exit_value_from)
+                            sys.exit(exit_values[0])
+                    else:
+                        exit_value = candidates[0].inspect()['State']['ExitCode']
+                        log.error('Returning exit value %d from container %s.', exit_value,
+                                  candidates[0].name_without_project)
+                        sys.exit(exit_value)
 
     @classmethod
     def version(cls, options):
@@ -947,30 +953,22 @@ def convergence_strategy_from_opts(options):
     return ConvergenceStrategy.changed
 
 
-def container_exitval_from_opts(options):
-    """ Assemble a container name suitable for mapping into the
-        output of filter_containers_to_service_names.  If the
-        container name ends in an underscore followed by a
-        positive integer, the user has deliberately specified
-        a container number and we believe her.  Otherwise, append
-        `_1` to the name so as to return the exit value of the
-        first such named container.
-    """
-    container_name = options.get('--forward-exitval')
-    if not container_name:
-        return None
-    segments = container_name.split('_')
-    if segments[-1].isdigit() and int(segments[-1]) > 0:
-        return '_'.join(segments)
-    else:
-        log.warn('"%s" does not specify a container number, '
-                 'defaulting to "%s_1"', container_name, container_name)
-        return '_'.join(segments + ['1'])
-
-
 def timeout_from_opts(options):
     timeout = options.get('--timeout')
     return None if timeout is None else int(timeout)
+
+
+def exitval_from_opts(options, project):
+    exit_value_from = options.get('--exit-code-from')
+    if exit_value_from:
+        if not options.get('--abort-on-container-exit'):
+            log.warn('using --exit-code-from implies --abort-on-container-exit')
+            options['--abort-on-container-exit'] = True
+        if exit_value_from not in [s.name for s in project.get_services()]:
+            log.error('No service named "%s" was found in your compose file.',
+                      exit_value_from)
+            sys.exit(2)
+    return exit_value_from
 
 
 def image_type_from_opt(flag, value):
