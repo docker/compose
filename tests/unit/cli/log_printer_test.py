@@ -90,17 +90,18 @@ class TestBuildLogGenerator(object):
 
     def test_no_log_stream(self, mock_container):
         mock_container.log_stream = None
-        mock_container.logs.return_value = iter([b"hello\nworld"])
+        mock_container.attach_log_stream.return_value = None
+
+        def set_iter():
+            mock_container.log_stream = iter([b"hello\nworld"])
+
+        mock_container.attach_log_stream.side_effect = set_iter
         log_args = {'follow': True}
 
         generator = build_log_generator(mock_container, log_args)
         assert next(generator) == "hello\n"
         assert next(generator) == "world"
-        mock_container.logs.assert_called_once_with(
-            stdout=True,
-            stderr=True,
-            stream=True,
-            **log_args)
+        mock_container.attach_log_stream.assert_called_once_with()
 
     def test_with_log_stream(self, mock_container):
         mock_container.log_stream = iter([b"hello\nworld"])

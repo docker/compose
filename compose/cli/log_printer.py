@@ -175,9 +175,8 @@ def build_log_generator(container, log_args):
     # if the container doesn't have a log_stream we need to attach to container
     # before log printer starts running
     if container.log_stream is None:
-        stream = container.logs(stdout=True, stderr=True, stream=True, **log_args)
-    else:
-        stream = container.log_stream
+        container.attach_log_stream()
+    stream = container.log_stream
 
     return split_buffer(stream)
 
