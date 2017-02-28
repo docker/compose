@@ -21,6 +21,7 @@ from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
+from .config.types import ServicePort
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
 from .const import IS_WINDOWS_PLATFORM
@@ -693,7 +694,7 @@ class Service(object):
 
         if 'ports' in container_options or 'expose' in self.options:
             container_options['ports'] = build_container_ports(
-                container_options,
+                formatted_ports(container_options.get('ports', [])),
                 self.options)
 
         container_options['environment'] = merge_environment(
@@ -747,7 +748,9 @@ class Service(object):
 
         host_config = self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
-            port_bindings=build_port_bindings(options.get('ports') or []),
+            port_bindings=build_port_bindings(
+                formatted_ports(options.get('ports', []))
+            ),
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=options.get('privileged', False),
@@ -875,7 +878,10 @@ class Service(object):
 
     def specifies_host_port(self):
         def has_host_port(binding):
-            _, external_bindings = split_port(binding)
+            if isinstance(binding, dict):
+                external_bindings = binding.get('published')
+            else:
+                _, external_bindings = split_port(binding)
 
             # there are no external bindings
             if external_bindings is None:
@@ -1214,12 +1220,21 @@ def format_environment(environment):
         return '{key}={value}'.format(key=key, value=value)
     return [format_env(*item) for item in environment.items()]
 
+
 # Ports
+def formatted_ports(ports):
+    result = []
+    for port in ports:
+        if isinstance(port, ServicePort):
+            result.append(port.legacy_repr())
+        else:
+            result.append(port)
+    return result
 
 
-def build_container_ports(container_options, options):
+def build_container_ports(container_ports, options):
     ports = []
-    all_ports = container_options.get('ports', []) + options.get('expose', [])
+    all_ports = container_ports + options.get('expose', [])
     for port_range in all_ports:
         internal_range, _ = split_port(port_range)
         for port in internal_range:

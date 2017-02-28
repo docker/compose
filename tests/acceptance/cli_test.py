@@ -1759,6 +1759,19 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(get_port(3001), "0.0.0.0:49152")
         self.assertEqual(get_port(3002), "0.0.0.0:49153")
 
+    def test_expanded_port(self):
+        self.base_dir = 'tests/fixtures/ports-composefile'
+        self.dispatch(['-f', 'expanded-notation.yml', 'up', '-d'])
+        container = self.project.get_service('simple').get_container()
+
+        def get_port(number):
+            result = self.dispatch(['port', 'simple', str(number)])
+            return result.stdout.rstrip()
+
+        self.assertEqual(get_port(3000), container.get_local_port(3000))
+        self.assertEqual(get_port(3001), "0.0.0.0:49152")
+        self.assertEqual(get_port(3002), "0.0.0.0:49153")
+
     def test_port_with_scale(self):
         self.base_dir = 'tests/fixtures/ports-composefile-scale'
         self.dispatch(['scale', 'simple=2'], None)

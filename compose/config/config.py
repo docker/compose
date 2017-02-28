@@ -35,6 +35,7 @@ from .sort_services import sort_service_dicts
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import ServiceLink
+from .types import ServicePort
 from .types import VolumeFromSpec
 from .types import VolumeSpec
 from .validation import match_named_volumes
@@ -683,7 +684,22 @@ def process_service(service_config):
             service_dict[field] = to_list(service_dict[field])
 
     service_dict = process_healthcheck(service_dict, service_config.name)
+    service_dict = process_ports(service_dict)
 
+    return service_dict
+
+
+def process_ports(service_dict):
+    if 'ports' not in service_dict:
+        return service_dict
+
+    ports = []
+    for port_definition in service_dict['ports']:
+        if isinstance(port_definition, ServicePort):
+            ports.append(port_definition)
+        else:
+            ports.extend(ServicePort.parse(port_definition))
+    service_dict['ports'] = ports
     return service_dict
 
 
@@ -864,7 +880,7 @@ def merge_service_dicts(base, override, version):
         md.merge_field(field, merge_path_mappings)
 
     for field in [
-        'ports', 'cap_add', 'cap_drop', 'expose', 'external_links',
+        'cap_add', 'cap_drop', 'expose', 'external_links',
         'security_opt', 'volumes_from',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
@@ -873,6 +889,7 @@ def merge_service_dicts(base, override, version):
         md.merge_field(field, merge_list_or_string)
 
     md.merge_field('logging', merge_logging, default={})
+    merge_ports(md, base, override)
 
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
@@ -887,6 +904,23 @@ def merge_service_dicts(base, override, version):
 
 def merge_unique_items_lists(base, override):
     return sorted(set().union(base, override))
+
+
+def merge_ports(md, base, override):
+    def parse_sequence_func(seq):
+        acc = []
+        for item in seq:
+            acc.extend(ServicePort.parse(item))
+        return to_mapping(acc, 'merge_field')
+
+    field = 'ports'
+
+    if not md.needs_merge(field):
+        return
+
+    merged = parse_sequence_func(md.base.get(field, []))
+    merged.update(parse_sequence_func(md.override.get(field, [])))
+    md[field] = [item for item in sorted(merged.values())]
 
 
 def merge_build(output, base, override):

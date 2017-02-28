@@ -7,6 +7,7 @@ import yaml
 from compose.config import types
 from compose.config.config import V1
 from compose.config.config import V2_1
+from compose.config.config import V3_1
 
 
 def serialize_config_type(dumper, data):
@@ -14,8 +15,14 @@ def serialize_config_type(dumper, data):
     return representer(data.repr())
 
 
+def serialize_dict_type(dumper, data):
+    return dumper.represent_dict(data.repr())
+
+
 yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
+yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
+yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
 def denormalize_config(config):
@@ -102,7 +109,10 @@ def denormalize_service_dict(service_dict, version):
                 service_dict['healthcheck']['timeout']
             )
 
-    if 'secrets' in service_dict:
-        service_dict['secrets'] = map(lambda s: s.repr(), service_dict['secrets'])
+    if 'ports' in service_dict and version != V3_1:
+        service_dict['ports'] = map(
+            lambda p: p.legacy_repr() if isinstance(p, types.ServicePort) else p,
+            service_dict['ports']
+        )
 
     return service_dict
