@@ -90,8 +90,9 @@ class LogPrinter(object):
             if self.cascade_stop:
                 matching_container = [cont.name for cont in self.containers if cont.name == line]
                 if line in matching_container:
-                    self.cascade_starter = line
-                    break
+                    # Returning the name of the container that started the
+                    # the cascade_stop so we can return the correct exit code
+                    return line
 
             if not line:
                 if not thread_map:
@@ -233,10 +234,7 @@ def consume_queue(queue, cascade_stop):
         if item.exc:
             raise item.exc
 
-        if item.is_stop:
-            if cascade_stop:
-                yield item.item
-            else:
-                continue
+        if item.is_stop and not cascade_stop:
+            continue
 
         yield item.item
