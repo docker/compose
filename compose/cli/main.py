@@ -854,7 +854,7 @@ class TopLevelCommand(object):
                                        running. (default: 10)
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
-            --filter-log "SERVICES"    Only show log output from services
+            --filter-log "SERVICES"    Only show log output from selected services. (example: "elasticsearch postgres")
         """
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
