@@ -886,15 +886,16 @@ class TopLevelCommand(object):
                 cascade_stop,
                 event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))
-            log_printer.run()
+            cascade_starter = log_printer.run()
 
             if cascade_stop:
                 print("Aborting on container exit...")
                 exit_code = 0
                 for e in self.project.containers(service_names=options['SERVICE'], stopped=True):
-                    if (not e.is_running and log_printer.cascade_starter == e.name):
+                    if (not e.is_running and cascade_starter == e.name):
                         if not e.exit_code == 0:
                             exit_code = e.exit_code
+                            break
                 self.project.stop(service_names=service_names, timeout=timeout)
                 sys.exit(exit_code)
 

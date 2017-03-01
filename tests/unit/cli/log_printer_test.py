@@ -187,11 +187,13 @@ class TestConsumeQueue(object):
         assert next(generator) == 'b'
 
     def test_item_is_stop_with_cascade_stop(self):
+        """Return the name of the container that caused the cascade_stop"""
         queue = Queue()
-        for item in QueueItem.stop(), QueueItem.new('a'), QueueItem.new('b'):
+        for item in QueueItem.stop('foobar-1'), QueueItem.new('a'), QueueItem.new('b'):
             queue.put(item)
 
-        assert list(consume_queue(queue, True)) == []
+        generator = consume_queue(queue, True)
+        assert next(generator) is 'foobar-1'
 
     def test_item_is_none_when_timeout_is_hit(self):
         queue = Queue()
