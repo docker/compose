@@ -1242,7 +1242,7 @@ class CLITestCase(DockerClientTestCase):
         container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
         self.assertEqual(user, container.get('Config.User'))
 
-    def test_run_service_with_environement_overridden(self):
+    def test_run_service_with_environment_overridden(self):
         name = 'service'
         self.base_dir = 'tests/fixtures/environment-composefile'
         self.dispatch([
@@ -1254,9 +1254,9 @@ class CLITestCase(DockerClientTestCase):
         ])
         service = self.project.get_service(name)
         container = service.containers(stopped=True, one_off=OneOffFilter.only)[0]
-        # env overriden
+        # env overridden
         self.assertEqual('notbar', container.environment['foo'])
-        # keep environement from yaml
+        # keep environment from yaml
         self.assertEqual('world', container.environment['hello'])
         # added option from command line
         self.assertEqual('beta', container.environment['alpha'])
@@ -1301,7 +1301,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_range[0], "0.0.0.0:49153")
         self.assertEqual(port_range[1], "0.0.0.0:49154")
 
-    def test_run_service_with_explicitly_maped_ports(self):
+    def test_run_service_with_explicitly_mapped_ports(self):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
         self.dispatch(['run', '-d', '-p', '30000:3000', '--publish', '30001:3001', 'simple'])
@@ -1318,7 +1318,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(port_short, "0.0.0.0:30000")
         self.assertEqual(port_full, "0.0.0.0:30001")
 
-    def test_run_service_with_explicitly_maped_ip_ports(self):
+    def test_run_service_with_explicitly_mapped_ip_ports(self):
         # create one off container
         self.base_dir = 'tests/fixtures/ports-composefile'
         self.dispatch([

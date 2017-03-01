@@ -13,12 +13,14 @@ import pytest
 
 from ...helpers import build_config_details
 from compose.config import config
+from compose.config import types
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.config import V2_1
 from compose.config.config import V3_0
+from compose.config.config import V3_1
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
@@ -50,6 +52,10 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
 
 def service_sort(services):
     return sorted(services, key=itemgetter('name'))
+
+
+def secret_sort(secrets):
+    return sorted(secrets, key=itemgetter('source'))
 
 
 class ConfigTest(unittest.TestCase):
@@ -167,6 +173,9 @@ class ConfigTest(unittest.TestCase):
         for version in ['3', '3.0']:
             cfg = config.load(build_config_details({'version': version}))
             assert cfg.version == V3_0
+
+        cfg = config.load(build_config_details({'version': '3.1'}))
+        assert cfg.version == V3_1
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -544,6 +553,20 @@ class ConfigTest(unittest.TestCase):
             "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
             excinfo.exconly()
         )
+
+    def test_config_invalid_service_name_raise_validation_error(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2',
+                    'services': {
+                        'test_app': {'build': '.'},
+                        'mong\\o': {'image': 'mongo'},
+                    }
+                })
+            )
+
+            assert 'Invalid service name \'mong\\o\'' in excinfo.exconly()
 
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
@@ -1766,6 +1789,38 @@ class ConfigTest(unittest.TestCase):
             'labels': {'com.docker.compose.test': 'yes'}
         }
 
+    def test_merge_different_secrets(self):
+        base = {
+            'image': 'busybox',
+            'secrets': [
+                {'source': 'src.txt'}
+            ]
+        }
+        override = {'secrets': ['other-src.txt']}
+
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert secret_sort(actual['secrets']) == secret_sort([
+            {'source': 'src.txt'},
+            {'source': 'other-src.txt'}
+        ])
+
+    def test_merge_secrets_override(self):
+        base = {
+            'image': 'busybox',
+            'secrets': ['src.txt'],
+        }
+        override = {
+            'secrets': [
+                {
+                    'source': 'src.txt',
+                    'target': 'data.txt',
+                    'mode': 0o400
+                }
+            ]
+        }
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert actual['secrets'] == override['secrets']
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -1844,6 +1899,91 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
         assert 'has neither an image nor a build context' in exc.exconly()
+
+    def test_load_secrets(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'secrets': [
+                            'one',
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+                'secrets': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        details = config.ConfigDetails('.', [base_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'secrets': [
+                    types.ServiceSecret('one', None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
+
+    def test_load_secrets_multi_file(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'secrets': ['one'],
+                    },
+                },
+                'secrets': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        override_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'secrets': [
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'secrets': [
+                    types.ServiceSecret('one', None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
 
 
 class NetworkModeTest(unittest.TestCase):
@@ -3401,3 +3541,24 @@ class SerializeTest(unittest.TestCase):
         denormalized_service = denormalize_service_dict(processed_service, V2_1)
         assert denormalized_service['healthcheck']['interval'] == '100s'
         assert denormalized_service['healthcheck']['timeout'] == '30s'
+
+    def test_denormalize_secrets(self):
+        service_dict = {
+            'name': 'web',
+            'image': 'example/web',
+            'secrets': [
+                types.ServiceSecret('one', None, None, None, None),
+                types.ServiceSecret('source', 'target', '100', '200', 0o777),
+            ],
+        }
+        denormalized_service = denormalize_service_dict(service_dict, V3_1)
+        assert secret_sort(denormalized_service['secrets']) == secret_sort([
+            {'source': 'one'},
+            {
+                'source': 'source',
+                'target': 'target',
+                'uid': '100',
+                'gid': '200',
+                'mode': 0o777,
+            },
+        ])

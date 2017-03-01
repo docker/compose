@@ -365,7 +365,7 @@ class Project(object):
 
             # TODO: get labels from the API v1.22 , see github issue 2618
             try:
-                # this can fail if the conatiner has been removed
+                # this can fail if the container has been removed
                 container = Container.from_id(self.client, event['id'])
             except APIError:
                 continue

@@ -211,9 +211,12 @@ def handle_error_for_schema_with_id(error, path):
 
     if is_service_dict_schema(schema_id) and error.validator == 'additionalProperties':
         return "Invalid service name '{}' - only {} characters are allowed".format(
-            # The service_name is the key to the json object
-            list(error.instance)[0],
-            VALID_NAME_CHARS)
+            # The service_name is one of the keys in the json object
+            [i for i in list(error.instance) if not i or any(filter(
+                lambda c: not re.match(VALID_NAME_CHARS, c), i
+            ))][0],
+            VALID_NAME_CHARS
+        )
 
     if error.validator == 'additionalProperties':
         if schema_id == '#/definitions/service':

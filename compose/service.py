@@ -226,9 +226,20 @@ class Service(object):
 
             if num_running != len(all_containers):
                 # we have some stopped containers, let's start them up again
+                stopped_containers = [
+                    c for c in all_containers if not c.is_running
+                ]
+
+                # Remove containers that have diverged
+                divergent_containers = [
+                    c for c in stopped_containers if self._containers_have_diverged([c])
+                ]
                 stopped_containers = sorted(
-                    (c for c in all_containers if not c.is_running),
-                    key=attrgetter('number'))
+                    set(stopped_containers) - set(divergent_containers),
+                    key=attrgetter('number')
+                )
+                for c in divergent_containers:
+                        c.remove()
 
                 num_stopped = len(stopped_containers)
 
@@ -802,6 +813,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             buildargs=build_opts.get('args', None),
+            cache_from=build_opts.get('cache_from', None),
         )
 
         try:

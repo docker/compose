@@ -1,6 +1,53 @@
 Change log
 ==========
 
+1.11.0 (2017-02-08)
+-------------------
+
+### New Features
+
+#### Compose file version 3.1
+
+- Introduced version 3.1 of the `docker-compose.yml` specification. This
+  version requires Docker Engine 1.13.0 or above. It introduces support
+  for secrets. See the documentation for more information
+
+#### Compose file version 2.0 and up
+
+- Introduced the `docker-compose top` command that displays processes running
+  for the different services managed by Compose.
+
+### Bugfixes
+
+- Fixed a bug where extending a service defining a healthcheck dictionary
+  would cause `docker-compose` to error out.
+
+- Fixed an issue where the `pid` entry in a service definition was being
+  ignored when using multiple Compose files.
+
+1.10.1 (2017-02-01)
+------------------
+
+### Bugfixes
+
+- Fixed an issue where presence of older versions of the docker-py
+  package would cause unexpected crashes while running Compose
+
+- Fixed an issue where healthcheck dependencies would be lost when
+  using multiple compose files for a project
+
+- Fixed a few issues that made the output of the `config` command
+  invalid
+
+- Fixed an issue where adding volume labels to v3 Compose files would
+  result in an error
+
+- Fixed an issue on Windows where build context paths containing unicode
+  characters were being improperly encoded
+
+- Fixed a bug where Compose would occasionally crash while streaming logs
+  when containers would stop or restart
+
 1.10.0 (2017-01-18)
 -------------------
 
@@ -573,7 +620,7 @@ Bug Fixes:
     if at least one container is using the network.
 
 -   When printings logs during `up` or `logs`, flush the output buffer after
-    each line to prevent buffering issues from hideing logs.
+    each line to prevent buffering issues from hiding logs.
 
 -   Recreate a container if one of its dependencies is being created.
     Previously a container was only recreated if it's dependencies already

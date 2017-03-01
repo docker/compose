@@ -186,11 +186,6 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '3':
             version = V3_0
 
-        if version not in (V2_0, V2_1, V3_0):
-            raise ConfigurationError(
-                'Version in "{}" is unsupported. {}'
-                .format(self.filename, VERSION_EXPLANATION))
-
         return version
 
     def get_service(self, name):
@@ -479,7 +474,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment)
 
-    if config_file.version in (V2_0, V2_1, V3_0):
+    if config_file.version in (V2_0, V2_1, V3_0, V3_1):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -495,7 +490,9 @@ def process_config_file(config_file, environment, service_name=None):
     elif config_file.version == V1:
         processed_config = services
     else:
-        raise Exception("Unsupported version: {}".format(repr(config_file.version)))
+        raise ConfigurationError(
+            'Version in "{}" is unsupported. {}'
+            .format(config_file.filename, VERSION_EXPLANATION))
 
     config_file = config_file._replace(config=processed_config)
     validate_against_config_schema(config_file)
@@ -765,6 +762,11 @@ def finalize_service(service_config, service_names, version, environment):
 
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
+
+    if 'secrets' in service_dict:
+        service_dict['secrets'] = [
+            types.ServiceSecret.parse(s) for s in service_dict['secrets']
+        ]
 
     normalize_build(service_dict, service_config.working_dir, environment)
 

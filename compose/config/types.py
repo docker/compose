@@ -253,3 +253,8 @@ class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
     @property
     def merge_field(self):
         return self.source
+
+    def repr(self):
+        return dict(
+            [(k, v) for k, v in self._asdict().items() if v is not None]
+        )

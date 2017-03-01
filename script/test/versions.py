@@ -44,7 +44,7 @@ class Version(namedtuple('_Version', 'major minor patch rc')):
         version = version.lstrip('v')
         version, _, rc = version.partition('-')
         major, minor, patch = version.split('.', 3)
-        return cls(int(major), int(minor), int(patch), rc)
+        return cls(major, minor, patch, rc)
 
     @property
     def major_minor(self):
@@ -57,7 +57,7 @@ class Version(namedtuple('_Version', 'major minor patch rc')):
         """
         # rc releases should appear before official releases
         rc = (0, self.rc) if self.rc else (1, )
-        return (self.major, self.minor, self.patch) + rc
+        return (int(self.major), int(self.minor), int(self.patch)) + rc
 
     def __str__(self):
         rc = '-{}'.format(self.rc) if self.rc else ''

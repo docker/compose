@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Util functions for release scritps
+# Util functions for release scripts
 #
 
 set -e
