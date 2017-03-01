@@ -177,6 +177,11 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['config', '--services'])
         assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
+    def test_config_list_volumes(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        result = self.dispatch(['config', '--volumes'])
+        assert set(result.stdout.rstrip().split('\n')) == {'data'}
+
     def test_config_quiet_with_error(self):
         self.base_dir = None
         result = self.dispatch([

@@ -301,6 +301,7 @@ class TopLevelCommand(object):
             -q, --quiet     Only validate the configuration, don't print
                             anything.
             --services      Print the service names, one per line.
+            --volumes       Print the volume names, one per line.
 
         """
         compose_config = get_config_from_options(self.project_dir, config_options)
@@ -310,6 +311,10 @@ class TopLevelCommand(object):
 
         if options['--services']:
             print('\n'.join(service['name'] for service in compose_config.services))
+            return
+
+        if options['--volumes']:
+            print('\n'.join(volume for volume in compose_config.volumes))
             return
 
         print(serialize_config(compose_config))
