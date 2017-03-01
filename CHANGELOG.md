@@ -1,6 +1,201 @@
 Change log
 ==========
 
+1.11.0 (2017-02-08)
+-------------------
+
+### New Features
+
+#### Compose file version 3.1
+
+- Introduced version 3.1 of the `docker-compose.yml` specification. This
+  version requires Docker Engine 1.13.0 or above. It introduces support
+  for secrets. See the documentation for more information
+
+#### Compose file version 2.0 and up
+
+- Introduced the `docker-compose top` command that displays processes running
+  for the different services managed by Compose.
+
+### Bugfixes
+
+- Fixed a bug where extending a service defining a healthcheck dictionary
+  would cause `docker-compose` to error out.
+
+- Fixed an issue where the `pid` entry in a service definition was being
+  ignored when using multiple Compose files.
+
+1.10.1 (2017-02-01)
+------------------
+
+### Bugfixes
+
+- Fixed an issue where presence of older versions of the docker-py
+  package would cause unexpected crashes while running Compose
+
+- Fixed an issue where healthcheck dependencies would be lost when
+  using multiple compose files for a project
+
+- Fixed a few issues that made the output of the `config` command
+  invalid
+
+- Fixed an issue where adding volume labels to v3 Compose files would
+  result in an error
+
+- Fixed an issue on Windows where build context paths containing unicode
+  characters were being improperly encoded
+
+- Fixed a bug where Compose would occasionally crash while streaming logs
+  when containers would stop or restart
+
+1.10.0 (2017-01-18)
+-------------------
+
+### New Features
+
+#### Compose file version 3.0
+
+- Introduced version 3.0 of the `docker-compose.yml` specification. This
+  version requires to be used with Docker Engine 1.13 or above and is
+  specifically designed to work with the `docker stack` commands.
+
+#### Compose file version 2.1 and up
+
+- Healthcheck configuration can now be done in the service definition using
+  the `healthcheck` parameter
+
+- Containers dependencies can now be set up to wait on positive healthchecks
+  when declared using `depends_on`. See the documentation for the updated
+  syntax.
+  **Note:** This feature will not be ported to version 3 Compose files.
+
+- Added support for the `sysctls` parameter in service definitions
+
+- Added support for the `userns_mode` parameter in service definitions
+
+- Compose now adds identifying labels to networks and volumes it creates
+
+#### Compose file version 2.0 and up
+
+- Added support for the `stop_grace_period` option in service definitions.
+
+### Bugfixes
+
+- Colored output now works properly on Windows.
+
+- Fixed a bug where docker-compose run would fail to set up link aliases
+  in interactive mode on Windows.
+
+- Networks created by Compose are now always made attachable
+  (Compose files v2.1 and up).
+
+- Fixed a bug where falsy values of `COMPOSE_CONVERT_WINDOWS_PATHS`
+  (`0`, `false`, empty value) were being interpreted as true.
+
+- Fixed a bug where forward slashes in some .dockerignore patterns weren't
+  being parsed correctly on Windows
+
+
+1.9.0 (2016-11-16)
+-----------------
+
+**Breaking changes**
+
+- When using Compose with Docker Toolbox/Machine on Windows, volume paths are
+  no longer converted from `C:\Users` to `/c/Users`-style by default. To
+  re-enable this conversion so that your volumes keep working, set the
+  environment variable `COMPOSE_CONVERT_WINDOWS_PATHS=1`. Users of
+  Docker for Windows are not affected and do not need to set the variable.
+
+New Features
+
+- Interactive mode for `docker-compose run` and `docker-compose exec` is
+  now supported on Windows platforms. Please note that the `docker` binary
+  is required to be present on the system for this feature to work.
+
+- Introduced version 2.1 of the `docker-compose.yml` specification. This
+  version requires to be used with Docker Engine 1.12 or above.
+    - Added support for setting volume labels and network labels in
+  `docker-compose.yml`.
+    - Added support for the `isolation` parameter in service definitions.
+    - Added support for link-local IPs in the service networks definitions.
+    - Added support for shell-style inline defaults in variable interpolation.
+      The supported forms are `${FOO-default}` (fall back if FOO is unset) and
+      `${FOO:-default}` (fall back if FOO is unset or empty).
+
+- Added support for the `group_add` and `oom_score_adj` parameters in
+  service definitions.
+
+- Added support for the `internal` and `enable_ipv6` parameters in network
+  definitions.
+
+- Compose now defaults to using the `npipe` protocol on Windows.
+
+- Overriding a `logging` configuration will now properly merge the `options`
+  mappings if the `driver` values do not conflict.
+
+Bug Fixes
+
+- Fixed several bugs related to `npipe` protocol support on Windows.
+
+- Fixed an issue with Windows paths being incorrectly converted when
+  using Docker on Windows Server.
+
+- Fixed a bug where an empty `restart` value would sometimes result in an
+  exception being raised.
+
+- Fixed an issue where service logs containing unicode characters would
+  sometimes cause an error to occur.
+
+- Fixed a bug where unicode values in environment variables would sometimes
+  raise a unicode exception when retrieved.
+
+- Fixed an issue where Compose would incorrectly detect a configuration
+  mismatch for overlay networks.
+
+
+1.8.1 (2016-09-22)
+-----------------
+
+Bug Fixes
+
+- Fixed a bug where users using a credentials store were not able
+  to access their private images.
+
+- Fixed a bug where users using identity tokens to authenticate
+  were not able to access their private images.
+
+- Fixed a bug where an `HttpHeaders` entry in the docker configuration
+  file would cause Compose to crash when trying to build an image.
+
+- Fixed a few bugs related to the handling of Windows paths in volume
+  binding declarations.
+
+- Fixed a bug where Compose would sometimes crash while trying to
+  read a streaming response from the engine.
+
+- Fixed an issue where Compose would crash when encountering an API error
+  while streaming container logs.
+
+- Fixed an issue where Compose would erroneously try to output logs from
+  drivers not handled by the Engine's API.
+
+- Fixed a bug where options from the `docker-machine config` command would
+  not be properly interpreted by Compose.
+
+- Fixed a bug where the connection to the Docker Engine would
+  sometimes fail when running a large number of services simultaneously.
+
+- Fixed an issue where Compose would sometimes print a misleading
+  suggestion message when running the `bundle` command.
+
+- Fixed a bug where connection errors would not be handled properly by
+  Compose during the project initialization phase.
+
+- Fixed a bug where a misleading error would appear when encountering
+  a connection timeout.
+
+
 1.8.0 (2016-06-14)
 -----------------
 
@@ -43,7 +238,7 @@ Bug Fixes
 - Fixed a bug in Windows environment where volume mappings of the
   host's root directory would be parsed incorrectly.
 
-- Fixed a bug where `docker-compose config` would ouput an invalid
+- Fixed a bug where `docker-compose config` would output an invalid
   Compose file if external networks were specified.
 
 - Fixed an issue where unset buildargs would be assigned a string
@@ -425,7 +620,7 @@ Bug Fixes:
     if at least one container is using the network.
 
 -   When printings logs during `up` or `logs`, flush the output buffer after
-    each line to prevent buffering issues from hideing logs.
+    each line to prevent buffering issues from hiding logs.
 
 -   Recreate a container if one of its dependencies is being created.
     Previously a container was only recreated if it's dependencies already
@@ -714,7 +909,7 @@ Fig has been renamed to Docker Compose, or just Compose for short. This has seve
 
 - The command you type is now `docker-compose`, not `fig`.
 - You should rename your fig.yml to docker-compose.yml.
-- If you’re installing via PyPi, the package is now `docker-compose`, so install it with `pip install docker-compose`.
+- If you’re installing via PyPI, the package is now `docker-compose`, so install it with `pip install docker-compose`.
 
 Besides that, there’s a lot of new stuff in this release:
 

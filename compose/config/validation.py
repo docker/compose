@@ -180,11 +180,13 @@ def validate_links(service_config, service_names):
 
 
 def validate_depends_on(service_config, service_names):
-    for dependency in service_config.config.get('depends_on', []):
+    deps = service_config.config.get('depends_on', {})
+    for dependency in deps.keys():
         if dependency not in service_names:
             raise ConfigurationError(
                 "Service '{s.name}' depends on service '{dep}' which is "
-                "undefined.".format(s=service_config, dep=dependency))
+                "undefined.".format(s=service_config, dep=dependency)
+            )
 
 
 def get_unsupported_config_msg(path, error_key):
@@ -201,7 +203,7 @@ def anglicize_json_type(json_type):
 
 
 def is_service_dict_schema(schema_id):
-    return schema_id in ('config_schema_v1.json',  '#/properties/services')
+    return schema_id in ('config_schema_v1.json', '#/properties/services')
 
 
 def handle_error_for_schema_with_id(error, path):
@@ -209,9 +211,12 @@ def handle_error_for_schema_with_id(error, path):
 
     if is_service_dict_schema(schema_id) and error.validator == 'additionalProperties':
         return "Invalid service name '{}' - only {} characters are allowed".format(
-            # The service_name is the key to the json object
-            list(error.instance)[0],
-            VALID_NAME_CHARS)
+            # The service_name is one of the keys in the json object
+            [i for i in list(error.instance) if not i or any(filter(
+                lambda c: not re.match(VALID_NAME_CHARS, c), i
+            ))][0],
+            VALID_NAME_CHARS
+        )
 
     if error.validator == 'additionalProperties':
         if schema_id == '#/definitions/service':

@@ -12,10 +12,14 @@ import six
 import yaml
 from cached_property import cached_property
 
+from . import types
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_0 as V2_0
 from ..const import COMPOSEFILE_V2_1 as V2_1
+from ..const import COMPOSEFILE_V3_0 as V3_0
+from ..const import COMPOSEFILE_V3_1 as V3_1
 from ..utils import build_string_dict
+from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
 from .environment import env_vars_from_file
 from .environment import Environment
@@ -64,6 +68,7 @@ DOCKER_CONFIG_KEYS = [
     'extra_hosts',
     'group_add',
     'hostname',
+    'healthcheck',
     'image',
     'ipc',
     'labels',
@@ -73,18 +78,21 @@ DOCKER_CONFIG_KEYS = [
     'memswap_limit',
     'mem_swappiness',
     'net',
-    'oom_score_adj'
+    'oom_score_adj',
     'pid',
     'ports',
     'privileged',
     'read_only',
     'restart',
+    'secrets',
     'security_opt',
     'shm_size',
     'stdin_open',
     'stop_signal',
+    'sysctls',
     'tty',
     'user',
+    'userns_mode',
     'volume_driver',
     'volumes',
     'volumes_from',
@@ -175,10 +183,8 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '2':
             version = V2_0
 
-        if version not in (V2_0, V2_1):
-            raise ConfigurationError(
-                'Version in "{}" is unsupported. {}'
-                .format(self.filename, VERSION_EXPLANATION))
+        if version == '3':
+            version = V3_0
 
         return version
 
@@ -194,8 +200,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_networks(self):
         return {} if self.version == V1 else self.config.get('networks', {})
 
+    def get_secrets(self):
+        return {} if self.version < V3_1 else self.config.get('secrets', {})
 
-class Config(namedtuple('_Config', 'version services volumes networks')):
+
+class Config(namedtuple('_Config', 'version services volumes networks secrets')):
     """
     :param version: configuration version
     :type  version: int
@@ -320,13 +329,22 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
+    secrets = load_secrets(config_details.config_files, config_details.working_dir)
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    return Config(main_file.version, service_dicts, volumes, networks)
+    services_using_deploy = [s for s in service_dicts if s.get('deploy')]
+    if services_using_deploy:
+        log.warn(
+            "Some services ({}) use the 'deploy' key, which will be ignored. "
+            "Compose does not support deploy configuration - use "
+            "`docker stack deploy` to deploy to a swarm."
+            .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
+
+    return Config(main_file.version, service_dicts, volumes, networks, secrets)
 
 
 def load_mapping(config_files, get_func, entity_type):
@@ -340,21 +358,11 @@ def load_mapping(config_files, get_func, entity_type):
 
             external = config.get('external')
             if external:
-                if len(config.keys()) > 1:
-                    raise ConfigurationError(
-                        '{} {} declared as external but specifies'
-                        ' additional attributes ({}). '.format(
-                            entity_type,
-                            name,
-                            ', '.join([k for k in config.keys() if k != 'external'])
-                        )
-                    )
+                validate_external(entity_type, name, config)
                 if isinstance(external, dict):
                     config['external_name'] = external.get('name')
                 else:
                     config['external_name'] = name
-
-            mapping[name] = config
 
             if 'driver_opts' in config:
                 config['driver_opts'] = build_string_dict(
@@ -363,6 +371,39 @@ def load_mapping(config_files, get_func, entity_type):
 
             if 'labels' in config:
                 config['labels'] = parse_labels(config['labels'])
+
+    return mapping
+
+
+def validate_external(entity_type, name, config):
+    if len(config.keys()) <= 1:
+        return
+
+    raise ConfigurationError(
+        "{} {} declared as external but specifies additional attributes "
+        "({}).".format(
+            entity_type, name, ', '.join(k for k in config if k != 'external')))
+
+
+def load_secrets(config_files, working_dir):
+    mapping = {}
+
+    for config_file in config_files:
+        for name, config in config_file.get_secrets().items():
+            mapping[name] = config or {}
+            if not config:
+                continue
+
+            external = config.get('external')
+            if external:
+                validate_external('Secret', name, config)
+                if isinstance(external, dict):
+                    config['external_name'] = external.get('name')
+                else:
+                    config['external_name'] = name
+
+            if 'file' in config:
+                config['file'] = expand_path(working_dir, config['file'])
 
     return mapping
 
@@ -433,7 +474,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment)
 
-    if config_file.version in (V2_0, V2_1):
+    if config_file.version in (V2_0, V2_1, V3_0, V3_1):
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -446,9 +487,12 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-
-    if config_file.version == V1:
+    elif config_file.version == V1:
         processed_config = services
+    else:
+        raise ConfigurationError(
+            'Version in "{}" is unsupported. {}'
+            .format(config_file.filename, VERSION_EXPLANATION))
 
     config_file = config_file._replace(config=processed_config)
     validate_against_config_schema(config_file)
@@ -629,10 +673,59 @@ def process_service(service_config):
     if 'extra_hosts' in service_dict:
         service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
 
+    if 'sysctls' in service_dict:
+        service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
+
+    service_dict = process_depends_on(service_dict)
+
     for field in ['dns', 'dns_search', 'tmpfs']:
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
+    service_dict = process_healthcheck(service_dict, service_config.name)
+
+    return service_dict
+
+
+def process_depends_on(service_dict):
+    if 'depends_on' in service_dict and not isinstance(service_dict['depends_on'], dict):
+        service_dict['depends_on'] = dict([
+            (svc, {'condition': 'service_started'}) for svc in service_dict['depends_on']
+        ])
+    return service_dict
+
+
+def process_healthcheck(service_dict, service_name):
+    if 'healthcheck' not in service_dict:
+        return service_dict
+
+    hc = {}
+    raw = service_dict['healthcheck']
+
+    if raw.get('disable'):
+        if len(raw) > 1:
+            raise ConfigurationError(
+                'Service "{}" defines an invalid healthcheck: '
+                '"disable: true" cannot be combined with other options'
+                .format(service_name))
+        hc['test'] = ['NONE']
+    elif 'test' in raw:
+        hc['test'] = raw['test']
+
+    if 'interval' in raw:
+        if not isinstance(raw['interval'], six.integer_types):
+            hc['interval'] = parse_nanoseconds_int(raw['interval'])
+        else:  # Conversion has been done previously
+            hc['interval'] = raw['interval']
+    if 'timeout' in raw:
+        if not isinstance(raw['timeout'], six.integer_types):
+            hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
+        else:  # Conversion has been done previously
+            hc['timeout'] = raw['timeout']
+    if 'retries' in raw:
+        hc['retries'] = raw['retries']
+
+    service_dict['healthcheck'] = hc
     return service_dict
 
 
@@ -652,7 +745,7 @@ def finalize_service(service_config, service_names, version, environment):
     if 'volumes' in service_dict:
         service_dict['volumes'] = [
             VolumeSpec.parse(
-                v, environment.get('COMPOSE_CONVERT_WINDOWS_PATHS')
+                v, environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
             ) for v in service_dict['volumes']
         ]
 
@@ -669,6 +762,11 @@ def finalize_service(service_config, service_names, version, environment):
 
     if 'restart' in service_dict:
         service_dict['restart'] = parse_restart_spec(service_dict['restart'])
+
+    if 'secrets' in service_dict:
+        service_dict['secrets'] = [
+            types.ServiceSecret.parse(s) for s in service_dict['secrets']
+        ]
 
     normalize_build(service_dict, service_config.working_dir, environment)
 
@@ -757,21 +855,24 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('ulimits', parse_ulimits)
     md.merge_mapping('networks', parse_networks)
+    md.merge_mapping('sysctls', parse_sysctls)
+    md.merge_mapping('depends_on', parse_depends_on)
     md.merge_sequence('links', ServiceLink.parse)
+    md.merge_sequence('secrets', types.ServiceSecret.parse)
 
     for field in ['volumes', 'devices']:
         md.merge_field(field, merge_path_mappings)
 
     for field in [
         'ports', 'cap_add', 'cap_drop', 'expose', 'external_links',
-        'security_opt', 'volumes_from', 'depends_on',
+        'security_opt', 'volumes_from',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 
     for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
 
-    md.merge_field('logging', merge_logging)
+    md.merge_field('logging', merge_logging, default={})
 
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
@@ -831,11 +932,11 @@ def merge_environment(base, override):
     return env
 
 
-def split_label(label):
-    if '=' in label:
-        return label.split('=', 1)
+def split_kv(kvpair):
+    if '=' in kvpair:
+        return kvpair.split('=', 1)
     else:
-        return label, ''
+        return kvpair, ''
 
 
 def parse_dict_or_list(split_func, type_name, arguments):
@@ -856,8 +957,12 @@ def parse_dict_or_list(split_func, type_name, arguments):
 
 parse_build_arguments = functools.partial(parse_dict_or_list, split_env, 'build arguments')
 parse_environment = functools.partial(parse_dict_or_list, split_env, 'environment')
-parse_labels = functools.partial(parse_dict_or_list, split_label, 'labels')
+parse_labels = functools.partial(parse_dict_or_list, split_kv, 'labels')
 parse_networks = functools.partial(parse_dict_or_list, lambda k: (k, None), 'networks')
+parse_sysctls = functools.partial(parse_dict_or_list, split_kv, 'sysctls')
+parse_depends_on = functools.partial(
+    parse_dict_or_list, lambda k: (k, {'condition': 'service_started'}), 'depends_on'
+)
 
 
 def parse_ulimits(ulimits):

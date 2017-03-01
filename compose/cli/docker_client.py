@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker import Client
+from docker import APIClient
 from docker.errors import TLSParameterError
 from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
@@ -71,4 +71,4 @@ def docker_client(environment, version=None, tls_config=None, host=None,
 
     kwargs['user_agent'] = generate_user_agent()
 
-    return Client(**kwargs)
+    return APIClient(**kwargs)

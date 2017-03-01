@@ -97,7 +97,7 @@ class CLITestCase(unittest.TestCase):
     @mock.patch('compose.cli.main.RunOperation', autospec=True)
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
     def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(docker.APIClient)
         project = Project.from_config(
             name='composetest',
             client=mock_client,
@@ -128,7 +128,7 @@ class CLITestCase(unittest.TestCase):
         assert call_kwargs['logs'] is False
 
     def test_run_service_with_restart_always(self):
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(docker.APIClient)
 
         project = Project.from_config(
             name='composetest',
@@ -184,7 +184,7 @@ class CLITestCase(unittest.TestCase):
             mock_client.create_host_config.call_args[1].get('restart_policy')
         )
 
-    def test_command_manula_and_service_ports_together(self):
+    def test_command_manual_and_service_ports_together(self):
         project = Project.from_config(
             name='composetest',
             client=None,

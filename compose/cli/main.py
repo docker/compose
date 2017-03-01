@@ -24,7 +24,6 @@ from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
-from ..const import DEFAULT_TIMEOUT
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -192,6 +191,7 @@ class TopLevelCommand(object):
       scale              Set number of containers for a service
       start              Start services
       stop               Stop services
+      top                Display the running processes
       unpause            Unpause services
       up                 Create and start containers
       version            Show the Docker-Compose version information
@@ -726,7 +726,7 @@ class TopLevelCommand(object):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
 
         for s in options['SERVICE=NUM']:
             if '=' not in s:
@@ -760,7 +760,7 @@ class TopLevelCommand(object):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
         self.project.stop(service_names=options['SERVICE'], timeout=timeout)
 
     def restart(self, options):
@@ -773,9 +773,36 @@ class TopLevelCommand(object):
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
                                      (default: 10)
         """
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
         containers = self.project.restart(service_names=options['SERVICE'], timeout=timeout)
         exit_if(not containers, 'No containers to restart', 1)
+
+    def top(self, options):
+        """
+        Display the running processes
+
+        Usage: top [SERVICE...]
+
+        """
+        containers = sorted(
+            self.project.containers(service_names=options['SERVICE'], stopped=False) +
+            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+            key=attrgetter('name')
+        )
+
+        for idx, container in enumerate(containers):
+            if idx > 0:
+                print()
+
+            top_data = self.project.client.top(container.name)
+            headers = top_data.get("Titles")
+            rows = []
+
+            for process in top_data.get("Processes", []):
+                rows.append(process)
+
+            print(container.name)
+            print(Formatter().table(headers, rows))
 
     def unpause(self, options):
         """
@@ -831,7 +858,7 @@ class TopLevelCommand(object):
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
-        timeout = int(options.get('--timeout') or DEFAULT_TIMEOUT)
+        timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
 
@@ -894,6 +921,11 @@ def convergence_strategy_from_opts(options):
         return ConvergenceStrategy.never
 
     return ConvergenceStrategy.changed
+
+
+def timeout_from_opts(options):
+    timeout = options.get('--timeout')
+    return None if timeout is None else int(timeout)
 
 
 def image_type_from_opt(flag, value):
@@ -984,6 +1016,7 @@ def run_one_off_container(container_options, project, service, options):
     try:
         try:
             if IS_WINDOWS_PLATFORM:
+                service.connect_container_to_networks(container)
                 exit_code = call_docker(["start", "--attach", "--interactive", container.id])
             else:
                 operation = RunOperation(

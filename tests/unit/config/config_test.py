@@ -13,16 +13,22 @@ import pytest
 
 from ...helpers import build_config_details
 from compose.config import config
+from compose.config import types
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
 from compose.config.config import V2_0
 from compose.config.config import V2_1
+from compose.config.config import V3_0
+from compose.config.config import V3_1
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
+from compose.config.serialize import denormalize_service_dict
+from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
+from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
 from tests import unittest
 
@@ -46,6 +52,10 @@ def make_service_dict(name, service_dict, working_dir, filename=None):
 
 def service_sort(services):
     return sorted(services, key=itemgetter('name'))
+
+
+def secret_sort(secrets):
+    return sorted(secrets, key=itemgetter('source'))
 
 
 class ConfigTest(unittest.TestCase):
@@ -156,8 +166,16 @@ class ConfigTest(unittest.TestCase):
         for version in ['2', '2.0']:
             cfg = config.load(build_config_details({'version': version}))
             assert cfg.version == V2_0
+
         cfg = config.load(build_config_details({'version': '2.1'}))
         assert cfg.version == V2_1
+
+        for version in ['3', '3.0']:
+            cfg = config.load(build_config_details({'version': version}))
+            assert cfg.version == V3_0
+
+        cfg = config.load(build_config_details({'version': '3.1'}))
+        assert cfg.version == V3_1
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -536,6 +554,20 @@ class ConfigTest(unittest.TestCase):
             excinfo.exconly()
         )
 
+    def test_config_invalid_service_name_raise_validation_error(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2',
+                    'services': {
+                        'test_app': {'build': '.'},
+                        'mong\\o': {'image': 'mongo'},
+                    }
+                })
+            )
+
+            assert 'Invalid service name \'mong\\o\'' in excinfo.exconly()
+
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -913,7 +945,10 @@ class ConfigTest(unittest.TestCase):
                 'build': {'context': os.path.abspath('/')},
                 'image': 'example/web',
                 'volumes': [VolumeSpec.parse('/home/user/project:/code')],
-                'depends_on': ['db', 'other'],
+                'depends_on': {
+                    'db': {'condition': 'service_started'},
+                    'other': {'condition': 'service_started'},
+                },
             },
             {
                 'name': 'db',
@@ -1657,6 +1692,135 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_logging_v2_no_base(self):
+        base = {
+            'image': 'alpine:edge'
+        }
+        override = {
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'json-file',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+
+    def test_merge_logging_v2_no_override(self):
+        base = {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+        override = {}
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'alpine:edge',
+            'logging': {
+                'driver': 'syslog',
+                'options': {
+                    'frequency': '2000'
+                }
+            }
+        }
+
+    def test_merge_depends_on_no_override(self):
+        base = {
+            'image': 'busybox',
+            'depends_on': {
+                'app1': {'condition': 'service_started'},
+                'app2': {'condition': 'service_healthy'}
+            }
+        }
+        override = {}
+        actual = config.merge_service_dicts(base, override, V2_1)
+        assert actual == base
+
+    def test_merge_depends_on_mixed_syntax(self):
+        base = {
+            'image': 'busybox',
+            'depends_on': {
+                'app1': {'condition': 'service_started'},
+                'app2': {'condition': 'service_healthy'}
+            }
+        }
+        override = {
+            'depends_on': ['app3']
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_1)
+        assert actual == {
+            'image': 'busybox',
+            'depends_on': {
+                'app1': {'condition': 'service_started'},
+                'app2': {'condition': 'service_healthy'},
+                'app3': {'condition': 'service_started'}
+            }
+        }
+
+    def test_merge_pid(self):
+        # Regression: https://github.com/docker/compose/issues/4184
+        base = {
+            'image': 'busybox',
+            'pid': 'host'
+        }
+
+        override = {
+            'labels': {'com.docker.compose.test': 'yes'}
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual == {
+            'image': 'busybox',
+            'pid': 'host',
+            'labels': {'com.docker.compose.test': 'yes'}
+        }
+
+    def test_merge_different_secrets(self):
+        base = {
+            'image': 'busybox',
+            'secrets': [
+                {'source': 'src.txt'}
+            ]
+        }
+        override = {'secrets': ['other-src.txt']}
+
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert secret_sort(actual['secrets']) == secret_sort([
+            {'source': 'src.txt'},
+            {'source': 'other-src.txt'}
+        ])
+
+    def test_merge_secrets_override(self):
+        base = {
+            'image': 'busybox',
+            'secrets': ['src.txt'],
+        }
+        override = {
+            'secrets': [
+                {
+                    'source': 'src.txt',
+                    'target': 'data.txt',
+                    'mode': 0o400
+                }
+            ]
+        }
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert actual['secrets'] == override['secrets']
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -1735,6 +1899,91 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(config_details)
         assert 'has neither an image nor a build context' in exc.exconly()
+
+    def test_load_secrets(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'secrets': [
+                            'one',
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+                'secrets': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        details = config.ConfigDetails('.', [base_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'secrets': [
+                    types.ServiceSecret('one', None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
+
+    def test_load_secrets_multi_file(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'secrets': ['one'],
+                    },
+                },
+                'secrets': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        override_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.1',
+                'services': {
+                    'web': {
+                        'secrets': [
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'secrets': [
+                    types.ServiceSecret('one', None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
 
 
 class NetworkModeTest(unittest.TestCase):
@@ -2448,6 +2697,15 @@ class EnvTest(unittest.TestCase):
             {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'},
         )
 
+    def test_environment_overrides_env_file(self):
+        self.assertEqual(
+            resolve_environment({
+                'environment': {'FOO': 'baz'},
+                'env_file': ['tests/fixtures/env/one.env'],
+            }),
+            {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz'},
+        )
+
     def test_resolve_environment_with_multiple_env_files(self):
         service_dict = {
             'env_file': [
@@ -2994,7 +3252,22 @@ class ExtendsTest(unittest.TestCase):
                 image: example
         """)
         services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
-        assert service_sort(services)[2]['depends_on'] == ['other']
+        assert service_sort(services)[2]['depends_on'] == {
+            'other': {'condition': 'service_started'}
+        }
+
+    def test_extends_with_healthcheck(self):
+        service_dicts = load_from_filename('tests/fixtures/extends/healthcheck-2.yml')
+        assert service_sort(service_dicts) == [{
+            'name': 'demo',
+            'image': 'foobar:latest',
+            'healthcheck': {
+                'test': ['CMD', '/health.sh'],
+                'interval': 10000000000,
+                'timeout': 5000000000,
+                'retries': 36,
+            }
+        }]
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
@@ -3111,6 +3384,54 @@ class BuildPathTest(unittest.TestCase):
             assert 'build path' in exc.exconly()
 
 
+class HealthcheckTest(unittest.TestCase):
+    def test_healthcheck(self):
+        service_dict = make_service_dict(
+            'test',
+            {'healthcheck': {
+                'test': ['CMD', 'true'],
+                'interval': '1s',
+                'timeout': '1m',
+                'retries': 3,
+            }},
+            '.',
+        )
+
+        assert service_dict['healthcheck'] == {
+            'test': ['CMD', 'true'],
+            'interval': nanoseconds_from_time_seconds(1),
+            'timeout': nanoseconds_from_time_seconds(60),
+            'retries': 3,
+        }
+
+    def test_disable(self):
+        service_dict = make_service_dict(
+            'test',
+            {'healthcheck': {
+                'disable': True,
+            }},
+            '.',
+        )
+
+        assert service_dict['healthcheck'] == {
+            'test': ['NONE'],
+        }
+
+    def test_disable_with_other_config_is_invalid(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            make_service_dict(
+                'invalid-healthcheck',
+                {'healthcheck': {
+                    'disable': True,
+                    'interval': '1s',
+                }},
+                '.',
+            )
+
+        assert 'invalid-healthcheck' in excinfo.exconly()
+        assert 'disable' in excinfo.exconly()
+
+
 class GetDefaultConfigFilesTestCase(unittest.TestCase):
 
     files = [
@@ -3155,3 +3476,89 @@ def get_config_filename_for_files(filenames, subdir=None):
         return os.path.basename(filename)
     finally:
         shutil.rmtree(project_dir)
+
+
+class SerializeTest(unittest.TestCase):
+    def test_denormalize_depends_on_v3(self):
+        service_dict = {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': {
+                'service2': {'condition': 'service_started'},
+                'service3': {'condition': 'service_started'},
+            }
+        }
+
+        assert denormalize_service_dict(service_dict, V3_0) == {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': ['service2', 'service3']
+        }
+
+    def test_denormalize_depends_on_v2_1(self):
+        service_dict = {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': {
+                'service2': {'condition': 'service_started'},
+                'service3': {'condition': 'service_started'},
+            }
+        }
+
+        assert denormalize_service_dict(service_dict, V2_1) == service_dict
+
+    def test_serialize_time(self):
+        data = {
+            9: '9ns',
+            9000: '9us',
+            9000000: '9ms',
+            90000000: '90ms',
+            900000000: '900ms',
+            999999999: '999999999ns',
+            1000000000: '1s',
+            60000000000: '1m',
+            60000000001: '60000000001ns',
+            9000000000000: '150m',
+            90000000000000: '25h',
+        }
+
+        for k, v in data.items():
+            assert serialize_ns_time_value(k) == v
+
+    def test_denormalize_healthcheck(self):
+        service_dict = {
+            'image': 'test',
+            'healthcheck': {
+                'test': 'exit 1',
+                'interval': '1m40s',
+                'timeout': '30s',
+                'retries': 5
+            }
+        }
+        processed_service = config.process_service(config.ServiceConfig(
+            '.', 'test', 'test', service_dict
+        ))
+        denormalized_service = denormalize_service_dict(processed_service, V2_1)
+        assert denormalized_service['healthcheck']['interval'] == '100s'
+        assert denormalized_service['healthcheck']['timeout'] == '30s'
+
+    def test_denormalize_secrets(self):
+        service_dict = {
+            'name': 'web',
+            'image': 'example/web',
+            'secrets': [
+                types.ServiceSecret('one', None, None, None, None),
+                types.ServiceSecret('source', 'target', '100', '200', 0o777),
+            ],
+        }
+        denormalized_service = denormalize_service_dict(service_dict, V3_1)
+        assert secret_sort(denormalized_service['secrets']) == secret_sort([
+            {'source': 'one'},
+            {
+                'source': 'source',
+                'target': 'target',
+                'uid': '100',
+                'gid': '200',
+                'mode': 0o777,
+            },
+        ])

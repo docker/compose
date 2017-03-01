@@ -10,7 +10,7 @@ from tests import mock
 
 @pytest.fixture
 def mock_client():
-    return mock.create_autospec(docker.Client)
+    return mock.create_autospec(docker.APIClient)
 
 
 class TestVolume(object):

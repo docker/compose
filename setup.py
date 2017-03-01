@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
+from __future__ import print_function
 from __future__ import unicode_literals
 
 import codecs
@@ -8,6 +9,7 @@ import os
 import re
 import sys
 
+import pkg_resources
 from setuptools import find_packages
 from setuptools import setup
 
@@ -29,12 +31,13 @@ def find_version(*file_paths):
 
 install_requires = [
     'cached-property >= 1.2.0, < 2',
+    'colorama >= 0.3.7, < 0.4',
     'docopt >= 0.6.1, < 0.7',
     'PyYAML >= 3.10, < 4',
     'requests >= 2.6.1, != 2.11.0, < 2.12',
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.32.0, < 1.0',
-    'docker-py >= 1.10.6, < 2.0',
+    'docker >= 2.1.0, < 3.0',
     'dockerpty >= 0.4.1, < 0.5',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
@@ -48,7 +51,25 @@ tests_require = [
 
 if sys.version_info[:2] < (3, 4):
     tests_require.append('mock >= 1.0.1')
-    install_requires.append('enum34 >= 1.0.4, < 2')
+
+extras_require = {
+    ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
+    ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5'],
+    ':python_version < "3.3"': ['ipaddress >= 1.0.16'],
+}
+
+
+try:
+    if 'bdist_wheel' not in sys.argv:
+        for key, value in extras_require.items():
+            if key.startswith(':') and pkg_resources.evaluate_marker(key[1:]):
+                install_requires.extend(value)
+except Exception as e:
+    print("Failed to compute platform dependencies: {}. ".format(e) +
+          "All dependencies will be installed as a result.", file=sys.stderr)
+    for key, value in extras_require.items():
+        if key.startswith(':'):
+            install_requires.extend(value)
 
 
 setup(
@@ -62,6 +83,7 @@ setup(
     include_package_data=True,
     test_suite='nose.collector',
     install_requires=install_requires,
+    extras_require=extras_require,
     tests_require=tests_require,
     entry_points="""
     [console_scripts]

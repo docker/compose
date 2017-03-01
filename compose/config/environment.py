@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import codecs
+import contextlib
 import logging
 import os
 
@@ -31,11 +32,12 @@ def env_vars_from_file(filename):
     elif not os.path.isfile(filename):
         raise ConfigurationError("%s is not a file." % (filename))
     env = {}
-    for line in codecs.open(filename, 'r', 'utf-8'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            k, v = split_env(line)
-            env[k] = v
+    with contextlib.closing(codecs.open(filename, 'r', 'utf-8')) as fileobj:
+        for line in fileobj:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                k, v = split_env(line)
+                env[k] = v
     return env
 
 
@@ -105,3 +107,14 @@ class Environment(dict):
                 super(Environment, self).get(key.upper(), *args, **kwargs)
             )
         return super(Environment, self).get(key, *args, **kwargs)
+
+    def get_boolean(self, key):
+        # Convert a value to a boolean using "common sense" rules.
+        # Unset, empty, "0" and "false" (i-case) yield False.
+        # All other values yield True.
+        value = self.get(key)
+        if not value:
+            return False
+        if value.lower() in ['0', 'false']:
+            return False
+        return True

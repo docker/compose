@@ -10,16 +10,20 @@ from operator import attrgetter
 import enum
 import six
 from docker.errors import APIError
-from docker.utils import LogConfig
+from docker.errors import ImageNotFound
+from docker.errors import NotFound
+from docker.types import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 
 from . import __version__
+from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
+from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -27,12 +31,15 @@ from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
 from .container import Container
+from .errors import HealthCheckFailed
+from .errors import NoHealthCheckConfigured
 from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .parallel import parallel_start
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+from .utils import parse_seconds_float
 
 
 log = logging.getLogger(__name__)
@@ -62,8 +69,13 @@ DOCKER_START_KEYS = [
     'restart',
     'security_opt',
     'shm_size',
+    'sysctls',
+    'userns_mode',
     'volumes_from',
 ]
+
+CONDITION_STARTED = 'service_started'
+CONDITION_HEALTHY = 'service_healthy'
 
 
 class BuildError(Exception):
@@ -128,6 +140,7 @@ class Service(object):
         volumes_from=None,
         network_mode=None,
         networks=None,
+        secrets=None,
         **options
     ):
         self.name = name
@@ -138,6 +151,7 @@ class Service(object):
         self.volumes_from = volumes_from or []
         self.network_mode = network_mode or NetworkMode(None)
         self.networks = networks or {}
+        self.secrets = secrets or []
         self.options = options
 
     def __repr__(self):
@@ -168,7 +182,7 @@ class Service(object):
             self.start_container_if_stopped(c, **options)
         return containers
 
-    def scale(self, desired_num, timeout=DEFAULT_TIMEOUT):
+    def scale(self, desired_num, timeout=None):
         """
         Adjusts the number of containers to the specified number and ensures
         they are running.
@@ -195,7 +209,7 @@ class Service(object):
             return container
 
         def stop_and_remove(container):
-            container.stop(timeout=timeout)
+            container.stop(timeout=self.stop_timeout(timeout))
             container.remove()
 
         running_containers = self.containers(stopped=False)
@@ -212,9 +226,20 @@ class Service(object):
 
             if num_running != len(all_containers):
                 # we have some stopped containers, let's start them up again
+                stopped_containers = [
+                    c for c in all_containers if not c.is_running
+                ]
+
+                # Remove containers that have diverged
+                divergent_containers = [
+                    c for c in stopped_containers if self._containers_have_diverged([c])
+                ]
                 stopped_containers = sorted(
-                    (c for c in all_containers if not c.is_running),
-                    key=attrgetter('number'))
+                    set(stopped_containers) - set(divergent_containers),
+                    key=attrgetter('number')
+                )
+                for c in divergent_containers:
+                        c.remove()
 
                 num_stopped = len(stopped_containers)
 
@@ -314,11 +339,8 @@ class Service(object):
     def image(self):
         try:
             return self.client.inspect_image(self.image_name)
-        except APIError as e:
-            if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                raise NoSuchImageError("Image '{}' not found".format(self.image_name))
-            else:
-                raise
+        except ImageNotFound:
+            raise NoSuchImageError("Image '{}' not found".format(self.image_name))
 
     @property
     def image_name(self):
@@ -373,7 +395,7 @@ class Service(object):
 
     def execute_convergence_plan(self,
                                  plan,
-                                 timeout=DEFAULT_TIMEOUT,
+                                 timeout=None,
                                  detached=False,
                                  start=True):
         (action, containers) = plan
@@ -420,7 +442,7 @@ class Service(object):
     def recreate_container(
             self,
             container,
-            timeout=DEFAULT_TIMEOUT,
+            timeout=None,
             attach_logs=False,
             start_new_container=True):
         """Recreate a container.
@@ -431,7 +453,7 @@ class Service(object):
         """
         log.info("Recreating %s" % container.name)
 
-        container.stop(timeout=timeout)
+        container.stop(timeout=self.stop_timeout(timeout))
         container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container,
@@ -444,6 +466,14 @@ class Service(object):
             self.start_container(new_container)
         container.remove()
         return new_container
+
+    def stop_timeout(self, timeout):
+        if timeout is not None:
+            return timeout
+        timeout = parse_seconds_float(self.options.get('stop_grace_period'))
+        if timeout is not None:
+            return timeout
+        return DEFAULT_TIMEOUT
 
     def start_container_if_stopped(self, container, attach_logs=False, quiet=False):
         if not container.is_running:
@@ -482,10 +512,10 @@ class Service(object):
                 link_local_ips=netdefs.get('link_local_ips', None),
             )
 
-    def remove_duplicate_containers(self, timeout=DEFAULT_TIMEOUT):
+    def remove_duplicate_containers(self, timeout=None):
         for c in self.duplicate_containers():
             log.info('Removing %s' % c.name)
-            c.stop(timeout=timeout)
+            c.stop(timeout=self.stop_timeout(timeout))
             c.remove()
 
     def duplicate_containers(self):
@@ -521,10 +551,38 @@ class Service(object):
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name
-        return (self.get_linked_service_names() +
-                self.get_volumes_from_names() +
-                ([net_name] if net_name else []) +
-                self.options.get('depends_on', []))
+        return (
+            self.get_linked_service_names() +
+            self.get_volumes_from_names() +
+            ([net_name] if net_name else []) +
+            list(self.options.get('depends_on', {}).keys())
+        )
+
+    def get_dependency_configs(self):
+        net_name = self.network_mode.service_name
+        configs = dict(
+            [(name, None) for name in self.get_linked_service_names()]
+        )
+        configs.update(dict(
+            [(name, None) for name in self.get_volumes_from_names()]
+        ))
+        configs.update({net_name: None} if net_name else {})
+        configs.update(self.options.get('depends_on', {}))
+        for svc, config in self.options.get('depends_on', {}).items():
+            if config['condition'] == CONDITION_STARTED:
+                configs[svc] = lambda s: True
+            elif config['condition'] == CONDITION_HEALTHY:
+                configs[svc] = lambda s: s.is_healthy()
+            else:
+                # The config schema already prevents this, but it might be
+                # bypassed if Compose is called programmatically.
+                raise ValueError(
+                    'depends_on condition "{}" is invalid.'.format(
+                        config['condition']
+                    )
+                )
+
+        return configs
 
     def get_linked_service_names(self):
         return [service.name for (service, _) in self.links]
@@ -648,9 +706,14 @@ class Service(object):
         override_options['binds'] = binds
         container_options['environment'].update(affinity)
 
-        if 'volumes' in container_options:
-            container_options['volumes'] = dict(
-                (v.internal, {}) for v in container_options['volumes'])
+        container_options['volumes'] = dict(
+            (v.internal, {}) for v in container_options.get('volumes') or {})
+
+        secret_volumes = self.get_secret_volumes()
+        if secret_volumes:
+            override_options['binds'].extend(v.repr() for v in secret_volumes)
+            container_options['volumes'].update(
+                (v.internal, {}) for v in secret_volumes)
 
         container_options['image'] = self.image_name
 
@@ -707,10 +770,12 @@ class Service(object):
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
+            sysctls=options.get('sysctls'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
             mem_swappiness=options.get('mem_swappiness'),
-            group_add=options.get('group_add')
+            group_add=options.get('group_add'),
+            userns_mode=options.get('userns_mode')
         )
 
         # TODO: Add as an argument to create_host_config once it's supported
@@ -719,14 +784,23 @@ class Service(object):
 
         return host_config
 
+    def get_secret_volumes(self):
+        def build_spec(secret):
+            target = '{}/{}'.format(
+                const.SECRETS_PATH,
+                secret['secret'].target or secret['secret'].source)
+            return VolumeSpec(secret['file'], target, 'ro')
+
+        return [build_spec(secret) for secret in self.secrets]
+
     def build(self, no_cache=False, pull=False, force_rm=False):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
         path = build_opts.get('context')
-        # python2 os.path() doesn't support unicode, so we need to encode it to
-        # a byte string
-        if not six.PY3:
+        # python2 os.stat() doesn't support unicode on some UNIX, so we
+        # encode it to a bytestring to be safe
+        if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
 
         build_output = self.client.build(
@@ -739,6 +813,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             buildargs=build_opts.get('args', None),
+            cache_from=build_opts.get('cache_from', None),
         )
 
         try:
@@ -829,12 +904,11 @@ class Service(object):
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
         log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
-        output = self.client.pull(repo, tag=tag, stream=True)
-
         try:
+            output = self.client.pull(repo, tag=tag, stream=True)
             return progress_stream.get_digest_from_pull(
                 stream_output(output, sys.stdout))
-        except StreamOutputError as e:
+        except (StreamOutputError, NotFound) as e:
             if not ignore_pull_failures:
                 raise
             else:
@@ -857,6 +931,24 @@ class Service(object):
                 raise
             else:
                 log.error(six.text_type(e))
+
+    def is_healthy(self):
+        """ Check that all containers for this service report healthy.
+            Returns false if at least one healthcheck is pending.
+            If an unhealthy container is detected, raise a HealthCheckFailed
+            exception.
+        """
+        result = True
+        for ctnr in self.containers():
+            ctnr.inspect()
+            status = ctnr.get('State.Health.Status')
+            if status is None:
+                raise NoHealthCheckConfigured(self.name)
+            elif status == 'starting':
+                result = False
+            elif status == 'unhealthy':
+                raise HealthCheckFailed(ctnr.short_id)
+        return result
 
 
 def short_id_alias_exists(container, network):

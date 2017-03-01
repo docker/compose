@@ -34,7 +34,7 @@ from compose.service import warn_on_masked_volume
 class ServiceTest(unittest.TestCase):
 
     def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
+        self.mock_client = mock.create_autospec(docker.APIClient)
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
@@ -446,6 +446,7 @@ class ServiceTest(unittest.TestCase):
             nocache=False,
             rm=True,
             buildargs=None,
+            cache_from=None,
         )
 
     def test_ensure_image_exists_no_build(self):
@@ -482,6 +483,7 @@ class ServiceTest(unittest.TestCase):
             nocache=False,
             rm=True,
             buildargs=None,
+            cache_from=None,
         )
 
     def test_build_does_not_pull(self):
@@ -666,7 +668,7 @@ class ServiceTest(unittest.TestCase):
 class TestServiceNetwork(object):
 
     def test_connect_container_to_networks_short_aliase_exists(self):
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(docker.APIClient)
         service = Service(
             'db',
             mock_client,
@@ -751,7 +753,7 @@ class NetTestCase(unittest.TestCase):
     def test_network_mode_service(self):
         container_id = 'bbbb'
         service_name = 'web'
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(docker.APIClient)
         mock_client.containers.return_value = [
             {'Id': container_id, 'Name': container_id, 'Image': 'abcd'},
         ]
@@ -765,7 +767,7 @@ class NetTestCase(unittest.TestCase):
 
     def test_network_mode_service_no_containers(self):
         service_name = 'web'
-        mock_client = mock.create_autospec(docker.Client)
+        mock_client = mock.create_autospec(docker.APIClient)
         mock_client.containers.return_value = []
 
         service = Service(name=service_name, client=mock_client)
@@ -783,7 +785,7 @@ def build_mount(destination, source, mode='rw'):
 class ServiceVolumesTest(unittest.TestCase):
 
     def setUp(self):
-        self.mock_client = mock.create_autospec(docker.Client)
+        self.mock_client = mock.create_autospec(docker.APIClient)
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(VolumeSpec.parse('/outside:/inside', True))
