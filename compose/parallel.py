@@ -11,6 +11,8 @@ from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
 
+from compose.cli.colors import green
+from compose.cli.colors import red
 from compose.cli.signals import ShutdownException
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
@@ -45,16 +47,16 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None):
 
     for obj, result, exception in events:
         if exception is None:
-            writer.write(get_name(obj), 'done')
+            writer.write(get_name(obj), green('done'))
             results.append(result)
         elif isinstance(exception, APIError):
             errors[get_name(obj)] = exception.explanation
-            writer.write(get_name(obj), 'error')
+            writer.write(get_name(obj), red('error'))
         elif isinstance(exception, (OperationFailedError, HealthCheckFailed, NoHealthCheckConfigured)):
             errors[get_name(obj)] = exception.msg
-            writer.write(get_name(obj), 'error')
+            writer.write(get_name(obj), red('error'))
         elif isinstance(exception, UpstreamError):
-            writer.write(get_name(obj), 'error')
+            writer.write(get_name(obj), red('error'))
         else:
             errors[get_name(obj)] = exception
             error_to_reraise = exception
