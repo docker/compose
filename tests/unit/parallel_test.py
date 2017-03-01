@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from threading import Lock
+
 import six
 from docker.errors import APIError
 
@@ -37,6 +39,30 @@ def test_parallel_execute():
     )
 
     assert sorted(results) == [2, 4, 6, 8, 10]
+    assert errors == {}
+
+
+def test_parallel_execute_with_limit():
+    limit = 1
+    tasks = 20
+    lock = Lock()
+
+    def f(obj):
+        locked = lock.acquire(False)
+        # we should always get the lock because we're the only thread running
+        assert locked
+        lock.release()
+        return None
+
+    results, errors = parallel_execute(
+        objects=list(range(tasks)),
+        func=f,
+        get_name=six.text_type,
+        msg="Testing",
+        limit=limit,
+    )
+
+    assert results == tasks*[None]
     assert errors == {}
 
 
@@ -82,7 +108,7 @@ def test_parallel_execute_with_upstream_errors():
     events = [
         (obj, result, type(exception))
         for obj, result, exception
-        in parallel_execute_iter(objects, process, get_deps)
+        in parallel_execute_iter(objects, process, get_deps, None)
     ]
 
     assert (cache, None, type(None)) in events
