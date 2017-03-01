@@ -859,7 +859,7 @@ class TopLevelCommand(object):
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
-        filter_logs = options.get('--filter-logs') if '--filter-logs' in options else service_names
+        filter_log = options.get('--filter-log') if '--filter-log' in options else service_names
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
@@ -882,7 +882,7 @@ class TopLevelCommand(object):
 
             log_printer = log_printer_from_project(
                 self.project,
-                filter_containers_to_service_names(to_attach, filter_logs),
+                filter_containers_to_service_names(to_attach, filter_log),
                 options['--no-color'],
                 {'follow': True},
                 cascade_stop,
