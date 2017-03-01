@@ -854,10 +854,12 @@ class TopLevelCommand(object):
                                        running. (default: 10)
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
+            --filter-log "SERVICES"    Only show log output from services
         """
         start_deps = not options['--no-deps']
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
+        filter_logs = options.get('--filter-logs') if '--filter-logs' in options else service_names
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
@@ -880,7 +882,7 @@ class TopLevelCommand(object):
 
             log_printer = log_printer_from_project(
                 self.project,
-                filter_containers_to_service_names(to_attach, service_names),
+                filter_containers_to_service_names(to_attach, filter_logs),
                 options['--no-color'],
                 {'follow': True},
                 cascade_stop,
