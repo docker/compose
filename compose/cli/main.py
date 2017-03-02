@@ -1014,7 +1014,7 @@ def run_one_off_container(container_options, project, service, options):
 
     def remove_container(force=False):
         if options['--rm']:
-            project.client.remove_container(container.id, force=True)
+            project.client.remove_container(container.id, force=True, v=True)
 
     signals.set_signal_handler_to_shutdown()
     try:

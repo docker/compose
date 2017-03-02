@@ -1178,6 +1178,36 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
+    def test_run_rm(self):
+        self.base_dir = 'tests/fixtures/volume'
+        proc = start_process(self.base_dir, ['run', '--rm', 'test'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'volume_test_run_1',
+            'running'))
+        service = self.project.get_service('test')
+        containers = service.containers(one_off=OneOffFilter.only)
+        self.assertEqual(len(containers), 1)
+        mounts = containers[0].get('Mounts')
+        for mount in mounts:
+            if mount['Destination'] == '/container-path':
+                anonymousName = mount['Name']
+                break
+        os.kill(proc.pid, signal.SIGINT)
+        wait_on_process(proc, 1)
+
+        self.assertEqual(len(service.containers(stopped=True, one_off=OneOffFilter.only)), 0)
+
+        volumes = self.client.volumes()['Volumes']
+        assert volumes is not None
+        for volume in service.options.get('volumes'):
+            if volume.internal == '/container-named-path':
+                name = volume.external
+                break
+        volumeNames = [v['Name'] for v in volumes]
+        assert name in volumeNames
+        assert anonymousName not in volumeNames
+
     def test_run_service_with_dockerfile_entrypoint(self):
         self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
         self.dispatch(['run', 'test'])
