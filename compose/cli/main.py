@@ -895,6 +895,7 @@ class TopLevelCommand(object):
                     if (not e.is_running and cascade_starter == e.name):
                         if not e.exit_code == 0:
                             exit_code = e.exit_code
+                        break
                 self.project.stop(service_names=service_names, timeout=timeout)
                 sys.exit(exit_code)
 
