@@ -87,6 +87,13 @@ class LogPrinter(object):
         for line in consume_queue(queue, self.cascade_stop):
             remove_stopped_threads(thread_map)
 
+            if self.cascade_stop:
+                matching_container = [cont.name for cont in self.containers if cont.name == line]
+                if line in matching_container:
+                    # Returning the name of the container that started the
+                    # the cascade_stop so we can return the correct exit code
+                    return line
+
             if not line:
                 if not thread_map:
                     # There are no running containers left to tail, so exit
@@ -132,8 +139,8 @@ class QueueItem(namedtuple('_QueueItem', 'item is_stop exc')):
         return cls(None, None, exc)
 
     @classmethod
-    def stop(cls):
-        return cls(None, True, None)
+    def stop(cls, item=None):
+        return cls(item, True, None)
 
 
 def tail_container_logs(container, presenter, queue, log_args):
@@ -145,10 +152,9 @@ def tail_container_logs(container, presenter, queue, log_args):
     except Exception as e:
         queue.put(QueueItem.exception(e))
         return
-
     if log_args.get('follow'):
         queue.put(QueueItem.new(presenter.color_func(wait_on_exit(container))))
-    queue.put(QueueItem.stop())
+    queue.put(QueueItem.stop(container.name))
 
 
 def get_log_generator(container):
@@ -228,10 +234,7 @@ def consume_queue(queue, cascade_stop):
         if item.exc:
             raise item.exc
 
-        if item.is_stop:
-            if cascade_stop:
-                raise StopIteration
-            else:
-                continue
+        if item.is_stop and not cascade_stop:
+            continue
 
         yield item.item
