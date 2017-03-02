@@ -299,7 +299,7 @@ class CLITestCase(DockerClientTestCase):
                 },
                 'volume': {
                     'image': 'busybox',
-                    'volumes': ['/data:rw'],
+                    'volumes': ['/data'],
                     'network_mode': 'bridge',
                 },
                 'app': {
