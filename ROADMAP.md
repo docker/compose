@@ -16,7 +16,7 @@ Some specific things we are considering:
   - It should roll back to a known good state if it fails.
   - It should allow a user to check the actions it is about to perform before running them.
 - It should be possible to partially modify the config file for different environments (dev/test/staging/prod), passing in e.g. custom ports, volume mount paths, or volume drivers. ([#1377](https://github.com/docker/compose/issues/1377))
-- Compose should recommend a technique for zero-downtime deploys.
+- Compose should recommend a technique for zero-downtime deploys. ([#1786](https://github.com/docker/compose/issues/1786))
 - It should be possible to continuously attempt to keep an application in the correct state, instead of just performing `up` a single time.
 
 ## Integration with Swarm
