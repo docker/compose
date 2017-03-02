@@ -484,7 +484,7 @@ class TopLevelCommand(object):
 
     def images(self, options):
         """
-        List images.
+        List images used by the created containers.
         Usage: images [options] [SERVICE...]
 
         Options:
@@ -510,7 +510,7 @@ class TopLevelCommand(object):
                 image_config = container.image_config
                 repo_tags = str.split(str(image_config['RepoTags'][0]), ':')
                 image_id = str.split(str(container.image), ':')[1][0:12]
-                size = round(int(image_config['Size'])/float(1 << 20), 1)
+                size = round(int(image_config['Size']) / float(1 << 20), 1)
                 rows.append([
                     repo_tags[0],
                     repo_tags[1],
