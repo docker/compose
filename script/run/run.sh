@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Run docker-compose in a container
 #
