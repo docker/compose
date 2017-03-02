@@ -1085,10 +1085,18 @@ class CLITestCase(DockerClientTestCase):
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
     def test_up_handles_abort_on_container_exit(self):
-        start_process(self.base_dir, ['up', '--abort-on-container-exit'])
-        wait_on_condition(ContainerCountCondition(self.project, 2))
-        self.project.stop(['simple'])
+        self.base_dir = 'tests/fixtures/abort-on-container-exit-0'
+        proc = start_process(self.base_dir, ['up', '--abort-on-container-exit'])
         wait_on_condition(ContainerCountCondition(self.project, 0))
+        proc.wait()
+        self.assertEqual(proc.returncode, 0)
+
+    def test_up_handles_abort_on_container_exit_code(self):
+        self.base_dir = 'tests/fixtures/abort-on-container-exit-1'
+        proc = start_process(self.base_dir, ['up', '--abort-on-container-exit'])
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+        proc.wait()
+        self.assertEqual(proc.returncode, 1)
 
     def test_exec_without_tty(self):
         self.base_dir = 'tests/fixtures/links-composefile'
