@@ -1976,3 +1976,13 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         result = self.dispatch(['top'])
         assert result.stdout.count("top") == 4
+
+    def test_forward_exitval(self):
+        self.base_dir = 'tests/fixtures/exit-code-from'
+        proc = start_process(
+            self.base_dir,
+            ['up', '--abort-on-container-exit', '--exit-code-from', 'another'])
+
+        result = wait_on_process(proc, returncode=1)
+
+        assert 'exitcodefrom_another_1 exited with code 1' in result.stdout
