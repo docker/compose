@@ -58,9 +58,8 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():
-    command = dispatch()
-
     try:
+        command = dispatch()
         command()
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
@@ -78,6 +77,10 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
+    except NoSuchCommand as e:
+        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
+        log.error("No such command: %s\n\n%s", e.command, commands)
+        sys.exit(1)
     except (errors.ConnectionError, StreamParseError):
         sys.exit(1)
 
@@ -88,13 +91,7 @@ def dispatch():
         TopLevelCommand,
         {'options_first': True, 'version': get_version_info('compose')})
 
-    try:
-        options, handler, command_options = dispatcher.parse(sys.argv[1:])
-    except NoSuchCommand as e:
-        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
-        log.error("No such command: %s\n\n%s", e.command, commands)
-        sys.exit(1)
-
+    options, handler, command_options = dispatcher.parse(sys.argv[1:])
     setup_console_handler(console_handler, options.get('--verbose'))
     return functools.partial(perform_command, options, handler, command_options)
 

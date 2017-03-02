@@ -9,3 +9,6 @@
 /venv
 README.rst
 compose/GITSHA
+*.swo
+*.swp
+.DS_Store

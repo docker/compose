@@ -152,6 +152,12 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
+    def test_help_nonexistent(self):
+        self.base_dir = 'tests/fixtures/no-composefile'
+        result = self.dispatch(['help', 'foobar'], returncode=1)
+        assert 'No such command' in result.stderr
+        self.base_dir = None
+
     def test_shorthand_host_opt(self):
         self.dispatch(
             ['-H={0}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
