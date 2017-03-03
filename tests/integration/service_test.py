@@ -887,16 +887,16 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
 
         host_container_groupadd = container.get('HostConfig.GroupAdd')
-        self.assertTrue("root" in host_container_groupadd)
-        self.assertTrue("1" in host_container_groupadd)
+        assert "root" in host_container_groupadd
+        assert "1" in host_container_groupadd
 
     def test_dns_opt_value(self):
         service = self.create_service('web', dns_opt=["use-vc", "no-tld-query"])
         container = create_and_start_container(service)
 
-        dns_opt = container.get('HostConfig.DNSOptions')
-        self.assertTrue("use-vc" in dns_opt)
-        self.assertTrue("no-tld-query" in dns_opt)
+        dns_opt = container.get('HostConfig.DnsOptions')
+        assert 'use-vc' in dns_opt
+        assert 'no-tld-query' in dns_opt
 
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart={

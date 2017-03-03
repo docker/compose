@@ -757,6 +757,7 @@ class Service(object):
             devices=options.get('devices'),
             dns=options.get('dns'),
             dns_opt=options.get('dns_opt'),
+            dns_search=options.get('dns_search'),
             restart_policy=options.get('restart'),
             cap_add=options.get('cap_add'),
             cap_drop=options.get('cap_drop'),
