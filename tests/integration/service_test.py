@@ -872,6 +872,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.MemorySwappiness'), 11)
 
+    def test_mem_reservation(self):
+        service = self.create_service('web', mem_reservation='20m')
+        container = create_and_start_container(service)
+        assert container.get('HostConfig.MemoryReservation') == 20 * 1024 * 1024
+
     def test_restart_always_value(self):
         service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)

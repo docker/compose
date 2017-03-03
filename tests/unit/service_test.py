@@ -168,6 +168,20 @@ class ServiceTest(unittest.TestCase):
             2000000000
         )
 
+    def test_mem_reservation(self):
+        self.mock_client.create_host_config.return_value = {}
+
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            mem_reservation='512m'
+        )
+        service._get_container_create_options({'some': 'overrides'}, 1)
+        assert self.mock_client.create_host_config.called is True
+        assert self.mock_client.create_host_config.call_args[1]['mem_reservation'] == '512m'
+
     def test_cgroup_parent(self):
         self.mock_client.create_host_config.return_value = {}
 
