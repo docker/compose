@@ -47,6 +47,7 @@ from .formatter import Formatter
 from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
+from .utils import human_readable_file_size
 from .utils import yesno
 
 
@@ -496,10 +497,11 @@ class TopLevelCommand(object):
             key=attrgetter('name'))
 
         if options['-q']:
-            for container in containers:
-                print(str.split(str(container.image), ':')[1])
+            for image in set(c.image for c in containers):
+                print(image.split(':')[1])
         else:
             headers = [
+                'Container',
                 'Repository',
                 'Tag',
                 'Image Id',
@@ -508,10 +510,11 @@ class TopLevelCommand(object):
             rows = []
             for container in containers:
                 image_config = container.image_config
-                repo_tags = str.split(str(image_config['RepoTags'][0]), ':')
-                image_id = str.split(str(container.image), ':')[1][0:12]
-                size = round(int(image_config['Size']) / float(1 << 20), 1)
+                repo_tags = image_config['RepoTags'][0].split(':')
+                image_id = image_config['Id'].split(':')[1][:12]
+                size = human_readable_file_size(image_config['Size'])
                 rows.append([
+                    container.name,
                     repo_tags[0],
                     repo_tags[1],
                     image_id,
