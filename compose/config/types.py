@@ -9,6 +9,7 @@ import re
 from collections import namedtuple
 
 import six
+from docker.utils.ports import build_port_bindings
 
 from ..const import COMPOSEFILE_V1 as V1
 from .errors import ConfigurationError
@@ -259,3 +260,61 @@ class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
         return dict(
             [(k, v) for k, v in self._asdict().items() if v is not None]
         )
+
+
+class ServicePort(namedtuple('_ServicePort', 'target published protocol mode external_ip')):
+
+    @classmethod
+    def parse(cls, spec):
+        if not isinstance(spec, dict):
+            result = []
+            for k, v in build_port_bindings([spec]).items():
+                if '/' in k:
+                    target, proto = k.split('/', 1)
+                else:
+                    target, proto = (k, None)
+                for pub in v:
+                    if pub is None:
+                        result.append(
+                            cls(target, None, proto, None, None)
+                        )
+                    elif isinstance(pub, tuple):
+                        result.append(
+                            cls(target, pub[1], proto, None, pub[0])
+                        )
+                    else:
+                        result.append(
+                            cls(target, pub, proto, None, None)
+                        )
+            return result
+
+        return [cls(
+            spec.get('target'),
+            spec.get('published'),
+            spec.get('protocol'),
+            spec.get('mode'),
+            None
+        )]
+
+    @property
+    def merge_field(self):
+        return (self.target, self.published)
+
+    def repr(self):
+        return dict(
+            [(k, v) for k, v in self._asdict().items() if v is not None]
+        )
+
+    def legacy_repr(self):
+        return normalize_port_dict(self.repr())
+
+
+def normalize_port_dict(port):
+    return '{external_ip}{has_ext_ip}{published}{is_pub}{target}/{protocol}'.format(
+        published=port.get('published', ''),
+        is_pub=(':' if port.get('published') else ''),
+        target=port.get('target'),
+        protocol=port.get('protocol', 'tcp'),
+        external_ip=port.get('external_ip', ''),
+        has_ext_ip=(':' if port.get('external_ip') else ''),
+    )

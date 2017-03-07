@@ -7,6 +7,7 @@ from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
+from compose.config.types import ServicePort
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_CONFIG_HASH
@@ -19,6 +20,7 @@ from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction
 from compose.service import ContainerNetworkMode
+from compose.service import formatted_ports
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
 from compose.service import merge_volume_bindings
@@ -776,6 +778,25 @@ class NetTestCase(unittest.TestCase):
         self.assertEqual(network_mode.id, service_name)
         self.assertEqual(network_mode.mode, None)
         self.assertEqual(network_mode.service_name, service_name)
+
+
+class ServicePortsTest(unittest.TestCase):
+    def test_formatted_ports(self):
+        ports = [
+            '3000',
+            '0.0.0.0:4025-4030:23000-23005',
+            ServicePort(6000, None, None, None, None),
+            ServicePort(8080, 8080, None, None, None),
+            ServicePort('20000', '20000', 'udp', 'ingress', None),
+            ServicePort(30000, '30000', 'tcp', None, '127.0.0.1'),
+        ]
+        formatted = formatted_ports(ports)
+        assert ports[0] in formatted
+        assert ports[1] in formatted
+        assert '6000/tcp' in formatted
+        assert '8080:8080/tcp' in formatted
+        assert '20000:20000/udp' in formatted
+        assert '127.0.0.1:30000:30000/tcp' in formatted
 
 
 def build_mount(destination, source, mode='rw'):

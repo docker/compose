@@ -10,6 +10,7 @@ from operator import itemgetter
 
 import py
 import pytest
+import yaml
 
 from ...helpers import build_config_details
 from compose.config import config
@@ -25,6 +26,7 @@ from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
 from compose.config.serialize import denormalize_service_dict
+from compose.config.serialize import serialize_config
 from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
@@ -1794,6 +1796,30 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_mixed_ports(self):
+        base = {
+            'image': 'busybox:latest',
+            'command': 'top',
+            'ports': [
+                {
+                    'target': '1245',
+                    'published': '1245',
+                    'protocol': 'tcp',
+                }
+            ]
+        }
+
+        override = {
+            'ports': ['1245:1245/udp']
+        }
+
+        actual = config.merge_service_dicts(base, override, V3_1)
+        assert actual == {
+            'image': 'busybox:latest',
+            'command': 'top',
+            'ports': [types.ServicePort('1245', '1245', 'udp', None, None)]
+        }
+
     def test_merge_depends_on_no_override(self):
         base = {
             'image': 'busybox',
@@ -2269,7 +2295,10 @@ class InterpolationTest(unittest.TestCase):
         self.assertEqual(service_dicts[0], {
             'name': 'web',
             'image': 'alpine:latest',
-            'ports': ['5643', '9999'],
+            'ports': [
+                types.ServicePort.parse('5643')[0],
+                types.ServicePort.parse('9999')[0]
+            ],
             'command': 'true'
         })
 
@@ -2292,7 +2321,7 @@ class InterpolationTest(unittest.TestCase):
             {
                 'name': 'web',
                 'image': 'busybox',
-                'ports': ['80:8000'],
+                'ports': types.ServicePort.parse('80:8000'),
                 'labels': {'mylabel': 'myvalue'},
                 'hostname': 'host-',
                 'command': '${ESCAPED}',
@@ -2576,13 +2605,37 @@ class MergePortsTest(unittest.TestCase, MergeListsTest):
     base_config = ['10:8000', '9000']
     override_config = ['20:8000']
 
+    def merged_config(self):
+        return self.convert(self.base_config) | self.convert(self.override_config)
+
+    def convert(self, port_config):
+        return set(config.merge_service_dicts(
+            {self.config_name: port_config},
+            {self.config_name: []},
+            DEFAULT_VERSION
+        )[self.config_name])
+
     def test_duplicate_port_mappings(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: self.base_config},
             {self.config_name: self.base_config},
             DEFAULT_VERSION
         )
-        assert set(service_dict[self.config_name]) == set(self.base_config)
+        assert set(service_dict[self.config_name]) == self.convert(self.base_config)
+
+    def test_no_override(self):
+        service_dict = config.merge_service_dicts(
+            {self.config_name: self.base_config},
+            {},
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name]) == self.convert(self.base_config)
+
+    def test_no_base(self):
+        service_dict = config.merge_service_dicts(
+            {},
+            {self.config_name: self.base_config},
+            DEFAULT_VERSION)
+        assert set(service_dict[self.config_name]) == self.convert(self.base_config)
 
 
 class MergeNetworksTest(unittest.TestCase, MergeListsTest):
@@ -3610,23 +3663,25 @@ class SerializeTest(unittest.TestCase):
         assert denormalized_service['healthcheck']['interval'] == '100s'
         assert denormalized_service['healthcheck']['timeout'] == '30s'
 
-    def test_denormalize_secrets(self):
+    def test_serialize_secrets(self):
         service_dict = {
-            'name': 'web',
             'image': 'example/web',
             'secrets': [
-                types.ServiceSecret('one', None, None, None, None),
-                types.ServiceSecret('source', 'target', '100', '200', 0o777),
-            ],
+                {'source': 'one'},
+                {
+                    'source': 'source',
+                    'target': 'target',
+                    'uid': '100',
+                    'gid': '200',
+                    'mode': 0o777,
+                }
+            ]
         }
-        denormalized_service = denormalize_service_dict(service_dict, V3_1)
-        assert secret_sort(denormalized_service['secrets']) == secret_sort([
-            {'source': 'one'},
-            {
-                'source': 'source',
-                'target': 'target',
-                'uid': '100',
-                'gid': '200',
-                'mode': 0o777,
-            },
-        ])
+        config_dict = config.load(build_config_details({
+            'version': '3.1',
+            'services': {'web': service_dict}
+        }))
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['web']
+        assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
