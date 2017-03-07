@@ -223,6 +223,7 @@
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "shm_size": {"type": ["number", "string"]},
         "sysctls": {"$ref": "#/definitions/list_or_dict"},
+        "pids_limit": {"type": ["number", "string"]},
         "stdin_open": {"type": "boolean"},
         "stop_grace_period": {"type": "string", "format": "duration"},
         "stop_signal": {"type": "string"},
