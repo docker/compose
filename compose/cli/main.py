@@ -24,6 +24,7 @@ from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
+from ..config.types import VolumeSpec
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -729,7 +730,7 @@ class TopLevelCommand(object):
         running. If you do not want to start linked services, use
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
-        Usage: run [options] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
+        Usage: run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
             -d                    Detached mode: Run container in the background, print
@@ -743,6 +744,7 @@ class TopLevelCommand(object):
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
+            -v, --volume=[]       Bind mount a volume (default [])
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
             -w, --workdir=""      Working directory inside the container
@@ -1085,6 +1087,10 @@ def build_container_options(options, detach, command):
 
     if options['--workdir']:
         container_options['working_dir'] = options['--workdir']
+
+    if options['--volume']:
+        volumes = [VolumeSpec.parse(i) for i in options['--volume']]
+        container_options['volumes'] = volumes
 
     return container_options
 
