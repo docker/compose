@@ -10,6 +10,7 @@ from docker.errors import NotFound
 
 from .. import mock
 from ..helpers import build_config as load_config
+from ..helpers import create_host_file
 from .testcases import DockerClientTestCase
 from compose.config import config
 from compose.config import ConfigurationError
@@ -1517,30 +1518,3 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         with pytest.raises(NoHealthCheckConfigured):
             svc1.is_healthy()
-
-
-def create_host_file(client, filename):
-    dirname = os.path.dirname(filename)
-
-    with open(filename, 'r') as fh:
-        content = fh.read()
-
-    container = client.create_container(
-        'busybox:latest',
-        ['sh', '-c', 'echo -n "{}" > {}'.format(content, filename)],
-        volumes={dirname: {}},
-        host_config=client.create_host_config(
-            binds={dirname: {'bind': dirname, 'ro': False}},
-            network_mode='none',
-        ),
-    )
-    try:
-        client.start(container)
-        exitcode = client.wait(container)
-
-        if exitcode != 0:
-            output = client.logs(container)
-            raise Exception(
-                "Container exited with code {}:\n{}".format(exitcode, output))
-    finally:
-        client.remove_container(container, force=True)

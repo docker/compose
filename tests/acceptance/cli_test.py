@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 import datetime
 import json
 import os
+import os.path
 import signal
 import subprocess
 import time
@@ -18,6 +19,7 @@ import yaml
 from docker import errors
 
 from .. import mock
+from ..helpers import create_host_file
 from compose.cli.command import get_project
 from compose.container import Container
 from compose.project import OneOffFilter
@@ -556,6 +558,45 @@ class CLITestCase(DockerClientTestCase):
         new_ids = [c.id for c in service.containers(stopped=True)]
 
         self.assertEqual(old_ids, new_ids)
+
+    def test_run_one_off_with_volume(self):
+        self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
+        volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files'))
+        create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
+
+        self.dispatch([
+            'run',
+            '-v', '{}:/data'.format(volume_path),
+            'simple',
+            'test', '-f', '/data/example.txt'
+        ], returncode=0)
+        # FIXME: does not work with Python 3
+        # assert cmd_result.stdout.strip() == 'FILE_CONTENT'
+
+    def test_run_one_off_with_multiple_volumes(self):
+        self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
+        volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files'))
+        create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
+
+        self.dispatch([
+            'run',
+            '-v', '{}:/data'.format(volume_path),
+            '-v', '{}:/data1'.format(volume_path),
+            'simple',
+            'test', '-f', '/data/example.txt'
+        ], returncode=0)
+        # FIXME: does not work with Python 3
+        # assert cmd_result.stdout.strip() == 'FILE_CONTENT'
+
+        self.dispatch([
+            'run',
+            '-v', '{}:/data'.format(volume_path),
+            '-v', '{}:/data1'.format(volume_path),
+            'simple',
+            'test', '-f' '/data1/example.txt'
+        ], returncode=0)
+        # FIXME: does not work with Python 3
+        # assert cmd_result.stdout.strip() == 'FILE_CONTENT'
 
     def test_create_with_force_recreate_and_no_recreate(self):
         self.dispatch(
