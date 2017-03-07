@@ -47,6 +47,7 @@ from .formatter import Formatter
 from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
+from .utils import human_readable_file_size
 from .utils import yesno
 
 
@@ -175,6 +176,7 @@ class TopLevelCommand(object):
       events             Receive real time events from containers
       exec               Execute a command in a running container
       help               Get help on a command
+      images             List images
       kill               Kill containers
       logs               View output from containers
       pause              Pause services
@@ -480,6 +482,45 @@ class TopLevelCommand(object):
             subject = cls
 
         print(getdoc(subject))
+
+    def images(self, options):
+        """
+        List images used by the created containers.
+        Usage: images [options] [SERVICE...]
+
+        Options:
+        -q     Only display IDs
+        """
+        containers = sorted(
+            self.project.containers(service_names=options['SERVICE'], stopped=True) +
+            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+            key=attrgetter('name'))
+
+        if options['-q']:
+            for image in set(c.image for c in containers):
+                print(image.split(':')[1])
+        else:
+            headers = [
+                'Container',
+                'Repository',
+                'Tag',
+                'Image Id',
+                'Size'
+            ]
+            rows = []
+            for container in containers:
+                image_config = container.image_config
+                repo_tags = image_config['RepoTags'][0].split(':')
+                image_id = image_config['Id'].split(':')[1][:12]
+                size = human_readable_file_size(image_config['Size'])
+                rows.append([
+                    container.name,
+                    repo_tags[0],
+                    repo_tags[1],
+                    image_id,
+                    size
+                ])
+            print(Formatter().table(headers, rows))
 
     def kill(self, options):
         """
