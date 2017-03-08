@@ -22,6 +22,7 @@ from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
@@ -219,6 +220,9 @@ class TopLevelCommand(object):
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
+        if build_args:
+            environment = Environment.from_env_file(self.project_dir)
+            build_args = resolve_build_args(build_args, environment)
 
         if not service_names and build_args:
             raise UserError("Need service name for --build-arg option")

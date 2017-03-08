@@ -461,7 +461,7 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
-            buildargs=None,
+            buildargs={},
             cache_from=None,
         )
 
@@ -498,7 +498,7 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
-            buildargs=None,
+            buildargs={},
             cache_from=None,
         )
 
@@ -518,19 +518,17 @@ class ServiceTest(unittest.TestCase):
             b'{"stream": "Successfully built 12345"}',
         ]
 
-        build_args = [
-            'arg1=arg1_new_value',
-            'arg2=arg2_value'
-        ]
+        build_args = {
+            'arg1': 'arg1_new_value',
+        }
         service = Service('foo', client=self.mock_client,
                           build={'context': '.', 'args': {'arg1': 'arg1', 'arg2': 'arg2'}})
-        service.build(build_args=build_args)
+        service.build(build_args_override=build_args)
 
         called_build_args = self.mock_client.build.call_args[1]['buildargs']
 
-        for arg in called_build_args:
-            if "arg1=" in arg:
-                self.assertEquals(arg, 'arg1=arg1_new_value')
+        assert called_build_args['arg1'] == build_args['arg1']
+        assert called_build_args['arg2'] == 'arg2'
 
     def test_config_dict(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}

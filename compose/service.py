@@ -21,7 +21,6 @@ from . import __version__
 from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
-from .config import merge_build_args
 from .config import merge_environment
 from .config.types import ServicePort
 from .config.types import VolumeSpec
@@ -804,14 +803,14 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
-    def build(self, no_cache=False, pull=False, force_rm=False, build_args=None):
+    def build(self, no_cache=False, pull=False, force_rm=False, build_args_override=None):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
 
-        self_args_opts = build_opts.get('args', None)
-        if self_args_opts and build_args:
-            merge_build_args(self_args_opts, build_args, self.options.get('environment'))
+        build_args = build_opts.get('args', {}).copy()
+        if build_args_override:
+            build_args.update(build_args_override)
 
         # python2 os.stat() doesn't support unicode on some UNIX, so we
         # encode it to a bytestring to be safe
@@ -829,7 +828,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             cache_from=build_opts.get('cache_from', None),
-            buildargs=self_args_opts
+            buildargs=build_args
         )
 
         try:

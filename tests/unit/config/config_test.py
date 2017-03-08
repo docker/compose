@@ -15,7 +15,6 @@ import yaml
 from ...helpers import build_config_details
 from compose.config import config
 from compose.config import types
-from compose.config.config import merge_build_args
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.config import V1
@@ -1523,7 +1522,7 @@ class ConfigTest(unittest.TestCase):
         assert actual == {
             'image': 'alpine:edge',
             'volumes': ['.:/app'],
-            'ports': ['5432']
+            'ports': types.ServicePort.parse('5432')
         }
 
     def test_merge_service_dicts_heterogeneous_2(self):
@@ -1542,40 +1541,7 @@ class ConfigTest(unittest.TestCase):
         assert actual == {
             'image': 'alpine:edge',
             'volumes': ['.:/app'],
-            'ports': ['5432']
-        }
-
-    def test_merge_build_args(self):
-        base = {
-            'build': {
-                'context': '.',
-                'args': {
-                    'ONE': '1',
-                    'TWO': '2',
-                },
-            }
-        }
-        override = {
-            'build': {
-                'args': {
-                    'TWO': 'dos',
-                    'THREE': '3',
-                },
-            }
-        }
-        actual = config.merge_service_dicts(
-            base,
-            override,
-            DEFAULT_VERSION)
-        assert actual == {
-            'build': {
-                'context': '.',
-                'args': {
-                    'ONE': '1',
-                    'TWO': 'dos',
-                    'THREE': '3',
-                },
-            }
+            'ports': types.ServicePort.parse('5432')
         }
 
     def test_merge_logging_v1(self):
@@ -2878,27 +2844,9 @@ class EnvTest(unittest.TestCase):
             }
         }
         self.assertEqual(
-            resolve_build_args(build, Environment.from_env_file(build['context'])),
+            resolve_build_args(build['args'], Environment.from_env_file(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
-
-    @mock.patch.dict(os.environ)
-    def test_merge_build_args(self):
-        os.environ['env_arg'] = 'value2'
-
-        base = {
-            'arg1': 'arg1_value',
-            'arg2': 'arg2_value'
-        }
-        override = {
-            'arg1': 'arg1_new_value',
-            'arg2': 'arg2_value'
-        }
-        self.assertEqual(base['arg1'], 'arg1_value')
-
-        merge_build_args(base, override, os.environ)
-
-        self.assertEqual(base['arg1'], 'arg1_new_value')
 
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
     @mock.patch.dict(os.environ)

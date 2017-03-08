@@ -597,12 +597,30 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
             f.write("ARG build_version\n")
+            f.write("RUN echo ${build_version}\n")
 
         service = self.create_service('buildwithargs',
                                       build={'context': text_type(base_dir),
                                              'args': {"build_version": "1"}})
         service.build()
         assert service.image()
+        assert "build_version=1" in service.image()['ContainerConfig']['Cmd']
+
+    def test_build_with_build_args_override(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+            f.write("ARG build_version\n")
+            f.write("RUN echo ${build_version}\n")
+
+        service = self.create_service('buildwithargs',
+                                      build={'context': text_type(base_dir),
+                                             'args': {"build_version": "1"}})
+        service.build(build_args_override={'build_version': '2'})
+        assert service.image()
+        assert "build_version=2" in service.image()['ContainerConfig']['Cmd']
 
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
@@ -1057,7 +1075,7 @@ class ServiceTest(DockerClientTestCase):
         one_off_container = service.create_container(one_off=True)
         self.assertNotEqual(one_off_container.name, 'my-web-container')
 
-    @pytest.mark.skipif(True, reason="Broken on 1.11.0rc1")
+    @pytest.mark.skipif(True, reason="Broken on 1.11.0 - 17.03.0")
     def test_log_drive_invalid(self):
         service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
