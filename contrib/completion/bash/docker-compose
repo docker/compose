@@ -375,14 +375,14 @@ _docker_compose_run() {
 			__docker_compose_nospace
 			return
 			;;
-		--entrypoint|--name|--user|-u|--workdir|-w)
+		--entrypoint|--name|--user|-u|--volume|-v|--workdir|-w)
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --name --no-deps --publish -p --rm --service-ports -T --user -u --workdir -w" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --name --no-deps --publish -p --rm --service-ports -T --user -u --volume -v --workdir -w" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
