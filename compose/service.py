@@ -803,13 +803,18 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
-    def build(self, no_cache=False, pull=False, force_rm=False):
+    def build(self, no_cache=False, pull=False, force_rm=False, build_args_override=None):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
-        path = build_opts.get('context')
+
+        build_args = build_opts.get('args', {}).copy()
+        if build_args_override:
+            build_args.update(build_args_override)
+
         # python2 os.stat() doesn't support unicode on some UNIX, so we
         # encode it to a bytestring to be safe
+        path = build_opts.get('context')
         if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
 
@@ -822,8 +827,8 @@ class Service(object):
             pull=pull,
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
-            buildargs=build_opts.get('args', None),
             cache_from=build_opts.get('cache_from', None),
+            buildargs=build_args
         )
 
         try:

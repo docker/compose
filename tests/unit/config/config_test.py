@@ -1522,7 +1522,7 @@ class ConfigTest(unittest.TestCase):
         assert actual == {
             'image': 'alpine:edge',
             'volumes': ['.:/app'],
-            'ports': ['5432']
+            'ports': types.ServicePort.parse('5432')
         }
 
     def test_merge_service_dicts_heterogeneous_2(self):
@@ -1541,40 +1541,7 @@ class ConfigTest(unittest.TestCase):
         assert actual == {
             'image': 'alpine:edge',
             'volumes': ['.:/app'],
-            'ports': ['5432']
-        }
-
-    def test_merge_build_args(self):
-        base = {
-            'build': {
-                'context': '.',
-                'args': {
-                    'ONE': '1',
-                    'TWO': '2',
-                },
-            }
-        }
-        override = {
-            'build': {
-                'args': {
-                    'TWO': 'dos',
-                    'THREE': '3',
-                },
-            }
-        }
-        actual = config.merge_service_dicts(
-            base,
-            override,
-            DEFAULT_VERSION)
-        assert actual == {
-            'build': {
-                'context': '.',
-                'args': {
-                    'ONE': '1',
-                    'TWO': 'dos',
-                    'THREE': '3',
-                },
-            }
+            'ports': types.ServicePort.parse('5432')
         }
 
     def test_merge_logging_v1(self):
@@ -2877,7 +2844,7 @@ class EnvTest(unittest.TestCase):
             }
         }
         self.assertEqual(
-            resolve_build_args(build, Environment.from_env_file(build['context'])),
+            resolve_build_args(build['args'], Environment.from_env_file(build['context'])),
             {'arg1': 'value1', 'empty_arg': '', 'env_arg': 'value2', 'no_env': None},
         )
 

@@ -22,6 +22,7 @@ from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
@@ -209,18 +210,29 @@ class TopLevelCommand(object):
         e.g. `composetest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `docker-compose build` to rebuild it.
 
-        Usage: build [options] [SERVICE...]
+        Usage: build [options] [--build-arg key=val...] [SERVICE...]
 
         Options:
-            --force-rm  Always remove intermediate containers.
-            --no-cache  Do not use cache when building the image.
-            --pull      Always attempt to pull a newer version of the image.
+            --force-rm              Always remove intermediate containers.
+            --no-cache              Do not use cache when building the image.
+            --pull                  Always attempt to pull a newer version of the image.
+            --build-arg key=val     Set build-time variables for one service.
         """
+        service_names = options['SERVICE']
+        build_args = options.get('--build-arg', None)
+        if build_args:
+            environment = Environment.from_env_file(self.project_dir)
+            build_args = resolve_build_args(build_args, environment)
+
+        if not service_names and build_args:
+            raise UserError("Need service name for --build-arg option")
+
         self.project.build(
-            service_names=options['SERVICE'],
+            service_names=service_names,
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
-            force_rm=bool(options.get('--force-rm', False)))
+            force_rm=bool(options.get('--force-rm', False)),
+            build_args=build_args)
 
     def bundle(self, config_options, options):
         """

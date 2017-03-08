@@ -602,8 +602,8 @@ def resolve_environment(service_dict, environment=None):
     return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))
 
 
-def resolve_build_args(build, environment):
-    args = parse_build_arguments(build.get('args'))
+def resolve_build_args(buildargs, environment):
+    args = parse_build_arguments(buildargs)
     return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(args))
 
 
@@ -1051,7 +1051,7 @@ def normalize_build(service_dict, working_dir, environment):
             build.update(service_dict['build'])
             if 'args' in build:
                 build['args'] = build_string_dict(
-                    resolve_build_args(build, environment)
+                    resolve_build_args(build.get('args'), environment)
                 )
 
         service_dict['build'] = build
