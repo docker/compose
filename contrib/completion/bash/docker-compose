@@ -221,14 +221,14 @@ _docker_compose_help() {
 }
 
 _docker_compose_images() {
-    case "$cur" in
-	-*)
-	    COMPREPLY=( $( compgen -W "--help -q" -- "$cur" ) )
-	    ;;
-	*)
-	    __docker_compose_services_all
-	    ;;
-    esac
+	case "$cur" in
+		-*)
+			COMPREPLY=( $( compgen -W "--help -q" -- "$cur" ) )
+			;;
+		*)
+			__docker_compose_services_all
+			;;
+	esac
 }
 
 _docker_compose_kill() {
@@ -508,6 +508,7 @@ _docker_compose() {
 		events
 		exec
 		help
+		images
 		kill
 		logs
 		pause
