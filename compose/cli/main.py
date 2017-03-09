@@ -168,6 +168,7 @@ class TopLevelCommand(object):
       --skip-hostname-check       Don't check the daemon's hostname against the name specified
                                   in the client certificate (for example if your docker host
                                   is an IP address)
+      --ignore-override           Ignore docker-compose.override.yml file during this run
 
     Commands:
       build              Build or rebuild services

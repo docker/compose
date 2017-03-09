@@ -235,7 +235,7 @@ class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name conf
             config)
 
 
-def find(base_dir, filenames, environment):
+def find(base_dir, filenames, environment, ignore_override=False):
     if filenames == ['-']:
         return ConfigDetails(
             os.getcwd(),
@@ -246,7 +246,7 @@ def find(base_dir, filenames, environment):
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filenames = get_default_config_files(base_dir)
+        filenames = get_default_config_files(base_dir, ignore_override)
 
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
@@ -272,7 +272,7 @@ def validate_config_version(config_files):
                     next_file.version))
 
 
-def get_default_config_files(base_dir):
+def get_default_config_files(base_dir, ignore_override=False):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
     if not candidates:
@@ -284,7 +284,10 @@ def get_default_config_files(base_dir):
         log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
         log.warn("Using %s\n", winner)
 
-    return [os.path.join(path, winner)] + get_default_override_file(path)
+    if ignore_override:
+        return [os.path.join(path, winner)]
+    else:
+        return [os.path.join(path, winner)] + get_default_override_file(path)
 
 
 def get_default_override_file(path):

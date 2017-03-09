@@ -1987,6 +1987,72 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(db.human_readable_command, 'top')
         self.assertEqual(other.human_readable_command, 'top')
 
+    def test_up_with_default_files_ignore_override(self):
+        # Set base dir to one which contains an docker-compose.override.yml file
+        self.base_dir = 'tests/fixtures/override-files'
+
+        # Explicitly set the list of compose files, leaving out .override. so it is
+        # picked up automatically
+        config_paths = None
+        self._project = get_project(self.base_dir, config_paths)
+
+        # dispatch with extra top-level param --ignore-override so the
+        # file docker-compose.override.yml is not used
+        self.dispatch(
+            [
+                'up', '-d'
+            ],
+            ['--ignore-override'])
+
+        containers = self.project.containers()
+        self.assertEqual(len(containers), 2)
+
+        # assert that none of the settings in .override. were used
+        web, db = containers
+        self.assertEqual(web.human_readable_command, 'sleep 200')
+        self.assertTrue({'db'} <= set(get_links(web)))
+        self.assertEqual(db.human_readable_command, 'sleep 200')
+
+    def test_up_with_excplicit_use_of_override_file_and_ignore_override(self):
+        # Purpose: to show that the use of --ignore-override will not impact
+        # the explicit list of files if it includes an override. That is, if
+        # the user lists a file then then it will be used and --ignore-override
+        # will only impact the *automatic* use of docker-compose.override.yml
+
+        # Set base dir to one which contains an docker-compose.override.yml file
+        self.base_dir = 'tests/fixtures/override-files'
+
+        # Explicitly set the list of compose files, including .override.
+        config_paths = [
+            'docker-compose.yml',
+            'docker-compose.override.yml',
+            'extra.yml',
+
+        ]
+        self._project = get_project(self.base_dir, config_paths)
+
+        # dispatch with extra top-level param --ignore-override but we
+        # still expect it to be used because it was explicitly listed in
+        # the list of files
+        self.dispatch(
+            [
+                '-f', config_paths[0],
+                '-f', config_paths[1],
+                '-f', config_paths[2],
+                'up', '-d'
+            ],
+            ['--ignore-override'])
+
+        containers = self.project.containers()
+        self.assertEqual(len(containers), 3)
+
+        # assert that the settings in .override. were used
+        web, other, db = containers
+        self.assertEqual(web.human_readable_command, 'top')
+        self.assertTrue({'db', 'other'} <= set(get_links(web)))
+        self.assertEqual(db.human_readable_command, 'top')
+        self.assertEqual(other.human_readable_command, 'top')
+
     def test_up_with_extends(self):
         self.base_dir = 'tests/fixtures/extends'
         self.dispatch(['up', '-d'], None)

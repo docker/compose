@@ -33,7 +33,8 @@ def project_from_options(project_dir, options):
         verbose=options.get('--verbose'),
         host=host,
         tls_config=tls_config_from_options(options),
-        environment=environment
+        environment=environment,
+        ignore_override=options['--ignore-override']
     )
 
 
@@ -93,10 +94,10 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_config=None, environment=None):
+                host=None, tls_config=None, environment=None, ignore_override=False):
     if not environment:
         environment = Environment.from_env_file(project_dir)
-    config_details = config.find(project_dir, config_path, environment)
+    config_details = config.find(project_dir, config_path, environment, ignore_override)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
