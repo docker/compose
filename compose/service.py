@@ -22,6 +22,7 @@ from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
+from .config.errors import DependencyError
 from .config.types import ServicePort
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
@@ -872,7 +873,17 @@ class Service(object):
         if self.custom_container_name and not one_off:
             return self.custom_container_name
 
-        return build_container_name(self.project, self.name, number, one_off)
+        container_name = build_container_name(
+            self.project, self.name, number, one_off,
+        )
+        ext_links_origins = [l.split(':')[0] for l in self.options.get('external_links', [])]
+        if container_name in ext_links_origins:
+            raise DependencyError(
+                'Service {0} has a self-referential external link: {1}'.format(
+                    self.name, container_name
+                )
+            )
+        return container_name
 
     def remove_image(self, image_type):
         if not image_type or image_type == ImageType.none:

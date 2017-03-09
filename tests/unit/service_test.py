@@ -7,6 +7,7 @@ from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
+from compose.config.errors import DependencyError
 from compose.config.types import ServicePort
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
@@ -169,6 +170,14 @@ class ServiceTest(unittest.TestCase):
             self.mock_client.create_host_config.call_args[1]['memswap_limit'],
             2000000000
         )
+
+    def test_self_reference_external_link(self):
+        service = Service(
+            name='foo',
+            external_links=['default_foo_1']
+        )
+        with self.assertRaises(DependencyError):
+            service.get_container_name(1)
 
     def test_mem_reservation(self):
         self.mock_client.create_host_config.return_value = {}
