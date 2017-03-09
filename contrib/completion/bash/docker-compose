@@ -36,6 +36,18 @@ __docker_compose_to_extglob() {
 	echo "@($extglob)"
 }
 
+# Determines whether the option passed as the first argument exist on
+# the commandline. The option may be a pattern, e.g. `--force|-f`.
+__docker_compose_has_option() {
+	local pattern="$1"
+	for (( i=2; i < $cword; ++i)); do
+		if [[ ${words[$i]} =~ ^($pattern)$ ]] ; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 # suppress trailing whitespace
 __docker_compose_nospace() {
 	# compopt is not available in ancient bash versions
@@ -359,10 +371,14 @@ _docker_compose_restart() {
 _docker_compose_rm() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--force -f --help -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--force -f --help --stop -s -v" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_stopped
+			if __docker_compose_has_option "--stop|-s" ; then
+				__docker_compose_services_all
+			else
+				__docker_compose_services_stopped
+			fi
 			;;
 	esac
 }
