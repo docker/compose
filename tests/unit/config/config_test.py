@@ -1821,6 +1821,23 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_empty_environment_key_allowed(self):
+        service_dict = config.load(
+            build_config_details(
+                {
+                    'web': {
+                        'build': '.',
+                        'environment': {
+                            'POSTGRES_PASSWORD': ''
+                        },
+                    },
+                },
+                '.',
+                None,
+            )
+        ).services[0]
+        self.assertEqual(service_dict['environment']['POSTGRES_PASSWORD'], '')
+
     def test_merge_pid(self):
         # Regression: https://github.com/docker/compose/issues/4184
         base = {
@@ -2335,22 +2352,23 @@ class InterpolationTest(unittest.TestCase):
         self.assertIn('in service "web"', cm.exception.msg)
         self.assertIn('"${"', cm.exception.msg)
 
-    def test_empty_environment_key_allowed(self):
-        service_dict = config.load(
-            build_config_details(
-                {
-                    'web': {
-                        'build': '.',
-                        'environment': {
-                            'POSTGRES_PASSWORD': ''
-                        },
-                    },
-                },
-                '.',
-                None,
-            )
-        ).services[0]
-        self.assertEqual(service_dict['environment']['POSTGRES_PASSWORD'], '')
+    @mock.patch.dict(os.environ)
+    def test_interpolation_secrets_section(self):
+        os.environ['FOO'] = 'baz.bar'
+        config_dict = config.load(build_config_details({
+            'version': '3.1',
+            'secrets': {
+                'secretdata': {
+                    'external': {'name': '$FOO'}
+                }
+            }
+        }))
+        assert config_dict.secrets == {
+            'secretdata': {
+                'external': {'name': 'baz.bar'},
+                'external_name': 'baz.bar'
+            }
+        }
 
 
 class VolumeConfigTest(unittest.TestCase):
@@ -3663,4 +3681,4 @@ class SerializeTest(unittest.TestCase):
         serialized_config = yaml.load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
-        assert serialized_config['secrets'] == secrets_dict
+        assert 'secrets' in serialized_config
