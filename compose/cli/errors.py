@@ -7,6 +7,7 @@ import socket
 from distutils.spawn import find_executable
 from textwrap import dedent
 
+import six
 from docker.errors import APIError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
@@ -68,14 +69,18 @@ def log_timeout_error(timeout):
 
 
 def log_api_error(e, client_version):
-    if b'client is newer than server' not in e.explanation:
-        log.error(e.explanation)
+    explanation = e.explanation
+    if isinstance(explanation, six.binary_type):
+        explanation = explanation.decode('utf-8')
+
+    if 'client is newer than server' not in explanation:
+        log.error(explanation)
         return
 
     version = API_VERSION_TO_ENGINE_VERSION.get(client_version)
     if not version:
         # They've set a custom API version
-        log.error(e.explanation)
+        log.error(explanation)
         return
 
     log.error(
