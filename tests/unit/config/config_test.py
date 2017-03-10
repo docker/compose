@@ -3650,11 +3650,17 @@ class SerializeTest(unittest.TestCase):
                 }
             ]
         }
+        secrets_dict = {
+            'one': {'file': '/one.txt'},
+            'source': {'file': '/source.pem'}
+        }
         config_dict = config.load(build_config_details({
             'version': '3.1',
-            'services': {'web': service_dict}
+            'services': {'web': service_dict},
+            'secrets': secrets_dict
         }))
 
         serialized_config = yaml.load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
+        assert serialized_config['secrets'] == secrets_dict
