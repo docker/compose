@@ -15,11 +15,11 @@ from .testcases import DockerClientTestCase
 from compose.config import config
 from compose.config import ConfigurationError
 from compose.config import types
-from compose.config.config import V2_0
-from compose.config.config import V2_1
-from compose.config.config import V3_1
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
+from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container

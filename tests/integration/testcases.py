@@ -10,12 +10,12 @@ from pytest import skip
 from .. import unittest
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
-from compose.config.config import V1
-from compose.config.config import V2_0
-from compose.config.config import V2_1
-from compose.config.config import V3_0
 from compose.config.environment import Environment
 from compose.const import API_VERSIONS
+from compose.const import COMPOSEFILE_V1 as V1
+from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.const import COMPOSEFILE_V2_0 as V2_1
+from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service

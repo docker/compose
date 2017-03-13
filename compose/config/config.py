@@ -13,11 +13,8 @@ import yaml
 from cached_property import cached_property
 
 from . import types
+from .. import const
 from ..const import COMPOSEFILE_V1 as V1
-from ..const import COMPOSEFILE_V2_0 as V2_0
-from ..const import COMPOSEFILE_V2_1 as V2_1
-from ..const import COMPOSEFILE_V3_0 as V3_0
-from ..const import COMPOSEFILE_V3_1 as V3_1
 from ..utils import build_string_dict
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
@@ -185,10 +182,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                 .format(self.filename, VERSION_EXPLANATION))
 
         if version == '2':
-            version = V2_0
+            version = const.COMPOSEFILE_V2_0
 
         if version == '3':
-            version = V3_0
+            version = const.COMPOSEFILE_V3_0
 
         return version
 
@@ -205,7 +202,7 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return {} if self.version == V1 else self.config.get('networks', {})
 
     def get_secrets(self):
-        return {} if self.version < V3_1 else self.config.get('secrets', {})
+        return {} if self.version < const.COMPOSEFILE_V3_1 else self.config.get('secrets', {})
 
 
 class Config(namedtuple('_Config', 'version services volumes networks secrets')):
@@ -427,7 +424,7 @@ def load_services(config_details, config_file):
         service_dict = process_service(resolver.run())
 
         service_config = service_config._replace(config=service_dict)
-        validate_service(service_config, service_names, config_file.version)
+        validate_service(service_config, service_names, config_file)
         service_dict = finalize_service(
             service_config,
             service_names,
@@ -480,7 +477,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment)
 
-    if config_file.version in (V2_0, V2_1, V3_0, V3_1):
+    if config_file.version != V1:
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -493,19 +490,13 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-        if config_file.version in (V3_1,):
-            processed_config['secrets'] = interpolate_config_section(
-                config_file,
-                config_file.get_secrets(),
-                'secrets',
-                environment
-            )
-    elif config_file.version == V1:
-        processed_config = services
+        processed_config['secrets'] = interpolate_config_section(
+            config_file,
+            config_file.get_secrets(),
+            'secrets',
+            environment)
     else:
-        raise ConfigurationError(
-            'Version in "{}" is unsupported. {}'
-            .format(config_file.filename, VERSION_EXPLANATION))
+        processed_config = services
 
     config_file = config_file._replace(config=processed_config)
     validate_against_config_schema(config_file)
@@ -642,9 +633,9 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'depends_on' cannot be extended" % error_prefix)
 
 
-def validate_service(service_config, service_names, version):
+def validate_service(service_config, service_names, config_file):
     service_dict, service_name = service_config.config, service_config.name
-    validate_service_constraints(service_dict, service_name, version)
+    validate_service_constraints(service_dict, service_name, config_file)
     validate_paths(service_dict)
 
     validate_ulimits(service_config)

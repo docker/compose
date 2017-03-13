@@ -17,11 +17,6 @@ from compose.config import config
 from compose.config import types
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
-from compose.config.config import V1
-from compose.config.config import V2_0
-from compose.config.config import V2_1
-from compose.config.config import V3_0
-from compose.config.config import V3_1
 from compose.config.environment import Environment
 from compose.config.errors import ConfigurationError
 from compose.config.errors import VERSION_EXPLANATION
@@ -29,6 +24,11 @@ from compose.config.serialize import denormalize_service_dict
 from compose.config.serialize import serialize_config
 from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
+from compose.const import COMPOSEFILE_V1 as V1
+from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V3_0 as V3_0
+from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
