@@ -76,7 +76,7 @@ DOCKER_CONFIG_KEYS = [
     'labels',
     'links',
     'mac_address',
-    'mem_limit'
+    'mem_limit',
     'mem_reservation',
     'memswap_limit',
     'mem_swappiness',
