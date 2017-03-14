@@ -26,34 +26,28 @@ yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
 def denormalize_config(config):
+    result = {'version': V2_1 if config.version == V1 else config.version}
     denormalized_services = [
         denormalize_service_dict(service_dict, config.version)
         for service_dict in config.services
     ]
-    services = {
+    result['services'] = {
         service_dict.pop('name'): service_dict
         for service_dict in denormalized_services
     }
-    networks = config.networks.copy()
-    for net_name, net_conf in networks.items():
+    result['networks'] = config.networks.copy()
+    for net_name, net_conf in result['networks'].items():
         if 'external_name' in net_conf:
             del net_conf['external_name']
 
-    volumes = config.volumes.copy()
-    for vol_name, vol_conf in volumes.items():
+    result['volumes'] = config.volumes.copy()
+    for vol_name, vol_conf in result['volumes'].items():
         if 'external_name' in vol_conf:
             del vol_conf['external_name']
 
-    version = config.version
-    if version == V1:
-        version = V2_1
-
-    return {
-        'version': version,
-        'services': services,
-        'networks': networks,
-        'volumes': volumes,
-    }
+    if config.version in (V3_1,):
+        result['secrets'] = config.secrets
+    return result
 
 
 def serialize_config(config):

@@ -218,6 +218,8 @@ class Config(namedtuple('_Config', 'version services volumes networks secrets'))
     :type  volumes: :class:`dict`
     :param networks: Dictionary mapping network names to description dictionaries
     :type  networks: :class:`dict`
+    :param secrets: Dictionary mapping secret names to description dictionaries
+    :type secrets: :class:`dict`
     """
 
 
@@ -491,6 +493,13 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
+        if config_file.version in (V3_1,):
+            processed_config['secrets'] = interpolate_config_section(
+                config_file,
+                config_file.get_secrets(),
+                'secrets',
+                environment
+            )
     elif config_file.version == V1:
         processed_config = services
     else:
