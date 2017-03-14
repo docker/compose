@@ -41,6 +41,12 @@
       "additionalProperties": false
     },
 
+    "extra": {
+      "id": "#/properties/extra",
+      "type": "object",
+      "additionalProperties": true
+    },
+
     "secrets": {
       "id": "#/properties/secrets",
       "type": "object",

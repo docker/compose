@@ -38,6 +38,12 @@
         }
       },
       "additionalProperties": false
+    },
+
+    "extra": {
+      "id": "#/properties/extra",
+      "type": "object",
+      "additionalProperties": true
     }
   },
 
