@@ -61,6 +61,7 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():
+    signals.ignore_sigpipe()
     try:
         command = dispatch()
         command()
