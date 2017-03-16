@@ -13,7 +13,9 @@ try:
     # https://github.com/docker/compose/issues/4481
     # https://github.com/pypa/pip/blob/master/pip/_vendor/__init__.py
     s_cmd = subprocess.Popen(
-        ['pip', 'freeze'], stderr=subprocess.PIPE, stdout=subprocess.PIPE
+        ['pip', '--disable-pip-version-check', 'freeze'],
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE
     )
     packages = s_cmd.communicate()[0].splitlines()
     dockerpy_installed = len(
