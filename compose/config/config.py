@@ -490,11 +490,12 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-        processed_config['secrets'] = interpolate_config_section(
-            config_file,
-            config_file.get_secrets(),
-            'secrets',
-            environment)
+        if config_file.version in (const.COMPOSEFILE_V3_1, const.COMPOSEFILE_V3_2):
+            processed_config['secrets'] = interpolate_config_section(
+                config_file,
+                config_file.get_secrets(),
+                'secrets',
+                environment)
     else:
         processed_config = services
 

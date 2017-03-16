@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v3.1.json",
+  "id": "config_schema_v3.2.json",
   "type": "object",
   "required": ["version"],
 
@@ -169,8 +169,7 @@
           "type": "array",
           "items": {
             "oneOf": [
-              {"type": "number", "format": "ports"},
-              {"type": "string", "format": "ports"},
+              {"type": ["string", "number"], "format": "ports"},
               {
                 "type": "object",
                 "properties": {
