@@ -18,7 +18,7 @@
 
 
 __docker_compose_q() {
-	docker-compose 2>/dev/null "${daemon_options[@]}" "$@"
+	docker-compose 2>/dev/null "${top_level_options[@]}" "$@"
 }
 
 # Transforms a multiline list of strings into a single line string
@@ -168,14 +168,18 @@ _docker_compose_docker_compose() {
 			_filedir "y?(a)ml"
 			return
 			;;
-		$(__docker_compose_to_extglob "$daemon_options_with_args") )
+		--project-directory)
+			_filedir -d
+			return
+			;;
+		$(__docker_compose_to_extglob "$top_level_options_with_args") )
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "$daemon_boolean_options  $daemon_options_with_args --help -h --verbose --version -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "$top_level_boolean_options  $top_level_options_with_args --help -h --verbose --version -v" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -554,14 +558,15 @@ _docker_compose() {
 
 	# options for the docker daemon that have to be passed to secondary calls to
 	# docker-compose executed by this script
-	local daemon_boolean_options="
+	local top_level_boolean_options="
 		--skip-hostname-check
 		--tls
 		--tlsverify
 	"
-	local daemon_options_with_args="
+	local top_level_options_with_args="
 		--file -f
 		--host -H
+		--project-directory
 		--project-name -p
 		--tlscacert
 		--tlscert
@@ -575,19 +580,19 @@ _docker_compose() {
 	# search subcommand and invoke its handler.
 	# special treatment of some top-level options
 	local command='docker_compose'
-	local daemon_options=()
+	local top_level_options=()
 	local counter=1
 
 	while [ $counter -lt $cword ]; do
 		case "${words[$counter]}" in
-			$(__docker_compose_to_extglob "$daemon_boolean_options") )
+			$(__docker_compose_to_extglob "$top_level_boolean_options") )
 				local opt=${words[counter]}
-				daemon_options+=($opt)
+				top_level_options+=($opt)
 				;;
-			$(__docker_compose_to_extglob "$daemon_options_with_args") )
+			$(__docker_compose_to_extglob "$top_level_options_with_args") )
 				local opt=${words[counter]}
 				local arg=${words[++counter]}
-				daemon_options+=($opt $arg)
+				top_level_options+=($opt $arg)
 				;;
 			-*)
 				;;
