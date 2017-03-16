@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v3.1.json",
+  "id": "config_schema_v3.2.json",
   "type": "object",
   "required": ["version"],
 
@@ -71,7 +71,8 @@
               "properties": {
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
-                "args": {"$ref": "#/definitions/list_or_dict"}
+                "args": {"$ref": "#/definitions/list_or_dict"},
+                "cache_from": {"$ref": "#/definitions/list_of_strings"}
               },
               "additionalProperties": false
             }
@@ -167,8 +168,19 @@
         "ports": {
           "type": "array",
           "items": {
-            "type": ["string", "number"],
-            "format": "ports"
+            "oneOf": [
+              {"type": ["string", "number"], "format": "ports"},
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {"type": "string"},
+                  "target": {"type": "integer"},
+                  "published": {"type": "integer"},
+                  "protocol": {"type": "string"}
+                },
+                "additionalProperties": false
+              }
+            ]
           },
           "uniqueItems": true
         },
@@ -223,7 +235,37 @@
         },
         "user": {"type": "string"},
         "userns_mode": {"type": "string"},
-        "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "volumes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": {"type": "string"},
+                  "source": {"type": "string"},
+                  "target": {"type": "string"},
+                  "read_only": {"type": "boolean"},
+                  "bind": {
+                    "type": "object",
+                    "properties": {
+                      "propagation": {"type": "string"}
+                    }
+                  },
+                  "volume": {
+                    "type": "object",
+                    "properties": {
+                      "nocopy": {"type": "boolean"}
+                    }
+                  }
+                }
+              }
+            ],
+            "uniqueItems": true
+          }
+        },
         "working_dir": {"type": "string"}
       },
       "additionalProperties": false
@@ -251,6 +293,7 @@
       "type": ["object", "null"],
       "properties": {
         "mode": {"type": "string"},
+        "endpoint_mode": {"type": "string"},
         "replicas": {"type": "integer"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "update_config": {
@@ -338,6 +381,7 @@
           "additionalProperties": false
         },
         "internal": {"type": "boolean"},
+        "attachable": {"type": "boolean"},
         "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false

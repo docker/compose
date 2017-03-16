@@ -365,7 +365,7 @@ def process_config_schema_errors(error):
 
 
 def validate_against_config_schema(config_file):
-    schema = load_jsonschema(config_file.version)
+    schema = load_jsonschema(config_file)
     format_checker = FormatChecker(["ports", "expose"])
     validator = Draft4Validator(
         schema,
@@ -377,11 +377,12 @@ def validate_against_config_schema(config_file):
         config_file.filename)
 
 
-def validate_service_constraints(config, service_name, version):
+def validate_service_constraints(config, service_name, config_file):
     def handler(errors):
-        return process_service_constraint_errors(errors, service_name, version)
+        return process_service_constraint_errors(
+            errors, service_name, config_file.version)
 
-    schema = load_jsonschema(version)
+    schema = load_jsonschema(config_file)
     validator = Draft4Validator(schema['definitions']['constraints']['service'])
     handle_errors(validator.iter_errors(config), handler, None)
 
@@ -390,10 +391,15 @@ def get_schema_path():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def load_jsonschema(version):
+def load_jsonschema(config_file):
     filename = os.path.join(
         get_schema_path(),
-        "config_schema_v{0}.json".format(version))
+        "config_schema_v{0}.json".format(config_file.version))
+
+    if not os.path.exists(filename):
+        raise ConfigurationError(
+            'Version in "{}" is unsupported. {}'
+            .format(config_file.filename, VERSION_EXPLANATION))
 
     with open(filename, "r") as fh:
         return json.load(fh)

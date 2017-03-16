@@ -5,9 +5,10 @@ import six
 import yaml
 
 from compose.config import types
-from compose.config.config import V1
-from compose.config.config import V2_1
-from compose.config.config import V3_1
+from compose.const import COMPOSEFILE_V1 as V1
+from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V3_1 as V3_1
+from compose.const import COMPOSEFILE_V3_1 as V3_2
 
 
 def serialize_config_type(dumper, data):
@@ -45,7 +46,7 @@ def denormalize_config(config):
         if 'external_name' in vol_conf:
             del vol_conf['external_name']
 
-    if config.version in (V3_1,):
+    if config.version in (V3_1, V3_2):
         result['secrets'] = config.secrets
     return result
 
@@ -103,7 +104,7 @@ def denormalize_service_dict(service_dict, version):
                 service_dict['healthcheck']['timeout']
             )
 
-    if 'ports' in service_dict and version != V3_1:
+    if 'ports' in service_dict and version not in (V3_2,):
         service_dict['ports'] = map(
             lambda p: p.legacy_repr() if isinstance(p, types.ServicePort) else p,
             service_dict['ports']
