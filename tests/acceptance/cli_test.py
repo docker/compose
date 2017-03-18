@@ -321,7 +321,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['config'])
 
         assert yaml.load(result.stdout) == {
-            'version': '3.0',
+            'version': '3.2',
             'networks': {},
             'volumes': {
                 'foobar': {
@@ -371,6 +371,11 @@ class CLITestCase(DockerClientTestCase):
                         'timeout': '1s',
                         'retries': 5,
                     },
+                    'volumes': [
+                        '/host/path:/container/path:ro',
+                        'foobar:/container/volumepath:rw',
+                        '/anonymous'
+                    ],
 
                     'stop_grace_period': '20s',
                 },
