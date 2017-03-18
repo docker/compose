@@ -1,6 +1,126 @@
 Change log
 ==========
 
+1.12.0 (2017-03-21)
+-------------------
+
+### New features
+
+#### Compose file version 3.2
+
+- Introduced version 3.2 of the `docker-compose.yml` specification.
+
+- Added support for `cache_from` in the `build` section of services
+
+- Added support for the new expanded ports syntax in service definitions
+
+- Added support for the new expanded volumes syntax in service definitions
+
+#### Compose file version 2.1
+
+- Added support for `pids_limit` in service definitions
+
+#### Compose file version 2.0 and up
+
+- Added `--volumes` option to `docker-compose config` that lists named
+  volumes declared for that project
+
+- Added support for `mem_reservation` in service definitions (2.x only)
+
+- Added support for `dns_opt` in service definitions (2.x only)
+
+#### All formats
+
+- Added a new `docker-compose images` command that lists images used by
+  the current project's containers
+
+- Added a `--stop` (shorthand `-s`) option to `docker-compose rm` that stops
+  the running containers before removing them
+
+- Added a `--resolve-image-digests` option to `docker-compose config` that
+  pins the image version for each service to a permanent digest
+
+- Added a `--exit-code-from SERVICE` option to `docker-compose up`. When
+  used, `docker-compose` will exit on any container's exit with the code
+  corresponding to the specified service's exit code
+
+- Added a `--parallel` option to `docker-compose pull` that enables images
+  for multiple services to be pulled simultaneously
+
+- Added a `--build-arg` option to `docker-compose build`
+
+- Added a `--volume <volume_mapping>` (shorthand `-v`) option to
+  `docker-compose run` to declare runtime volumes to be mounted
+
+- Added a `--project-directory PATH` option to `docker-compose` that will
+  affect path resolution for the project
+
+- When using `--abort-on-container-exit` in `docker-compose up`, the exit
+  code for the container that caused the abort will be the exit code of
+  the `docker-compose up` command
+
+- Users can now configure which path separator character they want to use
+  to separate the `COMPOSE_FILE` environment value using the
+  `COMPOSE_PATH_SEPARATOR` environment variable
+
+- Added support for port range to single port in port mappings
+  (e.g. `8000-8010:80`)
+
+### Bugfixes
+
+- `docker-compose run --rm` now removes anonymous volumes after execution,
+  matching the behavior of `docker run --rm`.
+
+- Fixed a bug where override files containing port lists would cause a
+  TypeError to be raised
+
+- Fixed a bug where scaling services up or down would sometimes re-use
+  obsolete containers
+
+- Fixed a bug where the output of `docker-compose config` would be invalid
+  if the project declared anonymous volumes
+
+- Variable interpolation now properly occurs in the `secrets` section of
+  the Compose file
+
+- The `secrets` section now properly appears in the output of
+  `docker-compose config`
+
+- Fixed a bug where changes to some networks properties would not be
+  detected against previously created networks
+
+- Fixed a bug where `docker-compose` would crash when trying to write into
+  a closed pipe
+
+1.11.2 (2017-02-17)
+-------------------
+
+### Bugfixes
+
+- Fixed a bug that was preventing secrets configuration from being
+  loaded properly
+
+- Fixed a bug where the `docker-compose config` command would fail
+  if the config file contained secrets definitions
+
+- Fixed an issue where Compose on some linux distributions would
+  pick up and load an outdated version of the requests library
+
+- Fixed an issue where socket-type files inside a build folder
+  would cause `docker-compose` to crash when trying to build that
+  service
+
+- Fixed an issue where recursive wildcard patterns `**` were not being
+  recognized in `.dockerignore` files.
+
+1.11.1 (2017-02-09)
+-------------------
+
+### Bugfixes
+
+- Fixed a bug where the 3.1 file format was not being recognized as valid
+  by the Compose parser
+
 1.11.0 (2017-02-08)
 -------------------
 
