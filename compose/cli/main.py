@@ -263,43 +263,7 @@ class TopLevelCommand(object):
         if not output:
             output = "{}.dab".format(self.project.name)
 
-        with errors.handle_connection_errors(self.project.client):
-            try:
-                image_digests = get_image_digests(
-                    self.project,
-                    allow_push=options['--push-images'],
-                )
-            except MissingDigests as e:
-                def list_images(images):
-                    return "\n".join("    {}".format(name) for name in sorted(images))
-
-                paras = ["Some images are missing digests."]
-
-                if e.needs_push:
-                    command_hint = (
-                        "Use `docker-compose push {}` to push them. "
-                        "You can do this automatically with `docker-compose bundle --push-images`."
-                        .format(" ".join(sorted(e.needs_push)))
-                    )
-                    paras += [
-                        "The following images can be pushed:",
-                        list_images(e.needs_push),
-                        command_hint,
-                    ]
-
-                if e.needs_pull:
-                    command_hint = (
-                        "Use `docker-compose pull {}` to pull them. "
-                        .format(" ".join(sorted(e.needs_pull)))
-                    )
-
-                    paras += [
-                        "The following images need to be pulled:",
-                        list_images(e.needs_pull),
-                        command_hint,
-                    ]
-
-                raise UserError("\n\n".join(paras))
+        image_digests = image_digests_for_project(self.project, options['--push-images'])
 
         with open(output, 'w') as f:
             f.write(serialize_bundle(compose_config, image_digests))
@@ -313,13 +277,20 @@ class TopLevelCommand(object):
         Usage: config [options]
 
         Options:
-            -q, --quiet     Only validate the configuration, don't print
-                            anything.
-            --services      Print the service names, one per line.
-            --volumes       Print the volume names, one per line.
+            --resolve-image-digests  Pin image tags to digests.
+            -q, --quiet              Only validate the configuration, don't print
+                                     anything.
+            --services               Print the service names, one per line.
+            --volumes                Print the volume names, one per line.
 
         """
+
         compose_config = get_config_from_options(self.project_dir, config_options)
+        image_digests = None
+
+        if options['--resolve-image-digests']:
+            self.project = project_from_options('.', config_options)
+            image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
             return
@@ -332,7 +303,7 @@ class TopLevelCommand(object):
             print('\n'.join(volume for volume in compose_config.volumes))
             return
 
-        print(serialize_config(compose_config))
+        print(serialize_config(compose_config, image_digests))
 
     def create(self, options):
         """
@@ -1032,6 +1003,45 @@ def convergence_strategy_from_opts(options):
 def timeout_from_opts(options):
     timeout = options.get('--timeout')
     return None if timeout is None else int(timeout)
+
+
+def image_digests_for_project(project, allow_push=False):
+    with errors.handle_connection_errors(project.client):
+        try:
+            return get_image_digests(
+                project,
+                allow_push=allow_push
+            )
+        except MissingDigests as e:
+            def list_images(images):
+                return "\n".join("    {}".format(name) for name in sorted(images))
+
+            paras = ["Some images are missing digests."]
+
+            if e.needs_push:
+                command_hint = (
+                    "Use `docker-compose push {}` to push them. "
+                    .format(" ".join(sorted(e.needs_push)))
+                )
+                paras += [
+                    "The following images can be pushed:",
+                    list_images(e.needs_push),
+                    command_hint,
+                ]
+
+            if e.needs_pull:
+                command_hint = (
+                    "Use `docker-compose pull {}` to pull them. "
+                    .format(" ".join(sorted(e.needs_pull)))
+                )
+
+                paras += [
+                    "The following images need to be pulled:",
+                    list_images(e.needs_pull),
+                    command_hint,
+                ]
+
+            raise UserError("\n\n".join(paras))
 
 
 def exitval_from_opts(options, project):

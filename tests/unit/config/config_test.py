@@ -3654,6 +3654,25 @@ class SerializeTest(unittest.TestCase):
         assert denormalized_service['healthcheck']['interval'] == '100s'
         assert denormalized_service['healthcheck']['timeout'] == '30s'
 
+    def test_denormalize_image_has_digest(self):
+        service_dict = {
+            'image': 'busybox'
+        }
+        image_digest = 'busybox@sha256:abcde'
+
+        assert denormalize_service_dict(service_dict, V3_0, image_digest) == {
+            'image': 'busybox@sha256:abcde'
+        }
+
+    def test_denormalize_image_no_digest(self):
+        service_dict = {
+            'image': 'busybox'
+        }
+
+        assert denormalize_service_dict(service_dict, V3_0) == {
+            'image': 'busybox'
+        }
+
     def test_serialize_secrets(self):
         service_dict = {
             'image': 'example/web',
