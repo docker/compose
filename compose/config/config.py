@@ -1030,7 +1030,13 @@ def resolve_volume_paths(working_dir, service_dict):
 
 
 def resolve_volume_path(working_dir, volume):
-    container_path, host_path = split_path_mapping(volume)
+    if isinstance(volume, dict):
+        host_path = volume.get('source')
+        container_path = volume.get('target')
+        if host_path and volume.get('read_only'):
+            container_path += ':ro'
+    else:
+        container_path, host_path = split_path_mapping(volume)
 
     if host_path is not None:
         if host_path.startswith('.'):
@@ -1112,6 +1118,8 @@ def split_path_mapping(volume_path):
     path. Using splitdrive so windows absolute paths won't cause issues with
     splitting on ':'.
     """
+    if isinstance(volume_path, dict):
+        return (volume_path.get('target'), volume_path)
     drive, volume_config = splitdrive(volume_path)
 
     if ':' in volume_config:
@@ -1123,7 +1131,9 @@ def split_path_mapping(volume_path):
 
 def join_path_mapping(pair):
     (container, host) = pair
-    if host is None:
+    if isinstance(host, dict):
+        return host
+    elif host is None:
         return container
     else:
         return ":".join((host, container))
