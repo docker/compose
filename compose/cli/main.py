@@ -1212,6 +1212,7 @@ def up_shutdown_context(project, service_names, timeout, detached):
         project.kill(service_names=service_names)
         sys.exit(2)
 
+
 def list_containers(containers):
     return ", ".join(c.name for c in containers)
 
