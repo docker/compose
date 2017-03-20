@@ -126,22 +126,64 @@ def create_ipam_config_from_dict(ipam_dict):
     )
 
 
+class NetworkConfigChangedError(ConfigurationError):
+    def __init__(self, net_name, property_name):
+        super(NetworkConfigChangedError, self).__init__(
+            'Network "{}" needs to be recreated - {} has changed'.format(
+                net_name, property_name
+            )
+        )
+
+
+def check_remote_ipam_config(remote, local):
+    remote_ipam = remote.get('IPAM')
+    ipam_dict = create_ipam_config_from_dict(local.ipam)
+    if local.ipam.get('driver') and local.ipam.get('driver') != remote_ipam.get('Driver'):
+        raise NetworkConfigChangedError(local.full_name, 'IPAM driver')
+    if len(ipam_dict['Config']) != 0:
+        if len(ipam_dict['Config']) != len(remote_ipam['Config']):
+            raise NetworkConfigChangedError(local.full_name, 'IPAM configs')
+        remote_configs = sorted(remote_ipam['Config'], key='Subnet')
+        local_configs = sorted(ipam_dict['Config'], key='Subnet')
+        while local_configs:
+            lc = local_configs.pop()
+            rc = remote_configs.pop()
+            if lc.get('Subnet') != rc.get('Subnet'):
+                raise NetworkConfigChangedError(local.full_name, 'IPAM config subnet')
+            if lc.get('Gateway') is not None and lc.get('Gateway') != rc.get('Gateway'):
+                raise NetworkConfigChangedError(local.full_name, 'IPAM config gateway')
+            if lc.get('IPRange') != rc.get('IPRange'):
+                raise NetworkConfigChangedError(local.full_name, 'IPAM config ip_range')
+            if sorted(lc.get('AuxiliaryAddresses')) != sorted(rc.get('AuxiliaryAddresses')):
+                raise NetworkConfigChangedError(local.full_name, 'IPAM config aux_addresses')
+
+
 def check_remote_network_config(remote, local):
     if local.driver and remote.get('Driver') != local.driver:
-        raise ConfigurationError(
-            'Network "{}" needs to be recreated - driver has changed'
-            .format(local.full_name)
-        )
+        raise NetworkConfigChangedError(local.full_name, 'driver')
     local_opts = local.driver_opts or {}
     remote_opts = remote.get('Options') or {}
     for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
         if k in OPTS_EXCEPTIONS:
             continue
         if remote_opts.get(k) != local_opts.get(k):
-            raise ConfigurationError(
-                'Network "{}" needs to be recreated - options have changed'
-                .format(local.full_name)
-            )
+            raise NetworkConfigChangedError(local.full_name, 'option "{}"'.format(k))
+
+    if local.ipam is not None:
+        check_remote_ipam_config(remote, local)
+
+    if local.internal is not None and local.internal != remote.get('Internal', False):
+        raise NetworkConfigChangedError(local.full_name, 'internal')
+    if local.enable_ipv6 is not None and local.enable_ipv6 != remote.get('EnableIPv6', False):
+        raise NetworkConfigChangedError(local.full_name, 'enable_ipv6')
+
+    local_labels = local.labels or {}
+    remote_labels = remote.get('Labels', {})
+    for k in set.union(set(remote_labels.keys()), set(local_labels.keys())):
+        if k.startswith('com.docker.compose.'):  # We are only interested in user-specified labels
+            continue
+        if remote_labels.get(k) != local_labels.get(k):
+            raise NetworkConfigChangedError(local.full_name, 'label "{}"'.format(k))
 
 
 def build_networks(name, config_data, client):

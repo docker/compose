@@ -75,7 +75,32 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    value = interpolate_environment_variables("2.0",  volumes, 'volume', mock_env)
+    value = interpolate_environment_variables("2.0", volumes, 'volume', mock_env)
+    assert value == expected
+
+
+def test_interpolate_environment_variables_in_secrets(mock_env):
+    secrets = {
+        'secretservice': {
+            'file': '$FOO',
+            'labels': {
+                'max': 2,
+                'user': '${USER}'
+            }
+        },
+        'other': None,
+    }
+    expected = {
+        'secretservice': {
+            'file': 'bar',
+            'labels': {
+                'max': 2,
+                'user': 'jenny'
+            }
+        },
+        'other': {},
+    }
+    value = interpolate_environment_variables("3.1", secrets, 'volume', mock_env)
     assert value == expected
 
 

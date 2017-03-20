@@ -7,6 +7,8 @@ from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
+from compose.config.errors import DependencyError
+from compose.config.types import ServicePort
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_CONFIG_HASH
@@ -19,6 +21,7 @@ from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction
 from compose.service import ContainerNetworkMode
+from compose.service import formatted_ports
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
 from compose.service import merge_volume_bindings
@@ -167,6 +170,28 @@ class ServiceTest(unittest.TestCase):
             self.mock_client.create_host_config.call_args[1]['memswap_limit'],
             2000000000
         )
+
+    def test_self_reference_external_link(self):
+        service = Service(
+            name='foo',
+            external_links=['default_foo_1']
+        )
+        with self.assertRaises(DependencyError):
+            service.get_container_name(1)
+
+    def test_mem_reservation(self):
+        self.mock_client.create_host_config.return_value = {}
+
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            mem_reservation='512m'
+        )
+        service._get_container_create_options({'some': 'overrides'}, 1)
+        assert self.mock_client.create_host_config.called is True
+        assert self.mock_client.create_host_config.call_args[1]['mem_reservation'] == '512m'
 
     def test_cgroup_parent(self):
         self.mock_client.create_host_config.return_value = {}
@@ -445,7 +470,8 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
-            buildargs=None,
+            buildargs={},
+            cache_from=None,
         )
 
     def test_ensure_image_exists_no_build(self):
@@ -481,7 +507,8 @@ class ServiceTest(unittest.TestCase):
             forcerm=False,
             nocache=False,
             rm=True,
-            buildargs=None,
+            buildargs={},
+            cache_from=None,
         )
 
     def test_build_does_not_pull(self):
@@ -494,6 +521,23 @@ class ServiceTest(unittest.TestCase):
 
         self.assertEqual(self.mock_client.build.call_count, 1)
         self.assertFalse(self.mock_client.build.call_args[1]['pull'])
+
+    def test_build_with_override_build_args(self):
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        build_args = {
+            'arg1': 'arg1_new_value',
+        }
+        service = Service('foo', client=self.mock_client,
+                          build={'context': '.', 'args': {'arg1': 'arg1', 'arg2': 'arg2'}})
+        service.build(build_args_override=build_args)
+
+        called_build_args = self.mock_client.build.call_args[1]['buildargs']
+
+        assert called_build_args['arg1'] == build_args['arg1']
+        assert called_build_args['arg2'] == 'arg2'
 
     def test_config_dict(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
@@ -774,6 +818,25 @@ class NetTestCase(unittest.TestCase):
         self.assertEqual(network_mode.id, service_name)
         self.assertEqual(network_mode.mode, None)
         self.assertEqual(network_mode.service_name, service_name)
+
+
+class ServicePortsTest(unittest.TestCase):
+    def test_formatted_ports(self):
+        ports = [
+            '3000',
+            '0.0.0.0:4025-4030:23000-23005',
+            ServicePort(6000, None, None, None, None),
+            ServicePort(8080, 8080, None, None, None),
+            ServicePort('20000', '20000', 'udp', 'ingress', None),
+            ServicePort(30000, '30000', 'tcp', None, '127.0.0.1'),
+        ]
+        formatted = formatted_ports(ports)
+        assert ports[0] in formatted
+        assert ports[1] in formatted
+        assert '6000/tcp' in formatted
+        assert '8080:8080/tcp' in formatted
+        assert '20000:20000/udp' in formatted
+        assert '127.0.0.1:30000:30000/tcp' in formatted
 
 
 def build_mount(destination, source, mode='rw'):

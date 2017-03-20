@@ -22,8 +22,10 @@ from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
+from ..config.types import VolumeSpec
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -47,6 +49,7 @@ from .formatter import Formatter
 from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
+from .utils import human_readable_file_size
 from .utils import yesno
 
 
@@ -58,9 +61,9 @@ console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():
-    command = dispatch()
-
+    signals.ignore_sigpipe()
     try:
+        command = dispatch()
         command()
     except (KeyboardInterrupt, signals.ShutdownException):
         log.error("Aborting.")
@@ -78,6 +81,10 @@ def main():
     except NeedsBuildError as e:
         log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
         sys.exit(1)
+    except NoSuchCommand as e:
+        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
+        log.error("No such command: %s\n\n%s", e.command, commands)
+        sys.exit(1)
     except (errors.ConnectionError, StreamParseError):
         sys.exit(1)
 
@@ -88,13 +95,7 @@ def dispatch():
         TopLevelCommand,
         {'options_first': True, 'version': get_version_info('compose')})
 
-    try:
-        options, handler, command_options = dispatcher.parse(sys.argv[1:])
-    except NoSuchCommand as e:
-        commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
-        log.error("No such command: %s\n\n%s", e.command, commands)
-        sys.exit(1)
-
+    options, handler, command_options = dispatcher.parse(sys.argv[1:])
     setup_console_handler(console_handler, options.get('--verbose'))
     return functools.partial(perform_command, options, handler, command_options)
 
@@ -168,6 +169,8 @@ class TopLevelCommand(object):
       --skip-hostname-check       Don't check the daemon's hostname against the name specified
                                   in the client certificate (for example if your docker host
                                   is an IP address)
+      --project-directory PATH    Specify an alternate working directory
+                                  (default: the path of the compose file)
 
     Commands:
       build              Build or rebuild services
@@ -178,6 +181,7 @@ class TopLevelCommand(object):
       events             Receive real time events from containers
       exec               Execute a command in a running container
       help               Get help on a command
+      images             List images
       kill               Kill containers
       logs               View output from containers
       pause              Pause services
@@ -209,18 +213,29 @@ class TopLevelCommand(object):
         e.g. `composetest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `docker-compose build` to rebuild it.
 
-        Usage: build [options] [SERVICE...]
+        Usage: build [options] [--build-arg key=val...] [SERVICE...]
 
         Options:
-            --force-rm  Always remove intermediate containers.
-            --no-cache  Do not use cache when building the image.
-            --pull      Always attempt to pull a newer version of the image.
+            --force-rm              Always remove intermediate containers.
+            --no-cache              Do not use cache when building the image.
+            --pull                  Always attempt to pull a newer version of the image.
+            --build-arg key=val     Set build-time variables for one service.
         """
+        service_names = options['SERVICE']
+        build_args = options.get('--build-arg', None)
+        if build_args:
+            environment = Environment.from_env_file(self.project_dir)
+            build_args = resolve_build_args(build_args, environment)
+
+        if not service_names and build_args:
+            raise UserError("Need service name for --build-arg option")
+
         self.project.build(
-            service_names=options['SERVICE'],
+            service_names=service_names,
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
-            force_rm=bool(options.get('--force-rm', False)))
+            force_rm=bool(options.get('--force-rm', False)),
+            build_args=build_args)
 
     def bundle(self, config_options, options):
         """
@@ -248,43 +263,7 @@ class TopLevelCommand(object):
         if not output:
             output = "{}.dab".format(self.project.name)
 
-        with errors.handle_connection_errors(self.project.client):
-            try:
-                image_digests = get_image_digests(
-                    self.project,
-                    allow_push=options['--push-images'],
-                )
-            except MissingDigests as e:
-                def list_images(images):
-                    return "\n".join("    {}".format(name) for name in sorted(images))
-
-                paras = ["Some images are missing digests."]
-
-                if e.needs_push:
-                    command_hint = (
-                        "Use `docker-compose push {}` to push them. "
-                        "You can do this automatically with `docker-compose bundle --push-images`."
-                        .format(" ".join(sorted(e.needs_push)))
-                    )
-                    paras += [
-                        "The following images can be pushed:",
-                        list_images(e.needs_push),
-                        command_hint,
-                    ]
-
-                if e.needs_pull:
-                    command_hint = (
-                        "Use `docker-compose pull {}` to pull them. "
-                        .format(" ".join(sorted(e.needs_pull)))
-                    )
-
-                    paras += [
-                        "The following images need to be pulled:",
-                        list_images(e.needs_pull),
-                        command_hint,
-                    ]
-
-                raise UserError("\n\n".join(paras))
+        image_digests = image_digests_for_project(self.project, options['--push-images'])
 
         with open(output, 'w') as f:
             f.write(serialize_bundle(compose_config, image_digests))
@@ -298,12 +277,20 @@ class TopLevelCommand(object):
         Usage: config [options]
 
         Options:
-            -q, --quiet     Only validate the configuration, don't print
-                            anything.
-            --services      Print the service names, one per line.
+            --resolve-image-digests  Pin image tags to digests.
+            -q, --quiet              Only validate the configuration, don't print
+                                     anything.
+            --services               Print the service names, one per line.
+            --volumes                Print the volume names, one per line.
 
         """
+
         compose_config = get_config_from_options(self.project_dir, config_options)
+        image_digests = None
+
+        if options['--resolve-image-digests']:
+            self.project = project_from_options('.', config_options)
+            image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
             return
@@ -312,7 +299,11 @@ class TopLevelCommand(object):
             print('\n'.join(service['name'] for service in compose_config.services))
             return
 
-        print(serialize_config(compose_config))
+        if options['--volumes']:
+            print('\n'.join(volume for volume in compose_config.volumes))
+            return
+
+        print(serialize_config(compose_config, image_digests))
 
     def create(self, options):
         """
@@ -479,6 +470,45 @@ class TopLevelCommand(object):
 
         print(getdoc(subject))
 
+    def images(self, options):
+        """
+        List images used by the created containers.
+        Usage: images [options] [SERVICE...]
+
+        Options:
+        -q     Only display IDs
+        """
+        containers = sorted(
+            self.project.containers(service_names=options['SERVICE'], stopped=True) +
+            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+            key=attrgetter('name'))
+
+        if options['-q']:
+            for image in set(c.image for c in containers):
+                print(image.split(':')[1])
+        else:
+            headers = [
+                'Container',
+                'Repository',
+                'Tag',
+                'Image Id',
+                'Size'
+            ]
+            rows = []
+            for container in containers:
+                image_config = container.image_config
+                repo_tags = image_config['RepoTags'][0].split(':')
+                image_id = image_config['Id'].split(':')[1][:12]
+                size = human_readable_file_size(image_config['Size'])
+                rows.append([
+                    container.name,
+                    repo_tags[0],
+                    repo_tags[1],
+                    image_id,
+                    size
+                ])
+            print(Formatter().table(headers, rows))
+
     def kill(self, options):
         """
         Force stop service containers.
@@ -602,10 +632,12 @@ class TopLevelCommand(object):
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
+            --parallel              Pull multiple images in parallel.
         """
         self.project.pull(
             service_names=options['SERVICE'],
-            ignore_pull_failures=options.get('--ignore-pull-failures')
+            ignore_pull_failures=options.get('--ignore-pull-failures'),
+            parallel_pull=options.get('--parallel')
         )
 
     def push(self, options):
@@ -635,6 +667,7 @@ class TopLevelCommand(object):
 
         Options:
             -f, --force   Don't ask to confirm removal
+            -s, --stop    Stop the containers, if required, before removing
             -v            Remove any anonymous volumes attached to containers
             -a, --all     Deprecated - no effect.
         """
@@ -644,6 +677,15 @@ class TopLevelCommand(object):
                 'of `docker-compose rm`'
             )
         one_off = OneOffFilter.include
+
+        if options.get('--stop'):
+            running_containers = self.project.containers(
+                service_names=options['SERVICE'], stopped=False, one_off=one_off
+            )
+            self.project.stop(
+                service_names=running_containers,
+                one_off=one_off
+            )
 
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off
@@ -674,7 +716,7 @@ class TopLevelCommand(object):
         running. If you do not want to start linked services, use
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
-        Usage: run [options] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
+        Usage: run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
             -d                    Detached mode: Run container in the background, print
@@ -688,6 +730,7 @@ class TopLevelCommand(object):
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
+            -v, --volume=[]       Bind mount a volume (default [])
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
             -w, --workdir=""      Working directory inside the container
@@ -854,8 +897,11 @@ class TopLevelCommand(object):
                                        running. (default: 10)
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
+            --exit-code-from SERVICE   Return the exit code of the selected service container.
+                                       Requires --abort-on-container-exit.
         """
         start_deps = not options['--no-deps']
+        exit_value_from = exitval_from_opts(options, self.project)
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
         timeout = timeout_from_opts(options)
@@ -878,19 +924,50 @@ class TopLevelCommand(object):
             if detached:
                 return
 
+            attached_containers = filter_containers_to_service_names(to_attach, service_names)
+
             log_printer = log_printer_from_project(
                 self.project,
-                filter_containers_to_service_names(to_attach, service_names),
+                attached_containers,
                 options['--no-color'],
                 {'follow': True},
                 cascade_stop,
                 event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))
-            log_printer.run()
+            cascade_starter = log_printer.run()
 
             if cascade_stop:
                 print("Aborting on container exit...")
+
+                exit_code = 0
+                if exit_value_from:
+                    candidates = filter(
+                        lambda c: c.service == exit_value_from,
+                        attached_containers)
+                    if not candidates:
+                        log.error(
+                            'No containers matching the spec "{0}" '
+                            'were run.'.format(exit_value_from)
+                        )
+                        exit_code = 2
+                    elif len(candidates) > 1:
+                        exit_values = filter(
+                            lambda e: e != 0,
+                            [c.inspect()['State']['ExitCode'] for c in candidates]
+                        )
+
+                        exit_code = exit_values[0]
+                    else:
+                        exit_code = candidates[0].inspect()['State']['ExitCode']
+                else:
+                    for e in self.project.containers(service_names=options['SERVICE'], stopped=True):
+                        if (not e.is_running and cascade_starter == e.name):
+                            if not e.exit_code == 0:
+                                exit_code = e.exit_code
+                                break
+
                 self.project.stop(service_names=service_names, timeout=timeout)
+                sys.exit(exit_code)
 
     @classmethod
     def version(cls, options):
@@ -926,6 +1003,58 @@ def convergence_strategy_from_opts(options):
 def timeout_from_opts(options):
     timeout = options.get('--timeout')
     return None if timeout is None else int(timeout)
+
+
+def image_digests_for_project(project, allow_push=False):
+    with errors.handle_connection_errors(project.client):
+        try:
+            return get_image_digests(
+                project,
+                allow_push=allow_push
+            )
+        except MissingDigests as e:
+            def list_images(images):
+                return "\n".join("    {}".format(name) for name in sorted(images))
+
+            paras = ["Some images are missing digests."]
+
+            if e.needs_push:
+                command_hint = (
+                    "Use `docker-compose push {}` to push them. "
+                    .format(" ".join(sorted(e.needs_push)))
+                )
+                paras += [
+                    "The following images can be pushed:",
+                    list_images(e.needs_push),
+                    command_hint,
+                ]
+
+            if e.needs_pull:
+                command_hint = (
+                    "Use `docker-compose pull {}` to pull them. "
+                    .format(" ".join(sorted(e.needs_pull)))
+                )
+
+                paras += [
+                    "The following images need to be pulled:",
+                    list_images(e.needs_pull),
+                    command_hint,
+                ]
+
+            raise UserError("\n\n".join(paras))
+
+
+def exitval_from_opts(options, project):
+    exit_value_from = options.get('--exit-code-from')
+    if exit_value_from:
+        if not options.get('--abort-on-container-exit'):
+            log.warn('using --exit-code-from implies --abort-on-container-exit')
+            options['--abort-on-container-exit'] = True
+        if exit_value_from not in [s.name for s in project.get_services()]:
+            log.error('No service named "%s" was found in your compose file.',
+                      exit_value_from)
+            sys.exit(2)
+    return exit_value_from
 
 
 def image_type_from_opt(flag, value):
@@ -984,6 +1113,10 @@ def build_container_options(options, detach, command):
     if options['--workdir']:
         container_options['working_dir'] = options['--workdir']
 
+    if options['--volume']:
+        volumes = [VolumeSpec.parse(i) for i in options['--volume']]
+        container_options['volumes'] = volumes
+
     return container_options
 
 
@@ -1010,7 +1143,7 @@ def run_one_off_container(container_options, project, service, options):
 
     def remove_container(force=False):
         if options['--rm']:
-            project.client.remove_container(container.id, force=True)
+            project.client.remove_container(container.id, force=True, v=True)
 
     signals.set_signal_handler_to_shutdown()
     try:

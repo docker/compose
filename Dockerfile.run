@@ -1,14 +1,14 @@
+FROM alpine:3.4
 
-FROM    alpine:3.4
-ARG     version
-RUN     apk -U add \
-            python \
-            py-pip
+ENV GLIBC 2.23-r3
 
-COPY    requirements.txt /code/requirements.txt
-RUN     pip install -r /code/requirements.txt
+RUN apk update && apk add --no-cache openssl ca-certificates && \
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub && \
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/$GLIBC/glibc-$GLIBC.apk && \
+    apk add --no-cache glibc-$GLIBC.apk && rm glibc-$GLIBC.apk && \
+    ln -s /lib/libz.so.1 /usr/glibc-compat/lib/ && \
+    ln -s /lib/libc.musl-x86_64.so.1 /usr/glibc-compat/lib
 
-COPY     dist/docker_compose-${version}-py2.py3-none-any.whl /code/
-RUN     pip install --no-deps /code/docker_compose-${version}-py2.py3-none-any.whl
+COPY dist/docker-compose-Linux-x86_64 /usr/local/bin/docker-compose
 
-ENTRYPOINT ["/usr/bin/docker-compose"]
+ENTRYPOINT ["docker-compose"]

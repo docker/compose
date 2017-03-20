@@ -35,7 +35,7 @@ A `docker-compose.yml` looks like this:
         image: redis
 
 For more information about the Compose file, see the
-[Compose file reference](https://github.com/docker/docker.github.io/blob/master/compose/compose-file.md)
+[Compose file reference](https://github.com/docker/docker.github.io/blob/master/compose/compose-file/compose-versioning.md)
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -55,7 +55,7 @@ Installation and documentation
 Contributing
 ------------
 
-[![Build Status](http://jenkins.dockerproject.org/buildStatus/icon?job=Compose%20Master)](http://jenkins.dockerproject.org/job/Compose%20Master/)
+[![Build Status](https://jenkins.dockerproject.org/buildStatus/icon?job=docker/compose/master)](https://jenkins.dockerproject.org/job/docker/job/compose/job/master/)
 
 Want to help build Compose? Check out our [contributing documentation](https://github.com/docker/compose/blob/master/CONTRIBUTING.md).
 

@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 VERSION_EXPLANATION = (
     'You might be seeing this error because you\'re using the wrong Compose file version. '
-    'Either specify a supported version ("2.0", "2.1", "3.0") and place your '
+    'Either specify a supported version ("2.0", "2.1", "3.0", "3.1") and place your '
     'service definitions under the `services` key, or omit the `version` key '
     'and place your service definitions at the root of the file to use '
     'version 1.\nFor more on the Compose file format versions, see '

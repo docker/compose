@@ -29,36 +29,36 @@ class CLITestCase(unittest.TestCase):
         test_dir = py._path.local.LocalPath('tests/fixtures/simple-composefile')
         with test_dir.as_cwd():
             project_name = get_project_name('.')
-            self.assertEquals('simplecomposefile', project_name)
+            self.assertEqual('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_base_dir(self):
         base_dir = 'tests/fixtures/simple-composefile'
         project_name = get_project_name(base_dir)
-        self.assertEquals('simplecomposefile', project_name)
+        self.assertEqual('simplecomposefile', project_name)
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         base_dir = 'tests/fixtures/UpperCaseDir'
         project_name = get_project_name(base_dir)
-        self.assertEquals('uppercasedir', project_name)
+        self.assertEqual('uppercasedir', project_name)
 
     def test_project_name_with_explicit_project_name(self):
         name = 'explicit-project-name'
         project_name = get_project_name(None, project_name=name)
-        self.assertEquals('explicitprojectname', project_name)
+        self.assertEqual('explicitprojectname', project_name)
 
     @mock.patch.dict(os.environ)
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         os.environ['COMPOSE_PROJECT_NAME'] = name
         project_name = get_project_name(None)
-        self.assertEquals(project_name, name)
+        self.assertEqual(project_name, name)
 
     def test_project_name_with_empty_environment_var(self):
         base_dir = 'tests/fixtures/simple-composefile'
         with mock.patch.dict(os.environ):
             os.environ['COMPOSE_PROJECT_NAME'] = ''
             project_name = get_project_name(base_dir)
-        self.assertEquals('simplecomposefile', project_name)
+        self.assertEqual('simplecomposefile', project_name)
 
     @mock.patch.dict(os.environ)
     def test_project_name_with_environment_file(self):
@@ -119,6 +119,7 @@ class CLITestCase(unittest.TestCase):
                 '--entrypoint': None,
                 '--service-ports': None,
                 '--publish': [],
+                '--volume': [],
                 '--rm': None,
                 '--name': None,
                 '--workdir': None,
@@ -153,12 +154,13 @@ class CLITestCase(unittest.TestCase):
             '--entrypoint': None,
             '--service-ports': None,
             '--publish': [],
+            '--volume': [],
             '--rm': None,
             '--name': None,
             '--workdir': None,
         })
 
-        self.assertEquals(
+        self.assertEqual(
             mock_client.create_host_config.call_args[1]['restart_policy']['Name'],
             'always'
         )
@@ -175,6 +177,7 @@ class CLITestCase(unittest.TestCase):
             '--entrypoint': None,
             '--service-ports': None,
             '--publish': [],
+            '--volume': [],
             '--rm': True,
             '--name': None,
             '--workdir': None,
@@ -184,7 +187,7 @@ class CLITestCase(unittest.TestCase):
             mock_client.create_host_config.call_args[1].get('restart_policy')
         )
 
-    def test_command_manula_and_service_ports_together(self):
+    def test_command_manual_and_service_ports_together(self):
         project = Project.from_config(
             name='composetest',
             client=None,

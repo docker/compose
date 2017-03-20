@@ -307,10 +307,10 @@ class Project(object):
             'Restarting')
         return containers
 
-    def build(self, service_names=None, no_cache=False, pull=False, force_rm=False):
+    def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, build_args=None):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull, force_rm)
+                service.build(no_cache, pull, force_rm, build_args)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
@@ -365,7 +365,7 @@ class Project(object):
 
             # TODO: get labels from the API v1.22 , see github issue 2618
             try:
-                # this can fail if the conatiner has been removed
+                # this can fail if the container has been removed
                 container = Container.from_id(self.client, event['id'])
             except APIError:
                 continue
@@ -454,9 +454,22 @@ class Project(object):
 
         return plans
 
-    def pull(self, service_names=None, ignore_pull_failures=False):
-        for service in self.get_services(service_names, include_deps=False):
-            service.pull(ignore_pull_failures)
+    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False):
+        services = self.get_services(service_names, include_deps=False)
+
+        if parallel_pull:
+            def pull_service(service):
+                service.pull(ignore_pull_failures, True)
+
+            parallel.parallel_execute(
+                services,
+                pull_service,
+                operator.attrgetter('name'),
+                'Pulling',
+                limit=5)
+        else:
+            for service in services:
+                service.pull(ignore_pull_failures)
 
     def push(self, service_names=None, ignore_push_failures=False):
         for service in self.get_services(service_names, include_deps=False):

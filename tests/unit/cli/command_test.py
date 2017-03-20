@@ -45,6 +45,15 @@ class TestGetConfigPathFromOptions(object):
                 '.', {}, environment
             ) == ['one.yml', 'two.yml']
 
+    def test_multiple_path_from_env_custom_separator(self):
+        with mock.patch.dict(os.environ):
+            os.environ['COMPOSE_PATH_SEPARATOR'] = '^'
+            os.environ['COMPOSE_FILE'] = 'c:\\one.yml^.\\semi;colon.yml'
+            environment = Environment.from_env_file('.')
+            assert get_config_path_from_options(
+                '.', {}, environment
+            ) == ['c:\\one.yml', '.\\semi;colon.yml']
+
     def test_no_path(self):
         environment = Environment.from_env_file('.')
         assert not get_config_path_from_options('.', {}, environment)

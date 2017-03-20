@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Run docker-compose in a container
 #
@@ -15,7 +15,7 @@
 
 set -e
 
-VERSION="1.11.2"
+VERSION="1.12.0-rc1"
 IMAGE="docker/compose:$VERSION"
 
 

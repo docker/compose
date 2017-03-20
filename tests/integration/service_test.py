@@ -32,6 +32,7 @@ from compose.service import NetworkMode
 from compose.service import Service
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
+from tests.integration.testcases import v3_only
 
 
 def create_and_start_container(service, **override_options):
@@ -40,6 +41,7 @@ def create_and_start_container(service, **override_options):
 
 
 class ServiceTest(DockerClientTestCase):
+
     def test_containers(self):
         foo = self.create_service('foo')
         bar = self.create_service('bar')
@@ -112,6 +114,14 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         self.assertEqual(container.get('HostConfig.ShmSize'), 67108864)
+
+    @pytest.mark.xfail(True, reason='Some kernels/configs do not support pids_limit')
+    def test_create_container_with_pids_limit(self):
+        self.require_api_version('1.23')
+        service = self.create_service('db', pids_limit=10)
+        container = service.create_container()
+        service.start_container(container)
+        assert container.get('HostConfig.PidsLimit') == 10
 
     def test_create_container_with_extra_hosts_list(self):
         extra_hosts = ['somehost:162.242.195.82', 'otherhost:50.31.209.229']
@@ -587,12 +597,30 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
             f.write("ARG build_version\n")
+            f.write("RUN echo ${build_version}\n")
 
         service = self.create_service('buildwithargs',
                                       build={'context': text_type(base_dir),
                                              'args': {"build_version": "1"}})
         service.build()
         assert service.image()
+        assert "build_version=1" in service.image()['ContainerConfig']['Cmd']
+
+    def test_build_with_build_args_override(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+            f.write("ARG build_version\n")
+            f.write("RUN echo ${build_version}\n")
+
+        service = self.create_service('buildwithargs',
+                                      build={'context': text_type(base_dir),
+                                             'args': {"build_version": "1"}})
+        service.build(build_args_override={'build_version': '2'})
+        assert service.image()
+        assert "build_version=2" in service.image()['ContainerConfig']['Cmd']
 
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
@@ -870,6 +898,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.MemorySwappiness'), 11)
 
+    def test_mem_reservation(self):
+        service = self.create_service('web', mem_reservation='20m')
+        container = create_and_start_container(service)
+        assert container.get('HostConfig.MemoryReservation') == 20 * 1024 * 1024
+
     def test_restart_always_value(self):
         service = self.create_service('web', restart={'Name': 'always'})
         container = create_and_start_container(service)
@@ -885,8 +918,16 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
 
         host_container_groupadd = container.get('HostConfig.GroupAdd')
-        self.assertTrue("root" in host_container_groupadd)
-        self.assertTrue("1" in host_container_groupadd)
+        assert "root" in host_container_groupadd
+        assert "1" in host_container_groupadd
+
+    def test_dns_opt_value(self):
+        service = self.create_service('web', dns_opt=["use-vc", "no-tld-query"])
+        container = create_and_start_container(service)
+
+        dns_opt = container.get('HostConfig.DnsOptions')
+        assert 'use-vc' in dns_opt
+        assert 'no-tld-query' in dns_opt
 
     def test_restart_on_failure_value(self):
         service = self.create_service('web', restart={
@@ -946,6 +987,20 @@ class ServiceTest(DockerClientTestCase):
         }.items():
             self.assertEqual(env[k], v)
 
+    @v3_only()
+    def test_build_with_cachefrom(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('cache_from',
+                                      build={'context': base_dir,
+                                             'cache_from': ['build1']})
+        service.build()
+        assert service.image()
+
     @mock.patch.dict(os.environ)
     def test_resolve_env(self):
         os.environ['FILE_DEF'] = 'E1'
@@ -974,7 +1029,7 @@ class ServiceTest(DockerClientTestCase):
         with mock.patch.object(self.client, '_version', '1.20'):
             service = self.create_service('web')
             service_config = service._get_container_host_config({})
-            self.assertEquals(service_config['NetworkMode'], 'default')
+            self.assertEqual(service_config['NetworkMode'], 'default')
 
     def test_labels(self):
         labels_dict = {
@@ -1020,7 +1075,7 @@ class ServiceTest(DockerClientTestCase):
         one_off_container = service.create_container(one_off=True)
         self.assertNotEqual(one_off_container.name, 'my-web-container')
 
-    @pytest.mark.skipif(True, reason="Broken on 1.11.0rc1")
+    @pytest.mark.skipif(True, reason="Broken on 1.11.0 - 17.03.0")
     def test_log_drive_invalid(self):
         service = self.create_service('web', logging={'driver': 'xxx'})
         expected_error_msg = "logger: no log driver named 'xxx' is registered"
@@ -1078,6 +1133,7 @@ def converge(service, strategy=ConvergenceStrategy.changed):
 
 
 class ConfigHashTest(DockerClientTestCase):
+
     def test_no_config_hash_when_one_off(self):
         web = self.create_service('web')
         container = web.create_container(one_off=True)

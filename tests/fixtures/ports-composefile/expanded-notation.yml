@@ -1,0 +1,15 @@
+version: '3.2'
+services:
+    simple:
+      image: busybox:latest
+      command: top
+      ports:
+        - target: 3000
+        - target: 3001
+          published: 49152
+        - target: 3002
+          published: 49153
+          protocol: tcp
+        - target: 3003
+          published: 49154
+          protocol: udp

@@ -80,6 +80,13 @@
         "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
+        "dns_opt": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "domainname": {"type": "string"},
         "entrypoint": {
@@ -138,8 +145,9 @@
 
         "mac_address": {"type": "string"},
         "mem_limit": {"type": ["number", "string"]},
-        "memswap_limit": {"type": ["number", "string"]},
+        "mem_reservation": {"type": ["string", "integer"]},
         "mem_swappiness": {"type": "integer"},
+        "memswap_limit": {"type": ["number", "string"]},
         "network_mode": {"type": "string"},
 
         "networks": {

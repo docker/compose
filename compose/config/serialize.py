@@ -5,8 +5,10 @@ import six
 import yaml
 
 from compose.config import types
-from compose.config.config import V1
-from compose.config.config import V2_1
+from compose.const import COMPOSEFILE_V1 as V1
+from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V3_1 as V3_1
+from compose.const import COMPOSEFILE_V3_1 as V3_2
 
 
 def serialize_config_type(dumper, data):
@@ -14,44 +16,47 @@ def serialize_config_type(dumper, data):
     return representer(data.repr())
 
 
+def serialize_dict_type(dumper, data):
+    return dumper.represent_dict(data.repr())
+
+
 yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
+yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
+yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
-def denormalize_config(config):
+def denormalize_config(config, image_digests=None):
+    result = {'version': V2_1 if config.version == V1 else config.version}
     denormalized_services = [
-        denormalize_service_dict(service_dict, config.version)
+        denormalize_service_dict(
+            service_dict,
+            config.version,
+            image_digests[service_dict['name']] if image_digests else None)
         for service_dict in config.services
     ]
-    services = {
+    result['services'] = {
         service_dict.pop('name'): service_dict
         for service_dict in denormalized_services
     }
-    networks = config.networks.copy()
-    for net_name, net_conf in networks.items():
+    result['networks'] = config.networks.copy()
+    for net_name, net_conf in result['networks'].items():
         if 'external_name' in net_conf:
             del net_conf['external_name']
 
-    volumes = config.volumes.copy()
-    for vol_name, vol_conf in volumes.items():
+    result['volumes'] = config.volumes.copy()
+    for vol_name, vol_conf in result['volumes'].items():
         if 'external_name' in vol_conf:
             del vol_conf['external_name']
 
-    version = config.version
-    if version == V1:
-        version = V2_1
-
-    return {
-        'version': version,
-        'services': services,
-        'networks': networks,
-        'volumes': volumes,
-    }
+    if config.version in (V3_1, V3_2):
+        result['secrets'] = config.secrets
+    return result
 
 
-def serialize_config(config):
+def serialize_config(config, image_digests=None):
     return yaml.safe_dump(
-        denormalize_config(config),
+        denormalize_config(config, image_digests),
         default_flow_style=False,
         indent=2,
         width=80)
@@ -76,8 +81,11 @@ def serialize_ns_time_value(value):
     return '{0}{1}'.format(*result)
 
 
-def denormalize_service_dict(service_dict, version):
+def denormalize_service_dict(service_dict, version, image_digest=None):
     service_dict = service_dict.copy()
+
+    if image_digest:
+        service_dict['image'] = image_digest
 
     if 'restart' in service_dict:
         service_dict['restart'] = types.serialize_restart_spec(
@@ -102,7 +110,10 @@ def denormalize_service_dict(service_dict, version):
                 service_dict['healthcheck']['timeout']
             )
 
-    if 'secrets' in service_dict:
-        service_dict['secrets'] = map(lambda s: s.repr(), service_dict['secrets'])
+    if 'ports' in service_dict and version not in (V3_2,):
+        service_dict['ports'] = map(
+            lambda p: p.legacy_repr() if isinstance(p, types.ServicePort) else p,
+            service_dict['ports']
+        )
 
     return service_dict

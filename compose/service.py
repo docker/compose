@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+import os
 import re
 import sys
 from collections import namedtuple
@@ -21,6 +22,8 @@ from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
+from .config.errors import DependencyError
+from .config.types import ServicePort
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
 from .const import IS_WINDOWS_PLATFORM
@@ -53,6 +56,7 @@ DOCKER_START_KEYS = [
     'devices',
     'dns',
     'dns_search',
+    'dns_opt',
     'env_file',
     'extra_hosts',
     'group_add',
@@ -61,10 +65,12 @@ DOCKER_START_KEYS = [
     'log_driver',
     'log_opt',
     'mem_limit',
+    'mem_reservation',
     'memswap_limit',
-    'oom_score_adj',
     'mem_swappiness',
+    'oom_score_adj',
     'pid',
+    'pids_limit',
     'privileged',
     'restart',
     'security_opt',
@@ -226,9 +232,20 @@ class Service(object):
 
             if num_running != len(all_containers):
                 # we have some stopped containers, let's start them up again
+                stopped_containers = [
+                    c for c in all_containers if not c.is_running
+                ]
+
+                # Remove containers that have diverged
+                divergent_containers = [
+                    c for c in stopped_containers if self._containers_have_diverged([c])
+                ]
                 stopped_containers = sorted(
-                    (c for c in all_containers if not c.is_running),
-                    key=attrgetter('number'))
+                    set(stopped_containers) - set(divergent_containers),
+                    key=attrgetter('number')
+                )
+                for c in divergent_containers:
+                        c.remove()
 
                 num_stopped = len(stopped_containers)
 
@@ -682,7 +699,7 @@ class Service(object):
 
         if 'ports' in container_options or 'expose' in self.options:
             container_options['ports'] = build_container_ports(
-                container_options,
+                formatted_ports(container_options.get('ports', [])),
                 self.options)
 
         container_options['environment'] = merge_environment(
@@ -736,18 +753,22 @@ class Service(object):
 
         host_config = self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
-            port_bindings=build_port_bindings(options.get('ports') or []),
+            port_bindings=build_port_bindings(
+                formatted_ports(options.get('ports', []))
+            ),
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=options.get('privileged', False),
             network_mode=self.network_mode.mode,
             devices=options.get('devices'),
             dns=options.get('dns'),
+            dns_opt=options.get('dns_opt'),
             dns_search=options.get('dns_search'),
             restart_policy=options.get('restart'),
             cap_add=options.get('cap_add'),
             cap_drop=options.get('cap_drop'),
             mem_limit=options.get('mem_limit'),
+            mem_reservation=options.get('mem_reservation'),
             memswap_limit=options.get('memswap_limit'),
             ulimits=build_ulimits(options.get('ulimits')),
             log_config=log_config,
@@ -760,6 +781,7 @@ class Service(object):
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
             sysctls=options.get('sysctls'),
+            pids_limit=options.get('pids_limit'),
             tmpfs=options.get('tmpfs'),
             oom_score_adj=options.get('oom_score_adj'),
             mem_swappiness=options.get('mem_swappiness'),
@@ -782,13 +804,18 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
-    def build(self, no_cache=False, pull=False, force_rm=False):
+    def build(self, no_cache=False, pull=False, force_rm=False, build_args_override=None):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
-        path = build_opts.get('context')
+
+        build_args = build_opts.get('args', {}).copy()
+        if build_args_override:
+            build_args.update(build_args_override)
+
         # python2 os.stat() doesn't support unicode on some UNIX, so we
         # encode it to a bytestring to be safe
+        path = build_opts.get('context')
         if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
 
@@ -801,7 +828,8 @@ class Service(object):
             pull=pull,
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
-            buildargs=build_opts.get('args', None),
+            cache_from=build_opts.get('cache_from', None),
+            buildargs=build_args
         )
 
         try:
@@ -845,7 +873,17 @@ class Service(object):
         if self.custom_container_name and not one_off:
             return self.custom_container_name
 
-        return build_container_name(self.project, self.name, number, one_off)
+        container_name = build_container_name(
+            self.project, self.name, number, one_off,
+        )
+        ext_links_origins = [l.split(':')[0] for l in self.options.get('external_links', [])]
+        if container_name in ext_links_origins:
+            raise DependencyError(
+                'Service {0} has a self-referential external link: {1}'.format(
+                    self.name, container_name
+                )
+            )
+        return container_name
 
     def remove_image(self, image_type):
         if not image_type or image_type == ImageType.none:
@@ -863,7 +901,10 @@ class Service(object):
 
     def specifies_host_port(self):
         def has_host_port(binding):
-            _, external_bindings = split_port(binding)
+            if isinstance(binding, dict):
+                external_bindings = binding.get('published')
+            else:
+                _, external_bindings = split_port(binding)
 
             # there are no external bindings
             if external_bindings is None:
@@ -885,17 +926,23 @@ class Service(object):
 
         return any(has_host_port(binding) for binding in self.options.get('ports', []))
 
-    def pull(self, ignore_pull_failures=False):
+    def pull(self, ignore_pull_failures=False, silent=False):
         if 'image' not in self.options:
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
-        log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
+        if not silent:
+            log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
         try:
             output = self.client.pull(repo, tag=tag, stream=True)
-            return progress_stream.get_digest_from_pull(
-                stream_output(output, sys.stdout))
+            if silent:
+                with open(os.devnull, 'w') as devnull:
+                    return progress_stream.get_digest_from_pull(
+                        stream_output(output, devnull))
+            else:
+                return progress_stream.get_digest_from_pull(
+                    stream_output(output, sys.stdout))
         except (StreamOutputError, NotFound) as e:
             if not ignore_pull_failures:
                 raise
@@ -1202,12 +1249,21 @@ def format_environment(environment):
         return '{key}={value}'.format(key=key, value=value)
     return [format_env(*item) for item in environment.items()]
 
+
 # Ports
+def formatted_ports(ports):
+    result = []
+    for port in ports:
+        if isinstance(port, ServicePort):
+            result.append(port.legacy_repr())
+        else:
+            result.append(port)
+    return result
 
 
-def build_container_ports(container_options, options):
+def build_container_ports(container_ports, options):
     ports = []
-    all_ports = container_options.get('ports', []) + options.get('expose', [])
+    all_ports = container_ports + options.get('expose', [])
     for port_range in all_ports:
         internal_range, _ = split_port(port_range)
         for port in internal_range:
