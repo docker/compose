@@ -1,4 +1,4 @@
-version: "3"
+version: "3.2"
 services:
   web:
     image: busybox
@@ -33,6 +33,17 @@ services:
       interval: 10s
       timeout: 1s
       retries: 5
+
+    volumes:
+      - source: /host/path
+        target: /container/path
+        type: bind
+        read_only: true
+      - source: foobar
+        type: volume
+        target: /container/volumepath
+      - type: volume
+        target: /anonymous
 
     stop_grace_period: 20s
 volumes:

@@ -29,6 +29,7 @@ from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_1 as V3_1
+from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
@@ -964,6 +965,44 @@ class ConfigTest(unittest.TestCase):
         ]
         assert service_sort(service_dicts) == service_sort(expected)
 
+    @mock.patch.dict(os.environ)
+    def test_load_with_multiple_files_v3_2(self):
+        os.environ['COMPOSE_CONVERT_WINDOWS_PATHS'] = 'true'
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.2',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'volumes': [
+                            {'source': '/a', 'target': '/b', 'type': 'bind'},
+                            {'source': 'vol', 'target': '/x', 'type': 'volume', 'read_only': True}
+                        ]
+                    }
+                },
+                'volumes': {'vol': {}}
+            }
+        )
+
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': '3.2',
+                'services': {
+                    'web': {
+                        'volumes': ['/c:/b', '/anonymous']
+                    }
+                }
+            }
+        )
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        svc_volumes = map(lambda v: v.repr(), service_dicts[0]['volumes'])
+        assert sorted(svc_volumes) == sorted(
+            ['/anonymous', '/c:/b:rw', 'vol:/x:ro']
+        )
+
     def test_undeclared_volume_v2(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -1543,6 +1582,29 @@ class ConfigTest(unittest.TestCase):
             'volumes': ['.:/app'],
             'ports': types.ServicePort.parse('5432')
         }
+
+    def test_merge_service_dicts_heterogeneous_volumes(self):
+        base = {
+            'volumes': ['/a:/b', '/x:/z'],
+        }
+
+        override = {
+            'image': 'alpine:edge',
+            'volumes': [
+                {'source': '/e', 'target': '/b', 'type': 'bind'},
+                {'source': '/c', 'target': '/d', 'type': 'bind'}
+            ]
+        }
+
+        actual = config.merge_service_dicts_from_files(
+            base, override, V3_2
+        )
+
+        assert actual['volumes'] == [
+            {'source': '/e', 'target': '/b', 'type': 'bind'},
+            {'source': '/c', 'target': '/d', 'type': 'bind'},
+            '/x:/z'
+        ]
 
     def test_merge_logging_v1(self):
         base = {
