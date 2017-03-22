@@ -266,6 +266,10 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
 
     @classmethod
     def parse(cls, spec):
+        if isinstance(spec, cls):
+            # WHen extending a service with ports, the port definitions have already been parsed
+            return [spec]
+
         if not isinstance(spec, dict):
             result = []
             for k, v in build_port_bindings([spec]).items():
