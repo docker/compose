@@ -1419,7 +1419,7 @@ class ProjectTest(DockerClientTestCase):
                         'test': 'exit 0',
                         'retries': 1,
                         'timeout': '10s',
-                        'interval': '0.1s'
+                        'interval': '1s'
                     },
                 },
                 'svc2': {
@@ -1456,7 +1456,7 @@ class ProjectTest(DockerClientTestCase):
                         'test': 'exit 1',
                         'retries': 1,
                         'timeout': '10s',
-                        'interval': '0.1s'
+                        'interval': '1s'
                     },
                 },
                 'svc2': {
