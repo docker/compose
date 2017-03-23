@@ -1033,8 +1033,11 @@ def resolve_volume_path(working_dir, volume):
     if isinstance(volume, dict):
         host_path = volume.get('source')
         container_path = volume.get('target')
-        if host_path and volume.get('read_only'):
-            container_path += ':ro'
+        if host_path:
+            if volume.get('read_only'):
+                container_path += ':ro'
+            if volume.get('volume', {}).get('nocopy'):
+                container_path += ':nocopy'
     else:
         container_path, host_path = split_path_mapping(volume)
 
