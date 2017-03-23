@@ -34,3 +34,9 @@ except OSError:
     # pip command is not available, which indicates it's probably the binary
     # distribution of Compose which is not affected
     pass
+except UnicodeDecodeError:
+    # ref: https://github.com/docker/compose/issues/4663
+    # This could be caused by a number of things, but it seems to be a
+    # python 2 + MacOS interaction. It's not ideal to ignore this, but at least
+    # it doesn't make the program unusable.
+    pass
