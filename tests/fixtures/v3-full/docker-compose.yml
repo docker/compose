@@ -44,6 +44,11 @@ services:
         target: /container/volumepath
       - type: volume
         target: /anonymous
+      - type: volume
+        source: foobar
+        target: /container/volumepath2
+        volume:
+          nocopy: true
 
     stop_grace_period: 20s
 volumes:
