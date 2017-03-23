@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
-import ssl
 
 import six
 
@@ -15,6 +14,7 @@ from ..config.environment import Environment
 from ..const import API_VERSIONS
 from ..project import Project
 from .docker_client import docker_client
+from .docker_client import get_tls_version
 from .docker_client import tls_config_from_options
 from .utils import get_version_info
 
@@ -58,23 +58,6 @@ def get_config_path_from_options(base_dir, options, environment):
         pathsep = environment.get('COMPOSE_PATH_SEPARATOR', os.pathsep)
         return config_files.split(pathsep)
     return None
-
-
-def get_tls_version(environment):
-    compose_tls_version = environment.get('COMPOSE_TLS_VERSION', None)
-    if not compose_tls_version:
-        return None
-
-    tls_attr_name = "PROTOCOL_{}".format(compose_tls_version)
-    if not hasattr(ssl, tls_attr_name):
-        log.warn(
-            'The "{}" protocol is unavailable. You may need to update your '
-            'version of Python or OpenSSL. Falling back to TLSv1 (default).'
-            .format(compose_tls_version)
-        )
-        return None
-
-    return getattr(ssl, tls_attr_name)
 
 
 def get_client(environment, verbose=False, version=None, tls_config=None, host=None,

@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import os
 import platform
+import ssl
 
 import docker
 import pytest
@@ -10,6 +11,7 @@ import pytest
 import compose
 from compose.cli import errors
 from compose.cli.docker_client import docker_client
+from compose.cli.docker_client import get_tls_version
 from compose.cli.docker_client import tls_config_from_options
 from tests import mock
 from tests import unittest
@@ -157,3 +159,29 @@ class TLSConfigTestCase(unittest.TestCase):
         assert result.cert == (self.client_cert, self.key)
         assert result.ca_cert == self.ca_cert
         assert result.verify is True
+
+    def test_tls_simple_with_tls_version(self):
+        tls_version = 'TLSv1'
+        options = {'--tls': True}
+        environment = {'COMPOSE_TLS_VERSION': tls_version}
+        result = tls_config_from_options(options, environment)
+        assert isinstance(result, docker.tls.TLSConfig)
+        assert result.ssl_version == ssl.PROTOCOL_TLSv1
+
+
+class TestGetTlsVersion(object):
+    def test_get_tls_version_default(self):
+        environment = {}
+        assert get_tls_version(environment) is None
+
+    @pytest.mark.skipif(not hasattr(ssl, 'PROTOCOL_TLSv1_2'), reason='TLS v1.2 unsupported')
+    def test_get_tls_version_upgrade(self):
+        environment = {'COMPOSE_TLS_VERSION': 'TLSv1_2'}
+        assert get_tls_version(environment) == ssl.PROTOCOL_TLSv1_2
+
+    def test_get_tls_version_unavailable(self):
+        environment = {'COMPOSE_TLS_VERSION': 'TLSv5_5'}
+        with mock.patch('compose.cli.docker_client.log') as mock_log:
+            tls_version = get_tls_version(environment)
+        mock_log.warn.assert_called_once_with(mock.ANY)
+        assert tls_version is None
