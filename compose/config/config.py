@@ -879,6 +879,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('depends_on', parse_depends_on)
     md.merge_sequence('links', ServiceLink.parse)
     md.merge_sequence('secrets', types.ServiceSecret.parse)
+    md.merge_mapping('deploy', parse_deploy)
 
     for field in ['volumes', 'devices']:
         md.merge_field(field, merge_path_mappings)
@@ -1003,6 +1004,7 @@ parse_sysctls = functools.partial(parse_dict_or_list, split_kv, 'sysctls')
 parse_depends_on = functools.partial(
     parse_dict_or_list, lambda k: (k, {'condition': 'service_started'}), 'depends_on'
 )
+parse_deploy = functools.partial(parse_dict_or_list, split_kv, 'deploy')
 
 
 def parse_ulimits(ulimits):
