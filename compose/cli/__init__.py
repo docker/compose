@@ -20,18 +20,23 @@ try:
         list(filter(lambda p: p.startswith(b'docker-py=='), packages))
     ) > 0
     if dockerpy_installed:
-        from .colors import red
+        from .colors import yellow
         print(
-            red('ERROR:'),
+            yellow('WARNING:'),
             "Dependency conflict: an older version of the 'docker-py' package "
-            "is polluting the namespace. "
-            "Run the following command to remedy the issue:\n"
-            "pip uninstall docker docker-py; pip install docker",
+            "may be polluting the namespace. "
+            "If you're experiencing crashes, run the following command to remedy the issue:\n"
+            "pip uninstall docker-py; pip uninstall docker; pip install docker",
             file=sys.stderr
         )
-        sys.exit(1)
 
 except OSError:
     # pip command is not available, which indicates it's probably the binary
     # distribution of Compose which is not affected
+    pass
+except UnicodeDecodeError:
+    # ref: https://github.com/docker/compose/issues/4663
+    # This could be caused by a number of things, but it seems to be a
+    # python 2 + MacOS interaction. It's not ideal to ignore this, but at least
+    # it doesn't make the program unusable.
     pass
