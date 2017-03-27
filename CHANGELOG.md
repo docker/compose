@@ -92,6 +92,9 @@ Change log
 - Fixed a bug where `docker-compose` would crash when trying to write into
   a closed pipe
 
+- Fixed an issue where Compose would not pick up on the value of
+  COMPOSE_TLS_VERSION when used in combination with command-line TLS flags
+
 1.11.2 (2017-02-17)
 -------------------
 

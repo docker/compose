@@ -374,7 +374,8 @@ class CLITestCase(DockerClientTestCase):
                     'volumes': [
                         '/host/path:/container/path:ro',
                         'foobar:/container/volumepath:rw',
-                        '/anonymous'
+                        '/anonymous',
+                        'foobar:/container/volumepath2:nocopy'
                     ],
 
                     'stop_grace_period': '20s',

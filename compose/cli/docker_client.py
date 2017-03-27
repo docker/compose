@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+import ssl
 
 from docker import APIClient
 from docker.errors import TLSParameterError
@@ -16,7 +17,24 @@ from .utils import unquote_path
 log = logging.getLogger(__name__)
 
 
-def tls_config_from_options(options):
+def get_tls_version(environment):
+    compose_tls_version = environment.get('COMPOSE_TLS_VERSION', None)
+    if not compose_tls_version:
+        return None
+
+    tls_attr_name = "PROTOCOL_{}".format(compose_tls_version)
+    if not hasattr(ssl, tls_attr_name):
+        log.warn(
+            'The "{}" protocol is unavailable. You may need to update your '
+            'version of Python or OpenSSL. Falling back to TLSv1 (default).'
+            .format(compose_tls_version)
+        )
+        return None
+
+    return getattr(ssl, tls_attr_name)
+
+
+def tls_config_from_options(options, environment=None):
     tls = options.get('--tls', False)
     ca_cert = unquote_path(options.get('--tlscacert'))
     cert = unquote_path(options.get('--tlscert'))
@@ -24,7 +42,9 @@ def tls_config_from_options(options):
     verify = options.get('--tlsverify')
     skip_hostname_check = options.get('--skip-hostname-check', False)
 
-    advanced_opts = any([ca_cert, cert, key, verify])
+    tls_version = get_tls_version(environment or {})
+
+    advanced_opts = any([ca_cert, cert, key, verify, tls_version])
 
     if tls is True and not advanced_opts:
         return True
@@ -35,7 +55,8 @@ def tls_config_from_options(options):
 
         return TLSConfig(
             client_cert=client_cert, verify=verify, ca_cert=ca_cert,
-            assert_hostname=False if skip_hostname_check else None
+            assert_hostname=False if skip_hostname_check else None,
+            ssl_version=tls_version
         )
 
     return None

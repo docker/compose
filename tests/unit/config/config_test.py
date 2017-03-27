@@ -3403,7 +3403,7 @@ class ExtendsTest(unittest.TestCase):
         self.assertEqual(service[0]['command'], "top")
 
     def test_extends_with_depends_on(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
+        tmpdir = py.test.ensuretemp('test_extends_with_depends_on')
         self.addCleanup(tmpdir.remove)
         tmpdir.join('docker-compose.yml').write("""
             version: "2"
@@ -3434,6 +3434,28 @@ class ExtendsTest(unittest.TestCase):
                 'retries': 36,
             }
         }]
+
+    def test_extends_with_ports(self):
+        tmpdir = py.test.ensuretemp('test_extends_with_ports')
+        self.addCleanup(tmpdir.remove)
+        tmpdir.join('docker-compose.yml').write("""
+            version: '2'
+
+            services:
+              a:
+                image: nginx
+                ports:
+                  - 80
+
+              b:
+                extends:
+                  service: a
+        """)
+        services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+
+        assert len(services) == 2
+        for svc in services:
+            assert svc['ports'] == [types.ServicePort('80', None, None, None, None)]
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
