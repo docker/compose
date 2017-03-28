@@ -82,6 +82,7 @@ HOST_CONFIG_KEYS = [
     'restart',
     'security_opt',
     'shm_size',
+    'storage_opt',
     'sysctls',
     'userns_mode',
     'volumes_from',
@@ -854,6 +855,7 @@ class Service(object):
             volume_driver=options.get('volume_driver'),
             cpuset_cpus=options.get('cpuset'),
             cpu_shares=options.get('cpu_shares'),
+            storage_opt=options.get('storage_opt')
         )
 
     def get_secret_volumes(self):
