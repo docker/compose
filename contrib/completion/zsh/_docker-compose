@@ -3,11 +3,6 @@
 # Description
 # -----------
 #  zsh completion for docker-compose
-#  https://github.com/sdurrheimer/docker-compose-zsh-completion
-# -------------------------------------------------------------------------
-# Version
-# -------
-#  1.5.0
 # -------------------------------------------------------------------------
 # Authors
 # -------
@@ -253,6 +248,12 @@ __docker-compose_subcommand() {
         (help)
             _arguments ':subcommand:__docker-compose_commands' && ret=0
             ;;
+	(images)
+	    _arguments \
+		$opts_help \
+		'-q[Only display IDs]' \
+		'*:services:__docker-compose_services_all' && ret=0
+	    ;;
         (kill)
             _arguments \
                 $opts_help \
