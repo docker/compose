@@ -309,16 +309,17 @@ __docker-compose_subcommand() {
         (run)
             _arguments \
                 $opts_help \
+                $opts_no_deps \
                 '-d[Detached mode: Run container in the background, print new container name.]' \
                 '*-e[KEY=VAL Set an environment variable (can be used multiple times)]:environment variable KEY=VAL: ' \
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '--name=[Assign a name to the container]:name: ' \
-                $opts_no_deps \
                 '(-p --publish)'{-p,--publish=}"[Publish a container's port(s) to the host]" \
                 '--rm[Remove container after run. Ignored in detached mode.]' \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
                 '(-u --user)'{-u,--user=}'[Run as specified username or uid]:username or uid:_users' \
+                '(-v --volume)*'{-v,--volume=}'[Bind mount a volume]:volume: ' \
                 '(-w --workdir)'{-w,--workdir=}'[Working directory inside the container]:workdir: ' \
                 '(-):services:__docker-compose_services' \
                 '(-):command: _command_names -e' \
