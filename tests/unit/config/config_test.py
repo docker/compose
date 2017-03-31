@@ -2300,7 +2300,8 @@ class PortsTest(unittest.TestCase):
     ]
 
     INVALID_PORT_MAPPINGS = [
-        ["8000-8001:8000"],
+        ["8000-8004:8000-8002"],
+        ["4242:4242-4244"],
     ]
 
     VALID_SINGLE_PORTS = [
