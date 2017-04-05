@@ -142,7 +142,7 @@ _docker_compose_bundle() {
 
 
 _docker_compose_config() {
-	COMPREPLY=( $( compgen -W "--help --quiet -q --services" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "--help --quiet -q --resolve-image-digests --services --volumes" -- "$cur" ) )
 }
 
 
@@ -341,7 +341,7 @@ _docker_compose_ps() {
 _docker_compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --parallel" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_image
@@ -498,6 +498,10 @@ _docker_compose_unpause() {
 
 _docker_compose_up() {
 	case "$prev" in
+		--exit-code-from)
+			__docker_compose_services_all
+			return
+			;;
 		--timeout|-t)
 			return
 			;;
@@ -505,7 +509,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--exit-code-from --abort-on-container-exit --build -d --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t --remove-orphans" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit --build -d --exit-code-from --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t --remove-orphans" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all

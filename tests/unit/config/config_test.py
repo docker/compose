@@ -1950,6 +1950,57 @@ class ConfigTest(unittest.TestCase):
         actual = config.merge_service_dicts(base, override, V3_1)
         assert actual['secrets'] == override['secrets']
 
+    def test_merge_deploy(self):
+        base = {
+            'image': 'busybox',
+        }
+        override = {
+            'deploy': {
+                'mode': 'global',
+                'restart_policy': {
+                    'condition': 'on-failure'
+                }
+            }
+        }
+        actual = config.merge_service_dicts(base, override, V3_0)
+        assert actual['deploy'] == override['deploy']
+
+    def test_merge_deploy_override(self):
+        base = {
+            'image': 'busybox',
+            'deploy': {
+                'mode': 'global',
+                'restart_policy': {
+                    'condition': 'on-failure'
+                },
+                'placement': {
+                    'constraints': [
+                        'node.role == manager'
+                    ]
+                }
+            }
+        }
+        override = {
+            'deploy': {
+                'mode': 'replicated',
+                'restart_policy': {
+                    'condition': 'any'
+                }
+            }
+        }
+        actual = config.merge_service_dicts(base, override, V3_0)
+        assert actual['deploy'] == {
+            'mode': 'replicated',
+            'restart_policy': {
+                'condition': 'any'
+            },
+            'placement': {
+                'constraints': [
+                    'node.role == manager'
+                ]
+            }
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -2249,7 +2300,8 @@ class PortsTest(unittest.TestCase):
     ]
 
     INVALID_PORT_MAPPINGS = [
-        ["8000-8001:8000"],
+        ["8000-8004:8000-8002"],
+        ["4242:4242-4244"],
     ]
 
     VALID_SINGLE_PORTS = [

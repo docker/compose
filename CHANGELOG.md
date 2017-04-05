@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.12.0 (2017-03-21)
+1.12.0 (2017-04-04)
 -------------------
 
 ### New features
@@ -73,6 +73,9 @@ Change log
 
 - Fixed a bug where override files containing port lists would cause a
   TypeError to be raised
+
+- Fixed a bug where the `deploy` key would be missing from the output of
+  `docker-compose config`
 
 - Fixed a bug where scaling services up or down would sometimes re-use
   obsolete containers
