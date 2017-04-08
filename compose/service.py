@@ -48,7 +48,7 @@ from .utils import parse_seconds_float
 log = logging.getLogger(__name__)
 
 
-DOCKER_START_KEYS = [
+HOST_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
     'cgroup_parent',
@@ -60,6 +60,7 @@ DOCKER_START_KEYS = [
     'env_file',
     'extra_hosts',
     'group_add',
+    'init',
     'ipc',
     'read_only',
     'log_driver',
@@ -729,8 +730,8 @@ class Service(object):
             number,
             self.config_hash if add_config_hash else None)
 
-        # Delete options which are only used when starting
-        for key in DOCKER_START_KEYS:
+        # Delete options which are only used in HostConfig
+        for key in HOST_CONFIG_KEYS:
             container_options.pop(key, None)
 
         container_options['host_config'] = self._get_container_host_config(
@@ -750,8 +751,12 @@ class Service(object):
 
         logging_dict = options.get('logging', None)
         log_config = get_log_config(logging_dict)
+        init_path = None
+        if isinstance(options.get('init'), six.string_types):
+            init_path = options.get('init')
+            options['init'] = True
 
-        host_config = self.client.create_host_config(
+        return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=build_port_bindings(
                 formatted_ports(options.get('ports', []))
@@ -786,14 +791,11 @@ class Service(object):
             oom_score_adj=options.get('oom_score_adj'),
             mem_swappiness=options.get('mem_swappiness'),
             group_add=options.get('group_add'),
-            userns_mode=options.get('userns_mode')
+            userns_mode=options.get('userns_mode'),
+            init=options.get('init', None),
+            init_path=init_path,
+            isolation=options.get('isolation'),
         )
-
-        # TODO: Add as an argument to create_host_config once it's supported
-        # in docker-py
-        host_config['Isolation'] = options.get('isolation')
-
-        return host_config
 
     def get_secret_volumes(self):
         def build_spec(secret):
