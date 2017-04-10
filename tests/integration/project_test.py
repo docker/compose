@@ -682,6 +682,41 @@ class ProjectTest(DockerClientTestCase):
         }
 
     @v2_only()
+    def test_up_with_ipam_options(self):
+        config_data = build_config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'networks': {'front': None},
+            }],
+            networks={
+                'front': {
+                    'driver': 'bridge',
+                    'ipam': {
+                        'driver': 'default',
+                        'options': {
+                            "com.docker.compose.network.test": "9-29-045"
+                        }
+                    },
+                },
+            },
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data,
+        )
+        project.up()
+
+        network = self.client.networks(names=['composetest_front'])[0]
+
+        assert network['IPAM']['Options'] == {
+            "com.docker.compose.network.test": "9-29-045"
+        }
+
+    @v2_only()
     def test_up_with_network_static_addresses(self):
         config_data = build_config(
             version=V2_0,

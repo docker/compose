@@ -123,6 +123,7 @@ def create_ipam_config_from_dict(ipam_dict):
             )
             for config in ipam_dict.get('config', [])
         ],
+        options=ipam_dict.get('options')
     )
 
 
@@ -156,6 +157,12 @@ def check_remote_ipam_config(remote, local):
                 raise NetworkConfigChangedError(local.full_name, 'IPAM config ip_range')
             if sorted(lc.get('AuxiliaryAddresses')) != sorted(rc.get('AuxiliaryAddresses')):
                 raise NetworkConfigChangedError(local.full_name, 'IPAM config aux_addresses')
+
+    remote_opts = remote_ipam.get('Options', {})
+    local_opts = local.ipam.get('options', {})
+    for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
+        if remote_opts.get(k) != local_opts.get(k):
+            raise NetworkConfigChangedError(local.full_name, 'IPAM option "{}"'.format(k))
 
 
 def check_remote_network_config(remote, local):
