@@ -75,6 +75,7 @@ DOCKER_START_KEYS = [
     'restart',
     'security_opt',
     'shm_size',
+    'storage_opt',
     'sysctls',
     'userns_mode',
     'volumes_from',
@@ -786,7 +787,8 @@ class Service(object):
             oom_score_adj=options.get('oom_score_adj'),
             mem_swappiness=options.get('mem_swappiness'),
             group_add=options.get('group_add'),
-            userns_mode=options.get('userns_mode')
+            userns_mode=options.get('userns_mode'),
+            storage_opt=options.get('storage_opt')
         )
 
         # TODO: Add as an argument to create_host_config once it's supported
