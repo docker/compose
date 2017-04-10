@@ -108,6 +108,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'log_opt',
     'logging',
     'network_mode',
+    'init',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
