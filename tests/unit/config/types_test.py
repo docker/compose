@@ -71,6 +71,16 @@ class TestServicePort(object):
         }
         assert ports[0].legacy_repr() == port_def
 
+    def test_parse_ext_ip_no_published_port(self):
+        port_def = '1.1.1.1::3000'
+        ports = ServicePort.parse(port_def)
+        assert len(ports) == 1
+        assert ports[0].legacy_repr() == port_def + '/tcp'
+        assert ports[0].repr() == {
+            'target': '3000',
+            'external_ip': '1.1.1.1',
+        }
+
     def test_parse_port_range(self):
         ports = ServicePort.parse('25000-25001:4000-4001')
         assert len(ports) == 2
