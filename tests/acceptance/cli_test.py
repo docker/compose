@@ -463,6 +463,10 @@ class CLITestCase(DockerClientTestCase):
                                  re.compile('''^(ERROR: )?(b')?.* nonexisting-image''',
                                             re.MULTILINE))
 
+    def test_pull_with_quiet(self):
+        assert self.dispatch(['pull', '--quiet']).stderr == ''
+        assert self.dispatch(['pull', '--quiet']).stdout == ''
+
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         self.dispatch(['build', 'simple'])
