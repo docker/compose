@@ -5,9 +5,11 @@ import logging
 import ssl
 
 from docker import APIClient
+from docker.api.client import NvidiaAPIClient
 from docker.errors import TLSParameterError
 from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
+from docker.utils.nvidia import nvidia_docker_compatible
 
 from ..const import HTTP_TIMEOUT
 from .errors import UserError
@@ -91,5 +93,8 @@ def docker_client(environment, version=None, tls_config=None, host=None,
         kwargs['timeout'] = HTTP_TIMEOUT
 
     kwargs['user_agent'] = generate_user_agent()
+
+    if nvidia_docker_compatible():
+        return NvidiaAPIClient(**kwargs)
 
     return APIClient(**kwargs)
