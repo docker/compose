@@ -462,12 +462,12 @@ class Project(object):
 
         return plans
 
-    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False):
+    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False):
         services = self.get_services(service_names, include_deps=False)
 
         if parallel_pull:
             def pull_service(service):
-                service.pull(ignore_pull_failures, True)
+                service.pull(ignore_pull_failures, True, silent=silent)
 
             parallel.parallel_execute(
                 services,
@@ -477,7 +477,7 @@ class Project(object):
                 limit=5)
         else:
             for service in services:
-                service.pull(ignore_pull_failures)
+                service.pull(ignore_pull_failures, silent=silent)
 
     def push(self, service_names=None, ignore_push_failures=False):
         for service in self.get_services(service_names, include_deps=False):
