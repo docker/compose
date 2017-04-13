@@ -7,9 +7,9 @@ import yaml
 from compose.config import types
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_1 as V2_1
-from compose.const import COMPOSEFILE_V2_1 as V2_2
+from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_1 as V3_1
-from compose.const import COMPOSEFILE_V3_1 as V3_2
+from compose.const import COMPOSEFILE_V3_2 as V3_2
 
 
 def serialize_config_type(dumper, data):

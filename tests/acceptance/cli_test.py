@@ -323,6 +323,7 @@ class CLITestCase(DockerClientTestCase):
         assert yaml.load(result.stdout) == {
             'version': '3.2',
             'networks': {},
+            'secrets': {},
             'volumes': {
                 'foobar': {
                     'labels': {
