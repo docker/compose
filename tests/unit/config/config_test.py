@@ -845,8 +845,7 @@ class ConfigTest(unittest.TestCase):
         ).services[0]
         assert 'labels' in service['build']
         assert 'label1' in service['build']['labels']
-        assert isinstance(service['build']['labels']['label1'], str)
-        assert service['build']['labels']['label1'] == '42'
+        assert service['build']['labels']['label1'] == 42
         assert service['build']['labels']['label2'] == 'foobar'
 
     def test_build_args_allow_empty_properties(self):
