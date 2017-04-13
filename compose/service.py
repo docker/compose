@@ -884,6 +884,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             cache_from=build_opts.get('cache_from', None),
+            labels=build_opts.get('labels', None),
             buildargs=build_args
         )
 
