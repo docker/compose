@@ -471,6 +471,7 @@ class ServiceTest(unittest.TestCase):
             nocache=False,
             rm=True,
             buildargs={},
+            labels=None,
             cache_from=None,
         )
 
@@ -508,6 +509,7 @@ class ServiceTest(unittest.TestCase):
             nocache=False,
             rm=True,
             buildargs={},
+            labels=None,
             cache_from=None,
         )
 
