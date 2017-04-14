@@ -1160,8 +1160,9 @@ def run_one_off_container(container_options, project, service, options):
                 )
                 pty = PseudoTerminal(project.client, operation)
                 sockets = pty.sockets()
-                service.start_container(container)
+                service.connect_container_to_networks(container)
                 pty.start(sockets)
+                service.start_container_without_connecting_to_networks(container)
                 exit_code = container.wait()
         except signals.ShutdownException:
             project.client.stop(container.id)

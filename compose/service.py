@@ -492,11 +492,7 @@ class Service(object):
 
     def start_container(self, container):
         self.connect_container_to_networks(container)
-        try:
-            container.start()
-        except APIError as ex:
-            raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
-        return container
+        return self.start_container_without_connecting_to_networks(container)
 
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
@@ -518,6 +514,13 @@ class Service(object):
                 links=self._get_links(False),
                 link_local_ips=netdefs.get('link_local_ips', None),
             )
+
+    def start_container_without_connecting_to_networks(self, container):
+        try:
+            container.start()
+        except APIError as ex:
+            raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
+        return container
 
     def remove_duplicate_containers(self, timeout=None):
         for c in self.duplicate_containers():
