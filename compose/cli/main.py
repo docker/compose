@@ -439,7 +439,7 @@ class TopLevelCommand(object):
         exec_id = container.create_exec(command, **create_exec_options)
 
         if detach:
-            container.start_exec(exec_id, tty=tty)
+            container.start_exec(exec_id, tty=tty, stream=True)
             return
 
         signals.set_signal_handler_to_shutdown()
