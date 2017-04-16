@@ -88,6 +88,11 @@ class Container(object):
         return int(number)
 
     @property
+    def ip(self):
+        self.inspect_if_not_inspected()
+        return self.get('NetworkSettings.IPAddress') or ''
+
+    @property
     def ports(self):
         self.inspect_if_not_inspected()
         return self.get('NetworkSettings.Ports') or {}
