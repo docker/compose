@@ -380,12 +380,16 @@ class Project(object):
            do_build=BuildAction.none,
            timeout=None,
            detached=False,
-           remove_orphans=False):
+           remove_orphans=False,
+           scale_override=None):
 
         warn_for_swarm_mode(self.client)
 
         self.initialize()
         self.find_orphan_containers(remove_orphans)
+
+        if scale_override is None:
+            scale_override = {}
 
         services = self.get_services_without_duplicate(
             service_names,
@@ -399,7 +403,8 @@ class Project(object):
             return service.execute_convergence_plan(
                 plans[service.name],
                 timeout=timeout,
-                detached=detached
+                detached=detached,
+                scale_override=scale_override.get(service.name)
             )
 
         def get_deps(service):
@@ -589,10 +594,13 @@ def get_secrets(service, service_secrets, secret_defs):
             continue
 
         if secret.uid or secret.gid or secret.mode:
-            log.warn("Service \"{service}\" uses secret \"{secret}\" with uid, "
-                     "gid, or mode. These fields are not supported by this "
-                     "implementation of the Compose file".format(
-                        service=service, secret=secret.source))
+            log.warn(
+                "Service \"{service}\" uses secret \"{secret}\" with uid, "
+                "gid, or mode. These fields are not supported by this "
+                "implementation of the Compose file".format(
+                    service=service, secret=secret.source
+                )
+            )
 
         secrets.append({'secret': secret, 'file': secret_def.get('file')})
 
