@@ -392,7 +392,7 @@ class Service(object):
                 range(i, i + scale),
                 lambda n: create_and_start(self, n),
                 lambda n: self.get_container_name(n),
-                "Creating"
+                "Creating",
             )
             for error in errors.values():
                 raise OperationFailedError(error)
@@ -413,7 +413,7 @@ class Service(object):
                 containers,
                 recreate,
                 lambda c: c.name,
-                "Recreating"
+                "Recreating",
             )
             for error in errors.values():
                 raise OperationFailedError(error)
@@ -433,7 +433,7 @@ class Service(object):
                     containers,
                     lambda c: self.start_container_if_stopped(c, attach_logs=not detached),
                     lambda c: c.name,
-                    "Starting"
+                    "Starting",
                 )
 
                 for error in errors.values():
@@ -868,7 +868,7 @@ class Service(object):
             volume_driver=options.get('volume_driver'),
             cpuset_cpus=options.get('cpuset'),
             cpu_shares=options.get('cpu_shares'),
-            storage_opt=options.get('storage_opt')
+            storage_opt=options.get('storage_opt'),
         )
 
     def get_secret_volumes(self):
@@ -905,9 +905,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             cache_from=build_opts.get('cache_from', None),
-            labels=build_opts.get('labels', None),
-            buildargs=build_args,
-            network_mode=build_opts.get('network', None),
+            buildargs=build_args
         )
 
         try:
