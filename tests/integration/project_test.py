@@ -19,6 +19,7 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
@@ -1136,6 +1137,33 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         containers = project.containers()
         self.assertEqual(len(containers), 1)
+
+    def test_project_up_config_scale(self):
+        config_data = build_config(
+            version=V2_2,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top',
+                'scale': 3
+            }]
+        )
+
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        assert len(project.containers()) == 3
+
+        project.up(scale_override={'web': 2})
+        assert len(project.containers()) == 2
+
+        project.up(scale_override={'web': 4})
+        assert len(project.containers()) == 4
+
+        project.stop()
+        project.up()
+        assert len(project.containers()) == 3
 
     @v2_only()
     def test_initialize_volumes(self):

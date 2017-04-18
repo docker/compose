@@ -1866,6 +1866,33 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
+    def test_up_scale(self):
+        self.base_dir = 'tests/fixtures/scale'
+        project = self.project
+        self.dispatch(['up', '-d'])
+        assert len(project.get_service('web').containers()) == 2
+        assert len(project.get_service('db').containers()) == 1
+
+        self.dispatch(['up', '-d', '--scale', 'web=1'])
+        assert len(project.get_service('web').containers()) == 1
+        assert len(project.get_service('db').containers()) == 1
+
+        self.dispatch(['up', '-d', '--scale', 'web=3'])
+        assert len(project.get_service('web').containers()) == 3
+        assert len(project.get_service('db').containers()) == 1
+
+        self.dispatch(['up', '-d', '--scale', 'web=1', '--scale', 'db=2'])
+        assert len(project.get_service('web').containers()) == 1
+        assert len(project.get_service('db').containers()) == 2
+
+        self.dispatch(['up', '-d'])
+        assert len(project.get_service('web').containers()) == 2
+        assert len(project.get_service('db').containers()) == 1
+
+        self.dispatch(['up', '-d', '--scale', 'web=0', '--scale', 'db=0'])
+        assert len(project.get_service('web').containers()) == 0
+        assert len(project.get_service('db').containers()) == 0
+
     def test_port(self):
         self.base_dir = 'tests/fixtures/ports-composefile'
         self.dispatch(['up', '-d'], None)
