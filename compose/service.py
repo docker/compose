@@ -378,16 +378,12 @@ class Service(object):
                     self.start_container(container)
                 return container
 
-            containers, errors = parallel_execute(
+            return parallel_execute(
                 range(i, i + scale),
                 lambda n: create_and_start(self, n),
                 lambda n: self.get_container_name(n),
                 "Creating"
-            )
-            for error in errors.values():
-                raise OperationFailedError(error)
-
-            return containers
+            )[0]
 
     def _execute_convergence_recreate(self, containers, scale, timeout, detached, start):
             if len(containers) > scale:
@@ -399,15 +395,12 @@ class Service(object):
                     container, timeout=timeout, attach_logs=not detached,
                     start_new_container=start
                 )
-            containers, errors = parallel_execute(
+            containers = parallel_execute(
                 containers,
                 recreate,
                 lambda c: c.name,
                 "Recreating"
-            )
-            for error in errors.values():
-                raise OperationFailedError(error)
-
+            )[0]
             if len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
                     scale - len(containers), detached, start
@@ -419,15 +412,12 @@ class Service(object):
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
             if start:
-                _, errors = parallel_execute(
+                parallel_execute(
                     containers,
                     lambda c: self.start_container_if_stopped(c, attach_logs=not detached),
                     lambda c: c.name,
                     "Starting"
                 )
-
-                for error in errors.values():
-                    raise OperationFailedError(error)
 
             if len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
