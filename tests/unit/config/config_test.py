@@ -3603,6 +3603,15 @@ class BuildPathTest(unittest.TestCase):
             'tests/fixtures/build-path-override-dir/docker-compose.yml', override_dir=override_dir)
         self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': self.abs_context_path}}])
 
+# E compose.config.errors.ConfigurationError:
+#     build path /build-ctx
+#     build path /code/https:/github.com/docker/compose/raw/master/tests/fixtures/build-ctx
+#     either does not exist, is not accessible, or is not a valid URL
+# def test_from_url(self):
+#     url = 'https://github.com/docker/compose/raw/master/tests/fixtures/build-path/docker-compose.yml'
+#     service_dict = load_from_filename(url)
+#     self.assertEquals(service_dict, [{'name': 'foo', 'build': {'context': url}}])
+
     def test_valid_url_in_build_path(self):
         valid_urls = [
             'git://github.com/docker/docker',

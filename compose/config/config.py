@@ -8,6 +8,7 @@ import string
 import sys
 from collections import namedtuple
 
+import requests
 import six
 import yaml
 from cached_property import cached_property
@@ -117,6 +118,11 @@ DOCKER_VALID_URL_PREFIXES = (
     'git://',
     'github.com/',
     'git@',
+)
+
+COMPOSE_VALID_URL_PREFIXES = (
+    'http://',
+    'https://',
 )
 
 SUPPORTED_FILENAMES = [
@@ -244,6 +250,13 @@ def find(base_dir, filenames, environment, override_dir=None):
         )
 
     if filenames:
+        if is_compose_url(filenames[0]):
+            response = requests.get(filenames[0])
+            response.raise_for_status()
+            return ConfigDetails(
+                os.getcwd(),
+                [ConfigFile(None, yaml.safe_load(response.text))])
+
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
         filenames = get_default_config_files(base_dir)
@@ -1078,6 +1091,10 @@ def resolve_build_path(working_dir, build_path):
 
 def is_url(build_path):
     return build_path.startswith(DOCKER_VALID_URL_PREFIXES)
+
+
+def is_compose_url(url):
+    return url.startswith(COMPOSE_VALID_URL_PREFIXES)
 
 
 def validate_paths(service_dict):
