@@ -377,12 +377,16 @@ class Service(object):
                     self.start_container(container)
                 return container
 
-            return parallel_execute(
+            containers, errors = parallel_execute(
                 range(i, i + scale),
                 lambda n: create_and_start(self, n),
                 lambda n: self.get_container_name(n),
                 "Creating"
-            )[0]
+            )
+            if errors:
+                raise OperationFailedError(errors.values()[0])
+
+            return containers
 
     def _execute_convergence_recreate(self, containers, scale, timeout, detached, start):
             if len(containers) > scale:
@@ -394,12 +398,14 @@ class Service(object):
                     container, timeout=timeout, attach_logs=not detached,
                     start_new_container=start
                 )
-            containers = parallel_execute(
+            containers, errors = parallel_execute(
                 containers,
                 recreate,
                 lambda c: c.name,
                 "Recreating"
-            )[0]
+            )
+            if errors:
+                raise OperationFailedError(errors.values()[0])
             if len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
                     scale - len(containers), detached, start
@@ -411,12 +417,16 @@ class Service(object):
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
             if start:
-                parallel_execute(
+                _, errors = parallel_execute(
                     containers,
                     lambda c: self.start_container_if_stopped(c, attach_logs=not detached),
                     lambda c: c.name,
                     "Starting"
                 )
+
+                if errors:
+                    raise OperationFailedError(errors.values()[0])
+
             if len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
                     scale - len(containers), detached, start
