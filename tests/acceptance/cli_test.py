@@ -151,7 +151,7 @@ class CLITestCase(DockerClientTestCase):
     def test_help(self):
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'up'], returncode=0)
-        assert 'Usage: up [options] [SERVICE...]' in result.stdout
+        assert 'Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]' in result.stdout
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
