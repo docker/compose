@@ -26,6 +26,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
+from compose.errors import OperationFailedError
 from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
@@ -777,15 +778,15 @@ class ServiceTest(DockerClientTestCase):
                 message="testing",
                 response={},
                 explanation="Boom")):
-
             with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
-                service.scale(3)
+                with pytest.raises(OperationFailedError):
+                    service.scale(3)
 
-        self.assertEqual(len(service.containers()), 1)
-        self.assertTrue(service.containers()[0].is_running)
-        self.assertIn(
-            "ERROR: for composetest_web_2  Cannot create container for service web: Boom",
-            mock_stderr.getvalue()
+        assert len(service.containers()) == 1
+        assert service.containers()[0].is_running
+        assert (
+            "ERROR: for composetest_web_2  Cannot create container for service"
+            " web: Boom" in mock_stderr.getvalue()
         )
 
     def test_scale_with_unexpected_exception(self):
@@ -837,7 +838,8 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('app', container_name='custom-container')
         self.assertEqual(service.custom_container_name, 'custom-container')
 
-        service.scale(3)
+        with pytest.raises(OperationFailedError):
+            service.scale(3)
 
         captured_output = mock_log.warn.call_args[0][0]
 

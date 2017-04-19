@@ -26,6 +26,7 @@ from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
+from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -770,6 +771,12 @@ class TopLevelCommand(object):
                                      (default: 10)
         """
         timeout = timeout_from_opts(options)
+
+        if self.project.config_version == V2_2:
+            raise UserError(
+                'The scale command is incompatible with the v2.2 format. '
+                'Use the up command with the --scale flag instead.'
+            )
 
         for service_name, num in parse_scale_args(options['SERVICE=NUM']).items():
             self.project.get_service(service_name).scale(num, timeout=timeout)

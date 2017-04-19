@@ -1866,9 +1866,27 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(project.get_service('simple').containers()), 0)
         self.assertEqual(len(project.get_service('another').containers()), 0)
 
-    def test_up_scale(self):
+    def test_scale_v2_2(self):
+        self.base_dir = 'tests/fixtures/scale'
+        result = self.dispatch(['scale', 'web=1'], returncode=1)
+        assert 'incompatible with the v2.2 format' in result.stderr
+
+    def test_up_scale_scale_up(self):
         self.base_dir = 'tests/fixtures/scale'
         project = self.project
+
+        self.dispatch(['up', '-d'])
+        assert len(project.get_service('web').containers()) == 2
+        assert len(project.get_service('db').containers()) == 1
+
+        self.dispatch(['up', '-d', '--scale', 'web=3'])
+        assert len(project.get_service('web').containers()) == 3
+        assert len(project.get_service('db').containers()) == 1
+
+    def test_up_scale_scale_down(self):
+        self.base_dir = 'tests/fixtures/scale'
+        project = self.project
+
         self.dispatch(['up', '-d'])
         assert len(project.get_service('web').containers()) == 2
         assert len(project.get_service('db').containers()) == 1
@@ -1877,13 +1895,21 @@ class CLITestCase(DockerClientTestCase):
         assert len(project.get_service('web').containers()) == 1
         assert len(project.get_service('db').containers()) == 1
 
-        self.dispatch(['up', '-d', '--scale', 'web=3'])
+    def test_up_scale_reset(self):
+        self.base_dir = 'tests/fixtures/scale'
+        project = self.project
+
+        self.dispatch(['up', '-d', '--scale', 'web=3', '--scale', 'db=3'])
         assert len(project.get_service('web').containers()) == 3
+        assert len(project.get_service('db').containers()) == 3
+
+        self.dispatch(['up', '-d'])
+        assert len(project.get_service('web').containers()) == 2
         assert len(project.get_service('db').containers()) == 1
 
-        self.dispatch(['up', '-d', '--scale', 'web=1', '--scale', 'db=2'])
-        assert len(project.get_service('web').containers()) == 1
-        assert len(project.get_service('db').containers()) == 2
+    def test_up_scale_to_zero(self):
+        self.base_dir = 'tests/fixtures/scale'
+        project = self.project
 
         self.dispatch(['up', '-d'])
         assert len(project.get_service('web').containers()) == 2

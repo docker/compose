@@ -57,12 +57,13 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, networks=None, volumes=None):
+    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None):
         self.name = name
         self.services = services
         self.client = client
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
+        self.config_version = config_version
 
     def labels(self, one_off=OneOffFilter.exclude):
         labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
@@ -82,7 +83,7 @@ class Project(object):
             networks,
             use_networking)
         volumes = ProjectVolumes.from_config(name, config_data, client)
-        project = cls(name, [], client, project_networks, volumes)
+        project = cls(name, [], client, project_networks, volumes, config_data.version)
 
         for service_dict in config_data.services:
             service_dict = dict(service_dict)
