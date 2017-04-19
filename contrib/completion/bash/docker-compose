@@ -399,7 +399,7 @@ _docker_compose_rm() {
 _docker_compose_run() {
 	case "$prev" in
 		-e)
-			COMPREPLY=( $( compgen -e -- "$cur" ) )
+			COMPREPLY=( $( compgen -e -S = -- "$cur" ) )
 			__docker_compose_nospace
 			return
 			;;
