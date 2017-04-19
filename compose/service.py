@@ -384,8 +384,8 @@ class Service(object):
                 lambda n: self.get_container_name(n),
                 "Creating"
             )
-            if errors:
-                raise OperationFailedError(errors.values()[0])
+            for error in errors.values():
+                raise OperationFailedError(error)
 
             return containers
 
@@ -405,8 +405,9 @@ class Service(object):
                 lambda c: c.name,
                 "Recreating"
             )
-            if errors:
-                raise OperationFailedError(errors.values()[0])
+            for error in errors.values():
+                raise OperationFailedError(error)
+
             if len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
                     scale - len(containers), detached, start
@@ -425,8 +426,8 @@ class Service(object):
                     "Starting"
                 )
 
-                if errors:
-                    raise OperationFailedError(errors.values()[0])
+                for error in errors.values():
+                    raise OperationFailedError(error)
 
             if len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
