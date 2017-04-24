@@ -3837,3 +3837,15 @@ class SerializeTest(unittest.TestCase):
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
         assert 'secrets' in serialized_config
+
+    def test_serialize_ports(self):
+        config_dict = config.Config(version='2.0', services=[
+            {
+                'ports': [types.ServicePort('80', '8080', None, None, None)],
+                'image': 'alpine',
+                'name': 'web'
+            }
+        ], volumes={}, networks={}, secrets={})
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        assert '8080:80/tcp' in serialized_config['services']['web']['ports']

@@ -108,6 +108,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'log_opt',
     'logging',
     'network_mode',
+    'init',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -234,10 +235,10 @@ class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name conf
             config)
 
 
-def find(base_dir, filenames, environment, override_dir='.'):
+def find(base_dir, filenames, environment, override_dir=None):
     if filenames == ['-']:
         return ConfigDetails(
-            os.path.abspath(override_dir),
+            os.path.abspath(override_dir) if override_dir else os.getcwd(),
             [ConfigFile(None, yaml.safe_load(sys.stdin))],
             environment
         )
@@ -249,7 +250,7 @@ def find(base_dir, filenames, environment, override_dir='.'):
 
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
-        override_dir or os.path.dirname(filenames[0]),
+        override_dir if override_dir else os.path.dirname(filenames[0]),
         [ConfigFile.from_filename(f) for f in filenames],
         environment
     )

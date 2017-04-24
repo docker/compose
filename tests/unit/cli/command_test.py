@@ -1,9 +1,11 @@
+# ~*~ encoding: utf-8 ~*~
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
 
 import pytest
+import six
 
 from compose.cli.command import get_config_path_from_options
 from compose.config.environment import Environment
@@ -55,3 +57,20 @@ class TestGetConfigPathFromOptions(object):
     def test_no_path(self):
         environment = Environment.from_env_file('.')
         assert not get_config_path_from_options('.', {}, environment)
+
+    def test_unicode_path_from_options(self):
+        paths = [b'\xe5\xb0\xb1\xe5\x90\x83\xe9\xa5\xad/docker-compose.yml']
+        opts = {'--file': paths}
+        environment = Environment.from_env_file('.')
+        assert get_config_path_from_options(
+            '.', opts, environment
+        ) == ['就吃饭/docker-compose.yml']
+
+    @pytest.mark.skipif(six.PY3, reason='Env values in Python 3 are already Unicode')
+    def test_unicode_path_from_env(self):
+        with mock.patch.dict(os.environ):
+            os.environ['COMPOSE_FILE'] = b'\xe5\xb0\xb1\xe5\x90\x83\xe9\xa5\xad/docker-compose.yml'
+            environment = Environment.from_env_file('.')
+            assert get_config_path_from_options(
+                '.', {}, environment
+            ) == ['就吃饭/docker-compose.yml']

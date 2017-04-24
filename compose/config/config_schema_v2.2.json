@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v2.1.json",
+  "id": "config_schema_v2.2.json",
   "type": "object",
 
   "properties": {
@@ -151,6 +151,7 @@
         "healthcheck": {"$ref": "#/definitions/healthcheck"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
+        "init": {"type": ["boolean", "string"]},
         "ipc": {"type": "string"},
         "isolation": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
@@ -221,6 +222,7 @@
         "privileged": {"type": "boolean"},
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
+        "scale": {"type": "integer"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "shm_size": {"type": ["number", "string"]},
         "sysctls": {"$ref": "#/definitions/list_or_dict"},
@@ -298,13 +300,6 @@
                 "driver": {"type": "string"},
                 "config": {
                     "type": "array"
-                },
-                "options": {
-                  "type": "object",
-                  "patternProperties": {
-                    "^.+$": {"type": "string"}
-                  },
-                  "additionalProperties": false
                 }
             },
             "additionalProperties": false
