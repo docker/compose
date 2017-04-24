@@ -299,6 +299,13 @@
                 "driver": {"type": "string"},
                 "config": {
                     "type": "array"
+                },
+                "options": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^.+$": {"type": "string"}
+                  },
+                  "additionalProperties": false
                 }
             },
             "additionalProperties": false
