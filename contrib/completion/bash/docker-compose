@@ -498,8 +498,17 @@ _docker_compose_unpause() {
 
 _docker_compose_up() {
 	case "$prev" in
+		=)
+			COMPREPLY=("$cur")
+			return
+			;;
 		--exit-code-from)
 			__docker_compose_services_all
+			return
+			;;
+		--scale)
+			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
+			__docker_compose_nospace
 			return
 			;;
 		--timeout|-t)
@@ -509,7 +518,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--abort-on-container-exit --build -d --exit-code-from --force-recreate --help --no-build --no-color --no-deps --no-recreate --timeout -t --remove-orphans" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit --build -d --exit-code-from --force-recreate --help --no-build --no-color --no-deps --no-recreate --remove-orphans --scale --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
