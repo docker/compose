@@ -858,6 +858,7 @@ class ServiceVolumesTest(unittest.TestCase):
             '/new/volume',
             '/existing/volume',
             'named:/named/vol',
+            '/dev/tmpfs'
         ]]
 
         self.mock_client.inspect_image.return_value = {
@@ -903,15 +904,18 @@ class ServiceVolumesTest(unittest.TestCase):
             VolumeSpec.parse('imagedata:/mnt/image/data:rw'),
         ]
 
-        volumes = get_container_data_volumes(container, options)
+        volumes = get_container_data_volumes(container, options, ['/dev/tmpfs'])
         assert sorted(volumes) == sorted(expected)
 
     def test_merge_volume_bindings(self):
         options = [
-            VolumeSpec.parse('/host/volume:/host/volume:ro', True),
-            VolumeSpec.parse('/host/rw/volume:/host/rw/volume', True),
-            VolumeSpec.parse('/new/volume', True),
-            VolumeSpec.parse('/existing/volume', True),
+            VolumeSpec.parse(v, True) for v in [
+                '/host/volume:/host/volume:ro',
+                '/host/rw/volume:/host/rw/volume',
+                '/new/volume',
+                '/existing/volume',
+                '/dev/tmpfs'
+            ]
         ]
 
         self.mock_client.inspect_image.return_value = {
@@ -936,7 +940,7 @@ class ServiceVolumesTest(unittest.TestCase):
             'existingvolume:/existing/volume:rw',
         ]
 
-        binds, affinity = merge_volume_bindings(options, previous_container)
+        binds, affinity = merge_volume_bindings(options, ['/dev/tmpfs'], previous_container)
         assert sorted(binds) == sorted(expected)
         assert affinity == {'affinity:container': '=cdefab'}
 
