@@ -367,7 +367,7 @@ class ServiceTest(unittest.TestCase):
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
-        container_dict = dict(Name='default_foo_2')
+        container_dict = dict(Name='default-foo-2')
         self.mock_client.containers.return_value = [container_dict]
         service = Service('foo', image='foo', client=self.mock_client)
 
@@ -565,7 +565,7 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         container = Container(
             self.mock_client,
-            {'Id': 'aaabbb', 'Name': '/foo_1'})
+            {'Id': 'aaabbb', 'Name': '/foo-1'})
         service = Service(
             'foo',
             image='example.com/foo',

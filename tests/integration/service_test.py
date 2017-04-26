@@ -50,7 +50,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(foo)
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, 'composetest_foo_1')
+        self.assertEqual(foo.containers()[0].name, 'composetest-foo-1')
         self.assertEqual(len(bar.containers()), 0)
 
         create_and_start_container(bar)
@@ -60,8 +60,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(bar.containers()), 2)
 
         names = [c.name for c in bar.containers()]
-        self.assertIn('composetest_bar_1', names)
-        self.assertIn('composetest_bar_2', names)
+        self.assertIn('composetest-bar-1', names)
+        self.assertIn('composetest-bar-2', names)
 
     def test_containers_one_off(self):
         db = self.create_service('db')
@@ -72,18 +72,18 @@ class ServiceTest(DockerClientTestCase):
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
         create_and_start_container(service)
-        self.assertEqual(service.containers()[0].name, 'composetest_web_1')
+        self.assertEqual(service.containers()[0].name, 'composetest-web-1')
 
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'composetest_db_run_1')
+        self.assertEqual(container.name, 'composetest-db-run-1')
 
     def test_create_container_with_one_off_when_existing_container_is_running(self):
         db = self.create_service('db')
         db.start()
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'composetest_db_run_1')
+        self.assertEqual(container.name, 'composetest-db-run-1')
 
     def test_create_container_with_unspecified_volume(self):
         service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
@@ -277,7 +277,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.get('Config.Entrypoint'), ['top'])
         self.assertEqual(old_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=1', old_container.get('Config.Env'))
-        self.assertEqual(old_container.name, 'composetest_db_1')
+        self.assertEqual(old_container.name, 'composetest-db-1')
         service.start_container(old_container)
         old_container.inspect()  # reload volume data
         volume_path = old_container.get_mount('/etc')['Source']
@@ -291,7 +291,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.get('Config.Entrypoint'), ['top'])
         self.assertEqual(new_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=2', new_container.get('Config.Env'))
-        self.assertEqual(new_container.name, 'composetest_db_1')
+        self.assertEqual(new_container.name, 'composetest-db-1')
         self.assertEqual(new_container.get_mount('/etc')['Source'], volume_path)
         self.assertIn(
             'affinity:container==%s' % old_container.id,
@@ -470,14 +470,14 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(
             set(get_links(web.containers()[0])),
             set([
-                'composetest_db_1', 'db_1',
-                'composetest_db_2', 'db_2',
+                'composetest-db-1', 'db-1',
+                'composetest-db-2', 'db-2',
                 'db'])
         )
 
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')
-        web = self.create_service('web', links=[(db, 'custom_link_name')])
+        web = self.create_service('web', links=[(db, 'custom-link-name')])
 
         create_and_start_container(db)
         create_and_start_container(db)
@@ -486,16 +486,16 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(
             set(get_links(web.containers()[0])),
             set([
-                'composetest_db_1', 'db_1',
-                'composetest_db_2', 'db_2',
-                'custom_link_name'])
+                'composetest-db-1', 'db-1',
+                'composetest-db-2', 'db-2',
+                'custom-link-name'])
         )
 
     def test_start_container_with_external_links(self):
         db = self.create_service('db')
-        web = self.create_service('web', external_links=['composetest_db_1',
-                                                         'composetest_db_2',
-                                                         'composetest_db_3:db_3'])
+        web = self.create_service('web', external_links=['composetest-db-1',
+                                                         'composetest-db-2',
+                                                         'composetest-db-3:db-3'])
 
         for _ in range(3):
             create_and_start_container(db)
@@ -504,9 +504,9 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(
             set(get_links(web.containers()[0])),
             set([
-                'composetest_db_1',
-                'composetest_db_2',
-                'db_3']),
+                'composetest-db-1',
+                'composetest-db-2',
+                'db-3']),
         )
 
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
@@ -529,8 +529,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(
             set(get_links(c)),
             set([
-                'composetest_db_1', 'db_1',
-                'composetest_db_2', 'db_2',
+                'composetest-db-1', 'db-1',
+                'composetest-db-2', 'db-2',
                 'db'])
         )
 
@@ -544,10 +544,10 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         container.wait()
         self.assertIn(b'success', container.logs())
-        self.assertEqual(len(self.client.images(name='composetest_test')), 1)
+        self.assertEqual(len(self.client.images(name='composetest-test')), 1)
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
-        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
+        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest-test')
         service = Service(
             name='test',
             client=self.client,
@@ -572,7 +572,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("FROM busybox\n")
 
         self.create_service('web', build={'context': base_dir}).build()
-        assert self.client.inspect_image('composetest_web')
+        assert self.client.inspect_image('composetest-web')
 
     def test_build_non_ascii_filename(self):
         base_dir = tempfile.mkdtemp()
@@ -585,7 +585,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("hello world\n")
 
         self.create_service('web', build={'context': text_type(base_dir)}).build()
-        assert self.client.inspect_image('composetest_web')
+        assert self.client.inspect_image('composetest-web')
 
     def test_build_with_image_name(self):
         base_dir = tempfile.mkdtemp()
@@ -784,7 +784,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 1)
         self.assertTrue(service.containers()[0].is_running)
         self.assertIn(
-            "ERROR: for composetest_web_2  Cannot create container for service web: Boom",
+            "ERROR: for composetest-web-2  Cannot create container for service web: Boom",
             mock_stderr.getvalue()
         )
 
@@ -1135,7 +1135,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(set(service.containers(stopped=True)), set([original]))
         self.assertEqual(set(service.duplicate_containers()), set())
 
-        options['name'] = 'temporary_container_name'
+        options['name'] = 'temporary-container-name'
         duplicate = Container.create(service.client, **options)
 
         self.assertEqual(set(service.containers(stopped=True)), set([original, duplicate]))

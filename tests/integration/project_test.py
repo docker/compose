@@ -64,7 +64,7 @@ class ProjectTest(DockerClientTestCase):
         containers = project.containers(['web'])
         self.assertEqual(
             [c.name for c in containers],
-            ['composetest_web_1'])
+            ['composetest-web-1'])
 
     def test_containers_with_extra_service(self):
         web = self.create_service('web')
@@ -105,7 +105,7 @@ class ProjectTest(DockerClientTestCase):
             self.client,
             image='busybox:latest',
             volumes=['/var/data'],
-            name='composetest_data_container',
+            name='composetest-data-container',
             labels={LABEL_PROJECT: 'composetest'},
         )
         project = Project.from_config(
@@ -113,7 +113,7 @@ class ProjectTest(DockerClientTestCase):
             config_data=load_config({
                 'db': {
                     'image': 'busybox:latest',
-                    'volumes_from': ['composetest_data_container'],
+                    'volumes_from': ['composetest-data-container'],
                 },
             }),
             client=self.client,
@@ -158,7 +158,7 @@ class ProjectTest(DockerClientTestCase):
                     'services': {
                         'web': {
                             'image': 'busybox:latest',
-                            'network_mode': 'container:composetest_net_container'
+                            'network_mode': 'container:composetest-net-container'
                         },
                     },
                 }),
@@ -168,12 +168,12 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             get_project()
 
-        assert "container 'composetest_net_container' which does not exist" in excinfo.exconly()
+        assert "container 'composetest-net-container' which does not exist" in excinfo.exconly()
 
         net_container = Container.create(
             self.client,
             image='busybox:latest',
-            name='composetest_net_container',
+            name='composetest-net-container',
             command='top',
             labels={LABEL_PROJECT: 'composetest'},
         )
@@ -215,7 +215,7 @@ class ProjectTest(DockerClientTestCase):
                 config_data=load_config({
                     'web': {
                         'image': 'busybox:latest',
-                        'net': 'container:composetest_net_container'
+                        'net': 'container:composetest-net-container'
                     },
                 }),
                 client=self.client,
@@ -224,12 +224,12 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             get_project()
 
-        assert "container 'composetest_net_container' which does not exist" in excinfo.exconly()
+        assert "container 'composetest-net-container' which does not exist" in excinfo.exconly()
 
         net_container = Container.create(
             self.client,
             image='busybox:latest',
-            name='composetest_net_container',
+            name='composetest-net-container',
             command='top',
             labels={LABEL_PROJECT: 'composetest'},
         )
@@ -627,16 +627,16 @@ class ProjectTest(DockerClientTestCase):
         container, = containers
 
         for net_name in ['foo', 'bar', 'baz']:
-            full_net_name = 'composetest_{}'.format(net_name)
+            full_net_name = 'composetest-{}'.format(net_name)
             network_data = self.client.inspect_network(full_net_name)
             assert network_data['Name'] == full_net_name
 
         aliases_key = 'NetworkSettings.Networks.{net}.Aliases'
-        assert 'web' in container.get(aliases_key.format(net='composetest_foo'))
-        assert 'web' in container.get(aliases_key.format(net='composetest_baz'))
-        assert 'extra' in container.get(aliases_key.format(net='composetest_baz'))
+        assert 'web' in container.get(aliases_key.format(net='composetest-foo'))
+        assert 'web' in container.get(aliases_key.format(net='composetest-baz'))
+        assert 'extra' in container.get(aliases_key.format(net='composetest-baz'))
 
-        foo_data = self.client.inspect_network('composetest_foo')
+        foo_data = self.client.inspect_network('composetest-foo')
         assert foo_data['Driver'] == 'bridge'
 
     @v2_only()
@@ -678,7 +678,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up()
 
-        network = self.client.networks(names=['composetest_front'])[0]
+        network = self.client.networks(names=['composetest-front'])[0]
 
         assert network['Options'] == {
             "com.docker.network.bridge.enable_icc": "false"
@@ -743,14 +743,14 @@ class ProjectTest(DockerClientTestCase):
                 'image': 'busybox:latest',
                 'command': 'top',
                 'networks': {
-                    'static_test': {
+                    'static-test': {
                         'ipv4_address': '172.16.100.100',
                         'ipv6_address': 'fe80::1001:102'
                     }
                 },
             }],
             networks={
-                'static_test': {
+                'static-test': {
                     'driver': 'bridge',
                     'driver_opts': {
                         "com.docker.network.enable_ipv6": "true",
@@ -774,7 +774,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up(detached=True)
 
-        network = self.client.networks(names=['static_test'])[0]
+        network = self.client.networks(names=['static-test'])[0]
         service_container = project.get_service('web').containers()[0]
 
         assert network['Options'] == {
@@ -782,7 +782,7 @@ class ProjectTest(DockerClientTestCase):
         }
 
         IPAMConfig = (service_container.inspect().get('NetworkSettings', {}).
-                      get('Networks', {}).get('composetest_static_test', {}).
+                      get('Networks', {}).get('composetest-static-test', {}).
                       get('IPAMConfig', {}))
         assert IPAMConfig.get('IPv4Address') == '172.16.100.100'
         assert IPAMConfig.get('IPv6Address') == 'fe80::1001:102'
@@ -797,13 +797,13 @@ class ProjectTest(DockerClientTestCase):
                 'image': 'busybox:latest',
                 'command': 'top',
                 'networks': {
-                    'static_test': {
+                    'static-test': {
                         'ipv6_address': 'fe80::1001:102'
                     }
                 },
             }],
             networks={
-                'static_test': {
+                'static-test': {
                     'driver': 'bridge',
                     'enable_ipv6': True,
                     'ipam': {
@@ -822,12 +822,12 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data,
         )
         project.up(detached=True)
-        network = self.client.networks(names=['static_test'])[0]
+        network = self.client.networks(names=['static-test'])[0]
         service_container = project.get_service('web').containers()[0]
 
         assert network['EnableIPv6'] is True
         ipam_config = (service_container.inspect().get('NetworkSettings', {}).
-                       get('Networks', {}).get('composetest_static_test', {}).
+                       get('Networks', {}).get('composetest-static-test', {}).
                        get('IPAMConfig', {}))
         assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
 
@@ -839,14 +839,14 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'image': 'busybox:latest',
                 'networks': {
-                    'static_test': {
+                    'static-test': {
                         'ipv4_address': '172.16.100.100',
                         'ipv6_address': 'fe80::1001:101'
                     }
                 },
             }],
             networks={
-                'static_test': {
+                'static-test': {
                     'driver': 'bridge',
                     'driver_opts': {
                         "com.docker.network.enable_ipv6": "true",
@@ -897,7 +897,7 @@ class ProjectTest(DockerClientTestCase):
         ).get(
             'Networks', {}
         ).get(
-            'composetest_linklocaltest', {}
+            'composetest-linklocaltest', {}
         ).get('IPAMConfig', {})
         assert 'LinkLocalIPs' in ipam_config
         assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
@@ -963,7 +963,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up()
 
-        network = self.client.networks(names=['composetest_internal'])[0]
+        network = self.client.networks(names=['composetest-internal'])[0]
 
         assert network['Internal'] is True
 
@@ -995,17 +995,17 @@ class ProjectTest(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('composetest_')
+            if n['Name'].startswith('composetest-')
         ]
 
-        assert [n['Name'] for n in networks] == ['composetest_{}'.format(network_name)]
+        assert [n['Name'] for n in networks] == ['composetest-{}'.format(network_name)]
         assert 'label_key' in networks[0]['Labels']
         assert networks[0]['Labels']['label_key'] == 'label_val'
 
     @v2_only()
     def test_project_up_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        full_vol_name = 'composetest-{0}'.format(vol_name)
         config_data = build_config(
             version=V2_0,
             services=[{
@@ -1059,10 +1059,10 @@ class ProjectTest(DockerClientTestCase):
 
         volumes = [
             v for v in self.client.volumes().get('Volumes', [])
-            if v['Name'].startswith('composetest_')
+            if v['Name'].startswith('composetest-')
         ]
 
-        assert [v['Name'] for v in volumes] == ['composetest_{}'.format(volume_name)]
+        assert [v['Name'] for v in volumes] == ['composetest-{}'.format(volume_name)]
 
         assert 'label_key' in volumes[0]['Labels']
         assert volumes[0]['Labels']['label_key'] == 'label_val'
@@ -1158,7 +1158,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_initialize_volumes(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        full_vol_name = 'composetest-{0}'.format(vol_name)
         config_data = build_config(
             version=V2_0,
             services=[{
@@ -1182,7 +1182,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_project_up_implicit_volume_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        full_vol_name = 'composetest-{0}'.format(vol_name)
         config_data = build_config(
             version=V2_0,
             services=[{
@@ -1263,7 +1263,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_initialize_volumes_updated_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        full_vol_name = 'composetest-{0}'.format(vol_name)
 
         config_data = build_config(
             version=V2_0,
@@ -1301,7 +1301,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_initialize_volumes_updated_blank_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        full_vol_name = 'composetest-{0}'.format(vol_name)
 
         config_data = build_config(
             version=V2_0,
@@ -1337,9 +1337,9 @@ class ProjectTest(DockerClientTestCase):
 
     @v2_only()
     def test_initialize_volumes_external_volumes(self):
-        # Use composetest_ prefix so it gets garbage-collected in tearDown()
-        vol_name = 'composetest_{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        # Use composetest- prefix so it gets garbage-collected in tearDown()
+        vol_name = 'composetest-{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest-{0}'.format(vol_name)
         self.client.create_volume(vol_name)
         config_data = build_config(
             version=V2_0,
@@ -1389,7 +1389,7 @@ class ProjectTest(DockerClientTestCase):
     @v2_only()
     def test_project_up_named_volumes_in_binds(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        full_vol_name = 'composetest-{0}'.format(vol_name)
 
         base_file = config.ConfigFile(
             'base.yml',

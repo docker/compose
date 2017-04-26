@@ -53,8 +53,8 @@ class BasicProjectTest(ProjectTestCase):
 
     def test_partial_change(self):
         old_containers = self.run_up(self.cfg)
-        old_db = [c for c in old_containers if c.name_without_project == 'db_1'][0]
-        old_web = [c for c in old_containers if c.name_without_project == 'web_1'][0]
+        old_db = [c for c in old_containers if c.name_without_project == 'db-1'][0]
+        old_web = [c for c in old_containers if c.name_without_project == 'web-1'][0]
 
         self.cfg['web']['command'] = '/bin/true'
 
@@ -69,7 +69,7 @@ class BasicProjectTest(ProjectTestCase):
 
         created = list(new_containers - old_containers)
         self.assertEqual(len(created), 1)
-        self.assertEqual(created[0].name_without_project, 'web_1')
+        self.assertEqual(created[0].name_without_project, 'web-1')
         self.assertEqual(created[0].get('Config.Cmd'), ['/bin/true'])
 
     def test_all_change(self):
@@ -114,7 +114,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         containers = self.run_up(self.cfg)
         self.assertEqual(
             set(c.name_without_project for c in containers),
-            set(['db_1', 'web_1', 'nginx_1']),
+            set(['db-1', 'web-1', 'nginx-1']),
         )
 
     def test_change_leaf(self):
@@ -125,7 +125,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.assertEqual(
             set(c.name_without_project for c in new_containers - old_containers),
-            set(['nginx_1']),
+            set(['nginx-1']),
         )
 
     def test_change_middle(self):
@@ -136,7 +136,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.assertEqual(
             set(c.name_without_project for c in new_containers - old_containers),
-            set(['web_1', 'nginx_1']),
+            set(['web-1', 'nginx-1']),
         )
 
     def test_change_root(self):
@@ -147,7 +147,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.assertEqual(
             set(c.name_without_project for c in new_containers - old_containers),
-            set(['db_1', 'web_1', 'nginx_1']),
+            set(['db-1', 'web-1', 'nginx-1']),
         )
 
     def test_change_root_no_recreate(self):
@@ -188,8 +188,8 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         web, = [c for c in containers if c.service == 'web']
         nginx, = [c for c in containers if c.service == 'nginx']
 
-        self.assertEqual(set(get_links(web)), {'composetest_db_1', 'db', 'db_1'})
-        self.assertEqual(set(get_links(nginx)), {'composetest_web_1', 'web', 'web_1'})
+        self.assertEqual(set(get_links(web)), {'composetest_db-1', 'db', 'db-1'})
+        self.assertEqual(set(get_links(nginx)), {'composetest_web-1', 'web', 'web-1'})
 
 
 class ServiceStateTest(DockerClientTestCase):

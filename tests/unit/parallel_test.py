@@ -13,7 +13,7 @@ from compose.parallel import UpstreamError
 
 web = 'web'
 db = 'db'
-data_volume = 'data_volume'
+data_volume = 'data-volume'
 cache = 'cache'
 
 objects = [web, db, data_volume, cache]

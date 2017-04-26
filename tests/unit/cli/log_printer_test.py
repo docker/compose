@@ -29,7 +29,7 @@ def output_stream():
 
 @pytest.fixture
 def mock_container():
-    return mock.Mock(spec=Container, name_without_project='web_1')
+    return mock.Mock(spec=Container, name_without_project='web-1')
 
 
 class TestLogPresenter(object):
@@ -38,7 +38,7 @@ class TestLogPresenter(object):
         presenters = build_log_presenters(['foo', 'bar'], True)
         presenter = next(presenters)
         actual = presenter.present(mock_container, "this line")
-        assert actual == "web_1  | this line"
+        assert actual == "web-1  | this line"
 
     def test_polychrome(self, mock_container):
         presenters = build_log_presenters(['foo', 'bar'], False)

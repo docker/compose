@@ -175,7 +175,7 @@ class CLITestCase(DockerClientTestCase):
     def test_host_not_reachable_volumes_from_container(self):
         self.base_dir = 'tests/fixtures/volumes-from-container'
 
-        container = self.client.create_container('busybox', 'true', name='composetest_data_container')
+        container = self.client.create_container('busybox', 'true', name='composetest-data-container')
         self.addCleanup(self.client.remove_container, container)
 
         result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
@@ -387,16 +387,16 @@ class CLITestCase(DockerClientTestCase):
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
-        assert 'simplecomposefile_simple_1' in result.stdout
+        assert 'simplecomposefile-simple-1' in result.stdout
 
     def test_ps_default_composefile(self):
         self.base_dir = 'tests/fixtures/multiple-composefiles'
         self.dispatch(['up', '-d'])
         result = self.dispatch(['ps'])
 
-        self.assertIn('multiplecomposefiles_simple_1', result.stdout)
-        self.assertIn('multiplecomposefiles_another_1', result.stdout)
-        self.assertNotIn('multiplecomposefiles_yetanother_1', result.stdout)
+        self.assertIn('multiplecomposefiles-simple-1', result.stdout)
+        self.assertIn('multiplecomposefiles-another-1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-yetanother-1', result.stdout)
 
     def test_ps_alternate_composefile(self):
         config_path = os.path.abspath(
@@ -407,9 +407,9 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['-f', 'compose2.yml', 'up', '-d'])
         result = self.dispatch(['-f', 'compose2.yml', 'ps'])
 
-        self.assertNotIn('multiplecomposefiles_simple_1', result.stdout)
-        self.assertNotIn('multiplecomposefiles_another_1', result.stdout)
-        self.assertIn('multiplecomposefiles_yetanother_1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-simple-1', result.stdout)
+        self.assertNotIn('multiplecomposefiles-another-1', result.stdout)
+        self.assertIn('multiplecomposefiles-yetanother-1', result.stdout)
 
     def test_pull(self):
         result = self.dispatch(['pull'])
@@ -644,13 +644,13 @@ class CLITestCase(DockerClientTestCase):
         assert len(self.project.containers(one_off=OneOffFilter.only, stopped=True)) == 2
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
-        assert 'Stopping v2full_web_1' in result.stderr
-        assert 'Stopping v2full_other_1' in result.stderr
-        assert 'Stopping v2full_web_run_2' in result.stderr
-        assert 'Removing v2full_web_1' in result.stderr
-        assert 'Removing v2full_other_1' in result.stderr
-        assert 'Removing v2full_web_run_1' in result.stderr
-        assert 'Removing v2full_web_run_2' in result.stderr
+        assert 'Stopping v2full-web-1' in result.stderr
+        assert 'Stopping v2full-other-1' in result.stderr
+        assert 'Stopping v2full-web-run-2' in result.stderr
+        assert 'Removing v2full-web-1' in result.stderr
+        assert 'Removing v2full-other-1' in result.stderr
+        assert 'Removing v2full-web-run-1' in result.stderr
+        assert 'Removing v2full-web-run-2' in result.stderr
         assert 'Removing volume v2full_data' in result.stderr
         assert 'Removing image v2full_web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
@@ -850,7 +850,7 @@ class CLITestCase(DockerClientTestCase):
 
     @v2_only()
     def test_up_with_network_mode(self):
-        c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
+        c = self.client.create_container('busybox', 'top', name='composetest-network-mode-container')
         self.addCleanup(self.client.remove_container, c, force=True)
         self.client.start(c)
         container_mode_source = 'container:{}'.format(c['Id'])
@@ -1234,7 +1234,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_run_without_command(self):
         self.base_dir = 'tests/fixtures/commands-composefile'
-        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
+        self.check_build('tests/fixtures/simple-dockerfile', tag='composetest-test')
 
         self.dispatch(['run', 'implicit'])
         service = self.project.get_service('implicit')
@@ -1737,7 +1737,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d', 'another'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'logscomposefile_another_1',
+            'logscomposefile-another-1',
             'exited'))
 
         self.dispatch(['kill', 'simple'])
@@ -1746,8 +1746,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'hello' in result.stdout
         assert 'test' in result.stdout
-        assert 'logscomposefile_another_1 exited with code 0' in result.stdout
-        assert 'logscomposefile_simple_1 exited with code 137' in result.stdout
+        assert 'logscomposefile-another-1 exited with code 0' in result.stdout
+        assert 'logscomposefile-simple-1 exited with code 137' in result.stdout
 
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
@@ -1945,7 +1945,7 @@ class CLITestCase(DockerClientTestCase):
         container, = self.project.containers()
         expected_template = (
             ' container {} {} (image=busybox:latest, '
-            'name=simplecomposefile_simple_1)')
+            'name=simplecomposefile-simple-1)')
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
@@ -2032,7 +2032,7 @@ class CLITestCase(DockerClientTestCase):
 
         self.assertEqual(
             set(get_links(web)),
-            set(['db', 'mydb_1', 'extends_mydb_1']))
+            set(['db', 'mydb-1', 'extends-mydb-1']))
 
         expected_env = set([
             "FOO=1",
@@ -2051,8 +2051,8 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         result = self.dispatch(['top'])
 
-        self.assertIn('top_service_a', result.stdout)
-        self.assertIn('top_service_b', result.stdout)
+        self.assertIn('top-service-a', result.stdout)
+        self.assertIn('top-service-b', result.stdout)
         self.assertNotIn('top_not_a_service', result.stdout)
 
     def test_top_processes_running(self):
