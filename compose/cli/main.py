@@ -764,6 +764,9 @@ class TopLevelCommand(object):
 
             $ docker-compose scale web=2 worker=3
 
+        This command is deprecated. Use the up command with the `--scale` flag
+        instead.
+
         Usage: scale [options] [SERVICE=NUM...]
 
         Options:
@@ -775,6 +778,11 @@ class TopLevelCommand(object):
         if self.project.config_version == V2_2:
             raise UserError(
                 'The scale command is incompatible with the v2.2 format. '
+                'Use the up command with the --scale flag instead.'
+            )
+        else:
+            log.warn(
+                'The scale command is deprecated. '
                 'Use the up command with the --scale flag instead.'
             )
 
