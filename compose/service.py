@@ -16,6 +16,7 @@ from docker.errors import NotFound
 from docker.types import LogConfig
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
+from docker.utils.utils import convert_tmpfs_mounts
 
 from . import __version__
 from . import const
@@ -709,6 +710,7 @@ class Service(object):
 
         binds, affinity = merge_volume_bindings(
             container_options.get('volumes') or [],
+            self.options.get('tmpfs') or [],
             previous_container)
         override_options['binds'] = binds
         container_options['environment'].update(affinity)
@@ -1091,7 +1093,7 @@ def parse_repository_tag(repo_path):
 # Volumes
 
 
-def merge_volume_bindings(volumes, previous_container):
+def merge_volume_bindings(volumes, tmpfs, previous_container):
     """Return a list of volume bindings for a container. Container data volumes
     are replaced by those from the previous container.
     """
@@ -1103,7 +1105,7 @@ def merge_volume_bindings(volumes, previous_container):
         if volume.external)
 
     if previous_container:
-        old_volumes = get_container_data_volumes(previous_container, volumes)
+        old_volumes = get_container_data_volumes(previous_container, volumes, tmpfs)
         warn_on_masked_volume(volumes, old_volumes, previous_container.service)
         volume_bindings.update(
             build_volume_binding(volume) for volume in old_volumes)
@@ -1114,7 +1116,7 @@ def merge_volume_bindings(volumes, previous_container):
     return list(volume_bindings.values()), affinity
 
 
-def get_container_data_volumes(container, volumes_option):
+def get_container_data_volumes(container, volumes_option, tmpfs_option):
     """Find the container data volumes that are in `volumes_option`, and return
     a mapping of volume bindings for those volumes.
     """
@@ -1135,6 +1137,10 @@ def get_container_data_volumes(container, volumes_option):
     for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
         if volume.external:
+            continue
+
+        # Attempting to rebind tmpfs volumes breaks: https://github.com/docker/compose/issues/4751
+        if volume.internal in convert_tmpfs_mounts(tmpfs_option).keys():
             continue
 
         mount = container_mounts.get(volume.internal)

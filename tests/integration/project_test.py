@@ -551,6 +551,24 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('data').containers(stopped=True)), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
+    def test_project_up_recreate_with_tmpfs_volume(self):
+        # https://github.com/docker/compose/issues/4751
+        project = Project.from_config(
+            name='composetest',
+            config_data=load_config({
+                'version': '2.1',
+                'services': {
+                    'foo': {
+                        'image': 'busybox:latest',
+                        'tmpfs': ['/dev/shm'],
+                        'volumes': ['/dev/shm']
+                    }
+                }
+            }), client=self.client
+        )
+        project.up()
+        project.up(strategy=ConvergenceStrategy.always)
+
     def test_unscale_after_restart(self):
         web = self.create_service('web')
         project = Project('composetest', [web], self.client)
