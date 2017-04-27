@@ -260,10 +260,6 @@ def parallel_remove(containers, options):
     parallel_operation(stopped_containers, 'remove', options, 'Removing')
 
 
-def parallel_start(containers, options):
-    parallel_operation(containers, 'start', options, 'Starting')
-
-
 def parallel_pause(containers, options):
     parallel_operation(containers, 'pause', options, 'Pausing')
 

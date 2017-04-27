@@ -26,6 +26,7 @@ from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
+from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -763,6 +764,9 @@ class TopLevelCommand(object):
 
             $ docker-compose scale web=2 worker=3
 
+        This command is deprecated. Use the up command with the `--scale` flag
+        instead.
+
         Usage: scale [options] [SERVICE=NUM...]
 
         Options:
@@ -771,15 +775,18 @@ class TopLevelCommand(object):
         """
         timeout = timeout_from_opts(options)
 
-        for s in options['SERVICE=NUM']:
-            if '=' not in s:
-                raise UserError('Arguments to scale should be in the form service=num')
-            service_name, num = s.split('=', 1)
-            try:
-                num = int(num)
-            except ValueError:
-                raise UserError('Number of containers for service "%s" is not a '
-                                'number' % service_name)
+        if self.project.config_version == V2_2:
+            raise UserError(
+                'The scale command is incompatible with the v2.2 format. '
+                'Use the up command with the --scale flag instead.'
+            )
+        else:
+            log.warn(
+                'The scale command is deprecated. '
+                'Use the up command with the --scale flag instead.'
+            )
+
+        for service_name, num in parse_scale_args(options['SERVICE=NUM']).items():
             self.project.get_service(service_name).scale(num, timeout=timeout)
 
     def start(self, options):
@@ -875,7 +882,7 @@ class TopLevelCommand(object):
         If you want to force Compose to stop and recreate all containers, use the
         `--force-recreate` flag.
 
-        Usage: up [options] [SERVICE...]
+        Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]
 
         Options:
             -d                         Detached mode: Run containers in the background,
@@ -898,7 +905,9 @@ class TopLevelCommand(object):
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
             --exit-code-from SERVICE   Return the exit code of the selected service container.
-                                       Requires --abort-on-container-exit.
+                                       Implies --abort-on-container-exit.
+            --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the `scale`
+                                       setting in the Compose file if present.
         """
         start_deps = not options['--no-deps']
         exit_value_from = exitval_from_opts(options, self.project)
@@ -919,7 +928,9 @@ class TopLevelCommand(object):
                 do_build=build_action_from_opts(options),
                 timeout=timeout,
                 detached=detached,
-                remove_orphans=remove_orphans)
+                remove_orphans=remove_orphans,
+                scale_override=parse_scale_args(options['--scale']),
+            )
 
             if detached:
                 return
@@ -1238,3 +1249,19 @@ def call_docker(args):
     log.debug(" ".join(map(pipes.quote, args)))
 
     return subprocess.call(args)
+
+
+def parse_scale_args(options):
+    res = {}
+    for s in options:
+        if '=' not in s:
+            raise UserError('Arguments to scale should be in the form service=num')
+        service_name, num = s.split('=', 1)
+        try:
+            num = int(num)
+        except ValueError:
+            raise UserError(
+                'Number of containers for service "%s" is not a number' % service_name
+            )
+        res[service_name] = num
+    return res
