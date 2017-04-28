@@ -128,7 +128,7 @@ SUPPORTED_FILENAMES = [
     'docker-compose.yaml',
 ]
 
-DEFAULT_OVERRIDE_FILENAME = 'docker-compose.override.yml'
+DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml', 'docker-compose.override.yaml')
 
 
 log = logging.getLogger(__name__)
@@ -292,8 +292,11 @@ def get_default_config_files(base_dir):
 
 
 def get_default_override_file(path):
-    override_filename = os.path.join(path, DEFAULT_OVERRIDE_FILENAME)
-    return [override_filename] if os.path.exists(override_filename) else []
+    for default_override_filename in DEFAULT_OVERRIDE_FILENAMES:
+        override_filename = os.path.join(path, default_override_filename)
+        if os.path.exists(override_filename):
+            return [override_filename]
+    return []
 
 
 def find_candidates_in_parent_dirs(filenames, path):
