@@ -2138,3 +2138,19 @@ class CLITestCase(DockerClientTestCase):
         assert 'busybox' in result.stdout
         assert 'multiplecomposefiles_another_1' in result.stdout
         assert 'multiplecomposefiles_simple_1' in result.stdout
+
+    def test_up_with_override_yaml(self):
+        self.base_dir = 'tests/fixtures/override-yaml-files'
+        self._project = get_project(self.base_dir, [])
+        self.dispatch(
+            [
+                'up', '-d',
+            ],
+            None)
+
+        containers = self.project.containers()
+        self.assertEqual(len(containers), 2)
+
+        web, db = containers
+        self.assertEqual(web.human_readable_command, 'sleep 100')
+        self.assertEqual(db.human_readable_command, 'top')
