@@ -23,8 +23,8 @@ class Interpolator(object):
     def interpolate(self, string):
         try:
             return self.templater(string).substitute(self.mapping)
-        except ValueError:
-            raise InvalidInterpolation(string)
+        except ValueError as e:
+            raise InvalidInterpolation(string, e)
 
 
 def interpolate_environment_variables(version, config, section, environment):
@@ -51,11 +51,12 @@ def interpolate_value(name, config_key, value, section, interpolator):
     except InvalidInterpolation as e:
         raise ConfigurationError(
             'Invalid interpolation format for "{config_key}" option '
-            'in {section} "{name}": "{string}"'.format(
+            'in {section} "{name}": "{string}" caused by {value_error}'.format(
                 config_key=config_key,
                 name=name,
                 section=section,
-                string=e.string))
+                string=e.string,
+                value_error=e.value_error))
 
 
 def recursive_interpolate(obj, interpolator):
@@ -72,15 +73,23 @@ def recursive_interpolate(obj, interpolator):
 
 
 class TemplateWithDefaults(Template):
-    idpattern = r'[_a-z][_a-z0-9]*(?::?-[^}]+)?'
+    idpattern = r'[_a-z][_a-z0-9]*(?::?-[^}]+)?\??'
 
     # Modified from python2.7/string.py
     def substitute(self, mapping):
+
         # Helper function for .sub()
         def convert(mo):
             # Check the most common path first.
             named = mo.group('named') or mo.group('braced')
             if named is not None:
+                if named.endswith('?'):
+                    var = named[:-1]
+                    value = mapping.get(var)
+                    if not value:
+                        raise ValueError('required environment variable "{var}" not set'
+                                         .format(var=var))
+                    return value
                 if ':-' in named:
                     var, _, default = named.partition(':-')
                     return mapping.get(var) or default
@@ -99,5 +108,6 @@ class TemplateWithDefaults(Template):
 
 
 class InvalidInterpolation(Exception):
-    def __init__(self, string):
+    def __init__(self, string, value_error):
         self.string = string
+        self.value_error = value_error

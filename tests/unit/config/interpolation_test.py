@@ -144,3 +144,12 @@ def test_interpolate_missing_with_default(defaults_interpolator):
 def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
+
+
+def test_interpolate_with_missing_required_environment_variable(defaults_interpolator):
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${missing?}')
+
+
+def test_interpolate_with_existing_required_environment_variable(defaults_interpolator):
+    assert defaults_interpolator("ok ${FOO?}") == "ok first"
