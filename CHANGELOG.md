@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.13.0 (2017-05-01)
+1.13.0 (2017-05-02)
 -------------------
 
 ### Breaking changes
@@ -46,6 +46,15 @@ Change log
 
 - Fixed an issue where paths containing unicode characters passed via the `-f`
   flag were causing Compose to crash
+
+- Fixed an issue where the output of `docker-compose config` would be invalid
+  if the Compose file contained external secrets
+
+- Fixed a bug where using `--exit-code-from` with `up` would fail if Compose
+  was installed in a Python 3 environment
+
+- Fixed a bug where recreating containers using a combination of `tmpfs` and
+  `volumes` would result in an invalid config state
 
 
 1.12.0 (2017-04-04)
