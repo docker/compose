@@ -51,7 +51,10 @@ def denormalize_config(config, image_digests=None):
             del vol_conf['external_name']
 
     if config.version in (V3_1, V3_2):
-        result['secrets'] = config.secrets
+        result['secrets'] = config.secrets.copy()
+        for secret_name, secret_conf in result['secrets'].items():
+            if 'external_name' in secret_conf:
+                del secret_conf['external_name']
     return result
 
 
