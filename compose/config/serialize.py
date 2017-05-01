@@ -52,6 +52,7 @@ def denormalize_config(config, image_digests=None):
         service_dict.pop('name'): service_dict
         for service_dict in denormalized_services
     }
+
     for key in ('networks', 'volumes', 'secrets', 'configs'):
         config_dict = getattr(config, key)
         if not config_dict:
