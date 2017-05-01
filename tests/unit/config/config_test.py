@@ -3825,7 +3825,8 @@ class SerializeTest(unittest.TestCase):
         }
         secrets_dict = {
             'one': {'file': '/one.txt'},
-            'source': {'file': '/source.pem'}
+            'source': {'file': '/source.pem'},
+            'two': {'external': True},
         }
         config_dict = config.load(build_config_details({
             'version': '3.1',
@@ -3837,6 +3838,7 @@ class SerializeTest(unittest.TestCase):
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
         assert 'secrets' in serialized_config
+        assert serialized_config['secrets']['two'] == secrets_dict['two']
 
     def test_serialize_ports(self):
         config_dict = config.Config(version='2.0', services=[
