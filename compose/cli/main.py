@@ -944,9 +944,9 @@ class TopLevelCommand(object):
 
                 exit_code = 0
                 if exit_value_from:
-                    candidates = filter(
+                    candidates = list(filter(
                         lambda c: c.service == exit_value_from,
-                        attached_containers)
+                        attached_containers))
                     if not candidates:
                         log.error(
                             'No containers matching the spec "{0}" '
