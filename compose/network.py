@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 
 OPTS_EXCEPTIONS = [
     'com.docker.network.driver.overlay.vxlanid_list',
+    'com.docker.network.windowsshim.hnsid'
 ]
 
 
