@@ -66,7 +66,8 @@ class NetworkTest(unittest.TestCase):
         options = {'com.docker.network.driver.foo': 'bar'}
         remote_options = {
             'com.docker.network.driver.overlay.vxlanid_list': '257',
-            'com.docker.network.driver.foo': 'bar'
+            'com.docker.network.driver.foo': 'bar',
+            'com.docker.network.windowsshim.hnsid': 'aac3fd4887daaec1e3b',
         }
         net = Network(
             None, 'compose_test', 'net1', 'overlay',
