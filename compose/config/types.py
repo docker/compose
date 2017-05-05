@@ -306,7 +306,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
 
     def repr(self):
         return dict(
-            [(k, v) for k, v in self._asdict().items() if v is not None]
+            [(k, v) for k, v in zip(self._fields, self) if v is not None]
         )
 
     def legacy_repr(self):
