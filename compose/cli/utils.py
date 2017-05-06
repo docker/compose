@@ -89,7 +89,7 @@ def get_version_info(scope):
     if scope == 'full':
         return (
             "{}\n"
-            "docker-py version: {}\n"
+            "docker version: {}\n"
             "{} version: {}\n"
             "OpenSSL version: {}"
         ).format(
