@@ -24,6 +24,7 @@ from .environment import split_env
 from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
+from .errors import DuplicateOverrideFileFound
 from .errors import VERSION_EXPLANATION
 from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
@@ -292,11 +293,12 @@ def get_default_config_files(base_dir):
 
 
 def get_default_override_file(path):
-    for default_override_filename in DEFAULT_OVERRIDE_FILENAMES:
-        override_filename = os.path.join(path, default_override_filename)
-        if os.path.exists(override_filename):
-            return [override_filename]
-    return []
+    override_files_in_path = [os.path.join(path, override_filename) for override_filename
+                              in DEFAULT_OVERRIDE_FILENAMES
+                              if os.path.exists(os.path.join(path, override_filename))]
+    if len(override_files_in_path) > 1:
+        raise DuplicateOverrideFileFound(override_files_in_path)
+    return override_files_in_path
 
 
 def find_candidates_in_parent_dirs(filenames, path):
