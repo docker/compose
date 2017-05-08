@@ -171,12 +171,12 @@ class TopLevelCommand(object):
                                   in the client certificate (for example if your docker host
                                   is an IP address)
       --project-directory PATH    Specify an alternate working directory
-                                  (default: the path of the compose file)
+                                  (default: the path of the Compose file)
 
     Commands:
       build              Build or rebuild services
       bundle             Generate a Docker bundle from the Compose file
-      config             Validate and view the compose file
+      config             Validate and view the Compose file
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
       events             Receive real time events from containers
@@ -273,7 +273,7 @@ class TopLevelCommand(object):
 
     def config(self, config_options, options):
         """
-        Validate and view the compose file.
+        Validate and view the Compose file.
 
         Usage: config [options]
 
@@ -627,7 +627,7 @@ class TopLevelCommand(object):
 
     def pull(self, options):
         """
-        Pulls images for services.
+        Pulls images for services defined in a Compose file, but does not start the containers.
 
         Usage: pull [options] [SERVICE...]
 
