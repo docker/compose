@@ -1,0 +1,9 @@
+version: '2.2'
+services:
+    web:
+        image: busybox
+        command: top
+        scale: 2
+    db:
+      image: busybox
+      command: top

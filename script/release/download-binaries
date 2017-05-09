@@ -1,0 +1,32 @@
+#!/bin/bash
+
+function usage() {
+    >&2 cat << EOM
+Download Linux, Mac OS and Windows binaries from remote endpoints
+
+Usage:
+
+    $0 <version>
+
+Options:
+
+    version        version string for the release (ex: 1.6.0)
+
+EOM
+    exit 1
+}
+
+
+[ -n "$1" ] || usage
+VERSION=$1
+BASE_BINTRAY_URL=https://dl.bintray.com/docker-compose/bump-$VERSION/
+DESTINATION=binaries-$VERSION
+APPVEYOR_URL=https://ci.appveyor.com/api/projects/docker/compose/\
+artifacts/dist%2Fdocker-compose-Windows-x86_64.exe?branch=bump-$VERSION
+
+mkdir $DESTINATION
+
+
+wget -O $DESTINATION/docker-compose-Darwin-x86_64 $BASE_BINTRAY_URL/docker-compose-Darwin-x86_64
+wget -O $DESTINATION/docker-compose-Linux-x86_64 $BASE_BINTRAY_URL/docker-compose-Linux-x86_64
+wget -O $DESTINATION/docker-compose-Windows-x86_64.exe $APPVEYOR_URL

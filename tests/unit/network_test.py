@@ -66,7 +66,8 @@ class NetworkTest(unittest.TestCase):
         options = {'com.docker.network.driver.foo': 'bar'}
         remote_options = {
             'com.docker.network.driver.overlay.vxlanid_list': '257',
-            'com.docker.network.driver.foo': 'bar'
+            'com.docker.network.driver.foo': 'bar',
+            'com.docker.network.windowsshim.hnsid': 'aac3fd4887daaec1e3b',
         }
         net = Network(
             None, 'compose_test', 'net1', 'overlay',
@@ -98,6 +99,44 @@ class NetworkTest(unittest.TestCase):
         net = Network(None, 'compose_test', 'net1', 'overlay')
         check_remote_network_config(
             {'Driver': 'overlay', 'Options': None}, net
+        )
+
+    def test_check_remote_network_config_null_remote_ipam_options(self):
+        ipam_config = {
+            'driver': 'default',
+            'config': [
+                {'subnet': '172.0.0.1/16', },
+                {
+                    'subnet': '156.0.0.1/25',
+                    'gateway': '156.0.0.1',
+                    'aux_addresses': ['11.0.0.1', '24.25.26.27'],
+                    'ip_range': '156.0.0.1-254'
+                }
+            ]
+        }
+        net = Network(
+            None, 'compose_test', 'net1', 'bridge', ipam=ipam_config,
+        )
+
+        check_remote_network_config(
+            {
+                'Driver': 'bridge',
+                'Attachable': True,
+                'IPAM': {
+                    'Driver': 'default',
+                    'Config': [{
+                        'Subnet': '156.0.0.1/25',
+                        'Gateway': '156.0.0.1',
+                        'AuxiliaryAddresses': ['24.25.26.27', '11.0.0.1'],
+                        'IPRange': '156.0.0.1-254'
+                    }, {
+                        'Subnet': '172.0.0.1/16',
+                        'Gateway': '172.0.0.1'
+                    }],
+                    'Options': None
+                },
+            },
+            net
         )
 
     def test_check_remote_network_labels_mismatch(self):

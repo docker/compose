@@ -19,6 +19,7 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
@@ -551,6 +552,24 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(project.get_service('data').containers(stopped=True)), 1)
         self.assertEqual(len(project.get_service('console').containers()), 0)
 
+    def test_project_up_recreate_with_tmpfs_volume(self):
+        # https://github.com/docker/compose/issues/4751
+        project = Project.from_config(
+            name='composetest',
+            config_data=load_config({
+                'version': '2.1',
+                'services': {
+                    'foo': {
+                        'image': 'busybox:latest',
+                        'tmpfs': ['/dev/shm'],
+                        'volumes': ['/dev/shm']
+                    }
+                }
+            }), client=self.client
+        )
+        project.up()
+        project.up(strategy=ConvergenceStrategy.always)
+
     def test_unscale_after_restart(self):
         web = self.create_service('web')
         project = Project('composetest', [web], self.client)
@@ -564,12 +583,12 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(len(service.containers()), 3)
         project.up()
         service = project.get_service('web')
-        self.assertEqual(len(service.containers()), 3)
+        self.assertEqual(len(service.containers()), 1)
         service.scale(1)
         self.assertEqual(len(service.containers()), 1)
-        project.up()
+        project.up(scale_override={'web': 3})
         service = project.get_service('web')
-        self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(len(service.containers()), 3)
         # does scale=0 ,makes any sense? after recreating at least 1 container is running
         service.scale(0)
         project.up()
@@ -1136,6 +1155,33 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         containers = project.containers()
         self.assertEqual(len(containers), 1)
+
+    def test_project_up_config_scale(self):
+        config_data = build_config(
+            version=V2_2,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top',
+                'scale': 3
+            }]
+        )
+
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        assert len(project.containers()) == 3
+
+        project.up(scale_override={'web': 2})
+        assert len(project.containers()) == 2
+
+        project.up(scale_override={'web': 4})
+        assert len(project.containers()) == 4
+
+        project.stop()
+        project.up()
+        assert len(project.containers()) == 3
 
     @v2_only()
     def test_initialize_volumes(self):

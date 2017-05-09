@@ -1,6 +1,62 @@
 Change log
 ==========
 
+1.13.0 (2017-05-02)
+-------------------
+
+### Breaking changes
+
+- `docker-compose up` now resets a service's scaling to its default value.
+  You can use the newly introduced `--scale` option to specify a custom
+  scale value
+
+### New features
+
+#### Compose file version 2.2
+
+- Introduced version 2.2 of the `docker-compose.yml` specification. This
+  version requires to be used with Docker Engine 1.13.0 or above
+
+- Added support for `init` in service definitions.
+
+- Added support for `scale` in service definitions. The configuration's value
+  can be overridden using the `--scale` flag in `docker-compose up`.
+  Please note that the `scale` command is disabled for this file format
+
+#### Compose file version 2.x
+
+- Added support for `options` in the `ipam` section of network definitions
+
+### Bugfixes
+
+- Fixed a bug where paths provided to compose via the `-f` option were not
+  being resolved properly
+
+- Fixed a bug where the `ext_ip::target_port` notation in the ports section
+  was incorrectly marked as invalid
+
+- Fixed an issue where the `exec` command would sometimes not return control
+  to the terminal when using the `-d` flag
+
+- Fixed a bug where secrets were missing from the output of the `config`
+  command for v3.2 files
+
+- Fixed an issue where `docker-compose` would hang if no internet connection
+  was available
+
+- Fixed an issue where paths containing unicode characters passed via the `-f`
+  flag were causing Compose to crash
+
+- Fixed an issue where the output of `docker-compose config` would be invalid
+  if the Compose file contained external secrets
+
+- Fixed a bug where using `--exit-code-from` with `up` would fail if Compose
+  was installed in a Python 3 environment
+
+- Fixed a bug where recreating containers using a combination of `tmpfs` and
+  `volumes` would result in an invalid config state
+
+
 1.12.0 (2017-04-04)
 -------------------
 
@@ -8,7 +64,7 @@ Change log
 
 #### Compose file version 3.2
 
-- Introduced version 3.2 of the `docker-compose.yml` specification.
+- Introduced version 3.2 of the `docker-compose.yml` specification
 
 - Added support for `cache_from` in the `build` section of services
 
