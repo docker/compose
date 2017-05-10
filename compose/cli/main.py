@@ -803,6 +803,8 @@ class TopLevelCommand(object):
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
+            --use-aliases         Use the service's network aliases in the network(s) the
+                                  container connects to.
             -v, --volume=[]       Bind mount a volume (default [])
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
@@ -1279,8 +1281,10 @@ def run_one_off_container(container_options, project, service, options, toplevel
         one_off=True,
         **container_options)
 
+    use_network_aliases = options['--use-aliases']
+
     if options.get('--detach'):
-        service.start_container(container)
+        service.start_container(container, use_network_aliases)
         print(container.name)
         return
 
@@ -1296,7 +1300,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
     try:
         try:
             if IS_WINDOWS_PLATFORM or use_cli:
-                service.connect_container_to_networks(container)
+                service.connect_container_to_networks(container, use_network_aliases)
                 exit_code = call_docker(
                     ["start", "--attach", "--interactive", container.id],
                     toplevel_options
@@ -1310,7 +1314,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
                 )
                 pty = PseudoTerminal(project.client, operation)
                 sockets = pty.sockets()
-                service.start_container(container)
+                service.start_container(container, use_network_aliases)
                 pty.start(sockets)
                 exit_code = container.wait()
         except (signals.ShutdownException):
