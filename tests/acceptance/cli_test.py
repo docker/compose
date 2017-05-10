@@ -1904,6 +1904,28 @@ class CLITestCase(DockerClientTestCase):
         assert workdir == container.get('Config.WorkingDir')
 
     @v2_only()
+    def test_run_service_with_use_aliases(self):
+        filename = 'network-aliases.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'run', '-d', '--use-aliases', 'web', 'top'])
+
+        back_name = '{}_back'.format(self.project.name)
+        front_name = '{}_front'.format(self.project.name)
+
+        web_container = self.project.get_service('web').containers(one_off=OneOffFilter.only)[0]
+
+        back_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(back_name)
+        )
+        assert 'web' in back_aliases
+        front_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(front_name)
+        )
+        assert 'web' in front_aliases
+        assert 'forward_facing' in front_aliases
+        assert 'ahead' in front_aliases
+
+    @v2_only()
     def test_run_interactive_connects_to_network(self):
         self.base_dir = 'tests/fixtures/networks'
 
