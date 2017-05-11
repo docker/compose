@@ -224,14 +224,14 @@ _docker_compose_events() {
 
 _docker_compose_exec() {
 	case "$prev" in
-		--index|--user)
+		--index|--user|-u)
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --help --index --privileged -T --user" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --help --index --privileged -T --user -u" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_running
