@@ -1211,6 +1211,17 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(db.containers()), 1)
         self.assertEqual(len(console.containers()), 0)
 
+    def test_run_service_with_scaled_dependencies(self):
+        self.base_dir = 'tests/fixtures/v2-dependencies'
+        self.dispatch(['up', '-d', '--scale', 'db=2', '--scale', 'console=0'])
+        db = self.project.get_service('db')
+        console = self.project.get_service('console')
+        assert len(db.containers()) == 2
+        assert len(console.containers()) == 0
+        self.dispatch(['run', 'web', '/bin/true'], None)
+        assert len(db.containers()) == 2
+        assert len(console.containers()) == 0
+
     def test_run_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['run', '--no-deps', 'web', '/bin/true'])
