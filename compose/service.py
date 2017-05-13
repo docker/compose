@@ -390,7 +390,7 @@ class Service(object):
             return containers
 
     def _execute_convergence_recreate(self, containers, scale, timeout, detached, start):
-            if len(containers) > scale:
+            if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
 
@@ -408,14 +408,14 @@ class Service(object):
             for error in errors.values():
                 raise OperationFailedError(error)
 
-            if len(containers) < scale:
+            if scale is not None and len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
                     scale - len(containers), detached, start
                 ))
             return containers
 
     def _execute_convergence_start(self, containers, scale, timeout, detached, start):
-            if len(containers) > scale:
+            if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
             if start:
@@ -429,7 +429,7 @@ class Service(object):
                 for error in errors.values():
                     raise OperationFailedError(error)
 
-            if len(containers) < scale:
+            if scale is not None and len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
                     scale - len(containers), detached, start
                 ))
@@ -448,7 +448,7 @@ class Service(object):
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
-                                 start=True, scale_override=None):
+                                 start=True, scale_override=None, rescale=True):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -459,6 +459,11 @@ class Service(object):
             return self._execute_convergence_create(
                 scale, detached, start
             )
+
+        # The create action needs always needs an initial scale, but otherwise,
+        # we set scale to none in no-rescale scenarios (`run` dependencies)
+        if not rescale:
+            scale = None
 
         if action == 'recreate':
             return self._execute_convergence_recreate(
