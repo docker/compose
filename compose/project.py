@@ -382,7 +382,8 @@ class Project(object):
            timeout=None,
            detached=False,
            remove_orphans=False,
-           scale_override=None):
+           scale_override=None,
+           rescale=True):
 
         warn_for_swarm_mode(self.client)
 
@@ -405,7 +406,8 @@ class Project(object):
                 plans[service.name],
                 timeout=timeout,
                 detached=detached,
-                scale_override=scale_override.get(service.name)
+                scale_override=scale_override.get(service.name),
+                rescale=rescale
             )
 
         def get_deps(service):

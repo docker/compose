@@ -1138,7 +1138,9 @@ def run_one_off_container(container_options, project, service, options):
             project.up(
                 service_names=deps,
                 start_deps=True,
-                strategy=ConvergenceStrategy.never)
+                strategy=ConvergenceStrategy.never,
+                rescale=False
+            )
 
     project.initialize()
 
