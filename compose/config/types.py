@@ -258,7 +258,7 @@ class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
 
     def repr(self):
         return dict(
-            [(k, v) for k, v in self._asdict().items() if v is not None]
+            [(k, v) for k, v in zip(self._fields, self) if v is not None]
         )
 
 
