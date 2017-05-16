@@ -736,6 +736,8 @@ class Service(object):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
+        override_options['volumes'] = (container_options.get('volumes', []) +
+                                       override_options.get('volumes', []))
         container_options.update(override_options)
 
         if not container_options.get('name'):
