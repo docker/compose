@@ -38,6 +38,7 @@ from .types import VolumeSpec
 from .validation import match_named_volumes
 from .validation import validate_against_config_schema
 from .validation import validate_config_section
+from .validation import validate_cpu
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_links
@@ -52,8 +53,11 @@ DOCKER_CONFIG_KEYS = [
     'cap_drop',
     'cgroup_parent',
     'command',
+    'cpu_count',
+    'cpu_percent',
     'cpu_quota',
     'cpu_shares',
+    'cpus',
     'cpuset',
     'detach',
     'devices',
@@ -640,6 +644,7 @@ def validate_service(service_config, service_names, config_file):
     validate_service_constraints(service_dict, service_name, config_file)
     validate_paths(service_dict)
 
+    validate_cpu(service_config)
     validate_ulimits(service_config)
     validate_network_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)

@@ -15,6 +15,7 @@ from compose.const import API_VERSIONS
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_0 as V2_1
+from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
@@ -70,8 +71,12 @@ def v2_1_only():
     return build_version_required_decorator((V1, V2_0))
 
 
-def v3_only():
+def v2_2_only():
     return build_version_required_decorator((V1, V2_0, V2_1))
+
+
+def v3_only():
+    return build_version_required_decorator((V1, V2_0, V2_1, V2_2))
 
 
 class DockerClientTestCase(unittest.TestCase):

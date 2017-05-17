@@ -15,6 +15,7 @@ from jsonschema import RefResolver
 from jsonschema import ValidationError
 
 from ..const import COMPOSEFILE_V1 as V1
+from ..const import NANOCPUS_SCALE
 from .errors import ConfigurationError
 from .errors import VERSION_EXPLANATION
 from .sort_services import get_service_name_from_network_mode
@@ -385,6 +386,16 @@ def validate_service_constraints(config, service_name, config_file):
     schema = load_jsonschema(config_file)
     validator = Draft4Validator(schema['definitions']['constraints']['service'])
     handle_errors(validator.iter_errors(config), handler, None)
+
+
+def validate_cpu(service_config):
+    cpus = service_config.config.get('cpus')
+    if not cpus:
+        return
+    nano_cpus = cpus * NANOCPUS_SCALE
+    if isinstance(nano_cpus, float) and not nano_cpus.is_integer():
+        raise ConfigurationError(
+            "cpus must have nine or less digits after decimal point")
 
 
 def get_schema_path():
