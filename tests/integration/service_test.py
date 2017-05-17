@@ -33,6 +33,7 @@ from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import Service
 from tests.integration.testcases import v2_1_only
+from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
 
@@ -109,6 +110,30 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         container.start()
         self.assertEqual(container.get('HostConfig.CpuQuota'), 40000)
+
+    @v2_2_only()
+    def test_create_container_with_cpu_count(self):
+        self.require_api_version('1.25')
+        service = self.create_service('db', cpu_count=2)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.CpuCount'), 2)
+
+    @v2_2_only()
+    def test_create_container_with_cpu_percent(self):
+        self.require_api_version('1.25')
+        service = self.create_service('db', cpu_percent=12)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.CpuPercent'), 12)
+
+    @v2_2_only()
+    def test_create_container_with_cpus(self):
+        self.require_api_version('1.25')
+        service = self.create_service('db', cpus=1)
+        container = service.create_container()
+        service.start_container(container)
+        self.assertEqual(container.get('HostConfig.NanoCpus'), 1000000000)
 
     def test_create_container_with_shm_size(self):
         self.require_api_version('1.22')

@@ -52,7 +52,10 @@ HOST_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
     'cgroup_parent',
+    'cpu_count',
+    'cpu_percent',
     'cpu_quota',
+    'cpus',
     'devices',
     'dns',
     'dns_search',
@@ -798,6 +801,10 @@ class Service(object):
             init_path = options.get('init')
             options['init'] = True
 
+        nano_cpus = None
+        if options.has_key('cpus'):
+            nano_cpus = int(options.get('cpus') * 1000000000)
+
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=build_port_bindings(
@@ -837,6 +844,9 @@ class Service(object):
             init=options.get('init', None),
             init_path=init_path,
             isolation=options.get('isolation'),
+            cpu_count=options.get('cpu_count'),
+            cpu_percent=options.get('cpu_percent'),
+            nano_cpus=nano_cpus,
         )
 
     def get_secret_volumes(self):
