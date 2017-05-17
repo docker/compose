@@ -802,7 +802,7 @@ class Service(object):
             options['init'] = True
 
         nano_cpus = None
-        if options.has_key('cpus'):
+        if 'cpus' in options:
             nano_cpus = int(options.get('cpus') * 1000000000)
 
         return self.client.create_host_config(
