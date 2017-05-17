@@ -25,6 +25,7 @@ from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
+from compose.const import IS_WINDOWS_PLATFORM
 from compose.container import Container
 from compose.errors import OperationFailedError
 from compose.project import OneOffFilter
@@ -120,6 +121,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.get('HostConfig.CpuCount'), 2)
 
     @v2_2_only()
+    @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='cpu_percent is not supported for Linux')
     def test_create_container_with_cpu_percent(self):
         self.require_api_version('1.25')
         service = self.create_service('db', cpu_percent=12)
