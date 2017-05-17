@@ -803,7 +803,10 @@ class Service(object):
 
         nano_cpus = None
         if 'cpus' in options:
-            nano_cpus = int(options.get('cpus') * 1000000000)
+            nano_cpus = options.get('cpus') * 1000000000
+            if isinstance(nano_cpus, float) and not nano_cpus.is_integer():
+                raise ValueError("cpus is too precise")
+            nano_cpus = int(nano_cpus)
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),

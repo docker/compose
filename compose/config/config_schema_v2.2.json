@@ -78,7 +78,7 @@
         "cpu_percent": {"type": "integer", "minimum": 0, "maximum": 100},
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
-        "cpus": {"type": ["number", "string"], "minimum": 0},
+        "cpus": {"type": "number", "minimum": 0},
         "cpuset": {"type": "string"},
         "depends_on": {
           "oneOf": [
