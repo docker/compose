@@ -70,8 +70,10 @@ def v2_only():
 def v2_1_only():
     return build_version_required_decorator((V1, V2_0))
 
+
 def v2_2_only():
     return build_version_required_decorator((V1, V2_0, V2_1))
+
 
 def v3_only():
     return build_version_required_decorator((V1, V2_0, V2_1, V2_2))
