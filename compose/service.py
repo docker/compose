@@ -34,6 +34,7 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
+from .const import NANOCPUS_SCALE
 from .container import Container
 from .errors import HealthCheckFailed
 from .errors import NoHealthCheckConfigured
@@ -803,10 +804,7 @@ class Service(object):
 
         nano_cpus = None
         if 'cpus' in options:
-            nano_cpus = options.get('cpus') * 1000000000
-            if isinstance(nano_cpus, float) and not nano_cpus.is_integer():
-                raise ValueError("cpus is too precise")
-            nano_cpus = int(nano_cpus)
+            nano_cpus = int(options.get('cpus') * NANOCPUS_SCALE)
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
