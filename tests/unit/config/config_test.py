@@ -27,6 +27,7 @@ from compose.config.types import VolumeSpec
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
@@ -173,6 +174,9 @@ class ConfigTest(unittest.TestCase):
 
         cfg = config.load(build_config_details({'version': '2.1'}))
         assert cfg.version == V2_1
+
+        cfg = config.load(build_config_details({'version': '2.2'}))
+        assert cfg.version == V2_2
 
         for version in ['3', '3.0']:
             cfg = config.load(build_config_details({'version': version}))
