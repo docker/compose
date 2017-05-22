@@ -1,9 +1,10 @@
-
-web:
-    links:
+version: '2.2'
+services:
+  web:
+    depends_on:
         - db
         - other
 
-other:
+  other:
     image: busybox:latest
     command: "top"

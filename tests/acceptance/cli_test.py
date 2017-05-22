@@ -20,6 +20,8 @@ from docker import errors
 
 from .. import mock
 from ..helpers import create_host_file
+from ..helpers import is_cluster
+from ..helpers import no_cluster
 from compose.cli.command import get_project
 from compose.config.errors import DuplicateOverrideFileFound
 from compose.container import Container
@@ -28,6 +30,7 @@ from compose.utils import nanoseconds_from_time_seconds
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
 from tests.integration.testcases import pull_busybox
+from tests.integration.testcases import SWARM_SKIP_RM_VOLUMES
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
@@ -68,7 +71,8 @@ def wait_on_condition(condition, delay=0.1, timeout=40):
 
 def kill_service(service):
     for container in service.containers():
-        container.kill()
+        if container.is_running:
+            container.kill()
 
 
 class ContainerCountCondition(object):
@@ -78,7 +82,7 @@ class ContainerCountCondition(object):
         self.expected = expected
 
     def __call__(self):
-        return len(self.project.containers()) == self.expected
+        return len([c for c in self.project.containers() if c.is_running]) == self.expected
 
     def __str__(self):
         return "waiting for counter count == %s" % self.expected
@@ -116,11 +120,14 @@ class CLITestCase(DockerClientTestCase):
 
             for container in self.project.containers(stopped=True, one_off=OneOffFilter.only):
                 container.remove(force=True)
-
             networks = self.client.networks()
             for n in networks:
-                if n['Name'].startswith('{}_'.format(self.project.name)):
+                if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name)):
                     self.client.remove_network(n['Name'])
+            volumes = self.client.volumes().get('Volumes') or []
+            for v in volumes:
+                if v['Name'].split('/')[-1].startswith('{}_'.format(self.project.name)):
+                    self.client.remove_volume(v['Name'])
         if hasattr(self, '_project'):
             del self._project
 
@@ -175,7 +182,10 @@ class CLITestCase(DockerClientTestCase):
     def test_host_not_reachable_volumes_from_container(self):
         self.base_dir = 'tests/fixtures/volumes-from-container'
 
-        container = self.client.create_container('busybox', 'true', name='composetest_data_container')
+        container = self.client.create_container(
+            'busybox', 'true', name='composetest_data_container',
+            host_config={}
+        )
         self.addCleanup(self.client.remove_container, container)
 
         result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
@@ -545,42 +555,48 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['create'])
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(another.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
-        self.assertEqual(len(another.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        another_containers = another.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert len(another_containers) == 1
+        assert not service_containers[0].is_running
+        assert not another_containers[0].is_running
 
     def test_create_with_force_recreate(self):
         self.dispatch(['create'], None)
         service = self.project.get_service('simple')
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
         old_ids = [c.id for c in service.containers(stopped=True)]
 
         self.dispatch(['create', '--force-recreate'], None)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
-        new_ids = [c.id for c in service.containers(stopped=True)]
+        new_ids = [c.id for c in service_containers]
 
-        self.assertNotEqual(old_ids, new_ids)
+        assert old_ids != new_ids
 
     def test_create_with_no_recreate(self):
         self.dispatch(['create'], None)
         service = self.project.get_service('simple')
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
         old_ids = [c.id for c in service.containers(stopped=True)]
 
         self.dispatch(['create', '--no-recreate'], None)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
-        new_ids = [c.id for c in service.containers(stopped=True)]
+        new_ids = [c.id for c in service_containers]
 
-        self.assertEqual(old_ids, new_ids)
+        assert old_ids == new_ids
 
     def test_run_one_off_with_volume(self):
         self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
@@ -687,7 +703,7 @@ class CLITestCase(DockerClientTestCase):
         network_name = self.project.networks.networks['default'].full_name
         networks = self.client.networks(names=[network_name])
         self.assertEqual(len(networks), 1)
-        self.assertEqual(networks[0]['Driver'], 'bridge')
+        assert networks[0]['Driver'] == 'bridge' if not is_cluster(self.client) else 'overlay'
         assert 'com.docker.network.bridge.enable_icc' not in networks[0]['Options']
 
         network = self.client.inspect_network(networks[0]['Id'])
@@ -733,11 +749,11 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
         # Two networks were created: back and front
-        assert sorted(n['Name'] for n in networks) == [back_name, front_name]
+        assert sorted(n['Name'].split('/')[-1] for n in networks) == [back_name, front_name]
         web_container = self.project.get_service('web').containers()[0]
 
         back_aliases = web_container.get(
@@ -761,11 +777,11 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
         # One network was created: internal
-        assert sorted(n['Name'] for n in networks) == [internal_net]
+        assert sorted(n['Name'].split('/')[-1] for n in networks) == [internal_net]
 
         assert networks[0]['Internal'] is True
 
@@ -780,11 +796,11 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
         # One networks was created: front
-        assert sorted(n['Name'] for n in networks) == [static_net]
+        assert sorted(n['Name'].split('/')[-1] for n in networks) == [static_net]
         web_container = self.project.get_service('web').containers()[0]
 
         ipam_config = web_container.get(
@@ -803,11 +819,11 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
         # Two networks were created: back and front
-        assert sorted(n['Name'] for n in networks) == [back_name, front_name]
+        assert sorted(n['Name'].split('/')[-1] for n in networks) == [back_name, front_name]
 
         back_network = [n for n in networks if n['Name'] == back_name][0]
         front_network = [n for n in networks if n['Name'] == front_name][0]
@@ -847,8 +863,12 @@ class CLITestCase(DockerClientTestCase):
         assert 'Service "web" uses an undefined network "foo"' in result.stderr
 
     @v2_only()
+    @no_cluster('container networks not supported in Swarm')
     def test_up_with_network_mode(self):
-        c = self.client.create_container('busybox', 'top', name='composetest_network_mode_container')
+        c = self.client.create_container(
+            'busybox', 'top', name='composetest_network_mode_container',
+            host_config={}
+        )
         self.addCleanup(self.client.remove_container, c, force=True)
         self.client.start(c)
         container_mode_source = 'container:{}'.format(c['Id'])
@@ -862,7 +882,7 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
         assert not networks
 
@@ -899,7 +919,7 @@ class CLITestCase(DockerClientTestCase):
 
         network_names = ['{}_{}'.format(self.project.name, n) for n in ['foo', 'bar']]
         for name in network_names:
-            self.client.create_network(name)
+            self.client.create_network(name, attachable=True)
 
         self.dispatch(['-f', filename, 'up', '-d'])
         container = self.project.containers()[0]
@@ -917,12 +937,12 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n['Name'] for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
         assert not networks
 
         network_name = 'composetest_external_network'
-        self.client.create_network(network_name)
+        self.client.create_network(network_name, attachable=True)
 
         self.dispatch(['-f', filename, 'up', '-d'])
         container = self.project.containers()[0]
@@ -941,10 +961,10 @@ class CLITestCase(DockerClientTestCase):
 
         networks = [
             n for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
-        assert [n['Name'] for n in networks] == [network_with_label]
+        assert [n['Name'].split('/')[-1] for n in networks] == [network_with_label]
         assert 'label_key' in networks[0]['Labels']
         assert networks[0]['Labels']['label_key'] == 'label_val'
 
@@ -961,10 +981,10 @@ class CLITestCase(DockerClientTestCase):
 
         volumes = [
             v for v in self.client.volumes().get('Volumes', [])
-            if v['Name'].startswith('{}_'.format(self.project.name))
+            if v['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
-        assert [v['Name'] for v in volumes] == [volume_with_label]
+        assert set([v['Name'].split('/')[-1] for v in volumes]) == set([volume_with_label])
         assert 'label_key' in volumes[0]['Labels']
         assert volumes[0]['Labels']['label_key'] == 'label_val'
 
@@ -975,7 +995,7 @@ class CLITestCase(DockerClientTestCase):
 
         network_names = [
             n['Name'] for n in self.client.networks()
-            if n['Name'].startswith('{}_'.format(self.project.name))
+            if n['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
         assert network_names == []
 
@@ -1010,6 +1030,7 @@ class CLITestCase(DockerClientTestCase):
 
         assert "Unsupported config option for services.bar: 'net'" in result.stderr
 
+    @no_cluster("Legacy networking not supported on Swarm")
     def test_up_with_net_v1(self):
         self.base_dir = 'tests/fixtures/net-container'
         self.dispatch(['up', '-d'], None)
@@ -1261,6 +1282,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
+    @py.test.mark.skipif(SWARM_SKIP_RM_VOLUMES, reason='Swarm DELETE /containers/<id> bug')
     def test_run_rm(self):
         self.base_dir = 'tests/fixtures/volume'
         proc = start_process(self.base_dir, ['run', '--rm', 'test'])
@@ -1274,7 +1296,7 @@ class CLITestCase(DockerClientTestCase):
         mounts = containers[0].get('Mounts')
         for mount in mounts:
             if mount['Destination'] == '/container-path':
-                anonymousName = mount['Name']
+                anonymous_name = mount['Name']
                 break
         os.kill(proc.pid, signal.SIGINT)
         wait_on_process(proc, 1)
@@ -1287,9 +1309,11 @@ class CLITestCase(DockerClientTestCase):
             if volume.internal == '/container-named-path':
                 name = volume.external
                 break
-        volumeNames = [v['Name'] for v in volumes]
-        assert name in volumeNames
-        assert anonymousName not in volumeNames
+        volume_names = [v['Name'].split('/')[-1] for v in volumes]
+        assert name in volume_names
+        if not is_cluster(self.client):
+            # The `-v` flag for `docker rm` in Swarm seems to be broken
+            assert anonymous_name not in volume_names
 
     def test_run_service_with_dockerfile_entrypoint(self):
         self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
@@ -1411,11 +1435,10 @@ class CLITestCase(DockerClientTestCase):
         container.stop()
 
         # check the ports
-        self.assertNotEqual(port_random, None)
-        self.assertIn("0.0.0.0", port_random)
-        self.assertEqual(port_assigned, "0.0.0.0:49152")
-        self.assertEqual(port_range[0], "0.0.0.0:49153")
-        self.assertEqual(port_range[1], "0.0.0.0:49154")
+        assert port_random is not None
+        assert port_assigned.endswith(':49152')
+        assert port_range[0].endswith(':49153')
+        assert port_range[1].endswith(':49154')
 
     def test_run_service_with_explicitly_mapped_ports(self):
         # create one off container
@@ -1431,8 +1454,8 @@ class CLITestCase(DockerClientTestCase):
         container.stop()
 
         # check the ports
-        self.assertEqual(port_short, "0.0.0.0:30000")
-        self.assertEqual(port_full, "0.0.0.0:30001")
+        assert port_short.endswith(':30000')
+        assert port_full.endswith(':30001')
 
     def test_run_service_with_explicitly_mapped_ip_ports(self):
         # create one off container
@@ -1953,9 +1976,9 @@ class CLITestCase(DockerClientTestCase):
             result = self.dispatch(['port', 'simple', str(number)])
             return result.stdout.rstrip()
 
-        self.assertEqual(get_port(3000), container.get_local_port(3000))
-        self.assertEqual(get_port(3001), "0.0.0.0:49152")
-        self.assertEqual(get_port(3002), "0.0.0.0:49153")
+        assert get_port(3000) == container.get_local_port(3000)
+        assert ':49152' in get_port(3001)
+        assert ':49153' in get_port(3002)
 
     def test_expanded_port(self):
         self.base_dir = 'tests/fixtures/ports-composefile'
@@ -1966,9 +1989,9 @@ class CLITestCase(DockerClientTestCase):
             result = self.dispatch(['port', 'simple', str(number)])
             return result.stdout.rstrip()
 
-        self.assertEqual(get_port(3000), container.get_local_port(3000))
-        self.assertEqual(get_port(3001), "0.0.0.0:49152")
-        self.assertEqual(get_port(3002), "0.0.0.0:49153")
+        assert get_port(3000) == container.get_local_port(3000)
+        assert ':49152' in get_port(3001)
+        assert ':49153' in get_port(3002)
 
     def test_port_with_scale(self):
         self.base_dir = 'tests/fixtures/ports-composefile-scale'
@@ -2021,12 +2044,14 @@ class CLITestCase(DockerClientTestCase):
         assert len(lines) == 2
 
         container, = self.project.containers()
-        expected_template = (
-            ' container {} {} (image=busybox:latest, '
-            'name=simplecomposefile_simple_1)')
+        expected_template = ' container {} {}'
+        expected_meta_info = ['image=busybox:latest', 'name=simplecomposefile_simple_1']
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
+        for line in lines:
+            for info in expected_meta_info:
+                assert info in line
 
         assert has_timestamp(lines[0])
 
@@ -2069,7 +2094,6 @@ class CLITestCase(DockerClientTestCase):
             'docker-compose.yml',
             'docker-compose.override.yml',
             'extra.yml',
-
         ]
         self._project = get_project(self.base_dir, config_paths)
         self.dispatch(
@@ -2086,7 +2110,6 @@ class CLITestCase(DockerClientTestCase):
 
         web, other, db = containers
         self.assertEqual(web.human_readable_command, 'top')
-        self.assertTrue({'db', 'other'} <= set(get_links(web)))
         self.assertEqual(db.human_readable_command, 'top')
         self.assertEqual(other.human_readable_command, 'top')
 
