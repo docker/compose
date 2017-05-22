@@ -56,7 +56,9 @@ HOST_CONFIG_KEYS = [
     'cpu_count',
     'cpu_percent',
     'cpu_quota',
+    'cpu_shares',
     'cpus',
+    'cpuset',
     'devices',
     'dns',
     'dns_search',
@@ -83,6 +85,7 @@ HOST_CONFIG_KEYS = [
     'sysctls',
     'userns_mode',
     'volumes_from',
+    'volume_driver',
 ]
 
 CONDITION_STARTED = 'service_started'
@@ -848,6 +851,9 @@ class Service(object):
             cpu_count=options.get('cpu_count'),
             cpu_percent=options.get('cpu_percent'),
             nano_cpus=nano_cpus,
+            volume_driver=options.get('volume_driver'),
+            cpuset_cpus=options.get('cpuset'),
+            cpu_shares=options.get('cpu_shares'),
         )
 
     def get_secret_volumes(self):

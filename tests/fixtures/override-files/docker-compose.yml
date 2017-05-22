@@ -1,10 +1,10 @@
-
-web:
+version: '2.2'
+services:
+  web:
     image: busybox:latest
     command: "sleep 200"
-    links:
+    depends_on:
         - db
-
-db:
+  db:
     image: busybox:latest
     command: "sleep 200"

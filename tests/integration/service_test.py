@@ -13,9 +13,13 @@ from six import StringIO
 from six import text_type
 
 from .. import mock
+from ..helpers import is_cluster
+from ..helpers import no_cluster
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import pull_busybox
+from .testcases import SWARM_SKIP_CONTAINERS_ALL
+from .testcases import SWARM_SKIP_CPU_SHARES
 from compose import __version__
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
@@ -100,6 +104,7 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual('foodriver', container.get('HostConfig.VolumeDriver'))
 
+    @pytest.mark.skipif(SWARM_SKIP_CPU_SHARES, reason='Swarm --cpu-shares bug')
     def test_create_container_with_cpu_shares(self):
         service = self.create_service('db', cpu_shares=73)
         container = service.create_container()
@@ -151,6 +156,7 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.Init') is True
 
+    @pytest.mark.xfail(True, reason='Option has been removed in Engine 17.06.0')
     def test_create_container_with_init_path(self):
         self.require_api_version('1.25')
         docker_init_path = find_executable('docker-init')
@@ -249,6 +255,7 @@ class ServiceTest(DockerClientTestCase):
             'busybox', 'true',
             volumes={container_path: {}},
             labels={'com.docker.compose.test_image': 'true'},
+            host_config={}
         )
         image = self.client.commit(tmp_container)['Id']
 
@@ -278,6 +285,7 @@ class ServiceTest(DockerClientTestCase):
             image='busybox:latest',
             command=["top"],
             labels={LABEL_PROJECT: 'composetest'},
+            host_config={},
         )
         host_service = self.create_service(
             'host',
@@ -321,9 +329,15 @@ class ServiceTest(DockerClientTestCase):
         self.assertIn('FOO=2', new_container.get('Config.Env'))
         self.assertEqual(new_container.name, 'composetest_db_1')
         self.assertEqual(new_container.get_mount('/etc')['Source'], volume_path)
-        self.assertIn(
-            'affinity:container==%s' % old_container.id,
-            new_container.get('Config.Env'))
+        if not is_cluster(self.client):
+            assert (
+                'affinity:container==%s' % old_container.id in
+                new_container.get('Config.Env')
+            )
+        else:
+            # In Swarm, the env marker is consumed and the container should be deployed
+            # on the same node.
+            assert old_container.get('Node.Name') == new_container.get('Node.Name')
 
         self.assertEqual(len(self.client.containers(all=True)), num_containers_before)
         self.assertNotEqual(old_container.id, new_container.id)
@@ -350,8 +364,13 @@ class ServiceTest(DockerClientTestCase):
                 ConvergencePlan('recreate', [orig_container]))
 
             assert new_container.get_mount('/etc')['Source'] == volume_path
-            assert ('affinity:container==%s' % orig_container.id in
-                    new_container.get('Config.Env'))
+            if not is_cluster(self.client):
+                assert ('affinity:container==%s' % orig_container.id in
+                        new_container.get('Config.Env'))
+            else:
+                # In Swarm, the env marker is consumed and the container should be deployed
+                # on the same node.
+                assert orig_container.get('Node.Name') == new_container.get('Node.Name')
 
             orig_container = new_container
 
@@ -464,18 +483,21 @@ class ServiceTest(DockerClientTestCase):
         )
 
         containers = service.execute_convergence_plan(ConvergencePlan('create', []), start=False)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
         containers = service.execute_convergence_plan(
             ConvergencePlan('recreate', containers),
             start=False)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
         service.execute_convergence_plan(ConvergencePlan('start', containers), start=False)
-        self.assertEqual(len(service.containers()), 0)
-        self.assertEqual(len(service.containers(stopped=True)), 1)
+        service_containers = service.containers(stopped=True)
+        assert len(service_containers) == 1
+        assert not service_containers[0].is_running
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')
@@ -487,6 +509,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
         self.assertEqual(db.containers()[0].environment['FOO'], 'BAR')
 
+    @no_cluster('No legacy links support in Swarm')
     def test_start_container_creates_links(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, None)])
@@ -503,6 +526,7 @@ class ServiceTest(DockerClientTestCase):
                 'db'])
         )
 
+    @no_cluster('No legacy links support in Swarm')
     def test_start_container_creates_links_with_names(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'custom_link_name')])
@@ -519,6 +543,7 @@ class ServiceTest(DockerClientTestCase):
                 'custom_link_name'])
         )
 
+    @no_cluster('No legacy links support in Swarm')
     def test_start_container_with_external_links(self):
         db = self.create_service('db')
         web = self.create_service('web', external_links=['composetest_db_1',
@@ -537,6 +562,7 @@ class ServiceTest(DockerClientTestCase):
                 'db_3']),
         )
 
+    @no_cluster('No legacy links support in Swarm')
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
         db = self.create_service('db')
 
@@ -546,6 +572,7 @@ class ServiceTest(DockerClientTestCase):
         c = create_and_start_container(db)
         self.assertEqual(set(get_links(c)), set([]))
 
+    @no_cluster('No legacy links support in Swarm')
     def test_start_one_off_container_creates_links_to_its_own_service(self):
         db = self.create_service('db')
 
@@ -572,7 +599,7 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         container.wait()
         self.assertIn(b'success', container.logs())
-        self.assertEqual(len(self.client.images(name='composetest_test')), 1)
+        assert len(self.client.images(name='composetest_test')) >= 1
 
     def test_start_container_uses_tagged_image_if_it_exists(self):
         self.check_build('tests/fixtures/simple-dockerfile', tag='composetest_test')
@@ -719,20 +746,27 @@ class ServiceTest(DockerClientTestCase):
             '0.0.0.0:9001:9000/udp',
         ])
         container = create_and_start_container(service).inspect()
-        self.assertEqual(container['NetworkSettings']['Ports'], {
-            '8000/tcp': [
-                {
-                    'HostIp': '127.0.0.1',
-                    'HostPort': '8001',
-                },
-            ],
-            '9000/udp': [
-                {
-                    'HostIp': '0.0.0.0',
-                    'HostPort': '9001',
-                },
-            ],
-        })
+        assert container['NetworkSettings']['Ports']['8000/tcp'] == [{
+            'HostIp': '127.0.0.1',
+            'HostPort': '8001',
+        }]
+        assert container['NetworkSettings']['Ports']['9000/udp'][0]['HostPort'] == '9001'
+        if not is_cluster(self.client):
+            assert container['NetworkSettings']['Ports']['9000/udp'][0]['HostIp'] == '0.0.0.0'
+        # self.assertEqual(container['NetworkSettings']['Ports'], {
+        #     '8000/tcp': [
+        #         {
+        #             'HostIp': '127.0.0.1',
+        #             'HostPort': '8001',
+        #         },
+        #     ],
+        #     '9000/udp': [
+        #         {
+        #             'HostIp': '0.0.0.0',
+        #             'HostPort': '9001',
+        #         },
+        #     ],
+        # })
 
     def test_create_with_image_id(self):
         # Get image id for the current busybox:latest
@@ -760,6 +794,10 @@ class ServiceTest(DockerClientTestCase):
         service.scale(0)
         self.assertEqual(len(service.containers()), 0)
 
+    @pytest.mark.skipif(
+        SWARM_SKIP_CONTAINERS_ALL,
+        reason='Swarm /containers/json bug'
+    )
     def test_scale_with_stopped_containers(self):
         """
         Given there are some stopped containers and scale is called with a

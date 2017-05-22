@@ -8,6 +8,7 @@ from docker.utils import version_lt
 from pytest import skip
 
 from .. import unittest
+from ..helpers import is_cluster
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
 from compose.config.environment import Environment
@@ -20,6 +21,10 @@ from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
 from compose.service import Service
+
+SWARM_SKIP_CONTAINERS_ALL = os.environ.get('SWARM_SKIP_CONTAINERS_ALL', '0') != '0'
+SWARM_SKIP_CPU_SHARES = os.environ.get('SWARM_SKIP_CPU_SHARES', '0') != '0'
+SWARM_SKIP_RM_VOLUMES = os.environ.get('SWARM_SKIP_RM_VOLUMES', '0') != '0'
 
 
 def pull_busybox(client):
@@ -97,7 +102,7 @@ class DockerClientTestCase(unittest.TestCase):
 
         for i in self.client.images(
                 filters={'label': 'com.docker.compose.test_image'}):
-            self.client.remove_image(i)
+            self.client.remove_image(i, force=True)
 
         volumes = self.client.volumes().get('Volumes') or []
         for v in volumes:
@@ -133,3 +138,11 @@ class DockerClientTestCase(unittest.TestCase):
         api_version = self.client.version()['ApiVersion']
         if version_lt(api_version, minimum):
             skip("API version is too low ({} < {})".format(api_version, minimum))
+
+    def get_volume_data(self, volume_name):
+        if not is_cluster(self.client):
+            return self.client.inspect_volume(volume_name)
+
+        volumes = self.client.volumes(filters={'name': volume_name})['Volumes']
+        assert len(volumes) > 0
+        return self.client.inspect_volume(volumes[0]['Name'])
