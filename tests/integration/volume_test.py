@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from docker.errors import DockerException
 
+from ..helpers import no_cluster
 from .testcases import DockerClientTestCase
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_VOLUME
@@ -35,26 +36,28 @@ class VolumeTest(DockerClientTestCase):
     def test_create_volume(self):
         vol = self.create_volume('volume01')
         vol.create()
-        info = self.client.inspect_volume(vol.full_name)
-        assert info['Name'] == vol.full_name
+        info = self.get_volume_data(vol.full_name)
+        assert info['Name'].split('/')[-1] == vol.full_name
 
     def test_recreate_existing_volume(self):
         vol = self.create_volume('volume01')
 
         vol.create()
-        info = self.client.inspect_volume(vol.full_name)
-        assert info['Name'] == vol.full_name
+        info = self.get_volume_data(vol.full_name)
+        assert info['Name'].split('/')[-1] == vol.full_name
 
         vol.create()
-        info = self.client.inspect_volume(vol.full_name)
-        assert info['Name'] == vol.full_name
+        info = self.get_volume_data(vol.full_name)
+        assert info['Name'].split('/')[-1] == vol.full_name
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_inspect_volume(self):
         vol = self.create_volume('volume01')
         vol.create()
         info = vol.inspect()
         assert info['Name'] == vol.full_name
 
+    @no_cluster('remove volume by name defect on Swarm Classic')
     def test_remove_volume(self):
         vol = Volume(self.client, 'composetest', 'volume01')
         vol.create()
@@ -62,6 +65,7 @@ class VolumeTest(DockerClientTestCase):
         volumes = self.client.volumes()['Volumes']
         assert len([v for v in volumes if v['Name'] == vol.full_name]) == 0
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_external_volume(self):
         vol = self.create_volume('composetest_volume_ext', external=True)
         assert vol.external is True
@@ -70,6 +74,7 @@ class VolumeTest(DockerClientTestCase):
         info = vol.inspect()
         assert info['Name'] == vol.name
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_external_aliased_volume(self):
         alias_name = 'composetest_alias01'
         vol = self.create_volume('volume01', external=alias_name)
@@ -79,24 +84,28 @@ class VolumeTest(DockerClientTestCase):
         info = vol.inspect()
         assert info['Name'] == alias_name
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_exists(self):
         vol = self.create_volume('volume01')
         assert vol.exists() is False
         vol.create()
         assert vol.exists() is True
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_exists_external(self):
         vol = self.create_volume('volume01', external=True)
         assert vol.exists() is False
         vol.create()
         assert vol.exists() is True
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_exists_external_aliased(self):
         vol = self.create_volume('volume01', external='composetest_alias01')
         assert vol.exists() is False
         vol.create()
         assert vol.exists() is True
 
+    @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_volume_default_labels(self):
         vol = self.create_volume('volume01')
         vol.create()
