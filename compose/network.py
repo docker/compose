@@ -188,10 +188,13 @@ def check_remote_network_config(remote, local):
     local_labels = local.labels or {}
     remote_labels = remote.get('Labels', {})
     for k in set.union(set(remote_labels.keys()), set(local_labels.keys())):
-        if k.startswith('com.docker.compose.'):  # We are only interested in user-specified labels
+        if k.startswith('com.docker.'):  # We are only interested in user-specified labels
             continue
         if remote_labels.get(k) != local_labels.get(k):
-            raise NetworkConfigChangedError(local.full_name, 'label "{}"'.format(k))
+            log.warn(
+                'Network {}: label "{}" has changed. It may need to be'
+                ' recreated.'.format(local.full_name, k)
+            )
 
 
 def build_networks(name, config_data, client):
