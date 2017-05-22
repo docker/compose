@@ -251,7 +251,7 @@ class ServiceStateTest(DockerClientTestCase):
         container = web.create_container()
 
         # update the image
-        c = self.client.create_container(image, ['touch', '/hello.txt'])
+        c = self.client.create_container(image, ['touch', '/hello.txt'], host_config={})
         self.client.commit(c, repository=repo, tag=tag)
         self.client.remove_container(c)
 
