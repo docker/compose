@@ -108,6 +108,7 @@ DOCKER_CONFIG_KEYS = [
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'build',
     'container_name',
+    'credential_spec',
     'dockerfile',
     'log_driver',
     'log_opt',
@@ -320,6 +321,27 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
+def check_swarm_only_config(service_dicts):
+    warning_template = (
+        "Some services ({services}) use the '{key}' key, which will be ignored. "
+        "Compose does not support '{key}' configuration - use "
+        "`docker stack deploy` to deploy to a swarm."
+    )
+
+    def check_swarm_only_key(service_dicts, key):
+        services = [s for s in service_dicts if s.get(key)]
+        if services:
+            log.warn(
+                warning_template.format(
+                    services=", ".join(sorted(s['name'] for s in services)),
+                    key=key
+                )
+            )
+
+    check_swarm_only_key(service_dicts, 'deploy')
+    check_swarm_only_key(service_dicts, 'credential_spec')
+
+
 def load(config_details):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
@@ -349,13 +371,7 @@ def load(config_details):
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    services_using_deploy = [s for s in service_dicts if s.get('deploy')]
-    if services_using_deploy:
-        log.warn(
-            "Some services ({}) use the 'deploy' key, which will be ignored. "
-            "Compose does not support deploy configuration - use "
-            "`docker stack deploy` to deploy to a swarm."
-            .format(", ".join(sorted(s['name'] for s in services_using_deploy))))
+    check_swarm_only_config(service_dicts)
 
     return Config(main_file.version, service_dicts, volumes, networks, secrets)
 
@@ -884,7 +900,7 @@ def merge_service_dicts(base, override, version):
 
     md.merge_mapping('environment', parse_environment)
     md.merge_mapping('labels', parse_labels)
-    md.merge_mapping('ulimits', parse_ulimits)
+    md.merge_mapping('ulimits', parse_flat_dict)
     md.merge_mapping('networks', parse_networks)
     md.merge_mapping('sysctls', parse_sysctls)
     md.merge_mapping('depends_on', parse_depends_on)
@@ -1020,12 +1036,14 @@ parse_depends_on = functools.partial(
 parse_deploy = functools.partial(parse_dict_or_list, split_kv, 'deploy')
 
 
-def parse_ulimits(ulimits):
-    if not ulimits:
+def parse_flat_dict(d):
+    if not d:
         return {}
 
-    if isinstance(ulimits, dict):
-        return dict(ulimits)
+    if isinstance(d, dict):
+        return dict(d)
+
+    raise ConfigurationError("Invalid type: expected mapping")
 
 
 def resolve_env_var(key, val, environment):
