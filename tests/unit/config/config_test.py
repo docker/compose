@@ -31,6 +31,7 @@ from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
+from compose.const import COMPOSEFILE_V3_3 as V3_3
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
@@ -825,11 +826,11 @@ class ConfigTest(unittest.TestCase):
         assert service['build']['args']['opt1'] == '42'
         assert service['build']['args']['opt2'] == 'foobar'
 
-    def test_load_with_labels(self):
+    def test_load_with_build_labels(self):
         service = config.load(
             build_config_details(
                 {
-                    'version': '3.2',
+                    'version': V3_3,
                     'services': {
                         'web': {
                             'build': {
