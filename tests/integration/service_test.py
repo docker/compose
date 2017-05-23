@@ -666,6 +666,21 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
         assert "build_version=2" in service.image()['ContainerConfig']['Cmd']
 
+    def test_build_with_build_labels(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox\n')
+
+        service = self.create_service('buildlabels', build={
+            'context': text_type(base_dir),
+            'labels': {'com.docker.compose.test': 'true'}
+        })
+        service.build()
+        assert service.image()
+        assert service.image()['Config']['Labels']['com.docker.compose.test'] == 'true'
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
