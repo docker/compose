@@ -10,6 +10,7 @@ from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
+from compose.const import COMPOSEFILE_V3_3 as V3_3
 
 
 def serialize_config_type(dumper, data):
@@ -50,7 +51,7 @@ def denormalize_config(config, image_digests=None):
         if 'external_name' in vol_conf:
             del vol_conf['external_name']
 
-    if config.version in (V3_1, V3_2):
+    if config.version in (V3_1, V3_2, V3_3):
         result['secrets'] = config.secrets.copy()
         for secret_name, secret_conf in result['secrets'].items():
             if 'external_name' in secret_conf:
@@ -114,7 +115,7 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
                 service_dict['healthcheck']['timeout']
             )
 
-    if 'ports' in service_dict and version not in (V3_2,):
+    if 'ports' in service_dict and version not in (V3_2, V3_3):
         service_dict['ports'] = [
             p.legacy_repr() if isinstance(p, types.ServicePort) else p
             for p in service_dict['ports']
