@@ -2847,6 +2847,74 @@ class MergeLabelsTest(unittest.TestCase):
         assert service_dict['labels'] == {'foo': '1', 'bar': ''}
 
 
+class MergeBuildTest(unittest.TestCase):
+    def test_full(self):
+        base = {
+            'context': '.',
+            'dockerfile': 'Dockerfile',
+            'args': {
+                'x': '1',
+                'y': '2',
+            },
+            'cache_from': ['ubuntu'],
+            'labels': ['com.docker.compose.test=true']
+        }
+
+        override = {
+            'context': './prod',
+            'dockerfile': 'Dockerfile.prod',
+            'args': ['x=12'],
+            'cache_from': ['debian'],
+            'labels': {
+                'com.docker.compose.test': 'false',
+                'com.docker.compose.prod': 'true',
+            }
+        }
+
+        result = config.merge_build(None, {'build': base}, {'build': override})
+        assert result['context'] == override['context']
+        assert result['dockerfile'] == override['dockerfile']
+        assert result['args'] == {'x': '12', 'y': '2'}
+        assert set(result['cache_from']) == set(['ubuntu', 'debian'])
+        assert result['labels'] == override['labels']
+
+    def test_empty_override(self):
+        base = {
+            'context': '.',
+            'dockerfile': 'Dockerfile',
+            'args': {
+                'x': '1',
+                'y': '2',
+            },
+            'cache_from': ['ubuntu'],
+            'labels': {
+                'com.docker.compose.test': 'true'
+            }
+        }
+
+        override = {}
+
+        result = config.merge_build(None, {'build': base}, {'build': override})
+        assert result == base
+
+    def test_empty_base(self):
+        base = {}
+
+        override = {
+            'context': './prod',
+            'dockerfile': 'Dockerfile.prod',
+            'args': {'x': '12'},
+            'cache_from': ['debian'],
+            'labels': {
+                'com.docker.compose.test': 'false',
+                'com.docker.compose.prod': 'true',
+            }
+        }
+
+        result = config.merge_build(None, {'build': base}, {'build': override})
+        assert result == override
+
+
 class MemoryOptionsTest(unittest.TestCase):
 
     def test_validation_fails_with_just_memswap_limit(self):
