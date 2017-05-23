@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v3.2.json",
+  "id": "config_schema_v3.3.json",
   "type": "object",
   "required": ["version"],
 
@@ -50,6 +50,17 @@
         }
       },
       "additionalProperties": false
+    },
+
+    "configs": {
+      "id": "#/properties/configs",
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9._-]+$": {
+          "$ref": "#/definitions/config"
+        }
+      },
+      "additionalProperties": false
     }
   },
 
@@ -72,6 +83,7 @@
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
                 "args": {"$ref": "#/definitions/list_or_dict"},
+                "labels": {"$ref": "#/definitions/list_or_dict"},
                 "cache_from": {"$ref": "#/definitions/list_of_strings"}
               },
               "additionalProperties": false
@@ -87,7 +99,29 @@
             {"type": "array", "items": {"type": "string"}}
           ]
         },
+        "configs": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "properties": {
+                  "source": {"type": "string"},
+                  "target": {"type": "string"},
+                  "uid": {"type": "string"},
+                  "gid": {"type": "string"},
+                  "mode": {"type": "number"}
+                }
+              }
+            ]
+          }
+        },
         "container_name": {"type": "string"},
+        "credential_spec": {"type": "object", "properties": {
+          "file": {"type": "string"},
+          "registry": {"type": "string"}
+        }},
         "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
@@ -169,7 +203,8 @@
           "type": "array",
           "items": {
             "oneOf": [
-              {"type": ["string", "number"], "format": "ports"},
+              {"type": "number", "format": "ports"},
+              {"type": "string", "format": "ports"},
               {
                 "type": "object",
                 "properties": {
@@ -248,6 +283,7 @@
                   "source": {"type": "string"},
                   "target": {"type": "string"},
                   "read_only": {"type": "boolean"},
+                  "consistency": {"type": "string"},
                   "bind": {
                     "type": "object",
                     "properties": {
@@ -327,7 +363,17 @@
         "placement": {
           "type": "object",
           "properties": {
-            "constraints": {"type": "array", "items": {"type": "string"}}
+            "constraints": {"type": "array", "items": {"type": "string"}},
+            "preferences": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "spread": {"type": "string"}
+                },
+                "additionalProperties": false
+              }
+            }
           },
           "additionalProperties": false
         }
@@ -412,6 +458,22 @@
 
     "secret": {
       "id": "#/definitions/secret",
+      "type": "object",
+      "properties": {
+        "file": {"type": "string"},
+        "external": {
+          "type": ["boolean", "object"],
+          "properties": {
+            "name": {"type": "string"}
+          }
+        },
+        "labels": {"$ref": "#/definitions/list_or_dict"}
+      },
+      "additionalProperties": false
+    },
+
+    "config": {
+      "id": "#/definitions/config",
       "type": "object",
       "properties": {
         "file": {"type": "string"},
