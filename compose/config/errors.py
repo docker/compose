@@ -49,10 +49,7 @@ class ComposeFileNotFound(ConfigurationError):
 class DuplicateOverrideFileFound(ConfigurationError):
     def __init__(self, override_filenames):
         self.override_filenames = override_filenames
-
-    @property
-    def msg(self):
-        return """
-        Unable to determine with duplicate override files, only a single override file can be used.
-        Found: %s
-        """ % ", ".join(self.override_filenames)
+        super(DuplicateOverrideFileFound, self).__init__(
+            "Multiple override files found: {}. You may only use a single "
+            "override file.".format(", ".join(override_filenames))
+        )
