@@ -680,13 +680,7 @@ class TopLevelCommand(object):
         one_off = OneOffFilter.include
 
         if options.get('--stop'):
-            running_containers = self.project.containers(
-                service_names=options['SERVICE'], stopped=False, one_off=one_off
-            )
-            self.project.stop(
-                service_names=running_containers,
-                one_off=one_off
-            )
+            self.project.stop(service_names=options['SERVICE'], one_off=one_off)
 
         all_containers = self.project.containers(
             service_names=options['SERVICE'], stopped=True, one_off=one_off
