@@ -2033,6 +2033,23 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_credential_spec(self):
+        base = {
+            'image': 'bb',
+            'credential_spec': {
+                'file': '/hello-world',
+            }
+        }
+
+        override = {
+            'credential_spec': {
+                'registry': 'revolution.com',
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V3_3)
+        assert actual['credential_spec'] == override['credential_spec']
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
