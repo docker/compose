@@ -21,6 +21,7 @@ from docker import errors
 from .. import mock
 from ..helpers import create_host_file
 from compose.cli.command import get_project
+from compose.config.errors import DuplicateOverrideFileFound
 from compose.container import Container
 from compose.project import OneOffFilter
 from compose.utils import nanoseconds_from_time_seconds
@@ -30,7 +31,6 @@ from tests.integration.testcases import pull_busybox
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
-
 
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
@@ -2149,3 +2149,25 @@ class CLITestCase(DockerClientTestCase):
         assert 'busybox' in result.stdout
         assert 'multiplecomposefiles_another_1' in result.stdout
         assert 'multiplecomposefiles_simple_1' in result.stdout
+
+    def test_up_with_override_yaml(self):
+        self.base_dir = 'tests/fixtures/override-yaml-files'
+        self._project = get_project(self.base_dir, [])
+        self.dispatch(
+            [
+                'up', '-d',
+            ],
+            None)
+
+        containers = self.project.containers()
+        self.assertEqual(len(containers), 2)
+
+        web, db = containers
+        self.assertEqual(web.human_readable_command, 'sleep 100')
+        self.assertEqual(db.human_readable_command, 'top')
+
+    def test_up_with_duplicate_override_yaml_files(self):
+        self.base_dir = 'tests/fixtures/duplicate-override-yaml-files'
+        with self.assertRaises(DuplicateOverrideFileFound):
+            get_project(self.base_dir, [])
+        self.base_dir = None
