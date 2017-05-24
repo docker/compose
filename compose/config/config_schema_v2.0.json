@@ -89,6 +89,16 @@
         },
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "domainname": {"type": "string"},
+        "healthcheck": {
+          "type": "object",
+          "properties": {
+            "cmd": {"type":"string"},
+            "delay": {"type": "number"},
+            "retries": {"type": "number"}
+          },
+          "additionalProperties": false
+
+        },
         "entrypoint": {
           "oneOf": [
             {"type": "string"},

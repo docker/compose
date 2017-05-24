@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import datetime
 import logging
 import operator
+import time
 from functools import reduce
 
 import enum
@@ -19,6 +20,7 @@ from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .container import Container
+from .errors import OperationFailedError
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks
@@ -30,7 +32,6 @@ from .service import Service
 from .service import ServiceNetworkMode
 from .utils import microseconds_from_time_nano
 from .volume import ProjectVolumes
-
 
 log = logging.getLogger(__name__)
 
@@ -224,6 +225,78 @@ class Project(object):
 
         return NetworkMode(network_mode)
 
+    @staticmethod
+    def execute_cmd_with_retry(container, cmd, retries, delay):
+        for i in range(retries):
+            exec_id = container.create_exec(cmd)
+            # find way how to perform executing of command with timeout
+            container.start_exec(exec_id)
+            result = container.client.exec_inspect(exec_id)
+            is_running = result.get('Running')
+            exit_code = result.get('ExitCode')
+            log.info('Return ExitStatus: %s, Retry: %i' % (exit_code, i))
+            if not is_running and exit_code == 0:
+                log.info('Health check was finished with 0 exit code. Running next container...')
+                break
+            time.sleep(delay)
+        else:
+            return False
+        return result
+
+    @staticmethod
+    def healthcheck_start(service, services, execute):
+        healthcheck_config = service.options.get('healthcheck', {})
+        cmd = healthcheck_config.get('cmd')
+        result = None
+        if cmd:
+            log.info('Check health status for %s' % service.name)
+            retries = healthcheck_config.get('retries', 3)
+            delay = healthcheck_config.get('delay', 5)
+            tokens = cmd.split(':', 1)
+            executed_cmd_locally = False
+            if len(tokens) == 2:
+                service_name = tokens[0]
+                cmd = tokens[1]
+                log.info('Execute remote command %s on %s service' % (cmd, service_name))
+                for s in services:
+                    if s.name == service_name:
+                        remote_service = s
+                        break
+                else:
+                    raise OperationFailedError(("Health check checking was failed for service %s: %s. " +
+                                                "Remote service wasn't found") % (service_name, cmd))
+                container = remote_service.get_container()
+
+                if container.is_running:
+                    result = Project.execute_cmd_with_retry(container, cmd, retries, delay)
+                    if not result:
+                        raise OperationFailedError(("Health check was finished for service %s: %s. " +
+                                                    "Return non zero result") % (service_name, cmd))
+                else:
+                    raise OperationFailedError(("Cannot execute health check of service %s: %s." +
+                                               "Service is not run") % (service_name, cmd))
+
+            else:
+                cmd = tokens[0]
+                executed_cmd_locally = True
+
+            containers = []
+            if result or executed_cmd_locally:
+                log.info('Starting container for %s service' % service.name)
+
+                execute(service)
+            if executed_cmd_locally:
+                log.info('Execute command %s on the service' % cmd)
+                result = Project.execute_cmd_with_retry(service.get_container(), cmd, retries, delay)
+
+            if not result and cmd:
+                raise OperationFailedError(("Health check of service %s " +
+                                           "doesn't pass : %s") % (service.name, cmd))
+
+            return containers
+        else:
+            return execute(service)
+
     def start(self, service_names=None, **options):
         containers = []
 
@@ -241,7 +314,7 @@ class Project(object):
 
         parallel.parallel_execute(
             services,
-            start_service,
+            lambda service: Project.healthcheck_start(service, services, start_service),
             operator.attrgetter('name'),
             'Starting',
             get_deps)
@@ -418,7 +491,7 @@ class Project(object):
 
         results, errors = parallel.parallel_execute(
             services,
-            do,
+            lambda service: Project.healthcheck_start(service, services, do),
             operator.attrgetter('name'),
             None,
             get_deps
