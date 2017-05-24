@@ -782,7 +782,8 @@ class Service(object):
 
         container_options['host_config'] = self._get_container_host_config(
             override_options,
-            one_off=one_off)
+            one_off=one_off,
+            number=number)
 
         networking_config = self.build_default_networking_config()
         if networking_config:
@@ -792,7 +793,7 @@ class Service(object):
             container_options['environment'])
         return container_options
 
-    def _get_container_host_config(self, override_options, one_off=False):
+    def _get_container_host_config(self, override_options, one_off=False, number=1):
         options = dict(self.options, **override_options)
 
         logging_dict = options.get('logging', None)
@@ -814,7 +815,7 @@ class Service(object):
             binds=options.get('binds'),
             volumes_from=self._get_volumes_from(),
             privileged=options.get('privileged', False),
-            network_mode=self.network_mode.mode,
+            network_mode=self.network_mode.for_number(number),
             devices=options.get('devices'),
             dns=options.get('dns'),
             dns_opt=options.get('dns_opt'),
@@ -1062,6 +1063,9 @@ class NetworkMode(object):
 
     mode = id
 
+    def for_number(self, number):
+        return self.mode
+
 
 class ContainerNetworkMode(object):
     """A network mode that uses a container's network stack."""
@@ -1079,6 +1083,9 @@ class ContainerNetworkMode(object):
     def mode(self):
         return 'container:' + self.container.id
 
+    def for_number(self, number):
+        return self.mode
+
 
 class ServiceNetworkMode(object):
     """A network mode that uses a service's network stack."""
@@ -1094,9 +1101,13 @@ class ServiceNetworkMode(object):
 
     @property
     def mode(self):
+        return self.for_number(1)
+
+    def for_number(self, number):
         containers = self.service.containers()
         if containers:
-            return 'container:' + containers[0].id
+            target_container = (number - 1) % len(containers)
+            return 'container:' + containers[target_container].id
 
         log.warn("Service %s is trying to use reuse the network stack "
                  "of another service that is not running." % (self.id))
