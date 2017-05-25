@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import pytest
 
+from .. import mock
 from .. import unittest
 from compose.network import check_remote_network_config
 from compose.network import Network
@@ -152,7 +153,9 @@ class NetworkTest(unittest.TestCase):
                 'com.project.touhou.character': 'marisa.kirisame',
             }
         }
-        with pytest.raises(NetworkConfigChangedError) as e:
+        with mock.patch('compose.network.log') as mock_log:
             check_remote_network_config(remote, net)
 
-        assert 'label "com.project.touhou.character" has changed' in str(e.value)
+        mock_log.warn.assert_called_once_with(mock.ANY)
+        _, args, kwargs = mock_log.warn.mock_calls[0]
+        assert 'label "com.project.touhou.character" has changed' in args[0]
