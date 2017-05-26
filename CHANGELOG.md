@@ -1,6 +1,55 @@
 Change log
 ==========
 
+1.14.0 (2017-06-06)
+-------------------
+
+### New features
+
+#### Compose file version 3.3
+
+- Introduced version 3.3 of the `docker-compose.yml` specification.
+  This version requires to be used with Docker Engine 17.06.0 or above.
+  Note: the `credential_spec` key only applies to Swarm services and will
+  be ignored by Compose
+
+#### Compose file version 2.2
+
+- Added the following parameters in service definitions: `cpu_count`,
+  `cpu_percent`, `cpus`
+
+#### Compose file version 2.1
+
+- Added support for build labels. This feature is also available in the
+  2.2 and 3.3 formats.
+
+#### All formats
+
+- Added shorthand `-u` for `--user` flag in `docker-compose exec`
+
+- Differences in labels between the Compose file and remote network
+  will now print a warning instead of preventing redeployment.
+
+### Bugfixes
+
+- Fixed a bug where service's dependencies were being rescaled to their
+  default scale when running a `docker-compose run` command
+
+- Fixed a bug where `docker-compose rm` with the `--stop` flag was not
+  behaving properly when provided with a list of services to remove
+
+- Fixed a bug where `cache_from` in the build section would be ignored when
+  using more than one Compose file.
+
+- Fixed a bug where override files would not be picked up by Compose if they
+  had the `.yaml` extension
+
+- Fixed a bug on Windows Engine where networks would be incorrectly flagged
+  for recreation
+
+- Fixed a bug where services declaring ports would cause crashes on some
+  versions of Python 3
+
 1.13.0 (2017-05-02)
 -------------------
 
