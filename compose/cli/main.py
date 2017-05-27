@@ -690,7 +690,7 @@ class TopLevelCommand(object):
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
             if options.get('--force') \
-                    or yesno("Are you sure? [yN] ", default=False):
+                    or yesno("Are you sure? [y/N] ", default=False):
                 self.project.remove_stopped(
                     service_names=options['SERVICE'],
                     v=options.get('-v', False),
