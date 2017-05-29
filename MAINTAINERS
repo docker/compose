@@ -15,6 +15,7 @@
 			"bfirsh",
 			"dnephin",
 			"mnowster",
+			"shin-",
 		]
 
 [people]
@@ -44,3 +45,8 @@
 	Name = "Mazz Mosley"
 	Email = "mazz@houseofmnowster.com"
 	GitHub = "mnowster"
+
+	[People.shin-]
+	Name = "Joffrey F"
+	Email = "joffrey@docker.com"
+	GitHub = "shin-"
