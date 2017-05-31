@@ -9,9 +9,18 @@ import os
 import re
 import sys
 
+import pip
 import pkg_resources
 from setuptools import find_packages
 from setuptools import setup
+
+
+if 'docker-py' in [x.project_name for x in pip.get_installed_distributions()]:
+    print(
+        'ERROR: "docker-py" needs to be uninstalled before installing this'
+        ' package:\npip uninstall docker-py', file=sys.stderr
+    )
+    sys.exit(1)
 
 
 def read(*parts):
