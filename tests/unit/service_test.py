@@ -149,6 +149,25 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
+    def test_templatable_hostname(self):
+        service = Service('foo', image='foo', hostname='name{num}', client=self.mock_client)
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        self.assertEqual(opts['hostname'], 'name1', 'hostname')
+        self.assertFalse('domainname' in opts, 'domainname')
+
+    def test_templatable_hostname_with_domainname(self):
+        service = Service('foo', image='foo', hostname='name{num}.domain', client=self.mock_client)
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        self.assertEqual(opts['hostname'], 'name1', 'hostname')
+        self.assertEqual(opts['domainname'], 'domain', 'domainname')
+
+    def test_templatable_hostname_number_is_taken_into_account(self):
+        service = Service('foo', image='foo', hostname='name{num}', client=self.mock_client)
+        for i in range(1, 3):
+            opts = service._get_container_create_options({'image': 'foo'}, i)
+            self.assertEqual(opts['hostname'], 'name' + str(i), 'hostname')
+            self.assertFalse('domainname' in opts, 'domainname')
+
     def test_memory_swap_limit(self):
         self.mock_client.create_host_config.return_value = {}
 

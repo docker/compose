@@ -732,16 +732,20 @@ class Service(object):
 
         container_options.setdefault('detach', True)
 
-        # If a qualified hostname was given, split it into an
-        # unqualified hostname and a domainname unless domainname
-        # was also given explicitly. This matches the behavior of
-        # the official Docker CLI in that scenario.
-        if ('hostname' in container_options and
-                'domainname' not in container_options and
-                '.' in container_options['hostname']):
-            parts = container_options['hostname'].partition('.')
-            container_options['hostname'] = parts[0]
-            container_options['domainname'] = parts[2]
+        if ('hostname' in container_options):
+
+            # If a qualified hostname was given, split it into an
+            # unqualified hostname and a domainname unless domainname
+            # was also given explicitly. This matches the behavior of
+            # the official Docker CLI in that scenario.
+            if ('domainname' not in container_options and '.' in container_options['hostname']):
+                parts = container_options['hostname'].partition('.')
+                container_options['hostname'] = parts[0]
+                container_options['domainname'] = parts[2]
+
+            if ('{num}' in container_options['hostname']):
+                container_options['hostname'] = \
+                    container_options['hostname'].replace('{num}', str(number))
 
         if 'ports' in container_options or 'expose' in self.options:
             container_options['ports'] = build_container_ports(
