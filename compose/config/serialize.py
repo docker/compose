@@ -8,7 +8,6 @@ from compose.config import types
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
-from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import COMPOSEFILE_V3_3 as V3_3
 
@@ -25,6 +24,7 @@ def serialize_dict_type(dumper, data):
 yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
+yaml.SafeDumper.add_representer(types.ServiceConfig, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
@@ -41,21 +41,15 @@ def denormalize_config(config, image_digests=None):
         service_dict.pop('name'): service_dict
         for service_dict in denormalized_services
     }
-    result['networks'] = config.networks.copy()
-    for net_name, net_conf in result['networks'].items():
-        if 'external_name' in net_conf:
-            del net_conf['external_name']
+    for key in ('networks', 'volumes', 'secrets', 'configs'):
+        config_dict = getattr(config, key)
+        if not config_dict:
+            continue
+        result[key] = config_dict.copy()
+        for name, conf in result[key].items():
+            if 'external_name' in conf:
+                del conf['external_name']
 
-    result['volumes'] = config.volumes.copy()
-    for vol_name, vol_conf in result['volumes'].items():
-        if 'external_name' in vol_conf:
-            del vol_conf['external_name']
-
-    if config.version in (V3_1, V3_2, V3_3):
-        result['secrets'] = config.secrets.copy()
-        for secret_name, secret_conf in result['secrets'].items():
-            if 'external_name' in secret_conf:
-                del secret_conf['external_name']
     return result
 
 
