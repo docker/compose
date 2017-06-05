@@ -238,8 +238,7 @@ class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
         return self.alias
 
 
-class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
-
+class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode')):
     @classmethod
     def parse(cls, spec):
         if isinstance(spec, six.string_types):
@@ -260,6 +259,14 @@ class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
         return dict(
             [(k, v) for k, v in zip(self._fields, self) if v is not None]
         )
+
+
+class ServiceSecret(ServiceConfigBase):
+    pass
+
+
+class ServiceConfig(ServiceConfigBase):
+    pass
 
 
 class ServicePort(namedtuple('_ServicePort', 'target published protocol mode external_ip')):
