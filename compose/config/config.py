@@ -211,8 +211,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_secrets(self):
         return {} if self.version < const.COMPOSEFILE_V3_1 else self.config.get('secrets', {})
 
+    def get_configs(self):
+        return {} if self.version < const.COMPOSEFILE_V3_3 else self.config.get('configs', {})
 
-class Config(namedtuple('_Config', 'version services volumes networks secrets')):
+
+class Config(namedtuple('_Config', 'version services volumes networks secrets configs')):
     """
     :param version: configuration version
     :type  version: int
@@ -224,6 +227,8 @@ class Config(namedtuple('_Config', 'version services volumes networks secrets'))
     :type  networks: :class:`dict`
     :param secrets: Dictionary mapping secret names to description dictionaries
     :type secrets: :class:`dict`
+    :param configs: Dictionary mapping config names to description dictionaries
+    :type configs: :class:`dict`
     """
 
 
@@ -340,6 +345,7 @@ def check_swarm_only_config(service_dicts):
 
     check_swarm_only_key(service_dicts, 'deploy')
     check_swarm_only_key(service_dicts, 'credential_spec')
+    check_swarm_only_key(service_dicts, 'configs')
 
 
 def load(config_details):
@@ -364,7 +370,12 @@ def load(config_details):
     networks = load_mapping(
         config_details.config_files, 'get_networks', 'Network'
     )
-    secrets = load_secrets(config_details.config_files, config_details.working_dir)
+    secrets = load_mapping(
+        config_details.config_files, 'get_secrets', 'Secret', config_details.working_dir
+    )
+    configs = load_mapping(
+        config_details.config_files, 'get_configs', 'Config', config_details.working_dir
+    )
     service_dicts = load_services(config_details, main_file)
 
     if main_file.version != V1:
@@ -373,10 +384,10 @@ def load(config_details):
 
     check_swarm_only_config(service_dicts)
 
-    return Config(main_file.version, service_dicts, volumes, networks, secrets)
+    return Config(main_file.version, service_dicts, volumes, networks, secrets, configs)
 
 
-def load_mapping(config_files, get_func, entity_type):
+def load_mapping(config_files, get_func, entity_type, working_dir=None):
     mapping = {}
 
     for config_file in config_files:
@@ -401,6 +412,9 @@ def load_mapping(config_files, get_func, entity_type):
             if 'labels' in config:
                 config['labels'] = parse_labels(config['labels'])
 
+            if 'file' in config:
+                config['file'] = expand_path(working_dir, config['file'])
+
     return mapping
 
 
@@ -412,29 +426,6 @@ def validate_external(entity_type, name, config):
         "{} {} declared as external but specifies additional attributes "
         "({}).".format(
             entity_type, name, ', '.join(k for k in config if k != 'external')))
-
-
-def load_secrets(config_files, working_dir):
-    mapping = {}
-
-    for config_file in config_files:
-        for name, config in config_file.get_secrets().items():
-            mapping[name] = config or {}
-            if not config:
-                continue
-
-            external = config.get('external')
-            if external:
-                validate_external('Secret', name, config)
-                if isinstance(external, dict):
-                    config['external_name'] = external.get('name')
-                else:
-                    config['external_name'] = name
-
-            if 'file' in config:
-                config['file'] = expand_path(working_dir, config['file'])
-
-    return mapping
 
 
 def load_services(config_details, config_file):
@@ -815,6 +806,11 @@ def finalize_service(service_config, service_names, version, environment):
             types.ServiceSecret.parse(s) for s in service_dict['secrets']
         ]
 
+    if 'configs' in service_dict:
+        service_dict['configs'] = [
+            types.ServiceConfig.parse(c) for c in service_dict['configs']
+        ]
+
     normalize_build(service_dict, service_config.working_dir, environment)
 
     service_dict['name'] = service_config.name
@@ -906,6 +902,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('depends_on', parse_depends_on)
     md.merge_sequence('links', ServiceLink.parse)
     md.merge_sequence('secrets', types.ServiceSecret.parse)
+    md.merge_sequence('configs', types.ServiceConfig.parse)
     md.merge_mapping('deploy', parse_deploy)
 
     for field in ['volumes', 'devices']:
