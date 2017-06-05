@@ -507,12 +507,20 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-        if config_file.version in (const.COMPOSEFILE_V3_1, const.COMPOSEFILE_V3_2):
+        if config_file.version in (const.COMPOSEFILE_V3_1, const.COMPOSEFILE_V3_2,
+                                   const.COMPOSEFILE_V3_3):
             processed_config['secrets'] = interpolate_config_section(
                 config_file,
                 config_file.get_secrets(),
                 'secrets',
                 environment)
+        if config_file.version in (const.COMPOSEFILE_V3_3):
+            processed_config['configs'] = interpolate_config_section(
+                config_file,
+                config_file.get_configs(),
+                'configs',
+                environment
+            )
     else:
         processed_config = services
 
