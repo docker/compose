@@ -1982,6 +1982,38 @@ class ConfigTest(unittest.TestCase):
         actual = config.merge_service_dicts(base, override, V3_1)
         assert actual['secrets'] == override['secrets']
 
+    def test_merge_different_configs(self):
+        base = {
+            'image': 'busybox',
+            'configs': [
+                {'source': 'src.txt'}
+            ]
+        }
+        override = {'configs': ['other-src.txt']}
+
+        actual = config.merge_service_dicts(base, override, V3_3)
+        assert secret_sort(actual['configs']) == secret_sort([
+            {'source': 'src.txt'},
+            {'source': 'other-src.txt'}
+        ])
+
+    def test_merge_configs_override(self):
+        base = {
+            'image': 'busybox',
+            'configs': ['src.txt'],
+        }
+        override = {
+            'configs': [
+                {
+                    'source': 'src.txt',
+                    'target': 'data.txt',
+                    'mode': 0o400
+                }
+            ]
+        }
+        actual = config.merge_service_dicts(base, override, V3_3)
+        assert actual['configs'] == override['configs']
+
     def test_merge_deploy(self):
         base = {
             'image': 'busybox',
@@ -2209,6 +2241,91 @@ class ConfigTest(unittest.TestCase):
                 'secrets': [
                     types.ServiceSecret('one', None, None, None, None),
                     types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
+
+    def test_load_configs(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.3',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'configs': [
+                            'one',
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+                'configs': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        details = config.ConfigDetails('.', [base_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'configs': [
+                    types.ServiceConfig('one', None, None, None, None),
+                    types.ServiceConfig('source', 'target', '100', '200', 0o777),
+                ],
+            },
+        ]
+        assert service_sort(service_dicts) == service_sort(expected)
+
+    def test_load_configs_multi_file(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.3',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'configs': ['one'],
+                    },
+                },
+                'configs': {
+                    'one': {'file': 'secret.txt'},
+                },
+            })
+        override_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '3.3',
+                'services': {
+                    'web': {
+                        'configs': [
+                            {
+                                'source': 'source',
+                                'target': 'target',
+                                'uid': '100',
+                                'gid': '200',
+                                'mode': 0o777,
+                            },
+                        ],
+                    },
+                },
+            })
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        expected = [
+            {
+                'name': 'web',
+                'image': 'example/web',
+                'configs': [
+                    types.ServiceConfig('one', None, None, None, None),
+                    types.ServiceConfig('source', 'target', '100', '200', 0o777),
                 ],
             },
         ]
@@ -2528,6 +2645,24 @@ class InterpolationTest(unittest.TestCase):
         }))
         assert config_dict.secrets == {
             'secretdata': {
+                'external': {'name': 'baz.bar'},
+                'external_name': 'baz.bar'
+            }
+        }
+
+    @mock.patch.dict(os.environ)
+    def test_interpolation_configs_section(self):
+        os.environ['FOO'] = 'baz.bar'
+        config_dict = config.load(build_config_details({
+            'version': '3.3',
+            'configs': {
+                'configdata': {
+                    'external': {'name': '$FOO'}
+                }
+            }
+        }))
+        assert config_dict.configs == {
+            'configdata': {
                 'external': {'name': 'baz.bar'},
                 'external_name': 'baz.bar'
             }
@@ -3964,7 +4099,38 @@ class SerializeTest(unittest.TestCase):
                 'image': 'alpine',
                 'name': 'web'
             }
-        ], volumes={}, networks={}, secrets={})
+        ], volumes={}, networks={}, secrets={}, configs={})
 
         serialized_config = yaml.load(serialize_config(config_dict))
         assert '8080:80/tcp' in serialized_config['services']['web']['ports']
+
+    def test_serialize_configs(self):
+        service_dict = {
+            'image': 'example/web',
+            'configs': [
+                {'source': 'one'},
+                {
+                    'source': 'source',
+                    'target': 'target',
+                    'uid': '100',
+                    'gid': '200',
+                    'mode': 0o777,
+                }
+            ]
+        }
+        configs_dict = {
+            'one': {'file': '/one.txt'},
+            'source': {'file': '/source.pem'},
+            'two': {'external': True},
+        }
+        config_dict = config.load(build_config_details({
+            'version': '3.3',
+            'services': {'web': service_dict},
+            'configs': configs_dict
+        }))
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['web']
+        assert secret_sort(serialized_service['configs']) == secret_sort(service_dict['configs'])
+        assert 'configs' in serialized_config
+        assert serialized_config['configs']['two'] == configs_dict['two']
