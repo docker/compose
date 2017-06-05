@@ -57,15 +57,15 @@ class TestServicePort(object):
     def test_parse_simple_target_port(self):
         ports = ServicePort.parse(8000)
         assert len(ports) == 1
-        assert ports[0].target == '8000'
+        assert ports[0].target == 8000
 
     def test_parse_complete_port_definition(self):
         port_def = '1.1.1.1:3000:3000/udp'
         ports = ServicePort.parse(port_def)
         assert len(ports) == 1
         assert ports[0].repr() == {
-            'target': '3000',
-            'published': '3000',
+            'target': 3000,
+            'published': 3000,
             'external_ip': '1.1.1.1',
             'protocol': 'udp',
         }
@@ -77,7 +77,7 @@ class TestServicePort(object):
         assert len(ports) == 1
         assert ports[0].legacy_repr() == port_def + '/tcp'
         assert ports[0].repr() == {
-            'target': '3000',
+            'target': 3000,
             'external_ip': '1.1.1.1',
         }
 
@@ -86,13 +86,18 @@ class TestServicePort(object):
         assert len(ports) == 2
         reprs = [p.repr() for p in ports]
         assert {
-            'target': '4000',
-            'published': '25000'
+            'target': 4000,
+            'published': 25000
         } in reprs
         assert {
-            'target': '4001',
-            'published': '25001'
+            'target': 4001,
+            'published': 25001
         } in reprs
+
+    def test_parse_invalid_port(self):
+        port_def = '4000p'
+        with pytest.raises(ConfigurationError):
+            ServicePort.parse(port_def)
 
 
 class TestVolumeSpec(object):
