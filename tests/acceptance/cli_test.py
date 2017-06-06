@@ -258,8 +258,6 @@ class CLITestCase(DockerClientTestCase):
                     'restart': ''
                 },
             },
-            'networks': {},
-            'volumes': {},
         }
 
     def test_config_external_network(self):
@@ -311,8 +309,6 @@ class CLITestCase(DockerClientTestCase):
                     'network_mode': 'service:net',
                 },
             },
-            'networks': {},
-            'volumes': {},
         }
 
     @v3_only()
@@ -322,8 +318,6 @@ class CLITestCase(DockerClientTestCase):
 
         assert yaml.load(result.stdout) == {
             'version': '3.2',
-            'networks': {},
-            'secrets': {},
             'volumes': {
                 'foobar': {
                     'labels': {
