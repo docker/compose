@@ -10,8 +10,8 @@ Change log
 
 - Introduced version 3.3 of the `docker-compose.yml` specification.
   This version requires to be used with Docker Engine 17.06.0 or above.
-  Note: the `credential_spec` key only applies to Swarm services and will
-  be ignored by Compose
+  Note: the `credential_spec` and `configs` keys only apply to Swarm services
+  and will be ignored by Compose
 
 #### Compose file version 2.2
 
@@ -49,6 +49,9 @@ Change log
 
 - Fixed a bug where services declaring ports would cause crashes on some
   versions of Python 3
+
+- Fixed a bug where the output of `docker-compose config` would sometimes
+  contain invalid port definitions
 
 1.13.0 (2017-05-02)
 -------------------
