@@ -10,6 +10,7 @@ import pipes
 import re
 import subprocess
 import sys
+import time
 from distutils.spawn import find_executable
 from inspect import getdoc
 from operator import attrgetter
@@ -52,7 +53,6 @@ from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import human_readable_file_size
 from .utils import yesno
-
 
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
@@ -1217,7 +1217,11 @@ def up_shutdown_context(project, service_names, timeout, detached):
     signals.set_signal_handler_to_shutdown()
     try:
         try:
-            yield
+            try:
+                yield
+            except signals.ShutdownException:
+                print("Backgrounding in 2 seconds ... (press Ctrl+c again to stop)")
+                time.sleep(2)
         except signals.ShutdownException:
             print("Gracefully stopping... (press Ctrl+C again to force)")
             project.stop(service_names=service_names, timeout=timeout)
