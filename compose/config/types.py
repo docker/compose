@@ -238,8 +238,7 @@ class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
         return self.alias
 
 
-class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
-
+class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode')):
     @classmethod
     def parse(cls, spec):
         if isinstance(spec, six.string_types):
@@ -262,7 +261,31 @@ class ServiceSecret(namedtuple('_ServiceSecret', 'source target uid gid mode')):
         )
 
 
+class ServiceSecret(ServiceConfigBase):
+    pass
+
+
+class ServiceConfig(ServiceConfigBase):
+    pass
+
+
 class ServicePort(namedtuple('_ServicePort', 'target published protocol mode external_ip')):
+    def __new__(cls, target, published, *args, **kwargs):
+        try:
+            if target:
+                target = int(target)
+        except ValueError:
+            raise ConfigurationError('Invalid target port: {}'.format(target))
+
+        try:
+            if published:
+                published = int(published)
+        except ValueError:
+            raise ConfigurationError('Invalid published port: {}'.format(published))
+
+        return super(ServicePort, cls).__new__(
+            cls, target, published, *args, **kwargs
+        )
 
     @classmethod
     def parse(cls, spec):

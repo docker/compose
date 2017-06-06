@@ -40,7 +40,9 @@ def build_config(**kwargs):
         services=kwargs.get('services'),
         volumes=kwargs.get('volumes'),
         networks=kwargs.get('networks'),
-        secrets=kwargs.get('secrets'))
+        secrets=kwargs.get('secrets'),
+        configs=kwargs.get('configs'),
+    )
 
 
 class ProjectTest(DockerClientTestCase):
