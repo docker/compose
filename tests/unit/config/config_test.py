@@ -1865,7 +1865,7 @@ class ConfigTest(unittest.TestCase):
                 {
                     'target': '1245',
                     'published': '1245',
-                    'protocol': 'tcp',
+                    'protocol': 'udp',
                 }
             ]
         }
