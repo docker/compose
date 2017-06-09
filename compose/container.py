@@ -96,12 +96,16 @@ class Container(object):
     def human_readable_ports(self):
         def format_port(private, public):
             if not public:
-                return private
-            return '{HostIp}:{HostPort}->{private}'.format(
-                private=private, **public[0])
+                return [private]
+            return [
+                '{HostIp}:{HostPort}->{private}'.format(private=private, **pub)
+                for pub in public
+            ]
 
-        return ', '.join(format_port(*item)
-                         for item in sorted(six.iteritems(self.ports)))
+        return ', '.join(
+            ','.join(format_port(*item))
+            for item in sorted(six.iteritems(self.ports))
+        )
 
     @property
     def labels(self):
