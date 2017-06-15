@@ -568,12 +568,21 @@ class ServiceExtendsResolver(object):
         config_path = self.get_extended_config_path(extends)
         service_name = extends['service']
 
-        extends_file = ConfigFile.from_filename(config_path)
-        validate_config_version([self.config_file, extends_file])
-        extended_file = process_config_file(
-            extends_file, self.environment, service_name=service_name
-        )
-        service_config = extended_file.get_service(service_name)
+        if config_path == self.service_config.filename:
+            try:
+                service_config = self.config_file.get_service(service_name)
+            except KeyError:
+                raise ConfigurationError(
+                    "Cannot extend service '{}' in {}: Service not found".format(
+                        service_name, config_path)
+                )
+        else:
+            extends_file = ConfigFile.from_filename(config_path)
+            validate_config_version([self.config_file, extends_file])
+            extended_file = process_config_file(
+                extends_file, self.environment, service_name=service_name
+            )
+            service_config = extended_file.get_service(service_name)
 
         return config_path, service_config, service_name
 
