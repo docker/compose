@@ -24,10 +24,13 @@ from .network import get_networks
 from .network import ProjectNetworks
 from .service import BuildAction
 from .service import ContainerNetworkMode
+from .service import ContainerPidMode
 from .service import ConvergenceStrategy
 from .service import NetworkMode
+from .service import PidMode
 from .service import Service
 from .service import ServiceNetworkMode
+from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
 from .volume import ProjectVolumes
 
@@ -97,6 +100,7 @@ class Project(object):
             network_mode = project.get_network_mode(
                 service_dict, list(service_networks.keys())
             )
+            pid_mode = project.get_pid_mode(service_dict)
             volumes_from = get_volumes_from(project, service_dict)
 
             if config_data.version != V1:
@@ -121,6 +125,7 @@ class Project(object):
                     network_mode=network_mode,
                     volumes_from=volumes_from,
                     secrets=secrets,
+                    pid_mode=pid_mode,
                     **service_dict)
             )
 
@@ -223,6 +228,27 @@ class Project(object):
                     "does not exist.".format(name=service_dict['name'], dep=container_name))
 
         return NetworkMode(network_mode)
+
+    def get_pid_mode(self, service_dict):
+        pid_mode = service_dict.pop('pid', None)
+        if not pid_mode:
+            return PidMode(None)
+
+        service_name = get_service_name_from_network_mode(pid_mode)
+        if service_name:
+            return ServicePidMode(self.get_service(service_name))
+
+        container_name = get_container_name_from_network_mode(pid_mode)
+        if container_name:
+            try:
+                return ContainerPidMode(Container.from_id(self.client, container_name))
+            except APIError:
+                raise ConfigurationError(
+                    "Service '{name}' uses the PID namespace of container '{dep}' which "
+                    "does not exist.".format(name=service_dict['name'], dep=container_name)
+                )
+
+        return PidMode(pid_mode)
 
     def start(self, service_names=None, **options):
         containers = []
