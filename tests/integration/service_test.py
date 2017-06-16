@@ -36,6 +36,7 @@ from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
+from compose.service import PidMode
 from compose.service import Service
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_2_only
@@ -968,12 +969,12 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.get('HostConfig.NetworkMode'), 'host')
 
     def test_pid_mode_none_defined(self):
-        service = self.create_service('web', pid=None)
+        service = self.create_service('web', pid_mode=None)
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.PidMode'), '')
 
     def test_pid_mode_host(self):
-        service = self.create_service('web', pid='host')
+        service = self.create_service('web', pid_mode=PidMode('host'))
         container = create_and_start_container(service)
         self.assertEqual(container.get('HostConfig.PidMode'), 'host')
 

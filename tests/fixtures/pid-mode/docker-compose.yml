@@ -1,0 +1,17 @@
+version: "2.2"
+
+services:
+  service:
+    image: busybox
+    command: top
+    pid: "service:container"
+
+  container:
+    image: busybox
+    command: top
+    pid: "container:composetest_pid_mode_container"
+
+  host:
+    image: busybox
+    command: top
+    pid: host

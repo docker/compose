@@ -172,6 +172,21 @@ def validate_network_mode(service_config, service_names):
             "is undefined.".format(s=service_config, dep=dependency))
 
 
+def validate_pid_mode(service_config, service_names):
+    pid_mode = service_config.config.get('pid')
+    if not pid_mode:
+        return
+
+    dependency = get_service_name_from_network_mode(pid_mode)
+    if not dependency:
+        return
+    if dependency not in service_names:
+        raise ConfigurationError(
+            "Service '{s.name}' uses the PID namespace of service '{dep}' which "
+            "is undefined.".format(s=service_config, dep=dependency)
+        )
+
+
 def validate_links(service_config, service_names):
     for link in service_config.config.get('links', []):
         if link.split(':')[0] not in service_names:

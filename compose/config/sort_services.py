@@ -38,6 +38,7 @@ def get_service_dependents(service_dict, services):
         if (name in get_service_names(service.get('links', [])) or
             name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
             name == get_service_name_from_network_mode(service.get('network_mode')) or
+            name == get_service_name_from_network_mode(service.get('pid')) or
             name in service.get('depends_on', []))
     ]
 
