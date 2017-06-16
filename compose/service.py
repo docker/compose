@@ -157,6 +157,7 @@ class Service(object):
         networks=None,
         secrets=None,
         scale=None,
+        pid_mode=None,
         **options
     ):
         self.name = name
@@ -166,6 +167,7 @@ class Service(object):
         self.links = links or []
         self.volumes_from = volumes_from or []
         self.network_mode = network_mode or NetworkMode(None)
+        self.pid_mode = pid_mode or PidMode(None)
         self.networks = networks or {}
         self.secrets = secrets or []
         self.scale_num = scale or 1
@@ -607,15 +609,19 @@ class Service(object):
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name
+        pid_namespace = self.pid_mode.service_name
         return (
             self.get_linked_service_names() +
             self.get_volumes_from_names() +
             ([net_name] if net_name else []) +
+            ([pid_namespace] if pid_namespace else []) +
             list(self.options.get('depends_on', {}).keys())
         )
 
     def get_dependency_configs(self):
         net_name = self.network_mode.service_name
+        pid_namespace = self.pid_mode.service_name
+
         configs = dict(
             [(name, None) for name in self.get_linked_service_names()]
         )
@@ -623,6 +629,7 @@ class Service(object):
             [(name, None) for name in self.get_volumes_from_names()]
         ))
         configs.update({net_name: None} if net_name else {})
+        configs.update({pid_namespace: None} if pid_namespace else {})
         configs.update(self.options.get('depends_on', {}))
         for svc, config in self.options.get('depends_on', {}).items():
             if config['condition'] == CONDITION_STARTED:
@@ -833,7 +840,7 @@ class Service(object):
             log_config=log_config,
             extra_hosts=options.get('extra_hosts'),
             read_only=options.get('read_only'),
-            pid_mode=options.get('pid'),
+            pid_mode=self.pid_mode.mode,
             security_opt=options.get('security_opt'),
             ipc_mode=options.get('ipc'),
             cgroup_parent=options.get('cgroup_parent'),
@@ -1054,6 +1061,46 @@ def short_id_alias_exists(container, network):
     aliases = container.get(
         'NetworkSettings.Networks.{net}.Aliases'.format(net=network)) or ()
     return container.short_id in aliases
+
+
+class PidMode(object):
+    def __init__(self, mode):
+        self._mode = mode
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @property
+    def service_name(self):
+        return None
+
+
+class ServicePidMode(PidMode):
+    def __init__(self, service):
+        self.service = service
+
+    @property
+    def service_name(self):
+        return self.service.name
+
+    @property
+    def mode(self):
+        containers = self.service.containers()
+        if containers:
+            return 'container:' + containers[0].id
+
+        log.warn(
+            "Service %s is trying to use reuse the PID namespace "
+            "of another service that is not running." % (self.service_name)
+        )
+        return None
+
+
+class ContainerPidMode(PidMode):
+    def __init__(self, container):
+        self.container = container
+        self._mode = 'container:{}'.format(container.id)
 
 
 class NetworkMode(object):
