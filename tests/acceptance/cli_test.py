@@ -1183,6 +1183,31 @@ class CLITestCase(DockerClientTestCase):
         proc.wait()
         self.assertEqual(proc.returncode, 1)
 
+    @v2_only()
+    def test_up_with_pid_mode(self):
+        c = self.client.create_container(
+            'busybox', 'top', name='composetest_pid_mode_container',
+            host_config={}
+        )
+        self.addCleanup(self.client.remove_container, c, force=True)
+        self.client.start(c)
+        container_mode_source = 'container:{}'.format(c['Id'])
+
+        self.base_dir = 'tests/fixtures/pid-mode'
+
+        self.dispatch(['up', '-d'], None)
+
+        service_mode_source = 'container:{}'.format(
+            self.project.get_service('container').containers()[0].id)
+        service_mode_container = self.project.get_service('service').containers()[0]
+        assert service_mode_container.get('HostConfig.PidMode') == service_mode_source
+
+        container_mode_container = self.project.get_service('container').containers()[0]
+        assert container_mode_container.get('HostConfig.PidMode') == container_mode_source
+
+        host_mode_container = self.project.get_service('host').containers()[0]
+        assert host_mode_container.get('HostConfig.PidMode') == 'host'
+
     def test_exec_without_tty(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'console'])

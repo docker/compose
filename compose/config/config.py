@@ -44,6 +44,7 @@ from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_links
 from .validation import validate_network_mode
+from .validation import validate_pid_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
@@ -667,6 +668,7 @@ def validate_service(service_config, service_names, config_file):
     validate_cpu(service_config)
     validate_ulimits(service_config)
     validate_network_mode(service_config, service_names)
+    validate_pid_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
     validate_links(service_config, service_names)
 
