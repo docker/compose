@@ -498,7 +498,7 @@ class Project(object):
 
         if parallel_pull:
             def pull_service(service):
-                service.pull(ignore_pull_failures, True, silent=silent)
+                service.pull(ignore_pull_failures, silent=silent)
 
             _, errors = parallel.parallel_execute(
                 services,
