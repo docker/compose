@@ -17,7 +17,7 @@ try:
     env[str('PIP_DISABLE_PIP_VERSION_CHECK')] = str('1')
 
     s_cmd = subprocess.Popen(
-        ['pip', 'freeze'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+        [sys.executable, '-m', 'pip', 'freeze'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,
         env=env
     )
     packages = s_cmd.communicate()[0].splitlines()
