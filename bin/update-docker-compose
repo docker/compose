@@ -1,0 +1,26 @@
+#!/bin/bash
+CMDS="curl git"
+for C in $CMDS; do
+  command -v $C > /dev/null && continue || { echo "$C command not found."; exit 1; }
+done
+COMPOSE=$(command -v docker-compose)
+if [ ! -z $COMPOSE ]; then
+  echo "Updating docker-compose..."
+  INSTALLED_RELEASE=$(docker-compose --version | cut -d',' -f1 | cut -d' ' -f3)
+  if [ -d compose/ ]; then
+    rm -rf compose/
+  fi
+  git clone https://github.com/docker/compose.git
+  cd compose
+  git fetch --all
+  LATEST_RELEASE=$(git tag -l | grep ^1 | sort -Vr | head -1)
+  if [ $INSTALLED_RELEASE != $LATEST_RELEASE ]; then
+    sudo curl -L https://github.com/docker/compose/releases/download/$LATEST_RELEASE/docker-compose-$(uname -s)-$(uname -m) -o $COMPOSE
+    sudo chmod +x $COMPOSE
+    echo "docker-compose updated from $INSTALLED_RELEASE to $LATEST_RELEASE."
+  else
+    echo "docker-compose $LATEST_RELEASE is up to date."
+  fi
+  cd -
+  rm -rf compose/
+fi
