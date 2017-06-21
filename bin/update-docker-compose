@@ -14,6 +14,17 @@ if [ ! -z $COMPOSE ]; then
   cd compose
   git fetch --all
   LATEST_RELEASE=$(git tag -l | grep ^1 | sort -Vr | head -1)
+  RC=$(git tag -l | grep ^1 | sort -Vr | head -1 | grep -e '[[:print:]]')
+  if [ ! -z $RC ]; then
+    STABLE_RELEASE=${LATEST_RELEASE/[\-a-zA-Z]*[0-9]*/}
+    RELEASES=$(git tag -l | grep ^1 | sort -Vr | xargs)
+    for R in $RELEASES; do
+      if [ $R == $STABLE_RELEASE ]; then
+        LATEST_RELEASE=$R
+        break
+      fi
+    done
+  fi
   if [ $INSTALLED_RELEASE != $LATEST_RELEASE ]; then
     sudo curl -L https://github.com/docker/compose/releases/download/$LATEST_RELEASE/docker-compose-$(uname -s)-$(uname -m) -o $COMPOSE
     sudo chmod +x $COMPOSE
