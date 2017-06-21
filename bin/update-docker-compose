@@ -14,7 +14,7 @@ if [ ! -z $COMPOSE ]; then
   cd compose
   git fetch --all
   LATEST_RELEASE=$(git tag -l | grep ^1 | sort -Vr | head -1)
-  RC=$(git tag -l | grep ^1 | sort -Vr | head -1 | grep -e '[[:print:]]')
+  RC=$(echo $LATEST_RELEASE | grep -e '[a-zA-Z]')
   if [ ! -z $RC ]; then
     STABLE_RELEASE=${LATEST_RELEASE/[\-a-zA-Z]*[0-9]*/}
     RELEASES=$(git tag -l | grep ^1 | sort -Vr | xargs)
