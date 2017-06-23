@@ -1615,6 +1615,22 @@ class ConfigTest(unittest.TestCase):
             'ports': types.ServicePort.parse('5432')
         }
 
+    def test_merge_service_dicts_ports_sorting(self):
+        base = {
+            'ports': [5432]
+        }
+        override = {
+            'image': 'alpine:edge',
+            'ports': ['5432/udp']
+        }
+        actual = config.merge_service_dicts_from_files(
+            base,
+            override,
+            DEFAULT_VERSION)
+        assert len(actual['ports']) == 2
+        assert types.ServicePort.parse('5432')[0] in actual['ports']
+        assert types.ServicePort.parse('5432/udp')[0] in actual['ports']
+
     def test_merge_service_dicts_heterogeneous_volumes(self):
         base = {
             'volumes': ['/a:/b', '/x:/z'],
