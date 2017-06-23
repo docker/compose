@@ -60,13 +60,15 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None):
+    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None,
+                 noansi=False):
         self.name = name
         self.services = services
         self.client = client
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
         self.config_version = config_version
+        self.noansi = noansi
 
     def labels(self, one_off=OneOffFilter.exclude):
         labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
@@ -75,7 +77,7 @@ class Project(object):
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client):
+    def from_config(cls, name, config_data, client, noansi=False):
         """
         Construct a Project from a config.Config object.
         """
@@ -86,7 +88,7 @@ class Project(object):
             networks,
             use_networking)
         volumes = ProjectVolumes.from_config(name, config_data, client)
-        project = cls(name, [], client, project_networks, volumes, config_data.version)
+        project = cls(name, [], client, project_networks, volumes, config_data.version, noansi=noansi)
 
         for service_dict in config_data.services:
             service_dict = dict(service_dict)
@@ -126,6 +128,7 @@ class Project(object):
                     volumes_from=volumes_from,
                     secrets=secrets,
                     pid_mode=pid_mode,
+                    noansi=noansi,
                     **service_dict)
             )
 
@@ -270,7 +273,8 @@ class Project(object):
             start_service,
             operator.attrgetter('name'),
             'Starting',
-            get_deps)
+            get_deps,
+            noansi=self.noansi)
 
         return containers
 
@@ -288,25 +292,26 @@ class Project(object):
             self.build_container_operation_with_timeout_func('stop', options),
             operator.attrgetter('name'),
             'Stopping',
-            get_deps)
+            get_deps,
+            noansi=self.noansi)
 
     def pause(self, service_names=None, **options):
         containers = self.containers(service_names)
-        parallel.parallel_pause(reversed(containers), options)
+        parallel.parallel_pause(reversed(containers), options, noansi=self.noansi)
         return containers
 
     def unpause(self, service_names=None, **options):
         containers = self.containers(service_names)
-        parallel.parallel_unpause(containers, options)
+        parallel.parallel_unpause(containers, options, noansi=self.noansi)
         return containers
 
     def kill(self, service_names=None, **options):
-        parallel.parallel_kill(self.containers(service_names), options)
+        parallel.parallel_kill(self.containers(service_names), options, noansi=self.noansi)
 
     def remove_stopped(self, service_names=None, one_off=OneOffFilter.exclude, **options):
         parallel.parallel_remove(self.containers(
             service_names, stopped=True, one_off=one_off
-        ), options)
+        ), options, noansi=self.noansi)
 
     def down(self, remove_image_type, include_volumes, remove_orphans=False):
         self.stop(one_off=OneOffFilter.include)
@@ -331,7 +336,8 @@ class Project(object):
             containers,
             self.build_container_operation_with_timeout_func('restart', options),
             operator.attrgetter('name'),
-            'Restarting')
+            'Restarting',
+            noansi=self.noansi)
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, build_args=None):
@@ -447,7 +453,8 @@ class Project(object):
             do,
             operator.attrgetter('name'),
             None,
-            get_deps
+            get_deps,
+            noansi=self.noansi,
         )
         if errors:
             raise ProjectError(
@@ -500,7 +507,8 @@ class Project(object):
                 pull_service,
                 operator.attrgetter('name'),
                 'Pulling',
-                limit=5)
+                limit=5,
+                noansi=self.noansi)
         else:
             for service in services:
                 service.pull(ignore_pull_failures, silent=silent)
