@@ -959,7 +959,7 @@ def merge_ports(md, base, override):
 
     merged = parse_sequence_func(md.base.get(field, []))
     merged.update(parse_sequence_func(md.override.get(field, [])))
-    md[field] = [item for item in sorted(merged.values())]
+    md[field] = [item for item in sorted(merged.values(), key=lambda x: x.target)]
 
 
 def merge_build(output, base, override):
