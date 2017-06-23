@@ -31,6 +31,7 @@ def project_from_options(project_dir, options):
         get_config_path_from_options(project_dir, options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
+        noansi=options.get('--no-ansi'),
         host=host,
         tls_config=tls_config_from_options(options),
         environment=environment,
@@ -81,7 +82,7 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_config=None, environment=None, override_dir=None):
+                noansi=False, host=None, tls_config=None, environment=None, override_dir=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
@@ -100,7 +101,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     )
 
     with errors.handle_connection_errors(client):
-        return Project.from_config(project_name, config_data, client)
+        return Project.from_config(project_name, config_data, client, noansi=noansi)
 
 
 def get_project_name(working_dir, project_name=None, environment=None):
