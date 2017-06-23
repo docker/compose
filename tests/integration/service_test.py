@@ -208,6 +208,7 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(set(container.get('HostConfig.SecurityOpt')), set(security_opt))
 
+    @pytest.mark.xfail(True, reason='Not supported on most drivers')
     def test_create_container_with_storage_opt(self):
         storage_opt = {'size': '1G'}
         service = self.create_service('db', storage_opt=storage_opt)
