@@ -159,6 +159,7 @@ class TopLevelCommand(object):
       -f, --file FILE             Specify an alternate compose file (default: docker-compose.yml)
       -p, --project-name NAME     Specify an alternate project name (default: directory name)
       --verbose                   Show more output
+      --no-ansi                   Do not print ANSI control characters
       -v, --version               Print version and exit
       -H, --host HOST             Daemon socket to connect to
 
