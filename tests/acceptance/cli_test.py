@@ -609,8 +609,13 @@ class CLITestCase(DockerClientTestCase):
             'simple',
             'test', '-f', '/data/example.txt'
         ], returncode=0)
-        # FIXME: does not work with Python 3
-        # assert cmd_result.stdout.strip() == 'FILE_CONTENT'
+
+        service = self.project.get_service('simple')
+        container_data = service.containers(one_off=OneOffFilter.only, stopped=True)[0]
+        mount = container_data.get('Mounts')[0]
+        assert mount['Source'] == volume_path
+        assert mount['Destination'] == '/data'
+        assert mount['Type'] == 'bind'
 
     def test_run_one_off_with_multiple_volumes(self):
         self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
@@ -624,8 +629,6 @@ class CLITestCase(DockerClientTestCase):
             'simple',
             'test', '-f', '/data/example.txt'
         ], returncode=0)
-        # FIXME: does not work with Python 3
-        # assert cmd_result.stdout.strip() == 'FILE_CONTENT'
 
         self.dispatch([
             'run',
@@ -634,8 +637,30 @@ class CLITestCase(DockerClientTestCase):
             'simple',
             'test', '-f' '/data1/example.txt'
         ], returncode=0)
-        # FIXME: does not work with Python 3
-        # assert cmd_result.stdout.strip() == 'FILE_CONTENT'
+
+    def test_run_one_off_with_volume_merge(self):
+        self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
+        volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files'))
+        create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
+
+        self.dispatch([
+            '-f', 'docker-compose.merge.yml',
+            'run',
+            '-v', '{}:/data'.format(volume_path),
+            'simple',
+            'test', '-f', '/data/example.txt'
+        ], returncode=0)
+
+        service = self.project.get_service('simple')
+        container_data = service.containers(one_off=OneOffFilter.only, stopped=True)[0]
+        mounts = container_data.get('Mounts')
+        assert len(mounts) == 2
+        config_mount = [m for m in mounts if m['Destination'] == '/data1'][0]
+        override_mount = [m for m in mounts if m['Destination'] == '/data'][0]
+
+        assert config_mount['Type'] == 'volume'
+        assert override_mount['Source'] == volume_path
+        assert override_mount['Type'] == 'bind'
 
     def test_create_with_force_recreate_and_no_recreate(self):
         self.dispatch(
