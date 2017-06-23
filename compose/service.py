@@ -736,8 +736,7 @@ class Service(object):
         container_options = dict(
             (k, self.options[k])
             for k in DOCKER_CONFIG_KEYS if k in self.options)
-        override_options['volumes'] = (container_options.get('volumes', []) +
-                                       override_options.get('volumes', []))
+        override_volumes = override_options.pop('volumes', [])
         container_options.update(override_options)
 
         if not container_options.get('name'):
@@ -760,6 +759,11 @@ class Service(object):
             container_options['ports'] = build_container_ports(
                 formatted_ports(container_options.get('ports', [])),
                 self.options)
+
+        if 'volumes' in container_options or override_volumes:
+            container_options['volumes'] = list(set(
+                container_options.get('volumes', []) + override_volumes
+            ))
 
         container_options['environment'] = merge_environment(
             self.options.get('environment'),

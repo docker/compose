@@ -1,0 +1,9 @@
+version: '2.2'
+services:
+  simple:
+    image: busybox:latest
+    volumes:
+      - datastore:/data1
+
+volumes:
+    datastore:
