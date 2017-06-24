@@ -3,12 +3,12 @@ cached-property==1.3.0
 certifi==2017.4.17
 chardet==3.0.4
 colorama==0.3.9; sys_platform == 'win32'
-docker==2.4.2
 docker-pycreds==0.2.1
 dockerpty==0.4.1
 docopt==0.6.2
 enum34==1.1.6; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
+git+https://github.com/docker/docker-py.git@942e778f302199ff6ec677860aa28d07f69e11da#egg=docker
 idna==2.5
 ipaddress==1.0.18
 jsonschema==2.6.0
