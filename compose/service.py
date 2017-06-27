@@ -549,7 +549,7 @@ class Service(object):
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network, netdefs in sorted(self.networks.iteritems()):
+        for network, netdefs in sorted(self.networks.items()):
             if network in connected_networks:
                 if short_id_alias_exists(container, network):
                     continue
