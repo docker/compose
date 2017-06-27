@@ -14,11 +14,12 @@ log = logging.getLogger(__name__)
 
 
 class Volume(object):
-    def __init__(self, client, project, name, driver=None, driver_opts=None,
+    def __init__(self, client, project, name, actual_name=None, driver=None, driver_opts=None,
                  external_name=None, labels=None):
         self.client = client
         self.project = project
         self.name = name
+        self.actual_name = actual_name
         self.driver = driver
         self.driver_opts = driver_opts
         self.external_name = external_name
@@ -54,6 +55,8 @@ class Volume(object):
     def full_name(self):
         if self.external_name:
             return self.external_name
+        if self.actual_name:
+            return self.actual_name
         return '{0}_{1}'.format(self.project, self.name)
 
     @property
@@ -81,6 +84,7 @@ class ProjectVolumes(object):
                 client=client,
                 project=name,
                 name=vol_name,
+                actual_name=data.get('actual_name'),
                 driver=data.get('driver'),
                 driver_opts=data.get('driver_opts'),
                 external_name=data.get('external_name'),
