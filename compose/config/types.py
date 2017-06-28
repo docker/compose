@@ -295,24 +295,28 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
 
         if not isinstance(spec, dict):
             result = []
-            for k, v in build_port_bindings([spec]).items():
-                if '/' in k:
-                    target, proto = k.split('/', 1)
-                else:
-                    target, proto = (k, None)
-                for pub in v:
-                    if pub is None:
-                        result.append(
-                            cls(target, None, proto, None, None)
-                        )
-                    elif isinstance(pub, tuple):
-                        result.append(
-                            cls(target, pub[1], proto, None, pub[0])
-                        )
+            try:
+                for k, v in build_port_bindings([spec]).items():
+                    if '/' in k:
+                        target, proto = k.split('/', 1)
                     else:
-                        result.append(
-                            cls(target, pub, proto, None, None)
-                        )
+                        target, proto = (k, None)
+                    for pub in v:
+                        if pub is None:
+                            result.append(
+                                cls(target, None, proto, None, None)
+                            )
+                        elif isinstance(pub, tuple):
+                            result.append(
+                                cls(target, pub[1], proto, None, pub[0])
+                            )
+                        else:
+                            result.append(
+                                cls(target, pub, proto, None, None)
+                            )
+            except ValueError as e:
+                raise ConfigurationError(str(e))
+
             return result
 
         return [cls(
