@@ -37,7 +37,7 @@ install_requires = [
     'requests >= 2.6.1, != 2.11.0, < 2.12',
     'texttable >= 0.8.1, < 0.9',
     'websocket-client >= 0.32.0, < 1.0',
-    'docker >= 2.3.0, < 3.0',
+    'docker >= 2.4.2, < 3.0',
     'dockerpty >= 0.4.1, < 0.5',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
