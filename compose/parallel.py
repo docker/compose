@@ -14,6 +14,7 @@ from six.moves.queue import Queue
 
 from compose.cli.colors import green
 from compose.cli.colors import red
+from compose.cli.colors import yellow
 from compose.cli.signals import ShutdownException
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
@@ -24,6 +25,12 @@ from compose.utils import get_output_stream
 log = logging.getLogger(__name__)
 
 STOP = object()
+
+STATUS_COLORS = {
+    'done': green,
+    'error': red,
+    'working': yellow,
+}
 
 
 def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
@@ -47,21 +54,20 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
     results = []
     error_to_reraise = None
 
-    for obj, result, exception in events:
-        if exception is None:
-            writer.write(get_name(obj), green('done'))
-            results.append(result)
-        elif isinstance(exception, APIError):
-            errors[get_name(obj)] = exception.explanation
-            writer.write(get_name(obj), red('error'))
-        elif isinstance(exception, (OperationFailedError, HealthCheckFailed, NoHealthCheckConfigured)):
-            errors[get_name(obj)] = exception.msg
-            writer.write(get_name(obj), red('error'))
-        elif isinstance(exception, UpstreamError):
-            writer.write(get_name(obj), red('error'))
-        else:
-            errors[get_name(obj)] = exception
-            error_to_reraise = exception
+    for status, obj, result, exception in events:
+        color = STATUS_COLORS.get(status, str)
+        writer.write(get_name(obj), color(status))
+        if status != 'working':
+            if exception is None:
+                results.append(result)
+            elif isinstance(exception, APIError):
+                errors[get_name(obj)] = exception.explanation
+            elif isinstance(exception, (OperationFailedError, HealthCheckFailed,
+                                        NoHealthCheckConfigured)):
+                errors[get_name(obj)] = exception.msg
+            elif not isinstance(exception, UpstreamError):
+                errors[get_name(obj)] = exception
+                error_to_reraise = exception
 
     for obj_name, error in errors.items():
         stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
@@ -113,14 +119,17 @@ def parallel_execute_iter(objects, func, get_deps, limit):
 
     Returns an iterator of tuples which look like:
 
+    # just before func starts
+    ('working', object, None, None)
+
     # if func returned normally when run on object
-    (object, result, None)
+    ('done', object, result, None)
 
     # if func raised an exception when run on object
-    (object, None, exception)
+    ('error', object, None, exception)
 
     # if func raised an exception when run on one of object's dependencies
-    (object, None, UpstreamError())
+    ('error', object, None, UpstreamError())
     """
     if get_deps is None:
         get_deps = _no_deps
@@ -147,13 +156,14 @@ def parallel_execute_iter(objects, func, get_deps, limit):
         if event is STOP:
             break
 
-        obj, _, exception = event
-        if exception is None:
-            log.debug('Finished processing: {}'.format(obj))
-            state.finished.add(obj)
-        else:
-            log.debug('Failed: {}'.format(obj))
-            state.failed.add(obj)
+        status, obj, _, exception = event
+        if status != 'working':
+            if exception is None:
+                log.debug('Finished processing: {}'.format(obj))
+                state.finished.add(obj)
+            else:
+                log.debug('Failed: {}'.format(obj))
+                state.failed.add(obj)
 
         yield event
 
@@ -165,10 +175,11 @@ def producer(obj, func, results, limiter):
     """
     with limiter:
         try:
+            results.put(('working', obj, None, None))
             result = func(obj)
-            results.put((obj, result, None))
+            results.put(('done', obj, result, None))
         except Exception as e:
-            results.put((obj, None, e))
+            results.put(('error', obj, None, e))
 
 
 def feed_queue(objects, func, get_deps, results, state, limiter):
@@ -176,8 +187,8 @@ def feed_queue(objects, func, get_deps, results, state, limiter):
     Starts producer threads for any objects which are ready to be processed
     (i.e. they have no dependencies which haven't been successfully processed).
 
-    Shortcuts any objects whose dependencies have failed and places an
-    (object, None, UpstreamError()) tuple on the results queue.
+    Shortcuts any objects whose dependencies have failed and places a
+    (status, object, None, UpstreamError()) tuple on the results queue.
     """
     pending = state.pending()
     log.debug('Pending: {}'.format(pending))
@@ -187,7 +198,7 @@ def feed_queue(objects, func, get_deps, results, state, limiter):
         try:
             if any(dep[0] in state.failed for dep in deps):
                 log.debug('{} has upstream errors - not processing'.format(obj))
-                results.put((obj, None, UpstreamError()))
+                results.put(('error', obj, None, UpstreamError()))
                 state.failed.add(obj)
             elif all(
                 dep not in objects or (
@@ -204,7 +215,7 @@ def feed_queue(objects, func, get_deps, results, state, limiter):
                 'Healthcheck for service(s) upstream of {} failed - '
                 'not processing'.format(obj)
             )
-            results.put((obj, None, e))
+            results.put(('error', obj, None, e))
 
     if state.is_done():
         results.put(STOP)

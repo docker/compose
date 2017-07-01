@@ -106,15 +106,15 @@ def test_parallel_execute_with_upstream_errors():
     assert log == [cache]
 
     events = [
-        (obj, result, type(exception))
-        for obj, result, exception
+        (status, obj, result, type(exception))
+        for status, obj, result, exception
         in parallel_execute_iter(objects, process, get_deps, None)
     ]
 
-    assert (cache, None, type(None)) in events
-    assert (data_volume, None, APIError) in events
-    assert (db, None, UpstreamError) in events
-    assert (web, None, UpstreamError) in events
+    assert ('done', cache, None, type(None)) in events
+    assert ('error', data_volume, None, APIError) in events
+    assert ('error', db, None, UpstreamError) in events
+    assert ('error', web, None, UpstreamError) in events
 
 
 def test_parallel_execute_alignment(capsys):
