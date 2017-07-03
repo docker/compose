@@ -56,6 +56,7 @@ extras_require = {
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5'],
     ':python_version < "3.3"': ['ipaddress >= 1.0.16'],
+    'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
 }
 
 
