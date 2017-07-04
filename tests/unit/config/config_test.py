@@ -2098,6 +2098,19 @@ class ConfigTest(unittest.TestCase):
         actual = config.merge_service_dicts(base, override, V3_3)
         assert actual['credential_spec'] == override['credential_spec']
 
+    def test_merge_scale(self):
+        base = {
+            'image': 'bar',
+            'scale': 2,
+        }
+
+        override = {
+            'scale': 4,
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_2)
+        assert actual == {'image': 'bar', 'scale': 4}
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
