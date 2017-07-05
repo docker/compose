@@ -975,6 +975,7 @@ def merge_build(output, base, override):
     md = MergeDict(to_dict(base), to_dict(override))
     md.merge_scalar('context')
     md.merge_scalar('dockerfile')
+    md.merge_scalar('network')
     md.merge_mapping('args', parse_build_arguments)
     md.merge_field('cache_from', merge_unique_items_lists, default=[])
     md.merge_mapping('labels', parse_labels)

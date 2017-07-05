@@ -717,6 +717,30 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
         assert service.image()['Config']['Labels']['com.docker.compose.test'] == 'true'
 
+    def test_build_with_network(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox\n')
+            f.write('RUN ping -c1 google.local\n')
+
+        net_container = self.client.create_container(
+            'busybox', 'top', host_config=self.client.create_host_config(
+                extra_hosts={'google.local': '8.8.8.8'}
+            ), name='composetest_build_network'
+        )
+
+        self.addCleanup(self.client.remove_container, net_container, force=True)
+        self.client.start(net_container)
+
+        service = self.create_service('buildwithnet', build={
+            'context': text_type(base_dir),
+            'network': 'container:{}'.format(net_container['Id'])
+        })
+
+        service.build()
+        assert service.image()
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
