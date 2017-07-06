@@ -16,8 +16,7 @@ try:
         [
             sys.executable, '-c',
             """import pkg_resources as pr; print "\\n".join([d.project_name for d in pr.working_set])"""
-        ], stderr=subprocess.PIPE, stdout=subprocess.PIPE,
-        env=env
+        ], stderr=subprocess.PIPE, stdout=subprocess.PIPE
     )
     packages = s_cmd.communicate()[0].splitlines()
     if 'docker-py' in packages:
