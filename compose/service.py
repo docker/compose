@@ -850,6 +850,7 @@ class Service(object):
             security_opt=options.get('security_opt'),
             ipc_mode=options.get('ipc'),
             cgroup_parent=options.get('cgroup_parent'),
+            container_id_file=options.get('cidfile'),
             cpu_quota=options.get('cpu_quota'),
             shm_size=options.get('shm_size'),
             sysctls=options.get('sysctls'),

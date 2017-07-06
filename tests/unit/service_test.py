@@ -210,6 +210,23 @@ class ServiceTest(unittest.TestCase):
             'test'
         )
 
+    def test_cidfile(self):
+        self.mock_client.create_host_config.return_value = {}
+
+        service = Service(
+            name='foo',
+            image='foo',
+            hostname='name',
+            client=self.mock_client,
+            cidfile='/var/run/cid.txt')
+        service._get_container_create_options({'some': 'overrides'}, 1)
+
+        self.assertTrue(self.mock_client.create_host_config.called)
+        self.assertEqual(
+            self.mock_client.create_host_config.call_args[1]['container_id_file'],
+            '/var/run/cid.txt'
+        )
+
     def test_log_opt(self):
         self.mock_client.create_host_config.return_value = {}
 
