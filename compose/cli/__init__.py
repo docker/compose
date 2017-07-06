@@ -19,15 +19,12 @@ try:
     s_cmd = subprocess.Popen(
         [
             sys.executable, '-c',
-            'import pkg_resources; print("\\n".join(map(str, [distr for distr in pkg_resources.working_set if distr.project_name])))'
+            """import pkg_resources as pr; print "\\n".join([d.project_name for d in pr.working_set])"""
         ], stderr=subprocess.PIPE, stdout=subprocess.PIPE,
         env=env
     )
     packages = s_cmd.communicate()[0].splitlines()
-    dockerpy_installed = len(
-        list(filter(lambda p: p.startswith(b'docker-py '), packages))
-    ) > 0
-    if dockerpy_installed:
+    if 'docker-py' in packages:
         from .colors import yellow
         print(
             yellow('WARNING:'),
@@ -39,7 +36,7 @@ try:
         )
 
 except OSError:
-    # pip command is not available, which indicates it's probably the binary
+    # python command is not available, which indicates it's probably the binary
     # distribution of Compose which is not affected
     pass
 except UnicodeDecodeError:
