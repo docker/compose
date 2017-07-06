@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import os
 import subprocess
 import sys
 
@@ -13,18 +12,14 @@ try:
     # https://github.com/docker/compose/issues/4425
     # https://github.com/docker/compose/issues/4481
     # https://github.com/pypa/pip/blob/master/pip/_vendor/__init__.py
-    env = os.environ.copy()
-    env[str('PIP_DISABLE_PIP_VERSION_CHECK')] = str('1')
-
     s_cmd = subprocess.Popen(
-        ['pip', 'freeze'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,
-        env=env
+        [
+            sys.executable, '-c',
+            """import pkg_resources as pr; print "\\n".join([d.project_name for d in pr.working_set])"""
+        ], stderr=subprocess.PIPE, stdout=subprocess.PIPE
     )
     packages = s_cmd.communicate()[0].splitlines()
-    dockerpy_installed = len(
-        list(filter(lambda p: p.startswith(b'docker-py=='), packages))
-    ) > 0
-    if dockerpy_installed:
+    if 'docker-py' in packages:
         from .colors import yellow
         print(
             yellow('WARNING:'),
@@ -36,7 +31,7 @@ try:
         )
 
 except OSError:
-    # pip command is not available, which indicates it's probably the binary
+    # python command is not available, which indicates it's probably the binary
     # distribution of Compose which is not affected
     pass
 except UnicodeDecodeError:
