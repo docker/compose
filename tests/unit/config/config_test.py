@@ -2361,6 +2361,52 @@ class ConfigTest(unittest.TestCase):
         assert service_sort(service_dicts) == service_sort(expected)
 
 
+def test_cidfile_v1():
+    config_details = build_config_details({
+        'simple': {
+            'image': 'busybox',
+            'cidfile': '/var/cid.txt',
+        },
+    })
+    cfg = config.load(config_details)
+    assert cfg.services == [
+        {
+            'name': 'simple',
+            'image': 'busybox',
+            'cidfile': '/var/cid.txt',
+        },
+    ]
+
+
+@pytest.mark.parametrize('version', [
+    '2',
+    '2.1',
+    '2.2',
+    '3',
+    '3.1',
+    '3.2',
+    '3.3',
+])
+def test_cidfile_v2_and_up(version):
+    config_details = build_config_details({
+        'version': version,
+        'services': {
+            'simple': {
+                'image': 'busybox',
+                'cidfile': '/var/cid.txt',
+            }
+        },
+    })
+    cfg = config.load(config_details)
+    assert cfg.services == [
+        {
+            'name': 'simple',
+            'image': 'busybox',
+            'cidfile': '/var/cid.txt',
+        },
+    ]
+
+
 class NetworkModeTest(unittest.TestCase):
 
     def test_network_mode_standard(self):
