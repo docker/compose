@@ -21,11 +21,23 @@ def serialize_dict_type(dumper, data):
     return dumper.represent_dict(data.repr())
 
 
+def serialize_string(dumper, data):
+    """ Ensure boolean-like strings are quoted in the output """
+    representer = dumper.represent_str if six.PY3 else dumper.represent_unicode
+    if data.lower() in ('y', 'n', 'yes', 'no', 'on', 'off', 'true', 'false'):
+        # Empirically only y/n appears to be an issue, but this might change
+        # depending on which PyYaml version is being used. Err on safe side.
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+    return representer(data)
+
+
 yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServiceConfig, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
+yaml.SafeDumper.add_representer(str, serialize_string)
+yaml.SafeDumper.add_representer(six.text_type, serialize_string)
 
 
 def denormalize_config(config, image_digests=None):
@@ -58,7 +70,8 @@ def serialize_config(config, image_digests=None):
         denormalize_config(config, image_digests),
         default_flow_style=False,
         indent=2,
-        width=80)
+        width=80
+    )
 
 
 def serialize_ns_time_value(value):
