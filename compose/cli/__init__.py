@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import os
 import subprocess
 import sys
 
@@ -13,9 +12,6 @@ try:
     # https://github.com/docker/compose/issues/4425
     # https://github.com/docker/compose/issues/4481
     # https://github.com/pypa/pip/blob/master/pip/_vendor/__init__.py
-    env = os.environ.copy()
-    env[str('PIP_DISABLE_PIP_VERSION_CHECK')] = str('1')
-
     s_cmd = subprocess.Popen(
         [
             sys.executable, '-c',
