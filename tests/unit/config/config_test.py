@@ -4163,3 +4163,21 @@ class SerializeTest(unittest.TestCase):
         assert secret_sort(serialized_service['configs']) == secret_sort(service_dict['configs'])
         assert 'configs' in serialized_config
         assert serialized_config['configs']['two'] == configs_dict['two']
+
+    def test_serialize_bool_string(self):
+        cfg = {
+            'version': '2.2',
+            'services': {
+                'web': {
+                    'image': 'example/web',
+                    'command': 'true',
+                    'environment': {'FOO': 'Y', 'BAR': 'on'}
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg))
+
+        serialized_config = serialize_config(config_dict)
+        assert 'command: "true"\n' in serialized_config
+        assert 'FOO: "Y"\n' in serialized_config
+        assert 'BAR: "on"\n' in serialized_config
