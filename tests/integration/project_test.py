@@ -34,6 +34,7 @@ from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
 from tests.integration.testcases import v2_1_only
+from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
 
@@ -150,7 +151,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             client=self.client,
             config_data=load_config({
-                'version': V2_0,
+                'version': str(V2_0),
                 'services': {
                     'net': {
                         'image': 'busybox:latest',
@@ -178,7 +179,7 @@ class ProjectTest(DockerClientTestCase):
             return Project.from_config(
                 name='composetest',
                 config_data=load_config({
-                    'version': V2_0,
+                    'version': str(V2_0),
                     'services': {
                         'web': {
                             'image': 'busybox:latest',
@@ -820,7 +821,7 @@ class ProjectTest(DockerClientTestCase):
     def test_up_with_enable_ipv6(self):
         self.require_api_version('1.23')
         config_data = build_config(
-            version=V2_0,
+            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -1003,7 +1004,7 @@ class ProjectTest(DockerClientTestCase):
         network_name = 'network_with_label'
 
         config_data = build_config(
-            version=V2_0,
+            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -1063,7 +1064,7 @@ class ProjectTest(DockerClientTestCase):
         volume_name = 'volume_with_label'
 
         config_data = build_config(
-            version=V2_0,
+            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
@@ -1103,7 +1104,7 @@ class ProjectTest(DockerClientTestCase):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': V2_0,
+                'version': str(V2_0),
                 'services': {
                     'simple': {'image': 'busybox:latest', 'command': 'top'},
                     'another': {
@@ -1122,7 +1123,7 @@ class ProjectTest(DockerClientTestCase):
         override_file = config.ConfigFile(
             'override.yml',
             {
-                'version': V2_0,
+                'version': str(V2_0),
                 'services': {
                     'another': {
                         'logging': {
@@ -1155,7 +1156,7 @@ class ProjectTest(DockerClientTestCase):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': V2_0,
+                'version': str(V2_0),
                 'services': {
                     'simple': {
                         'image': 'busybox:latest',
@@ -1168,7 +1169,7 @@ class ProjectTest(DockerClientTestCase):
         override_file = config.ConfigFile(
             'override.yml',
             {
-                'version': V2_0,
+                'version': str(V2_0),
                 'services': {
                     'simple': {
                         'ports': ['1234:1234']
@@ -1186,6 +1187,7 @@ class ProjectTest(DockerClientTestCase):
         containers = project.containers()
         self.assertEqual(len(containers), 1)
 
+    @v2_2_only()
     def test_project_up_config_scale(self):
         config_data = build_config(
             version=V2_2,
@@ -1454,7 +1456,7 @@ class ProjectTest(DockerClientTestCase):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': V2_0,
+                'version': str(V2_0),
                 'services': {
                     'simple': {
                         'image': 'busybox:latest',
