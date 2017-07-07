@@ -7,9 +7,8 @@ import yaml
 from compose.config import types
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_1 as V2_1
-from compose.const import COMPOSEFILE_V2_2 as V2_2
+from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_2 as V3_2
-from compose.const import COMPOSEFILE_V3_3 as V3_3
 
 
 def serialize_config_type(dumper, data):
@@ -41,7 +40,7 @@ yaml.SafeDumper.add_representer(six.text_type, serialize_string)
 
 
 def denormalize_config(config, image_digests=None):
-    result = {'version': V2_1 if config.version == V1 else config.version}
+    result = {'version': str(V2_1) if config.version == V1 else str(config.version)}
     denormalized_services = [
         denormalize_service_dict(
             service_dict,
@@ -107,7 +106,7 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
 
-    if 'depends_on' in service_dict and version not in (V2_1, V2_2):
+    if 'depends_on' in service_dict and (version < V2_1 or version >= V3_0):
         service_dict['depends_on'] = sorted([
             svc for svc in service_dict['depends_on'].keys()
         ])
@@ -122,7 +121,7 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
                 service_dict['healthcheck']['timeout']
             )
 
-    if 'ports' in service_dict and version not in (V3_2, V3_3):
+    if 'ports' in service_dict and version < V3_2:
         service_dict['ports'] = [
             p.legacy_repr() if isinstance(p, types.ServicePort) else p
             for p in service_dict['ports']

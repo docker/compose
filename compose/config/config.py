@@ -18,6 +18,7 @@ from ..const import COMPOSEFILE_V1 as V1
 from ..utils import build_string_dict
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
+from ..version import ComposeVersion
 from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
@@ -188,15 +189,16 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         if version == '1':
             raise ConfigurationError(
                 'Version in "{}" is invalid. {}'
-                .format(self.filename, VERSION_EXPLANATION))
+                .format(self.filename, VERSION_EXPLANATION)
+            )
 
         if version == '2':
-            version = const.COMPOSEFILE_V2_0
+            return const.COMPOSEFILE_V2_0
 
         if version == '3':
-            version = const.COMPOSEFILE_V3_0
+            return const.COMPOSEFILE_V3_0
 
-        return version
+        return ComposeVersion(version)
 
     def get_service(self, name):
         return self.get_service_dicts()[name]
@@ -496,7 +498,7 @@ def process_config_file(config_file, environment, service_name=None):
         'service',
         environment)
 
-    if config_file.version != V1:
+    if config_file.version > V1:
         processed_config = dict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
@@ -509,14 +511,13 @@ def process_config_file(config_file, environment, service_name=None):
             config_file.get_networks(),
             'network',
             environment)
-        if config_file.version in (const.COMPOSEFILE_V3_1, const.COMPOSEFILE_V3_2,
-                                   const.COMPOSEFILE_V3_3):
+        if config_file.version >= const.COMPOSEFILE_V3_1:
             processed_config['secrets'] = interpolate_config_section(
                 config_file,
                 config_file.get_secrets(),
                 'secrets',
                 environment)
-        if config_file.version in (const.COMPOSEFILE_V3_3):
+        if config_file.version >= const.COMPOSEFILE_V3_3:
             processed_config['configs'] = interpolate_config_section(
                 config_file,
                 config_file.get_configs(),

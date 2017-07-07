@@ -10,6 +10,8 @@ from .. import mock
 from .. import unittest
 from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
+from compose.const import COMPOSEFILE_V1 as V1
+from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
@@ -21,9 +23,9 @@ class ProjectTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
 
-    def test_from_config(self):
+    def test_from_config_v1(self):
         config = Config(
-            version=None,
+            version=V1,
             services=[
                 {
                     'name': 'web',
@@ -53,7 +55,7 @@ class ProjectTest(unittest.TestCase):
 
     def test_from_config_v2(self):
         config = Config(
-            version=2,
+            version=V2_0,
             services=[
                 {
                     'name': 'web',
@@ -166,7 +168,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=None,
+                version=V2_0,
                 services=[{
                     'name': 'test',
                     'image': 'busybox:latest',
@@ -194,7 +196,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=None,
+                version=V2_0,
                 services=[
                     {
                         'name': 'vol',
@@ -221,7 +223,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=None,
             config_data=Config(
-                version=None,
+                version=V2_0,
                 services=[
                     {
                         'name': 'vol',
@@ -361,7 +363,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=None,
+                version=V1,
                 services=[
                     {
                         'name': 'test',
@@ -386,7 +388,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=None,
+                version=V2_0,
                 services=[
                     {
                         'name': 'test',
@@ -417,7 +419,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=None,
+                version=V2_0,
                 services=[
                     {
                         'name': 'aaa',
@@ -444,7 +446,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=2,
+                version=V2_0,
                 services=[
                     {
                         'name': 'foo',
@@ -465,7 +467,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=2,
+                version=V2_0,
                 services=[
                     {
                         'name': 'foo',
@@ -500,7 +502,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version=None,
+                version=V2_0,
                 services=[{
                     'name': 'web',
                     'image': 'busybox:latest',
@@ -518,7 +520,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
-                version='2',
+                version=V2_0,
                 services=[{
                     'name': 'web',
                     'image': 'busybox:latest',
