@@ -7,7 +7,6 @@ from string import Template
 import six
 
 from .errors import ConfigurationError
-from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 
 
@@ -28,7 +27,7 @@ class Interpolator(object):
 
 
 def interpolate_environment_variables(version, config, section, environment):
-    if version in (V2_0, V1):
+    if version <= V2_0:
         interpolator = Interpolator(Template, environment)
     else:
         interpolator = Interpolator(TemplateWithDefaults, environment)

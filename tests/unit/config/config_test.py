@@ -378,7 +378,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile(
             'base.yaml',
             {
-                'version': V2_1,
+                'version': str(V2_1),
                 'services': {
                     'web': {
                         'image': 'example/web',
@@ -830,7 +830,7 @@ class ConfigTest(unittest.TestCase):
         service = config.load(
             build_config_details(
                 {
-                    'version': V3_3,
+                    'version': str(V3_3),
                     'services': {
                         'web': {
                             'build': {
@@ -1523,7 +1523,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_isolation_option(self):
         actual = config.load(build_config_details({
-            'version': V2_1,
+            'version': str(V2_1),
             'services': {
                 'web': {
                     'image': 'win10',
@@ -4122,7 +4122,7 @@ class SerializeTest(unittest.TestCase):
         assert serialized_config['secrets']['two'] == secrets_dict['two']
 
     def test_serialize_ports(self):
-        config_dict = config.Config(version='2.0', services=[
+        config_dict = config.Config(version=V2_0, services=[
             {
                 'ports': [types.ServicePort('80', '8080', None, None, None)],
                 'image': 'alpine',

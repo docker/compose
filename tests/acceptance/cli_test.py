@@ -850,8 +850,13 @@ class CLITestCase(DockerClientTestCase):
         # Two networks were created: back and front
         assert sorted(n['Name'].split('/')[-1] for n in networks) == [back_name, front_name]
 
-        back_network = [n for n in networks if n['Name'] == back_name][0]
-        front_network = [n for n in networks if n['Name'] == front_name][0]
+        # lookup by ID instead of name in case of duplicates
+        back_network = self.client.inspect_network(
+            [n for n in networks if n['Name'] == back_name][0]['Id']
+        )
+        front_network = self.client.inspect_network(
+            [n for n in networks if n['Name'] == front_name][0]['Id']
+        )
 
         web_container = self.project.get_service('web').containers()[0]
         app_container = self.project.get_service('app').containers()[0]
