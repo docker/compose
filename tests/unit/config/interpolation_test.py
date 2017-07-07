@@ -8,6 +8,8 @@ from compose.config.interpolation import interpolate_environment_variables
 from compose.config.interpolation import Interpolator
 from compose.config.interpolation import InvalidInterpolation
 from compose.config.interpolation import TemplateWithDefaults
+from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.const import COMPOSEFILE_V3_1 as V3_1
 
 
 @pytest.fixture
@@ -50,7 +52,7 @@ def test_interpolate_environment_variables_in_services(mock_env):
             }
         }
     }
-    value = interpolate_environment_variables("2.0", services, 'service', mock_env)
+    value = interpolate_environment_variables(V2_0, services, 'service', mock_env)
     assert value == expected
 
 
@@ -75,7 +77,7 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    value = interpolate_environment_variables("2.0", volumes, 'volume', mock_env)
+    value = interpolate_environment_variables(V2_0, volumes, 'volume', mock_env)
     assert value == expected
 
 
@@ -100,7 +102,7 @@ def test_interpolate_environment_variables_in_secrets(mock_env):
         },
         'other': {},
     }
-    value = interpolate_environment_variables("3.1", secrets, 'volume', mock_env)
+    value = interpolate_environment_variables(V3_1, secrets, 'volume', mock_env)
     assert value == expected
 
 

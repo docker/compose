@@ -9,6 +9,7 @@ from compose import bundle
 from compose import service
 from compose.cli.errors import UserError
 from compose.config.config import Config
+from compose.const import COMPOSEFILE_V2_0 as V2_0
 
 
 @pytest.fixture
@@ -74,7 +75,7 @@ def test_to_bundle():
         {'name': 'b', 'build': './b'},
     ]
     config = Config(
-        version=2,
+        version=V2_0,
         services=services,
         volumes={'special': {}},
         networks={'extra': {}},

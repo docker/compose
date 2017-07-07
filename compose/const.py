@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import sys
 
+from .version import ComposeVersion
+
 DEFAULT_TIMEOUT = 10
 HTTP_TIMEOUT = 60
 IMAGE_EVENTS = ['delete', 'import', 'load', 'pull', 'push', 'save', 'tag', 'untag']
@@ -19,15 +21,15 @@ NANOCPUS_SCALE = 1000000000
 
 SECRETS_PATH = '/run/secrets'
 
-COMPOSEFILE_V1 = '1'
-COMPOSEFILE_V2_0 = '2.0'
-COMPOSEFILE_V2_1 = '2.1'
-COMPOSEFILE_V2_2 = '2.2'
+COMPOSEFILE_V1 = ComposeVersion('1')
+COMPOSEFILE_V2_0 = ComposeVersion('2.0')
+COMPOSEFILE_V2_1 = ComposeVersion('2.1')
+COMPOSEFILE_V2_2 = ComposeVersion('2.2')
 
-COMPOSEFILE_V3_0 = '3.0'
-COMPOSEFILE_V3_1 = '3.1'
-COMPOSEFILE_V3_2 = '3.2'
-COMPOSEFILE_V3_3 = '3.3'
+COMPOSEFILE_V3_0 = ComposeVersion('3.0')
+COMPOSEFILE_V3_1 = ComposeVersion('3.1')
+COMPOSEFILE_V3_2 = ComposeVersion('3.2')
+COMPOSEFILE_V3_3 = ComposeVersion('3.3')
 
 API_VERSIONS = {
     COMPOSEFILE_V1: '1.21',
