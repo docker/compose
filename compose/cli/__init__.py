@@ -17,6 +17,8 @@ try:
     env[str('PIP_DISABLE_PIP_VERSION_CHECK')] = str('1')
 
     s_cmd = subprocess.Popen(
+        # DO NOT replace this call with a `sys.executable` call. It breaks the binary
+        # distribution (with the binary calling itself recursively over and over).
         ['pip', 'freeze'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,
         env=env
     )
