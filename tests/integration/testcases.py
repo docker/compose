@@ -16,6 +16,7 @@ from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_0 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
+from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_3 as V3_3
 from compose.const import LABEL_PROJECT
@@ -72,7 +73,11 @@ def v2_1_only():
 
 
 def v2_2_only():
-    return min_version_skip(V2_0)
+    return min_version_skip(V2_2)
+
+
+def v2_3_only():
+    return min_version_skip(V2_3)
 
 
 def v3_only():
