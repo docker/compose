@@ -905,7 +905,10 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             cache_from=build_opts.get('cache_from', None),
-            buildargs=build_args
+            labels=build_opts.get('labels', None),
+            buildargs=build_args,
+            network_mode=build_opts.get('network', None),
+            target=build_opts.get('target', None),
         )
 
         try:
