@@ -908,6 +908,7 @@ class Service(object):
             labels=build_opts.get('labels', None),
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
+            target=build_opts.get('target', None),
         )
 
         try:
