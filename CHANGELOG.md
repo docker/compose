@@ -1,6 +1,50 @@
 Change log
 ==========
 
+1.15.0 (2017-07-18)
+-------------------
+
+### New features
+
+#### Compose file version 2.2
+
+- Added support for the `network` parameter in build configurations.
+
+#### Compose file version 2.1 and up
+
+- The `pid` option in a service's definition now supports a `service:<name>`
+  value.
+
+- Added support for the `storage_opt` parameter in in service definitions.
+  This option is not available for the v3 format
+
+#### All formats
+
+- Added `--quiet` flag to `docker-compose pull`, suppressing progress output
+
+- Some improvements to CLI output
+
+### Bugfixes
+
+- Volumes specified through the `--volume` flag of `docker-compose run` now
+  complement volumes declared in the service's defintion instead of replacing
+  them
+
+- Fixed a bug where using multiple Compose files would unset the scale value
+  defined inside the Compose file.
+
+- Fixed an issue where the `credHelpers` entries in the `config.json` file
+  were not being honored by Compose
+
+- Fixed a bug where using multiple Compose files with port declarations
+  would cause failures in Python 3 environments
+
+- Fixed a bug where some proxy-related options present in the user's
+  environment would prevent Compose from running
+
+- Fixed an issue where the output of `docker-compose config` would be invalid
+  if the original file used `Y` or `N` values
+
 1.14.0 (2017-06-19)
 -------------------
 

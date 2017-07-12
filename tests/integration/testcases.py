@@ -19,6 +19,7 @@ from compose.const import COMPOSEFILE_V2_0 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_0 as V3_0
+from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import COMPOSEFILE_V3_3 as V3_3
 from compose.const import LABEL_PROJECT
 from compose.progress_stream import stream_output
@@ -55,7 +56,7 @@ def engine_max_version():
     if version_lt(version, '1.13'):
         return V2_1
     if version_lt(version, '17.06'):
-        return V2_2
+        return V3_2
     return V3_3
 
 
