@@ -1,6 +1,14 @@
 Change log
 ==========
 
+Unreleased
+----------
+
+#### All formats
+
+- The `COMPOSE_PROJECT_NAME` environment variable is now always available for
+  substitutions even when the value is not explicitly set.
+
 1.14.0 (2017-06-19)
 -------------------
 

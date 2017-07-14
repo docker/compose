@@ -88,6 +88,9 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
+    # Provide ``COMPOSE_PROJECT_NAME`` for substitutions even
+    # when the value is inferred from the directory name.
+    environment.setdefault('COMPOSE_PROJECT_NAME', project_name)
     config_data = config.load(config_details)
 
     api_version = environment.get(

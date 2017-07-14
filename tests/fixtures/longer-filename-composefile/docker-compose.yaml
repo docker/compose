@@ -1,3 +1,5 @@
 definedinyamlnotyml:
   image: busybox:latest
   command: top
+  environment:
+    CONTAINER_GLOB: "${COMPOSE_PROJECT_NAME}_*"

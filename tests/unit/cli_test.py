@@ -82,6 +82,12 @@ class CLITestCase(unittest.TestCase):
         self.assertEqual(project.name, 'longerfilenamecomposefile')
         self.assertTrue(project.client)
         self.assertTrue(project.services)
+        self.assertEqual(
+            project.get_service('definedinyamlnotyml').options['environment'],
+            {
+                'CONTAINER_GLOB': 'longerfilenamecomposefile_*',
+            },
+        )
 
     def test_command_help(self):
         with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
