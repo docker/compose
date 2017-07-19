@@ -20,8 +20,6 @@ from docker import errors
 
 from .. import mock
 from ..helpers import create_host_file
-from ..helpers import is_cluster
-from ..helpers import no_cluster
 from compose.cli.command import get_project
 from compose.config.errors import DuplicateOverrideFileFound
 from compose.container import Container
@@ -29,6 +27,8 @@ from compose.project import OneOffFilter
 from compose.utils import nanoseconds_from_time_seconds
 from tests.integration.testcases import DockerClientTestCase
 from tests.integration.testcases import get_links
+from tests.integration.testcases import is_cluster
+from tests.integration.testcases import no_cluster
 from tests.integration.testcases import pull_busybox
 from tests.integration.testcases import SWARM_SKIP_RM_VOLUMES
 from tests.integration.testcases import v2_1_only
@@ -116,7 +116,7 @@ class CLITestCase(DockerClientTestCase):
     def tearDown(self):
         if self.base_dir:
             self.project.kill()
-            self.project.remove_stopped()
+            self.project.down(None, True)
 
             for container in self.project.containers(stopped=True, one_off=OneOffFilter.only):
                 container.remove(force=True)
@@ -1214,6 +1214,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(proc.returncode, 1)
 
     @v2_only()
+    @no_cluster('Container PID mode does not work across clusters')
     def test_up_with_pid_mode(self):
         c = self.client.create_container(
             'busybox', 'top', name='composetest_pid_mode_container',
@@ -1244,8 +1245,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(self.project.containers()), 1)
 
         stdout, stderr = self.dispatch(['exec', '-T', 'console', 'ls', '-1d', '/'])
-        self.assertEqual(stdout, "/\n")
         self.assertEqual(stderr, "")
+        self.assertEqual(stdout, "/\n")
 
     def test_exec_custom_user(self):
         self.base_dir = 'tests/fixtures/links-composefile'
@@ -1826,7 +1827,13 @@ class CLITestCase(DockerClientTestCase):
 
         result = self.dispatch(['logs', '-f'])
 
-        assert result.stdout.count('\n') == 5
+        if not is_cluster(self.client):
+            assert result.stdout.count('\n') == 5
+        else:
+            # Sometimes logs are picked up from old containers that haven't yet
+            # been removed (removal in Swarm is async)
+            assert result.stdout.count('\n') >= 5
+
         assert 'simple' in result.stdout
         assert 'another' in result.stdout
         assert 'exited with code 0' in result.stdout
@@ -1882,7 +1889,10 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up'])
 
         result = self.dispatch(['logs', '--tail', '2'])
-        assert result.stdout.count('\n') == 3
+        assert 'c\n' in result.stdout
+        assert 'd\n' in result.stdout
+        assert 'a\n' not in result.stdout
+        assert 'b\n' not in result.stdout
 
     def test_kill(self):
         self.dispatch(['up', '-d'], None)
@@ -2045,8 +2055,8 @@ class CLITestCase(DockerClientTestCase):
             return result.stdout.rstrip()
 
         assert get_port(3000) == container.get_local_port(3000)
-        assert ':49152' in get_port(3001)
-        assert ':49153' in get_port(3002)
+        assert ':53222' in get_port(3001)
+        assert ':53223' in get_port(3002)
 
     def test_port_with_scale(self):
         self.base_dir = 'tests/fixtures/ports-composefile-scale'
