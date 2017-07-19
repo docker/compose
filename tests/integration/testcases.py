@@ -1,13 +1,14 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import functools
 import os
 
 import pytest
+from docker.errors import APIError
 from docker.utils import version_lt
 
 from .. import unittest
-from ..helpers import is_cluster
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
 from compose.config.environment import Environment
@@ -25,6 +26,7 @@ from compose.service import Service
 SWARM_SKIP_CONTAINERS_ALL = os.environ.get('SWARM_SKIP_CONTAINERS_ALL', '0') != '0'
 SWARM_SKIP_CPU_SHARES = os.environ.get('SWARM_SKIP_CPU_SHARES', '0') != '0'
 SWARM_SKIP_RM_VOLUMES = os.environ.get('SWARM_SKIP_RM_VOLUMES', '0') != '0'
+SWARM_ASSUME_MULTINODE = os.environ.get('SWARM_ASSUME_MULTINODE', '0') != '0'
 
 
 def pull_busybox(client):
@@ -141,3 +143,35 @@ class DockerClientTestCase(unittest.TestCase):
         volumes = self.client.volumes(filters={'name': volume_name})['Volumes']
         assert len(volumes) > 0
         return self.client.inspect_volume(volumes[0]['Name'])
+
+
+def is_cluster(client):
+    if SWARM_ASSUME_MULTINODE:
+        return True
+
+    def get_nodes_number():
+        try:
+            return len(client.nodes())
+        except APIError:
+            # If the Engine is not part of a Swarm, the SDK will raise
+            # an APIError
+            return 0
+
+    if not hasattr(is_cluster, 'nodes') or is_cluster.nodes is None:
+        # Only make the API call if the value hasn't been cached yet
+        is_cluster.nodes = get_nodes_number()
+
+    return is_cluster.nodes > 1
+
+
+def no_cluster(reason):
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            if is_cluster(self.client):
+                pytest.skip("Test will not be run in cluster mode: %s" % reason)
+                return
+            return f(self, *args, **kwargs)
+        return wrapper
+
+    return decorator

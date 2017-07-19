@@ -6,10 +6,10 @@ services:
       ports:
         - target: 3000
         - target: 3001
-          published: 49152
+          published: 53222
         - target: 3002
-          published: 49153
+          published: 53223
           protocol: tcp
         - target: 3003
-          published: 49154
+          published: 53224
           protocol: udp
