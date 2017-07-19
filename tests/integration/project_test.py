@@ -12,8 +12,6 @@ from docker.errors import NotFound
 from .. import mock
 from ..helpers import build_config as load_config
 from ..helpers import create_host_file
-from ..helpers import is_cluster
-from ..helpers import no_cluster
 from .testcases import DockerClientTestCase
 from .testcases import SWARM_SKIP_CONTAINERS_ALL
 from compose.config import config
@@ -33,6 +31,8 @@ from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
+from tests.integration.testcases import is_cluster
+from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_only

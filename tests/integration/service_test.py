@@ -13,8 +13,6 @@ from six import StringIO
 from six import text_type
 
 from .. import mock
-from ..helpers import is_cluster
-from ..helpers import no_cluster
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import pull_busybox
@@ -38,6 +36,8 @@ from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import PidMode
 from compose.service import Service
+from tests.integration.testcases import is_cluster
+from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_only
@@ -635,7 +635,10 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        self.create_service('web', build={'context': base_dir}).build()
+        service = self.create_service('web', build={'context': base_dir})
+        service.build()
+        self.addCleanup(self.client.remove_image, service.image_name)
+
         assert self.client.inspect_image('composetest_web')
 
     def test_build_non_ascii_filename(self):
@@ -648,7 +651,9 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir.encode('utf8'), b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
-        self.create_service('web', build={'context': text_type(base_dir)}).build()
+        service = self.create_service('web', build={'context': text_type(base_dir)})
+        service.build()
+        self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
 
     def test_build_with_image_name(self):
@@ -683,6 +688,7 @@ class ServiceTest(DockerClientTestCase):
                                       build={'context': text_type(base_dir),
                                              'args': {"build_version": "1"}})
         service.build()
+        self.addCleanup(self.client.remove_image, service.image_name)
         assert service.image()
         assert "build_version=1" in service.image()['ContainerConfig']['Cmd']
 
@@ -699,6 +705,8 @@ class ServiceTest(DockerClientTestCase):
                                       build={'context': text_type(base_dir),
                                              'args': {"build_version": "1"}})
         service.build(build_args_override={'build_version': '2'})
+        self.addCleanup(self.client.remove_image, service.image_name)
+
         assert service.image()
         assert "build_version=2" in service.image()['ContainerConfig']['Cmd']
 
@@ -714,9 +722,12 @@ class ServiceTest(DockerClientTestCase):
             'labels': {'com.docker.compose.test': 'true'}
         })
         service.build()
+        self.addCleanup(self.client.remove_image, service.image_name)
+
         assert service.image()
         assert service.image()['Config']['Labels']['com.docker.compose.test'] == 'true'
 
+    @no_cluster('Container networks not on Swarm')
     def test_build_with_network(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
@@ -739,6 +750,8 @@ class ServiceTest(DockerClientTestCase):
         })
 
         service.build()
+        self.addCleanup(self.client.remove_image, service.image_name)
+
         assert service.image()
 
     def test_start_container_stays_unprivileged(self):
@@ -1130,6 +1143,8 @@ class ServiceTest(DockerClientTestCase):
                                       build={'context': base_dir,
                                              'cache_from': ['build1']})
         service.build()
+        self.addCleanup(self.client.remove_image, service.image_name)
+
         assert service.image()
 
     @mock.patch.dict(os.environ)

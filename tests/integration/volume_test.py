@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 from docker.errors import DockerException
 
-from ..helpers import no_cluster
 from .testcases import DockerClientTestCase
+from .testcases import no_cluster
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_VOLUME
 from compose.volume import Volume
