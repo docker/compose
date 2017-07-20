@@ -54,6 +54,10 @@ git push $GITHUB_REPO $VERSION
 echo "Uploading the docker image"
 docker push docker/compose:$VERSION
 
+echo "Uploading the compose-tests image"
+docker push docker/compose-tests:latest
+docker push docker/compose-tests:$VERSION
+
 echo "Uploading package to PyPI"
 pandoc -f markdown -t rst README.md -o README.rst
 sed -i -e 's/logo.png?raw=true/https:\/\/github.com\/docker\/compose\/raw\/master\/logo.png?raw=true/' README.rst

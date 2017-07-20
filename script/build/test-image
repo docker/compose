@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+
+if [ -z "$1" ]; then
+    >&2 echo "First argument must be image tag."
+    exit 1
+fi
+
+TAG=$1
+
+docker build -t docker-compose-tests:tmp .
+ctnr_id=$(docker create --entrypoint=tox docker-compose-tests:tmp)
+docker commit $ctnr_id docker/compose-tests:latest
+docker tag docker/compose-tests:latest docker/compose-tests:$TAG
+docker rm -f $ctnr_id
+docker rmi -f docker-compose-tests:tmp
