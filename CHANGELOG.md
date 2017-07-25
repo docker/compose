@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.15.0 (2017-07-18)
+1.15.0 (2017-07-26)
 -------------------
 
 ### New features
@@ -44,6 +44,9 @@ Change log
 
 - Fixed an issue where the output of `docker-compose config` would be invalid
   if the original file used `Y` or `N` values
+
+- Fixed an issue preventing `up` operations on a previously created stack on
+  Windows Engine.
 
 1.14.0 (2017-06-19)
 -------------------
