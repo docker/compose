@@ -21,8 +21,11 @@ def serialize_dict_type(dumper, data):
 
 
 def serialize_string(dumper, data):
-    """ Ensure boolean-like strings are quoted in the output """
+    """ Ensure boolean-like strings are quoted in the output and escape $ characters """
     representer = dumper.represent_str if six.PY3 else dumper.represent_unicode
+
+    data = data.replace('$', '$$')
+
     if data.lower() in ('y', 'n', 'yes', 'no', 'on', 'off', 'true', 'false'):
         # Empirically only y/n appears to be an issue, but this might change
         # depending on which PyYaml version is being used. Err on safe side.

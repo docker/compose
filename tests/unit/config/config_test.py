@@ -4185,3 +4185,25 @@ class SerializeTest(unittest.TestCase):
         assert 'command: "true"\n' in serialized_config
         assert 'FOO: "Y"\n' in serialized_config
         assert 'BAR: "on"\n' in serialized_config
+
+    def test_serialize_escape_dollar_sign(self):
+        cfg = {
+            'version': '2.2',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': 'echo $$FOO',
+                    'environment': {
+                        'CURRENCY': '$$'
+                    },
+                    'entrypoint': ['$$SHELL', '-c'],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg))
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['web']
+        assert serialized_service['environment']['CURRENCY'] == '$$'
+        assert serialized_service['command'] == 'echo $$FOO'
+        assert serialized_service['entrypoint'][0] == '$$SHELL'
