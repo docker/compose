@@ -343,7 +343,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
 def normalize_port_dict(port):
     return '{external_ip}{has_ext_ip}{published}{is_pub}{target}/{protocol}'.format(
         published=port.get('published', ''),
-        is_pub=(':' if port.get('published') or port.get('external_ip') else ''),
+        is_pub=(':' if port.get('published') is not None or port.get('external_ip') else ''),
         target=port.get('target'),
         protocol=port.get('protocol', 'tcp'),
         external_ip=port.get('external_ip', ''),
