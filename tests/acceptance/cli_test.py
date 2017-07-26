@@ -439,7 +439,8 @@ class CLITestCase(DockerClientTestCase):
         assert 'Pulling simple (busybox:latest)...' in result.stderr
         assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
         assert ('repository nonexisting-image not found' in result.stderr or
-                'image library/nonexisting-image:latest not found' in result.stderr)
+                'image library/nonexisting-image:latest not found' in result.stderr or
+                'pull access denied for nonexisting-image' in result.stderr)
 
     def test_pull_with_quiet(self):
         assert self.dispatch(['pull', '--quiet']).stderr == ''
