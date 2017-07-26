@@ -31,7 +31,6 @@ def find_version(*file_paths):
 
 install_requires = [
     'cached-property >= 1.2.0, < 2',
-    'colorama >= 0.3.7, < 0.4',
     'docopt >= 0.6.1, < 0.7',
     'PyYAML >= 3.10, < 4',
     'requests >= 2.6.1, != 2.11.0, < 2.12',
@@ -56,6 +55,7 @@ extras_require = {
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5'],
     ':python_version < "3.3"': ['ipaddress >= 1.0.16'],
+    ':sys_platform == "win32"': ['colorama >= 0.3.7, < 0.4'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
 }
 
