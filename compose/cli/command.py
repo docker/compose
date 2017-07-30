@@ -34,7 +34,7 @@ def project_from_options(project_dir, options):
         host=host,
         tls_config=tls_config_from_options(options),
         environment=environment,
-        override_dir=options.get('--project-directory'),
+        override_dir=options.get('--project-directory') or environment.get('COMPOSE_PROJECT_DIRECTORY'),
     )
 
 
