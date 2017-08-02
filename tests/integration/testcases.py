@@ -105,7 +105,11 @@ class DockerClientTestCase(unittest.TestCase):
 
         for i in self.client.images(
                 filters={'label': 'com.docker.compose.test_image'}):
-            self.client.remove_image(i, force=True)
+            try:
+                self.client.remove_image(i, force=True)
+            except APIError as e:
+                if e.is_server_error():
+                    pass
 
         volumes = self.client.volumes().get('Volumes') or []
         for v in volumes:

@@ -451,7 +451,6 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['build', 'simple'])
 
         result = self.dispatch(['build', 'simple'])
-        assert BUILD_CACHE_TEXT in result.stdout
         assert BUILD_PULL_TEXT not in result.stdout
 
     def test_build_no_cache(self):
@@ -469,7 +468,9 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['build', 'simple'], None)
 
         result = self.dispatch(['build', '--pull', 'simple'])
-        assert BUILD_CACHE_TEXT in result.stdout
+        if not is_cluster(self.client):
+            # If previous build happened on another node, cache won't be available
+            assert BUILD_CACHE_TEXT in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
 
     def test_build_no_cache_pull(self):
@@ -602,11 +603,12 @@ class CLITestCase(DockerClientTestCase):
     def test_run_one_off_with_volume(self):
         self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
         volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files'))
-        create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
+        node = create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
 
         self.dispatch([
             'run',
             '-v', '{}:/data'.format(volume_path),
+            '-e', 'constraint:node=={}'.format(node if node is not None else '*'),
             'simple',
             'test', '-f', '/data/example.txt'
         ], returncode=0)
@@ -621,12 +623,13 @@ class CLITestCase(DockerClientTestCase):
     def test_run_one_off_with_multiple_volumes(self):
         self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
         volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files'))
-        create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
+        node = create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
 
         self.dispatch([
             'run',
             '-v', '{}:/data'.format(volume_path),
             '-v', '{}:/data1'.format(volume_path),
+            '-e', 'constraint:node=={}'.format(node if node is not None else '*'),
             'simple',
             'test', '-f', '/data/example.txt'
         ], returncode=0)
@@ -635,6 +638,7 @@ class CLITestCase(DockerClientTestCase):
             'run',
             '-v', '{}:/data'.format(volume_path),
             '-v', '{}:/data1'.format(volume_path),
+            '-e', 'constraint:node=={}'.format(node if node is not None else '*'),
             'simple',
             'test', '-f' '/data1/example.txt'
         ], returncode=0)
@@ -1376,9 +1380,7 @@ class CLITestCase(DockerClientTestCase):
                 break
         volume_names = [v['Name'].split('/')[-1] for v in volumes]
         assert name in volume_names
-        if not is_cluster(self.client):
-            # The `-v` flag for `docker rm` in Swarm seems to be broken
-            assert anonymous_name not in volume_names
+        assert anonymous_name not in volume_names
 
     def test_run_service_with_dockerfile_entrypoint(self):
         self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
