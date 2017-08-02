@@ -325,13 +325,15 @@ class ServiceTest(DockerClientTestCase):
             command=["top"],
             labels={LABEL_PROJECT: 'composetest'},
             host_config={},
+            environment=['affinity:container=={}'.format(volume_container_1.id)],
         )
         host_service = self.create_service(
             'host',
             volumes_from=[
                 VolumeFromSpec(volume_service, 'rw', 'service'),
                 VolumeFromSpec(volume_container_2, 'rw', 'container')
-            ]
+            ],
+            environment=['affinity:container=={}'.format(volume_container_1.id)],
         )
         host_container = host_service.create_container()
         host_service.start_container(host_container)
@@ -785,6 +787,7 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
 
     @v2_3_only()
+    @no_cluster('Not supported on UCP 2.2.0-beta1')  # FIXME: remove once support is added
     def test_build_with_target(self):
         self.require_api_version('1.30')
         base_dir = tempfile.mkdtemp()
@@ -792,11 +795,12 @@ class ServiceTest(DockerClientTestCase):
 
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write('FROM busybox as one\n')
+            f.write('LABEL com.docker.compose.test=true\n')
             f.write('LABEL com.docker.compose.test.target=one\n')
             f.write('FROM busybox as two\n')
             f.write('LABEL com.docker.compose.test.target=two\n')
 
-        service = self.create_service('buildlabels', build={
+        service = self.create_service('buildtarget', build={
             'context': text_type(base_dir),
             'target': 'one'
         })
