@@ -42,5 +42,9 @@ def create_host_file(client, filename):
             output = client.logs(container)
             raise Exception(
                 "Container exited with code {}:\n{}".format(exitcode, output))
+
+        container_info = client.inspect_container(container)
+        if 'Node' in container_info:
+            return container_info['Node']['Name']
     finally:
         client.remove_container(container, force=True)

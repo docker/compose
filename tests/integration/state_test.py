@@ -6,9 +6,11 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import py
+from docker.errors import ImageNotFound
 
 from .testcases import DockerClientTestCase
 from .testcases import get_links
+from .testcases import no_cluster
 from compose.config import config
 from compose.project import Project
 from compose.service import ConvergenceStrategy
@@ -243,21 +245,34 @@ class ServiceStateTest(DockerClientTestCase):
         tag = 'latest'
         image = '{}:{}'.format(repo, tag)
 
+        def safe_remove_image(image):
+            try:
+                self.client.remove_image(image)
+            except ImageNotFound:
+                pass
+
         image_id = self.client.images(name='busybox')[0]['Id']
         self.client.tag(image_id, repository=repo, tag=tag)
-        self.addCleanup(self.client.remove_image, image)
+        self.addCleanup(safe_remove_image, image)
 
         web = self.create_service('web', image=image)
         container = web.create_container()
 
         # update the image
         c = self.client.create_container(image, ['touch', '/hello.txt'], host_config={})
+
+        # In the case of a cluster, there's a chance we pick up the old image when
+        # calculating the new hash. To circumvent that, untag the old image first
+        # See also: https://github.com/moby/moby/issues/26852
+        self.client.remove_image(image, force=True)
+
         self.client.commit(c, repository=repo, tag=tag)
         self.client.remove_container(c)
 
         web = self.create_service('web', image=image)
         self.assertEqual(('recreate', [container]), web.convergence_plan())
 
+    @no_cluster('Can not guarantee the build will be run on the same node the service is deployed')
     def test_trigger_recreate_with_build(self):
         context = py.test.ensuretemp('test_trigger_recreate_with_build')
         self.addCleanup(context.remove)
