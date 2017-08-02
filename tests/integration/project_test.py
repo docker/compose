@@ -1265,7 +1265,7 @@ class ProjectTest(DockerClientTestCase):
 
     @v3_only()
     def test_project_up_with_secrets(self):
-        create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
+        node = create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
 
         config_data = build_config(
             version=V3_1,
@@ -1276,6 +1276,7 @@ class ProjectTest(DockerClientTestCase):
                 'secrets': [
                     types.ServiceSecret.parse({'source': 'super', 'target': 'special'}),
                 ],
+                'environment': ['constraint:node=={}'.format(node if node is not None else '*')]
             }],
             secrets={
                 'super': {
