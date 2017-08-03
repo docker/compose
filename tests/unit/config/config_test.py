@@ -702,6 +702,42 @@ class ConfigTest(unittest.TestCase):
         ]
         self.assertEqual(service_sort(service_dicts), service_sort(expected))
 
+    def test_load_mixed_extends_resolution(self):
+        main_file = config.ConfigFile(
+            'main.yml', {
+                'version': '2.2',
+                'services': {
+                    'prodweb': {
+                        'extends': {
+                            'service': 'web',
+                            'file': 'base.yml'
+                        },
+                        'environment': {'PROD': 'true'},
+                    },
+                },
+            }
+        )
+
+        tmpdir = pytest.ensuretemp('config_test')
+        self.addCleanup(tmpdir.remove)
+        tmpdir.join('base.yml').write("""
+            version: '2.2'
+            services:
+              base:
+                image: base
+              web:
+                extends: base
+        """)
+
+        details = config.ConfigDetails('.', [main_file])
+        with tmpdir.as_cwd():
+            service_dicts = config.load(details).services
+            assert service_dicts[0] == {
+                'name': 'prodweb',
+                'image': 'base',
+                'environment': {'PROD': 'true'},
+            }
+
     def test_load_with_multiple_files_and_invalid_override(self):
         base_file = config.ConfigFile(
             'base.yaml',
