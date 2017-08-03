@@ -50,4 +50,3 @@ echo "*** Using $(openssl_version)"
 if !(which virtualenv); then
   pip install virtualenv
 fi
-
