@@ -1189,6 +1189,13 @@ class CLITestCase(DockerClientTestCase):
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerCountCondition(self.project, 0))
 
+    def test_up_handles_sighup(self):
+        proc = start_process(self.base_dir, ['up', '-t', '2'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        os.kill(proc.pid, signal.SIGHUP)
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+
     @v2_only()
     def test_up_handles_force_shutdown(self):
         self.base_dir = 'tests/fixtures/sleeps-composefile'
@@ -1655,6 +1662,19 @@ class CLITestCase(DockerClientTestCase):
             'running'))
 
         os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            'exited'))
+
+    def test_run_handles_sighup(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            'running'))
+
+        os.kill(proc.pid, signal.SIGHUP)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',

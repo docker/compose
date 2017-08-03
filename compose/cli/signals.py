@@ -17,6 +17,7 @@ def shutdown(signal, frame):
 def set_signal_handler(handler):
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)
+    signal.signal(signal.SIGHUP, handler)
 
 
 def set_signal_handler_to_shutdown():
