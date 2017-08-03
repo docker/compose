@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 STOP = object()
 
 
-def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
+def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, noansi=False):
     """Runs func on objects in parallel while ensuring that func is
     ran on object only after it is ran on all its dependencies.
 
@@ -36,7 +36,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
     objects = list(objects)
     stream = get_output_stream(sys.stderr)
 
-    writer = ParallelStreamWriter(stream, msg)
+    writer = ParallelStreamWriter(stream, msg, noansi)
     for obj in objects:
         writer.add_object(get_name(obj))
     writer.write_initial()
@@ -221,11 +221,12 @@ class ParallelStreamWriter(object):
     to jump to the correct line, and write over the line.
     """
 
-    def __init__(self, stream, msg):
+    def __init__(self, stream, msg, noansi):
         self.stream = stream
         self.msg = msg
         self.lines = []
         self.width = 0
+        self.noansi = noansi
 
     def add_object(self, obj_index):
         self.lines.append(obj_index)
@@ -239,9 +240,7 @@ class ParallelStreamWriter(object):
                               width=self.width))
         self.stream.flush()
 
-    def write(self, obj_index, status):
-        if self.msg is None:
-            return
+    def _write_ansi(self, obj_index, status):
         position = self.lines.index(obj_index)
         diff = len(self.lines) - position
         # move up
@@ -254,27 +253,41 @@ class ParallelStreamWriter(object):
         self.stream.write("%c[%dB" % (27, diff))
         self.stream.flush()
 
+    def _write_noansi(self, obj_index, status):
+        self.stream.write("{} {:<{width}} ... {}\r\n".format(self.msg, obj_index,
+                          status, width=self.width))
+        self.stream.flush()
 
-def parallel_operation(containers, operation, options, message):
+    def write(self, obj_index, status):
+        if self.msg is None:
+            return
+        if self.noansi:
+            self._write_noansi(obj_index, status)
+        else:
+            self._write_ansi(obj_index, status)
+
+
+def parallel_operation(containers, operation, options, message, noansi=False):
     parallel_execute(
         containers,
         operator.methodcaller(operation, **options),
         operator.attrgetter('name'),
-        message)
+        message,
+        noansi=noansi)
 
 
-def parallel_remove(containers, options):
+def parallel_remove(containers, options, noansi=False):
     stopped_containers = [c for c in containers if not c.is_running]
-    parallel_operation(stopped_containers, 'remove', options, 'Removing')
+    parallel_operation(stopped_containers, 'remove', options, 'Removing', noansi=noansi)
 
 
-def parallel_pause(containers, options):
-    parallel_operation(containers, 'pause', options, 'Pausing')
+def parallel_pause(containers, options, noansi=False):
+    parallel_operation(containers, 'pause', options, 'Pausing', noansi=noansi)
 
 
-def parallel_unpause(containers, options):
-    parallel_operation(containers, 'unpause', options, 'Unpausing')
+def parallel_unpause(containers, options, noansi=False):
+    parallel_operation(containers, 'unpause', options, 'Unpausing', noansi=noansi)
 
 
-def parallel_kill(containers, options):
-    parallel_operation(containers, 'kill', options, 'Killing')
+def parallel_kill(containers, options, noansi=False):
+    parallel_operation(containers, 'kill', options, 'Killing', noansi=noansi)

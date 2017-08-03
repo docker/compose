@@ -130,3 +130,19 @@ def test_parallel_execute_alignment(capsys):
     _, err = capsys.readouterr()
     a, b = err.split('\n')[:2]
     assert a.index('...') == b.index('...')
+
+
+def test_parallel_execute_alignment_noansi(capsys):
+    results, errors = parallel_execute(
+        objects=["short", "a very long name"],
+        func=lambda x: x,
+        get_name=six.text_type,
+        msg="Aligning",
+        noansi=True,
+    )
+
+    assert errors == {}
+
+    _, err = capsys.readouterr()
+    a, b, c, d = err.split('\n')[:4]
+    assert a.index('...') == b.index('...') == c.index('...') == d.index('...')
