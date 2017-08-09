@@ -158,7 +158,6 @@ class Service(object):
         secrets=None,
         scale=None,
         pid_mode=None,
-        noansi=False,
         **options
     ):
         self.name = name
@@ -172,7 +171,6 @@ class Service(object):
         self.networks = networks or {}
         self.secrets = secrets or []
         self.scale_num = scale or 1
-        self.noansi = noansi
         self.options = options
 
     def __repr__(self):
@@ -395,7 +393,6 @@ class Service(object):
                 lambda n: create_and_start(self, n),
                 lambda n: self.get_container_name(n),
                 "Creating",
-                noansi=self.noansi,
             )
             for error in errors.values():
                 raise OperationFailedError(error)
@@ -417,7 +414,6 @@ class Service(object):
                 recreate,
                 lambda c: c.name,
                 "Recreating",
-                noansi=self.noansi,
             )
             for error in errors.values():
                 raise OperationFailedError(error)
@@ -438,7 +434,6 @@ class Service(object):
                     lambda c: self.start_container_if_stopped(c, attach_logs=not detached),
                     lambda c: c.name,
                     "Starting",
-                    noansi=self.noansi,
                 )
 
                 for error in errors.values():
@@ -460,7 +455,6 @@ class Service(object):
             stop_and_remove,
             lambda c: c.name,
             "Stopping and removing",
-            noansi=self.noansi,
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,

@@ -98,6 +98,7 @@ def dispatch():
 
     options, handler, command_options = dispatcher.parse(sys.argv[1:])
     setup_console_handler(console_handler, options.get('--verbose'))
+    setup_parallel_logger(options.get('--no-ansi'))
     return functools.partial(perform_command, options, handler, command_options)
 
 
@@ -125,6 +126,12 @@ def setup_logging():
 
     # Disable requests logging
     logging.getLogger("requests").propagate = False
+
+
+def setup_parallel_logger(noansi):
+    if noansi:
+        import compose.parallel
+        compose.parallel.ParallelStreamWriter.set_noansi()
 
 
 def setup_console_handler(handler, verbose):
