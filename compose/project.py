@@ -498,13 +498,15 @@ class Project(object):
             def pull_service(service):
                 service.pull(ignore_pull_failures, True)
 
-            parallel.parallel_execute(
+            _, errors = parallel.parallel_execute(
                 services,
                 pull_service,
                 operator.attrgetter('name'),
                 'Pulling',
                 limit=5,
             )
+            if len(errors):
+                raise ProjectError(b"\n".join(errors.values()))
         else:
             for service in services:
                 service.pull(ignore_pull_failures, silent=silent)
