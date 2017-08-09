@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import os.path
+import re
 import signal
 import subprocess
 import time
@@ -447,6 +448,20 @@ class CLITestCase(DockerClientTestCase):
     def test_pull_with_quiet(self):
         assert self.dispatch(['pull', '--quiet']).stderr == ''
         assert self.dispatch(['pull', '--quiet']).stdout == ''
+
+    def test_pull_with_parallel_failure(self):
+        result = self.dispatch([
+            '-f', 'ignore-pull-failures.yml', 'pull', '--parallel'],
+            returncode=1
+        )
+
+        self.assertRegexpMatches(result.stderr, re.compile('^Pulling simple', re.MULTILINE))
+        self.assertRegexpMatches(result.stderr, re.compile('^Pulling another', re.MULTILINE))
+        self.assertRegexpMatches(result.stderr,
+                                 re.compile('^ERROR: for another .*does not exist.*', re.MULTILINE))
+        self.assertRegexpMatches(result.stderr,
+                                 re.compile('''^(ERROR: )?(b')?.* nonexisting-image''',
+                                            re.MULTILINE))
 
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
