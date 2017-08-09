@@ -752,6 +752,14 @@ class CLITestCase(DockerClientTestCase):
                 assert self.lookup(container, service.name)
 
     @v2_only()
+    def test_up_no_ansi(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
+        result = self.dispatch(['--no-ansi', 'up', '-d'], None)
+        assert "%c[2K\r" % 27 not in result.stderr
+        assert "%c[1A" % 27 not in result.stderr
+        assert "%c[1B" % 27 not in result.stderr
+
+    @v2_only()
     def test_up_with_default_network_config(self):
         filename = 'default-network-config.yml'
 

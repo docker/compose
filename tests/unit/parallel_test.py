@@ -8,6 +8,7 @@ from docker.errors import APIError
 
 from compose.parallel import parallel_execute
 from compose.parallel import parallel_execute_iter
+from compose.parallel import ParallelStreamWriter
 from compose.parallel import UpstreamError
 
 
@@ -62,7 +63,7 @@ def test_parallel_execute_with_limit():
         limit=limit,
     )
 
-    assert results == tasks*[None]
+    assert results == tasks * [None]
     assert errors == {}
 
 
@@ -133,12 +134,12 @@ def test_parallel_execute_alignment(capsys):
 
 
 def test_parallel_execute_alignment_noansi(capsys):
+    ParallelStreamWriter.set_noansi()
     results, errors = parallel_execute(
         objects=["short", "a very long name"],
         func=lambda x: x,
         get_name=six.text_type,
         msg="Aligning",
-        noansi=True,
     )
 
     assert errors == {}
