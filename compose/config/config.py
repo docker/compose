@@ -404,11 +404,12 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
 
             external = config.get('external')
             if external:
+                name_field = 'name' if entity_type == 'Volume' else 'external_name'
                 validate_external(entity_type, name, config)
                 if isinstance(external, dict):
-                    config['external_name'] = external.get('name')
-                else:
-                    config['external_name'] = name
+                    config[name_field] = external.get('name')
+                elif not config.get('name'):
+                    config[name_field] = name
 
             if 'driver_opts' in config:
                 config['driver_opts'] = build_string_dict(
