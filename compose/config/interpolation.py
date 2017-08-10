@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+from collections import OrderedDict
 from string import Template
 
 import six
@@ -33,12 +34,12 @@ def interpolate_environment_variables(version, config, section, environment):
         interpolator = Interpolator(TemplateWithDefaults, environment)
 
     def process_item(name, config_dict):
-        return dict(
+        return OrderedDict(
             (key, interpolate_value(name, key, val, section, interpolator))
             for key, val in (config_dict or {}).items()
         )
 
-    return dict(
+    return OrderedDict(
         (name, process_item(name, config_dict or {}))
         for name, config_dict in config.items()
     )
@@ -61,7 +62,7 @@ def recursive_interpolate(obj, interpolator):
     if isinstance(obj, six.string_types):
         return interpolator.interpolate(obj)
     if isinstance(obj, dict):
-        return dict(
+        return OrderedDict(
             (key, recursive_interpolate(val, interpolator))
             for (key, val) in obj.items()
         )

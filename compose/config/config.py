@@ -7,6 +7,7 @@ import os
 import string
 import sys
 from collections import namedtuple
+from collections import OrderedDict
 
 import six
 import yaml
@@ -50,6 +51,21 @@ from .validation import validate_pid_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
+
+
+def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
+    class OrderedLoader(Loader):
+        pass
+
+    def construct_mapping(loader, node):
+        loader.flatten_mapping(node)
+        return object_pairs_hook(loader.construct_pairs(node))
+
+    OrderedLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        construct_mapping)
+
+    return yaml.load(stream, OrderedLoader)
 
 
 DOCKER_CONFIG_KEYS = [
@@ -256,7 +272,7 @@ def find(base_dir, filenames, environment, override_dir=None):
     if filenames == ['-']:
         return ConfigDetails(
             os.path.abspath(override_dir) if override_dir else os.getcwd(),
-            [ConfigFile(None, yaml.safe_load(sys.stdin))],
+            [ConfigFile(None, ordered_load(sys.stdin, yaml.SafeLoader))],
             environment
         )
 
@@ -502,7 +518,7 @@ def process_config_file(config_file, environment, service_name=None):
         environment)
 
     if config_file.version > V1:
-        processed_config = dict(config_file.config)
+        processed_config = OrderedDict(config_file.config)
         processed_config['services'] = services
         processed_config['volumes'] = interpolate_config_section(
             config_file,
@@ -635,17 +651,17 @@ def resolve_environment(service_dict, environment=None):
     """Unpack any environment variables from an env_file, if set.
     Interpolate environment values if set.
     """
-    env = {}
+    env = OrderedDict()
     for env_file in service_dict.get('env_file', []):
         env.update(env_vars_from_file(env_file))
 
     env.update(parse_environment(service_dict.get('environment')))
-    return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))
+    return OrderedDict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))
 
 
 def resolve_build_args(buildargs, environment):
     args = parse_build_arguments(buildargs)
-    return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(args))
+    return OrderedDict(resolve_env_var(k, v, environment) for k, v in six.iteritems(args))
 
 
 def validate_extended_service_dict(service_dict, filename, service):
@@ -696,7 +712,7 @@ def validate_service(service_config, service_names, config_file):
 
 def process_service(service_config):
     working_dir = service_config.working_dir
-    service_dict = dict(service_config.config)
+    service_dict = OrderedDict(service_config.config)
 
     if 'env_file' in service_dict:
         service_dict['env_file'] = [
@@ -749,7 +765,7 @@ def process_ports(service_dict):
 
 def process_depends_on(service_dict):
     if 'depends_on' in service_dict and not isinstance(service_dict['depends_on'], dict):
-        service_dict['depends_on'] = dict([
+        service_dict['depends_on'] = OrderedDict([
             (svc, {'condition': 'service_started'}) for svc in service_dict['depends_on']
         ])
     return service_dict
@@ -808,7 +824,7 @@ def process_healthcheck(service_dict, service_name):
 
 
 def finalize_service(service_config, service_names, version, environment):
-    service_dict = dict(service_config.config)
+    service_dict = OrderedDict(service_config.config)
 
     if 'environment' in service_dict or 'env_file' in service_dict:
         service_dict['environment'] = resolve_environment(service_dict, environment)
@@ -971,7 +987,7 @@ def merge_service_dicts(base, override, version):
     elif md.needs_merge('build'):
         md['build'] = merge_build(md, base, override)
 
-    return dict(md)
+    return OrderedDict(md)
 
 
 def merge_unique_items_lists(base, override):
@@ -1020,7 +1036,7 @@ def merge_build(output, base, override):
     md.merge_mapping('args', parse_build_arguments)
     md.merge_field('cache_from', merge_unique_items_lists, default=[])
     md.merge_mapping('labels', parse_labels)
-    return dict(md)
+    return OrderedDict(md)
 
 
 def merge_blkio_config(base, override):
@@ -1081,13 +1097,13 @@ def split_kv(kvpair):
 
 def parse_dict_or_list(split_func, type_name, arguments):
     if not arguments:
-        return {}
+        return OrderedDict()
 
     if isinstance(arguments, list):
-        return dict(split_func(e) for e in arguments)
+        return OrderedDict(split_func(e) for e in arguments)
 
     if isinstance(arguments, dict):
-        return dict(arguments)
+        return OrderedDict(arguments)
 
     raise ConfigurationError(
         "%s \"%s\" must be a list or mapping," %
@@ -1108,10 +1124,10 @@ parse_deploy = functools.partial(parse_dict_or_list, split_kv, 'deploy')
 
 def parse_flat_dict(d):
     if not d:
-        return {}
+        return OrderedDict()
 
     if isinstance(d, dict):
-        return dict(d)
+        return OrderedDict(d)
 
     raise ConfigurationError("Invalid type: expected mapping")
 
@@ -1209,9 +1225,9 @@ def merge_path_mappings(base, override):
 
 def dict_from_path_mappings(path_mappings):
     if path_mappings:
-        return dict(split_path_mapping(v) for v in path_mappings)
+        return OrderedDict(split_path_mapping(v) for v in path_mappings)
     else:
-        return {}
+        return OrderedDict()
 
 
 def path_mappings_from_dict(d):
@@ -1273,7 +1289,7 @@ def has_uppercase(name):
 def load_yaml(filename):
     try:
         with open(filename, 'r') as fh:
-            return yaml.safe_load(fh)
+            return ordered_load(fh, yaml.SafeLoader)
     except (IOError, yaml.YAMLError) as e:
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
         raise ConfigurationError(u"{}: {}".format(error_name, e))

@@ -5,6 +5,7 @@ import codecs
 import contextlib
 import logging
 import os
+from collections import OrderedDict
 
 import six
 
@@ -31,7 +32,7 @@ def env_vars_from_file(filename):
         raise ConfigurationError("Couldn't find env file: %s" % filename)
     elif not os.path.isfile(filename):
         raise ConfigurationError("%s is not a file." % (filename))
-    env = {}
+    env = OrderedDict()
     with contextlib.closing(codecs.open(filename, 'r', 'utf-8')) as fileobj:
         for line in fileobj:
             line = line.strip()

@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from collections import OrderedDict
+
 import six
 import yaml
 
@@ -43,8 +45,22 @@ yaml.SafeDumper.add_representer(str, serialize_string)
 yaml.SafeDumper.add_representer(six.text_type, serialize_string)
 
 
+def ordered_dump(data, stream=None, Dumper=yaml.Dumper, **kwds):
+    class OrderedDumper(Dumper):
+        pass
+
+    def _dict_representer(dumper, data):
+        return dumper.represent_mapping(
+            yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+            data.items())
+
+    OrderedDumper.add_representer(OrderedDict, _dict_representer)
+    return yaml.dump(data, stream, OrderedDumper, **kwds)
+
+
 def denormalize_config(config, image_digests=None):
-    result = {'version': str(V2_1) if config.version == V1 else str(config.version)}
+    result = OrderedDict()
+    result['version'] = str(V2_1) if config.version == V1 else str(config.version)
     denormalized_services = [
         denormalize_service_dict(
             service_dict,
@@ -52,10 +68,11 @@ def denormalize_config(config, image_digests=None):
             image_digests[service_dict['name']] if image_digests else None)
         for service_dict in config.services
     ]
-    result['services'] = {
-        service_dict.pop('name'): service_dict
-        for service_dict in denormalized_services
-    }
+    result['services'] = OrderedDict()
+    for service_dict in denormalized_services:
+        name = service_dict.pop('name')
+        result['services'][name] = service_dict
+
     for key in ('networks', 'volumes', 'secrets', 'configs'):
         config_dict = getattr(config, key)
         if not config_dict:
@@ -75,8 +92,9 @@ def denormalize_config(config, image_digests=None):
 
 
 def serialize_config(config, image_digests=None):
-    return yaml.safe_dump(
+    return ordered_dump(
         denormalize_config(config, image_digests),
+        Dumper=yaml.SafeDumper,
         default_flow_style=False,
         indent=2,
         width=80
