@@ -1412,7 +1412,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={
-                vol_name: {'external': True, 'external_name': vol_name}
+                vol_name: {'external': True, 'name': vol_name}
             },
         )
         project = Project.from_config(
@@ -1436,7 +1436,7 @@ class ProjectTest(DockerClientTestCase):
                 'command': 'top'
             }],
             volumes={
-                vol_name: {'external': True, 'external_name': vol_name}
+                vol_name: {'external': True, 'name': vol_name}
             },
         )
         project = Project.from_config(
