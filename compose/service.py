@@ -813,6 +813,7 @@ class Service(object):
         options = dict(self.options, **override_options)
 
         logging_dict = options.get('logging', None)
+        blkio_config = convert_blkio_config(options.get('blkio_config', None))
         log_config = get_log_config(logging_dict)
         init_path = None
         if isinstance(options.get('init'), six.string_types):
@@ -868,7 +869,13 @@ class Service(object):
             volume_driver=options.get('volume_driver'),
             cpuset_cpus=options.get('cpuset'),
             cpu_shares=options.get('cpu_shares'),
-            storage_opt=options.get('storage_opt')
+            storage_opt=options.get('storage_opt'),
+            blkio_weight=blkio_config.get('weight'),
+            blkio_weight_device=blkio_config.get('weight_device'),
+            device_read_bps=blkio_config.get('device_read_bps'),
+            device_read_iops=blkio_config.get('device_read_iops'),
+            device_write_bps=blkio_config.get('device_write_bps'),
+            device_write_iops=blkio_config.get('device_write_iops'),
         )
 
     def get_secret_volumes(self):
@@ -1395,3 +1402,22 @@ def build_container_ports(container_ports, options):
                 port = tuple(port.split('/'))
             ports.append(port)
     return ports
+
+
+def convert_blkio_config(blkio_config):
+    result = {}
+    if blkio_config is None:
+        return result
+
+    result['weight'] = blkio_config.get('weight')
+    for field in [
+        "device_read_bps", "device_read_iops", "device_write_bps",
+        "device_write_iops", "weight_device",
+    ]:
+        if field not in blkio_config:
+            continue
+        arr = []
+        for item in blkio_config[field]:
+            arr.append(dict([(k.capitalize(), v) for k, v in item.items()]))
+        result[field] = arr
+    return result

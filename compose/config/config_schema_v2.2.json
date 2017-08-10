@@ -50,6 +50,34 @@
       "type": "object",
 
       "properties": {
+        "blkio_config": {
+          "type": "object",
+          "properties": {
+            "device_read_bps": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/blkio_limit"}
+            },
+            "device_read_iops": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/blkio_limit"}
+            },
+            "device_write_bps": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/blkio_limit"}
+            },
+            "device_write_iops": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/blkio_limit"}
+            },
+            "weight": {"type": "integer"},
+            "weight_device": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/blkio_weight"}
+            }
+          },
+          "additionalProperties": false
+        },
+
         "build": {
           "oneOf": [
             {"type": "string"},
@@ -381,6 +409,23 @@
         },
         {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
       ]
+    },
+
+    "blkio_limit": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string"},
+        "rate": {"type": ["integer", "string"]}
+      },
+      "additionalProperties": false
+    },
+    "blkio_weight": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string"},
+        "weight": {"type": "integer"}
+      },
+      "additionalProperties": false
     },
 
     "constraints": {

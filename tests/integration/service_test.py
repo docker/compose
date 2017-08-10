@@ -203,6 +203,34 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.ReadonlyRootfs') == read_only
 
+    def test_create_container_with_blkio_config(self):
+        blkio_config = {
+            'weight': 300,
+            'weight_device': [{'path': '/dev/sda', 'weight': 200}],
+            'device_read_bps': [{'path': '/dev/sda', 'rate': 1024 * 1024 * 100}],
+            'device_read_iops': [{'path': '/dev/sda', 'rate': 1000}],
+            'device_write_bps': [{'path': '/dev/sda', 'rate': 1024 * 1024}],
+            'device_write_iops': [{'path': '/dev/sda', 'rate': 800}]
+        }
+        service = self.create_service('web', blkio_config=blkio_config)
+        container = service.create_container()
+        assert container.get('HostConfig.BlkioWeight') == 300
+        assert container.get('HostConfig.BlkioWeightDevice') == [{
+            'Path': '/dev/sda', 'Weight': 200
+        }]
+        assert container.get('HostConfig.BlkioDeviceReadBps') == [{
+            'Path': '/dev/sda', 'Rate': 1024 * 1024 * 100
+        }]
+        assert container.get('HostConfig.BlkioDeviceWriteBps') == [{
+            'Path': '/dev/sda', 'Rate': 1024 * 1024
+        }]
+        assert container.get('HostConfig.BlkioDeviceReadIOps') == [{
+            'Path': '/dev/sda', 'Rate': 1000
+        }]
+        assert container.get('HostConfig.BlkioDeviceWriteIOps') == [{
+            'Path': '/dev/sda', 'Rate': 800
+        }]
+
     def test_create_container_with_security_opt(self):
         security_opt = ['label:disable']
         service = self.create_service('db', security_opt=security_opt)
