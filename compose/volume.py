@@ -15,14 +15,15 @@ log = logging.getLogger(__name__)
 
 class Volume(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 external_name=None, labels=None):
+                 external=False, labels=None, custom_name=False):
         self.client = client
         self.project = project
         self.name = name
         self.driver = driver
         self.driver_opts = driver_opts
-        self.external_name = external_name
+        self.external = external
         self.labels = labels
+        self.custom_name = custom_name
 
     def create(self):
         return self.client.create_volume(
@@ -47,13 +48,9 @@ class Volume(object):
         return True
 
     @property
-    def external(self):
-        return bool(self.external_name)
-
-    @property
     def full_name(self):
-        if self.external_name:
-            return self.external_name
+        if self.custom_name:
+            return self.name
         return '{0}_{1}'.format(self.project, self.name)
 
     @property
@@ -80,11 +77,12 @@ class ProjectVolumes(object):
             vol_name: Volume(
                 client=client,
                 project=name,
-                name=vol_name,
+                name=data.get('name', vol_name),
                 driver=data.get('driver'),
                 driver_opts=data.get('driver_opts'),
-                external_name=data.get('external_name'),
-                labels=data.get('labels')
+                custom_name=data.get('name') is not None,
+                labels=data.get('labels'),
+                external=bool(data.get('external', False))
             )
             for vol_name, data in config_volumes.items()
         }
