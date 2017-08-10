@@ -2151,6 +2151,53 @@ class ConfigTest(unittest.TestCase):
         actual = config.merge_service_dicts(base, override, V2_2)
         assert actual == {'image': 'bar', 'scale': 4}
 
+    def test_merge_blkio_config(self):
+        base = {
+            'image': 'bar',
+            'blkio_config': {
+                'weight': 300,
+                'weight_device': [
+                    {'path': '/dev/sda1', 'weight': 200}
+                ],
+                'device_read_iops': [
+                    {'path': '/dev/sda1', 'rate': 300}
+                ],
+                'device_write_iops': [
+                    {'path': '/dev/sda1', 'rate': 1000}
+                ]
+            }
+        }
+
+        override = {
+            'blkio_config': {
+                'weight': 450,
+                'weight_device': [
+                    {'path': '/dev/sda2', 'weight': 400}
+                ],
+                'device_read_iops': [
+                    {'path': '/dev/sda1', 'rate': 2000}
+                ],
+                'device_read_bps': [
+                    {'path': '/dev/sda1', 'rate': 1024}
+                ]
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_2)
+        assert actual == {
+            'image': 'bar',
+            'blkio_config': {
+                'weight': override['blkio_config']['weight'],
+                'weight_device': (
+                    base['blkio_config']['weight_device'] +
+                    override['blkio_config']['weight_device']
+                ),
+                'device_read_iops': override['blkio_config']['device_read_iops'],
+                'device_read_bps': override['blkio_config']['device_read_bps'],
+                'device_write_iops': base['blkio_config']['device_write_iops']
+            }
+        }
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
