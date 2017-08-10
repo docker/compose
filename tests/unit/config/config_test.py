@@ -1864,7 +1864,6 @@ class ConfigTest(unittest.TestCase):
             'image': 'alpine:edge',
             'logging': {
                 'driver': 'syslog',
-                'options': None
             }
         }
 
