@@ -9,6 +9,7 @@ from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_2 as V3_2
+from compose.const import COMPOSEFILE_V3_2 as V3_4
 
 
 def serialize_config_type(dumper, data):
@@ -64,6 +65,9 @@ def denormalize_config(config, image_digests=None):
         for name, conf in result[key].items():
             if 'external_name' in conf:
                 del conf['external_name']
+
+            if 'name' in conf and config.version < V3_4:
+                del conf['name']
 
     return result
 
