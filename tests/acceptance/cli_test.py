@@ -291,10 +291,12 @@ class CLITestCase(DockerClientTestCase):
         assert 'volumes' in json_result
         assert json_result['volumes'] == {
             'foo': {
-                'external': True
+                'external': True,
+                'name': 'foo',
             },
             'bar': {
-                'external': {'name': 'some_bar'}
+                'external': True,
+                'name': 'some_bar',
             }
         }
 
