@@ -1044,8 +1044,8 @@ def merge_logging(base, override):
     md.merge_scalar('driver')
     if md.get('driver') == base.get('driver') or base.get('driver') is None:
         md.merge_mapping('options', lambda m: m or {})
-    else:
-        md['options'] = override.get('options')
+    elif override.get('options'):
+        md['options'] = override.get('options', {})
     return dict(md)
 
 
