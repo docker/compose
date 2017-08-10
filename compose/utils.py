@@ -9,7 +9,10 @@ import logging
 import ntpath
 
 import six
+from docker.errors import DockerException
+from docker.utils import parse_bytes as sdk_parse_bytes
 
+from .config.errors import ConfigurationError
 from .errors import StreamParseError
 from .timeparse import timeparse
 
@@ -133,3 +136,10 @@ def splitdrive(path):
     if path[0] in ['.', '\\', '/', '~']:
         return ('', path)
     return ntpath.splitdrive(path)
+
+
+def parse_bytes(n):
+    try:
+        return sdk_parse_bytes(n)
+    except DockerException:
+        raise ConfigurationError('Invalid format for bytes value: {}'.format(n))

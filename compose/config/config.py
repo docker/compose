@@ -16,6 +16,7 @@ from . import types
 from .. import const
 from ..const import COMPOSEFILE_V1 as V1
 from ..utils import build_string_dict
+from ..utils import parse_bytes
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
 from ..version import ComposeVersion
@@ -108,6 +109,7 @@ DOCKER_CONFIG_KEYS = [
 ]
 
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
+    'blkio_config',
     'build',
     'container_name',
     'credential_spec',
@@ -726,8 +728,9 @@ def process_service(service_config):
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
-    service_dict = process_healthcheck(service_dict, service_config.name)
-    service_dict = process_ports(service_dict)
+    service_dict = process_blkio_config(process_ports(
+        process_healthcheck(service_dict, service_config.name)
+    ))
 
     return service_dict
 
@@ -751,6 +754,28 @@ def process_depends_on(service_dict):
         service_dict['depends_on'] = dict([
             (svc, {'condition': 'service_started'}) for svc in service_dict['depends_on']
         ])
+    return service_dict
+
+
+def process_blkio_config(service_dict):
+    if not service_dict.get('blkio_config'):
+        return service_dict
+
+    for field in ['device_read_bps', 'device_write_bps']:
+        if field in service_dict['blkio_config']:
+            for v in service_dict['blkio_config'].get(field, []):
+                v['rate'] = parse_bytes(v.get('rate', 0))
+
+    for field in ['device_read_iops', 'device_write_iops']:
+        if field in service_dict['blkio_config']:
+            for v in service_dict['blkio_config'].get(field, []):
+                try:
+                    v['rate'] = int(v.get('rate', 0))
+                except ValueError:
+                    raise ConfigurationError(
+                        'Invalid IOPS value: "{}". Must be a positive integer.'.format(v.get('rate'))
+                    )
+
     return service_dict
 
 
@@ -940,6 +965,7 @@ def merge_service_dicts(base, override, version):
 
     md.merge_field('logging', merge_logging, default={})
     merge_ports(md, base, override)
+    md.merge_field('blkio_config', merge_blkio_config, default={})
 
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
@@ -990,6 +1016,26 @@ def merge_build(output, base, override):
     md.merge_mapping('args', parse_build_arguments)
     md.merge_field('cache_from', merge_unique_items_lists, default=[])
     md.merge_mapping('labels', parse_labels)
+    return dict(md)
+
+
+def merge_blkio_config(base, override):
+    md = MergeDict(base, override)
+    md.merge_scalar('weight')
+
+    def merge_blkio_limits(base, override):
+        index = dict((b['path'], b) for b in base)
+        for o in override:
+            index[o['path']] = o
+
+        return sorted(list(index.values()), key=lambda x: x['path'])
+
+    for field in [
+            "device_read_bps", "device_read_iops", "device_write_bps",
+            "device_write_iops", "weight_device",
+    ]:
+        md.merge_field(field, merge_blkio_limits, default=[])
+
     return dict(md)
 
 
