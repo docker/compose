@@ -65,8 +65,11 @@ def denormalize_config(config, image_digests=None):
             if 'external_name' in conf:
                 del conf['external_name']
 
-            if 'name' in conf and config.version < V3_4:
-                del conf['name']
+            if 'name' in conf:
+                if config.version < V2_1 or (config.version > V3_0 and config.version < V3_4):
+                    del conf['name']
+                elif 'external' in conf:
+                    conf['external'] = True
 
     return result
 

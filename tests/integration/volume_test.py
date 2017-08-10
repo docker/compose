@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import six
 from docker.errors import DockerException
 
 from .testcases import DockerClientTestCase
@@ -23,12 +24,15 @@ class VolumeTest(DockerClientTestCase):
         del self.tmp_volumes
         super(VolumeTest, self).tearDown()
 
-    def create_volume(self, name, driver=None, opts=None, external=None):
-        if external and isinstance(external, bool):
-            external = name
+    def create_volume(self, name, driver=None, opts=None, external=None, custom_name=False):
+        if external:
+            custom_name = True
+            if isinstance(external, six.text_type):
+                name = external
+
         vol = Volume(
             self.client, 'composetest', name, driver=driver, driver_opts=opts,
-            external_name=external
+            external=bool(external), custom_name=custom_name
         )
         self.tmp_volumes.append(vol)
         return vol
@@ -38,6 +42,13 @@ class VolumeTest(DockerClientTestCase):
         vol.create()
         info = self.get_volume_data(vol.full_name)
         assert info['Name'].split('/')[-1] == vol.full_name
+
+    def test_create_volume_custom_name(self):
+        vol = self.create_volume('volume01', custom_name=True)
+        assert vol.name == vol.full_name
+        vol.create()
+        info = self.get_volume_data(vol.full_name)
+        assert info['Name'].split('/')[-1] == vol.name
 
     def test_recreate_existing_volume(self):
         vol = self.create_volume('volume01')
