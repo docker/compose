@@ -36,6 +36,7 @@ from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
 from compose.service import PidMode
 from compose.service import Service
+from compose.utils import parse_nanoseconds_int
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
@@ -269,6 +270,24 @@ class ServiceTest(DockerClientTestCase):
 
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
+
+    def test_create_container_with_healthcheck_config(self):
+        one_second = parse_nanoseconds_int('1s')
+        healthcheck = {
+            'test': ['true'],
+            'interval': 2 * one_second,
+            'timeout': 5 * one_second,
+            'retries': 5,
+            'start_period': 2 * one_second
+        }
+        service = self.create_service('db', healthcheck=healthcheck)
+        container = service.create_container()
+        remote_healthcheck = container.get('Config.Healthcheck')
+        assert remote_healthcheck['Test'] == healthcheck['test']
+        assert remote_healthcheck['Interval'] == healthcheck['interval']
+        assert remote_healthcheck['Timeout'] == healthcheck['timeout']
+        assert remote_healthcheck['Retries'] == healthcheck['retries']
+        assert remote_healthcheck['StartPeriod'] == healthcheck['start_period']
 
     def test_recreate_preserves_volume_with_trailing_slash(self):
         """When the Compose file specifies a trailing slash in the container path, make
