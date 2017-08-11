@@ -797,16 +797,12 @@ def process_healthcheck(service_dict, service_name):
     elif 'test' in raw:
         hc['test'] = raw['test']
 
-    if 'interval' in raw:
-        if not isinstance(raw['interval'], six.integer_types):
-            hc['interval'] = parse_nanoseconds_int(raw['interval'])
-        else:  # Conversion has been done previously
-            hc['interval'] = raw['interval']
-    if 'timeout' in raw:
-        if not isinstance(raw['timeout'], six.integer_types):
-            hc['timeout'] = parse_nanoseconds_int(raw['timeout'])
-        else:  # Conversion has been done previously
-            hc['timeout'] = raw['timeout']
+    for field in ['interval', 'timeout', 'start_period']:
+        if field in raw:
+            if not isinstance(raw[field], six.integer_types):
+                hc[field] = parse_nanoseconds_int(raw[field])
+            else:  # Conversion has been done previously
+                hc[field] = raw[field]
     if 'retries' in raw:
         hc['retries'] = raw['retries']
 
@@ -967,6 +963,7 @@ def merge_service_dicts(base, override, version):
     md.merge_field('logging', merge_logging, default={})
     merge_ports(md, base, override)
     md.merge_field('blkio_config', merge_blkio_config, default={})
+    md.merge_field('healthcheck', merge_healthchecks, default={})
 
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
@@ -983,6 +980,14 @@ def merge_unique_items_lists(base, override):
     override = [str(o) for o in override]
     base = [str(b) for b in base]
     return sorted(set().union(base, override))
+
+
+def merge_healthchecks(base, override):
+    if override.get('disabled') is True:
+        return override
+    result = base.copy()
+    result.update(override)
+    return result
 
 
 def merge_ports(md, base, override):

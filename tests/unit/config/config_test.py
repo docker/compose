@@ -2197,6 +2197,75 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_healthcheck_config(self):
+        base = {
+            'image': 'bar',
+            'healthcheck': {
+                'start_period': 1000,
+                'interval': 3000,
+                'test': ['true']
+            }
+        }
+
+        override = {
+            'healthcheck': {
+                'interval': 5000,
+                'timeout': 10000,
+                'test': ['echo', 'OK'],
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_3)
+        assert actual['healthcheck'] == {
+            'start_period': base['healthcheck']['start_period'],
+            'test': override['healthcheck']['test'],
+            'interval': override['healthcheck']['interval'],
+            'timeout': override['healthcheck']['timeout'],
+        }
+
+    def test_merge_healthcheck_override_disables(self):
+        base = {
+            'image': 'bar',
+            'healthcheck': {
+                'start_period': 1000,
+                'interval': 3000,
+                'timeout': 2000,
+                'retries': 3,
+                'test': ['true']
+            }
+        }
+
+        override = {
+            'healthcheck': {
+                'disabled': True
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_3)
+        assert actual['healthcheck'] == {'disabled': True}
+
+    def test_merge_healthcheck_override_enables(self):
+        base = {
+            'image': 'bar',
+            'healthcheck': {
+                'disabled': True
+            }
+        }
+
+        override = {
+            'healthcheck': {
+                'disabled': False,
+                'start_period': 1000,
+                'interval': 3000,
+                'timeout': 2000,
+                'retries': 3,
+                'test': ['true']
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_3)
+        assert actual['healthcheck'] == override['healthcheck']
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
@@ -4008,6 +4077,7 @@ class HealthcheckTest(unittest.TestCase):
                 'interval': '1s',
                 'timeout': '1m',
                 'retries': 3,
+                'start_period': '10s'
             }},
             '.',
         )
@@ -4017,6 +4087,7 @@ class HealthcheckTest(unittest.TestCase):
             'interval': nanoseconds_from_time_seconds(1),
             'timeout': nanoseconds_from_time_seconds(60),
             'retries': 3,
+            'start_period': nanoseconds_from_time_seconds(10)
         }
 
     def test_disable(self):
@@ -4147,15 +4218,17 @@ class SerializeTest(unittest.TestCase):
                 'test': 'exit 1',
                 'interval': '1m40s',
                 'timeout': '30s',
-                'retries': 5
+                'retries': 5,
+                'start_period': '2s90ms'
             }
         }
         processed_service = config.process_service(config.ServiceConfig(
             '.', 'test', 'test', service_dict
         ))
-        denormalized_service = denormalize_service_dict(processed_service, V2_1)
+        denormalized_service = denormalize_service_dict(processed_service, V2_3)
         assert denormalized_service['healthcheck']['interval'] == '100s'
         assert denormalized_service['healthcheck']['timeout'] == '30s'
+        assert denormalized_service['healthcheck']['start_period'] == '2090ms'
 
     def test_denormalize_image_has_digest(self):
         service_dict = {
