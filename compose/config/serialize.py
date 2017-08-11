@@ -131,6 +131,10 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
                 service_dict['healthcheck']['timeout']
             )
 
+        if 'start_period' in service_dict['healthcheck']:
+            service_dict['healthcheck']['start_period'] = serialize_ns_time_value(
+                service_dict['healthcheck']['start_period']
+            )
     if 'ports' in service_dict and version < V3_2:
         service_dict['ports'] = [
             p.legacy_repr() if isinstance(p, types.ServicePort) else p

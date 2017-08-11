@@ -309,6 +309,7 @@
         "disable": {"type": "boolean"},
         "interval": {"type": "string"},
         "retries": {"type": "number"},
+        "start_period": {"type": "string"},
         "test": {
           "oneOf": [
             {"type": "string"},
