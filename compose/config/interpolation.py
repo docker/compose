@@ -82,10 +82,12 @@ class TemplateWithDefaults(Template):
             if named is not None:
                 if ':-' in named:
                     var, _, default = named.partition(':-')
-                    return mapping.get(var) or default
+                    interpolated = self.__class__(default).substitute(mapping)
+                    return mapping.get(var) or interpolated or default
                 if '-' in named:
                     var, _, default = named.partition('-')
-                    return mapping.get(var, default)
+                    interpolated = self.__class__(default).substitute(mapping)
+                    return mapping.get(var, interpolated or default)
                 val = mapping[named]
                 return '%s' % (val,)
             if mo.group('escaped') is not None:
