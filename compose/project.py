@@ -454,7 +454,8 @@ class Project(object):
         )
         if errors:
             raise ProjectError(
-                'Encountered errors while bringing up the project.'
+                'Encountered errors while bringing up the project.\n{0}'.format
+                ('\n'.join(['\t{0}: {1}'.format(service, error) for service, error in errors.items()]))
             )
 
         return [
