@@ -916,6 +916,7 @@ class Service(object):
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
             target=build_opts.get('target', None),
+            squash=build_opts.get('squash', None)
         )
 
         try:

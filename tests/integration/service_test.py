@@ -39,6 +39,7 @@ from compose.service import Service
 from compose.utils import parse_nanoseconds_int
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
+from tests.integration.testcases import requires_experimental
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_3_only
@@ -827,6 +828,26 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
         assert service.image()['Config']['Labels']['com.docker.compose.test.target'] == 'one'
+
+    @v2_2_only()
+    @requires_experimental(None)
+    def test_build_with_squash(self):
+        self.require_api_version('1.25')
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox\n')
+            f.write('RUN echo 1 > a.txt\n')
+            f.write('RUN echo 2 > a.txt\n')
+
+        service = self.create_service('buildsquash', build={
+            'context': text_type(base_dir),
+            'squash': True
+        })
+
+        service.build()
+        assert service.image()
+        assert len(service.image()['RootFS']['Layers']) == 2
 
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')

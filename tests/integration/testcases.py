@@ -185,3 +185,18 @@ def no_cluster(reason):
         return wrapper
 
     return decorator
+
+
+def requires_experimental(until=None):
+    def req_exp(f):
+        @functools.wraps(f)
+        def wrapped(self, *args, **kwargs):
+            if until and not version_lt(self.client._version, until):
+                return f(self, *args, **kwargs)
+            if not self.client.info()['ExperimentalBuild']:
+                pytest.skip('Feature requires Docker Engine experimental mode')
+            return f(self, *args, **kwargs)
+
+        return wrapped
+
+    return req_exp
