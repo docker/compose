@@ -1,0 +1,7 @@
+version: '3.5'
+
+services:
+  custom_shm_size:
+    build:
+      context: .
+      shm_size: 100663296 # =96M

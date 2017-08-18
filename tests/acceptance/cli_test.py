@@ -531,6 +531,12 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert not containers
 
+    def test_build_shm_size_build_option(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-shm-size'
+        result = self.dispatch(['build', '--no-cache'], None)
+        assert 'shm_size: 96' in result.stdout
+
     def test_bundle_with_digests(self):
         self.base_dir = 'tests/fixtures/bundle-with-digests/'
         tmpdir = py.test.ensuretemp('cli_test_bundle')
