@@ -1019,6 +1019,7 @@ def merge_build(output, base, override):
     md.merge_scalar('dockerfile')
     md.merge_scalar('network')
     md.merge_scalar('target')
+    md.merge_scalar('shm_size')
     md.merge_mapping('args', parse_build_arguments)
     md.merge_field('cache_from', merge_unique_items_lists, default=[])
     md.merge_mapping('labels', parse_labels)

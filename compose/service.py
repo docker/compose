@@ -43,6 +43,7 @@ from .parallel import parallel_execute
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
 from .utils import json_hash
+from .utils import parse_bytes
 from .utils import parse_seconds_float
 
 
@@ -916,6 +917,7 @@ class Service(object):
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
             target=build_opts.get('target', None),
+            shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
         )
 
         try:
