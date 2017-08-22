@@ -49,16 +49,16 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
 
     for obj, result, exception in events:
         if exception is None:
-            writer.write(get_name(obj), green('done'))
+            writer.write(get_name(obj), 'done', green)
             results.append(result)
         elif isinstance(exception, APIError):
             errors[get_name(obj)] = exception.explanation
-            writer.write(get_name(obj), red('error'))
+            writer.write(get_name(obj), 'error', red)
         elif isinstance(exception, (OperationFailedError, HealthCheckFailed, NoHealthCheckConfigured)):
             errors[get_name(obj)] = exception.msg
-            writer.write(get_name(obj), red('error'))
+            writer.write(get_name(obj), 'error', red)
         elif isinstance(exception, UpstreamError):
-            writer.write(get_name(obj), red('error'))
+            writer.write(get_name(obj), 'error', red)
         else:
             errors[get_name(obj)] = exception
             error_to_reraise = exception
@@ -263,13 +263,13 @@ class ParallelStreamWriter(object):
                           status, width=self.width))
         self.stream.flush()
 
-    def write(self, obj_index, status):
+    def write(self, obj_index, status, color_func):
         if self.msg is None:
             return
         if self.noansi:
             self._write_noansi(obj_index, status)
         else:
-            self._write_ansi(obj_index, status)
+            self._write_ansi(obj_index, color_func(status))
 
 
 def parallel_operation(containers, operation, options, message):
