@@ -133,17 +133,31 @@ def test_parallel_execute_alignment(capsys):
     assert a.index('...') == b.index('...')
 
 
-def test_parallel_execute_alignment_noansi(capsys):
-    ParallelStreamWriter.set_noansi()
+def test_parallel_execute_ansi(capsys):
+    ParallelStreamWriter.set_noansi(value=False)
     results, errors = parallel_execute(
-        objects=["short", "a very long name"],
+        objects=["something", "something more"],
         func=lambda x: x,
         get_name=six.text_type,
-        msg="Aligning",
+        msg="Control characters",
     )
 
     assert errors == {}
 
     _, err = capsys.readouterr()
-    a, b, c, d = err.split('\n')[:4]
-    assert a.index('...') == b.index('...') == c.index('...') == d.index('...')
+    assert "\x1b" in err
+
+
+def test_parallel_execute_noansi(capsys):
+    ParallelStreamWriter.set_noansi()
+    results, errors = parallel_execute(
+        objects=["something", "something more"],
+        func=lambda x: x,
+        get_name=six.text_type,
+        msg="Control characters",
+    )
+
+    assert errors == {}
+
+    _, err = capsys.readouterr()
+    assert "\x1b" not in err
