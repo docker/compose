@@ -31,7 +31,7 @@ COMPOSEFILE_V3_0 = ComposeVersion('3.0')
 COMPOSEFILE_V3_1 = ComposeVersion('3.1')
 COMPOSEFILE_V3_2 = ComposeVersion('3.2')
 COMPOSEFILE_V3_3 = ComposeVersion('3.3')
-COMPOSEFILE_V3_4 = ComposeVersion('3.4')
+COMPOSEFILE_V3_4 = ComposeVersion('3.4-beta')
 
 API_VERSIONS = {
     COMPOSEFILE_V1: '1.21',
