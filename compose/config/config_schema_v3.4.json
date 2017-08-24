@@ -86,7 +86,8 @@
                 "labels": {"$ref": "#/definitions/list_or_dict"},
                 "cache_from": {"$ref": "#/definitions/list_of_strings"},
                 "network": {"type": "string"},
-                "target": {"type": "string"}
+                "target": {"type": "string"},
+                "squash": {"type": "boolean"}
               },
               "additionalProperties": false
             }
