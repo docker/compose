@@ -97,8 +97,10 @@ def dispatch():
         {'options_first': True, 'version': get_version_info('compose')})
 
     options, handler, command_options = dispatcher.parse(sys.argv[1:])
-    setup_console_handler(console_handler, options.get('--verbose'))
+    setup_console_handler(console_handler, options.get('--verbose'), options.get('--no-ansi'))
     setup_parallel_logger(options.get('--no-ansi'))
+    if options.get('--no-ansi'):
+        command_options['--no-color'] = True
     return functools.partial(perform_command, options, handler, command_options)
 
 
@@ -134,8 +136,8 @@ def setup_parallel_logger(noansi):
         compose.parallel.ParallelStreamWriter.set_noansi()
 
 
-def setup_console_handler(handler, verbose):
-    if handler.stream.isatty():
+def setup_console_handler(handler, verbose, noansi=False):
+    if handler.stream.isatty() and noansi is False:
         format_class = ConsoleWarningFormatter
     else:
         format_class = logging.Formatter
