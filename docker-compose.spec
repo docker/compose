@@ -63,6 +63,11 @@ exe = EXE(pyz,
                 'DATA'
             ),
             (
+                'compose/config/config_schema_v3.4-beta.json',
+                'compose/config/config_schema_v3.4-beta.json',
+                'DATA'
+            ),
+            (
                 'compose/GITSHA',
                 'compose/GITSHA',
                 'DATA'
