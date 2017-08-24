@@ -507,6 +507,11 @@ class TopLevelCommand(object):
             for container in containers:
                 image_config = container.image_config
                 repo_tags = image_config['RepoTags'][0].split(':')
+                # For RepoTags like 'example.com:5000/busybox:latest',
+                # we must combine the first two part.
+                if len(repo_tags) > 2:
+                    repo_tags[0] = repo_tags[0] + repo_tags[1]
+                    repo_tags[1] = repo_tags[2]
                 image_id = image_config['Id'].split(':')[1][:12]
                 size = human_readable_file_size(image_config['Size'])
                 rows.append([
