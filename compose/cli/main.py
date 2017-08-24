@@ -506,7 +506,7 @@ class TopLevelCommand(object):
             rows = []
             for container in containers:
                 image_config = container.image_config
-                repo_tags = image_config['RepoTags'][0].split(':')
+                repo_tags = image_config['RepoTags'][0].rsplit(':', 1)
                 image_id = image_config['Id'].split(':')[1][:12]
                 size = human_readable_file_size(image_config['Size'])
                 rows.append([
