@@ -102,8 +102,18 @@ class LogPrinter(object):
                 # active containers to tail, so continue
                 continue
 
+            self.write(line)
+
+    def write(self, line):
+        try:
             self.output.write(line)
-            self.output.flush()
+        except UnicodeEncodeError:
+            # This may happen if the user's locale settings don't support UTF-8
+            # and UTF-8 characters are present in the log line. The following
+            # will output a "degraded" log with unsupported characters
+            # replaced by `?`
+            self.output.write(line.encode('ascii', 'replace').decode())
+        self.output.flush()
 
 
 def remove_stopped_threads(thread_map):
