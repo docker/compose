@@ -102,7 +102,15 @@ class LogPrinter(object):
                 # active containers to tail, so continue
                 continue
 
-            self.output.write(line)
+            try:
+                self.output.write(line)
+            except UnicodeEncodeError:
+                bytes = line.encode(self.output.encoding, 'backslashreplace')
+                if hasattr(self.output, 'buffer'):
+                    self.output.buffer.write(bytes)
+                else:
+                    line = bytes.decode(self.output.encoding, 'strict')
+                    self.output.write(line)
             self.output.flush()
 
 
