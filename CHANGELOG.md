@@ -6,18 +6,12 @@ Change log
 
 ### New features
 
-#### Compose file version 3.4
-
-- Introduced version 3.4 of the `docker-compose.yml` specification.
-  This version requires to be used with Docker Engine 17.06.0 or above.
-
 #### Compose file version 2.3
 
 - Introduced version 2.3 of the `docker-compose.yml` specification.
   This version requires to be used with Docker Engine 17.06.0 or above.
 
 - Added support for the `target` parameter in network configurations
-  (also available in 3.4)
 
 - Added support for the `start_period` parameter in healthcheck
   configurations
@@ -44,6 +38,9 @@ Change log
 - Fixed issues where logs of TTY-enabled services were being printed
   incorrectly and causing `MemoryError` exceptions
 
+- Fixed a bug where printing application logs would sometimes be interrupted
+  by a `UnicodeEncodeError` exception on Python 3
+
 - The `$` character in the output of `docker-compose config` is now
   properly escaped
 
@@ -57,6 +54,9 @@ Change log
 
 - Fixed an issue where the `logging` options in the output of
   `docker-compose config` would be set to `null`, an invalid value
+
+- Fixed the output of the `docker-compose images` command when an image
+  would come from a private repository using an explicit port number
 
 - Fixed the output of `docker-compose config` when a port definition used
   `0` as the value for the published port
