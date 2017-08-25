@@ -1,6 +1,66 @@
 Change log
 ==========
 
+1.16.0 (2017-08-31)
+-------------------
+
+### New features
+
+#### Compose file version 2.3
+
+- Introduced version 2.3 of the `docker-compose.yml` specification.
+  This version requires to be used with Docker Engine 17.06.0 or above.
+
+- Added support for the `target` parameter in network configurations
+
+- Added support for the `start_period` parameter in healthcheck
+  configurations
+
+#### Compose file version 2.x
+
+- Added support for the `blkio_config` parameter in service definitions
+
+- Added support for setting a custom name in volume definitions using
+  the `name` parameter (not available for version 2.0)
+
+#### All formats
+
+- Added new CLI flag `--no-ansi` to suppress ANSI control characters in
+  output
+
+### Bugfixes
+
+- Fixed a bug where nested `extends` instructions weren't resolved
+  properly, causing "file not found" errors
+
+- Fixed several issues with `.dockerignore` parsing
+
+- Fixed issues where logs of TTY-enabled services were being printed
+  incorrectly and causing `MemoryError` exceptions
+
+- Fixed a bug where printing application logs would sometimes be interrupted
+  by a `UnicodeEncodeError` exception on Python 3
+
+- The `$` character in the output of `docker-compose config` is now
+  properly escaped
+
+- Fixed a bug where running `docker-compose top` would sometimes fail
+  with an uncaught exception
+
+- Fixed a bug where `docker-compose pull` with the `--parallel` flag
+  would return a `0` exit code when failing
+
+- Fixed an issue where keys in `deploy.resources` were not being validated
+
+- Fixed an issue where the `logging` options in the output of
+  `docker-compose config` would be set to `null`, an invalid value
+
+- Fixed the output of the `docker-compose images` command when an image
+  would come from a private repository using an explicit port number
+
+- Fixed the output of `docker-compose config` when a port definition used
+  `0` as the value for the published port
+
 1.15.0 (2017-07-26)
 -------------------
 
