@@ -239,6 +239,16 @@ def handle_error_for_schema_with_id(error, path):
             invalid_config_key = parse_key_from_error_msg(error)
             return get_unsupported_config_msg(path, invalid_config_key)
 
+        if schema_id.startswith('config_schema_v'):
+            invalid_config_key = parse_key_from_error_msg(error)
+            return ('Invalid top-level property "{key}". Valid top-level '
+                    'sections for this Compose file are: {properties}, and '
+                    'extensions starting with "x-".\n\n{explanation}').format(
+                key=invalid_config_key,
+                properties=', '.join(error.schema['properties'].keys()),
+                explanation=VERSION_EXPLANATION
+            )
+
         if not error.path:
             return '{}\n\n{}'.format(error.message, VERSION_EXPLANATION)
 

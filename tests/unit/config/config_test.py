@@ -251,7 +251,7 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert 'Additional properties are not allowed' in excinfo.exconly()
+        assert 'Invalid top-level property "web"' in excinfo.exconly()
         assert VERSION_EXPLANATION in excinfo.exconly()
 
     def test_named_volume_config_empty(self):
@@ -772,6 +772,18 @@ class ConfigTest(unittest.TestCase):
         assert services[0]['name'] == 'volume'
         assert services[1]['name'] == 'db'
         assert services[2]['name'] == 'web'
+
+    def test_load_with_extensions(self):
+        config_details = build_config_details({
+            'version': '2.3',
+            'x-data': {
+                'lambda': 3,
+                'excess': [True, {}]
+            }
+        })
+
+        config_data = config.load(config_details)
+        assert config_data.services == []
 
     def test_config_build_configuration(self):
         service = config.load(
