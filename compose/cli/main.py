@@ -969,33 +969,10 @@ class TopLevelCommand(object):
 
             if cascade_stop:
                 print("Aborting on container exit...")
-
-                exit_code = 0
-                if exit_value_from:
-                    candidates = list(filter(
-                        lambda c: c.service == exit_value_from,
-                        attached_containers))
-                    if not candidates:
-                        log.error(
-                            'No containers matching the spec "{0}" '
-                            'were run.'.format(exit_value_from)
-                        )
-                        exit_code = 2
-                    elif len(candidates) > 1:
-                        exit_values = filter(
-                            lambda e: e != 0,
-                            [c.inspect()['State']['ExitCode'] for c in candidates]
-                        )
-
-                        exit_code = exit_values[0]
-                    else:
-                        exit_code = candidates[0].inspect()['State']['ExitCode']
-                else:
-                    for e in self.project.containers(service_names=options['SERVICE'], stopped=True):
-                        if (not e.is_running and cascade_starter == e.name):
-                            if not e.exit_code == 0:
-                                exit_code = e.exit_code
-                                break
+                all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+                exit_code = compute_exit_code(
+                    exit_value_from, attached_containers, cascade_starter, all_containers
+                )
 
                 self.project.stop(service_names=service_names, timeout=timeout)
                 sys.exit(exit_code)
@@ -1014,6 +991,37 @@ class TopLevelCommand(object):
             print(__version__)
         else:
             print(get_version_info('full'))
+
+
+def compute_exit_code(exit_value_from, attached_containers, cascade_starter, all_containers):
+    exit_code = 0
+    if exit_value_from:
+        candidates = list(filter(
+            lambda c: c.service == exit_value_from,
+            attached_containers))
+        if not candidates:
+            log.error(
+                'No containers matching the spec "{0}" '
+                'were run.'.format(exit_value_from)
+            )
+            exit_code = 2
+        elif len(candidates) > 1:
+            exit_values = filter(
+                lambda e: e != 0,
+                [c.inspect()['State']['ExitCode'] for c in candidates]
+            )
+
+            exit_code = exit_values[0]
+        else:
+            exit_code = candidates[0].inspect()['State']['ExitCode']
+    else:
+        for e in all_containers:
+            if (not e.is_running and cascade_starter == e.name):
+                if not e.exit_code == 0:
+                    exit_code = e.exit_code
+                    break
+
+    return exit_code
 
 
 def convergence_strategy_from_opts(options):
