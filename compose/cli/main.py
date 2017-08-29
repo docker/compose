@@ -319,6 +319,7 @@ class TopLevelCommand(object):
     def create(self, options):
         """
         Creates containers for a service.
+        This command is deprecated. Use the `up` command with `--no-start` instead.
 
         Usage: create [options] [SERVICE...]
 
@@ -331,6 +332,11 @@ class TopLevelCommand(object):
             --build                Build images before creating containers.
         """
         service_names = options['SERVICE']
+
+        log.warn(
+            'The create command is deprecated. '
+            'Use the up command with the --no-start flag instead.'
+        )
 
         self.project.create(
             service_names=service_names,
@@ -902,6 +908,7 @@ class TopLevelCommand(object):
             --no-recreate              If containers already exist, don't recreate them.
                                        Incompatible with --force-recreate.
             --no-build                 Don't build an image, even if it's missing.
+            --no-start                 Don't start the services after creating them.
             --build                    Build images before starting containers.
             --abort-on-container-exit  Stops all containers if any container was stopped.
                                        Incompatible with -d.
@@ -922,9 +929,15 @@ class TopLevelCommand(object):
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
+        no_start = options.get('--no-start')
 
-        if detached and cascade_stop:
+        if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
+
+        if no_start:
+            for excluded in ['-d', '--abort-on-container-exit', '--exit-code-from']:
+                if options.get(excluded):
+                    raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             to_attach = self.project.up(
@@ -936,9 +949,10 @@ class TopLevelCommand(object):
                 detached=detached,
                 remove_orphans=remove_orphans,
                 scale_override=parse_scale_args(options['--scale']),
+                start=not no_start
             )
 
-            if detached:
+            if detached or no_start:
                 return
 
             attached_containers = filter_containers_to_service_names(to_attach, service_names)
