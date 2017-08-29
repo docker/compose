@@ -773,6 +773,31 @@ class CLITestCase(DockerClientTestCase):
                 assert self.lookup(container, service.name)
 
     @v2_only()
+    def test_up_no_start(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        self.dispatch(['up', '--no-start'], None)
+
+        services = self.project.get_services()
+
+        default_network = self.project.networks.networks['default'].full_name
+        front_network = self.project.networks.networks['front'].full_name
+        networks = self.client.networks(names=[default_network, front_network])
+        assert len(networks) == 2
+
+        for service in services:
+            containers = service.containers(stopped=True)
+            assert len(containers) == 1
+
+            container = containers[0]
+            assert not container.is_running
+            assert container.get('State.Status') == 'created'
+
+        volumes = self.project.volumes.volumes
+        assert 'data' in volumes
+        volume = volumes['data']
+        assert volume.exists()
+
+    @v2_only()
     def test_up_no_ansi(self):
         self.base_dir = 'tests/fixtures/v2-simple'
         result = self.dispatch(['--no-ansi', 'up', '-d'], None)
