@@ -8,6 +8,7 @@ import six
 
 from .errors import ConfigurationError
 from compose.const import COMPOSEFILE_V2_0 as V2_0
+from ast import literal_eval
 
 
 log = logging.getLogger(__name__)
@@ -21,10 +22,22 @@ class Interpolator(object):
 
     def interpolate(self, string):
         try:
-            return self.templater(string).substitute(self.mapping)
+            str=self.templater(string).substitute(self.mapping)
+            try:
+                 return literal_eval(str)
+            except:
+                return str
+
         except ValueError:
             raise InvalidInterpolation(string)
 
+def interpolate_parse_int(s):
+    try:
+        res = int(eval(str(s)))
+        if type(res) == int:
+            return res
+    except:
+        return
 
 def interpolate_environment_variables(version, config, section, environment):
     if version <= V2_0:
