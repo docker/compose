@@ -2209,6 +2209,24 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_merge_extra_hosts(self):
+        base = {
+            'image': 'bar',
+            'extra_hosts': {
+                'foo': '1.2.3.4',
+            }
+        }
+
+        override = {
+            'extra_hosts': ['bar:5.6.7.8', 'foo:127.0.0.1']
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_0)
+        assert actual['extra_hosts'] == {
+            'foo': '127.0.0.1',
+            'bar': '5.6.7.8',
+        }
+
     def test_merge_healthcheck_config(self):
         base = {
             'image': 'bar',

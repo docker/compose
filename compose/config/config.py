@@ -717,9 +717,6 @@ def process_service(service_config):
     if 'labels' in service_dict:
         service_dict['labels'] = parse_labels(service_dict['labels'])
 
-    if 'extra_hosts' in service_dict:
-        service_dict['extra_hosts'] = parse_extra_hosts(service_dict['extra_hosts'])
-
     if 'sysctls' in service_dict:
         service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
 
@@ -947,6 +944,7 @@ def merge_service_dicts(base, override, version):
     md.merge_sequence('secrets', types.ServiceSecret.parse)
     md.merge_sequence('configs', types.ServiceConfig.parse)
     md.merge_mapping('deploy', parse_deploy)
+    md.merge_mapping('extra_hosts', parse_extra_hosts)
 
     for field in ['volumes', 'devices']:
         md.merge_field(field, merge_path_mappings)
