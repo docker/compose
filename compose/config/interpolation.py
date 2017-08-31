@@ -31,14 +31,6 @@ class Interpolator(object):
         except ValueError:
             raise InvalidInterpolation(string)
 
-def interpolate_parse_int(s):
-    try:
-        res = int(eval(str(s)))
-        if type(res) == int:
-            return res
-    except:
-        return
-
 def interpolate_environment_variables(version, config, section, environment):
     if version <= V2_0:
         interpolator = Interpolator(Template, environment)
