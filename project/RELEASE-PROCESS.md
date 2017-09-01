@@ -24,7 +24,7 @@ As part of this script you'll be asked to:
 
     If the next release will be an RC, append `-rcN`, e.g. `1.4.0-rc1`.
 
-2.  Write release notes in `CHANGES.md`.
+2.  Write release notes in `CHANGELOG.md`.
 
     Almost every feature enhancement should be mentioned, with the most
     visible/exciting ones first. Use descriptive sentences and give context
@@ -67,16 +67,13 @@ Check out the bump branch and run the `build-binaries` script
 
 When prompted build the non-linux binaries and test them.
 
-1.  Download the osx binary from Bintray. Make sure that the latest Travis
-    build has finished, otherwise you'll be downloading an old binary.
+1.  Download the different platform binaries by running the following script:
 
-    https://dl.bintray.com/docker-compose/$BRANCH_NAME/
+    `./script/release/download-binaries $VERSION`
 
-2.  Download the windows binary from AppVeyor
+    The binaries for Linux, OSX and Windows will be downloaded in the `binaries-$VERSION` folder.
 
-    https://ci.appveyor.com/project/docker/compose
-
-3.  Draft a release from the tag on GitHub (the script will open the window for
+3.  Draft a release from the tag on GitHub (the `build-binaries` script will open the window for
     you)
 
     The tag will only be present on Github when you run the `push-release`
@@ -87,18 +84,30 @@ When prompted build the non-linux binaries and test them.
 
         If you're a Mac or Windows user, the best way to install Compose and keep it up-to-date is **[Docker for Mac and Windows](https://www.docker.com/products/docker)**.
 
-        Note that Compose 1.9.0 requires Docker Engine 1.10.0 or later for version 2 of the Compose File format, and Docker Engine 1.9.1 or later for version 1. Docker for Mac and Windows will automatically install the latest version of Docker Engine for you.
+        Docker for Mac and Windows will automatically install the latest version of Docker Engine for you.
 
         Alternatively, you can use the usual commands to install or upgrade Compose:
 
         ```
-        curl -L https://github.com/docker/compose/releases/download/1.9.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+        curl -L https://github.com/docker/compose/releases/download/1.16.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
         chmod +x /usr/local/bin/docker-compose
         ```
 
         See the [install docs](https://docs.docker.com/compose/install/) for more install options and instructions.
 
-        Here's what's new:
+        ## Compose file format compatibility matrix
+
+        | Compose file format | Docker Engine |
+        | --- | --- |
+        | 3.3 | 17.06.0+ |
+        | 3.0 &ndash; 3.2 | 1.13.0+ |
+        | 2.3| 17.06.0+ |
+        | 2.2 | 1.13.0+ |
+        | 2.1 | 1.12.0+ |
+        | 2.0 | 1.10.0+ |
+        | 1.0 | 1.9.1+ |
+
+        ## Changes
 
         ...release notes go here...
 
@@ -119,7 +128,7 @@ When prompted build the non-linux binaries and test them.
 
 9.  Check that all the binaries download (following the install instructions) and run.
 
-10. Email maintainers@dockerproject.org and engineering@docker.com about the new release.
+10. Announce the release on the appropriate Slack channel(s).
 
 ## If it’s a stable release (not an RC)
 
