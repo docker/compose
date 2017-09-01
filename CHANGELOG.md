@@ -1,6 +1,14 @@
 Change log
 ==========
 
+1.16.1 (2017-09-01)
+-------------------
+
+### Bugfixes
+
+- Fixed bug that prevented using `extra_hosts` in several configuration files.
+
+
 1.16.0 (2017-08-31)
 -------------------
 
