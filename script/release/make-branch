@@ -65,8 +65,7 @@ git config "branch.${BRANCH}.release" $VERSION
 
 editor=${EDITOR:-vim}
 
-echo "Update versions in docs/install.md, compose/__init__.py, script/run/run.sh"
-$editor docs/install.md
+echo "Update versions in compose/__init__.py, script/run/run.sh"
 $editor compose/__init__.py
 $editor script/run/run.sh
 
