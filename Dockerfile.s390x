@@ -1,0 +1,6 @@
+FROM s390x/python:3.6.2-slim
+ARG COMPOSE_VERSION=1.16.1
+
+RUN pip install --no-cache-dir docker-compose==$COMPOSE_VERSION
+
+ENTRYPOINT ["docker-compose"]
