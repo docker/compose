@@ -170,7 +170,8 @@
           "type": "array",
           "items": {
             "oneOf": [
-              {"type": ["string", "number"], "format": "ports"},
+              {"type": "number", "format": "ports"},
+              {"type": "string", "format": "ports"},
               {
                 "type": "object",
                 "properties": {
@@ -249,6 +250,7 @@
                   "source": {"type": "string"},
                   "target": {"type": "string"},
                   "read_only": {"type": "boolean"},
+                  "consistency": {"type": "string"},
                   "bind": {
                     "type": "object",
                     "properties": {
