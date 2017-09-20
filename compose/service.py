@@ -880,9 +880,12 @@ class Service(object):
 
     def get_secret_volumes(self):
         def build_spec(secret):
-            target = '{}/{}'.format(
-                const.SECRETS_PATH,
-                secret['secret'].target or secret['secret'].source)
+            if secret['secret'].target is not None and secret['secret'].target.startswith('/'):
+                target = secret['secret'].target
+            else:
+                target = '{}/{}'.format(
+                    const.SECRETS_PATH,
+                    secret['secret'].target or secret['secret'].source)
             return VolumeSpec(secret['file'], target, 'ro')
 
         return [build_spec(secret) for secret in self.secrets]
