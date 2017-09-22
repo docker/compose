@@ -230,19 +230,15 @@ class TopLevelCommand(object):
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
             --pull                  Always attempt to pull a newer version of the image.
-            --build-arg key=val     Set build-time variables for one service.
+            --build-arg key=val     Set build-time variables for service(s).
         """
-        service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
         if build_args:
             environment = Environment.from_env_file(self.project_dir)
             build_args = resolve_build_args(build_args, environment)
 
-        if not service_names and build_args:
-            raise UserError("Need service name for --build-arg option")
-
         self.project.build(
-            service_names=service_names,
+            service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
@@ -969,7 +965,8 @@ class TopLevelCommand(object):
 
             if cascade_stop:
                 print("Aborting on container exit...")
-                all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+                all_containers = self.project.containers(
+                    service_names=options['SERVICE'], stopped=True)
                 exit_code = compute_exit_code(
                     exit_value_from, attached_containers, cascade_starter, all_containers
                 )
