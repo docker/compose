@@ -325,7 +325,6 @@ def _parse_oneof_validator(error):
     """
     types = []
     for context in error.context:
-
         if context.validator == 'oneOf':
             _, error_msg = _parse_oneof_validator(context)
             return path_string(context.path), error_msg
@@ -337,19 +336,19 @@ def _parse_oneof_validator(error):
             invalid_config_key = parse_key_from_error_msg(context)
             return (None, "contains unsupported option: '{}'".format(invalid_config_key))
 
+        if context.validator == 'uniqueItems':
+            return (
+                path_string(context.path) if context.path else None,
+                "contains non-unique items, please remove duplicates from {}".format(
+                    context.instance),
+            )
+
         if context.path:
             return (
                 path_string(context.path),
                 "contains {}, which is an invalid type, it should be {}".format(
                     json.dumps(context.instance),
                     _parse_valid_types_from_validator(context.validator_value)),
-            )
-
-        if context.validator == 'uniqueItems':
-            return (
-                None,
-                "contains non unique items, please remove duplicates from {}".format(
-                    context.instance),
             )
 
         if context.validator == 'type':
