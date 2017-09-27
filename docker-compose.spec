@@ -63,8 +63,8 @@ exe = EXE(pyz,
                 'DATA'
             ),
             (
-                'compose/config/config_schema_v3.4-beta.json',
-                'compose/config/config_schema_v3.4-beta.json',
+                'compose/config/config_schema_v3.4.json',
+                'compose/config/config_schema_v3.4.json',
                 'DATA'
             ),
             (
