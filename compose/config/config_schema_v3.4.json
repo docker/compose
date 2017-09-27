@@ -1,6 +1,7 @@
+
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v3.4-beta.json",
+  "id": "config_schema_v3.4.json",
   "type": "object",
   "required": ["version"],
 
@@ -316,7 +317,7 @@
       "additionalProperties": false,
       "properties": {
         "disable": {"type": "boolean"},
-        "interval": {"type": "string"},
+        "interval": {"type": "string", "format": "duration"},
         "retries": {"type": "number"},
         "test": {
           "oneOf": [
@@ -324,7 +325,8 @@
             {"type": "array", "items": {"type": "string"}}
           ]
         },
-        "timeout": {"type": "string"}
+        "timeout": {"type": "string", "format": "duration"},
+        "start_period": {"type": "string", "format": "duration"}
       }
     },
     "deployment": {
