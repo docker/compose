@@ -762,7 +762,10 @@ def process_blkio_config(service_dict):
     for field in ['device_read_bps', 'device_write_bps']:
         if field in service_dict['blkio_config']:
             for v in service_dict['blkio_config'].get(field, []):
-                v['rate'] = parse_bytes(v.get('rate', 0))
+                rate = v.get('rate', 0)
+                v['rate'] = parse_bytes(rate)
+                if v['rate'] is None:
+                    raise ConfigurationError('Invalid format for bytes value: "{}"'.format(rate))
 
     for field in ['device_read_iops', 'device_write_iops']:
         if field in service_dict['blkio_config']:
