@@ -1137,24 +1137,30 @@ def resolve_volume_paths(working_dir, service_dict):
 
 
 def resolve_volume_path(working_dir, volume):
+    mount_params = None
     if isinstance(volume, dict):
-        host_path = volume.get('source')
         container_path = volume.get('target')
+        host_path = volume.get('source')
+        mode = None
         if host_path:
             if volume.get('read_only'):
-                container_path += ':ro'
+                mode = 'ro'
             if volume.get('volume', {}).get('nocopy'):
-                container_path += ':nocopy'
+                mode = 'nocopy'
+        mount_params = (host_path, mode)
     else:
-        container_path, host_path = split_path_mapping(volume)
+        container_path, mount_params = split_path_mapping(volume)
 
-    if host_path is not None:
+    if mount_params is not None:
+        host_path, mode = mount_params
+        if host_path is None:
+            return container_path
         if host_path.startswith('.'):
             host_path = expand_path(working_dir, host_path)
         host_path = os.path.expanduser(host_path)
-        return u"{}:{}".format(host_path, container_path)
-    else:
-        return container_path
+        return u"{}:{}{}".format(host_path, container_path, (':' + mode if mode else ''))
+
+    return container_path
 
 
 def normalize_build(service_dict, working_dir, environment):
@@ -1234,7 +1240,12 @@ def split_path_mapping(volume_path):
 
     if ':' in volume_config:
         (host, container) = volume_config.split(':', 1)
-        return (container, drive + host)
+        container_drive, container_path = splitdrive(container)
+        mode = None
+        if ':' in container_path:
+            container_path, mode = container_path.rsplit(':', 1)
+
+        return (container_drive + container_path, (drive + host, mode))
     else:
         return (volume_path, None)
 
@@ -1246,7 +1257,11 @@ def join_path_mapping(pair):
     elif host is None:
         return container
     else:
-        return ":".join((host, container))
+        host, mode = host
+        result = ":".join((host, container))
+        if mode:
+            result += ":" + mode
+        return result
 
 
 def expand_path(working_dir, path):
