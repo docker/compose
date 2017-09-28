@@ -1101,6 +1101,38 @@ class ConfigTest(unittest.TestCase):
             ['/anonymous', '/c:/b:rw', 'vol:/x:ro']
         )
 
+    @mock.patch.dict(os.environ)
+    def test_volume_mode_override(self):
+        os.environ['COMPOSE_CONVERT_WINDOWS_PATHS'] = 'true'
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2.3',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'volumes': ['/c:/b:rw']
+                    }
+                },
+            }
+        )
+
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': '2.3',
+                'services': {
+                    'web': {
+                        'volumes': ['/c:/b:ro']
+                    }
+                }
+            }
+        )
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        svc_volumes = list(map(lambda v: v.repr(), service_dicts[0]['volumes']))
+        assert svc_volumes == ['/c:/b:ro']
+
     def test_undeclared_volume_v2(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -4018,7 +4050,7 @@ class VolumePathTest(unittest.TestCase):
     def test_split_path_mapping_with_windows_path(self):
         host_path = "c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config"
         windows_volume_path = host_path + ":/opt/connect/config:ro"
-        expected_mapping = ("/opt/connect/config:ro", host_path)
+        expected_mapping = ("/opt/connect/config", (host_path, 'ro'))
 
         mapping = config.split_path_mapping(windows_volume_path)
         assert mapping == expected_mapping
@@ -4026,7 +4058,7 @@ class VolumePathTest(unittest.TestCase):
     def test_split_path_mapping_with_windows_path_in_container(self):
         host_path = 'c:\\Users\\remilia\\data'
         container_path = 'c:\\scarletdevil\\data'
-        expected_mapping = (container_path, host_path)
+        expected_mapping = (container_path, (host_path, None))
 
         mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
         assert mapping == expected_mapping
@@ -4034,7 +4066,7 @@ class VolumePathTest(unittest.TestCase):
     def test_split_path_mapping_with_root_mount(self):
         host_path = '/'
         container_path = '/var/hostroot'
-        expected_mapping = (container_path, host_path)
+        expected_mapping = (container_path, (host_path, None))
         mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
         assert mapping == expected_mapping
 
