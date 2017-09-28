@@ -60,3 +60,11 @@ class TestJsonStream(object):
             {'three': 'four'},
             {'x': 2}
         ]
+
+
+class TestParseBytes(object):
+    def test_parse_bytes(self):
+        assert utils.parse_bytes('123kb') == 123 * 1024
+        assert utils.parse_bytes(123) == 123
+        assert utils.parse_bytes('foobar') is None
+        assert utils.parse_bytes('123') == 123

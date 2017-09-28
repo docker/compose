@@ -12,7 +12,6 @@ import six
 from docker.errors import DockerException
 from docker.utils import parse_bytes as sdk_parse_bytes
 
-from .config.errors import ConfigurationError
 from .errors import StreamParseError
 from .timeparse import MULTIPLIERS
 from .timeparse import timeparse
@@ -143,4 +142,4 @@ def parse_bytes(n):
     try:
         return sdk_parse_bytes(n)
     except DockerException:
-        raise ConfigurationError('Invalid format for bytes value: {}'.format(n))
+        return None
