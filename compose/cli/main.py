@@ -14,6 +14,8 @@ from distutils.spawn import find_executable
 from inspect import getdoc
 from operator import attrgetter
 
+import docker
+
 from . import errors
 from . import signals
 from .. import __version__
@@ -402,7 +404,7 @@ class TopLevelCommand(object):
         """
         Execute a command in a running container
 
-        Usage: exec [options] SERVICE COMMAND [ARGS...]
+        Usage: exec [options] [-e KEY=VAL...] SERVICE COMMAND [ARGS...]
 
         Options:
             -d                Detached mode: Run command in the background.
@@ -412,6 +414,7 @@ class TopLevelCommand(object):
                               allocates a TTY.
             --index=index     index of the container if there are multiple
                               instances of a service [default: 1]
+            -e, --env KEY=VAL Set environment variables (can be used multiple times)
         """
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
@@ -425,26 +428,7 @@ class TopLevelCommand(object):
         tty = not options["-T"]
 
         if IS_WINDOWS_PLATFORM and not detach:
-            args = ["exec"]
-
-            if options["-d"]:
-                args += ["--detach"]
-            else:
-                args += ["--interactive"]
-
-            if not options["-T"]:
-                args += ["--tty"]
-
-            if options["--privileged"]:
-                args += ["--privileged"]
-
-            if options["--user"]:
-                args += ["--user", options["--user"]]
-
-            args += [container.id]
-            args += command
-
-            sys.exit(call_docker(args))
+            sys.exit(call_docker(build_exec_command(options, container.id, command)))
 
         create_exec_options = {
             "privileged": options["--privileged"],
@@ -452,6 +436,10 @@ class TopLevelCommand(object):
             "tty": tty,
             "stdin": tty,
         }
+
+        # setting environment for exec is not supported in API < 1.25'
+        if docker.utils.version_gte(self.project.client.api_version, '1.25'):
+            create_exec_options["environment"] = options["--env"]
 
         exec_id = container.create_exec(command, **create_exec_options)
 
@@ -1295,3 +1283,29 @@ def parse_scale_args(options):
             )
         res[service_name] = num
     return res
+
+
+def build_exec_command(options, container_id, command):
+    args = ["exec"]
+
+    if options["-d"]:
+        args += ["--detach"]
+    else:
+        args += ["--interactive"]
+
+    if not options["-T"]:
+        args += ["--tty"]
+
+    if options["--privileged"]:
+        args += ["--privileged"]
+
+    if options["--user"]:
+        args += ["--user", options["--user"]]
+
+    if options["--env"]:
+        for env_variable in options["--env"]:
+            args += ["--env", env_variable]
+
+    args += [container_id]
+    args += command
+    return args
