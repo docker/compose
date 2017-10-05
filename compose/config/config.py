@@ -12,6 +12,7 @@ import six
 import yaml
 from cached_property import cached_property
 
+from . import default_config
 from . import types
 from .. import const
 from ..const import COMPOSEFILE_V1 as V1
@@ -24,9 +25,7 @@ from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
 from .errors import CircularReference
-from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
-from .errors import DuplicateOverrideFileFound
 from .errors import VERSION_EXPLANATION
 from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
@@ -50,7 +49,6 @@ from .validation import validate_pid_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
-
 
 DOCKER_CONFIG_KEYS = [
     'cap_add',
@@ -134,9 +132,6 @@ SUPPORTED_FILENAMES = [
     'docker-compose.yml',
     'docker-compose.yaml',
 ]
-
-DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml', 'docker-compose.override.yaml')
-
 
 log = logging.getLogger(__name__)
 
@@ -263,7 +258,7 @@ def find(base_dir, filenames, environment, override_dir=None):
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        filenames = get_default_config_files(base_dir)
+        filenames = default_config.find(SUPPORTED_FILENAMES, base_dir)
 
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
@@ -287,49 +282,6 @@ def validate_config_version(config_files):
                     main_file.version,
                     next_file.filename,
                     next_file.version))
-
-
-def get_default_config_files(base_dir):
-    (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
-
-    if not candidates:
-        raise ComposeFileNotFound(SUPPORTED_FILENAMES)
-
-    winner = candidates[0]
-
-    if len(candidates) > 1:
-        log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
-        log.warn("Using %s\n", winner)
-
-    return [os.path.join(path, winner)] + get_default_override_file(path)
-
-
-def get_default_override_file(path):
-    override_files_in_path = [os.path.join(path, override_filename) for override_filename
-                              in DEFAULT_OVERRIDE_FILENAMES
-                              if os.path.exists(os.path.join(path, override_filename))]
-    if len(override_files_in_path) > 1:
-        raise DuplicateOverrideFileFound(override_files_in_path)
-    return override_files_in_path
-
-
-def find_candidates_in_parent_dirs(filenames, path):
-    """
-    Given a directory path to start, looks for filenames in the
-    directory, and then each parent directory successively,
-    until found.
-
-    Returns tuple (candidates, path).
-    """
-    candidates = [filename for filename in filenames
-                  if os.path.exists(os.path.join(path, filename))]
-
-    if not candidates:
-        parent_dir = os.path.join(path, '..')
-        if os.path.abspath(parent_dir) != os.path.abspath(path):
-            return find_candidates_in_parent_dirs(filenames, parent_dir)
-
-    return (candidates, path)
 
 
 def check_swarm_only_config(service_dicts):

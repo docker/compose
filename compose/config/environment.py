@@ -8,7 +8,9 @@ import os
 
 import six
 
+from . import default_config
 from ..const import IS_WINDOWS_PLATFORM
+from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 
 log = logging.getLogger(__name__)
@@ -52,9 +54,13 @@ class Environment(dict):
             result = cls()
             if base_dir is None:
                 return result
-            env_file_path = os.path.join(base_dir, '.env')
             try:
-                return cls(env_vars_from_file(env_file_path))
+                env_file_path = default_config.find(['.env'], base_dir)
+            except ComposeFileNotFound:
+                return result
+            # FIXME: Shouldn't we try all candidates?
+            try:
+                return cls(env_vars_from_file(env_file_path[0]))
             except ConfigurationError:
                 pass
             return result

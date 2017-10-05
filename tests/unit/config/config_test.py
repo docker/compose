@@ -4175,7 +4175,7 @@ class GetDefaultConfigFilesTestCase(unittest.TestCase):
             self.assertEqual(
                 filename,
                 get_config_filename_for_files(self.files[index:]))
-        with self.assertRaises(config.ComposeFileNotFound):
+        with self.assertRaises(config.default_config.ComposeFileNotFound):
             get_config_filename_for_files([])
 
     def test_get_config_path_default_file_in_parent_dir(self):
@@ -4186,7 +4186,7 @@ class GetDefaultConfigFilesTestCase(unittest.TestCase):
 
         for index, filename in enumerate(self.files):
             self.assertEqual(filename, get_config_in_subdir(self.files[index:]))
-        with self.assertRaises(config.ComposeFileNotFound):
+        with self.assertRaises(config.default_config.ComposeFileNotFound):
             get_config_in_subdir([])
 
 
@@ -4203,7 +4203,7 @@ def get_config_filename_for_files(filenames, subdir=None):
             base_dir = tempfile.mkdtemp(dir=project_dir)
         else:
             base_dir = project_dir
-        filename, = config.get_default_config_files(base_dir)
+        filename, = config.default_config.find(filenames, base_dir)
         return os.path.basename(filename)
     finally:
         shutil.rmtree(project_dir)
