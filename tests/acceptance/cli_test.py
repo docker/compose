@@ -33,6 +33,7 @@ from tests.integration.testcases import no_cluster
 from tests.integration.testcases import pull_busybox
 from tests.integration.testcases import SWARM_SKIP_RM_VOLUMES
 from tests.integration.testcases import v2_1_only
+from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
 
@@ -1317,6 +1318,31 @@ class CLITestCase(DockerClientTestCase):
         stdout, stderr = self.dispatch(['exec', '-T', '--user=operator', 'console', 'whoami'])
         self.assertEqual(stdout, "operator\n")
         self.assertEqual(stderr, "")
+
+    @v2_2_only()
+    def test_exec_service_with_environment_overridden(self):
+        name = 'service'
+        self.base_dir = 'tests/fixtures/environment-exec'
+        self.dispatch(['up', '-d'])
+        self.assertEqual(len(self.project.containers()), 1)
+
+        stdout, stderr = self.dispatch([
+            'exec',
+            '-T',
+            '-e', 'foo=notbar',
+            '--env', 'alpha=beta',
+            name,
+            'env',
+        ])
+
+        # env overridden
+        self.assertIn('foo=notbar', stdout)
+        # keep environment from yaml
+        self.assertIn('hello=world', stdout)
+        # added option from command line
+        self.assertIn('alpha=beta', stdout)
+
+        self.assertEqual(stderr, '')
 
     def test_run_service_without_links(self):
         self.base_dir = 'tests/fixtures/links-composefile'
