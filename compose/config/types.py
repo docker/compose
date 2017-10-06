@@ -310,6 +310,12 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
                             result.append(
                                 cls(target, pub[1], proto, None, pub[0])
                             )
+                        elif isinstance(pub, six.string_types) and '-' in pub:
+                            start, end = pub.split('-')
+                            result.extend(
+                                cls(target, pub_port, proto, None, None)
+                                for pub_port in range(int(start), int(end) + 1)
+                            )
                         else:
                             result.append(
                                 cls(target, pub, proto, None, None)

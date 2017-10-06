@@ -87,7 +87,7 @@ class TestServicePort(object):
         assert len(ports) == 1
         assert ports[0].legacy_repr() == port_def + '/tcp'
 
-    def test_parse_port_range(self):
+    def test_parse_port_range_match_length(self):
         ports = ServicePort.parse('25000-25001:4000-4001')
         assert len(ports) == 2
         reprs = [p.repr() for p in ports]
@@ -99,6 +99,33 @@ class TestServicePort(object):
             'target': 4001,
             'published': 25001
         } in reprs
+
+    def test_parse_port_range_invalid_length(self):
+        # when specifying ranges for both container and host the number of ports in the ranges must match
+        with pytest.raises(ConfigurationError) as exc:
+            ServicePort.parse('25000-25001:4000-4002')
+
+        assert "Port ranges don't match in length" in exc.value.msg
+
+    def test_parse_port_range_only_in_published(self):
+        ports = ServicePort.parse('25000-25001:4000')
+        assert len(ports) == 2
+        reprs = [p.repr() for p in ports]
+        assert {
+            'target': 4000,
+            'published': 25000
+        } in reprs
+        assert {
+            'target': 4000,
+            'published': 25001
+        } in reprs
+
+    def test_parse_port_range_only_in_target(self):
+        # when specifying a range only for the host the container port must not be a range
+        with pytest.raises(ConfigurationError) as exc:
+            ServicePort.parse('25000:4000-4002')
+
+        assert "Port ranges don't match in length" in exc.value.msg
 
     def test_parse_invalid_port(self):
         port_def = '4000p'
