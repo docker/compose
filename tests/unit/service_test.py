@@ -179,7 +179,7 @@ class ServiceTest(unittest.TestCase):
             external_links=['default_foo_1']
         )
         with self.assertRaises(DependencyError):
-            service.get_container_name(1)
+            service.get_container_name('foo', 1)
 
     def test_mem_reservation(self):
         self.mock_client.create_host_config.return_value = {}
