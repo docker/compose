@@ -29,6 +29,7 @@ from .service import ConvergenceStrategy
 from .service import NetworkMode
 from .service import PidMode
 from .service import Service
+from .service import ServiceName
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
@@ -189,6 +190,25 @@ class Project(object):
         for service in services:
             service.remove_duplicate_containers()
         return services
+
+    def get_scaled_services(self, services, scale_override):
+        """
+        Returns a list of this project's services as scaled ServiceName objects.
+
+        services: a list of Service objects
+        scale_override: a dict with the scale to apply to each service (k: service_name, v: scale)
+        """
+        service_names = []
+        for service in services:
+            if service.name in scale_override:
+                scale = scale_override[service.name]
+            else:
+                scale = service.scale_num
+
+            for i in range(1, scale + 1):
+                service_names.append(ServiceName(self.name, service.name, i))
+
+        return service_names
 
     def get_links(self, service_dict):
         links = []
@@ -430,15 +450,18 @@ class Project(object):
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
         plans = self._get_convergence_plans(services, strategy)
+        scaled_services = self.get_scaled_services(services, scale_override)
 
         def do(service):
+
             return service.execute_convergence_plan(
                 plans[service.name],
                 timeout=timeout,
                 detached=detached,
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
-                start=start
+                start=start,
+                project_services=scaled_services
             )
 
         def get_deps(service):
