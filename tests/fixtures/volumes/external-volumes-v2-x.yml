@@ -11,6 +11,7 @@ services:
 volumes:
   foo:
     external: true
+    name: some_foo
   bar:
     external:
       name: some_bar
