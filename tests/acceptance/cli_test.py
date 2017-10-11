@@ -285,15 +285,63 @@ class CLITestCase(DockerClientTestCase):
             }
         }
 
-    def test_config_external_volume(self):
+    def test_config_external_volume_v2(self):
         self.base_dir = 'tests/fixtures/volumes'
-        result = self.dispatch(['-f', 'external-volumes.yml', 'config'])
+        result = self.dispatch(['-f', 'external-volumes-v2.yml', 'config'])
         json_result = yaml.load(result.stdout)
         assert 'volumes' in json_result
         assert json_result['volumes'] == {
             'foo': {
                 'external': True,
-                'name': 'foo',
+            },
+            'bar': {
+                'external': {
+                    'name': 'some_bar',
+                },
+            }
+        }
+
+    def test_config_external_volume_v2_x(self):
+        self.base_dir = 'tests/fixtures/volumes'
+        result = self.dispatch(['-f', 'external-volumes-v2-x.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'volumes' in json_result
+        assert json_result['volumes'] == {
+            'foo': {
+                'external': True,
+                'name': 'some_foo',
+            },
+            'bar': {
+                'external': True,
+                'name': 'some_bar',
+            }
+        }
+
+    def test_config_external_volume_v3_x(self):
+        self.base_dir = 'tests/fixtures/volumes'
+        result = self.dispatch(['-f', 'external-volumes-v3-x.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'volumes' in json_result
+        assert json_result['volumes'] == {
+            'foo': {
+                'external': True,
+            },
+            'bar': {
+                'external': {
+                    'name': 'some_bar',
+                },
+            }
+        }
+
+    def test_config_external_volume_v3_4(self):
+        self.base_dir = 'tests/fixtures/volumes'
+        result = self.dispatch(['-f', 'external-volumes-v3-4.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'volumes' in json_result
+        assert json_result['volumes'] == {
+            'foo': {
+                'external': True,
+                'name': 'some_foo',
             },
             'bar': {
                 'external': True,
