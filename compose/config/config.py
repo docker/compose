@@ -15,6 +15,9 @@ from cached_property import cached_property
 from . import types
 from .. import const
 from ..const import COMPOSEFILE_V1 as V1
+from ..const import COMPOSEFILE_V2_1 as V2_1
+from ..const import COMPOSEFILE_V3_0 as V3_0
+from ..const import COMPOSEFILE_V3_4 as V3_4
 from ..utils import build_string_dict
 from ..utils import parse_bytes
 from ..utils import parse_nanoseconds_int
@@ -405,7 +408,7 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
             external = config.get('external')
             if external:
                 name_field = 'name' if entity_type == 'Volume' else 'external_name'
-                validate_external(entity_type, name, config)
+                validate_external(entity_type, name, config, config_file.version)
                 if isinstance(external, dict):
                     config[name_field] = external.get('name')
                 elif not config.get('name'):
@@ -425,14 +428,12 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
     return mapping
 
 
-def validate_external(entity_type, name, config):
-    if len(config.keys()) <= 1:
-        return
-
-    raise ConfigurationError(
-        "{} {} declared as external but specifies additional attributes "
-        "({}).".format(
-            entity_type, name, ', '.join(k for k in config if k != 'external')))
+def validate_external(entity_type, name, config, version):
+    if (version < V2_1 or (version >= V3_0 and version < V3_4)) and len(config.keys()) > 1:
+        raise ConfigurationError(
+            "{} {} declared as external but specifies additional attributes "
+            "({}).".format(
+                entity_type, name, ', '.join(k for k in config if k != 'external')))
 
 
 def load_services(config_details, config_file):
