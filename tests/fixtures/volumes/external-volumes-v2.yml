@@ -1,0 +1,16 @@
+version: "2"
+
+services:
+  web:
+    image: busybox
+    command: top
+    volumes:
+      - foo:/var/lib/
+      - bar:/etc/
+
+volumes:
+  foo:
+    external: true
+  bar:
+    external:
+      name: some_bar

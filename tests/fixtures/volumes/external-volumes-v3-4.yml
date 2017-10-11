@@ -1,0 +1,17 @@
+version: "3.4"
+
+services:
+  web:
+    image: busybox
+    command: top
+    volumes:
+      - foo:/var/lib/
+      - bar:/etc/
+
+volumes:
+  foo:
+    external: true
+    name: some_foo
+  bar:
+    external:
+      name: some_bar
