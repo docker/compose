@@ -14,7 +14,7 @@ from collections import Counter
 from collections import namedtuple
 from operator import attrgetter
 
-import py
+import pytest
 import six
 import yaml
 from docker import errors
@@ -500,6 +500,7 @@ class CLITestCase(DockerClientTestCase):
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
 
+    @pytest.mark.xfail(reason='17.10.0 RC bug remove after GA https://github.com/moby/moby/issues/35116')
     def test_build_failed(self):
         self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
         self.dispatch(['build', 'simple'], returncode=1)
@@ -513,6 +514,7 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert len(containers) == 1
 
+    @pytest.mark.xfail(reason='17.10.0 RC bug remove after GA https://github.com/moby/moby/issues/35116')
     def test_build_failed_forcerm(self):
         self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
         self.dispatch(['build', '--force-rm', 'simple'], returncode=1)
@@ -535,7 +537,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_bundle_with_digests(self):
         self.base_dir = 'tests/fixtures/bundle-with-digests/'
-        tmpdir = py.test.ensuretemp('cli_test_bundle')
+        tmpdir = pytest.ensuretemp('cli_test_bundle')
         self.addCleanup(tmpdir.remove)
         filename = str(tmpdir.join('example.dab'))
 
@@ -1399,7 +1401,7 @@ class CLITestCase(DockerClientTestCase):
             [u'/bin/true'],
         )
 
-    @py.test.mark.skipif(SWARM_SKIP_RM_VOLUMES, reason='Swarm DELETE /containers/<id> bug')
+    @pytest.mark.skipif(SWARM_SKIP_RM_VOLUMES, reason='Swarm DELETE /containers/<id> bug')
     def test_run_rm(self):
         self.base_dir = 'tests/fixtures/volume'
         proc = start_process(self.base_dir, ['run', '--rm', 'test'])
