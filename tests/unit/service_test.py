@@ -9,12 +9,14 @@ from .. import mock
 from .. import unittest
 from compose.config.errors import DependencyError
 from compose.config.types import ServicePort
+from compose.config.types import ServiceSecret
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
+from compose.const import SECRETS_PATH
 from compose.container import Container
 from compose.project import OneOffFilter
 from compose.service import build_ulimits
@@ -1089,3 +1091,56 @@ class ServiceVolumesTest(unittest.TestCase):
         self.assertEqual(
             self.mock_client.create_host_config.call_args[1]['binds'],
             [volume])
+
+
+class ServiceSecretTest(unittest.TestCase):
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.APIClient)
+
+    def test_get_secret_volumes(self):
+        secret1 = {
+            'secret': ServiceSecret.parse({'source': 'secret1', 'target': 'b.txt'}),
+            'file': 'a.txt'
+        }
+        service = Service(
+            'web',
+            client=self.mock_client,
+            image='busybox',
+            secrets=[secret1]
+        )
+        volumes = service.get_secret_volumes()
+
+        assert volumes[0].external == secret1['file']
+        assert volumes[0].internal == '{}/{}'.format(SECRETS_PATH, secret1['secret'].target)
+
+    def test_get_secret_volumes_abspath(self):
+        secret1 = {
+            'secret': ServiceSecret.parse({'source': 'secret1', 'target': '/d.txt'}),
+            'file': 'c.txt'
+        }
+        service = Service(
+            'web',
+            client=self.mock_client,
+            image='busybox',
+            secrets=[secret1]
+        )
+        volumes = service.get_secret_volumes()
+
+        assert volumes[0].external == secret1['file']
+        assert volumes[0].internal == secret1['secret'].target
+
+    def test_get_secret_volumes_no_target(self):
+        secret1 = {
+            'secret': ServiceSecret.parse({'source': 'secret1'}),
+            'file': 'c.txt'
+        }
+        service = Service(
+            'web',
+            client=self.mock_client,
+            image='busybox',
+            secrets=[secret1]
+        )
+        volumes = service.get_secret_volumes()
+
+        assert volumes[0].external == secret1['file']
+        assert volumes[0].internal == '{}/{}'.format(SECRETS_PATH, secret1['secret'].source)
