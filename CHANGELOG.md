@@ -1,13 +1,70 @@
 Change log
 ==========
 
+1.17.0 (2017-11-03)
+-------------------
+
+### New features
+
+#### Compose file version 3.4
+
+- Introduced version 3.4 of the `docker-compose.yml` specification.
+  This version requires to be used with Docker Engine 17.06.0 or above.
+
+- Added support for `cache_from`, `network` and `target` options in build
+  configurations
+
+- Added support for the `order` parameter in the `update_config` section
+
+- Added support for setting a custom name in volume definitions using
+  the `name` parameter
+
+#### Compose file version 2.3
+
+- Added support for `shm_size` option in build configuration
+
+#### Compose file version 2.x
+
+- Added support for extension fields (`x-*`). Also available for v3.4 files
+
+#### All formats
+
+- Added new `--no-start` to the `up` command, allowing users to create all
+  resources (networks, volumes, containers) without starting services.
+  The `create` command is deprecated in favor of this new option
+
+### Bugfixes
+
+- Fixed a bug where `extra_hosts` values would be overridden by extension
+  files instead of merging together
+
+- Fixed a bug where the validation for v3.2 files would prevent using the
+  `consistency` field in service volume definitions
+
+- Fixed a bug that would cause a crash when configuration fields expecting
+  unique items would contain duplicates
+
+- Fixed a bug where mount overrides with a different mode would create a
+  duplicate entry instead of overriding the original entry
+
+- Fixed a bug where build labels declared as a list wouldn't be properly
+  parsed
+
+- Fixed a bug where the output of `docker-compose config` would be invalid
+  for some versions if the file contained custom-named external volumes
+
+- Improved error handling when issuing a build command on Windows using an
+  unsupported file version
+
+- Fixed an issue where networks with identical names would sometimes be
+  created when running `up` commands concurrently.
+
 1.16.1 (2017-09-01)
 -------------------
 
 ### Bugfixes
 
 - Fixed bug that prevented using `extra_hosts` in several configuration files.
-
 
 1.16.0 (2017-08-31)
 -------------------
@@ -19,7 +76,7 @@ Change log
 - Introduced version 2.3 of the `docker-compose.yml` specification.
   This version requires to be used with Docker Engine 17.06.0 or above.
 
-- Added support for the `target` parameter in network configurations
+- Added support for the `target` parameter in build configurations
 
 - Added support for the `start_period` parameter in healthcheck
   configurations
