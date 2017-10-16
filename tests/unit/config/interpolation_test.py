@@ -125,6 +125,8 @@ def test_invalid_interpolation(defaults_interpolator):
         defaults_interpolator('${foo }')
     with pytest.raises(InvalidInterpolation):
         defaults_interpolator('${foo!}')
+    with pytest.raises(InvalidInterpolation):
+        defaults_interpolator('${foo:}')
 
 
 def test_interpolate_missing_no_default(defaults_interpolator):
@@ -143,6 +145,22 @@ def test_interpolate_missing_with_default(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-/non:-alphanumeric}") == "ok /non:-alphanumeric"
 
 
-def test_interpolate_with_empty_and_default_value(defaults_interpolator):
+def test_interpolate_empty_with_default(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
+    assert defaults_interpolator("ok $BAR:-def then") == "ok def then"
+
+
+def test_interpolate_value_with_default(defaults_interpolator):
+    assert defaults_interpolator("ok $FOO:-def then when") == "ok first"
+    assert defaults_interpolator("ok ${FOO:-def then} when") == "ok first when"
+
+
+def test_interpolate_with_nested_default_variables(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:-${FOO}}") == "ok first"
+    assert defaults_interpolator("ok ${BAR-$FOO}") == "ok "
+    assert defaults_interpolator("ok ${missing-$FOO}") == "ok first"
+    assert defaults_interpolator("ok ${BAR:-the $FOO def} this") == "ok the first def this"
+    assert defaults_interpolator("ok ${missing-the $FOO def} this") == "ok the first def this"
+    assert defaults_interpolator("ok ${A:-${B:-$C-${FOO}}}") == "ok first"
+    assert defaults_interpolator("ok $A:-$B-$C:-$D-$FOO") == "ok first"
