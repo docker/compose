@@ -761,7 +761,7 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
         assert "build_version=2" in service.image()['ContainerConfig']['Cmd']
 
-    def test_build_with_build_labels_dict(self):
+    def test_build_with_build_labels(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
 
@@ -771,23 +771,6 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('buildlabels', build={
             'context': text_type(base_dir),
             'labels': {'com.docker.compose.test': 'true'}
-        })
-        service.build()
-        self.addCleanup(self.client.remove_image, service.image_name)
-
-        assert service.image()
-        assert service.image()['Config']['Labels']['com.docker.compose.test'] == 'true'
-
-    def test_build_with_build_labels_list(self):
-        base_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, base_dir)
-
-        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
-            f.write('FROM busybox\n')
-
-        service = self.create_service('buildlabels', build={
-            'context': text_type(base_dir),
-            'labels': ['com.docker.compose.test=true']
         })
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
