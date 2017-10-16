@@ -23,7 +23,6 @@ from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
-from .config.config import parse_labels
 from .config.errors import DependencyError
 from .config.types import ServicePort
 from .config.types import VolumeSpec
@@ -917,7 +916,7 @@ class Service(object):
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
             cache_from=build_opts.get('cache_from', None),
-            labels=parse_labels(build_opts.get('labels', None)),
+            labels=build_opts.get('labels', None),
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
             target=build_opts.get('target', None),
