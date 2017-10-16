@@ -892,7 +892,7 @@ class ConfigTest(unittest.TestCase):
         assert service['build']['args']['opt1'] == '42'
         assert service['build']['args']['opt2'] == 'foobar'
 
-    def test_load_with_build_labels(self):
+    def test_load_build_labels_dict(self):
         service = config.load(
             build_config_details(
                 {
@@ -918,6 +918,28 @@ class ConfigTest(unittest.TestCase):
         assert 'label1' in service['build']['labels']
         assert service['build']['labels']['label1'] == 42
         assert service['build']['labels']['label2'] == 'foobar'
+
+    def test_load_build_labels_list(self):
+        base_file = config.ConfigFile(
+            'base.yml',
+            {
+                'version': '2.3',
+                'services': {
+                    'web': {
+                        'build': {
+                            'context': '.',
+                            'labels': ['foo=bar', 'baz=true', 'foobar=1']
+                        },
+                    },
+                },
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file])
+        service = config.load(details).services[0]
+        assert service['build']['labels'] == {
+            'foo': 'bar', 'baz': 'true', 'foobar': '1'
+        }
 
     def test_build_args_allow_empty_properties(self):
         service = config.load(
