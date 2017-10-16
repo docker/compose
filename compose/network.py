@@ -79,6 +79,7 @@ class Network(object):
                 enable_ipv6=self.enable_ipv6,
                 labels=self._labels,
                 attachable=version_gte(self.client._version, '1.24') or None,
+                check_duplicate=True,
             )
 
     def remove(self):
