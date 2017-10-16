@@ -57,6 +57,26 @@ def handle_connection_errors(client):
     except (ReadTimeout, socket.timeout) as e:
         log_timeout_error(client.timeout)
         raise ConnectionError()
+    except Exception as e:
+        if is_windows():
+            import pywintypes
+            if isinstance(e, pywintypes.error):
+                log_windows_pipe_error(e)
+                raise ConnectionError()
+        raise
+
+
+def log_windows_pipe_error(exc):
+    if exc.winerror == 232:  # https://github.com/docker/compose/issues/5005
+        log.error(
+            "The current Compose file version is not compatible with your engine version. "
+            "Please upgrade your Compose file to a more recent version, or set "
+            "a COMPOSE_API_VERSION in your environment."
+        )
+    else:
+        log.error(
+            "Windows named pipe error: {} (code: {})".format(exc.strerror, exc.winerror)
+        )
 
 
 def log_timeout_error(timeout):
