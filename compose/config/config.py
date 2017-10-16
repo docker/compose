@@ -707,15 +707,15 @@ def process_service(service_config):
     if 'build' in service_dict:
         if isinstance(service_dict['build'], six.string_types):
             service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
-        elif isinstance(service_dict['build'], dict) and 'context' in service_dict['build']:
-            path = service_dict['build']['context']
-            service_dict['build']['context'] = resolve_build_path(working_dir, path)
+        elif isinstance(service_dict['build'], dict):
+            if 'context' in service_dict['build']:
+                path = service_dict['build']['context']
+                service_dict['build']['context'] = resolve_build_path(working_dir, path)
+            if 'labels' in service_dict['build']:
+                service_dict['build']['labels'] = parse_labels(service_dict['build']['labels'])
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
         service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
-
-    if 'labels' in service_dict:
-        service_dict['labels'] = parse_labels(service_dict['labels'])
 
     if 'sysctls' in service_dict:
         service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
