@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import docker
 import pytest
+from docker.constants import DEFAULT_DOCKER_API_VERSION
 from docker.errors import APIError
 
 from .. import mock
@@ -40,6 +41,7 @@ class ServiceTest(unittest.TestCase):
 
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
@@ -145,12 +147,6 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
         from_service.create_container.assert_called_once_with()
 
-    def test_split_domainname_none(self):
-        service = Service('foo', image='foo', hostname='name', client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertEqual(opts['hostname'], 'name', 'hostname')
-        self.assertFalse('domainname' in opts, 'domainname')
-
     def test_memory_swap_limit(self):
         self.mock_client.create_host_config.return_value = {}
 
@@ -232,7 +228,18 @@ class ServiceTest(unittest.TestCase):
             {'Type': 'syslog', 'Config': {'syslog-address': 'tcp://192.168.0.42:123'}}
         )
 
+    def test_split_domainname_none(self):
+        service = Service(
+            'foo',
+            image='foo',
+            hostname='name.domain.tld',
+            client=self.mock_client)
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        self.assertEqual(opts['hostname'], 'name.domain.tld', 'hostname')
+        self.assertFalse('domainname' in opts, 'domainname')
+
     def test_split_domainname_fqdn(self):
+        self.mock_client.api_version = '1.22'
         service = Service(
             'foo',
             hostname='name.domain.tld',
@@ -243,6 +250,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_both(self):
+        self.mock_client.api_version = '1.22'
         service = Service(
             'foo',
             hostname='name',
@@ -254,6 +262,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
     def test_split_domainname_weird(self):
+        self.mock_client.api_version = '1.22'
         service = Service(
             'foo',
             hostname='name.sub',
@@ -857,6 +866,7 @@ class ServiceVolumesTest(unittest.TestCase):
 
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(VolumeSpec.parse('/outside:/inside', True))
