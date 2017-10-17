@@ -105,7 +105,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
 
 def get_project_name(working_dir, project_name=None, environment=None):
     def normalize_name(name):
-        return re.sub(r'[^a-z0-9]', '', name.lower())
+        return re.sub(r'[^a-z0-9-]', '', name.lower())
 
     if not environment:
         environment = Environment.from_env_file(working_dir)
