@@ -14,6 +14,7 @@ from docker.errors import APIError
 from docker.errors import ImageNotFound
 from docker.errors import NotFound
 from docker.types import LogConfig
+from docker.utils import version_lt
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 from docker.utils.utils import convert_tmpfs_mounts
@@ -748,9 +749,10 @@ class Service(object):
 
         # If a qualified hostname was given, split it into an
         # unqualified hostname and a domainname unless domainname
-        # was also given explicitly. This matches the behavior of
-        # the official Docker CLI in that scenario.
-        if ('hostname' in container_options and
+        # was also given explicitly. This matches behavior
+        # until Docker Engine 1.11.0 - Docker API 1.23.
+        if (version_lt(self.client.api_version, '1.23') and
+                'hostname' in container_options and
                 'domainname' not in container_options and
                 '.' in container_options['hostname']):
             parts = container_options['hostname'].partition('.')
