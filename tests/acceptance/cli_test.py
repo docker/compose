@@ -719,12 +719,13 @@ class CLITestCase(DockerClientTestCase):
     def test_run_one_off_with_volume_merge(self):
         self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
         volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files'))
-        create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
+        node = create_host_file(self.client, os.path.join(volume_path, 'example.txt'))
 
         self.dispatch([
             '-f', 'docker-compose.merge.yml',
             'run',
             '-v', '{}:/data'.format(volume_path),
+            '-e', 'constraint:node=={}'.format(node if node is not None else '*'),
             'simple',
             'test', '-f', '/data/example.txt'
         ], returncode=0)
