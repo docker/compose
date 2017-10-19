@@ -1124,6 +1124,13 @@ def parse_flat_dict(d):
 def resolve_env_var(key, val, environment):
     if val is not None:
         return key, val
+    elif environment and key.endswith('?'):
+        required_key = key[:-1]
+        if required_key not in environment:
+            raise ConfigurationError(
+                'environment variable "{key}" is required'.format(key=key))
+        else:
+            return required_key, environment[required_key]
     elif environment and key in environment:
         return key, environment[key]
     else:
