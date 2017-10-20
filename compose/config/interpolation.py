@@ -71,7 +71,7 @@ def recursive_interpolate(obj, interpolator):
 
 
 class TemplateWithDefaults(Template):
-    idpattern = r'[_a-z][_a-z0-9]*(?::?-[^}]+)?'
+    idpattern = r'[_a-z][_a-z0-9]*(?::?-[^}]*)?'
 
     # Modified from python2.7/string.py
     def substitute(self, mapping):

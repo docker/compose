@@ -2876,6 +2876,28 @@ class InterpolationTest(unittest.TestCase):
         ])
 
     @mock.patch.dict(os.environ)
+    def test_config_file_with_environment_variable_with_defaults(self):
+        project_dir = 'tests/fixtures/environment-interpolation-with-defaults'
+        os.environ.update(
+            IMAGE="busybox",
+        )
+
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
+        ).services
+
+        self.assertEqual(service_dicts, [
+            {
+                'name': 'web',
+                'image': 'busybox',
+                'ports': types.ServicePort.parse('80:8000'),
+                'hostname': 'host-',
+            }
+        ])
+
+    @mock.patch.dict(os.environ)
     def test_unset_variable_produces_warning(self):
         os.environ.pop('FOO', None)
         os.environ.pop('BAR', None)
