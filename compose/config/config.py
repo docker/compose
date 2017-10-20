@@ -519,13 +519,13 @@ def process_config_file(config_file, environment, service_name=None):
             processed_config['secrets'] = interpolate_config_section(
                 config_file,
                 config_file.get_secrets(),
-                'secrets',
+                'secret',
                 environment)
         if config_file.version >= const.COMPOSEFILE_V3_3:
             processed_config['configs'] = interpolate_config_section(
                 config_file,
                 config_file.get_configs(),
-                'configs',
+                'config',
                 environment
             )
     else:
