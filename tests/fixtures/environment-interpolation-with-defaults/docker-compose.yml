@@ -1,0 +1,13 @@
+version: "2.1"
+
+services:
+  web:
+    # set value with default, default must be ignored
+    image: ${IMAGE:-alpine}
+
+    # unset value with default value
+    ports:
+      - "${HOST_PORT:-80}:8000"
+
+    # unset value with empty default
+    hostname: "host-${UNSET_VALUE:-}"
