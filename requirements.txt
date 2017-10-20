@@ -20,3 +20,4 @@ six==1.10.0
 texttable==0.9.1
 urllib3==1.21.1
 websocket-client==0.32.0
+yamllint==1.9.0

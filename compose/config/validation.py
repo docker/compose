@@ -13,6 +13,8 @@ from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
 from jsonschema import RefResolver
 from jsonschema import ValidationError
+from yamllint import linter
+from yamllint.config import YamlLintConfig
 
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import NANOCPUS_SCALE
@@ -465,3 +467,17 @@ def handle_errors(errors, format_error_func, filename):
         "The Compose file{file_msg} is invalid because:\n{error_msg}".format(
             file_msg=" '{}'".format(filename) if filename else "",
             error_msg=error_msg))
+
+
+def validate_yaml(fh):
+    """Validate the YAML structure of a configuration file. Use a YAML
+    linter to find duplicate keys since pyyaml doesn't detect duplicates.
+    """
+    linter_config = YamlLintConfig(content='rules:\n  key-duplicates: enable')
+    errors = list(linter.run(fh, linter_config))
+    if errors:
+        raise ConfigurationError(
+            "The Compose file {0} is invalid:\n{1}".format(
+                fh.name, "\n".join(
+                    ["line {0}, column {1}: {2}".format(error.line, error.column, error.message)
+                     for error in errors])))

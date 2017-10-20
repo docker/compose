@@ -53,6 +53,7 @@ from .validation import validate_pid_mode
 from .validation import validate_service_constraints
 from .validation import validate_top_level_object
 from .validation import validate_ulimits
+from .validation import validate_yaml
 
 
 DOCKER_CONFIG_KEYS = [
@@ -1293,6 +1294,9 @@ def has_uppercase(name):
 def load_yaml(filename):
     try:
         with open(filename, 'r') as fh:
+            validate_yaml(fh)
+            # stream has been read by validation function, seek to beginning before parsing yaml
+            fh.seek(0)
             return yaml.safe_load(fh)
     except (IOError, yaml.YAMLError) as e:
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
