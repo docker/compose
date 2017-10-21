@@ -46,7 +46,7 @@ def interpolate_environment_variables(version, config, section, environment):
 
 def interpolate_value(name, config_key, value, section, interpolator):
     try:
-        return recursive_interpolate(value, interpolator)
+        return recursive_interpolate(config_key, value, interpolator)
     except InvalidInterpolation as e:
         raise ConfigurationError(
             'Invalid interpolation format for "{config_key}" option '
@@ -57,16 +57,20 @@ def interpolate_value(name, config_key, value, section, interpolator):
                 string=e.string))
 
 
-def recursive_interpolate(obj, interpolator):
+def recursive_interpolate(config_key, obj, interpolator):
     if isinstance(obj, six.string_types):
+        if config_key == "privileged" and interpolator.interpolate(obj).lower() == 'true':
+            return True
+        elif config_key == "privileged" and interpolator.interpolate(obj).lower() == 'false':
+            return False
         return interpolator.interpolate(obj)
     if isinstance(obj, dict):
         return dict(
-            (key, recursive_interpolate(val, interpolator))
+            (key, recursive_interpolate('', val, interpolator))
             for (key, val) in obj.items()
         )
     if isinstance(obj, list):
-        return [recursive_interpolate(val, interpolator) for val in obj]
+        return [recursive_interpolate('', val, interpolator) for val in obj]
     return obj
 
 
