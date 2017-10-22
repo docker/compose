@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import sys
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from operator import attrgetter
 
 import enum
@@ -597,17 +597,14 @@ class Service(object):
         return json_hash(self.config_dict())
 
     def config_dict(self):
-        return {
-            'options': self.options,
-            'image_id': self.image()['Id'],
-            'links': self.get_link_names(),
-            'net': self.network_mode.id,
-            'networks': self.networks,
-            'volumes_from': [
-                (v.source.name, v.mode)
-                for v in self.volumes_from if isinstance(v.source, Service)
-            ],
-        }
+        return OrderedDict(
+            [('options', self.options),
+             ('image_id', self.image()['Id']),
+             ('links', self.get_link_names()),
+             ('net', self.network_mode.id),
+             ('networks', self.networks),
+             ('volumes_from', [(v.source.name, v.mode) for v in self.volumes_from if isinstance(v.source, Service)])]
+        )
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name
