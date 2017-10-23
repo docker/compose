@@ -465,3 +465,27 @@ def handle_errors(errors, format_error_func, filename):
         "The Compose file{file_msg} is invalid because:\n{error_msg}".format(
             file_msg=" '{}'".format(filename) if filename else "",
             error_msg=error_msg))
+
+
+def validate_healthcheck(service_config):
+    healthcheck = service_config.config.get('healthcheck', {})
+
+    if 'test' in healthcheck and isinstance(healthcheck['test'], list):
+        if len(healthcheck['test']) == 0:
+            raise ConfigurationError(
+                'Service "{}" defines an invalid healthcheck: '
+                '"test" is an empty list'
+                .format(service_config.name))
+
+        # when disable is true config.py::process_healthcheck adds "test: ['NONE']" to service_config
+        elif healthcheck['test'][0] == 'NONE' and len(healthcheck) > 1:
+            raise ConfigurationError(
+                'Service "{}" defines an invalid healthcheck: '
+                '"disable: true" cannot be combined with other options'
+                .format(service_config.name))
+
+        elif healthcheck['test'][0] not in ('NONE', 'CMD', 'CMD-SHELL'):
+            raise ConfigurationError(
+                'Service "{}" defines an invalid healthcheck: '
+                'when "test" is a list the first item must be either NONE, CMD or CMD-SHELL'
+                .format(service_config.name))
