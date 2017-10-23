@@ -1,0 +1,8 @@
+service:
+  image: busybox:latest
+  command: top
+  command: duplicate
+
+  environment:
+    foo: bar
+    foo: bar

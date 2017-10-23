@@ -1507,6 +1507,17 @@ class ConfigTest(unittest.TestCase):
 
         assert 'line 3, column 32' in exc.exconly()
 
+    def test_load_yaml_with_duplicate_keys(self):
+        project_dir = 'tests/fixtures/duplicate-keys'
+
+        with pytest.raises(ConfigurationError) as exc:
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
+
+        assert 'duplication of key "command"' in exc.exconly()
+        assert 'duplication of key "foo"' in exc.exconly()
+
     def test_validate_extra_hosts_invalid(self):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details({
