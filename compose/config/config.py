@@ -47,6 +47,7 @@ from .validation import validate_config_section
 from .validation import validate_cpu
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
+from .validation import validate_healthcheck
 from .validation import validate_links
 from .validation import validate_network_mode
 from .validation import validate_pid_mode
@@ -686,6 +687,7 @@ def validate_service(service_config, service_names, config_file):
     validate_pid_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
     validate_links(service_config, service_names)
+    validate_healthcheck(service_config)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(
@@ -724,7 +726,7 @@ def process_service(service_config):
             service_dict[field] = to_list(service_dict[field])
 
     service_dict = process_blkio_config(process_ports(
-        process_healthcheck(service_dict, service_config.name)
+        process_healthcheck(service_dict)
     ))
 
     return service_dict
@@ -788,33 +790,20 @@ def process_blkio_config(service_dict):
     return service_dict
 
 
-def process_healthcheck(service_dict, service_name):
+def process_healthcheck(service_dict):
     if 'healthcheck' not in service_dict:
         return service_dict
 
-    hc = {}
-    raw = service_dict['healthcheck']
-
-    if raw.get('disable'):
-        if len(raw) > 1:
-            raise ConfigurationError(
-                'Service "{}" defines an invalid healthcheck: '
-                '"disable: true" cannot be combined with other options'
-                .format(service_name))
-        hc['test'] = ['NONE']
-    elif 'test' in raw:
-        hc['test'] = raw['test']
+    if 'disable' in service_dict['healthcheck']:
+        del service_dict['healthcheck']['disable']
+        service_dict['healthcheck']['test'] = ['NONE']
 
     for field in ['interval', 'timeout', 'start_period']:
-        if field in raw:
-            if not isinstance(raw[field], six.integer_types):
-                hc[field] = parse_nanoseconds_int(raw[field])
-            else:  # Conversion has been done previously
-                hc[field] = raw[field]
-    if 'retries' in raw:
-        hc['retries'] = raw['retries']
+        if field in service_dict['healthcheck']:
+            if not isinstance(service_dict['healthcheck'][field], six.integer_types):
+                service_dict['healthcheck'][field] = parse_nanoseconds_int(
+                                                        service_dict['healthcheck'][field])
 
-    service_dict['healthcheck'] = hc
     return service_dict
 
 

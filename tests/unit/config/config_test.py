@@ -34,7 +34,6 @@ from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import COMPOSEFILE_V3_3 as V3_3
 from compose.const import IS_WINDOWS_PLATFORM
-from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
 from tests import unittest
 
@@ -4210,52 +4209,103 @@ class BuildPathTest(unittest.TestCase):
 
 class HealthcheckTest(unittest.TestCase):
     def test_healthcheck(self):
-        service_dict = make_service_dict(
-            'test',
-            {'healthcheck': {
-                'test': ['CMD', 'true'],
-                'interval': '1s',
-                'timeout': '1m',
-                'retries': 3,
-                'start_period': '10s'
-            }},
-            '.',
+        config_dict = config.load(
+            build_config_details({
+                'version': '2.3',
+                'services': {
+                    'test': {
+                        'image': 'busybox',
+                        'healthcheck': {
+                            'test': ['CMD', 'true'],
+                            'interval': '1s',
+                            'timeout': '1m',
+                            'retries': 3,
+                            'start_period': '10s',
+                        }
+                    }
+                }
+
+            })
         )
 
-        assert service_dict['healthcheck'] == {
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['test']
+
+        assert serialized_service['healthcheck'] == {
             'test': ['CMD', 'true'],
-            'interval': nanoseconds_from_time_seconds(1),
-            'timeout': nanoseconds_from_time_seconds(60),
+            'interval': '1s',
+            'timeout': '1m',
             'retries': 3,
-            'start_period': nanoseconds_from_time_seconds(10)
+            'start_period': '10s'
         }
 
     def test_disable(self):
-        service_dict = make_service_dict(
-            'test',
-            {'healthcheck': {
-                'disable': True,
-            }},
-            '.',
+        config_dict = config.load(
+            build_config_details({
+                'version': '2.3',
+                'services': {
+                    'test': {
+                        'image': 'busybox',
+                        'healthcheck': {
+                            'disable': True,
+                        }
+                    }
+                }
+
+            })
         )
 
-        assert service_dict['healthcheck'] == {
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['test']
+
+        assert serialized_service['healthcheck'] == {
             'test': ['NONE'],
         }
 
     def test_disable_with_other_config_is_invalid(self):
         with pytest.raises(ConfigurationError) as excinfo:
-            make_service_dict(
-                'invalid-healthcheck',
-                {'healthcheck': {
-                    'disable': True,
-                    'interval': '1s',
-                }},
-                '.',
+            config.load(
+                build_config_details({
+                    'version': '2.3',
+                    'services': {
+                        'invalid-healthcheck': {
+                            'image': 'busybox',
+                            'healthcheck': {
+                                'disable': True,
+                                'interval': '1s',
+                            }
+                        }
+                    }
+
+                })
             )
 
         assert 'invalid-healthcheck' in excinfo.exconly()
-        assert 'disable' in excinfo.exconly()
+        assert '"disable: true" cannot be combined with other options' in excinfo.exconly()
+
+    def test_healthcheck_with_invalid_test(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2.3',
+                    'services': {
+                        'invalid-healthcheck': {
+                            'image': 'busybox',
+                            'healthcheck': {
+                                'test': ['true'],
+                                'interval': '1s',
+                                'timeout': '1m',
+                                'retries': 3,
+                                'start_period': '10s',
+                            }
+                        }
+                    }
+
+                })
+            )
+
+        assert 'invalid-healthcheck' in excinfo.exconly()
+        assert 'the first item must be either NONE, CMD or CMD-SHELL' in excinfo.exconly()
 
 
 class GetDefaultConfigFilesTestCase(unittest.TestCase):
