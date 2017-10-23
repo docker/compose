@@ -794,15 +794,16 @@ def process_healthcheck(service_dict):
     if 'healthcheck' not in service_dict:
         return service_dict
 
-    if 'disable' in service_dict['healthcheck']:
-        del service_dict['healthcheck']['disable']
-        service_dict['healthcheck']['test'] = ['NONE']
+    hc = service_dict['healthcheck']
+
+    if 'disable' in hc:
+        del hc['disable']
+        hc['test'] = ['NONE']
 
     for field in ['interval', 'timeout', 'start_period']:
-        if field in service_dict['healthcheck']:
-            if not isinstance(service_dict['healthcheck'][field], six.integer_types):
-                service_dict['healthcheck'][field] = parse_nanoseconds_int(
-                                                        service_dict['healthcheck'][field])
+        if field not in hc or isinstance(hc[field], six.integer_types):
+            continue
+        hc[field] = parse_nanoseconds_int(hc[field])
 
     return service_dict
 
