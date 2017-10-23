@@ -121,7 +121,7 @@ def get_image_digest(service, allow_push=False):
 def push_image(service):
     try:
         digest = service.push()
-    except:
+    except Exception:
         log.error(
             "Failed to push image for service '{s.name}'. Please use an "
             "image tag that can be pushed to a Docker "
