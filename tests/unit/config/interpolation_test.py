@@ -338,3 +338,15 @@ def test_interpolate_missing_with_default(defaults_interpolator):
 def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
+
+def test_interpolate_types(defaults_interpolator):
+    assert defaults_interpolator("${BAR:-1}") == 1
+    assert defaults_interpolator("${BAR:--1}") == -1
+    assert defaults_interpolator("${BAR:-1.2}") == 1.2
+    assert defaults_interpolator("${BAR:-True}") == True
+    assert defaults_interpolator("${BAR:-False}") == False
+    assert defaults_interpolator("${BAR:-\"True\"}") == "True"
+    assert defaults_interpolator("${BAR:-\"False\"}") == "False"
+    assert defaults_interpolator("${BAR:-\"1\"}") == "1"
+    assert defaults_interpolator("${BAR:-\"1.2\"}") == "1.2"
+    assert defaults_interpolator("${BAR:-\"foo\"}") == "foo"
