@@ -405,7 +405,7 @@ class TopLevelCommand(object):
         Usage: exec [options] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d                Detached mode: Run command in the background.
+            -d, --detach      Detached mode: Run command in the background.
             --privileged      Give extended privileges to the process.
             -u, --user USER   Run the command as this user.
             -T                Disable pseudo-tty allocation. By default `docker-compose exec`
@@ -415,7 +415,7 @@ class TopLevelCommand(object):
         """
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
-        detach = options['-d']
+        detach = options.get('-d') or options.get('--detach')
 
         try:
             container = service.get_container(number=index)
@@ -732,7 +732,7 @@ class TopLevelCommand(object):
         Usage: run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
-            -d                    Detached mode: Run container in the background, print
+            -d --detach           Detached mode: Run container in the background, print
                                   new container name.
             --name NAME           Assign a name to the container
             --entrypoint CMD      Override the entrypoint of the image.
@@ -749,7 +749,7 @@ class TopLevelCommand(object):
             -w, --workdir=""      Working directory inside the container
         """
         service = self.project.get_service(options['SERVICE'])
-        detach = options['-d']
+        detach = options.get('-d') or options.get('--detach')
 
         if options['--publish'] and options['--service-ports']:
             raise UserError(
@@ -897,7 +897,7 @@ class TopLevelCommand(object):
         Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]
 
         Options:
-            -d                         Detached mode: Run containers in the background,
+            -d --detach                Detached mode: Run containers in the background,
                                        print new container names.
                                        Incompatible with --abort-on-container-exit.
             --no-color                 Produce monochrome output.
@@ -928,14 +928,14 @@ class TopLevelCommand(object):
         service_names = options['SERVICE']
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
-        detached = options.get('-d')
+        detached = options.get('-d') or options.get('--detach')
         no_start = options.get('--no-start')
 
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
         if no_start:
-            for excluded in ['-d', '--abort-on-container-exit', '--exit-code-from']:
+            for excluded in ['-d', '--detach', '--abort-on-container-exit', '--exit-code-from']:
                 if options.get(excluded):
                     raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
@@ -1177,7 +1177,7 @@ def run_one_off_container(container_options, project, service, options):
         one_off=True,
         **container_options)
 
-    if options['-d']:
+    if options.get('-d') or options.get('--detach'):
         service.start_container(container)
         print(container.name)
         return
