@@ -156,6 +156,7 @@ class ConversionMap(object):
         service_path('deploy', 'update_config', 'max_failure_ratio'): float,
         service_path('deploy', 'restart_policy', 'max_attempts'): to_int,
         service_path('mem_swappiness'): to_int,
+        service_path('oom_kill_disable'): to_boolean,
         service_path('oom_score_adj'): to_int,
         service_path('ports', 'target'): to_int,
         service_path('ports', 'published'): to_int,
