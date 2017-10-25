@@ -92,7 +92,8 @@
                 "cache_from": {"$ref": "#/definitions/list_of_strings"},
                 "network": {"type": "string"},
                 "target": {"type": "string"},
-                "shm_size": {"type": ["integer", "string"]}
+                "shm_size": {"type": ["integer", "string"]},
+                "extra_hosts": {"$ref": "#/definitions/list_or_dict"}
               },
               "additionalProperties": false
             }
