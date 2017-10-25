@@ -833,6 +833,29 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
         assert service.image()['Config']['Labels']['com.docker.compose.test.target'] == 'one'
 
+    @v2_3_only()
+    def test_build_with_extra_hosts(self):
+        self.require_api_version('1.27')
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('\n'.join([
+                'FROM busybox',
+                'RUN ping -c1 foobar',
+                'RUN ping -c1 baz',
+            ]))
+
+        service = self.create_service('build_extra_hosts', build={
+            'context': text_type(base_dir),
+            'extra_hosts': {
+                'foobar': '127.0.0.1',
+                'baz': '127.0.0.1'
+            }
+        })
+        service.build()
+        assert service.image()
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
