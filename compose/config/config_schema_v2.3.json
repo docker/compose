@@ -237,6 +237,7 @@
             }
           ]
         },
+        "oom_kill_disable": {"type": "boolean"},
         "oom_score_adj": {"type": "integer", "minimum": -1000, "maximum": 1000},
         "group_add": {
             "type": "array",
