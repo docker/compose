@@ -239,14 +239,19 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         self.assertEqual(set(container.get('HostConfig.SecurityOpt')), set(security_opt))
 
-    # @pytest.mark.xfail(True, reason='Not supported on most drivers')
-    @pytest.mark.skipif(True, reason='https://github.com/moby/moby/issues/34270')
+    @pytest.mark.xfail(True, reason='Not supported on most drivers')
     def test_create_container_with_storage_opt(self):
         storage_opt = {'size': '1G'}
         service = self.create_service('db', storage_opt=storage_opt)
         container = service.create_container()
         service.start_container(container)
         self.assertEqual(container.get('HostConfig.StorageOpt'), storage_opt)
+
+    def test_create_container_with_oom_kill_disable(self):
+        self.require_api_version('1.20')
+        service = self.create_service('db', oom_kill_disable=True)
+        container = service.create_container()
+        assert container.get('HostConfig.OomKillDisable') is True
 
     def test_create_container_with_mac_address(self):
         service = self.create_service('db', mac_address='02:42:ac:11:65:43')
