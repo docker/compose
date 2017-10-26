@@ -15,6 +15,7 @@ from docker.errors import ImageNotFound
 from docker.errors import NotFound
 from docker.types import LogConfig
 from docker.utils import version_lt
+from docker.utils import version_gte
 from docker.utils.ports import build_port_bindings
 from docker.utils.ports import split_port
 from docker.utils.utils import convert_tmpfs_mounts
@@ -758,6 +759,11 @@ class Service(object):
             parts = container_options['hostname'].partition('.')
             container_options['hostname'] = parts[0]
             container_options['domainname'] = parts[2]
+
+        if (version_gte(self.client.api_version, '1.25') and
+                'stop_grace_period' in self.options):
+            container_options['stop_timeout'] = parse_seconds_float(
+                self.options.pop('stop_grace_period'))
 
         if 'ports' in container_options or 'expose' in self.options:
             container_options['ports'] = build_container_ports(
