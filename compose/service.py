@@ -521,7 +521,8 @@ class Service(object):
         """
 
         container.stop(timeout=self.stop_timeout(timeout))
-        container.rename_to_tmp_name()
+        if not container.name.startswith(container.short_id):
+            container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
