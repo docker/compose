@@ -640,7 +640,10 @@ def resolve_environment(service_dict, environment=None):
     """
     env = {}
     for env_file in service_dict.get('env_file', []):
-        env.update(env_vars_from_file(env_file))
+        try:
+            env.update(env_vars_from_file(env_file))
+        except ConfigurationError as exc:
+            log.warn('{} - ignoring'.format(exc.msg))
 
     env.update(parse_environment(service_dict.get('environment')))
     return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))

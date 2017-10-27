@@ -3492,13 +3492,13 @@ class EnvTest(unittest.TestCase):
         )
 
     def test_resolve_environment_nonexistent_file(self):
-        with pytest.raises(ConfigurationError) as exc:
+        with mock.patch('compose.config.config.log') as mock_logging:
             config.load(build_config_details(
                 {'foo': {'image': 'example', 'env_file': 'nonexistent.env'}},
                 working_dir='tests/fixtures/env'))
 
-        assert 'Couldn\'t find env file' in exc.exconly()
-        assert 'nonexistent.env' in exc.exconly()
+        assert 'Couldn\'t find env file' in mock_logging.warn.call_args[0][0]
+        assert 'nonexistent.env' in mock_logging.warn.call_args[0][0]
 
     @mock.patch.dict(os.environ)
     def test_resolve_environment_from_env_file_with_empty_values(self):
