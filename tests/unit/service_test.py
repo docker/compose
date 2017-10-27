@@ -228,6 +228,17 @@ class ServiceTest(unittest.TestCase):
             {'Type': 'syslog', 'Config': {'syslog-address': 'tcp://192.168.0.42:123'}}
         )
 
+    def test_stop_grace_period(self):
+        self.mock_client.api_version = '1.25'
+        self.mock_client.create_host_config.return_value = {}
+        service = Service(
+            'foo',
+            image='foo',
+            client=self.mock_client,
+            stop_grace_period="1m35s")
+        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        self.assertEqual(opts['stop_timeout'], 95)
+
     def test_split_domainname_none(self):
         service = Service(
             'foo',
