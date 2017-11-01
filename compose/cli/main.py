@@ -1178,6 +1178,7 @@ def run_one_off_container(container_options, project, service, options):
             project.client.remove_container(container.id, force=True, v=True)
 
     signals.set_signal_handler_to_shutdown()
+    signals.set_signal_handler_to_hang_up()
     try:
         try:
             if IS_WINDOWS_PLATFORM:
@@ -1195,10 +1196,10 @@ def run_one_off_container(container_options, project, service, options):
                 service.start_container(container)
                 pty.start(sockets)
                 exit_code = container.wait()
-        except signals.ShutdownException:
+        except (signals.ShutdownException, signals.HangUpException):
             project.client.stop(container.id)
             exit_code = 1
-    except signals.ShutdownException:
+    except (signals.ShutdownException, signals.HangUpException):
         project.client.kill(container.id)
         remove_container(force=True)
         sys.exit(2)
