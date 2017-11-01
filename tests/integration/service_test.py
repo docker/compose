@@ -793,7 +793,7 @@ class ServiceTest(DockerClientTestCase):
 
         net_container = self.client.create_container(
             'busybox', 'top', host_config=self.client.create_host_config(
-                extra_hosts={'google.local': '8.8.8.8'}
+                extra_hosts={'google.local': '127.0.0.1'}
             ), name='composetest_build_network'
         )
 
