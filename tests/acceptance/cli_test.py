@@ -851,7 +851,13 @@ class CLITestCase(DockerClientTestCase):
         volumes = self.project.volumes.volumes
         assert 'data' in volumes
         volume = volumes['data']
-        assert volume.exists()
+
+        # The code below is a Swarm-compatible equivalent to volume.exists()
+        remote_volumes = [
+            v for v in self.client.volumes().get('Volumes', [])
+            if v['Name'].split('/')[-1] == volume.full_name
+        ]
+        assert len(remote_volumes) > 0
 
     @v2_only()
     def test_up_no_ansi(self):
