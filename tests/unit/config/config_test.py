@@ -406,6 +406,32 @@ class ConfigTest(unittest.TestCase):
             }
         }
 
+    def test_load_config_service_labels(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2.1',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'labels': ['label_key=label_val']
+                    },
+                    'db': {
+                        'image': 'example/db',
+                        'labels': {
+                            'label_key': 'label_val'
+                        }
+                    }
+                },
+            }
+        )
+        details = config.ConfigDetails('.', [base_file])
+        service_dicts = config.load(details).services
+        for service in service_dicts:
+            assert service['labels'] == {
+                'label_key': 'label_val'
+            }
+
     def test_load_config_volume_and_network_labels(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -434,30 +460,23 @@ class ConfigTest(unittest.TestCase):
         )
 
         details = config.ConfigDetails('.', [base_file])
-        network_dict = config.load(details).networks
-        volume_dict = config.load(details).volumes
+        loaded_config = config.load(details)
 
-        self.assertEqual(
-            network_dict,
-            {
-                'with_label': {
-                    'labels': {
-                        'label_key': 'label_val'
-                    }
+        assert loaded_config.networks == {
+            'with_label': {
+                'labels': {
+                    'label_key': 'label_val'
                 }
             }
-        )
+        }
 
-        self.assertEqual(
-            volume_dict,
-            {
-                'with_label': {
-                    'labels': {
-                        'label_key': 'label_val'
-                    }
+        assert loaded_config.volumes == {
+            'with_label': {
+                'labels': {
+                    'label_key': 'label_val'
                 }
             }
-        )
+        }
 
     def test_load_config_invalid_service_names(self):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
