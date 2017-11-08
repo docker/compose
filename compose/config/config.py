@@ -125,6 +125,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'network_mode',
     'init',
     'scale',
+    'overwrite_multivals'
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -902,13 +903,22 @@ class MergeDict(dict):
     def needs_merge(self, field):
         return field in self.base or field in self.override
 
-    def merge_field(self, field, merge_func, default=None):
+    def needs_overwrite(self, field):
+        return ('overwrite_multivals' in self.override and
+                field in self.override['overwrite_multivals'])
+
+    def merge_field(self, field, merge_func, overwrite_func=None, default=None):
         if not self.needs_merge(field):
             return
 
-        self[field] = merge_func(
-            self.base.get(field, default),
-            self.override.get(field, default))
+        if self.needs_overwrite(field):
+            self[field] = overwrite_func(
+                self.base.get(field, default),
+                self.override.get(field, default))
+        else:
+            self[field] = merge_func(
+                self.base.get(field, default),
+                self.override.get(field, default))
 
     def merge_mapping(self, field, parse_func):
         if not self.needs_merge(field):
@@ -924,9 +934,13 @@ class MergeDict(dict):
         if not self.needs_merge(field):
             return
 
-        merged = parse_sequence_func(self.base.get(field, []))
-        merged.update(parse_sequence_func(self.override.get(field, [])))
-        self[field] = [item.repr() for item in sorted(merged.values())]
+        if self.needs_overwrite(field):
+            result = parse_sequence_func(self.override.get(field, []))
+        else:
+            result = parse_sequence_func(self.base.get(field, []))
+            result.update(parse_sequence_func(self.override.get(field, [])))
+
+        self[field] = [item.repr() for item in sorted(result.values())]
 
     def merge_scalar(self, field):
         if self.needs_merge(field):
@@ -949,13 +963,13 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('extra_hosts', parse_extra_hosts)
 
     for field in ['volumes', 'devices']:
-        md.merge_field(field, merge_path_mappings)
+        md.merge_field(field, merge_path_mappings, overwrite_path_mappings)
 
     for field in [
         'cap_add', 'cap_drop', 'expose', 'external_links',
         'security_opt', 'volumes_from',
     ]:
-        md.merge_field(field, merge_unique_items_lists, default=[])
+        md.merge_field(field, merge_unique_items_lists, overwrite_unique_items_lists, default=[])
 
     for field in ['dns', 'dns_search', 'env_file', 'tmpfs']:
         md.merge_field(field, merge_list_or_string)
@@ -974,6 +988,11 @@ def merge_service_dicts(base, override, version):
         md['build'] = merge_build(md, base, override)
 
     return dict(md)
+
+
+def overwrite_unique_items_lists(base, override):
+    override = [str(o) for o in override]
+    return sorted(set(override))
 
 
 def merge_unique_items_lists(base, override):
@@ -1002,8 +1021,12 @@ def merge_ports(md, base, override):
     if not md.needs_merge(field):
         return
 
-    merged = parse_sequence_func(md.base.get(field, []))
-    merged.update(parse_sequence_func(md.override.get(field, [])))
+    if md.needs_overwrite(field):
+        merged = parse_sequence_func(md.override.get(field, []))
+    else:
+        merged = parse_sequence_func(md.base.get(field, []))
+        merged.update(parse_sequence_func(md.override.get(field, [])))
+
     md[field] = [item for item in sorted(merged.values(), key=lambda x: x.target)]
 
 
@@ -1208,6 +1231,11 @@ def validate_paths(service_dict):
             raise ConfigurationError(
                 "build path %s either does not exist, is not accessible, "
                 "or is not a valid URL." % build_path)
+
+
+def overwrite_path_mappings(base, override):
+    d = dict_from_path_mappings(override)
+    return path_mappings_from_dict(d)
 
 
 def merge_path_mappings(base, override):
