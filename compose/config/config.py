@@ -125,6 +125,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'network_mode',
     'init',
     'scale',
+    'overwrite_ports'
 ]
 
 DOCKER_VALID_URL_PREFIXES = (
@@ -1002,8 +1003,12 @@ def merge_ports(md, base, override):
     if not md.needs_merge(field):
         return
 
-    merged = parse_sequence_func(md.base.get(field, []))
-    merged.update(parse_sequence_func(md.override.get(field, [])))
+    if ('overwrite_ports' in override and override['overwrite_ports']):
+        merged = parse_sequence_func(md.override.get(field, []))
+    else:
+        merged = parse_sequence_func(md.base.get(field, []))
+        merged.update(parse_sequence_func(md.override.get(field, [])))
+
     md[field] = [item for item in sorted(merged.values(), key=lambda x: x.target)]
 
 
