@@ -514,7 +514,6 @@ class Service(object):
         volumes can be copied to the new container, before the original
         container is removed.
         """
-        log.info("Recreating %s" % container.name)
 
         container.stop(timeout=self.stop_timeout(timeout))
         container.rename_to_tmp_name()
