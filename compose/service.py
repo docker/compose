@@ -381,11 +381,11 @@ class Service(object):
 
         return has_diverged
 
-    def _execute_convergence_create(self, scale, detached, start):
+    def _execute_convergence_create(self, scale, detached, start, project_services=None):
             i = self._next_container_number()
 
             def create_and_start(service, n):
-                container = service.create_container(number=n)
+                container = service.create_container(number=n, quiet=True)
                 if not detached:
                     container.attach_log_stream()
                 if start:
@@ -393,10 +393,11 @@ class Service(object):
                 return container
 
             containers, errors = parallel_execute(
-                range(i, i + scale),
-                lambda n: create_and_start(self, n),
-                lambda n: self.get_container_name(n),
+                [ServiceName(self.project, self.name, index) for index in range(i, i + scale)],
+                lambda service_name: create_and_start(self, service_name.number),
+                lambda service_name: self.get_container_name(service_name.service, service_name.number),
                 "Creating",
+                parent_objects=project_services
             )
             for error in errors.values():
                 raise OperationFailedError(error)
@@ -435,7 +436,7 @@ class Service(object):
             if start:
                 _, errors = parallel_execute(
                     containers,
-                    lambda c: self.start_container_if_stopped(c, attach_logs=not detached),
+                    lambda c: self.start_container_if_stopped(c, attach_logs=not detached, quiet=True),
                     lambda c: c.name,
                     "Starting",
                 )
@@ -462,7 +463,7 @@ class Service(object):
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
-                                 start=True, scale_override=None, rescale=True):
+                                 start=True, scale_override=None, rescale=True, project_services=None):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -471,7 +472,7 @@ class Service(object):
 
         if action == 'create':
             return self._execute_convergence_create(
-                scale, detached, start
+                scale, detached, start, project_services
             )
 
         # The create action needs always needs an initial scale, but otherwise,
@@ -744,7 +745,7 @@ class Service(object):
         container_options.update(override_options)
 
         if not container_options.get('name'):
-            container_options['name'] = self.get_container_name(number, one_off)
+            container_options['name'] = self.get_container_name(self.name, number, one_off)
 
         container_options.setdefault('detach', True)
 
@@ -969,12 +970,12 @@ class Service(object):
     def custom_container_name(self):
         return self.options.get('container_name')
 
-    def get_container_name(self, number, one_off=False):
+    def get_container_name(self, service_name, number, one_off=False):
         if self.custom_container_name and not one_off:
             return self.custom_container_name
 
         container_name = build_container_name(
-            self.project, self.name, number, one_off,
+            self.project, service_name, number, one_off,
         )
         ext_links_origins = [l.split(':')[0] for l in self.options.get('external_links', [])]
         if container_name in ext_links_origins:
