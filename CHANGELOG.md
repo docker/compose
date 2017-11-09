@@ -1,6 +1,14 @@
 Change log
 ==========
 
+1.17.1 (2017-11-08)
+------------------
+
+### Bugfixes
+
+- Fixed a bug that would prevent creating new containers when using
+  container labels in the list format as part of the service's definition.
+
 1.17.0 (2017-11-02)
 -------------------
 
