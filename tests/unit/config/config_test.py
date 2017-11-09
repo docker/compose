@@ -2846,6 +2846,88 @@ class PortsTest(unittest.TestCase):
         )
 
 
+class SubnetTest(unittest.TestCase):
+    INVALID_SUBNET_TYPES = [
+        None,
+        False,
+        10,
+    ]
+
+    INVALID_SUBNET_MAPPINGS = [
+        "",
+        "192.168.0.1/sdfsdfs",
+        "192.168.0.1/",
+        "192.168.0.1/33",
+        "192.168.0.1/01",
+        "192.168.0.1",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/sdfsdfs",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/129",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/01",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156",
+    ]
+
+    ILLEGAL_SUBNET_MAPPINGS = [
+        "ge80:0000:0000:0000:0204:61ff:fe9d:f156/128"
+    ]
+
+    VALID_SUBNET_MAPPINGS = [
+        "192.168.0.1/0",
+        "192.168.0.1/32",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/0",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/128",
+    ]
+
+    def test_config_invalid_subnet_type_validation(self):
+        for invalid_subnet in self.INVALID_SUBNET_TYPES:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config(invalid_subnet)
+
+            assert "contains an invalid type" in exc.value.msg
+
+    def test_config_invalid_subnet_format_validation(self):
+        for invalid_subnet in self.INVALID_SUBNET_MAPPINGS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config(invalid_subnet)
+
+            assert "should be of the format 'IP_ADDRESS/CIDR'" in exc.value.msg
+
+    def test_config_illegal_subnet_type_validation(self):
+        for invalid_subnet in self.ILLEGAL_SUBNET_MAPPINGS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config(invalid_subnet)
+
+            assert "illegal IP address string" in exc.value.msg
+
+    def test_config_valid_subnet_format_validation(self):
+        for valid_subnet in self.VALID_SUBNET_MAPPINGS:
+            self.check_config(valid_subnet)
+
+    def check_config(self, subnet):
+        config.load(
+            build_config_details({
+                'version': '3.5',
+                'services': {
+                    'web': {
+                        'image': 'busybox'
+                    }
+                },
+                'networks': {
+                    'default': {
+                        'ipam': {
+                            'config': [
+                                {
+                                    'subnet': subnet
+                                }
+                            ],
+                            'driver': 'default'
+                        }
+                    }
+                }
+            })
+        )
+
+
 class InterpolationTest(unittest.TestCase):
 
     @mock.patch.dict(os.environ)
