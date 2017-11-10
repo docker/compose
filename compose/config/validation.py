@@ -67,7 +67,8 @@ def format_expose(instance):
 def match_named_volumes(service_dict, project_volumes):
     service_volumes = service_dict.get('volumes', [])
     for volume_spec in service_volumes:
-        if volume_spec.is_named_volume and volume_spec.external not in project_volumes:
+        if volume_spec.is_named_volume and volume_spec.source not in project_volumes:
+            print(volume_spec.repr())
             raise ConfigurationError(
                 'Named volume "{0}" is used in service "{1}" but no'
                 ' declaration was found in the volumes section.'.format(

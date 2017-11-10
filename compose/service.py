@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from collections import namedtuple
+from copy import copy
 from operator import attrgetter
 
 import enum
@@ -26,8 +27,8 @@ from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config.errors import DependencyError
+from .config.types import MountSpec
 from .config.types import ServicePort
-from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
 from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
@@ -782,17 +783,12 @@ class Service(object):
             container_options.get('volumes') or [],
             self.options.get('tmpfs') or [],
             previous_container)
-        override_options['binds'] = binds
+
+        container_options, override_options = set_volume_config(
+            binds, self.get_secret_volumes(), container_options, override_options,
+            self.client.api_version
+        )
         container_options['environment'].update(affinity)
-
-        container_options['volumes'] = dict(
-            (v.internal, {}) for v in container_options.get('volumes') or {})
-
-        secret_volumes = self.get_secret_volumes()
-        if secret_volumes:
-            override_options['binds'].extend(v.repr() for v in secret_volumes)
-            container_options['volumes'].update(
-                (v.internal, {}) for v in secret_volumes)
 
         container_options['image'] = self.image_name
 
@@ -886,6 +882,7 @@ class Service(object):
             device_read_iops=blkio_config.get('device_read_iops'),
             device_write_bps=blkio_config.get('device_write_bps'),
             device_write_iops=blkio_config.get('device_write_iops'),
+            mounts=options.get('mounts')
         )
 
     def get_secret_volumes(self):
@@ -896,7 +893,7 @@ class Service(object):
             elif not os.path.isabs(target):
                 target = '{}/{}'.format(const.SECRETS_PATH, target)
 
-            return VolumeSpec(secret['file'], target, 'ro')
+            return MountSpec('bind', secret['file'], target, read_only=True)
 
         return [build_spec(secret) for secret in self.secrets]
 
@@ -1237,15 +1234,15 @@ def merge_volume_bindings(volumes, tmpfs, previous_container):
     affinity = {}
 
     volume_bindings = dict(
-        build_volume_binding(volume)
-        for volume in volumes
-        if volume.external)
+        build_volume_binding(volume) for volume in volumes if volume.source
+    )
 
     if previous_container:
         old_volumes = get_container_data_volumes(previous_container, volumes, tmpfs)
         warn_on_masked_volume(volumes, old_volumes, previous_container.service)
         volume_bindings.update(
-            build_volume_binding(volume) for volume in old_volumes)
+            build_volume_binding(volume) for volume in old_volumes
+        )
 
         if old_volumes:
             affinity = {'affinity:container': '=' + previous_container.id}
@@ -1266,21 +1263,22 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option):
     )
 
     image_volumes = [
-        VolumeSpec.parse(volume)
+        MountSpec.parse(volume)
         for volume in
         container.image_config['ContainerConfig'].get('Volumes') or {}
     ]
 
     for volume in set(volumes_option + image_volumes):
+        print(volume.repr())
         # No need to preserve host volumes
-        if volume.external:
+        if volume.source:
             continue
 
         # Attempting to rebind tmpfs volumes breaks: https://github.com/docker/compose/issues/4751
-        if volume.internal in convert_tmpfs_mounts(tmpfs_option).keys():
+        if volume.target in convert_tmpfs_mounts(tmpfs_option).keys():
             continue
 
-        mount = container_mounts.get(volume.internal)
+        mount = container_mounts.get(volume.target)
 
         # New volume, doesn't exist in the old container
         if not mount:
@@ -1291,22 +1289,59 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option):
             continue
 
         # Copy existing volume from old container
-        volume = volume._replace(external=mount['Name'])
+        volume = copy(volume)
+        volume.source = mount['Name']
         volumes.append(volume)
 
     return volumes
 
 
+def set_volume_config(binds, secret_volumes, container_options, override_options, version):
+    if version_lt(version, '1.30'):
+        container_options['volumes'] = dict(
+            (v.target, {}) for v in container_options.get('volumes') or []
+        )
+        override_options['binds'] = [v.legacy_repr() for v in binds]
+    else:
+        override_options['binds'] = []
+        override_options['mounts'] = []
+        for b in binds:
+            if b.special_mode is None:
+                override_options['mounts'].append(b.as_mount_object())
+            else:
+                # The new mounts don't support z/Z modes, so we use old style
+                # binds for those
+                override_options['binds'].append(b.legacy_repr())
+        # Add anonymous volumes
+        for v in container_options.get('volumes', []):
+            if v.source is None and v.target not in [b.target for b in binds]:
+                override_options['mounts'].append(v.as_mount_object())
+
+        if 'volumes' in container_options:
+            del container_options['volumes']
+
+    if secret_volumes:
+        if version_lt(version, '1.30'):
+            override_options['binds'].extend(v.legacy_repr() for v in secret_volumes)
+            container_options['volumes'].update(
+                (v.target, {}) for v in secret_volumes
+            )
+        else:
+            override_options['mounts'].extend([v.as_mount_object() for v in secret_volumes])
+
+    return container_options, override_options
+
+
 def warn_on_masked_volume(volumes_option, container_volumes, service):
     container_volumes = dict(
-        (volume.internal, volume.external)
+        (volume.target, volume.source)
         for volume in container_volumes)
 
     for volume in volumes_option:
         if (
-            volume.external and
-            volume.internal in container_volumes and
-            container_volumes.get(volume.internal) != volume.external
+            volume.source and
+            volume.target in container_volumes and
+            container_volumes.get(volume.target) != volume.source
         ):
             log.warn((
                 "Service \"{service}\" is using volume \"{volume}\" from the "
@@ -1315,12 +1350,12 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
                 "to use the host volume mapping."
             ).format(
                 service=service,
-                volume=volume.internal,
-                host_path=volume.external))
+                volume=volume.target,
+                host_path=volume.source))
 
 
 def build_volume_binding(volume_spec):
-    return volume_spec.internal, volume_spec.repr()
+    return volume_spec.target, volume_spec
 
 
 def build_volume_from(volume_from_spec):

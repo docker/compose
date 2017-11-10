@@ -12,7 +12,7 @@ import sys
 
 import ruamel.yaml
 
-from compose.config.types import VolumeSpec
+from compose.config.types import MountSpec
 
 
 log = logging.getLogger('migrate')
@@ -120,7 +120,7 @@ def create_volumes_section(data):
 
 def get_named_volumes(services):
     volume_specs = [
-        VolumeSpec.parse(volume)
+        MountSpec.parse(volume)
         for service in services.values()
         for volume in service.get('volumes', [])
     ]

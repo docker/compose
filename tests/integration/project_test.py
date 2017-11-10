@@ -17,8 +17,8 @@ from .testcases import SWARM_SKIP_CONTAINERS_ALL
 from compose.config import config
 from compose.config import ConfigurationError
 from compose.config import types
+from compose.config.types import MountSpec
 from compose.config.types import VolumeFromSpec
-from compose.config.types import VolumeSpec
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
@@ -327,7 +327,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_create(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
 
         project.create(['db'])
@@ -341,7 +341,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_create_twice(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
 
         project.create(['db', 'web'])
@@ -395,7 +395,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -419,7 +419,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_recreate_preserves_volumes(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/etc')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/etc')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -438,7 +438,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_with_no_recreate_running(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -460,7 +460,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
         self.assertEqual(len(project.containers()), 0)
@@ -501,7 +501,7 @@ class ProjectTest(DockerClientTestCase):
 
     def test_project_up_starts_links(self):
         console = self.create_service('console')
-        db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        db = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         web = self.create_service('web', links=[(db, 'db')])
 
         project = Project('composetest', [web, db, console], self.client)
@@ -811,11 +811,11 @@ class ProjectTest(DockerClientTestCase):
 
         service_container = project.get_service('web').containers()[0]
 
-        IPAMConfig = (service_container.inspect().get('NetworkSettings', {}).
-                      get('Networks', {}).get('composetest_static_test', {}).
-                      get('IPAMConfig', {}))
-        assert IPAMConfig.get('IPv4Address') == '172.16.100.100'
-        assert IPAMConfig.get('IPv6Address') == 'fe80::1001:102'
+        ipam_config = (service_container.inspect().get('NetworkSettings', {}).
+                       get('Networks', {}).get('composetest_static_test', {}).
+                       get('IPAMConfig', {}))
+        assert ipam_config.get('IPv4Address') == '172.16.100.100'
+        assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
 
     @v2_1_only()
     def test_up_with_enable_ipv6(self):
@@ -1068,7 +1068,7 @@ class ProjectTest(DockerClientTestCase):
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',
-                'volumes': [VolumeSpec.parse('{}:/data'.format(volume_name))]
+                'volumes': [MountSpec.parse('{}:/data'.format(volume_name))]
             }],
             volumes={
                 volume_name: {
@@ -1479,7 +1479,7 @@ class ProjectTest(DockerClientTestCase):
         self.assertEqual(service.name, 'simple')
         volumes = service.options.get('volumes')
         self.assertEqual(len(volumes), 1)
-        self.assertEqual(volumes[0].external, full_vol_name)
+        self.assertEqual(volumes[0].source, full_vol_name)
         project.up()
         engine_volumes = self.client.volumes()['Volumes']
         container = service.get_container()
