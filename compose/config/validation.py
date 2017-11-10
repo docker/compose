@@ -72,22 +72,24 @@ def format_expose(instance):
 def format_subnet_ip_address(instance):
     if isinstance(instance, six.string_types):
         if '/' not in instance:
-            raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
+            raise ValidationError("'{0}' 75 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
 
         ip_address, cidr = instance.split('/')
 
         if re.match(VALID_IPV4_FORMAT, ip_address):
             if not (re.match(VALID_IPV4_CIDR_FORMAT, cidr) and
                     all(0 <= int(component) <= 255 for component in ip_address.split("."))):
-                raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
+                raise ValidationError(
+                    "'{0}' 83 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
         elif re.match(VALID_IPV6_CIDR_FORMAT, cidr) and hasattr(socket, "inet_pton"):
             try:
                 if not (socket.inet_pton(socket.AF_INET6, ip_address)):
-                    raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
+                    raise ValidationError(
+                        "'{0}' 88 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
             except socket.error as e:
                 raise ValidationError(six.text_type(e))
         else:
-            raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
+            raise ValidationError("'{0}' 92 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
 
     return True
 
