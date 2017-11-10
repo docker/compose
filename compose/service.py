@@ -930,6 +930,7 @@ class Service(object):
             network_mode=build_opts.get('network', None),
             target=build_opts.get('target', None),
             shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
+            extra_hosts=build_opts.get('extra_hosts', None),
         )
 
         try:
