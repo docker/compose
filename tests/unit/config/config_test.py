@@ -2896,8 +2896,11 @@ class SubnetTest(unittest.TestCase):
         for invalid_subnet in self.ILLEGAL_SUBNET_MAPPINGS:
             with pytest.raises(ConfigurationError) as exc:
                 self.check_config(invalid_subnet)
-
-            assert "illegal IP address string" in exc.value.msg
+            if IS_WINDOWS_PLATFORM:
+                assert "An invalid argument was supplied" in exc.value.msg or \
+                       "illegal IP address string" in exc.value.msg
+            else:
+                assert "illegal IP address string" in exc.value.msg
 
     def test_config_valid_subnet_format_validation(self):
         for valid_subnet in self.VALID_SUBNET_MAPPINGS:
