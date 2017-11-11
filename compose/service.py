@@ -770,9 +770,11 @@ class Service(object):
                 self.options)
 
         if 'volumes' in container_options or override_volumes:
-            container_options['volumes'] = list(set(
-                container_options.get('volumes', []) + override_volumes
-            ))
+            volumes = []
+            for volume in override_volumes + container_options.get('volumes', []):
+                if volume.internal not in [i.internal for i in volumes]:
+                    volumes.append(volume)
+            container_options['volumes'] = volumes
 
         container_options['environment'] = merge_environment(
             self.options.get('environment'),

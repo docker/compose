@@ -1,0 +1,4 @@
+simple:
+  image: busybox:latest
+  volumes:
+    - ./files:/files

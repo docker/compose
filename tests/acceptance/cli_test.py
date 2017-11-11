@@ -742,6 +742,24 @@ class CLITestCase(DockerClientTestCase):
         assert override_mount['Source'] == volume_path
         assert override_mount['Type'] == 'bind'
 
+    def test_run_one_off_override_compose_file_volume_from_cli(self):
+        '''
+        User can attach volumes from the cli when executing the service. Volume
+        passed from cli should overrite the ones defined in yml file.
+        '''
+        self.base_dir = 'tests/fixtures/simple-composefile-volume-ready'
+        volume_path = os.path.abspath(os.path.join(os.getcwd(), self.base_dir, 'files2'))
+        node = create_host_file(self.client, os.path.join(volume_path, 'example2.txt'))
+
+        self.dispatch([
+            '-f', 'docker-compose.default_volume.yml',
+            'run',
+            '-v', '{}:/files'.format(volume_path),
+            '-e', 'constraint:node=={}'.format(node if node is not None else '*'),
+            'simple',
+            'test', '-f', '/files/example2.txt'
+        ], returncode=0)
+
     def test_create_with_force_recreate_and_no_recreate(self):
         self.dispatch(
             ['create', '--force-recreate', '--no-recreate'],
