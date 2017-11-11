@@ -10,6 +10,7 @@ import six
 from . import errors
 from . import verbose_proxy
 from .. import config
+from ..config import ConfigurationError
 from ..config.environment import Environment
 from ..const import API_VERSIONS
 from ..project import Project
@@ -85,10 +86,11 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
-    project_name = get_project_name(
-        config_details.working_dir, project_name, environment
-    )
+    config_project_name = get_config_project_name(config_details.config_files)
     config_data = config.load(config_details)
+    project_name = get_project_name(
+        config_details.working_dir, project_name, config_project_name, environment
+    )
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',
@@ -103,7 +105,21 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         return Project.from_config(project_name, config_data, client)
 
 
-def get_project_name(working_dir, project_name=None, environment=None):
+def get_config_project_name(config_files):
+    config_project_names = set([config_file.project_name
+                                for config_file in config_files
+                                if config_file.project_name])
+    if len(config_project_names) > 1:
+        raise ConfigurationError("project_name has multiple values: {0}"
+                                 .format(", ".join(str(e) for e in config_project_names)))
+    config_project_name = None
+    if len(config_project_names) > 0:
+        config_project_name = config_project_names.pop()
+
+    return config_project_name
+
+
+def get_project_name(working_dir, project_name=None, config_project_name=None, environment=None):
     def normalize_name(name):
         return re.sub(r'[^a-z0-9]', '', name.lower())
 
@@ -112,6 +128,9 @@ def get_project_name(working_dir, project_name=None, environment=None):
     project_name = project_name or environment.get('COMPOSE_PROJECT_NAME')
     if project_name:
         return normalize_name(project_name)
+
+    if config_project_name:
+        return normalize_name(config_project_name)
 
     project = os.path.basename(os.path.abspath(working_dir))
     if project:

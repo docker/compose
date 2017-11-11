@@ -76,6 +76,7 @@ def test_to_bundle():
     ]
     config = Config(
         version=V2_0,
+        project_name='',
         services=services,
         volumes={'special': {}},
         networks={'extra': {}},

@@ -8,6 +8,9 @@ import pytest
 import six
 
 from compose.cli.command import get_config_path_from_options
+from compose.cli.command import get_config_project_name
+from compose.config import ConfigurationError
+from compose.config.config import ConfigFile
 from compose.config.environment import Environment
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
@@ -74,3 +77,27 @@ class TestGetConfigPathFromOptions(object):
             assert get_config_path_from_options(
                 '.', {}, environment
             ) == ['就吃饭/docker-compose.yml']
+
+
+class TestGetConfigProjectName(object):
+
+    def test_single_config_file(self):
+        config_files = [ConfigFile(None, {'project_name': 'myproject'})]
+        assert get_config_project_name(config_files) == 'myproject'
+
+    def test_undefined_project_name(self):
+        config_files = [ConfigFile(None, {})]
+        assert get_config_project_name(config_files) is None
+
+    def test_ambiguous_project_name(self):
+        config_files = [ConfigFile(None, {'project_name': 'myproject'}),
+                        ConfigFile(None, {'project_name': 'another_name'})]
+        with pytest.raises(ConfigurationError) as excinfo:
+            get_config_project_name(config_files)
+        assert 'project_name has multiple values: another_name, myproject' in str(excinfo) \
+               or 'project_name has multiple values: myproject, another_name' in str(excinfo)
+
+    def test_duplicated_project_name(self):
+        config_files = [ConfigFile(None, {'project_name': 'myproject'}),
+                        ConfigFile(None, {'project_name': 'myproject'})]
+        assert get_config_project_name(config_files) == 'myproject'

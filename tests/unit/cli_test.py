@@ -47,12 +47,34 @@ class CLITestCase(unittest.TestCase):
         project_name = get_project_name(None, project_name=name)
         self.assertEqual('explicitprojectname', project_name)
 
+    def test_project_name_with_explicit_config_project_name(self):
+        name = 'explicit-project-name'
+        project_name = get_project_name(None, None, config_project_name=name)
+        self.assertEqual('explicitprojectname', project_name)
+
     @mock.patch.dict(os.environ)
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         os.environ['COMPOSE_PROJECT_NAME'] = name
         project_name = get_project_name(None)
         self.assertEqual(project_name, name)
+
+    @mock.patch.dict(os.environ)
+    def test_project_name_priority(self):
+        base_dir = 'tests/fixtures/testdir'
+        os.environ['COMPOSE_PROJECT_NAME'] = 'env_name'
+        project_name = get_project_name(base_dir, project_name='project_name',
+                                        config_project_name='config_project_name')
+        self.assertEqual('projectname', project_name)
+        project_name = get_project_name(base_dir, project_name=None,
+                                        config_project_name='config_project_name')
+        self.assertEqual('envname', project_name)
+        del os.environ['COMPOSE_PROJECT_NAME']
+        project_name = get_project_name(base_dir, project_name=None,
+                                        config_project_name='config_project_name')
+        self.assertEqual('configprojectname', project_name)
+        project_name = get_project_name(base_dir, project_name=None, config_project_name=None)
+        self.assertEqual('testdir', project_name)
 
     def test_project_name_with_empty_environment_var(self):
         base_dir = 'tests/fixtures/simple-composefile'

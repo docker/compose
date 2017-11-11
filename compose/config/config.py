@@ -207,6 +207,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
         return ComposeVersion(version)
 
+    @cached_property
+    def project_name(self):
+        return self.config['project_name'] if 'project_name' in self.config else None
+
     def get_service(self, name):
         return self.get_service_dicts()[name]
 
@@ -226,10 +230,12 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return {} if self.version < const.COMPOSEFILE_V3_3 else self.config.get('configs', {})
 
 
-class Config(namedtuple('_Config', 'version services volumes networks secrets configs')):
+class Config(namedtuple('_Config', 'version project_name services volumes networks secrets configs')):
     """
     :param version: configuration version
     :type  version: int
+    :param project_name: Project name
+    :type  project_name: str
     :param services: List of service description dictionaries
     :type  services: :class:`list`
     :param volumes: Dictionary mapping volume names to description dictionaries
@@ -395,7 +401,8 @@ def load(config_details):
 
     check_swarm_only_config(service_dicts)
 
-    return Config(main_file.version, service_dicts, volumes, networks, secrets, configs)
+    return Config(main_file.version, main_file.project_name, service_dicts, volumes, networks, secrets,
+                  configs)
 
 
 def load_mapping(config_files, get_func, entity_type, working_dir=None):

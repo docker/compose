@@ -42,6 +42,7 @@ from tests.integration.testcases import v3_only
 def build_config(**kwargs):
     return config.Config(
         version=kwargs.get('version'),
+        project_name=None,
         services=kwargs.get('services'),
         volumes=kwargs.get('volumes'),
         networks=kwargs.get('networks'),

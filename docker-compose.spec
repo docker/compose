@@ -43,6 +43,11 @@ exe = EXE(pyz,
                 'DATA'
             ),
             (
+                'compose/config/config_schema_v2.4.json',
+                'compose/config/config_schema_v2.4.json',
+                'DATA'
+            ),
+            (
                 'compose/config/config_schema_v3.0.json',
                 'compose/config/config_schema_v3.0.json',
                 'DATA'
@@ -65,6 +70,11 @@ exe = EXE(pyz,
             (
                 'compose/config/config_schema_v3.4.json',
                 'compose/config/config_schema_v3.4.json',
+                'DATA'
+            ),
+            (
+                'compose/config/config_schema_v3.6.json',
+                'compose/config/config_schema_v3.6.json',
                 'DATA'
             ),
             (

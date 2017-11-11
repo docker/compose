@@ -253,6 +253,14 @@ class ConfigTest(unittest.TestCase):
         assert 'Invalid top-level property "web"' in excinfo.exconly()
         assert VERSION_EXPLANATION in excinfo.exconly()
 
+    def test_project_name(self):
+        config_details = build_config_details({
+            'version': '2.4',
+            'project_name': 'test'
+        })
+        config_result = config.load(config_details)
+        assert config_result.project_name == 'test'
+
     def test_named_volume_config_empty(self):
         config_details = build_config_details({
             'version': '2',
@@ -4471,7 +4479,7 @@ class SerializeTest(unittest.TestCase):
         assert serialized_config['secrets']['two'] == secrets_dict['two']
 
     def test_serialize_ports(self):
-        config_dict = config.Config(version=V2_0, services=[
+        config_dict = config.Config(version=V2_0, project_name='test', services=[
             {
                 'ports': [types.ServicePort('80', '8080', None, None, None)],
                 'image': 'alpine',

@@ -26,6 +26,7 @@ class ProjectTest(unittest.TestCase):
     def test_from_config_v1(self):
         config = Config(
             version=V1,
+            project_name=None,
             services=[
                 {
                     'name': 'web',
@@ -56,6 +57,7 @@ class ProjectTest(unittest.TestCase):
     def test_from_config_v2(self):
         config = Config(
             version=V2_0,
+            project_name=None,
             services=[
                 {
                     'name': 'web',
@@ -169,6 +171,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[{
                     'name': 'test',
                     'image': 'busybox:latest',
@@ -197,6 +200,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[
                     {
                         'name': 'vol',
@@ -224,6 +228,7 @@ class ProjectTest(unittest.TestCase):
             client=None,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[
                     {
                         'name': 'vol',
@@ -364,6 +369,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V1,
+                project_name=None,
                 services=[
                     {
                         'name': 'test',
@@ -389,6 +395,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[
                     {
                         'name': 'test',
@@ -420,6 +427,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[
                     {
                         'name': 'aaa',
@@ -447,6 +455,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[
                     {
                         'name': 'foo',
@@ -468,6 +477,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[
                     {
                         'name': 'foo',
@@ -503,6 +513,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[{
                     'name': 'web',
                     'image': 'busybox:latest',
@@ -521,6 +532,7 @@ class ProjectTest(unittest.TestCase):
             client=self.mock_client,
             config_data=Config(
                 version=V2_0,
+                project_name=None,
                 services=[{
                     'name': 'web',
                     'image': 'busybox:latest',
