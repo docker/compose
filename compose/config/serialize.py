@@ -45,6 +45,8 @@ yaml.SafeDumper.add_representer(six.text_type, serialize_string)
 
 def denormalize_config(config, image_digests=None):
     result = {'version': str(V2_1) if config.version == V1 else str(config.version)}
+    if config.project_name:
+        result['project_name'] = config.project_name
     denormalized_services = [
         denormalize_service_dict(
             service_dict,

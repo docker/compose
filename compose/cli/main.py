@@ -214,7 +214,7 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, project_dir='.'):
+    def __init__(self, project):
         self.project = project
         self.project_dir = '.'
 
