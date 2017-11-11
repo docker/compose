@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import re
-import socket
 import sys
 
 import six
@@ -44,9 +43,32 @@ DOCKER_CONFIG_HINTS = {
 
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
-VALID_IPV4_FORMAT = r'^(\d{1,3}.){3}\d{1,3}$'
-VALID_IPV4_CIDR_FORMAT = r'^(\d|[1-2]\d|3[0-2])$'
-VALID_IPV6_CIDR_FORMAT = r'^(\d|[1-9]\d|1[0-1]\d|12[0-8])$'
+
+VALID_IPV4_SEG = r'(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
+VALID_REGEX_IPV4_CIDR = r'^(\d|[1-2]\d|3[0-2])$'
+VALID_IPV4_ADDR = "({IPV4_SEG}\.){{3}}{IPV4_SEG}".format(IPV4_SEG=VALID_IPV4_SEG)
+VALID_REGEX_IPV4_ADDR = "^{IPV4_ADDR}$".format(IPV4_ADDR=VALID_IPV4_ADDR)
+
+VALID_IPV6_SEG = r'[0-9a-fA-F]{1,4}'
+VALID_REGEX_IPV6_CIDR = r'^(\d|[1-9]\d|1[0-1]\d|12[0-8])$'
+VALID_REGEX_IPV6_ADDR = "".join("""
+^
+(
+    (({IPV6_SEG}:){{7}}{IPV6_SEG})|
+    (({IPV6_SEG}:){{1,7}}:)|
+    (({IPV6_SEG}:){{1,6}}(:{IPV6_SEG}){{1,1}})|
+    (({IPV6_SEG}:){{1,5}}(:{IPV6_SEG}){{1,2}})|
+    (({IPV6_SEG}:){{1,4}}(:{IPV6_SEG}){{1,3}})|
+    (({IPV6_SEG}:){{1,3}}(:{IPV6_SEG}){{1,4}})|
+    (({IPV6_SEG}:){{1,2}}(:{IPV6_SEG}){{1,5}})|
+    (({IPV6_SEG}:){{1,1}}(:{IPV6_SEG}){{1,6}})|
+    (:((:{IPV6_SEG}){{1,7}}|:))|
+    (fe80:(:{IPV6_SEG}){{0,4}}%[0-9a-zA-Z]{{1,}})|
+    (::(ffff(:0{{1,4}}){{0,1}}:){{0,1}}{IPV4_ADDR})|
+    (({IPV6_SEG}:){{1,4}}:{IPV4_ADDR})
+)
+$
+""".format(IPV6_SEG=VALID_IPV6_SEG, IPV4_ADDR=VALID_IPV4_ADDR).split())
 
 
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)
@@ -72,24 +94,18 @@ def format_expose(instance):
 def format_subnet_ip_address(instance):
     if isinstance(instance, six.string_types):
         if '/' not in instance:
-            raise ValidationError("'{0}' 75 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
+            raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
 
         ip_address, cidr = instance.split('/')
 
-        if re.match(VALID_IPV4_FORMAT, ip_address):
-            if not (re.match(VALID_IPV4_CIDR_FORMAT, cidr) and
-                    all(0 <= int(component) <= 255 for component in ip_address.split("."))):
-                raise ValidationError(
-                    "'{0}' 83 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
-        elif re.match(VALID_IPV6_CIDR_FORMAT, cidr) and hasattr(socket, "inet_pton"):
-            try:
-                if not (socket.inet_pton(socket.AF_INET6, ip_address)):
-                    raise ValidationError(
-                        "'{0}' 88 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
-            except socket.error as e:
-                raise ValidationError(six.text_type(e))
+        if re.match(VALID_REGEX_IPV4_ADDR, ip_address):
+            if not re.match(VALID_REGEX_IPV4_CIDR, cidr):
+                raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
+        elif re.match(VALID_REGEX_IPV6_ADDR, ip_address):
+            if not re.match(VALID_REGEX_IPV6_CIDR, cidr):
+                raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
         else:
-            raise ValidationError("'{0}' 92 should be of the format 'IP_ADDRESS/CIDR'".format(instance))
+            raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
 
     return True
 
