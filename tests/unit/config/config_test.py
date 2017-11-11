@@ -2865,10 +2865,7 @@ class SubnetTest(unittest.TestCase):
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156/129",
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156/01",
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156",
-    ]
-
-    ILLEGAL_SUBNET_MAPPINGS = [
-        "ge80:0000:0000:0000:0204:61ff:fe9d:f156/128"
+        "ge80:0000:0000:0000:0204:61ff:fe9d:f156/128",
     ]
 
     VALID_SUBNET_MAPPINGS = [
@@ -2876,6 +2873,21 @@ class SubnetTest(unittest.TestCase):
         "192.168.0.1/32",
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156/0",
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156/128",
+        "1:2:3:4:5:6:7:8/0",
+        "1::/0",
+        "1:2:3:4:5:6:7::/0",
+        "1::8/0",
+        "1:2:3:4:5:6::8/0",
+        "::/0",
+        "::8/0",
+        "::2:3:4:5:6:7:8/0",
+        "fe80::7:8%eth0/0",
+        "fe80::7:8%1/0",
+        "::255.255.255.255/0",
+        "::ffff:255.255.255.255/0",
+        "::ffff:0:255.255.255.255/0",
+        "2001:db8:3:4::192.0.2.33/0",
+        "64:ff9b::192.0.2.33/0",
     ]
 
     def test_config_invalid_subnet_type_validation(self):
@@ -2891,16 +2903,6 @@ class SubnetTest(unittest.TestCase):
                 self.check_config(invalid_subnet)
 
             assert "should be of the format 'IP_ADDRESS/CIDR'" in exc.value.msg
-
-    def test_config_illegal_subnet_type_validation(self):
-        for invalid_subnet in self.ILLEGAL_SUBNET_MAPPINGS:
-            with pytest.raises(ConfigurationError) as exc:
-                self.check_config(invalid_subnet)
-            if IS_WINDOWS_PLATFORM:
-                assert "An invalid argument was supplied" in exc.value.msg or \
-                       "illegal IP address string" in exc.value.msg
-            else:
-                assert "illegal IP address string" in exc.value.msg
 
     def test_config_valid_subnet_format_validation(self):
         for valid_subnet in self.VALID_SUBNET_MAPPINGS:
