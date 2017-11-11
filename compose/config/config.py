@@ -401,7 +401,8 @@ def load(config_details):
 
     check_swarm_only_config(service_dicts)
 
-    return Config(main_file.version, main_file.project_name, service_dicts, volumes, networks, secrets, configs)
+    return Config(main_file.version, main_file.project_name, service_dicts, volumes, networks, secrets,
+                  configs)
 
 
 def load_mapping(config_files, get_func, entity_type, working_dir=None):

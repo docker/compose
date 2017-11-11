@@ -63,12 +63,15 @@ class CLITestCase(unittest.TestCase):
     def test_project_name_priority(self):
         base_dir = 'tests/fixtures/testdir'
         os.environ['COMPOSE_PROJECT_NAME'] = 'env_name'
-        project_name = get_project_name(base_dir, project_name='project_name', config_project_name='config_project_name')
+        project_name = get_project_name(base_dir, project_name='project_name',
+                                        config_project_name='config_project_name')
         self.assertEqual('projectname', project_name)
-        project_name = get_project_name(base_dir, project_name=None, config_project_name='config_project_name')
+        project_name = get_project_name(base_dir, project_name=None,
+                                        config_project_name='config_project_name')
         self.assertEqual('envname', project_name)
         del os.environ['COMPOSE_PROJECT_NAME']
-        project_name = get_project_name(base_dir, project_name=None, config_project_name='config_project_name')
+        project_name = get_project_name(base_dir, project_name=None,
+                                        config_project_name='config_project_name')
         self.assertEqual('configprojectname', project_name)
         project_name = get_project_name(base_dir, project_name=None, config_project_name=None)
         self.assertEqual('testdir', project_name)
