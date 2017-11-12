@@ -25,6 +25,7 @@ from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
+from .config import merge_labels
 from .config.errors import DependencyError
 from .config.types import ServicePort
 from .config.types import VolumeSpec
@@ -777,6 +778,10 @@ class Service(object):
         container_options['environment'] = merge_environment(
             self.options.get('environment'),
             override_options.get('environment'))
+
+        container_options['labels'] = merge_labels(
+            self.options.get('labels'),
+            override_options.get('labels'))
 
         binds, affinity = merge_volume_bindings(
             container_options.get('volumes') or [],

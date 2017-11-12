@@ -24,6 +24,7 @@ from ..bundle import MissingDigests
 from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
+from ..config import parse_labels
 from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
@@ -720,7 +721,9 @@ class TopLevelCommand(object):
         running. If you do not want to start linked services, use
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
-        Usage: run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
+        Usage:
+            run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...]
+                SERVICE [COMMAND] [ARGS...]
 
         Options:
             -d                    Detached mode: Run container in the background, print
@@ -728,6 +731,7 @@ class TopLevelCommand(object):
             --name NAME           Assign a name to the container
             --entrypoint CMD      Override the entrypoint of the image.
             -e KEY=VAL            Set an environment variable (can be used multiple times)
+            -l, --label KEY=VAL   Add or override a label (can be used multiple times)
             -u, --user=""         Run as specified username or uid
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
@@ -1121,6 +1125,9 @@ def build_container_options(options, detach, command):
         container_options['environment'] = Environment.from_command_line(
             parse_environment(options['-e'])
         )
+
+    if options['--label']:
+        container_options['labels'] = parse_labels(options['--label'])
 
     if options['--entrypoint']:
         container_options['entrypoint'] = options.get('--entrypoint')
