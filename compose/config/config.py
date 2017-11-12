@@ -1076,6 +1076,12 @@ def merge_environment(base, override):
     return env
 
 
+def merge_labels(base, override):
+    labels = parse_labels(base)
+    labels.update(parse_labels(override))
+    return labels
+
+
 def split_kv(kvpair):
     if '=' in kvpair:
         return kvpair.split('=', 1)

@@ -1851,6 +1851,17 @@ class CLITestCase(DockerClientTestCase):
         assert 'FOO=bar' in environment
         assert 'BAR=baz' not in environment
 
+    def test_run_label_flag(self):
+        self.base_dir = 'tests/fixtures/run-labels'
+        name = 'service'
+        self.dispatch(['run', '-l', 'default', '--label', 'foo=baz', name, '/bin/true'])
+        service = self.project.get_service(name)
+        container, = service.containers(stopped=True, one_off=OneOffFilter.only)
+        labels = container.labels
+        assert labels['default'] == ''
+        assert labels['foo'] == 'baz'
+        assert labels['hello'] == 'world'
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
