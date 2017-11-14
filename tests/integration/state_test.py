@@ -138,6 +138,17 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.assertEqual(
             set(c.name_without_project for c in new_containers - old_containers),
+            set(['web_1']),
+        )
+
+    def test_change_middle_always_recreate_deps(self):
+        old_containers = self.run_up(self.cfg, **{"always_recreate_deps": True})
+
+        self.cfg['web']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(self.cfg, **{"always_recreate_deps": True})
+
+        self.assertEqual(
+            set(c.name_without_project for c in new_containers - old_containers),
             set(['web_1', 'nginx_1']),
         )
 
@@ -146,6 +157,17 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
+
+        self.assertEqual(
+            set(c.name_without_project for c in new_containers - old_containers),
+            set(['db_1']),
+        )
+
+    def test_change_root_always_recreate_deps(self):
+        old_containers = self.run_up(self.cfg, **{"always_recreate_deps": True})
+
+        self.cfg['db']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(self.cfg, **{"always_recreate_deps": True})
 
         self.assertEqual(
             set(c.name_without_project for c in new_containers - old_containers),
