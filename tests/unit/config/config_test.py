@@ -2866,6 +2866,7 @@ class SubnetTest(unittest.TestCase):
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156/01",
         "fe80:0000:0000:0000:0204:61ff:fe9d:f156",
         "ge80:0000:0000:0000:0204:61ff:fe9d:f156/128",
+        "192.168.0.1/31/31",
     ]
 
     VALID_SUBNET_MAPPINGS = [
@@ -2902,7 +2903,7 @@ class SubnetTest(unittest.TestCase):
             with pytest.raises(ConfigurationError) as exc:
                 self.check_config(invalid_subnet)
 
-            assert "should be of the format 'IP_ADDRESS/CIDR'" in exc.value.msg
+            assert "should use the CIDR format" in exc.value.msg
 
     def test_config_valid_subnet_format_validation(self):
         for valid_subnet in self.VALID_SUBNET_MAPPINGS:

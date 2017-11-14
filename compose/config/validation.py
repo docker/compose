@@ -45,13 +45,11 @@ VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
 
 VALID_IPV4_SEG = r'(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
-VALID_REGEX_IPV4_CIDR = r'^(\d|[1-2]\d|3[0-2])$'
 VALID_IPV4_ADDR = "({IPV4_SEG}\.){{3}}{IPV4_SEG}".format(IPV4_SEG=VALID_IPV4_SEG)
-VALID_REGEX_IPV4_ADDR = "^{IPV4_ADDR}$".format(IPV4_ADDR=VALID_IPV4_ADDR)
+VALID_REGEX_IPV4_CIDR = "^{IPV4_ADDR}/(\d|[1-2]\d|3[0-2])$".format(IPV4_ADDR=VALID_IPV4_ADDR)
 
 VALID_IPV6_SEG = r'[0-9a-fA-F]{1,4}'
-VALID_REGEX_IPV6_CIDR = r'^(\d|[1-9]\d|1[0-1]\d|12[0-8])$'
-VALID_REGEX_IPV6_ADDR = "".join("""
+VALID_REGEX_IPV6_CIDR = "".join("""
 ^
 (
     (({IPV6_SEG}:){{7}}{IPV6_SEG})|
@@ -67,6 +65,7 @@ VALID_REGEX_IPV6_ADDR = "".join("""
     (::(ffff(:0{{1,4}}){{0,1}}:){{0,1}}{IPV4_ADDR})|
     (({IPV6_SEG}:){{1,4}}:{IPV4_ADDR})
 )
+/(\d|[1-9]\d|1[0-1]\d|12[0-8])
 $
 """.format(IPV6_SEG=VALID_IPV6_SEG, IPV4_ADDR=VALID_IPV4_ADDR).split())
 
@@ -93,19 +92,9 @@ def format_expose(instance):
 @FormatChecker.cls_checks("subnet_ip_address", raises=ValidationError)
 def format_subnet_ip_address(instance):
     if isinstance(instance, six.string_types):
-        if '/' not in instance:
-            raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
-
-        ip_address, cidr = instance.split('/')
-
-        if re.match(VALID_REGEX_IPV4_ADDR, ip_address):
-            if not re.match(VALID_REGEX_IPV4_CIDR, cidr):
-                raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
-        elif re.match(VALID_REGEX_IPV6_ADDR, ip_address):
-            if not re.match(VALID_REGEX_IPV6_CIDR, cidr):
-                raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
-        else:
-            raise ValidationError("should be of the format 'IP_ADDRESS/CIDR'")
+        if not re.match(VALID_REGEX_IPV4_CIDR, instance) and \
+                not re.match(VALID_REGEX_IPV6_CIDR, instance):
+            raise ValidationError("should use the CIDR format")
 
     return True
 
