@@ -225,6 +225,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_configs(self):
         return {} if self.version < const.COMPOSEFILE_V3_3 else self.config.get('configs', {})
 
+    def get_x_properties(self):
+        if self.version == V1:
+            return {}
+        return dict((k, v) for k, v in self.config.items() if k.startswith('x-'))
+
 
 class Config(namedtuple('_Config', 'version services volumes networks secrets configs')):
     """
