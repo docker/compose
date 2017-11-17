@@ -323,7 +323,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "subnet": {"type": "string"}
+                  "subnet": {"type": "string", "format": "subnet_ip_address"}
                 },
                 "additionalProperties": false
               }

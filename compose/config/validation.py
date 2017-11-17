@@ -44,6 +44,31 @@ DOCKER_CONFIG_HINTS = {
 VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
 VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
 
+VALID_IPV4_SEG = r'(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
+VALID_IPV4_ADDR = "({IPV4_SEG}\.){{3}}{IPV4_SEG}".format(IPV4_SEG=VALID_IPV4_SEG)
+VALID_REGEX_IPV4_CIDR = "^{IPV4_ADDR}/(\d|[1-2]\d|3[0-2])$".format(IPV4_ADDR=VALID_IPV4_ADDR)
+
+VALID_IPV6_SEG = r'[0-9a-fA-F]{1,4}'
+VALID_REGEX_IPV6_CIDR = "".join("""
+^
+(
+    (({IPV6_SEG}:){{7}}{IPV6_SEG})|
+    (({IPV6_SEG}:){{1,7}}:)|
+    (({IPV6_SEG}:){{1,6}}(:{IPV6_SEG}){{1,1}})|
+    (({IPV6_SEG}:){{1,5}}(:{IPV6_SEG}){{1,2}})|
+    (({IPV6_SEG}:){{1,4}}(:{IPV6_SEG}){{1,3}})|
+    (({IPV6_SEG}:){{1,3}}(:{IPV6_SEG}){{1,4}})|
+    (({IPV6_SEG}:){{1,2}}(:{IPV6_SEG}){{1,5}})|
+    (({IPV6_SEG}:){{1,1}}(:{IPV6_SEG}){{1,6}})|
+    (:((:{IPV6_SEG}){{1,7}}|:))|
+    (fe80:(:{IPV6_SEG}){{0,4}}%[0-9a-zA-Z]{{1,}})|
+    (::(ffff(:0{{1,4}}){{0,1}}:){{0,1}}{IPV4_ADDR})|
+    (({IPV6_SEG}:){{1,4}}:{IPV4_ADDR})
+)
+/(\d|[1-9]\d|1[0-1]\d|12[0-8])
+$
+""".format(IPV6_SEG=VALID_IPV6_SEG, IPV4_ADDR=VALID_IPV4_ADDR).split())
+
 
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)
 def format_ports(instance):
@@ -60,6 +85,16 @@ def format_expose(instance):
         if not re.match(VALID_EXPOSE_FORMAT, instance):
             raise ValidationError(
                 "should be of the format 'PORT[/PROTOCOL]'")
+
+    return True
+
+
+@FormatChecker.cls_checks("subnet_ip_address", raises=ValidationError)
+def format_subnet_ip_address(instance):
+    if isinstance(instance, six.string_types):
+        if not re.match(VALID_REGEX_IPV4_CIDR, instance) and \
+                not re.match(VALID_REGEX_IPV6_CIDR, instance):
+            raise ValidationError("should use the CIDR format")
 
     return True
 
@@ -391,7 +426,7 @@ def process_config_schema_errors(error):
 
 def validate_against_config_schema(config_file):
     schema = load_jsonschema(config_file)
-    format_checker = FormatChecker(["ports", "expose"])
+    format_checker = FormatChecker(["ports", "expose", "subnet_ip_address"])
     validator = Draft4Validator(
         schema,
         resolver=RefResolver(get_resolver_path(), schema),
