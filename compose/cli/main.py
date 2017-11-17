@@ -287,7 +287,7 @@ class TopLevelCommand(object):
         """
         Validate and view the Compose file.
 
-        Usage: config [options]
+        Usage: config [options] [-f KEY=VAL...]
 
         Options:
             --resolve-image-digests  Pin image tags to digests.
@@ -295,6 +295,7 @@ class TopLevelCommand(object):
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
+            -f, --filter KEY=VAL     Filter containers by a property (can be used multiple times)
 
         """
 
@@ -309,7 +310,15 @@ class TopLevelCommand(object):
             return
 
         if options['--services']:
-            print('\n'.join(service['name'] for service in compose_config.services))
+            filters = build_filters(options.get('--filter'))
+            if filters:
+                if not self.project:
+                    self.project = project_from_options('.', config_options)
+                services = filter_services(filters, self.project.services, self.project)
+            else:
+                services = [service['name'] for service in compose_config.services]
+
+            print('\n'.join(services))
             return
 
         if options['--volumes']:
@@ -1312,3 +1321,51 @@ def build_exec_command(options, container_id, command):
     args += [container_id]
     args += command
     return args
+
+
+def has_container_with_state(containers, state):
+    for container in containers:
+        states = {
+            'running': container.is_running,
+            'stopped': not container.is_running,
+            'paused': container.is_paused,
+        }
+        if state not in states:
+            raise UserError("Invalid state: %s" % state)
+        if states[state]:
+            return True
+    return False
+
+
+def filter_services(filters, services, project):
+    def should_include(service):
+        for f in filters:
+            if f == 'status':
+                containers = project.containers([service.name], stopped=True)
+                for status in filters[f]:
+                    if not has_container_with_state(containers, status):
+                        return False
+            elif f == 'option':
+                for option in filters[f]:
+                    if option == 'image' or option == 'build':
+                        if option not in service.options:
+                            return False
+                    else:
+                        raise UserError("Invalid option: %s" % option)
+            else:
+                raise UserError("Invalid filter: %s" % f)
+        return True
+
+    return [s.name for s in services if should_include(s)]
+
+
+def build_filters(args):
+    filters = {}
+    for arg in args:
+        if '=' not in arg:
+            raise UserError("Arguments to --filter should be in form KEY=VAL")
+        key, val = arg.split('=', 1)
+        if key not in filters:
+            filters[key] = []
+        filters[key].append(val)
+    return filters

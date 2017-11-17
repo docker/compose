@@ -1,0 +1,6 @@
+with_image:
+  image: busybox:latest
+  command: top
+with_build:
+  build: ../build-ctx/
+  command: top

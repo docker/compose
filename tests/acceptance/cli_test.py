@@ -440,6 +440,32 @@ class CLITestCase(DockerClientTestCase):
             },
         }
 
+    def test_config_services_filter_option(self):
+        self.base_dir = 'tests/fixtures/config-services-filter'
+        image = self.dispatch(['config', '--services', '--filter', 'option=image'])
+        build = self.dispatch(['config', '--services', '--filter', 'option=build'])
+
+        self.assertIn('with_build', build.stdout)
+        self.assertNotIn('with_build', image.stdout)
+        self.assertIn('with_image', image.stdout)
+        self.assertNotIn('with_image', build.stdout)
+
+    def test_config_services_filter_status(self):
+        self.base_dir = 'tests/fixtures/config-services-filter'
+        self.dispatch(['up', '-d'])
+        self.dispatch(['pause', 'with_image'])
+        paused = self.dispatch(['config', '--services', '--filter', 'status=paused'])
+        stopped = self.dispatch(['config', '--services', '--filter', 'status=stopped'])
+        running = self.dispatch(['config', '--services', '--filter', 'status=running',
+                                 '--filter', 'option=build'])
+
+        self.assertNotIn('with_build', stopped.stdout)
+        self.assertNotIn('with_image', stopped.stdout)
+        self.assertNotIn('with_build', paused.stdout)
+        self.assertIn('with_image', paused.stdout)
+        self.assertIn('with_build', running.stdout)
+        self.assertNotIn('with_image', running.stdout)
+
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
