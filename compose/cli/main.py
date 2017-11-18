@@ -295,7 +295,7 @@ class TopLevelCommand(object):
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
-            -f, --filter KEY=VAL     Filter containers by a property (can be used multiple times)
+            -f, --filter KEY=VAL     Filter services by a property (can be used multiple times)
 
         """
 
