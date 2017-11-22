@@ -64,8 +64,8 @@ you can specify a test directory, file, module, class or method:
 
     $ script/test/default tests/unit
     $ script/test/default tests/unit/cli_test.py
-    $ script/test/default tests/unit/config_test.py::ConfigTest
-    $ script/test/default tests/unit/config_test.py::ConfigTest::test_load
+    $ script/test/default tests/unit/config/config_test.py::ConfigTest
+    $ script/test/default tests/unit/config/config_test.py::ConfigTest::test_load
 
 ## Finding things to work on
 
