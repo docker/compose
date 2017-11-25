@@ -900,7 +900,7 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
-    def build(self, no_cache=False, pull=False, force_rm=False, build_args_override=None):
+    def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
@@ -931,6 +931,9 @@ class Service(object):
             target=build_opts.get('target', None),
             shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
             extra_hosts=build_opts.get('extra_hosts', None),
+            container_limits={
+                'memory': parse_bytes(memory) if memory else None
+            },
         )
 
         try:
