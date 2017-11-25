@@ -233,6 +233,7 @@ class TopLevelCommand(object):
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
             --pull                  Always attempt to pull a newer version of the image.
+            -m, --memory MEM        Sets memory limit for the bulid container.
             --build-arg key=val     Set build-time variables for one service.
         """
         service_names = options['SERVICE']
@@ -249,6 +250,7 @@ class TopLevelCommand(object):
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
+            memory=options.get('--memory'),
             build_args=build_args)
 
     def bundle(self, config_options, options):
