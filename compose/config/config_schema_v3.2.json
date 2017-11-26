@@ -189,6 +189,7 @@
         "privileged": {"type": "boolean"},
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
+        "scale": {"type": "integer"},
         "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "shm_size": {"type": ["number", "string"]},
         "secrets": {
