@@ -720,6 +720,10 @@ class TopLevelCommand(object):
         running. If you do not want to start linked services, use
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
+        Same for labels, by default, defined labels will be used.
+        If you do not want to use labels, use
+        `docker-compose run --no-labels SERVICE COMMAND [ARGS...]`.
+
         Usage: run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] SERVICE [COMMAND] [ARGS...]
 
         Options:
@@ -738,6 +742,7 @@ class TopLevelCommand(object):
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
             -w, --workdir=""      Working directory inside the container
+            --no-labels           Remove defined labels
         """
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
@@ -1146,6 +1151,9 @@ def build_container_options(options, detach, command):
     if options['--volume']:
         volumes = [VolumeSpec.parse(i) for i in options['--volume']]
         container_options['volumes'] = volumes
+
+    if options['--no-labels']:
+        container_options['labels'] = []
 
     return container_options
 

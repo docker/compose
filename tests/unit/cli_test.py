@@ -125,6 +125,7 @@ class CLITestCase(unittest.TestCase):
                 '--rm': None,
                 '--name': None,
                 '--workdir': None,
+                '--no-labels': None,
             })
 
         _, _, call_kwargs = mock_run_operation.mock_calls[0]
@@ -161,6 +162,7 @@ class CLITestCase(unittest.TestCase):
             '--rm': None,
             '--name': None,
             '--workdir': None,
+            '--no-labels': None,
         })
 
         self.assertEqual(
@@ -184,6 +186,7 @@ class CLITestCase(unittest.TestCase):
             '--rm': True,
             '--name': None,
             '--workdir': None,
+            '--no-labels': None,
         })
 
         self.assertFalse(
