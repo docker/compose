@@ -105,7 +105,7 @@
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
-        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "labels": {"$ref": "#/definitions/labels"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
         "logging": {
@@ -223,7 +223,7 @@
       "properties": {
         "mode": {"type": "string"},
         "replicas": {"type": "integer"},
-        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "labels": {"$ref": "#/definitions/labels"},
         "update_config": {
           "type": "object",
           "properties": {
@@ -310,7 +310,7 @@
           "additionalProperties": false
         },
         "internal": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"}
+        "labels": {"$ref": "#/definitions/labels"}
       },
       "additionalProperties": false
     },
@@ -333,7 +333,7 @@
           },
           "additionalProperties": false
         },
-        "labels": {"$ref": "#/definitions/list_or_dict"}
+        "labels": {"$ref": "#/definitions/labels"}
       },
       "additionalProperties": false
     },
@@ -358,6 +358,21 @@
           "patternProperties": {
             ".+": {
               "type": ["string", "number", "null"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      ]
+    },
+
+    "labels": {
+      "oneOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            ".+": {
+              "type": "string"
             }
           },
           "additionalProperties": false

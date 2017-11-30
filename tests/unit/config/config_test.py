@@ -2631,6 +2631,40 @@ class ConfigTest(unittest.TestCase):
         ]
         assert service_sort(service_dicts) == service_sort(expected)
 
+    def test_config_invalid_service_label_validation(self):
+        config_details = build_config_details(
+            {
+                'version': '3.5',
+                'services': {
+                    'web': {
+                        'image': 'busybox',
+                        'labels': {
+                            "key": 12345
+                        }
+                    },
+                },
+            }
+        )
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "which is an invalid type, it should be a string" in exc.exconly()
+
+    def test_config_valid_service_label_validation(self):
+        config_details = build_config_details(
+            {
+                'version': '3.5',
+                'services': {
+                    'web': {
+                        'image': 'busybox',
+                        'labels': {
+                            "key": "string"
+                        }
+                    },
+                },
+            }
+        )
+        config.load(config_details)
+
 
 class NetworkModeTest(unittest.TestCase):
 
