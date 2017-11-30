@@ -895,7 +895,7 @@ class TopLevelCommand(object):
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
                                        and image haven't changed.
-            --always-recreate-deps     Recreate dependant containers.
+            --always-recreate-deps     Recreate dependent containers.
                                        Incompatible with --no-recreate.
             --no-recreate              If containers already exist, don't recreate them.
                                        Incompatible with --force-recreate.
