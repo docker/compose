@@ -2631,6 +2631,33 @@ class ConfigTest(unittest.TestCase):
         ]
         assert service_sort(service_dicts) == service_sort(expected)
 
+    def test_service_volume_invalid_config(self):
+        config_details = build_config_details(
+            {
+                'version': '3.2',
+                'services': {
+                    'web': {
+                        'build': {
+                            'context': '.',
+                            'args': None,
+                        },
+                        'volumes': [
+                            {
+                                "type": "volume",
+                                "source": "/data",
+                                "garbage": {
+                                    "and": "error"
+                                }
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "services.web.volumes contains unsupported option: 'garbage'" in exc.exconly()
+
 
 class NetworkModeTest(unittest.TestCase):
 
