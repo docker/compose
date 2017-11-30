@@ -116,7 +116,7 @@ def create_ipam_config_from_dict(ipam_dict):
         return None
 
     return IPAMConfig(
-        driver=ipam_dict.get('driver'),
+        driver=ipam_dict.get('driver') or 'default',
         pool_configs=[
             IPAMPool(
                 subnet=config.get('subnet'),
