@@ -510,8 +510,8 @@ class Project(object):
                 log.debug('%s has upstream changes (%s)',
                           service.name,
                           ", ".join(updated_dependencies))
-                containers_stopped = len(
-                    service.containers(stopped=True, filters={'status': ['created', 'exited']})) > 0
+                containers_stopped = any(
+                    service.containers(stopped=True, filters={'status': ['created', 'exited']}))
                 has_links = any(c.get('HostConfig.Links') for c in service.containers())
                 if always_recreate_deps or containers_stopped or not has_links:
                     plan = service.convergence_plan(ConvergenceStrategy.always)
