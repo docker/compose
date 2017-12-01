@@ -19,6 +19,30 @@ def build_config_details(contents, working_dir='working_dir', filename='filename
     )
 
 
+def create_host_folder(client, folder_name):
+    container = client.create_container(
+        'busybox:latest', ['true'], host_config=client.create_host_config(
+            binds={folder_name: {'bind': folder_name, 'ro': False}},
+            network_mode='none'
+        )
+    )
+
+    try:
+        client.start(container)
+        exitcode = client.wait(container)
+
+        if exitcode != 0:
+            output = client.logs(container)
+            raise Exception(
+                "Container exited with code {}:\n{}".format(exitcode, output))
+
+        container_info = client.inspect_container(container)
+        if 'Node' in container_info:
+            return container_info['Node']['Name']
+    finally:
+        client.remove_container(container, force=True)
+
+
 def create_host_file(client, filename):
     dirname = os.path.dirname(filename)
 

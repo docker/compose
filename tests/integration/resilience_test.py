@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from .. import mock
 from .testcases import DockerClientTestCase
-from compose.config.types import VolumeSpec
+from compose.config.types import MountSpec
 from compose.project import Project
 from compose.service import ConvergenceStrategy
 
@@ -12,7 +12,7 @@ class ResilienceTest(DockerClientTestCase):
     def setUp(self):
         self.db = self.create_service(
             'db',
-            volumes=[VolumeSpec.parse('/var/db')],
+            volumes=[MountSpec.parse('/var/db')],
             command='top')
         self.project = Project('composetest', [self.db], self.client)
 

@@ -13,14 +13,15 @@ from six import StringIO
 from six import text_type
 
 from .. import mock
+from ..helpers import create_host_folder
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import pull_busybox
 from .testcases import SWARM_SKIP_CONTAINERS_ALL
 from .testcases import SWARM_SKIP_CPU_SHARES
 from compose import __version__
+from compose.config.types import MountSpec
 from compose.config.types import VolumeFromSpec
-from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_CONTAINER_NUMBER
@@ -96,7 +97,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(container.name, 'composetest_db_run_1')
 
     def test_create_container_with_unspecified_volume(self):
-        service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
+        service = self.create_service('db', volumes=[MountSpec.parse('/var/db')])
         container = service.create_container()
         service.start_container(container)
         assert container.get_mount('/var/db')
@@ -263,9 +264,12 @@ class ServiceTest(DockerClientTestCase):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
 
+        node = create_host_folder(self.client, host_path)
         service = self.create_service(
             'db',
-            volumes=[VolumeSpec(host_path, container_path, 'rw')])
+            volumes=[MountSpec(source=host_path, target=container_path, type='bind')],
+            environment=['constraint:node=={}'.format(node if node is not None else '*')],
+        )
         container = service.create_container()
         service.start_container(container)
         assert container.get_mount(container_path)
@@ -298,7 +302,7 @@ class ServiceTest(DockerClientTestCase):
         """When the Compose file specifies a trailing slash in the container path, make
         sure we copy the volume over when recreating.
         """
-        service = self.create_service('data', volumes=[VolumeSpec.parse('/data/')])
+        service = self.create_service('data', volumes=[MountSpec.parse('/data/')])
         old_container = create_and_start_container(service)
         volume_path = old_container.get_mount('/data')['Source']
 
@@ -312,7 +316,9 @@ class ServiceTest(DockerClientTestCase):
         """
         host_path = '/tmp/data'
         container_path = '/data'
-        volumes = [VolumeSpec.parse('{}:{}/'.format(host_path, container_path))]
+        volumes = [MountSpec.parse('{}:{}/'.format(host_path, container_path))]
+
+        node = create_host_folder(self.client, host_path)
 
         tmp_container = self.client.create_container(
             'busybox', 'true',
@@ -322,7 +328,10 @@ class ServiceTest(DockerClientTestCase):
         )
         image = self.client.commit(tmp_container)['Id']
 
-        service = self.create_service('db', image=image, volumes=volumes)
+        service = self.create_service(
+            'db', image=image, volumes=volumes,
+            environment=['constraint:node=={}'.format(node if node is not None else '*')]
+        )
         old_container = create_and_start_container(service)
 
         self.assertEqual(
@@ -370,7 +379,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=[VolumeSpec.parse('/etc')],
+            volumes=[MountSpec.parse('/etc')],
             entrypoint=['top'],
             command=['-d', '1']
         )
@@ -413,7 +422,7 @@ class ServiceTest(DockerClientTestCase):
     def test_execute_convergence_plan_recreate_twice(self):
         service = self.create_service(
             'db',
-            volumes=[VolumeSpec.parse('/etc')],
+            volumes=[MountSpec.parse('/etc')],
             entrypoint=['top'],
             command=['-d', '1'])
 
@@ -443,7 +452,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             environment={'FOO': '1'},
-            volumes=[VolumeSpec.parse('/var/db')],
+            volumes=[MountSpec.parse('/var/db')],
             entrypoint=['top'],
             command=['-d', '1']
         )
@@ -498,7 +507,7 @@ class ServiceTest(DockerClientTestCase):
         )
         volume_path = old_container.get_mount('/data')['Source']
 
-        service.options['volumes'] = [VolumeSpec.parse('/tmp:/data')]
+        service.options['volumes'] = [MountSpec.parse('/tmp:/data')]
 
         with mock.patch('compose.service.log') as mock_log:
             new_container, = service.execute_convergence_plan(
@@ -521,7 +530,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service(
             'db',
             build={'context': 'tests/fixtures/dockerfile-with-volume'},
-            volumes=[VolumeSpec(host_path, '/data', 'rw')])
+            volumes=[MountSpec(source=host_path, target='/data', type='bind')])
 
         old_container = create_and_start_container(service)
         assert (

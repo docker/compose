@@ -429,10 +429,27 @@ class CLITestCase(DockerClientTestCase):
                         'retries': 5,
                     },
                     'volumes': [
-                        '/host/path:/container/path:ro',
-                        'foobar:/container/volumepath:rw',
-                        '/anonymous',
-                        'foobar:/container/volumepath2:nocopy'
+                        {
+                            'source': '/host/path',
+                            'target': '/container/path',
+                            'type': 'bind',
+                            'read_only': True,
+                        },
+                        {
+                            'source': 'foobar',
+                            'target': '/container/volumepath',
+                            'type': 'volume',
+                        },
+                        {
+                            'target': '/anonymous',
+                            'type': 'volume'
+                        },
+                        {
+                            'source': 'foobar',
+                            'target': '/container/volumepath2',
+                            'volume': {'nocopy': True},
+                            'type': 'volume'
+                        },
                     ],
 
                     'stop_grace_period': '20s',
@@ -1495,6 +1512,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 1)
         mounts = containers[0].get('Mounts')
         for mount in mounts:
+            print(mount)
             if mount['Destination'] == '/container-path':
                 anonymous_name = mount['Name']
                 break
@@ -1506,8 +1524,8 @@ class CLITestCase(DockerClientTestCase):
         volumes = self.client.volumes()['Volumes']
         assert volumes is not None
         for volume in service.options.get('volumes'):
-            if volume.internal == '/container-named-path':
-                name = volume.external
+            if volume.target == '/container-named-path':
+                name = volume.source
                 break
         volume_names = [v['Name'].split('/')[-1] for v in volumes]
         assert name in volume_names

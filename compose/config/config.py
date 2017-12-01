@@ -21,7 +21,6 @@ from ..const import COMPOSEFILE_V3_4 as V3_4
 from ..utils import build_string_dict
 from ..utils import parse_bytes
 from ..utils import parse_nanoseconds_int
-from ..utils import splitdrive
 from ..version import ComposeVersion
 from .environment import env_vars_from_file
 from .environment import Environment
@@ -35,12 +34,12 @@ from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
 from .sort_services import get_service_name_from_network_mode
 from .sort_services import sort_service_dicts
+from .types import MountSpec
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import ServiceLink
 from .types import ServicePort
 from .types import VolumeFromSpec
-from .types import VolumeSpec
 from .validation import match_named_volumes
 from .validation import validate_against_config_schema
 from .validation import validate_config_section
@@ -448,7 +447,7 @@ def load_services(config_details, config_file):
         resolver = ServiceExtendsResolver(
             service_config, config_file, environment=config_details.environment
         )
-        service_dict = process_service(resolver.run())
+        service_dict = process_service(resolver.run(), config_details.environment)
 
         service_config = service_config._replace(config=service_dict)
         validate_service(service_config, service_names, config_file)
@@ -608,7 +607,7 @@ class ServiceExtendsResolver(object):
         )
 
         service_config = resolver.run()
-        other_service_dict = process_service(service_config)
+        other_service_dict = process_service(service_config, self.environment)
         validate_extended_service_dict(
             other_service_dict,
             extended_config_path,
@@ -698,7 +697,7 @@ def validate_service(service_config, service_names, config_file):
             .format(name=service_name))
 
 
-def process_service(service_config):
+def process_service(service_config, environment):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
 
@@ -712,7 +711,9 @@ def process_service(service_config):
         process_build_section(service_dict, working_dir)
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
-        service_dict['volumes'] = resolve_volume_paths(working_dir, service_dict)
+        service_dict['volumes'] = resolve_volume_paths(
+            working_dir, service_dict, environment.get('COMPOSE_CONVERT_WINDOWS_PATHS')
+        )
 
     if 'sysctls' in service_dict:
         service_dict['sysctls'] = build_string_dict(parse_sysctls(service_dict['sysctls']))
@@ -823,11 +824,7 @@ def finalize_service(service_config, service_names, version, environment):
         ]
 
     if 'volumes' in service_dict:
-        service_dict['volumes'] = [
-            VolumeSpec.parse(
-                v, environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
-            ) for v in service_dict['volumes']
-        ]
+        assert all(isinstance(v, MountSpec) for v in service_dict['volumes'])
 
     if 'net' in service_dict:
         network_mode = service_dict.pop('net')
@@ -1135,38 +1132,20 @@ def resolve_env_var(key, val, environment):
         return key, None
 
 
-def resolve_volume_paths(working_dir, service_dict):
+def resolve_volume_paths(working_dir, service_dict, normalize=False):
     return [
-        resolve_volume_path(working_dir, volume)
+        resolve_volume_path(working_dir, volume, normalize)
         for volume in service_dict['volumes']
     ]
 
 
-def resolve_volume_path(working_dir, volume):
-    mount_params = None
-    if isinstance(volume, dict):
-        container_path = volume.get('target')
-        host_path = volume.get('source')
-        mode = None
-        if host_path:
-            if volume.get('read_only'):
-                mode = 'ro'
-            if volume.get('volume', {}).get('nocopy'):
-                mode = 'nocopy'
-        mount_params = (host_path, mode)
-    else:
-        container_path, mount_params = split_path_mapping(volume)
-
-    if mount_params is not None:
-        host_path, mode = mount_params
-        if host_path is None:
-            return container_path
-        if host_path.startswith('.'):
-            host_path = expand_path(working_dir, host_path)
-        host_path = os.path.expanduser(host_path)
-        return u"{}:{}{}".format(host_path, container_path, (':' + mode if mode else ''))
-
-    return container_path
+def resolve_volume_path(working_dir, volume, normalize=False):
+    spec = MountSpec.parse(volume, normalize)
+    if spec.source is not None:
+        if spec.source.startswith('.'):
+            spec.source = expand_path(working_dir, spec.source)
+        spec.source = os.path.expanduser(spec.source)
+    return spec
 
 
 def normalize_build(service_dict, working_dir, environment):
@@ -1237,23 +1216,13 @@ def path_mappings_from_dict(d):
 def split_path_mapping(volume_path):
     """
     Ascertain if the volume_path contains a host path as well as a container
-    path. Using splitdrive so windows absolute paths won't cause issues with
-    splitting on ':'.
+    path.
     """
-    if isinstance(volume_path, dict):
-        return (volume_path.get('target'), volume_path)
-    drive, volume_config = splitdrive(volume_path)
-
-    if ':' in volume_config:
-        (host, container) = volume_config.split(':', 1)
-        container_drive, container_path = splitdrive(container)
-        mode = None
-        if ':' in container_path:
-            container_path, mode = container_path.rsplit(':', 1)
-
-        return (container_drive + container_path, (drive + host, mode))
+    if isinstance(volume_path, MountSpec):
+        spec = volume_path
     else:
-        return (volume_path, None)
+        spec = MountSpec.parse(volume_path)
+    return (spec.target, spec.repr())
 
 
 def join_path_mapping(pair):

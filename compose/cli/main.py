@@ -28,7 +28,7 @@ from ..config import parse_labels
 from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
-from ..config.types import VolumeSpec
+from ..config.types import MountSpec
 from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
@@ -1151,7 +1151,7 @@ def build_container_options(options, detach, command):
         container_options['working_dir'] = options['--workdir']
 
     if options['--volume']:
-        volumes = [VolumeSpec.parse(i) for i in options['--volume']]
+        volumes = [MountSpec.parse(i) for i in options['--volume']]
         container_options['volumes'] = volumes
 
     return container_options

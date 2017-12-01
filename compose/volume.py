@@ -145,5 +145,5 @@ class ProjectVolumes(object):
         if not volume_spec.is_named_volume:
             return volume_spec
 
-        volume = self.volumes[volume_spec.external]
-        return volume_spec._replace(external=volume.full_name)
+        volume_spec.source = self.volumes[volume_spec.source].full_name
+        return volume_spec

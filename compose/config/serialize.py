@@ -7,6 +7,7 @@ import yaml
 from compose.config import types
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_1 as V2_1
+from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import COMPOSEFILE_V3_4 as V3_4
@@ -36,6 +37,7 @@ def serialize_string(dumper, data):
 
 yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
+yaml.SafeDumper.add_representer(types.MountSpec, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServiceConfig, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
@@ -139,6 +141,11 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
         service_dict['ports'] = [
             p.legacy_repr() if isinstance(p, types.ServicePort) else p
             for p in service_dict['ports']
+        ]
+
+    if 'volumes' in service_dict and (version < V2_3 or (version > V3_0 and version < V3_2)):
+        service_dict['volumes'] = [
+            v.legacy_repr() for v in service_dict['volumes']
         ]
 
     return service_dict
