@@ -14,6 +14,7 @@ from docker.errors import APIError
 from docker.errors import ImageNotFound
 from docker.errors import NotFound
 from docker.types import LogConfig
+from docker.types import Mount
 from docker.utils import version_gte
 from docker.utils import version_lt
 from docker.utils.ports import build_port_bindings
@@ -27,6 +28,7 @@ from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config import merge_labels
 from .config.errors import DependencyError
+from .config.types import MountSpec
 from .config.types import ServicePort
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
@@ -795,9 +797,13 @@ class Service(object):
 
         secret_volumes = self.get_secret_volumes()
         if secret_volumes:
-            override_options['binds'].extend(v.repr() for v in secret_volumes)
-            container_options['volumes'].update(
-                (v.internal, {}) for v in secret_volumes)
+            if version_lt(self.client.api_version, '1.30'):
+                override_options['binds'].extend(v.legacy_repr() for v in secret_volumes)
+                container_options['volumes'].update(
+                    (v.target, {}) for v in secret_volumes
+                )
+            else:
+                override_options['mounts'] = [build_mount(v) for v in secret_volumes]
 
         container_options['image'] = self.image_name
 
@@ -891,6 +897,7 @@ class Service(object):
             device_read_iops=blkio_config.get('device_read_iops'),
             device_write_bps=blkio_config.get('device_write_bps'),
             device_write_iops=blkio_config.get('device_write_iops'),
+            mounts=options.get('mounts'),
         )
 
     def get_secret_volumes(self):
@@ -901,7 +908,7 @@ class Service(object):
             elif not os.path.isabs(target):
                 target = '{}/{}'.format(const.SECRETS_PATH, target)
 
-            return VolumeSpec(secret['file'], target, 'ro')
+            return MountSpec('bind', secret['file'], target, read_only=True)
 
         return [build_spec(secret) for secret in self.secrets]
 
@@ -1345,6 +1352,18 @@ def build_volume_from(volume_from_spec):
     elif isinstance(volume_from_spec.source, Container):
         return "{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)
 
+
+def build_mount(mount_spec):
+    kwargs = {}
+    if mount_spec.options:
+        for option, sdk_name in mount_spec.options_map[mount_spec.type].items():
+            if option in mount_spec.options:
+                kwargs[sdk_name] = mount_spec.options[option]
+
+    return Mount(
+        type=mount_spec.type, target=mount_spec.target, source=mount_spec.source,
+        read_only=mount_spec.read_only, consistency=mount_spec.consistency, **kwargs
+    )
 
 # Labels
 

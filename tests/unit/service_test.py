@@ -1133,8 +1133,8 @@ class ServiceSecretTest(unittest.TestCase):
         )
         volumes = service.get_secret_volumes()
 
-        assert volumes[0].external == secret1['file']
-        assert volumes[0].internal == '{}/{}'.format(SECRETS_PATH, secret1['secret'].target)
+        assert volumes[0].source == secret1['file']
+        assert volumes[0].target == '{}/{}'.format(SECRETS_PATH, secret1['secret'].target)
 
     def test_get_secret_volumes_abspath(self):
         secret1 = {
@@ -1149,8 +1149,8 @@ class ServiceSecretTest(unittest.TestCase):
         )
         volumes = service.get_secret_volumes()
 
-        assert volumes[0].external == secret1['file']
-        assert volumes[0].internal == secret1['secret'].target
+        assert volumes[0].source == secret1['file']
+        assert volumes[0].target == secret1['secret'].target
 
     def test_get_secret_volumes_no_target(self):
         secret1 = {
@@ -1165,5 +1165,5 @@ class ServiceSecretTest(unittest.TestCase):
         )
         volumes = service.get_secret_volumes()
 
-        assert volumes[0].external == secret1['file']
-        assert volumes[0].internal == '{}/{}'.format(SECRETS_PATH, secret1['secret'].source)
+        assert volumes[0].source == secret1['file']
+        assert volumes[0].target == '{}/{}'.format(SECRETS_PATH, secret1['secret'].source)

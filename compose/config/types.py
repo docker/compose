@@ -133,6 +133,48 @@ def normalize_path_for_engine(path):
     return path.replace('\\', '/')
 
 
+class MountSpec(object):
+    options_map = {
+        'volume': {
+            'nocopy': 'no_copy'
+        },
+        'bind': {
+            'propagation': 'propagation'
+        }
+    }
+    _fields = ['type', 'source', 'target', 'read_only', 'consistency']
+
+    def __init__(self, type, source=None, target=None, read_only=None, consistency=None, **kwargs):
+        self.type = type
+        self.source = source
+        self.target = target
+        self.read_only = read_only
+        self.consistency = consistency
+        self.options = None
+        if self.type in kwargs:
+            self.options = kwargs[self.type]
+
+    def as_volume_spec(self):
+        mode = 'ro' if self.read_only else 'rw'
+        return VolumeSpec(external=self.source, internal=self.target, mode=mode)
+
+    def legacy_repr(self):
+        return self.as_volume_spec().repr()
+
+    def repr(self):
+        res = {}
+        for field in self._fields:
+            if getattr(self, field, None):
+                res[field] = getattr(self, field)
+        if self.options:
+            res[self.type] = self.options
+        return res
+
+    @property
+    def is_named_volume(self):
+        return self.type == 'volume' and self.source
+
+
 class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
 
     @classmethod
