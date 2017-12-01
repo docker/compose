@@ -319,11 +319,19 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         except ValueError:
             raise ConfigurationError('Invalid target port: {}'.format(target))
 
-        try:
-            if published:
-                published = int(published)
-        except ValueError:
-            raise ConfigurationError('Invalid published port: {}'.format(published))
+        if published:
+            if isinstance(published, six.string_types) and '-' in published:  # "x-y:z" format
+                a, b = published.split('-', 1)
+                try:
+                    int(a)
+                    int(b)
+                except ValueError:
+                    raise ConfigurationError('Invalid published port: {}'.format(published))
+            else:
+                try:
+                    published = int(published)
+                except ValueError:
+                    raise ConfigurationError('Invalid published port: {}'.format(published))
 
         return super(ServicePort, cls).__new__(
             cls, target, published, *args, **kwargs
