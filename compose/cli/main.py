@@ -287,7 +287,7 @@ class TopLevelCommand(object):
         """
         Validate and view the Compose file.
 
-        Usage: config [options] [-f KEY=VAL...]
+        Usage: config [options]
 
         Options:
             --resolve-image-digests  Pin image tags to digests.
@@ -295,7 +295,6 @@ class TopLevelCommand(object):
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
-            -f, --filter KEY=VAL     Filter services by a property (can be used multiple times)
 
         """
 
@@ -310,15 +309,7 @@ class TopLevelCommand(object):
             return
 
         if options['--services']:
-            filters = build_filters(options.get('--filter'))
-            if filters:
-                if not self.project:
-                    self.project = project_from_options('.', config_options)
-                services = filter_services(filters, self.project.services, self.project)
-            else:
-                services = [service['name'] for service in compose_config.services]
-
-            print('\n'.join(services))
+            print('\n'.join(service['name'] for service in compose_config.services))
             return
 
         if options['--volumes']:
@@ -608,38 +599,47 @@ class TopLevelCommand(object):
         """
         List containers.
 
-        Usage: ps [options] [SERVICE...]
+        Usage: ps [options] [--filter KEY=VAL...] [SERVICE...]
 
         Options:
-            -q    Only display IDs
+            -q                   Only display IDs
+            --services           Display services
+            --filter KEY=VAL     Filter services by a property (can be used multiple times)
         """
-        containers = sorted(
-            self.project.containers(service_names=options['SERVICE'], stopped=True) +
-            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
-            key=attrgetter('name'))
-
-        if options['-q']:
-            for container in containers:
-                print(container.id)
+        if options['--services']:
+            filters = build_filters(options.get('--filter'))
+            services = self.project.services
+            if filters:
+                services = filter_services(filters, services, self.project)
+            print('\n'.join(service.name for service in services))
         else:
-            headers = [
-                'Name',
-                'Command',
-                'State',
-                'Ports',
-            ]
-            rows = []
-            for container in containers:
-                command = container.human_readable_command
-                if len(command) > 30:
-                    command = '%s ...' % command[:26]
-                rows.append([
-                    container.name,
-                    command,
-                    container.human_readable_state,
-                    container.human_readable_ports,
-                ])
-            print(Formatter().table(headers, rows))
+            containers = sorted(
+                self.project.containers(service_names=options['SERVICE'], stopped=True) +
+                self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+                key=attrgetter('name'))
+
+            if options['-q']:
+                for container in containers:
+                    print(container.id)
+            else:
+                headers = [
+                    'Name',
+                    'Command',
+                    'State',
+                    'Ports',
+                ]
+                rows = []
+                for container in containers:
+                    command = container.human_readable_command
+                    if len(command) > 30:
+                        command = '%s ...' % command[:26]
+                    rows.append([
+                        container.name,
+                        command,
+                        container.human_readable_state,
+                        container.human_readable_ports,
+                    ])
+                print(Formatter().table(headers, rows))
 
     def pull(self, options):
         """
@@ -1345,18 +1345,18 @@ def filter_services(filters, services, project):
                 for status in filters[f]:
                     if not has_container_with_state(containers, status):
                         return False
-            elif f == 'option':
-                for option in filters[f]:
-                    if option == 'image' or option == 'build':
-                        if option not in service.options:
+            elif f == 'key':
+                for key in filters[f]:
+                    if key == 'image' or key == 'build':
+                        if key not in service.options:
                             return False
                     else:
-                        raise UserError("Invalid option: %s" % option)
+                        raise UserError("Invalid option: %s" % key)
             else:
                 raise UserError("Invalid filter: %s" % f)
         return True
 
-    return [s.name for s in services if should_include(s)]
+    return filter(should_include, services)
 
 
 def build_filters(args):

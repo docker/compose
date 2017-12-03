@@ -66,29 +66,29 @@ __docker_compose_services_all() {
 
 # All services that are defined by a Dockerfile reference
 __docker_compose_services_from_build() {
-	COMPREPLY=( $(compgen -W "$(__docker_compose_q config --services --filter "option=build")" -- "$cur") )
+	COMPREPLY=( $(compgen -W "$(__docker_compose_q ps --services --filter "key=build")" -- "$cur") )
 }
 
 # All services that are defined by an image
 __docker_compose_services_from_image() {
-	COMPREPLY=( $(compgen -W "$(__docker_compose_q config --services --filter "option=image")" -- "$cur") )
+	COMPREPLY=( $(compgen -W "$(__docker_compose_q ps --services --filter "key=image")" -- "$cur") )
 }
 
 # The services for which at least one paused container exists
 __docker_compose_services_paused() {
-	names=$(__docker_compose_q config --services --filter "status=paused")
+	names=$(__docker_compose_q ps --services --filter "status=paused")
 	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 # The services for which at least one running container exists
 __docker_compose_services_running() {
-	names=$(__docker_compose_q config --services --filter "status=running")
+	names=$(__docker_compose_q ps --services --filter "status=running")
 	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 # The services for which at least one stopped container exists
 __docker_compose_services_stopped() {
-	names=$(__docker_compose_q config --services --filter "status=stopped")
+	names=$(__docker_compose_q ps --services --filter "status=stopped")
 	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 

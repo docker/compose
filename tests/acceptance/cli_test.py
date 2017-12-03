@@ -440,32 +440,6 @@ class CLITestCase(DockerClientTestCase):
             },
         }
 
-    def test_config_services_filter_option(self):
-        self.base_dir = 'tests/fixtures/config-services-filter'
-        image = self.dispatch(['config', '--services', '--filter', 'option=image'])
-        build = self.dispatch(['config', '--services', '--filter', 'option=build'])
-
-        self.assertIn('with_build', build.stdout)
-        self.assertNotIn('with_build', image.stdout)
-        self.assertIn('with_image', image.stdout)
-        self.assertNotIn('with_image', build.stdout)
-
-    def test_config_services_filter_status(self):
-        self.base_dir = 'tests/fixtures/config-services-filter'
-        self.dispatch(['up', '-d'])
-        self.dispatch(['pause', 'with_image'])
-        paused = self.dispatch(['config', '--services', '--filter', 'status=paused'])
-        stopped = self.dispatch(['config', '--services', '--filter', 'status=stopped'])
-        running = self.dispatch(['config', '--services', '--filter', 'status=running',
-                                 '--filter', 'option=build'])
-
-        self.assertNotIn('with_build', stopped.stdout)
-        self.assertNotIn('with_image', stopped.stdout)
-        self.assertNotIn('with_build', paused.stdout)
-        self.assertIn('with_image', paused.stdout)
-        self.assertIn('with_build', running.stdout)
-        self.assertNotIn('with_image', running.stdout)
-
     def test_ps(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
@@ -492,6 +466,35 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('multiplecomposefiles_simple_1', result.stdout)
         self.assertNotIn('multiplecomposefiles_another_1', result.stdout)
         self.assertIn('multiplecomposefiles_yetanother_1', result.stdout)
+
+    def test_ps_services_filter_option(self):
+        self.base_dir = 'tests/fixtures/ps-services-filter'
+        image = self.dispatch(['ps', '--services', '--filter', 'key=image'])
+        build = self.dispatch(['ps', '--services', '--filter', 'key=build'])
+        all_services = self.dispatch(['ps', '--services'])
+
+        self.assertIn('with_build', all_services.stdout)
+        self.assertIn('with_image', all_services.stdout)
+        self.assertIn('with_build', build.stdout)
+        self.assertNotIn('with_build', image.stdout)
+        self.assertIn('with_image', image.stdout)
+        self.assertNotIn('with_image', build.stdout)
+
+    def test_ps_services_filter_status(self):
+        self.base_dir = 'tests/fixtures/ps-services-filter'
+        self.dispatch(['up', '-d'])
+        self.dispatch(['pause', 'with_image'])
+        paused = self.dispatch(['ps', '--services', '--filter', 'status=paused'])
+        stopped = self.dispatch(['ps', '--services', '--filter', 'status=stopped'])
+        running = self.dispatch(['ps', '--services', '--filter', 'status=running',
+                                 '--filter', 'key=build'])
+
+        self.assertNotIn('with_build', stopped.stdout)
+        self.assertNotIn('with_image', stopped.stdout)
+        self.assertNotIn('with_build', paused.stdout)
+        self.assertIn('with_image', paused.stdout)
+        self.assertIn('with_build', running.stdout)
+        self.assertNotIn('with_image', running.stdout)
 
     def test_pull(self):
         result = self.dispatch(['pull'])
