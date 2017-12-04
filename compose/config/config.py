@@ -97,6 +97,7 @@ DOCKER_CONFIG_KEYS = [
     'privileged',
     'read_only',
     'restart',
+    'runtime',
     'secrets',
     'security_opt',
     'shm_size',
