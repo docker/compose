@@ -8,6 +8,7 @@ matrix:
       services:
       - docker
     - os: osx
+      osx_image: xcode7.3
       language: generic
 
 install: ./script/travis/install
