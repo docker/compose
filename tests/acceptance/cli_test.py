@@ -79,12 +79,15 @@ def kill_service(service):
 
 class ContainerCountCondition(object):
 
-    def __init__(self, project, expected):
+    def __init__(self, project, expected, one_off=OneOffFilter.exclude):
         self.project = project
         self.expected = expected
+        self.one_off = one_off
 
     def __call__(self):
-        return len([c for c in self.project.containers() if c.is_running]) == self.expected
+        return len(
+            [c for c in self.project.containers(one_off=self.one_off) if c.is_running]
+        ) == self.expected
 
     def __str__(self):
         return "waiting for counter count == %s" % self.expected
@@ -441,18 +444,18 @@ class CLITestCase(DockerClientTestCase):
         }
 
     def test_ps(self):
-        self.project.get_service('simple').create_container()
+        container = self.project.get_service('simple').create_container()
         result = self.dispatch(['ps'])
-        assert 'simplecomposefile_simple_1' in result.stdout
+        assert 'simplecomposefile_simple_%s' % container.uid in result.stdout
 
     def test_ps_default_composefile(self):
         self.base_dir = 'tests/fixtures/multiple-composefiles'
         self.dispatch(['up', '-d'])
         result = self.dispatch(['ps'])
 
-        self.assertIn('multiplecomposefiles_simple_1', result.stdout)
-        self.assertIn('multiplecomposefiles_another_1', result.stdout)
-        self.assertNotIn('multiplecomposefiles_yetanother_1', result.stdout)
+        self.assertIn('multiplecomposefiles_simple_', result.stdout)
+        self.assertIn('multiplecomposefiles_another_', result.stdout)
+        self.assertNotIn('multiplecomposefiles_yetanother_', result.stdout)
 
     def test_ps_alternate_composefile(self):
         config_path = os.path.abspath(
@@ -463,9 +466,9 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['-f', 'compose2.yml', 'up', '-d'])
         result = self.dispatch(['-f', 'compose2.yml', 'ps'])
 
-        self.assertNotIn('multiplecomposefiles_simple_1', result.stdout)
-        self.assertNotIn('multiplecomposefiles_another_1', result.stdout)
-        self.assertIn('multiplecomposefiles_yetanother_1', result.stdout)
+        self.assertNotIn('multiplecomposefiles_simple_', result.stdout)
+        self.assertNotIn('multiplecomposefiles_another_', result.stdout)
+        self.assertIn('multiplecomposefiles_yetanother_', result.stdout)
 
     def test_pull(self):
         result = self.dispatch(['pull'])
@@ -763,13 +766,13 @@ class CLITestCase(DockerClientTestCase):
         assert len(self.project.containers(one_off=OneOffFilter.only, stopped=True)) == 2
 
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
-        assert 'Stopping v2full_web_1' in result.stderr
-        assert 'Stopping v2full_other_1' in result.stderr
-        assert 'Stopping v2full_web_run_2' in result.stderr
-        assert 'Removing v2full_web_1' in result.stderr
-        assert 'Removing v2full_other_1' in result.stderr
-        assert 'Removing v2full_web_run_1' in result.stderr
-        assert 'Removing v2full_web_run_2' in result.stderr
+        assert 'Stopping v2full_web_' in result.stderr
+        assert 'Stopping v2full_other_' in result.stderr
+        assert 'Stopping v2full_web_run_' in result.stderr
+        assert 'Removing v2full_web_' in result.stderr
+        assert 'Removing v2full_other_' in result.stderr
+        assert 'Removing v2full_web_run_' in result.stderr
+        assert 'Removing v2full_web_run_' in result.stderr
         assert 'Removing volume v2full_data' in result.stderr
         assert 'Removing image v2full_web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
@@ -793,10 +796,17 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/echo-services'
         result = self.dispatch(['up', '--no-color'])
 
-        assert 'simple_1   | simple' in result.stdout
-        assert 'another_1  | another' in result.stdout
-        assert 'simple_1 exited with code 0' in result.stdout
-        assert 'another_1 exited with code 0' in result.stdout
+        simple_containers = self.project.containers(['simple'], stopped=True)
+        another_containers = self.project.containers(['another'], stopped=True)
+        assert len(simple_containers) == 1
+        assert len(another_containers) == 1
+        simple_uid = simple_containers[0].uid
+        another_uid = another_containers[0].uid
+
+        assert 'simple_%s | simple' % simple_uid in result.stdout
+        assert 'another_%s | another' % another_uid in result.stdout
+        assert 'simple_%s exited with code 0' % simple_uid in result.stdout
+        assert 'another_%s exited with code 0' % another_uid in result.stdout
 
     @v2_only()
     def test_up(self):
@@ -1486,13 +1496,11 @@ class CLITestCase(DockerClientTestCase):
     def test_run_rm(self):
         self.base_dir = 'tests/fixtures/volume'
         proc = start_process(self.base_dir, ['run', '--rm', 'test'])
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'volume_test_run_1',
-            'running'))
-        service = self.project.get_service('test')
-        containers = service.containers(one_off=OneOffFilter.only)
+        wait_on_condition(ContainerCountCondition(self.project, 1, one_off=OneOffFilter.include))
+        containers = self.project.containers(one_off=OneOffFilter.only)
         self.assertEqual(len(containers), 1)
+        self.assertTrue(containers[0].is_running)
+        service = self.project.get_service('test')
         mounts = containers[0].get('Mounts')
         for mount in mounts:
             if mount['Destination'] == '/container-path':
@@ -1777,29 +1785,27 @@ class CLITestCase(DockerClientTestCase):
 
     def test_run_handles_sigint(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'simplecomposefile_simple_run_1',
-            'running'))
-
+        wait_on_condition(ContainerCountCondition(self.project, 1, one_off=OneOffFilter.include))
+        containers = self.project.containers(one_off=OneOffFilter.include)
+        assert len(containers) == 1
+        assert containers[0].is_running
         os.kill(proc.pid, signal.SIGINT)
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'simplecomposefile_simple_run_1',
-            'exited'))
+        wait_on_condition((ContainerCountCondition(self.project, 0, one_off=OneOffFilter.include)))
+        containers = self.project.containers(one_off=OneOffFilter.include, stopped=True)
+        assert len(containers) == 1
+        assert containers[0].exit_code is not None
 
     def test_run_handles_sigterm(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'simplecomposefile_simple_run_1',
-            'running'))
-
+        wait_on_condition(ContainerCountCondition(self.project, 1, one_off=OneOffFilter.include))
+        containers = self.project.containers(one_off=OneOffFilter.include)
+        assert len(containers) == 1
+        assert containers[0].is_running
         os.kill(proc.pid, signal.SIGTERM)
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'simplecomposefile_simple_run_1',
-            'exited'))
+        wait_on_condition((ContainerCountCondition(self.project, 0, one_off=OneOffFilter.include)))
+        containers = self.project.containers(one_off=OneOffFilter.include, stopped=True)
+        assert len(containers) == 1
+        assert containers[0].exit_code is not None
 
     @mock.patch.dict(os.environ)
     def test_run_unicode_env_values_from_system(self):
@@ -1998,10 +2004,15 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, ['logs', '-f'])
 
         self.dispatch(['up', '-d', 'another'])
+        another_containers = self.project.containers(['another'], stopped=True)
+        assert len(another_containers) == 1
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'logscomposefile_another_1',
+            another_containers[0].name,
             'exited'))
+
+        simple_containers = self.project.containers(['simple'], stopped=True)
+        assert len(simple_containers) == 1
 
         self.dispatch(['kill', 'simple'])
 
@@ -2009,8 +2020,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'hello' in result.stdout
         assert 'test' in result.stdout
-        assert 'logscomposefile_another_1 exited with code 0' in result.stdout
-        assert 'logscomposefile_simple_1 exited with code 137' in result.stdout
+        assert '%s exited with code 0' % another_containers[0].name in result.stdout
+        assert '%s exited with code 137' % simple_containers[0].name in result.stdout
 
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
@@ -2218,16 +2229,17 @@ class CLITestCase(DockerClientTestCase):
             self.project.containers(service_names=['simple']),
             key=attrgetter('name'))
 
-        def get_port(number, index=None):
-            if index is None:
+        def get_port(number, uid=None):
+            if uid is None:
                 result = self.dispatch(['port', 'simple', str(number)])
             else:
-                result = self.dispatch(['port', '--index=' + str(index), 'simple', str(number)])
+                result = self.dispatch(['port', '--uid=' + str(uid), 'simple', str(number)])
             return result.stdout.rstrip()
 
-        self.assertEqual(get_port(3000), containers[0].get_local_port(3000))
-        self.assertEqual(get_port(3000, index=1), containers[0].get_local_port(3000))
-        self.assertEqual(get_port(3000, index=2), containers[1].get_local_port(3000))
+        self.assertTrue(get_port(3000) == containers[0].get_local_port(3000) or
+                        get_port(3000) == containers[1].get_local_port(3000))
+        self.assertEqual(get_port(3000, uid=containers[0].uid), containers[0].get_local_port(3000))
+        self.assertEqual(get_port(3000, uid=containers[1].uid), containers[1].get_local_port(3000))
         self.assertEqual(get_port(3002), "")
 
     def test_events_json(self):
@@ -2263,7 +2275,7 @@ class CLITestCase(DockerClientTestCase):
 
         container, = self.project.containers()
         expected_template = ' container {} {}'
-        expected_meta_info = ['image=busybox:latest', 'name=simplecomposefile_simple_1']
+        expected_meta_info = ['image=busybox:latest', 'name=simplecomposefile_simple_']
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
@@ -2349,9 +2361,11 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(containers), 2)
         web = containers[1]
 
-        self.assertEqual(
-            set(get_links(web)),
-            set(['db', 'mydb_1', 'extends_mydb_1']))
+        links = get_links(web)
+        self.assertEqual(len(links), 3)
+        self.assertIn('db', links)
+        self.assertTrue(any(l.startswith('mydb_') for l in links))
+        self.assertTrue(any(l.startswith('extends_mydb_') for l in links))
 
         expected_env = set([
             "FOO=1",
@@ -2387,14 +2401,17 @@ class CLITestCase(DockerClientTestCase):
             ['up', '--abort-on-container-exit', '--exit-code-from', 'another'])
 
         result = wait_on_process(proc, returncode=1)
+        containers = self.project.containers(['another'], stopped=True)
+        assert len(containers) == 1
 
-        assert 'exitcodefrom_another_1 exited with code 1' in result.stdout
+        exit_message = 'exitcodefrom_another_%s exited with code 1' % containers[0].uid
+        assert exit_message in result.stdout
 
     def test_images(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['images'])
         assert 'busybox' in result.stdout
-        assert 'simplecomposefile_simple_1' in result.stdout
+        assert 'simplecomposefile_simple_' in result.stdout
 
     def test_images_default_composefile(self):
         self.base_dir = 'tests/fixtures/multiple-composefiles'
@@ -2402,8 +2419,8 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['images'])
 
         assert 'busybox' in result.stdout
-        assert 'multiplecomposefiles_another_1' in result.stdout
-        assert 'multiplecomposefiles_simple_1' in result.stdout
+        assert 'multiplecomposefiles_another_' in result.stdout
+        assert 'multiplecomposefiles_simple_' in result.stdout
 
     def test_up_with_override_yaml(self):
         self.base_dir = 'tests/fixtures/override-yaml-files'

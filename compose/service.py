@@ -32,7 +32,7 @@ from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
 from .const import IS_WINDOWS_PLATFORM
 from .const import LABEL_CONFIG_HASH
-from .const import LABEL_CONTAINER_NUMBER
+from .const import LABEL_CONTAINER_UID
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
@@ -45,6 +45,7 @@ from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
+from .utils import generate_uid
 from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
@@ -113,7 +114,7 @@ class NoSuchImageError(Exception):
     pass
 
 
-ServiceName = namedtuple('ServiceName', 'project service number')
+ServiceName = namedtuple('ServiceName', 'project service uid')
 
 
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
@@ -190,15 +191,17 @@ class Service(object):
                 all=stopped,
                 filters=filters)]))
 
-    def get_container(self, number=1):
+    def get_container(self, uid=None):
         """Return a :class:`compose.container.Container` for this service. The
-        container must be active, and match `number`.
+        container must be active, and match `uid`.
         """
-        labels = self.labels() + ['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]
+        labels = self.labels()
+        if uid:
+            labels += ['{0}={1}'.format(LABEL_CONTAINER_UID, uid)]
         for container in self.client.containers(filters={'label': labels}):
             return Container.from_ps(self.client, container)
 
-        raise ValueError("No container found for %s_%s" % (self.name, number))
+        raise ValueError("No container found for %s_%s" % (self.name, uid))
 
     def start(self, **options):
         containers = self.containers(stopped=True)
@@ -257,7 +260,7 @@ class Service(object):
 
                 all_containers = list(set(all_containers) - set(divergent_containers))
 
-            sorted_containers = sorted(all_containers, key=attrgetter('number'))
+            sorted_containers = sorted(all_containers, key=attrgetter('uid'))
             self._execute_convergence_start(
                 sorted_containers, desired_num, timeout, True, True
             )
@@ -267,14 +270,14 @@ class Service(object):
 
             sorted_running_containers = sorted(
                 running_containers,
-                key=attrgetter('number'))
+                key=attrgetter('uid'))
 
             self._downscale(sorted_running_containers[-num_to_stop:], timeout)
 
     def create_container(self,
                          one_off=False,
                          previous_container=None,
-                         number=None,
+                         uid=None,
                          quiet=False,
                          **override_options):
         """
@@ -287,7 +290,7 @@ class Service(object):
 
         container_options = self._get_container_create_options(
             override_options,
-            number or self._next_container_number(one_off=one_off),
+            uid=uid,
             one_off=one_off,
             previous_container=previous_container,
         )
@@ -383,20 +386,26 @@ class Service(object):
         return has_diverged
 
     def _execute_convergence_create(self, scale, detached, start, project_services=None):
-            i = self._next_container_number()
 
-            def create_and_start(service, n):
-                container = service.create_container(number=n, quiet=True)
+            def create_and_start(service, uid):
+                container = service.create_container(uid=uid, quiet=True)
                 if not detached:
                     container.attach_log_stream()
                 if start:
                     self.start_container(container)
                 return container
 
+            if project_services:
+                service_names = project_services.get(self.name, [])
+                # get all values in the dict in one list
+                project_services = sum(project_services.values(), [])
+            else:
+                service_names = [ServiceName(self.project, self.name, generate_uid())
+                                 for _ in range(scale)]
             containers, errors = parallel_execute(
-                [ServiceName(self.project, self.name, index) for index in range(i, i + scale)],
-                lambda service_name: create_and_start(self, service_name.number),
-                lambda service_name: self.get_container_name(service_name.service, service_name.number),
+                service_names,
+                lambda service_name: create_and_start(self, service_name.uid),
+                lambda service_name: self.get_container_name(service_name.service, service_name.uid),
                 "Creating",
                 parent_objects=project_services
             )
@@ -467,7 +476,7 @@ class Service(object):
                                  start=True, scale_override=None, rescale=True, project_services=None):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
-        containers = sorted(containers, key=attrgetter('number'))
+        containers = sorted(containers, key=attrgetter('uid'))
 
         self.show_scale_warnings(scale)
 
@@ -520,7 +529,7 @@ class Service(object):
         container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container,
-            number=container.labels.get(LABEL_CONTAINER_NUMBER),
+            uid=container.labels.get(LABEL_CONTAINER_UID),
             quiet=True,
         )
         if attach_logs:
@@ -587,13 +596,13 @@ class Service(object):
             key=lambda c: c.get('Created'),
         )
 
-        numbers = set()
+        uids = set()
 
         for c in containers:
-            if c.number in numbers:
+            if c.uid in uids:
                 yield c
             else:
-                numbers.add(c.number)
+                uids.add(c.uid)
 
     @property
     def config_hash(self):
@@ -661,18 +670,6 @@ class Service(object):
     def get_volumes_from_names(self):
         return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
-    # TODO: this would benefit from github.com/docker/docker/pull/14699
-    # to remove the need to inspect every container
-    def _next_container_number(self, one_off=False):
-        containers = filter(None, [
-            Container.from_ps(self.client, container)
-            for container in self.client.containers(
-                all=True,
-                filters={'label': self.labels(one_off=one_off)})
-        ])
-        numbers = [c.number for c in containers]
-        return 1 if not numbers else max(numbers) + 1
-
     def _get_aliases(self, network, container=None):
         if container and container.labels.get(LABEL_ONE_OFF) == "True":
             return []
@@ -733,7 +730,7 @@ class Service(object):
     def _get_container_create_options(
             self,
             override_options,
-            number,
+            uid=None,
             one_off=False,
             previous_container=None):
         add_config_hash = (not one_off and not override_options)
@@ -744,8 +741,10 @@ class Service(object):
         override_volumes = override_options.pop('volumes', [])
         container_options.update(override_options)
 
+        if not uid:
+            uid = generate_uid()
         if not container_options.get('name'):
-            container_options['name'] = self.get_container_name(self.name, number, one_off)
+            container_options['name'] = self.get_container_name(self.name, uid, one_off)
 
         container_options.setdefault('detach', True)
 
@@ -804,7 +803,7 @@ class Service(object):
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
             self.labels(one_off=one_off),
-            number,
+            uid,
             self.config_hash if add_config_hash else None)
 
         # Delete options which are only used in HostConfig
@@ -975,12 +974,12 @@ class Service(object):
     def custom_container_name(self):
         return self.options.get('container_name')
 
-    def get_container_name(self, service_name, number, one_off=False):
+    def get_container_name(self, service_name, uid, one_off=False):
         if self.custom_container_name and not one_off:
             return self.custom_container_name
 
         container_name = build_container_name(
-            self.project, service_name, number, one_off,
+            self.project, service_name, uid, one_off,
         )
         ext_links_origins = [l.split(':')[0] for l in self.options.get('external_links', [])]
         if container_name in ext_links_origins:
@@ -1196,11 +1195,11 @@ class ServiceNetworkMode(object):
 # Names
 
 
-def build_container_name(project, service, number, one_off=False):
+def build_container_name(project, service, uid, one_off=False):
     bits = [project, service]
     if one_off:
         bits.append('run')
-    return '_'.join(bits + [str(number)])
+    return '_'.join(bits + [str(uid)])
 
 
 # Images
@@ -1349,10 +1348,10 @@ def build_volume_from(volume_from_spec):
 # Labels
 
 
-def build_container_labels(label_options, service_labels, number, config_hash):
+def build_container_labels(label_options, service_labels, uid, config_hash):
     labels = dict(label_options or {})
     labels.update(label.split('=', 1) for label in service_labels)
-    labels[LABEL_CONTAINER_NUMBER] = str(number)
+    labels[LABEL_CONTAINER_UID] = uid
     labels[LABEL_VERSION] = __version__
 
     if config_hash:

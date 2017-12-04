@@ -74,8 +74,8 @@ class ServiceTest(unittest.TestCase):
         service = Service('db', self.mock_client, 'myproject', image='foo')
 
         self.assertEqual([c.id for c in service.containers()], ['1'])
-        self.assertEqual(service._next_container_number(), 2)
-        self.assertEqual(service.get_container(1).id, '1')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(service.containers()[0].id, '1')
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -157,7 +157,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             mem_limit=1000000000,
             memswap_limit=2000000000)
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'})
 
         self.assertTrue(self.mock_client.create_host_config.called)
         self.assertEqual(
@@ -175,7 +175,7 @@ class ServiceTest(unittest.TestCase):
             external_links=['default_foo_1']
         )
         with self.assertRaises(DependencyError):
-            service.get_container_name('foo', 1)
+            service.get_container_name('foo', '1')
 
     def test_mem_reservation(self):
         self.mock_client.create_host_config.return_value = {}
@@ -187,7 +187,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             mem_reservation='512m'
         )
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'})
         assert self.mock_client.create_host_config.called is True
         assert self.mock_client.create_host_config.call_args[1]['mem_reservation'] == '512m'
 
@@ -200,7 +200,7 @@ class ServiceTest(unittest.TestCase):
             hostname='name',
             client=self.mock_client,
             cgroup_parent='test')
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'})
 
         self.assertTrue(self.mock_client.create_host_config.called)
         self.assertEqual(
@@ -220,7 +220,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             log_driver='syslog',
             logging=logging)
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'})
 
         self.assertTrue(self.mock_client.create_host_config.called)
         self.assertEqual(
@@ -236,7 +236,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             client=self.mock_client,
             stop_grace_period="1m35s")
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['stop_timeout'], 95)
 
     def test_split_domainname_none(self):
@@ -245,7 +245,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             hostname='name.domain.tld',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name.domain.tld', 'hostname')
         self.assertFalse('domainname' in opts, 'domainname')
 
@@ -256,7 +256,7 @@ class ServiceTest(unittest.TestCase):
             hostname='name.domain.tld',
             image='foo',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -268,7 +268,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             domainname='domain.tld',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -280,7 +280,7 @@ class ServiceTest(unittest.TestCase):
             domainname='domain.tld',
             image='foo',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
         self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
 
@@ -291,7 +291,7 @@ class ServiceTest(unittest.TestCase):
             use_networking=False,
             client=self.mock_client,
         )
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'})
         self.assertIsNone(opts.get('hostname'))
 
     def test_get_container_create_options_with_name_option(self):
@@ -303,7 +303,6 @@ class ServiceTest(unittest.TestCase):
         name = 'the_new_name'
         opts = service._get_container_create_options(
             {'name': name},
-            1,
             one_off=OneOffFilter.only)
         self.assertEqual(opts['name'], name)
 
@@ -325,7 +324,6 @@ class ServiceTest(unittest.TestCase):
 
         opts = service._get_container_create_options(
             {},
-            1,
             previous_container=prev_container)
 
         self.assertEqual(service.options['labels'], labels)
@@ -362,7 +360,6 @@ class ServiceTest(unittest.TestCase):
 
         opts = service._get_container_create_options(
             {},
-            1,
             previous_container=prev_container)
 
         assert opts['environment'] == ['affinity:container==ababab']
@@ -377,7 +374,6 @@ class ServiceTest(unittest.TestCase):
 
         opts = service._get_container_create_options(
             {},
-            1,
             previous_container=prev_container)
         assert opts['environment'] == []
 
@@ -393,7 +389,7 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.containers.return_value = [container_dict]
         service = Service('foo', image='foo', client=self.mock_client)
 
-        container = service.get_container(number=2)
+        container = service.get_container()
         self.assertEqual(container, mock_container_class.from_ps.return_value)
         mock_container_class.from_ps.assert_called_once_with(
             self.mock_client, container_dict)
@@ -997,7 +993,6 @@ class ServiceVolumesTest(unittest.TestCase):
 
         service._get_container_create_options(
             override_options={},
-            number=1,
         )
 
         self.assertEqual(
@@ -1043,7 +1038,6 @@ class ServiceVolumesTest(unittest.TestCase):
 
         service._get_container_create_options(
             override_options={},
-            number=1,
             previous_container=Container(self.mock_client, {'Id': '123123123'}),
         )
 

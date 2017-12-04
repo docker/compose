@@ -9,7 +9,7 @@ DEFAULT_TIMEOUT = 10
 HTTP_TIMEOUT = 60
 IMAGE_EVENTS = ['delete', 'import', 'load', 'pull', 'push', 'save', 'tag', 'untag']
 IS_WINDOWS_PLATFORM = (sys.platform == "win32")
-LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
+LABEL_CONTAINER_UID = 'com.docker.compose.container-uid'
 LABEL_ONE_OFF = 'com.docker.compose.oneoff'
 LABEL_PROJECT = 'com.docker.compose.project'
 LABEL_SERVICE = 'com.docker.compose.service'

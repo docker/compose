@@ -413,12 +413,12 @@ class TopLevelCommand(object):
             -u, --user USER   Run the command as this user.
             -T                Disable pseudo-tty allocation. By default `docker-compose exec`
                               allocates a TTY.
-            --index=index     index of the container if there are multiple
-                              instances of a service [default: 1]
+            --uid=uid         uid of the container if there are multiple
+                              instances of a service
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
         """
-        index = int(options.get('--index'))
+        uid = options.get('--uid')
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
 
@@ -426,7 +426,7 @@ class TopLevelCommand(object):
             raise UserError("Setting environment for exec is not supported in API < 1.25'")
 
         try:
-            container = service.get_container(number=index)
+            container = service.get_container(uid)
         except ValueError as e:
             raise UserError(str(e))
         command = [options['COMMAND']] + options['ARGS']
@@ -583,13 +583,13 @@ class TopLevelCommand(object):
 
         Options:
             --protocol=proto  tcp or udp [default: tcp]
-            --index=index     index of the container if there are multiple
-                              instances of a service [default: 1]
+            --uid=uid         uid of the container if there are multiple
+                              instances of a service
         """
-        index = int(options.get('--index'))
+        uid = options.get('--uid')
         service = self.project.get_service(options['SERVICE'])
         try:
-            container = service.get_container(number=index)
+            container = service.get_container(uid)
         except ValueError as e:
             raise UserError(str(e))
         print(container.get_local_port(

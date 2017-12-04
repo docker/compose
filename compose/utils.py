@@ -7,6 +7,7 @@ import json
 import json.decoder
 import logging
 import ntpath
+import uuid
 
 import six
 from docker.errors import DockerException
@@ -143,3 +144,7 @@ def parse_bytes(n):
         return sdk_parse_bytes(n)
     except DockerException:
         return None
+
+
+def generate_uid():
+    return str(uuid.uuid4().hex)

@@ -32,6 +32,7 @@ from .service import Service
 from .service import ServiceName
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
+from .utils import generate_uid
 from .utils import microseconds_from_time_nano
 from .volume import ProjectVolumes
 
@@ -193,12 +194,12 @@ class Project(object):
 
     def get_scaled_services(self, services, scale_override):
         """
-        Returns a list of this project's services as scaled ServiceName objects.
+        Returns a dict from service to list of scaled ServiceName objects.
 
         services: a list of Service objects
         scale_override: a dict with the scale to apply to each service (k: service_name, v: scale)
         """
-        service_names = []
+        service_names = {}
         for service in services:
             if service.name in scale_override:
                 scale = scale_override[service.name]
@@ -206,7 +207,9 @@ class Project(object):
                 scale = service.scale_num
 
             for i in range(1, scale + 1):
-                service_names.append(ServiceName(self.name, service.name, i))
+                if not service_names.get(service.name):
+                    service_names[service.name] = []
+                service_names[service.name].append(ServiceName(self.name, service.name, generate_uid()))
 
         return service_names
 
