@@ -428,13 +428,21 @@ class CLITestCase(DockerClientTestCase):
                         'timeout': '1s',
                         'retries': 5,
                     },
-                    'volumes': [
-                        '/host/path:/container/path:ro',
-                        'foobar:/container/volumepath:rw',
-                        '/anonymous',
-                        'foobar:/container/volumepath2:nocopy'
-                    ],
-
+                    'volumes': [{
+                        'read_only': True,
+                        'source': '/host/path',
+                        'target': '/container/path',
+                        'type': 'bind'
+                    }, {
+                        'source': 'foobar', 'target': '/container/volumepath', 'type': 'volume'
+                    }, {
+                        'target': '/anonymous', 'type': 'volume'
+                    }, {
+                        'source': 'foobar',
+                        'target': '/container/volumepath2',
+                        'type': 'volume',
+                        'volume': {'nocopy': True}
+                    }],
                     'stop_grace_period': '20s',
                 },
             },

@@ -19,12 +19,8 @@ def build_config_details(contents, working_dir='working_dir', filename='filename
     )
 
 
-def create_host_file(client, filename):
+def create_custom_host_file(client, filename, content):
     dirname = os.path.dirname(filename)
-
-    with open(filename, 'r') as fh:
-        content = fh.read()
-
     container = client.create_container(
         'busybox:latest',
         ['sh', '-c', 'echo -n "{}" > {}'.format(content, filename)],
@@ -48,3 +44,10 @@ def create_host_file(client, filename):
             return container_info['Node']['Name']
     finally:
         client.remove_container(container, force=True)
+
+
+def create_host_file(client, filename):
+    with open(filename, 'r') as fh:
+        content = fh.read()
+
+    return create_custom_host_file(client, filename, content)

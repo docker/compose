@@ -1137,9 +1137,12 @@ class ConfigTest(unittest.TestCase):
         details = config.ConfigDetails('.', [base_file, override_file])
         service_dicts = config.load(details).services
         svc_volumes = map(lambda v: v.repr(), service_dicts[0]['volumes'])
-        assert sorted(svc_volumes) == sorted(
-            ['/anonymous', '/c:/b:rw', 'vol:/x:ro']
-        )
+        for vol in svc_volumes:
+            assert vol in [
+                '/anonymous',
+                '/c:/b:rw',
+                {'source': 'vol', 'target': '/x', 'type': 'volume', 'read_only': True}
+            ]
 
     @mock.patch.dict(os.environ)
     def test_volume_mode_override(self):
@@ -1222,6 +1225,50 @@ class ConfigTest(unittest.TestCase):
         volume = config_data.services[0].get('volumes')[0]
         assert volume.external == 'data0028'
         assert volume.is_named_volume
+
+    def test_volumes_long_syntax(self):
+        base_file = config.ConfigFile(
+            'base.yaml', {
+                'version': '2.3',
+                'services': {
+                    'web': {
+                        'image': 'busybox:latest',
+                        'volumes': [
+                            {
+                                'target': '/anonymous', 'type': 'volume'
+                            }, {
+                                'source': '/abc', 'target': '/xyz', 'type': 'bind'
+                            }, {
+                                'source': '\\\\.\\pipe\\abcd', 'target': '/named_pipe', 'type': 'npipe'
+                            }, {
+                                'type': 'tmpfs', 'target': '/tmpfs'
+                            }
+                        ]
+                    },
+                },
+            },
+        )
+        details = config.ConfigDetails('.', [base_file])
+        config_data = config.load(details)
+        volumes = config_data.services[0].get('volumes')
+        anon_volume = [v for v in volumes if v.target == '/anonymous'][0]
+        tmpfs_mount = [v for v in volumes if v.type == 'tmpfs'][0]
+        host_mount = [v for v in volumes if v.type == 'bind'][0]
+        npipe_mount = [v for v in volumes if v.type == 'npipe'][0]
+
+        assert anon_volume.type == 'volume'
+        assert not anon_volume.is_named_volume
+
+        assert tmpfs_mount.target == '/tmpfs'
+        assert not tmpfs_mount.is_named_volume
+
+        assert host_mount.source == os.path.normpath('/abc')
+        assert host_mount.target == '/xyz'
+        assert not host_mount.is_named_volume
+
+        assert npipe_mount.source == '\\\\.\\pipe\\abcd'
+        assert npipe_mount.target == '/named_pipe'
+        assert not npipe_mount.is_named_volume
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
