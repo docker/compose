@@ -35,6 +35,7 @@ from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
 from .sort_services import get_service_name_from_network_mode
 from .sort_services import sort_service_dicts
+from .types import MountSpec
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import ServiceLink
@@ -809,6 +810,20 @@ def process_healthcheck(service_dict):
     return service_dict
 
 
+def finalize_service_volumes(service_dict, environment):
+    if 'volumes' in service_dict:
+        finalized_volumes = []
+        normalize = environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
+        for v in service_dict['volumes']:
+            if isinstance(v, dict):
+                finalized_volumes.append(MountSpec.parse(v, normalize))
+            else:
+                finalized_volumes.append(VolumeSpec.parse(v, normalize))
+        service_dict['volumes'] = finalized_volumes
+
+    return service_dict
+
+
 def finalize_service(service_config, service_names, version, environment):
     service_dict = dict(service_config.config)
 
@@ -822,12 +837,7 @@ def finalize_service(service_config, service_names, version, environment):
             for vf in service_dict['volumes_from']
         ]
 
-    if 'volumes' in service_dict:
-        service_dict['volumes'] = [
-            VolumeSpec.parse(
-                v, environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
-            ) for v in service_dict['volumes']
-        ]
+    service_dict = finalize_service_volumes(service_dict, environment)
 
     if 'net' in service_dict:
         network_mode = service_dict.pop('net')
@@ -1143,19 +1153,13 @@ def resolve_volume_paths(working_dir, service_dict):
 
 
 def resolve_volume_path(working_dir, volume):
-    mount_params = None
     if isinstance(volume, dict):
-        container_path = volume.get('target')
-        host_path = volume.get('source')
-        mode = None
-        if host_path:
-            if volume.get('read_only'):
-                mode = 'ro'
-            if volume.get('volume', {}).get('nocopy'):
-                mode = 'nocopy'
-        mount_params = (host_path, mode)
-    else:
-        container_path, mount_params = split_path_mapping(volume)
+        if volume.get('source', '').startswith('.') and volume['type'] == 'mount':
+            volume['source'] = expand_path(working_dir, volume['source'])
+        return volume
+
+    mount_params = None
+    container_path, mount_params = split_path_mapping(volume)
 
     if mount_params is not None:
         host_path, mode = mount_params
