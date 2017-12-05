@@ -7,6 +7,7 @@ from docker.errors import NotFound
 from docker.utils import version_lt
 
 from .config import ConfigurationError
+from .config.types import VolumeSpec
 from .const import LABEL_PROJECT
 from .const import LABEL_VOLUME
 
@@ -145,5 +146,9 @@ class ProjectVolumes(object):
         if not volume_spec.is_named_volume:
             return volume_spec
 
-        volume = self.volumes[volume_spec.external]
-        return volume_spec._replace(external=volume.full_name)
+        if isinstance(volume_spec, VolumeSpec):
+            volume = self.volumes[volume_spec.external]
+            return volume_spec._replace(external=volume.full_name)
+        else:
+            volume_spec.source = self.volumes[volume_spec.source].full_name
+            return volume_spec

@@ -101,7 +101,7 @@ def json_stream(stream):
 
 
 def json_hash(obj):
-    dump = json.dumps(obj, sort_keys=True, separators=(',', ':'))
+    dump = json.dumps(obj, sort_keys=True, separators=(',', ':'), default=lambda x: x.repr())
     h = hashlib.sha256()
     h.update(dump.encode('utf8'))
     return h.hexdigest()

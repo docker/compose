@@ -19,6 +19,7 @@ from .testcases import pull_busybox
 from .testcases import SWARM_SKIP_CONTAINERS_ALL
 from .testcases import SWARM_SKIP_CPU_SHARES
 from compose import __version__
+from compose.config.types import MountSpec
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
@@ -37,6 +38,7 @@ from compose.service import NetworkMode
 from compose.service import PidMode
 from compose.service import Service
 from compose.utils import parse_nanoseconds_int
+from tests.helpers import create_custom_host_file
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
@@ -276,6 +278,54 @@ class ServiceTest(DockerClientTestCase):
         self.assertTrue(path.basename(actual_host_path) == path.basename(host_path),
                         msg=("Last component differs: %s, %s" % (actual_host_path, host_path)))
 
+    @v2_3_only()
+    def test_create_container_with_host_mount(self):
+        host_path = '/tmp/host-path'
+        container_path = '/container-path'
+
+        create_custom_host_file(self.client, path.join(host_path, 'a.txt'), 'test')
+
+        service = self.create_service(
+            'db',
+            volumes=[
+                MountSpec(type='bind', source=host_path, target=container_path, read_only=True)
+            ]
+        )
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount
+        assert path.basename(mount['Source']) == path.basename(host_path)
+        assert mount['RW'] is False
+
+    @v2_3_only()
+    def test_create_container_with_tmpfs_mount(self):
+        container_path = '/container-tmpfs'
+        service = self.create_service(
+            'db',
+            volumes=[MountSpec(type='tmpfs', target=container_path)]
+        )
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount
+        assert mount['Type'] == 'tmpfs'
+
+    @v2_3_only()
+    def test_create_container_with_volume_mount(self):
+        container_path = '/container-volume'
+        volume_name = 'composetest_abcde'
+        self.client.create_volume(volume_name)
+        service = self.create_service(
+            'db',
+            volumes=[MountSpec(type='volume', source=volume_name, target=container_path)]
+        )
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount
+        assert mount['Name'] == volume_name
+
     def test_create_container_with_healthcheck_config(self):
         one_second = parse_nanoseconds_int('1s')
         healthcheck = {
@@ -427,6 +477,38 @@ class ServiceTest(DockerClientTestCase):
         for _ in range(2):
             new_container, = service.execute_convergence_plan(
                 ConvergencePlan('recreate', [orig_container]))
+
+            assert new_container.get_mount('/etc')['Source'] == volume_path
+            if not is_cluster(self.client):
+                assert ('affinity:container==%s' % orig_container.id in
+                        new_container.get('Config.Env'))
+            else:
+                # In Swarm, the env marker is consumed and the container should be deployed
+                # on the same node.
+                assert orig_container.get('Node.Name') == new_container.get('Node.Name')
+
+            orig_container = new_container
+
+    @v2_3_only()
+    def test_execute_convergence_plan_recreate_twice_with_mount(self):
+        service = self.create_service(
+            'db',
+            volumes=[MountSpec(target='/etc', type='volume')],
+            entrypoint=['top'],
+            command=['-d', '1']
+        )
+
+        orig_container = service.create_container()
+        service.start_container(orig_container)
+
+        orig_container.inspect()  # reload volume data
+        volume_path = orig_container.get_mount('/etc')['Source']
+
+        # Do this twice to reproduce the bug
+        for _ in range(2):
+            new_container, = service.execute_convergence_plan(
+                ConvergencePlan('recreate', [orig_container])
+            )
 
             assert new_container.get_mount('/etc')['Source'] == volume_path
             if not is_cluster(self.client):
