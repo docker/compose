@@ -889,8 +889,8 @@ class TopLevelCommand(object):
 
         Options:
             -d                         Detached mode: Run containers in the background,
-                                       print new container names.
-                                       Incompatible with --abort-on-container-exit.
+                                       print new container names. Incompatible with
+                                       --abort-on-container-exit and --timeout.
             --no-color                 Produce monochrome output.
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
@@ -904,7 +904,8 @@ class TopLevelCommand(object):
             --abort-on-container-exit  Stops all containers if any container was stopped.
                                        Incompatible with -d.
             -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
-                                       when attached or when containers are already
+                                       when attached or when containers are already.
+                                       Incompatible with -d.
                                        running. (default: 10)
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
@@ -924,6 +925,9 @@ class TopLevelCommand(object):
 
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
+
+        if detached and timeout:
+            raise UserError("-d and --timeout cannot be combined.")
 
         if no_start:
             for excluded in ['-d', '--abort-on-container-exit', '--exit-code-from']:
