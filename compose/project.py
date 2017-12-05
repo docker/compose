@@ -330,8 +330,8 @@ class Project(object):
             service_names, stopped=True, one_off=one_off
         ), options)
 
-    def down(self, remove_image_type, include_volumes, remove_orphans=False):
-        self.stop(one_off=OneOffFilter.include)
+    def down(self, remove_image_type, include_volumes, remove_orphans=False, timeout=None):
+        self.stop(one_off=OneOffFilter.include, timeout=timeout)
         self.find_orphan_containers(remove_orphans)
         self.remove_stopped(v=include_volumes, one_off=OneOffFilter.include)
 

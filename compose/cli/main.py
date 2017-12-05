@@ -374,9 +374,12 @@ class TopLevelCommand(object):
                                 attached to containers.
             --remove-orphans    Remove containers for services not defined in the
                                 Compose file
+            -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
+                                     (default: 10)
         """
         image_type = image_type_from_opt('--rmi', options['--rmi'])
-        self.project.down(image_type, options['--volumes'], options['--remove-orphans'])
+        timeout = timeout_from_opts(options)
+        self.project.down(image_type, options['--volumes'], options['--remove-orphans'], timeout=timeout)
 
     def events(self, options):
         """
