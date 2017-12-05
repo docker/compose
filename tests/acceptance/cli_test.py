@@ -1325,18 +1325,9 @@ class CLITestCase(DockerClientTestCase):
             ['up', '-d', '--force-recreate', '--no-recreate'],
             returncode=1)
 
-    def test_up_with_timeout(self):
-        self.dispatch(['up', '-d', '-t', '1'])
-        service = self.project.get_service('simple')
-        another = self.project.get_service('another')
-        self.assertEqual(len(service.containers()), 1)
-        self.assertEqual(len(another.containers()), 1)
-
-        # Ensure containers don't have stdin and stdout connected in -d mode
-        config = service.containers()[0].inspect()['Config']
-        self.assertFalse(config['AttachStderr'])
-        self.assertFalse(config['AttachStdout'])
-        self.assertFalse(config['AttachStdin'])
+    def test_up_with_timeout_detached(self):
+        result = self.dispatch(['up', '-d', '-t', '1'], returncode=1)
+        assert "-d and --timeout cannot be combined." in result.stderr
 
     def test_up_handles_sigint(self):
         proc = start_process(self.base_dir, ['up', '-t', '2'])
