@@ -144,6 +144,15 @@ class MountSpec(object):
     }
     _fields = ['type', 'source', 'target', 'read_only', 'consistency']
 
+    @classmethod
+    def parse(cls, mount_dict, normalize=False):
+        if mount_dict.get('source'):
+            mount_dict['source'] = os.path.normpath(mount_dict['source'])
+            if normalize:
+                mount_dict['source'] = normalize_path_for_engine(mount_dict['source'])
+
+        return cls(**mount_dict)
+
     def __init__(self, type, source=None, target=None, read_only=None, consistency=None, **kwargs):
         self.type = type
         self.source = source
@@ -173,6 +182,10 @@ class MountSpec(object):
     @property
     def is_named_volume(self):
         return self.type == 'volume' and self.source
+
+    @property
+    def external(self):
+        return self.source
 
 
 class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
