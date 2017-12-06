@@ -77,6 +77,7 @@ HOST_CONFIG_KEYS = [
     'read_only',
     'log_driver',
     'log_opt',
+    'logging',
     'mem_limit',
     'mem_reservation',
     'memswap_limit',
