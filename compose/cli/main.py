@@ -172,6 +172,7 @@ class TopLevelCommand(object):
       -p, --project-name NAME     Specify an alternate project name (default: directory name)
       --verbose                   Show more output
       --no-ansi                   Do not print ANSI control characters
+      --url URL                   Specify url of compose file to use
       -v, --version               Print version and exit
       -H, --host HOST             Daemon socket to connect to
 
