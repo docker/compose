@@ -42,7 +42,7 @@ Change log
 - Values interpolated from the environment will now be converted to the
   proper type when used in non-string fields.
 
-- Added support for `--labels` in `docker-compose run`
+- Added support for `--label` in `docker-compose run`
 
 - Added support for `--timeout` in `docker-compose down`
 
