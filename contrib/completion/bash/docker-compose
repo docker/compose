@@ -194,11 +194,14 @@ _docker_compose_down() {
 			COMPREPLY=( $( compgen -W "all local" -- "$cur" ) )
 			return
 			;;
+		--timeout|-t)
+			return
+			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --rmi --volumes -v --remove-orphans" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --rmi --timeout -t --volumes -v --remove-orphans" -- "$cur" ) )
 			;;
 	esac
 }
