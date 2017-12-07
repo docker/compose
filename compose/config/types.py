@@ -293,17 +293,18 @@ class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
         return self.alias
 
 
-class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode')):
+class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode name')):
     @classmethod
     def parse(cls, spec):
         if isinstance(spec, six.string_types):
-            return cls(spec, None, None, None, None)
+            return cls(spec, None, None, None, None, None)
         return cls(
             spec.get('source'),
             spec.get('target'),
             spec.get('uid'),
             spec.get('gid'),
             spec.get('mode'),
+            spec.get('name')
         )
 
     @property

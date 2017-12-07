@@ -954,6 +954,43 @@ class ProjectTest(DockerClientTestCase):
         assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
 
     @v2_1_only()
+    def test_up_with_custom_name_resources(self):
+        config_data = build_config(
+            version=V2_2,
+            services=[{
+                'name': 'web',
+                'volumes': [VolumeSpec.parse('foo:/container-path')],
+                'networks': {'foo': {}},
+                'image': 'busybox:latest'
+            }],
+            networks={
+                'foo': {
+                    'name': 'zztop',
+                    'labels': {'com.docker.compose.test_value': 'sharpdressedman'}
+                }
+            },
+            volumes={
+                'foo': {
+                    'name': 'acdc',
+                    'labels': {'com.docker.compose.test_value': 'thefuror'}
+                }
+            }
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+
+        project.up(detached=True)
+        network = [n for n in self.client.networks() if n['Name'] == 'zztop'][0]
+        volume = [v for v in self.client.volumes()['Volumes'] if v['Name'] == 'acdc'][0]
+
+        assert network['Labels']['com.docker.compose.test_value'] == 'sharpdressedman'
+        assert volume['Labels']['com.docker.compose.test_value'] == 'thefuror'
+
+    @v2_1_only()
     def test_up_with_isolation(self):
         self.require_api_version('1.24')
         config_data = build_config(
