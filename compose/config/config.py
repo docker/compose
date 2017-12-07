@@ -35,6 +35,7 @@ from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
 from .sort_services import get_service_name_from_network_mode
 from .sort_services import sort_service_dicts
+from .types import MountSpec
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import ServiceLink
@@ -47,6 +48,7 @@ from .validation import validate_config_section
 from .validation import validate_cpu
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
+from .validation import validate_healthcheck
 from .validation import validate_links
 from .validation import validate_network_mode
 from .validation import validate_pid_mode
@@ -90,6 +92,7 @@ DOCKER_CONFIG_KEYS = [
     'mem_swappiness',
     'net',
     'oom_score_adj',
+    'oom_kill_disable',
     'pid',
     'ports',
     'privileged',
@@ -407,12 +410,11 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
 
             external = config.get('external')
             if external:
-                name_field = 'name' if entity_type == 'Volume' else 'external_name'
                 validate_external(entity_type, name, config, config_file.version)
                 if isinstance(external, dict):
-                    config[name_field] = external.get('name')
+                    config['name'] = external.get('name')
                 elif not config.get('name'):
-                    config[name_field] = name
+                    config['name'] = name
 
             if 'driver_opts' in config:
                 config['driver_opts'] = build_string_dict(
@@ -519,13 +521,13 @@ def process_config_file(config_file, environment, service_name=None):
             processed_config['secrets'] = interpolate_config_section(
                 config_file,
                 config_file.get_secrets(),
-                'secrets',
+                'secret',
                 environment)
         if config_file.version >= const.COMPOSEFILE_V3_3:
             processed_config['configs'] = interpolate_config_section(
                 config_file,
                 config_file.get_configs(),
-                'configs',
+                'config',
                 environment
             )
     else:
@@ -686,6 +688,7 @@ def validate_service(service_config, service_names, config_file):
     validate_pid_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
     validate_links(service_config, service_names)
+    validate_healthcheck(service_config)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(
@@ -724,7 +727,7 @@ def process_service(service_config):
             service_dict[field] = to_list(service_dict[field])
 
     service_dict = process_blkio_config(process_ports(
-        process_healthcheck(service_dict, service_config.name)
+        process_healthcheck(service_dict)
     ))
 
     return service_dict
@@ -788,33 +791,35 @@ def process_blkio_config(service_dict):
     return service_dict
 
 
-def process_healthcheck(service_dict, service_name):
+def process_healthcheck(service_dict):
     if 'healthcheck' not in service_dict:
         return service_dict
 
-    hc = {}
-    raw = service_dict['healthcheck']
+    hc = service_dict['healthcheck']
 
-    if raw.get('disable'):
-        if len(raw) > 1:
-            raise ConfigurationError(
-                'Service "{}" defines an invalid healthcheck: '
-                '"disable: true" cannot be combined with other options'
-                .format(service_name))
+    if 'disable' in hc:
+        del hc['disable']
         hc['test'] = ['NONE']
-    elif 'test' in raw:
-        hc['test'] = raw['test']
 
     for field in ['interval', 'timeout', 'start_period']:
-        if field in raw:
-            if not isinstance(raw[field], six.integer_types):
-                hc[field] = parse_nanoseconds_int(raw[field])
-            else:  # Conversion has been done previously
-                hc[field] = raw[field]
-    if 'retries' in raw:
-        hc['retries'] = raw['retries']
+        if field not in hc or isinstance(hc[field], six.integer_types):
+            continue
+        hc[field] = parse_nanoseconds_int(hc[field])
 
-    service_dict['healthcheck'] = hc
+    return service_dict
+
+
+def finalize_service_volumes(service_dict, environment):
+    if 'volumes' in service_dict:
+        finalized_volumes = []
+        normalize = environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
+        for v in service_dict['volumes']:
+            if isinstance(v, dict):
+                finalized_volumes.append(MountSpec.parse(v, normalize))
+            else:
+                finalized_volumes.append(VolumeSpec.parse(v, normalize))
+        service_dict['volumes'] = finalized_volumes
+
     return service_dict
 
 
@@ -831,12 +836,7 @@ def finalize_service(service_config, service_names, version, environment):
             for vf in service_dict['volumes_from']
         ]
 
-    if 'volumes' in service_dict:
-        service_dict['volumes'] = [
-            VolumeSpec.parse(
-                v, environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
-            ) for v in service_dict['volumes']
-        ]
+    service_dict = finalize_service_volumes(service_dict, environment)
 
     if 'net' in service_dict:
         network_mode = service_dict.pop('net')
@@ -1032,6 +1032,7 @@ def merge_build(output, base, override):
     md.merge_mapping('args', parse_build_arguments)
     md.merge_field('cache_from', merge_unique_items_lists, default=[])
     md.merge_mapping('labels', parse_labels)
+    md.merge_mapping('extra_hosts', parse_extra_hosts)
     return dict(md)
 
 
@@ -1082,6 +1083,12 @@ def merge_environment(base, override):
     env = parse_environment(base)
     env.update(parse_environment(override))
     return env
+
+
+def merge_labels(base, override):
+    labels = parse_labels(base)
+    labels.update(parse_labels(override))
+    return labels
 
 
 def split_kv(kvpair):
@@ -1145,19 +1152,13 @@ def resolve_volume_paths(working_dir, service_dict):
 
 
 def resolve_volume_path(working_dir, volume):
-    mount_params = None
     if isinstance(volume, dict):
-        container_path = volume.get('target')
-        host_path = volume.get('source')
-        mode = None
-        if host_path:
-            if volume.get('read_only'):
-                mode = 'ro'
-            if volume.get('volume', {}).get('nocopy'):
-                mode = 'nocopy'
-        mount_params = (host_path, mode)
-    else:
-        container_path, mount_params = split_path_mapping(volume)
+        if volume.get('source', '').startswith('.') and volume['type'] == 'mount':
+            volume['source'] = expand_path(working_dir, volume['source'])
+        return volume
+
+    mount_params = None
+    container_path, mount_params = split_path_mapping(volume)
 
     if mount_params is not None:
         host_path, mode = mount_params

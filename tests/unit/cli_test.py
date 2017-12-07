@@ -10,6 +10,7 @@ from io import StringIO
 import docker
 import py
 import pytest
+from docker.constants import DEFAULT_DOCKER_API_VERSION
 
 from .. import mock
 from .. import unittest
@@ -98,6 +99,7 @@ class CLITestCase(unittest.TestCase):
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
     def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
         mock_client = mock.create_autospec(docker.APIClient)
+        mock_client.api_version = DEFAULT_DOCKER_API_VERSION
         project = Project.from_config(
             name='composetest',
             client=mock_client,
@@ -112,6 +114,7 @@ class CLITestCase(unittest.TestCase):
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
+                '--label': [],
                 '--user': None,
                 '--no-deps': None,
                 '-d': False,
@@ -130,6 +133,7 @@ class CLITestCase(unittest.TestCase):
 
     def test_run_service_with_restart_always(self):
         mock_client = mock.create_autospec(docker.APIClient)
+        mock_client.api_version = DEFAULT_DOCKER_API_VERSION
 
         project = Project.from_config(
             name='composetest',
@@ -147,6 +151,7 @@ class CLITestCase(unittest.TestCase):
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
+            '--label': [],
             '--user': None,
             '--no-deps': None,
             '-d': True,
@@ -170,6 +175,7 @@ class CLITestCase(unittest.TestCase):
             'SERVICE': 'service',
             'COMMAND': None,
             '-e': [],
+            '--label': [],
             '--user': None,
             '--no-deps': None,
             '-d': True,
@@ -202,6 +208,7 @@ class CLITestCase(unittest.TestCase):
                 'SERVICE': 'service',
                 'COMMAND': None,
                 '-e': [],
+                '--label': [],
                 '--user': None,
                 '--no-deps': None,
                 '-d': True,

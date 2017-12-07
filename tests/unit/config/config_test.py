@@ -34,7 +34,6 @@ from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import COMPOSEFILE_V3_3 as V3_3
 from compose.const import IS_WINDOWS_PLATFORM
-from compose.utils import nanoseconds_from_time_seconds
 from tests import mock
 from tests import unittest
 
@@ -432,6 +431,40 @@ class ConfigTest(unittest.TestCase):
             assert service['labels'] == {
                 'label_key': 'label_val'
             }
+
+    def test_load_config_custom_resource_names(self):
+        base_file = config.ConfigFile(
+            'base.yaml', {
+                'version': '3.5',
+                'volumes': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                },
+                'networks': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                },
+                'secrets': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                },
+                'configs': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                }
+            }
+        )
+        details = config.ConfigDetails('.', [base_file])
+        loaded_config = config.load(details)
+
+        assert loaded_config.networks['abc'] == {'name': 'xyz'}
+        assert loaded_config.volumes['abc'] == {'name': 'xyz'}
+        assert loaded_config.secrets['abc']['name'] == 'xyz'
+        assert loaded_config.configs['abc']['name'] == 'xyz'
 
     def test_load_config_volume_and_network_labels(self):
         base_file = config.ConfigFile(
@@ -1138,9 +1171,12 @@ class ConfigTest(unittest.TestCase):
         details = config.ConfigDetails('.', [base_file, override_file])
         service_dicts = config.load(details).services
         svc_volumes = map(lambda v: v.repr(), service_dicts[0]['volumes'])
-        assert sorted(svc_volumes) == sorted(
-            ['/anonymous', '/c:/b:rw', 'vol:/x:ro']
-        )
+        for vol in svc_volumes:
+            assert vol in [
+                '/anonymous',
+                '/c:/b:rw',
+                {'source': 'vol', 'target': '/x', 'type': 'volume', 'read_only': True}
+            ]
 
     @mock.patch.dict(os.environ)
     def test_volume_mode_override(self):
@@ -1223,6 +1259,50 @@ class ConfigTest(unittest.TestCase):
         volume = config_data.services[0].get('volumes')[0]
         assert volume.external == 'data0028'
         assert volume.is_named_volume
+
+    def test_volumes_long_syntax(self):
+        base_file = config.ConfigFile(
+            'base.yaml', {
+                'version': '2.3',
+                'services': {
+                    'web': {
+                        'image': 'busybox:latest',
+                        'volumes': [
+                            {
+                                'target': '/anonymous', 'type': 'volume'
+                            }, {
+                                'source': '/abc', 'target': '/xyz', 'type': 'bind'
+                            }, {
+                                'source': '\\\\.\\pipe\\abcd', 'target': '/named_pipe', 'type': 'npipe'
+                            }, {
+                                'type': 'tmpfs', 'target': '/tmpfs'
+                            }
+                        ]
+                    },
+                },
+            },
+        )
+        details = config.ConfigDetails('.', [base_file])
+        config_data = config.load(details)
+        volumes = config_data.services[0].get('volumes')
+        anon_volume = [v for v in volumes if v.target == '/anonymous'][0]
+        tmpfs_mount = [v for v in volumes if v.type == 'tmpfs'][0]
+        host_mount = [v for v in volumes if v.type == 'bind'][0]
+        npipe_mount = [v for v in volumes if v.type == 'npipe'][0]
+
+        assert anon_volume.type == 'volume'
+        assert not anon_volume.is_named_volume
+
+        assert tmpfs_mount.target == '/tmpfs'
+        assert not tmpfs_mount.is_named_volume
+
+        assert host_mount.source == os.path.normpath('/abc')
+        assert host_mount.target == '/xyz'
+        assert not host_mount.is_named_volume
+
+        assert npipe_mount.source == '\\\\.\\pipe\\abcd'
+        assert npipe_mount.target == '/named_pipe'
+        assert not npipe_mount.is_named_volume
 
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
@@ -2493,8 +2573,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'secrets': [
-                    types.ServiceSecret('one', None, None, None, None),
-                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                    types.ServiceSecret('one', None, None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -2540,8 +2620,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'secrets': [
-                    types.ServiceSecret('one', None, None, None, None),
-                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                    types.ServiceSecret('one', None, None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -2578,8 +2658,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'configs': [
-                    types.ServiceConfig('one', None, None, None, None),
-                    types.ServiceConfig('source', 'target', '100', '200', 0o777),
+                    types.ServiceConfig('one', None, None, None, None, None),
+                    types.ServiceConfig('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -2625,12 +2705,39 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'configs': [
-                    types.ServiceConfig('one', None, None, None, None),
-                    types.ServiceConfig('source', 'target', '100', '200', 0o777),
+                    types.ServiceConfig('one', None, None, None, None, None),
+                    types.ServiceConfig('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
         assert service_sort(service_dicts) == service_sort(expected)
+
+    def test_service_volume_invalid_config(self):
+        config_details = build_config_details(
+            {
+                'version': '3.2',
+                'services': {
+                    'web': {
+                        'build': {
+                            'context': '.',
+                            'args': None,
+                        },
+                        'volumes': [
+                            {
+                                "type": "volume",
+                                "source": "/data",
+                                "garbage": {
+                                    "and": "error"
+                                }
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(config_details)
+        assert "services.web.volumes contains unsupported option: 'garbage'" in exc.exconly()
 
 
 class NetworkModeTest(unittest.TestCase):
@@ -2847,6 +2954,94 @@ class PortsTest(unittest.TestCase):
         )
 
 
+class SubnetTest(unittest.TestCase):
+    INVALID_SUBNET_TYPES = [
+        None,
+        False,
+        10,
+    ]
+
+    INVALID_SUBNET_MAPPINGS = [
+        "",
+        "192.168.0.1/sdfsdfs",
+        "192.168.0.1/",
+        "192.168.0.1/33",
+        "192.168.0.1/01",
+        "192.168.0.1",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/sdfsdfs",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/129",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/01",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156",
+        "ge80:0000:0000:0000:0204:61ff:fe9d:f156/128",
+        "192.168.0.1/31/31",
+    ]
+
+    VALID_SUBNET_MAPPINGS = [
+        "192.168.0.1/0",
+        "192.168.0.1/32",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/0",
+        "fe80:0000:0000:0000:0204:61ff:fe9d:f156/128",
+        "1:2:3:4:5:6:7:8/0",
+        "1::/0",
+        "1:2:3:4:5:6:7::/0",
+        "1::8/0",
+        "1:2:3:4:5:6::8/0",
+        "::/0",
+        "::8/0",
+        "::2:3:4:5:6:7:8/0",
+        "fe80::7:8%eth0/0",
+        "fe80::7:8%1/0",
+        "::255.255.255.255/0",
+        "::ffff:255.255.255.255/0",
+        "::ffff:0:255.255.255.255/0",
+        "2001:db8:3:4::192.0.2.33/0",
+        "64:ff9b::192.0.2.33/0",
+    ]
+
+    def test_config_invalid_subnet_type_validation(self):
+        for invalid_subnet in self.INVALID_SUBNET_TYPES:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config(invalid_subnet)
+
+            assert "contains an invalid type" in exc.value.msg
+
+    def test_config_invalid_subnet_format_validation(self):
+        for invalid_subnet in self.INVALID_SUBNET_MAPPINGS:
+            with pytest.raises(ConfigurationError) as exc:
+                self.check_config(invalid_subnet)
+
+            assert "should use the CIDR format" in exc.value.msg
+
+    def test_config_valid_subnet_format_validation(self):
+        for valid_subnet in self.VALID_SUBNET_MAPPINGS:
+            self.check_config(valid_subnet)
+
+    def check_config(self, subnet):
+        config.load(
+            build_config_details({
+                'version': '3.5',
+                'services': {
+                    'web': {
+                        'image': 'busybox'
+                    }
+                },
+                'networks': {
+                    'default': {
+                        'ipam': {
+                            'config': [
+                                {
+                                    'subnet': subnet
+                                }
+                            ],
+                            'driver': 'default'
+                        }
+                    }
+                }
+            })
+        )
+
+
 class InterpolationTest(unittest.TestCase):
 
     @mock.patch.dict(os.environ)
@@ -2891,6 +3086,28 @@ class InterpolationTest(unittest.TestCase):
                 'labels': {'mylabel': 'myvalue'},
                 'hostname': 'host-',
                 'command': '${ESCAPED}',
+            }
+        ])
+
+    @mock.patch.dict(os.environ)
+    def test_config_file_with_environment_variable_with_defaults(self):
+        project_dir = 'tests/fixtures/environment-interpolation-with-defaults'
+        os.environ.update(
+            IMAGE="busybox",
+        )
+
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir)
+            )
+        ).services
+
+        self.assertEqual(service_dicts, [
+            {
+                'name': 'web',
+                'image': 'busybox',
+                'ports': types.ServicePort.parse('80:8000'),
+                'hostname': 'host-',
             }
         ])
 
@@ -2948,7 +3165,7 @@ class InterpolationTest(unittest.TestCase):
         assert config_dict.secrets == {
             'secretdata': {
                 'external': {'name': 'baz.bar'},
-                'external_name': 'baz.bar'
+                'name': 'baz.bar'
             }
         }
 
@@ -2966,7 +3183,7 @@ class InterpolationTest(unittest.TestCase):
         assert config_dict.configs == {
             'configdata': {
                 'external': {'name': 'baz.bar'},
-                'external_name': 'baz.bar'
+                'name': 'baz.bar'
             }
         }
 
@@ -4188,52 +4405,103 @@ class BuildPathTest(unittest.TestCase):
 
 class HealthcheckTest(unittest.TestCase):
     def test_healthcheck(self):
-        service_dict = make_service_dict(
-            'test',
-            {'healthcheck': {
-                'test': ['CMD', 'true'],
-                'interval': '1s',
-                'timeout': '1m',
-                'retries': 3,
-                'start_period': '10s'
-            }},
-            '.',
+        config_dict = config.load(
+            build_config_details({
+                'version': '2.3',
+                'services': {
+                    'test': {
+                        'image': 'busybox',
+                        'healthcheck': {
+                            'test': ['CMD', 'true'],
+                            'interval': '1s',
+                            'timeout': '1m',
+                            'retries': 3,
+                            'start_period': '10s',
+                        }
+                    }
+                }
+
+            })
         )
 
-        assert service_dict['healthcheck'] == {
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['test']
+
+        assert serialized_service['healthcheck'] == {
             'test': ['CMD', 'true'],
-            'interval': nanoseconds_from_time_seconds(1),
-            'timeout': nanoseconds_from_time_seconds(60),
+            'interval': '1s',
+            'timeout': '1m',
             'retries': 3,
-            'start_period': nanoseconds_from_time_seconds(10)
+            'start_period': '10s'
         }
 
     def test_disable(self):
-        service_dict = make_service_dict(
-            'test',
-            {'healthcheck': {
-                'disable': True,
-            }},
-            '.',
+        config_dict = config.load(
+            build_config_details({
+                'version': '2.3',
+                'services': {
+                    'test': {
+                        'image': 'busybox',
+                        'healthcheck': {
+                            'disable': True,
+                        }
+                    }
+                }
+
+            })
         )
 
-        assert service_dict['healthcheck'] == {
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['test']
+
+        assert serialized_service['healthcheck'] == {
             'test': ['NONE'],
         }
 
     def test_disable_with_other_config_is_invalid(self):
         with pytest.raises(ConfigurationError) as excinfo:
-            make_service_dict(
-                'invalid-healthcheck',
-                {'healthcheck': {
-                    'disable': True,
-                    'interval': '1s',
-                }},
-                '.',
+            config.load(
+                build_config_details({
+                    'version': '2.3',
+                    'services': {
+                        'invalid-healthcheck': {
+                            'image': 'busybox',
+                            'healthcheck': {
+                                'disable': True,
+                                'interval': '1s',
+                            }
+                        }
+                    }
+
+                })
             )
 
         assert 'invalid-healthcheck' in excinfo.exconly()
-        assert 'disable' in excinfo.exconly()
+        assert '"disable: true" cannot be combined with other options' in excinfo.exconly()
+
+    def test_healthcheck_with_invalid_test(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2.3',
+                    'services': {
+                        'invalid-healthcheck': {
+                            'image': 'busybox',
+                            'healthcheck': {
+                                'test': ['true'],
+                                'interval': '1s',
+                                'timeout': '1m',
+                                'retries': 3,
+                                'start_period': '10s',
+                            }
+                        }
+                    }
+
+                })
+            )
+
+        assert 'invalid-healthcheck' in excinfo.exconly()
+        assert 'the first item must be either NONE, CMD or CMD-SHELL' in excinfo.exconly()
 
 
 class GetDefaultConfigFilesTestCase(unittest.TestCase):

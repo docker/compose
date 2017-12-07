@@ -29,6 +29,7 @@ from .service import ConvergenceStrategy
 from .service import NetworkMode
 from .service import PidMode
 from .service import Service
+from .service import ServiceName
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
@@ -190,6 +191,25 @@ class Project(object):
             service.remove_duplicate_containers()
         return services
 
+    def get_scaled_services(self, services, scale_override):
+        """
+        Returns a list of this project's services as scaled ServiceName objects.
+
+        services: a list of Service objects
+        scale_override: a dict with the scale to apply to each service (k: service_name, v: scale)
+        """
+        service_names = []
+        for service in services:
+            if service.name in scale_override:
+                scale = scale_override[service.name]
+            else:
+                scale = service.scale_num
+
+            for i in range(1, scale + 1):
+                service_names.append(ServiceName(self.name, service.name, i))
+
+        return service_names
+
     def get_links(self, service_dict):
         links = []
         if 'links' in service_dict:
@@ -310,8 +330,8 @@ class Project(object):
             service_names, stopped=True, one_off=one_off
         ), options)
 
-    def down(self, remove_image_type, include_volumes, remove_orphans=False):
-        self.stop(one_off=OneOffFilter.include)
+    def down(self, remove_image_type, include_volumes, remove_orphans=False, timeout=None):
+        self.stop(one_off=OneOffFilter.include, timeout=timeout)
         self.find_orphan_containers(remove_orphans)
         self.remove_stopped(v=include_volumes, one_off=OneOffFilter.include)
 
@@ -337,10 +357,11 @@ class Project(object):
         )
         return containers
 
-    def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, build_args=None):
+    def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
+              build_args=None):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull, force_rm, build_args)
+                service.build(no_cache, pull, force_rm, memory, build_args)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
@@ -430,15 +451,18 @@ class Project(object):
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
         plans = self._get_convergence_plans(services, strategy)
+        scaled_services = self.get_scaled_services(services, scale_override)
 
         def do(service):
+
             return service.execute_convergence_plan(
                 plans[service.name],
                 timeout=timeout,
                 detached=detached,
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
-                start=start
+                start=start,
+                project_services=scaled_services
             )
 
         def get_deps(service):
@@ -624,7 +648,7 @@ def get_secrets(service, service_secrets, secret_defs):
                 "Service \"{service}\" uses an undefined secret \"{secret}\" "
                 .format(service=service, secret=secret.source))
 
-        if secret_def.get('external_name'):
+        if secret_def.get('external'):
             log.warn("Service \"{service}\" uses secret \"{secret}\" which is external. "
                      "External secrets are not available to containers created by "
                      "docker-compose.".format(service=service, secret=secret.source))

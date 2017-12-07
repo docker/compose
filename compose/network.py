@@ -25,21 +25,22 @@ OPTS_EXCEPTIONS = [
 
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
-                 ipam=None, external_name=None, internal=False, enable_ipv6=False,
-                 labels=None):
+                 ipam=None, external=False, internal=False, enable_ipv6=False,
+                 labels=None, custom_name=False):
         self.client = client
         self.project = project
         self.name = name
         self.driver = driver
         self.driver_opts = driver_opts
         self.ipam = create_ipam_config_from_dict(ipam)
-        self.external_name = external_name
+        self.external = external
         self.internal = internal
         self.enable_ipv6 = enable_ipv6
         self.labels = labels
+        self.custom_name = custom_name
 
     def ensure(self):
-        if self.external_name:
+        if self.external:
             try:
                 self.inspect()
                 log.debug(
@@ -51,7 +52,7 @@ class Network(object):
                     'Network {name} declared as external, but could'
                     ' not be found. Please create the network manually'
                     ' using `{command} {name}` and try again.'.format(
-                        name=self.external_name,
+                        name=self.full_name,
                         command='docker network create'
                     )
                 )
@@ -83,7 +84,7 @@ class Network(object):
             )
 
     def remove(self):
-        if self.external_name:
+        if self.external:
             log.info("Network %s is external, skipping", self.full_name)
             return
 
@@ -95,8 +96,8 @@ class Network(object):
 
     @property
     def full_name(self):
-        if self.external_name:
-            return self.external_name
+        if self.custom_name:
+            return self.name
         return '{0}_{1}'.format(self.project, self.name)
 
     @property
@@ -116,7 +117,7 @@ def create_ipam_config_from_dict(ipam_dict):
         return None
 
     return IPAMConfig(
-        driver=ipam_dict.get('driver'),
+        driver=ipam_dict.get('driver') or 'default',
         pool_configs=[
             IPAMPool(
                 subnet=config.get('subnet'),
@@ -203,14 +204,16 @@ def build_networks(name, config_data, client):
     network_config = config_data.networks or {}
     networks = {
         network_name: Network(
-            client=client, project=name, name=network_name,
+            client=client, project=name,
+            name=data.get('name', network_name),
             driver=data.get('driver'),
             driver_opts=data.get('driver_opts'),
             ipam=data.get('ipam'),
-            external_name=data.get('external_name'),
+            external=bool(data.get('external', False)),
             internal=data.get('internal'),
             enable_ipv6=data.get('enable_ipv6'),
             labels=data.get('labels'),
+            custom_name=data.get('name') is not None,
         )
         for network_name, data in network_config.items()
     }

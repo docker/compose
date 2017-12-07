@@ -229,6 +229,7 @@
             }
           ]
         },
+        "oom_kill_disable": {"type": "boolean"},
         "oom_score_adj": {"type": "integer", "minimum": -1000, "maximum": 1000},
         "group_add": {
             "type": "array",
@@ -349,7 +350,8 @@
         },
         "internal": {"type": "boolean"},
         "enable_ipv6": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"}
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "name": {"type": "string"}
       },
       "additionalProperties": false
     },

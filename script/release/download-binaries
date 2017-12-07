@@ -30,3 +30,8 @@ mkdir $DESTINATION
 wget -O $DESTINATION/docker-compose-Darwin-x86_64 $BASE_BINTRAY_URL/docker-compose-Darwin-x86_64
 wget -O $DESTINATION/docker-compose-Linux-x86_64 $BASE_BINTRAY_URL/docker-compose-Linux-x86_64
 wget -O $DESTINATION/docker-compose-Windows-x86_64.exe $APPVEYOR_URL
+
+echo -e "\n\nCopy the following lines into the integrity check table in the release notes:\n\n"
+cd $DESTINATION
+ls | xargs sha256sum | sed 's/  / | /g' | sed -r 's/([^ |]+)/`\1`/g'
+cd -

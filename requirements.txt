@@ -2,20 +2,20 @@ backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.3.0
 certifi==2017.4.17
 chardet==3.0.4
-colorama==0.3.9; sys_platform == 'win32'
-docker==2.5.1
+docker==2.6.1
 docker-pycreds==0.2.1
 dockerpty==0.4.1
 docopt==0.6.2
 enum34==1.1.6; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
+git+git://github.com/tartley/colorama.git@bd378c725b45eba0b8e5cc091c3ca76a954c92ff; sys_platform == 'win32'
 idna==2.5
 ipaddress==1.0.18
 jsonschema==2.6.0
 pypiwin32==219; sys_platform == 'win32'
 PySocks==1.6.7
 PyYAML==3.12
-requests==2.11.1
+requests==2.18.4
 six==1.10.0
 texttable==0.9.1
 urllib3==1.21.1

@@ -120,7 +120,7 @@ _docker_compose_build() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--build-arg --force-rm --help --no-cache --pull" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--build-arg --force-rm --help --memory --no-cache --pull" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_build
@@ -403,14 +403,14 @@ _docker_compose_run() {
 			__docker_compose_nospace
 			return
 			;;
-		--entrypoint|--name|--user|-u|--volume|-v|--workdir|-w)
+		--entrypoint|--label|-l|--name|--user|-u|--volume|-v|--workdir|-w)
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --name --no-deps --publish -p --rm --service-ports -T --user -u --volume -v --workdir -w" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --entrypoint -e --help --label -l --name --no-deps --publish -p --rm --service-ports -T --user -u --volume -v --workdir -w" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all

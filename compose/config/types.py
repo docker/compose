@@ -133,6 +133,61 @@ def normalize_path_for_engine(path):
     return path.replace('\\', '/')
 
 
+class MountSpec(object):
+    options_map = {
+        'volume': {
+            'nocopy': 'no_copy'
+        },
+        'bind': {
+            'propagation': 'propagation'
+        }
+    }
+    _fields = ['type', 'source', 'target', 'read_only', 'consistency']
+
+    @classmethod
+    def parse(cls, mount_dict, normalize=False):
+        if mount_dict.get('source'):
+            mount_dict['source'] = os.path.normpath(mount_dict['source'])
+            if normalize:
+                mount_dict['source'] = normalize_path_for_engine(mount_dict['source'])
+
+        return cls(**mount_dict)
+
+    def __init__(self, type, source=None, target=None, read_only=None, consistency=None, **kwargs):
+        self.type = type
+        self.source = source
+        self.target = target
+        self.read_only = read_only
+        self.consistency = consistency
+        self.options = None
+        if self.type in kwargs:
+            self.options = kwargs[self.type]
+
+    def as_volume_spec(self):
+        mode = 'ro' if self.read_only else 'rw'
+        return VolumeSpec(external=self.source, internal=self.target, mode=mode)
+
+    def legacy_repr(self):
+        return self.as_volume_spec().repr()
+
+    def repr(self):
+        res = {}
+        for field in self._fields:
+            if getattr(self, field, None):
+                res[field] = getattr(self, field)
+        if self.options:
+            res[self.type] = self.options
+        return res
+
+    @property
+    def is_named_volume(self):
+        return self.type == 'volume' and self.source
+
+    @property
+    def external(self):
+        return self.source
+
+
 class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
 
     @classmethod
@@ -238,17 +293,18 @@ class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
         return self.alias
 
 
-class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode')):
+class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode name')):
     @classmethod
     def parse(cls, spec):
         if isinstance(spec, six.string_types):
-            return cls(spec, None, None, None, None)
+            return cls(spec, None, None, None, None, None)
         return cls(
             spec.get('source'),
             spec.get('target'),
             spec.get('uid'),
             spec.get('gid'),
             spec.get('mode'),
+            spec.get('name')
         )
 
     @property
@@ -277,11 +333,19 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         except ValueError:
             raise ConfigurationError('Invalid target port: {}'.format(target))
 
-        try:
-            if published:
-                published = int(published)
-        except ValueError:
-            raise ConfigurationError('Invalid published port: {}'.format(published))
+        if published:
+            if isinstance(published, six.string_types) and '-' in published:  # "x-y:z" format
+                a, b = published.split('-', 1)
+                try:
+                    int(a)
+                    int(b)
+                except ValueError:
+                    raise ConfigurationError('Invalid published port: {}'.format(published))
+            else:
+                try:
+                    published = int(published)
+                except ValueError:
+                    raise ConfigurationError('Invalid published port: {}'.format(published))
 
         return super(ServicePort, cls).__new__(
             cls, target, published, *args, **kwargs

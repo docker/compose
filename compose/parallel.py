@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 STOP = object()
 
 
-def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
+def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, parent_objects=None):
     """Runs func on objects in parallel while ensuring that func is
     ran on object only after it is ran on all its dependencies.
 
@@ -37,9 +37,19 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
     stream = get_output_stream(sys.stderr)
 
     writer = ParallelStreamWriter(stream, msg)
-    for obj in objects:
+
+    if parent_objects:
+        display_objects = list(parent_objects)
+    else:
+        display_objects = objects
+
+    for obj in display_objects:
         writer.add_object(get_name(obj))
-    writer.write_initial()
+
+    # write data in a second loop to consider all objects for width alignment
+    # and avoid duplicates when parent_objects exists
+    for obj in objects:
+        writer.write_initial(get_name(obj))
 
     events = parallel_execute_iter(objects, func, get_deps, limit)
 
@@ -237,12 +247,11 @@ class ParallelStreamWriter(object):
         self.lines.append(obj_index)
         self.width = max(self.width, len(obj_index))
 
-    def write_initial(self):
+    def write_initial(self, obj_index):
         if self.msg is None:
             return
-        for line in self.lines:
-            self.stream.write("{} {:<{width}} ... \r\n".format(self.msg, line,
-                              width=self.width))
+        self.stream.write("{} {:<{width}} ... \r\n".format(
+            self.msg, self.lines[self.lines.index(obj_index)], width=self.width))
         self.stream.flush()
 
     def _write_ansi(self, obj_index, status):

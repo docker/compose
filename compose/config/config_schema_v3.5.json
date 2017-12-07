@@ -64,6 +64,7 @@
     }
   },
 
+  "patternProperties": {"^x-": {}},
   "additionalProperties": false,
 
   "definitions": {
@@ -154,6 +155,7 @@
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
+        "isolation": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
@@ -299,7 +301,8 @@
                       "nocopy": {"type": "boolean"}
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             ],
             "uniqueItems": true
@@ -316,7 +319,7 @@
       "additionalProperties": false,
       "properties": {
         "disable": {"type": "boolean"},
-        "interval": {"type": "string"},
+        "interval": {"type": "string", "format": "duration"},
         "retries": {"type": "number"},
         "test": {
           "oneOf": [
@@ -324,7 +327,8 @@
             {"type": "array", "items": {"type": "string"}}
           ]
         },
-        "timeout": {"type": "string"}
+        "timeout": {"type": "string", "format": "duration"},
+        "start_period": {"type": "string", "format": "duration"}
       }
     },
     "deployment": {
@@ -352,8 +356,23 @@
         "resources": {
           "type": "object",
           "properties": {
-            "limits": {"$ref": "#/definitions/resource"},
-            "reservations": {"$ref": "#/definitions/resource"}
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpus": {"type": "string"},
+                "memory": {"type": "string"}
+              },
+              "additionalProperties": false
+            },
+            "reservations": {
+              "type": "object",
+              "properties": {
+                "cpus": {"type": "string"},
+                "memory": {"type": "string"},
+                "generic_resources": {"$ref": "#/definitions/generic_resources"}
+              },
+              "additionalProperties": false
+            }
           },
           "additionalProperties": false
         },
@@ -388,20 +407,30 @@
       "additionalProperties": false
     },
 
-    "resource": {
-      "id": "#/definitions/resource",
-      "type": "object",
-      "properties": {
-        "cpus": {"type": "string"},
-        "memory": {"type": "string"}
-      },
-      "additionalProperties": false
+    "generic_resources": {
+      "id": "#/definitions/generic_resources",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "discrete_resource_spec": {
+            "type": "object",
+            "properties": {
+              "kind": {"type": "string"},
+              "value": {"type": "number"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
     },
 
     "network": {
       "id": "#/definitions/network",
       "type": ["object", "null"],
       "properties": {
+        "name": {"type": "string"},
         "driver": {"type": "string"},
         "driver_opts": {
           "type": "object",
@@ -418,7 +447,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "subnet": {"type": "string"}
+                  "subnet": {"type": "string", "format": "subnet_ip_address"}
                 },
                 "additionalProperties": false
               }
@@ -468,6 +497,7 @@
       "id": "#/definitions/secret",
       "type": "object",
       "properties": {
+        "name": {"type": "string"},
         "file": {"type": "string"},
         "external": {
           "type": ["boolean", "object"],
@@ -484,6 +514,7 @@
       "id": "#/definitions/config",
       "type": "object",
       "properties": {
+        "name": {"type": "string"},
         "file": {"type": "string"},
         "external": {
           "type": ["boolean", "object"],

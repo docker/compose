@@ -100,8 +100,34 @@ class TestServicePort(object):
             'published': 25001
         } in reprs
 
+    def test_parse_port_publish_range(self):
+        ports = ServicePort.parse('4440-4450:4000')
+        assert len(ports) == 1
+        reprs = [p.repr() for p in ports]
+        assert {
+            'target': 4000,
+            'published': '4440-4450'
+        } in reprs
+
     def test_parse_invalid_port(self):
         port_def = '4000p'
+        with pytest.raises(ConfigurationError):
+            ServicePort.parse(port_def)
+
+    def test_parse_invalid_publish_range(self):
+        port_def = '-4000:4000'
+        with pytest.raises(ConfigurationError):
+            ServicePort.parse(port_def)
+
+        port_def = 'asdf:4000'
+        with pytest.raises(ConfigurationError):
+            ServicePort.parse(port_def)
+
+        port_def = '1234-12f:4000'
+        with pytest.raises(ConfigurationError):
+            ServicePort.parse(port_def)
+
+        port_def = '1234-1235-1239:4000'
         with pytest.raises(ConfigurationError):
             ServicePort.parse(port_def)
 

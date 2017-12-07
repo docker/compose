@@ -32,7 +32,7 @@ def env_vars_from_file(filename):
     elif not os.path.isfile(filename):
         raise ConfigurationError("%s is not a file." % (filename))
     env = {}
-    with contextlib.closing(codecs.open(filename, 'r', 'utf-8')) as fileobj:
+    with contextlib.closing(codecs.open(filename, 'r', 'utf-8-sig')) as fileobj:
         for line in fileobj:
             line = line.strip()
             if line and not line.startswith('#'):

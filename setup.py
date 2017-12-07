@@ -33,10 +33,10 @@ install_requires = [
     'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 0.7',
     'PyYAML >= 3.10, < 4',
-    'requests >= 2.6.1, != 2.11.0, < 2.12',
+    'requests >= 2.6.1, != 2.11.0, != 2.12.2, != 2.18.0, < 2.19',
     'texttable >= 0.9.0, < 0.10',
     'websocket-client >= 0.32.0, < 1.0',
-    'docker >= 2.5.1, < 3.0',
+    'docker >= 2.6.1, < 3.0',
     'dockerpty >= 0.4.1, < 0.5',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
@@ -55,7 +55,7 @@ extras_require = {
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5'],
     ':python_version < "3.3"': ['ipaddress >= 1.0.16'],
-    ':sys_platform == "win32"': ['colorama >= 0.3.7, < 0.4'],
+    ':sys_platform == "win32"': ['colorama >= 0.3.9, < 0.4'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
 }
 

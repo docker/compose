@@ -1,0 +1,17 @@
+version: "3.5"
+
+services:
+  web:
+    image: busybox
+    command: top
+    networks:
+      - foo
+      - bar
+
+networks:
+  foo:
+    external: true
+    name: some_foo
+  bar:
+    external:
+      name: some_bar

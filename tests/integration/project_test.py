@@ -35,6 +35,7 @@ from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_2_only
+from tests.integration.testcases import v2_3_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
 
@@ -435,6 +436,26 @@ class ProjectTest(DockerClientTestCase):
         db_container = [c for c in project.containers() if 'db' in c.name][0]
         self.assertNotEqual(db_container.id, old_db_id)
         self.assertEqual(db_container.get('Volumes./etc'), db_volume_path)
+
+    @v2_3_only()
+    def test_recreate_preserves_mounts(self):
+        web = self.create_service('web')
+        db = self.create_service('db', volumes=[types.MountSpec(type='volume', target='/etc')])
+        project = Project('composetest', [web, db], self.client)
+        project.start()
+        assert len(project.containers()) == 0
+
+        project.up(['db'])
+        assert len(project.containers()) == 1
+        old_db_id = project.containers()[0].id
+        db_volume_path = project.containers()[0].get_mount('/etc')['Source']
+
+        project.up(strategy=ConvergenceStrategy.always)
+        assert len(project.containers()) == 2
+
+        db_container = [c for c in project.containers() if 'db' in c.name][0]
+        assert db_container.id != old_db_id
+        assert db_container.get_mount('/etc')['Source'] == db_volume_path
 
     def test_project_up_with_no_recreate_running(self):
         web = self.create_service('web')
@@ -931,6 +952,43 @@ class ProjectTest(DockerClientTestCase):
         ).get('IPAMConfig', {})
         assert 'LinkLocalIPs' in ipam_config
         assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
+
+    @v2_1_only()
+    def test_up_with_custom_name_resources(self):
+        config_data = build_config(
+            version=V2_2,
+            services=[{
+                'name': 'web',
+                'volumes': [VolumeSpec.parse('foo:/container-path')],
+                'networks': {'foo': {}},
+                'image': 'busybox:latest'
+            }],
+            networks={
+                'foo': {
+                    'name': 'zztop',
+                    'labels': {'com.docker.compose.test_value': 'sharpdressedman'}
+                }
+            },
+            volumes={
+                'foo': {
+                    'name': 'acdc',
+                    'labels': {'com.docker.compose.test_value': 'thefuror'}
+                }
+            }
+        )
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+
+        project.up(detached=True)
+        network = [n for n in self.client.networks() if n['Name'] == 'zztop'][0]
+        volume = [v for v in self.client.volumes()['Volumes'] if v['Name'] == 'acdc'][0]
+
+        assert network['Labels']['com.docker.compose.test_value'] == 'sharpdressedman'
+        assert volume['Labels']['com.docker.compose.test_value'] == 'thefuror'
 
     @v2_1_only()
     def test_up_with_isolation(self):

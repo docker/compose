@@ -92,7 +92,8 @@
                 "cache_from": {"$ref": "#/definitions/list_of_strings"},
                 "network": {"type": "string"},
                 "target": {"type": "string"},
-                "shm_size": {"type": ["integer", "string"]}
+                "shm_size": {"type": ["integer", "string"]},
+                "extra_hosts": {"$ref": "#/definitions/list_or_dict"}
               },
               "additionalProperties": false
             }
@@ -237,6 +238,7 @@
             }
           ]
         },
+        "oom_kill_disable": {"type": "boolean"},
         "oom_score_adj": {"type": "integer", "minimum": -1000, "maximum": 1000},
         "group_add": {
             "type": "array",
@@ -291,7 +293,39 @@
         },
         "user": {"type": "string"},
         "userns_mode": {"type": "string"},
-        "volumes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "volumes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "required": ["type"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"type": "string"},
+                  "source": {"type": "string"},
+                  "target": {"type": "string"},
+                  "read_only": {"type": "boolean"},
+                  "consistency": {"type": "string"},
+                  "bind": {
+                    "type": "object",
+                    "properties": {
+                      "propagation": {"type": "string"}
+                    }
+                  },
+                  "volume": {
+                    "type": "object",
+                    "properties": {
+                      "nocopy": {"type": "boolean"}
+                    }
+                  }
+                }
+              }
+            ],
+            "uniqueItems": true
+          }
+        },
         "volume_driver": {"type": "string"},
         "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "working_dir": {"type": "string"}
@@ -359,7 +393,8 @@
         },
         "internal": {"type": "boolean"},
         "enable_ipv6": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"}
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "name": {"type": "string"}
       },
       "additionalProperties": false
     },
