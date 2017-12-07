@@ -350,6 +350,22 @@ class CLITestCase(DockerClientTestCase):
             }
         }
 
+    def test_config_external_network_v3_5(self):
+        self.base_dir = 'tests/fixtures/networks'
+        result = self.dispatch(['-f', 'external-networks-v3-5.yml', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert 'networks' in json_result
+        assert json_result['networks'] == {
+            'foo': {
+                'external': True,
+                'name': 'some_foo',
+            },
+            'bar': {
+                'external': True,
+                'name': 'some_bar',
+            },
+        }
+
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])

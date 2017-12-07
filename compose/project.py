@@ -648,7 +648,7 @@ def get_secrets(service, service_secrets, secret_defs):
                 "Service \"{service}\" uses an undefined secret \"{secret}\" "
                 .format(service=service, secret=secret.source))
 
-        if secret_def.get('external_name'):
+        if secret_def.get('external'):
             log.warn("Service \"{service}\" uses secret \"{secret}\" which is external. "
                      "External secrets are not available to containers created by "
                      "docker-compose.".format(service=service, secret=secret.source))
