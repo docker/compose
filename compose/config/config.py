@@ -1153,7 +1153,7 @@ def resolve_volume_paths(working_dir, service_dict):
 
 def resolve_volume_path(working_dir, volume):
     if isinstance(volume, dict):
-        if volume.get('source', '').startswith('.') and volume['type'] == 'mount':
+        if volume.get('source', '').startswith('.') and volume['type'] == 'bind':
             volume['source'] = expand_path(working_dir, volume['source'])
         return volume
 
