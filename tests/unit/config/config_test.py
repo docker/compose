@@ -1304,6 +1304,29 @@ class ConfigTest(unittest.TestCase):
         assert npipe_mount.target == '/named_pipe'
         assert not npipe_mount.is_named_volume
 
+    def test_load_bind_mount_relative_path(self):
+        expected_source = 'C:\\tmp\\web' if IS_WINDOWS_PLATFORM else '/tmp/web'
+        base_file = config.ConfigFile(
+            'base.yaml', {
+                'version': '3.4',
+                'services': {
+                    'web': {
+                        'image': 'busybox:latest',
+                        'volumes': [
+                            {'type': 'bind', 'source': './web', 'target': '/web'},
+                        ],
+                    },
+                },
+            },
+        )
+
+        details = config.ConfigDetails('/tmp', [base_file])
+        config_data = config.load(details)
+        mount = config_data.services[0].get('volumes')[0]
+        assert mount.target == '/web'
+        assert mount.type == 'bind'
+        assert mount.source == expected_source
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             services = config.load(
