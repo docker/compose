@@ -350,7 +350,8 @@
         },
         "internal": {"type": "boolean"},
         "enable_ipv6": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"}
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "name": {"type": "string"}
       },
       "additionalProperties": false
     },

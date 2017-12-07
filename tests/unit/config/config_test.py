@@ -432,6 +432,40 @@ class ConfigTest(unittest.TestCase):
                 'label_key': 'label_val'
             }
 
+    def test_load_config_custom_resource_names(self):
+        base_file = config.ConfigFile(
+            'base.yaml', {
+                'version': '3.5',
+                'volumes': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                },
+                'networks': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                },
+                'secrets': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                },
+                'configs': {
+                    'abc': {
+                        'name': 'xyz'
+                    }
+                }
+            }
+        )
+        details = config.ConfigDetails('.', [base_file])
+        loaded_config = config.load(details)
+
+        assert loaded_config.networks['abc'] == {'name': 'xyz'}
+        assert loaded_config.volumes['abc'] == {'name': 'xyz'}
+        assert loaded_config.secrets['abc']['name'] == 'xyz'
+        assert loaded_config.configs['abc']['name'] == 'xyz'
+
     def test_load_config_volume_and_network_labels(self):
         base_file = config.ConfigFile(
             'base.yaml',
@@ -2539,8 +2573,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'secrets': [
-                    types.ServiceSecret('one', None, None, None, None),
-                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                    types.ServiceSecret('one', None, None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -2586,8 +2620,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'secrets': [
-                    types.ServiceSecret('one', None, None, None, None),
-                    types.ServiceSecret('source', 'target', '100', '200', 0o777),
+                    types.ServiceSecret('one', None, None, None, None, None),
+                    types.ServiceSecret('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -2624,8 +2658,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'configs': [
-                    types.ServiceConfig('one', None, None, None, None),
-                    types.ServiceConfig('source', 'target', '100', '200', 0o777),
+                    types.ServiceConfig('one', None, None, None, None, None),
+                    types.ServiceConfig('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -2671,8 +2705,8 @@ class ConfigTest(unittest.TestCase):
                 'name': 'web',
                 'image': 'example/web',
                 'configs': [
-                    types.ServiceConfig('one', None, None, None, None),
-                    types.ServiceConfig('source', 'target', '100', '200', 0o777),
+                    types.ServiceConfig('one', None, None, None, None, None),
+                    types.ServiceConfig('source', 'target', '100', '200', 0o777, None),
                 ],
             },
         ]
@@ -3131,7 +3165,7 @@ class InterpolationTest(unittest.TestCase):
         assert config_dict.secrets == {
             'secretdata': {
                 'external': {'name': 'baz.bar'},
-                'external_name': 'baz.bar'
+                'name': 'baz.bar'
             }
         }
 
@@ -3149,7 +3183,7 @@ class InterpolationTest(unittest.TestCase):
         assert config_dict.configs == {
             'configdata': {
                 'external': {'name': 'baz.bar'},
-                'external_name': 'baz.bar'
+                'name': 'baz.bar'
             }
         }
 
