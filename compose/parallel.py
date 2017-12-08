@@ -15,6 +15,8 @@ from six.moves.queue import Queue
 from compose.cli.colors import green
 from compose.cli.colors import red
 from compose.cli.signals import ShutdownException
+from compose.config.environment import Environment
+from compose.const import PARALLEL_LIMIT
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
 from compose.errors import OperationFailedError
@@ -24,6 +26,18 @@ from compose.utils import get_output_stream
 log = logging.getLogger(__name__)
 
 STOP = object()
+
+
+def get_configured_limit():
+    limit = Environment.from_command_line({'COMPOSE_PARALLEL_LIMIT': None})['COMPOSE_PARALLEL_LIMIT']
+    if limit:
+        limit = int(limit)
+    else:
+        limit = PARALLEL_LIMIT
+    return limit
+
+
+global_limiter = Semaphore(get_configured_limit())
 
 
 def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, parent_objects=None):
@@ -173,7 +187,7 @@ def producer(obj, func, results, limiter):
     The entry point for a producer thread which runs func on a single object.
     Places a tuple on the results queue once func has either returned or raised.
     """
-    with limiter:
+    with limiter, global_limiter:
         try:
             result = func(obj)
             results.put((obj, result, None))
