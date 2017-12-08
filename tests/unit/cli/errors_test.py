@@ -86,3 +86,13 @@ class TestHandleConnectionErrors(object):
 
         _, args, _ = mock_logging.error.mock_calls[0]
         assert "Windows named pipe error: The pipe is busy. (code: 231)" == args[0]
+
+    @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='Needs pywin32')
+    def test_windows_pipe_error_encoding_issue(self, mock_logging):
+        import pywintypes
+        with pytest.raises(errors.ConnectionError):
+            with handle_connection_errors(mock.Mock(api_version='1.22')):
+                raise pywintypes.error(9999, 'WriteFile', 'I use weird characters \xe9')
+
+        _, args, _ = mock_logging.error.mock_calls[0]
+        assert 'Windows named pipe error: I use weird characters \xe9 (code: 9999)' == args[0]
