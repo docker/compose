@@ -7,7 +7,6 @@ import socket
 from distutils.spawn import find_executable
 from textwrap import dedent
 
-import six
 from docker.errors import APIError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
@@ -15,6 +14,7 @@ from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
+from .utils import binarystr_to_unicode
 from .utils import is_docker_for_mac_installed
 from .utils import is_mac
 from .utils import is_ubuntu
@@ -75,7 +75,9 @@ def log_windows_pipe_error(exc):
         )
     else:
         log.error(
-            "Windows named pipe error: {} (code: {})".format(exc.strerror, exc.winerror)
+            "Windows named pipe error: {} (code: {})".format(
+                binarystr_to_unicode(exc.strerror), exc.winerror
+            )
         )
 
 
@@ -89,9 +91,7 @@ def log_timeout_error(timeout):
 
 
 def log_api_error(e, client_version):
-    explanation = e.explanation
-    if isinstance(explanation, six.binary_type):
-        explanation = explanation.decode('utf-8')
+    explanation = binarystr_to_unicode(e.explanation)
 
     if 'client is newer than server' not in explanation:
         log.error(explanation)
