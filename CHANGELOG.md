@@ -71,6 +71,8 @@ Change log
 - Fixed a bug where missing secret files would generate an empty directory
   in their place
 
+- Fixed character encoding issues in the CLI's error handlers
+
 - Added validation for the `test` field in healthchecks
 
 - Added validation for the `subnet` field in IPAM configurations
