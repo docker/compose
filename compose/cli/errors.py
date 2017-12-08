@@ -106,7 +106,8 @@ def log_api_error(e, client_version):
     log.error(
         "The Docker Engine version is less than the minimum required by "
         "Compose. Your current project requires a Docker Engine of "
-        "version {version} or greater.".format(version=version))
+        "version {version} or greater.".format(version=version)
+    )
 
 
 def exit_with_error(msg):
@@ -115,12 +116,17 @@ def exit_with_error(msg):
 
 
 def get_conn_error_message(url):
-    if find_executable('docker') is None:
-        return docker_not_found_msg("Couldn't connect to Docker daemon.")
-    if is_docker_for_mac_installed():
-        return conn_error_docker_for_mac
-    if find_executable('docker-machine') is not None:
-        return conn_error_docker_machine
+    try:
+        if find_executable('docker') is None:
+            return docker_not_found_msg("Couldn't connect to Docker daemon.")
+        if is_docker_for_mac_installed():
+            return conn_error_docker_for_mac
+        if find_executable('docker-machine') is not None:
+            return conn_error_docker_machine
+    except UnicodeDecodeError:
+        # https://github.com/docker/compose/issues/5442
+        # Ignore the error and print the generic message instead.
+        pass
     return conn_error_generic.format(url=url)
 
 
