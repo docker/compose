@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 import docker
+import six
 
 import compose
 from ..const import IS_WINDOWS_PLATFORM
@@ -148,3 +149,15 @@ def human_readable_file_size(size):
         size / float(1 << (order * 10)),
         suffixes[order]
     )
+
+
+def binarystr_to_unicode(s):
+    if not isinstance(s, six.binary_type):
+        return s
+
+    if IS_WINDOWS_PLATFORM:
+        try:
+            return s.decode('windows-1250')
+        except UnicodeDecodeError:
+            pass
+    return s.decode('utf-8', 'replace')

@@ -42,7 +42,7 @@ Change log
 - Values interpolated from the environment will now be converted to the
   proper type when used in non-string fields.
 
-- Added support for `--labels` in `docker-compose run`
+- Added support for `--label` in `docker-compose run`
 
 - Added support for `--timeout` in `docker-compose down`
 
@@ -70,6 +70,8 @@ Change log
 
 - Fixed a bug where missing secret files would generate an empty directory
   in their place
+
+- Fixed character encoding issues in the CLI's error handlers
 
 - Added validation for the `test` field in healthchecks
 
