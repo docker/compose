@@ -442,6 +442,7 @@ class Project(object):
            remove_orphans=False,
            ignore_orphans=False,
            scale_override=None,
+           rebuild=False,
            rescale=True,
            start=True,
            always_recreate_deps=False):
@@ -472,6 +473,7 @@ class Project(object):
                 timeout=timeout,
                 detached=detached,
                 scale_override=scale_override.get(service.name),
+                rebuild=rebuild,
                 rescale=rescale,
                 start=start,
                 project_services=scaled_services

@@ -280,6 +280,7 @@ class Service(object):
                          previous_container=None,
                          number=None,
                          quiet=False,
+                         rebuild=False,
                          **override_options):
         """
         Create a container for this service. If the image doesn't exist, attempt to pull
@@ -293,6 +294,7 @@ class Service(object):
             override_options,
             number or self._next_container_number(one_off=one_off),
             one_off=one_off,
+            rebuild=rebuild,
             previous_container=previous_container,
         )
 
@@ -409,7 +411,7 @@ class Service(object):
 
             return containers
 
-    def _execute_convergence_recreate(self, containers, scale, timeout, detached, start):
+    def _execute_convergence_recreate(self, containers, scale, timeout, detached, start, rebuild):
             if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
@@ -417,7 +419,7 @@ class Service(object):
             def recreate(container):
                 return self.recreate_container(
                     container, timeout=timeout, attach_logs=not detached,
-                    start_new_container=start
+                    start_new_container=start, rebuild=rebuild
                 )
             containers, errors = parallel_execute(
                 containers,
@@ -468,7 +470,8 @@ class Service(object):
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
-                                 start=True, scale_override=None, rescale=True, project_services=None):
+                                 start=True, scale_override=None, rebuild=False,
+                                 rescale=True, project_services=None):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -487,7 +490,7 @@ class Service(object):
 
         if action == 'recreate':
             return self._execute_convergence_recreate(
-                containers, scale, timeout, detached, start
+                containers, scale, timeout, detached, start, rebuild
             )
 
         if action == 'start':
@@ -512,6 +515,7 @@ class Service(object):
             container,
             timeout=None,
             attach_logs=False,
+            rebuild=False,
             start_new_container=True):
         """Recreate a container.
 
@@ -526,6 +530,7 @@ class Service(object):
             previous_container=container,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
+            rebuild=rebuild
         )
         if attach_logs:
             new_container.attach_log_stream()
@@ -746,6 +751,7 @@ class Service(object):
             override_options,
             number,
             one_off=False,
+            rebuild=False,
             previous_container=None):
         add_config_hash = (not one_off and not override_options)
 
@@ -795,7 +801,7 @@ class Service(object):
             override_options.get('labels'))
 
         container_options, override_options = self._build_container_volume_options(
-            previous_container, container_options, override_options
+            previous_container, container_options, override_options, rebuild
         )
 
         container_options['image'] = self.image_name
@@ -822,7 +828,8 @@ class Service(object):
             container_options['environment'])
         return container_options
 
-    def _build_container_volume_options(self, previous_container, container_options, override_options):
+    def _build_container_volume_options(self, previous_container, container_options,
+                                        override_options, rebuild):
         container_volumes = []
         container_mounts = []
         if 'volumes' in container_options:
@@ -833,7 +840,7 @@ class Service(object):
 
         binds, affinity = merge_volume_bindings(
             container_volumes, self.options.get('tmpfs') or [], previous_container,
-            container_mounts
+            container_mounts, rebuild
         )
         override_options['binds'] = binds
         container_options['environment'].update(affinity)
@@ -1281,7 +1288,7 @@ def parse_repository_tag(repo_path):
 # Volumes
 
 
-def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
+def merge_volume_bindings(volumes, tmpfs, previous_container, mounts, rebuild):
     """
         Return a list of volume bindings for a container. Container data volumes
         are replaced by those from the previous container.
@@ -1297,7 +1304,7 @@ def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
 
     if previous_container:
         old_volumes, old_mounts = get_container_data_volumes(
-            previous_container, volumes, tmpfs, mounts
+            previous_container, volumes, tmpfs, mounts, rebuild
         )
         warn_on_masked_volume(volumes, old_volumes, previous_container.service)
         volume_bindings.update(
@@ -1310,12 +1317,34 @@ def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
     return list(volume_bindings.values()), affinity
 
 
-def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_option):
+def try_get_image_volumes(container, rebuild):
+    """
+        Try to get the volumes from the existing container. If the image does
+        not exist, prompt the user to either continue (rebuild the image from
+        scratch) or raise an exception.
+    """
+
+    try:
+        image_volumes = [
+            VolumeSpec.parse(volume)
+            for volume in
+            container.image_config['ContainerConfig'].get('Volumes') or {}
+        ]
+        return image_volumes
+    except ImageNotFound:
+        if rebuild:
+            # This will force Compose to rebuild the images.
+            return []
+        raise
+
+
+def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_option, rebuild):
     """
         Find the container data volumes that are in `volumes_option`, and return
         a mapping of volume bindings for those volumes.
         Anonymous volume mounts are updated in place instead.
     """
+
     volumes = []
     volumes_option = volumes_option or []
 
@@ -1324,11 +1353,7 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
         for mount in container.get('Mounts') or {}
     )
 
-    image_volumes = [
-        VolumeSpec.parse(volume)
-        for volume in
-        container.image_config['ContainerConfig'].get('Volumes') or {}
-    ]
+    image_volumes = try_get_image_volumes(container, rebuild)
 
     for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
