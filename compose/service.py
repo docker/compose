@@ -1291,17 +1291,21 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
     """
     volumes = []
     volumes_option = volumes_option or []
+    image_volumes = []
 
     container_mounts = dict(
         (mount['Destination'], mount)
         for mount in container.get('Mounts') or {}
     )
 
-    image_volumes = [
-        VolumeSpec.parse(volume)
-        for volume in
-        container.image_config['ContainerConfig'].get('Volumes') or {}
-    ]
+    try:
+        image_volumes = [
+            VolumeSpec.parse(volume)
+            for volume in
+            container.image_config['ContainerConfig'].get('Volumes') or {}
+        ]
+    except ImageNotFound:
+        return volumes
 
     for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
