@@ -926,6 +926,14 @@ class ServiceVolumesTest(unittest.TestCase):
         volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
         assert sorted(volumes) == sorted(expected)
 
+        # Issue 5465, check for non-existant image.
+
+        container = Container(self.mock_client, {}, has_been_inspected=True)
+        expected = []
+
+        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
+        assert sorted(volumes) == sorted(expected)
+
     def test_merge_volume_bindings(self):
         options = [
             VolumeSpec.parse(v, True) for v in [
