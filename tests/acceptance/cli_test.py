@@ -1244,6 +1244,18 @@ class CLITestCase(DockerClientTestCase):
         assert foo_container.get('HostConfig.NetworkMode') == \
             'container:{}'.format(bar_container.id)
 
+    def test_up_ordered_networks(self):
+        self.base_dir = 'tests/fixtures/networks'
+
+        self.dispatch(['-f', 'ordered-networks.yml', 'up', '-d'])
+
+        containers = self.project.get_service('web').containers()
+
+        for container in containers:
+            networks = container.get('NetworkSettings.Networks')
+            assert networks.keys()[0] == "networks_bar"
+            assert networks.keys()[1] == "networks_foo"
+
     @v3_only()
     def test_up_with_healthcheck(self):
         def wait_on_health_status(container, status):
