@@ -433,7 +433,8 @@ class Project(object):
            remove_orphans=False,
            scale_override=None,
            rescale=True,
-           start=True):
+           start=True,
+           rollout_factor=None):
 
         warn_for_swarm_mode(self.client)
 
@@ -461,7 +462,8 @@ class Project(object):
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
                 start=start,
-                project_services=scaled_services
+                project_services=scaled_services,
+                rollout_factor=rollout_factor,
             )
 
         def get_deps(service):

@@ -405,7 +405,7 @@ class Service(object):
 
             return containers
 
-    def _execute_convergence_recreate(self, containers, scale, timeout, detached, start):
+    def _execute_convergence_recreate(self, containers, scale, timeout, detached, start, rollout_factor):
             if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
@@ -420,6 +420,7 @@ class Service(object):
                 recreate,
                 lambda c: c.name,
                 "Recreating",
+                limit=rollout_factor,
             )
             for error in errors.values():
                 raise OperationFailedError(error)
@@ -464,7 +465,8 @@ class Service(object):
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
-                                 start=True, scale_override=None, rescale=True, project_services=None):
+                                 start=True, scale_override=None, rescale=True, project_services=None,
+                                 rollout_factor=None):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -483,7 +485,7 @@ class Service(object):
 
         if action == 'recreate':
             return self._execute_convergence_recreate(
-                containers, scale, timeout, detached, start
+                containers, scale, timeout, detached, start, rollout_factor
             )
 
         if action == 'start':

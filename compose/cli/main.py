@@ -916,6 +916,8 @@ class TopLevelCommand(object):
                                        Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the `scale`
                                        setting in the Compose file if present.
+            --rollout-factor NUM       The number of containers to restart at one time when
+                                       the scale factor is greater than 1.
         """
         start_deps = not options['--no-deps']
         exit_value_from = exitval_from_opts(options, self.project)
@@ -925,6 +927,7 @@ class TopLevelCommand(object):
         remove_orphans = options['--remove-orphans']
         detached = options.get('-d')
         no_start = options.get('--no-start')
+        rollout = rollout_from_opts(options)
 
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
@@ -944,7 +947,8 @@ class TopLevelCommand(object):
                 detached=detached,
                 remove_orphans=remove_orphans,
                 scale_override=parse_scale_args(options['--scale']),
-                start=not no_start
+                start=not no_start,
+                rollout_factor=rollout,
             )
 
             if detached or no_start:
@@ -1037,6 +1041,16 @@ def convergence_strategy_from_opts(options):
 def timeout_from_opts(options):
     timeout = options.get('--timeout')
     return None if timeout is None else int(timeout)
+
+
+def rollout_from_opts(options):
+    rollout = options.get('--rollout-factor')
+    if rollout is None:
+        return None
+    rollout = int(rollout)
+    if rollout == 0:
+        return None
+    return rollout
 
 
 def image_digests_for_project(project, allow_push=False):
