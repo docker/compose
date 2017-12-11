@@ -928,7 +928,11 @@ class ServiceVolumesTest(unittest.TestCase):
 
         # Issue 5465, check for non-existant image.
 
-        container = Container(self.mock_client, {}, has_been_inspected=True)
+        container = Container(self.mock_client, {
+            'Image': None,
+            'Mounts': []
+        }, has_been_inspected=True)
+
         expected = []
 
         volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
