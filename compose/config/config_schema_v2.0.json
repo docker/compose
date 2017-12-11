@@ -299,7 +299,8 @@
           },
           "additionalProperties": false
         },
-        "internal": {"type": "boolean"}
+        "internal": {"type": "boolean"},
+        "priority": {"type": "number"}
       },
       "additionalProperties": false
     },

@@ -1,0 +1,13 @@
+version: "2"
+
+services:
+  web:
+    image: busybox
+    command: top
+    networks: ["foo", "bar"]
+
+networks:
+  foo:
+    priority: 1
+  bar:
+     priority: 2

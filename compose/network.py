@@ -26,7 +26,7 @@ OPTS_EXCEPTIONS = [
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
                  ipam=None, external=False, internal=False, enable_ipv6=False,
-                 labels=None, custom_name=False):
+                 labels=None, custom_name=False, priority=0):
         self.client = client
         self.project = project
         self.name = name
@@ -38,6 +38,7 @@ class Network(object):
         self.enable_ipv6 = enable_ipv6
         self.labels = labels
         self.custom_name = custom_name
+        self.priority = priority
 
     def ensure(self):
         if self.external:
@@ -214,6 +215,7 @@ def build_networks(name, config_data, client):
             enable_ipv6=data.get('enable_ipv6'),
             labels=data.get('labels'),
             custom_name=data.get('name') is not None,
+            priority=data.get('priority'),
         )
         for network_name, data in network_config.items()
     }
