@@ -126,6 +126,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'network_mode',
     'init',
     'scale',
+    'stop_grace_period',
 ]
 
 DOCKER_VALID_URL_PREFIXES = (

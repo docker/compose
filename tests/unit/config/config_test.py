@@ -1150,7 +1150,8 @@ class ConfigTest(unittest.TestCase):
                         'volumes': [
                             {'source': '/a', 'target': '/b', 'type': 'bind'},
                             {'source': 'vol', 'target': '/x', 'type': 'volume', 'read_only': True}
-                        ]
+                        ],
+                        'stop_grace_period': '30s',
                     }
                 },
                 'volumes': {'vol': {}}
@@ -1177,6 +1178,7 @@ class ConfigTest(unittest.TestCase):
                 '/c:/b:rw',
                 {'source': 'vol', 'target': '/x', 'type': 'volume', 'read_only': True}
             ]
+        assert service_dicts[0]['stop_grace_period'] == '30s'
 
     @mock.patch.dict(os.environ)
     def test_volume_mode_override(self):
