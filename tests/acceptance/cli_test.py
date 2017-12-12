@@ -2447,14 +2447,30 @@ class CLITestCase(DockerClientTestCase):
         assert 'multiplecomposefiles_another_1' in result.stdout
         assert 'multiplecomposefiles_simple_1' in result.stdout
 
+    @mock.patch.dict(os.environ)
+    def test_images_tagless_image(self):
+        self.base_dir = 'tests/fixtures/tagless-image'
+        stream = self.client.build(self.base_dir, decode=True)
+        img_id = None
+        for data in stream:
+            if 'aux' in data:
+                img_id = data['aux']['ID']
+                break
+            if 'stream' in data and 'Successfully built' in data['stream']:
+                img_id = self.client.inspect_image(data['stream'].split(' ')[2].strip())['Id']
+
+        assert img_id
+
+        os.environ['IMAGE_ID'] = img_id
+        self.project.get_service('foo').create_container()
+        result = self.dispatch(['images'])
+        assert '<none>' in result.stdout
+        assert 'taglessimage_foo_1' in result.stdout
+
     def test_up_with_override_yaml(self):
         self.base_dir = 'tests/fixtures/override-yaml-files'
         self._project = get_project(self.base_dir, [])
-        self.dispatch(
-            [
-                'up', '-d',
-            ],
-            None)
+        self.dispatch(['up', '-d'], None)
 
         containers = self.project.containers()
         self.assertEqual(len(containers), 2)
