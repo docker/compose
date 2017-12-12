@@ -282,6 +282,7 @@ def get_networks(service_dict, network_definitions):
     for name, netdef in get_network_defs_for_service(service_dict).items():
         network = network_definitions.get(name)
         if network:
+            netdef['priority'] = network.priority
             networks[network.full_name] = netdef
         else:
             raise ConfigurationError(

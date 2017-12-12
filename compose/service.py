@@ -574,6 +574,7 @@ class Service(object):
                     container.id,
                     network)
 
+            print('Connecting to {}'.format(network))
             self.client.connect_container_to_network(
                 container.id, network,
                 aliases=self._get_aliases(netdefs, container),

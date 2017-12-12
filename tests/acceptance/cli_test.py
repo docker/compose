@@ -1246,15 +1246,9 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up_ordered_networks(self):
         self.base_dir = 'tests/fixtures/networks'
+        result = self.dispatch(['-f', 'ordered-networks.yml', 'up', '-d'])
 
-        self.dispatch(['-f', 'ordered-networks.yml', 'up', '-d'])
-
-        containers = self.project.get_service('web').containers()
-
-        for container in containers:
-            networks = container.get('NetworkSettings.Networks')
-            assert networks.keys()[0] == "networks_bar"
-            assert networks.keys()[1] == "networks_foo"
+        assert 'Connecting to networks_bar\nConnecting to networks_foo' in result.stdout
 
     @v3_only()
     def test_up_with_healthcheck(self):
@@ -1866,7 +1860,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['run', 'simple'])
 
         if six.PY2:  # Can't retrieve output on Py3. See issue #3670
-            assert value == result.stdout.strip()
+            assert value in result.stdout.strip()
 
         container = self.project.containers(one_off=OneOffFilter.only, stopped=True)[0]
         environment = container.get('Config.Env')
