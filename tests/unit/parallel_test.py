@@ -7,6 +7,7 @@ from threading import Lock
 import six
 from docker.errors import APIError
 
+from .. import mock
 from compose.parallel import get_configured_limit
 from compose.parallel import parallel_execute
 from compose.parallel import parallel_execute_iter
@@ -69,6 +70,7 @@ def test_parallel_execute_with_limit():
     assert errors == {}
 
 
+@mock.patch.dict(os.environ)
 def test_parallel_execute_with_global_limit():
     os.environ['COMPOSE_PARALLEL_LIMIT'] = '1'
     tasks = 20
