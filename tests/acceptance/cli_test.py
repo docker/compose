@@ -1278,7 +1278,8 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/networks'
         result = self.dispatch(['-f', 'ordered-networks.yml', 'up', '-d'])
 
-        assert 'Connecting to networks_bar\nConnecting to networks_foo' in result.stdout
+        assert 'Connecting to networks_buzz\nConnecting to networks_foo' \
+               '\nConnecting to networks_bar' in result.stdout
 
     @v3_only()
     def test_up_with_healthcheck(self):
