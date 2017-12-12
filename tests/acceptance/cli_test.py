@@ -1909,8 +1909,8 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(service.containers(stopped=True)[0].exit_code, 0)
 
     def test_start_no_containers(self):
-        result = self.dispatch(['start'], returncode=1)
-        assert 'No containers to start' in result.stderr
+        result = self.dispatch(['start'])
+        assert 'No containers have been created yet' in result.stdout
 
     @v2_only()
     def test_up_logging(self):

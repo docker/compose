@@ -799,7 +799,9 @@ class TopLevelCommand(object):
         Usage: start [SERVICE...]
         """
         containers = self.project.start(service_names=options['SERVICE'])
-        exit_if(not containers, 'No containers to start', 1)
+        if not containers:
+            print('No containers have been created yet')
+        # exit_if(not containers, 'No containers to start', 1)
 
     def stop(self, options):
         """
