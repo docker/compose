@@ -559,7 +559,7 @@ class Service(object):
 
     def prioritized_networks(self):
         prioritized_networks = OrderedDict(
-            sorted(self.networks.items(), key=lambda t: t[1].get('priority', 0), reverse=True))
+            sorted(self.networks.items(), key=lambda t: t[1].get('priority', 0) or 0, reverse=True))
         return prioritized_networks
 
     def connect_container_to_networks(self, container):

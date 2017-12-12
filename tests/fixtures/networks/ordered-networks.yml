@@ -4,10 +4,12 @@ services:
   web:
     image: busybox
     command: top
-    networks: ["foo", "bar"]
+    networks: ["foo", "bar", "buzz"]
 
 networks:
   foo:
-    priority: 1
+    priority: 2
   bar:
-     priority: 2
+     priority: 1
+  buzz:
+    priority: 3
