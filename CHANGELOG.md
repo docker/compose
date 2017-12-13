@@ -9,7 +9,7 @@ Change log
 #### Compose file version 3.5
 
 - Introduced version 3.5 of the `docker-compose.yml` specification.
-  This version requires to be used with Docker Engine 17.06.0 or above
+  This version requires Docker Engine 17.06.0 or above
 
 - Added support for the `shm_size` parameter in build configurations
 
@@ -21,20 +21,15 @@ Change log
 
 - Added support for `extra_hosts` in build configuration
 
-- Added support for the
-  [long syntax](https://docs.docker.com/compose/compose-file/#long-syntax-3)
-  for volume entries, as previously introduced in the 3.2 format.
-  Note that using this syntax will create
-  [mounts](https://docs.docker.com/engine/admin/volumes/bind-mounts/)
-  instead of volumes.
+- Added support for the [long syntax](https://docs.docker.com/compose/compose-file/#long-syntax-3) for volume entries, as previously introduced in the 3.2 format.
+  Note that using this syntax will create [mounts](https://docs.docker.com/engine/admin/volumes/bind-mounts/) instead of volumes.
 
 #### Compose file version 2.1 and up
 
 - Added support for the `oom_kill_disable` parameter in service definitions
   (2.x only)
 
-- Added support for custom names for network, secret and config definitions
-  (2.x only)
+- Added support for custom names for network definitions (2.x only)
 
 
 #### All formats
@@ -61,6 +56,12 @@ Change log
 
 - Fixed an issue with CLI logging causing duplicate messages and inelegant
   output to occur
+
+- Fixed an issue that caused `stop_grace_period` to be ignored when using
+  multiple Compose files
+
+- Fixed a bug that caused `docker-compose images` to crash when using
+  untagged images
 
 - Fixed a bug where the valid `${VAR:-}` syntax would cause Compose to
   error out
