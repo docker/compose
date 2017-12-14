@@ -8,6 +8,7 @@ from docker.errors import APIError
 
 from .. import mock
 from .. import unittest
+from compose.cli import utils
 from compose.config.errors import DependencyError
 from compose.config.types import ServicePort
 from compose.config.types import ServiceSecret
@@ -927,6 +928,7 @@ class ServiceVolumesTest(unittest.TestCase):
         assert sorted(volumes) == sorted(expected)
 
         # Issue 5465, check for non-existant image.
+        utils.yesno = mock.MagicMock(return_value=True)
 
         container = Container(self.mock_client, {
             'Image': None,

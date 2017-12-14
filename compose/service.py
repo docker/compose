@@ -24,6 +24,7 @@ from docker.utils.utils import convert_tmpfs_mounts
 from . import __version__
 from . import const
 from . import progress_stream
+from .cli.utils import yesno
 from .config import DOCKER_CONFIG_KEYS
 from .config import merge_environment
 from .config import merge_labels
@@ -1296,20 +1297,12 @@ def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
     return list(volume_bindings.values()), affinity
 
 
-def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_option):
+def try_get_image_volumes(container):
     """
-        Find the container data volumes that are in `volumes_option`, and return
-        a mapping of volume bindings for those volumes.
-        Anonymous volume mounts are updated in place instead.
+        Try to get the volumes from the existing container. If the image does
+        not exist, prompt the user to either continue (rebuild the image from
+        scratch) or throw an exception.
     """
-    volumes = []
-    volumes_option = volumes_option or []
-    image_volumes = []
-
-    container_mounts = dict(
-        (mount['Destination'], mount)
-        for mount in container.get('Mounts') or {}
-    )
 
     try:
         image_volumes = [
@@ -1317,8 +1310,32 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
             for volume in
             container.image_config['ContainerConfig'].get('Volumes') or {}
         ]
+        return image_volumes
     except ImageNotFound:
-        return volumes
+        prompt = \
+            "WARNING: Image not found. Continue by rebuilding the image? [yN]"
+        ans = yesno(prompt, False)
+        if ans is None or not ans:
+            raise
+        return []
+
+
+def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_option):
+    """
+        Find the container data volumes that are in `volumes_option`, and return
+        a mapping of volume bindings for those volumes.
+        Anonymous volume mounts are updated in place instead.
+    """
+
+    volumes = []
+    volumes_option = volumes_option or []
+
+    container_mounts = dict(
+        (mount['Destination'], mount)
+        for mount in container.get('Mounts') or {}
+    )
+
+    image_volumes = try_get_image_volumes(container)
 
     for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
