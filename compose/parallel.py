@@ -15,7 +15,6 @@ from six.moves.queue import Queue
 from compose.cli.colors import green
 from compose.cli.colors import red
 from compose.cli.signals import ShutdownException
-from compose.config.environment import Environment
 from compose.const import PARALLEL_LIMIT
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
@@ -28,16 +27,17 @@ log = logging.getLogger(__name__)
 STOP = object()
 
 
-def get_configured_limit():
-    limit = Environment.from_command_line({'COMPOSE_PARALLEL_LIMIT': None})['COMPOSE_PARALLEL_LIMIT']
-    if limit:
-        limit = int(limit)
-    else:
-        limit = PARALLEL_LIMIT
-    return limit
+class GlobalLimit(object):
+    """Simple class to hold a global semaphore limiter for a project. This class
+    should be treated as a singleton that is instantiated when the project is.
+    """
 
+    global_limiter = Semaphore(PARALLEL_LIMIT)
 
-global_limiter = Semaphore(get_configured_limit())
+    @classmethod
+    def set_global_limit(cls, value=None):
+        if value is not None:
+            cls.global_limiter = Semaphore(value)
 
 
 def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, parent_objects=None):
@@ -187,7 +187,7 @@ def producer(obj, func, results, limiter):
     The entry point for a producer thread which runs func on a single object.
     Places a tuple on the results queue once func has either returned or raised.
     """
-    with limiter, global_limiter:
+    with limiter, GlobalLimit.global_limiter:
         try:
             result = func(obj)
             results.put((obj, result, None))
