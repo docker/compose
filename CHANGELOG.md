@@ -1,6 +1,97 @@
 Change log
 ==========
 
+1.18.0 (2017-12-15)
+-------------------
+
+### New features
+
+#### Compose file version 3.5
+
+- Introduced version 3.5 of the `docker-compose.yml` specification.
+  This version requires Docker Engine 17.06.0 or above
+
+- Added support for the `shm_size` parameter in build configurations
+
+- Added support for the `isolation` parameter in service definitions
+
+- Added support for custom names for network, secret and config definitions
+
+#### Compose file version 2.3
+
+- Added support for `extra_hosts` in build configuration
+
+- Added support for the [long syntax](https://docs.docker.com/compose/compose-file/#long-syntax-3) for volume entries, as previously introduced in the 3.2 format.
+  Note that using this syntax will create [mounts](https://docs.docker.com/engine/admin/volumes/bind-mounts/) instead of volumes.
+
+#### Compose file version 2.1 and up
+
+- Added support for the `oom_kill_disable` parameter in service definitions
+  (2.x only)
+
+- Added support for custom names for network definitions (2.x only)
+
+
+#### All formats
+
+- Values interpolated from the environment will now be converted to the
+  proper type when used in non-string fields.
+
+- Added support for `--label` in `docker-compose run`
+
+- Added support for `--timeout` in `docker-compose down`
+
+- Added support for `--memory` in `docker-compose build`
+
+- Setting `stop_grace_period` in service definitions now also sets the
+  container's `stop_timeout`
+
+### Bugfixes
+
+- Fixed an issue where Compose was still handling service hostname according
+  to legacy engine behavior, causing hostnames containing dots to be cut up
+
+- Fixed a bug where the `X-Y:Z` syntax for ports was considered invalid
+  by Compose
+
+- Fixed an issue with CLI logging causing duplicate messages and inelegant
+  output to occur
+
+- Fixed an issue that caused `stop_grace_period` to be ignored when using
+  multiple Compose files
+
+- Fixed a bug that caused `docker-compose images` to crash when using
+  untagged images
+
+- Fixed a bug where the valid `${VAR:-}` syntax would cause Compose to
+  error out
+
+- Fixed a bug where `env_file` entries using an UTF-8 BOM were being read
+  incorrectly
+
+- Fixed a bug where missing secret files would generate an empty directory
+  in their place
+
+- Fixed character encoding issues in the CLI's error handlers
+
+- Added validation for the `test` field in healthchecks
+
+- Added validation for the `subnet` field in IPAM configurations
+
+- Added validation for `volumes` properties when using the long syntax in
+  service definitions
+
+- The CLI now explicit prevents using `-d` and `--timeout` together
+  in `docker-compose up`
+
+1.17.1 (2017-11-08)
+------------------
+
+### Bugfixes
+
+- Fixed a bug that would prevent creating new containers when using
+  container labels in the list format as part of the service's definition.
+
 1.17.0 (2017-11-02)
 -------------------
 
