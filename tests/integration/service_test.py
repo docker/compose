@@ -13,6 +13,7 @@ from six import StringIO
 from six import text_type
 
 from .. import mock
+from .testcases import docker_client
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import pull_busybox
@@ -320,6 +321,23 @@ class ServiceTest(DockerClientTestCase):
             'db',
             volumes=[MountSpec(type='volume', source=volume_name, target=container_path)]
         )
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount
+        assert mount['Name'] == volume_name
+
+    @v3_only()
+    def test_create_container_with_legacy_mount(self):
+        # Ensure mounts are converted to volumes if API version < 1.30
+        # Needed to support long syntax in the 3.2 format
+        client = docker_client({}, version='1.25')
+        container_path = '/container-volume'
+        volume_name = 'composetest_abcde'
+        self.client.create_volume(volume_name)
+        service = Service('db', client=client, volumes=[
+            MountSpec(type='volume', source=volume_name, target=container_path)
+        ], image='busybox:latest', command=['top'], project='composetest')
         container = service.create_container()
         service.start_container(container)
         mount = container.get_mount(container_path)

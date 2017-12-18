@@ -1,0 +1,5 @@
+version: '2.3'
+services:
+  foo:
+    image: ${IMAGE_ID}
+    command: top
