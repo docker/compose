@@ -785,34 +785,9 @@ class Service(object):
             self.options.get('labels'),
             override_options.get('labels'))
 
-        container_volumes = []
-        container_mounts = []
-        if 'volumes' in container_options:
-            container_volumes = [
-                v for v in container_options.get('volumes') if isinstance(v, VolumeSpec)
-            ]
-            container_mounts = [v for v in container_options.get('volumes') if isinstance(v, MountSpec)]
-
-        binds, affinity = merge_volume_bindings(
-            container_volumes, self.options.get('tmpfs') or [], previous_container,
-            container_mounts
+        container_options, override_options = self._build_container_volume_options(
+            previous_container, container_options, override_options
         )
-        override_options['binds'] = binds
-        container_options['environment'].update(affinity)
-
-        container_options['volumes'] = dict((v.internal, {}) for v in container_volumes or {})
-        override_options['mounts'] = [build_mount(v) for v in container_mounts] or None
-
-        secret_volumes = self.get_secret_volumes()
-        if secret_volumes:
-            if version_lt(self.client.api_version, '1.30'):
-                override_options['binds'].extend(v.legacy_repr() for v in secret_volumes)
-                container_options['volumes'].update(
-                    (v.target, {}) for v in secret_volumes
-                )
-            else:
-                override_options['mounts'] = override_options.get('mounts') or []
-                override_options['mounts'].extend([build_mount(v) for v in secret_volumes])
 
         container_options['image'] = self.image_name
 
@@ -837,6 +812,42 @@ class Service(object):
         container_options['environment'] = format_environment(
             container_options['environment'])
         return container_options
+
+    def _build_container_volume_options(self, previous_container, container_options, override_options):
+        container_volumes = []
+        container_mounts = []
+        if 'volumes' in container_options:
+            container_volumes = [
+                v for v in container_options.get('volumes') if isinstance(v, VolumeSpec)
+            ]
+            container_mounts = [v for v in container_options.get('volumes') if isinstance(v, MountSpec)]
+
+        binds, affinity = merge_volume_bindings(
+            container_volumes, self.options.get('tmpfs') or [], previous_container,
+            container_mounts
+        )
+        override_options['binds'] = binds
+        container_options['environment'].update(affinity)
+
+        container_options['volumes'] = dict((v.internal, {}) for v in container_volumes or {})
+        if version_gte(self.client.api_version, '1.30'):
+            override_options['mounts'] = [build_mount(v) for v in container_mounts] or None
+        else:
+            override_options['binds'].extend(m.legacy_repr() for m in container_mounts)
+            container_options['volumes'].update((m.target, {}) for m in container_mounts)
+
+        secret_volumes = self.get_secret_volumes()
+        if secret_volumes:
+            if version_lt(self.client.api_version, '1.30'):
+                override_options['binds'].extend(v.legacy_repr() for v in secret_volumes)
+                container_options['volumes'].update(
+                    (v.target, {}) for v in secret_volumes
+                )
+            else:
+                override_options['mounts'] = override_options.get('mounts') or []
+                override_options['mounts'].extend([build_mount(v) for v in secret_volumes])
+
+        return container_options, override_options
 
     def _get_container_host_config(self, override_options, one_off=False):
         options = dict(self.options, **override_options)
