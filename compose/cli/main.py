@@ -907,6 +907,7 @@ class TopLevelCommand(object):
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
                                        and image haven't changed.
+            --always-recreate-deps     Recreate dependent containers.
                                        Incompatible with --no-recreate.
             --no-recreate              If containers already exist, don't recreate them.
                                        Incompatible with --force-recreate.
@@ -927,6 +928,7 @@ class TopLevelCommand(object):
                                        setting in the Compose file if present.
         """
         start_deps = not options['--no-deps']
+        always_recreate_deps = options['--always-recreate-deps']
         exit_value_from = exitval_from_opts(options, self.project)
         cascade_stop = options['--abort-on-container-exit']
         service_names = options['SERVICE']
@@ -956,7 +958,8 @@ class TopLevelCommand(object):
                 detached=detached,
                 remove_orphans=remove_orphans,
                 scale_override=parse_scale_args(options['--scale']),
-                start=not no_start
+                start=not no_start,
+                always_recreate_deps=always_recreate_deps
             )
 
             if detached or no_start:
