@@ -46,12 +46,12 @@ class ProjectTest(unittest.TestCase):
             config_data=config,
             client=None,
         )
-        self.assertEqual(len(project.services), 2)
-        self.assertEqual(project.get_service('web').name, 'web')
-        self.assertEqual(project.get_service('web').options['image'], 'busybox:latest')
-        self.assertEqual(project.get_service('db').name, 'db')
-        self.assertEqual(project.get_service('db').options['image'], 'busybox:latest')
-        self.assertFalse(project.networks.use_networking)
+        assert len(project.services) == 2
+        assert project.get_service('web').name == 'web'
+        assert project.get_service('web').options['image'] == 'busybox:latest'
+        assert project.get_service('db').name == 'db'
+        assert project.get_service('db').options['image'] == 'busybox:latest'
+        assert not project.networks.use_networking
 
     def test_from_config_v2(self):
         config = Config(
@@ -72,8 +72,8 @@ class ProjectTest(unittest.TestCase):
             configs=None,
         )
         project = Project.from_config('composetest', config, None)
-        self.assertEqual(len(project.services), 2)
-        self.assertTrue(project.networks.use_networking)
+        assert len(project.services) == 2
+        assert project.networks.use_networking
 
     def test_get_service(self):
         web = Service(
@@ -83,7 +83,7 @@ class ProjectTest(unittest.TestCase):
             image="busybox:latest",
         )
         project = Project('test', [web], None)
-        self.assertEqual(project.get_service('web'), web)
+        assert project.get_service('web') == web
 
     def test_get_services_returns_all_services_without_args(self):
         web = Service(
@@ -97,7 +97,7 @@ class ProjectTest(unittest.TestCase):
             image='foo',
         )
         project = Project('test', [web, console], None)
-        self.assertEqual(project.get_services(), [web, console])
+        assert project.get_services() == [web, console]
 
     def test_get_services_returns_listed_services_with_args(self):
         web = Service(
@@ -111,7 +111,7 @@ class ProjectTest(unittest.TestCase):
             image='foo',
         )
         project = Project('test', [web, console], None)
-        self.assertEqual(project.get_services(['console']), [console])
+        assert project.get_services(['console']) == [console]
 
     def test_get_services_with_include_links(self):
         db = Service(
@@ -137,10 +137,7 @@ class ProjectTest(unittest.TestCase):
             links=[(web, 'web')]
         )
         project = Project('test', [web, db, cache, console], None)
-        self.assertEqual(
-            project.get_services(['console'], include_deps=True),
-            [db, web, console]
-        )
+        assert project.get_services(['console'], include_deps=True) == [db, web, console]
 
     def test_get_services_removes_duplicates_following_links(self):
         db = Service(
@@ -155,10 +152,7 @@ class ProjectTest(unittest.TestCase):
             links=[(db, 'database')]
         )
         project = Project('test', [web, db], None)
-        self.assertEqual(
-            project.get_services(['web', 'db'], include_deps=True),
-            [db, web]
-        )
+        assert project.get_services(['web', 'db'], include_deps=True) == [db, web]
 
     def test_use_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -377,8 +371,8 @@ class ProjectTest(unittest.TestCase):
             ),
         )
         service = project.get_service('test')
-        self.assertEqual(service.network_mode.id, None)
-        self.assertNotIn('NetworkMode', service._get_container_host_config({}))
+        assert service.network_mode.id is None
+        assert 'NetworkMode' not in service._get_container_host_config({})
 
     def test_use_net_from_container(self):
         container_id = 'aabbccddee'
@@ -403,7 +397,7 @@ class ProjectTest(unittest.TestCase):
             ),
         )
         service = project.get_service('test')
-        self.assertEqual(service.network_mode.mode, 'container:' + container_id)
+        assert service.network_mode.mode == 'container:' + container_id
 
     def test_use_net_from_service(self):
         container_name = 'test_aaa_1'
@@ -439,7 +433,7 @@ class ProjectTest(unittest.TestCase):
         )
 
         service = project.get_service('test')
-        self.assertEqual(service.network_mode.mode, 'container:' + container_name)
+        assert service.network_mode.mode == 'container:' + container_name
 
     def test_uses_default_network_true(self):
         project = Project.from_config(
@@ -513,7 +507,7 @@ class ProjectTest(unittest.TestCase):
                 configs=None,
             ),
         )
-        self.assertEqual([c.id for c in project.containers()], ['1'])
+        assert [c.id for c in project.containers()] == ['1']
 
     def test_down_with_no_resources(self):
         project = Project.from_config(

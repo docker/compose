@@ -60,7 +60,7 @@ class DockerClientTestCase(unittest.TestCase):
             platform.system(),
             platform.release()
         )
-        self.assertEqual(client.headers['User-Agent'], expected)
+        assert client.headers['User-Agent'] == expected
 
 
 class TLSConfigTestCase(unittest.TestCase):
