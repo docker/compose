@@ -46,14 +46,14 @@ class ServiceTest(unittest.TestCase):
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
         self.mock_client.containers.return_value = []
-        self.assertEqual(list(service.containers()), [])
+        assert list(service.containers()) == []
 
     def test_containers_with_containers(self):
         self.mock_client.containers.return_value = [
             dict(Name=str(i), Image='foo', Id=i) for i in range(3)
         ]
         service = Service('db', self.mock_client, 'myproject', image='foo')
-        self.assertEqual([c.id for c in service.containers()], list(range(3)))
+        assert [c.id for c in service.containers()] == list(range(3))
 
         expected_labels = [
             '{0}=myproject'.format(LABEL_PROJECT),
@@ -73,9 +73,9 @@ class ServiceTest(unittest.TestCase):
         ]
         service = Service('db', self.mock_client, 'myproject', image='foo')
 
-        self.assertEqual([c.id for c in service.containers()], ['1'])
-        self.assertEqual(service._next_container_number(), 2)
-        self.assertEqual(service.get_container(1).id, '1')
+        assert [c.id for c in service.containers()] == ['1']
+        assert service._next_container_number() == 2
+        assert service.get_container(1).id == '1'
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -88,7 +88,7 @@ class ServiceTest(unittest.TestCase):
                     'rw',
                     'container')])
 
-        self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
+        assert service._get_volumes_from() == [container_id + ':rw']
 
     def test_get_volumes_from_container_read_only(self):
         container_id = 'aabbccddee'
@@ -101,7 +101,7 @@ class ServiceTest(unittest.TestCase):
                     'ro',
                     'container')])
 
-        self.assertEqual(service._get_volumes_from(), [container_id + ':ro'])
+        assert service._get_volumes_from() == [container_id + ':ro']
 
     def test_get_volumes_from_service_container_exists(self):
         container_ids = ['aabbccddee', '12345']
@@ -115,7 +115,7 @@ class ServiceTest(unittest.TestCase):
             volumes_from=[VolumeFromSpec(from_service, 'rw', 'service')],
             image='foo')
 
-        self.assertEqual(service._get_volumes_from(), [container_ids[0] + ":rw"])
+        assert service._get_volumes_from() == [container_ids[0] + ":rw"]
 
     def test_get_volumes_from_service_container_exists_with_flags(self):
         for mode in ['ro', 'rw', 'z', 'rw,z', 'z,rw']:
@@ -130,7 +130,7 @@ class ServiceTest(unittest.TestCase):
                 volumes_from=[VolumeFromSpec(from_service, mode, 'service')],
                 image='foo')
 
-            self.assertEqual(service._get_volumes_from(), [container_ids[0]])
+            assert service._get_volumes_from() == [container_ids[0]]
 
     def test_get_volumes_from_service_no_container(self):
         container_id = 'abababab'
@@ -144,7 +144,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             volumes_from=[VolumeFromSpec(from_service, 'rw', 'service')])
 
-        self.assertEqual(service._get_volumes_from(), [container_id + ':rw'])
+        assert service._get_volumes_from() == [container_id + ':rw']
         from_service.create_container.assert_called_once_with()
 
     def test_memory_swap_limit(self):
@@ -159,22 +159,16 @@ class ServiceTest(unittest.TestCase):
             memswap_limit=2000000000)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
-        self.assertTrue(self.mock_client.create_host_config.called)
-        self.assertEqual(
-            self.mock_client.create_host_config.call_args[1]['mem_limit'],
-            1000000000
-        )
-        self.assertEqual(
-            self.mock_client.create_host_config.call_args[1]['memswap_limit'],
-            2000000000
-        )
+        assert self.mock_client.create_host_config.called
+        assert self.mock_client.create_host_config.call_args[1]['mem_limit'] == 1000000000
+        assert self.mock_client.create_host_config.call_args[1]['memswap_limit'] == 2000000000
 
     def test_self_reference_external_link(self):
         service = Service(
             name='foo',
             external_links=['default_foo_1']
         )
-        with self.assertRaises(DependencyError):
+        with pytest.raises(DependencyError):
             service.get_container_name('foo', 1)
 
     def test_mem_reservation(self):
@@ -202,11 +196,8 @@ class ServiceTest(unittest.TestCase):
             cgroup_parent='test')
         service._get_container_create_options({'some': 'overrides'}, 1)
 
-        self.assertTrue(self.mock_client.create_host_config.called)
-        self.assertEqual(
-            self.mock_client.create_host_config.call_args[1]['cgroup_parent'],
-            'test'
-        )
+        assert self.mock_client.create_host_config.called
+        assert self.mock_client.create_host_config.call_args[1]['cgroup_parent'] == 'test'
 
     def test_log_opt(self):
         self.mock_client.create_host_config.return_value = {}
@@ -222,11 +213,10 @@ class ServiceTest(unittest.TestCase):
             logging=logging)
         service._get_container_create_options({'some': 'overrides'}, 1)
 
-        self.assertTrue(self.mock_client.create_host_config.called)
-        self.assertEqual(
-            self.mock_client.create_host_config.call_args[1]['log_config'],
-            {'Type': 'syslog', 'Config': {'syslog-address': 'tcp://192.168.0.42:123'}}
-        )
+        assert self.mock_client.create_host_config.called
+        assert self.mock_client.create_host_config.call_args[1]['log_config'] == {
+            'Type': 'syslog', 'Config': {'syslog-address': 'tcp://192.168.0.42:123'}
+        }
 
     def test_stop_grace_period(self):
         self.mock_client.api_version = '1.25'
@@ -237,7 +227,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             stop_grace_period="1m35s")
         opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertEqual(opts['stop_timeout'], 95)
+        assert opts['stop_timeout'] == 95
 
     def test_split_domainname_none(self):
         service = Service(
@@ -246,8 +236,8 @@ class ServiceTest(unittest.TestCase):
             hostname='name.domain.tld',
             client=self.mock_client)
         opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertEqual(opts['hostname'], 'name.domain.tld', 'hostname')
-        self.assertFalse('domainname' in opts, 'domainname')
+        assert opts['hostname'] == 'name.domain.tld', 'hostname'
+        assert not ('domainname' in opts), 'domainname'
 
     def test_split_domainname_fqdn(self):
         self.mock_client.api_version = '1.22'
@@ -257,8 +247,8 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             client=self.mock_client)
         opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertEqual(opts['hostname'], 'name', 'hostname')
-        self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+        assert opts['hostname'] == 'name', 'hostname'
+        assert opts['domainname'] == 'domain.tld', 'domainname'
 
     def test_split_domainname_both(self):
         self.mock_client.api_version = '1.22'
@@ -269,8 +259,8 @@ class ServiceTest(unittest.TestCase):
             domainname='domain.tld',
             client=self.mock_client)
         opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertEqual(opts['hostname'], 'name', 'hostname')
-        self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+        assert opts['hostname'] == 'name', 'hostname'
+        assert opts['domainname'] == 'domain.tld', 'domainname'
 
     def test_split_domainname_weird(self):
         self.mock_client.api_version = '1.22'
@@ -281,8 +271,8 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             client=self.mock_client)
         opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertEqual(opts['hostname'], 'name.sub', 'hostname')
-        self.assertEqual(opts['domainname'], 'domain.tld', 'domainname')
+        assert opts['hostname'] == 'name.sub', 'hostname'
+        assert opts['domainname'] == 'domain.tld', 'domainname'
 
     def test_no_default_hostname_when_not_using_networking(self):
         service = Service(
@@ -292,7 +282,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
         )
         opts = service._get_container_create_options({'image': 'foo'}, 1)
-        self.assertIsNone(opts.get('hostname'))
+        assert opts.get('hostname') is None
 
     def test_get_container_create_options_with_name_option(self):
         service = Service(
@@ -305,7 +295,7 @@ class ServiceTest(unittest.TestCase):
             {'name': name},
             1,
             one_off=OneOffFilter.only)
-        self.assertEqual(opts['name'], name)
+        assert opts['name'] == name
 
     def test_get_container_create_options_does_not_mutate_options(self):
         labels = {'thing': 'real'}
@@ -328,12 +318,11 @@ class ServiceTest(unittest.TestCase):
             1,
             previous_container=prev_container)
 
-        self.assertEqual(service.options['labels'], labels)
-        self.assertEqual(service.options['environment'], environment)
+        assert service.options['labels'] == labels
+        assert service.options['environment'] == environment
 
-        self.assertEqual(
-            opts['labels'][LABEL_CONFIG_HASH],
-            '2524a06fcb3d781aa2c981fc40bcfa08013bb318e4273bfa388df22023e6f2aa')
+        assert opts['labels'][LABEL_CONFIG_HASH] == \
+            '2524a06fcb3d781aa2c981fc40bcfa08013bb318e4273bfa388df22023e6f2aa'
         assert opts['environment'] == ['also=real']
 
     def test_get_container_create_options_sets_affinity_with_binds(self):
@@ -385,7 +374,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.containers.return_value = []
         service = Service('foo', client=self.mock_client, image='foo')
 
-        self.assertRaises(ValueError, service.get_container)
+        with pytest.raises(ValueError):
+            service.get_container()
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
@@ -394,7 +384,7 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', image='foo', client=self.mock_client)
 
         container = service.get_container(number=2)
-        self.assertEqual(container, mock_container_class.from_ps.return_value)
+        assert container == mock_container_class.from_ps.return_value
         mock_container_class.from_ps.assert_called_once_with(
             self.mock_client, container_dict)
 
@@ -449,23 +439,17 @@ class ServiceTest(unittest.TestCase):
         mock_container.stop.assert_called_once_with(timeout=1)
 
     def test_parse_repository_tag(self):
-        self.assertEqual(parse_repository_tag("root"), ("root", "", ":"))
-        self.assertEqual(parse_repository_tag("root:tag"), ("root", "tag", ":"))
-        self.assertEqual(parse_repository_tag("user/repo"), ("user/repo", "", ":"))
-        self.assertEqual(parse_repository_tag("user/repo:tag"), ("user/repo", "tag", ":"))
-        self.assertEqual(parse_repository_tag("url:5000/repo"), ("url:5000/repo", "", ":"))
-        self.assertEqual(
-            parse_repository_tag("url:5000/repo:tag"),
-            ("url:5000/repo", "tag", ":"))
-        self.assertEqual(
-            parse_repository_tag("root@sha256:digest"),
-            ("root", "sha256:digest", "@"))
-        self.assertEqual(
-            parse_repository_tag("user/repo@sha256:digest"),
-            ("user/repo", "sha256:digest", "@"))
-        self.assertEqual(
-            parse_repository_tag("url:5000/repo@sha256:digest"),
-            ("url:5000/repo", "sha256:digest", "@"))
+        assert parse_repository_tag("root") == ("root", "", ":")
+        assert parse_repository_tag("root:tag") == ("root", "tag", ":")
+        assert parse_repository_tag("user/repo") == ("user/repo", "", ":")
+        assert parse_repository_tag("user/repo:tag") == ("user/repo", "tag", ":")
+        assert parse_repository_tag("url:5000/repo") == ("url:5000/repo", "", ":")
+        assert parse_repository_tag("url:5000/repo:tag") == ("url:5000/repo", "tag", ":")
+        assert parse_repository_tag("root@sha256:digest") == ("root", "sha256:digest", "@")
+        assert parse_repository_tag("user/repo@sha256:digest") == ("user/repo", "sha256:digest", "@")
+        assert parse_repository_tag("url:5000/repo@sha256:digest") == (
+            "url:5000/repo", "sha256:digest", "@"
+        )
 
     def test_create_container(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
@@ -553,8 +537,8 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         service.build()
 
-        self.assertEqual(self.mock_client.build.call_count, 1)
-        self.assertFalse(self.mock_client.build.call_args[1]['pull'])
+        assert self.mock_client.build.call_count == 1
+        assert not self.mock_client.build.call_args[1]['pull']
 
     def test_build_with_override_build_args(self):
         self.mock_client.build.return_value = [
@@ -653,63 +637,63 @@ class ServiceTest(unittest.TestCase):
         service = Service(
             'foo',
             image='foo')
-        self.assertEqual(service.specifies_host_port(), False)
+        assert not service.specifies_host_port()
 
     def test_specifies_host_port_with_container_port(self):
         service = Service(
             'foo',
             image='foo',
             ports=["2000"])
-        self.assertEqual(service.specifies_host_port(), False)
+        assert not service.specifies_host_port()
 
     def test_specifies_host_port_with_host_port(self):
         service = Service(
             'foo',
             image='foo',
             ports=["1000:2000"])
-        self.assertEqual(service.specifies_host_port(), True)
+        assert service.specifies_host_port()
 
     def test_specifies_host_port_with_host_ip_no_port(self):
         service = Service(
             'foo',
             image='foo',
             ports=["127.0.0.1::2000"])
-        self.assertEqual(service.specifies_host_port(), False)
+        assert not service.specifies_host_port()
 
     def test_specifies_host_port_with_host_ip_and_port(self):
         service = Service(
             'foo',
             image='foo',
             ports=["127.0.0.1:1000:2000"])
-        self.assertEqual(service.specifies_host_port(), True)
+        assert service.specifies_host_port()
 
     def test_specifies_host_port_with_container_port_range(self):
         service = Service(
             'foo',
             image='foo',
             ports=["2000-3000"])
-        self.assertEqual(service.specifies_host_port(), False)
+        assert not service.specifies_host_port()
 
     def test_specifies_host_port_with_host_port_range(self):
         service = Service(
             'foo',
             image='foo',
             ports=["1000-2000:2000-3000"])
-        self.assertEqual(service.specifies_host_port(), True)
+        assert service.specifies_host_port()
 
     def test_specifies_host_port_with_host_ip_no_port_range(self):
         service = Service(
             'foo',
             image='foo',
             ports=["127.0.0.1::2000-3000"])
-        self.assertEqual(service.specifies_host_port(), False)
+        assert not service.specifies_host_port()
 
     def test_specifies_host_port_with_host_ip_and_port_range(self):
         service = Service(
             'foo',
             image='foo',
             ports=["127.0.0.1:1000-2000:2000-3000"])
-        self.assertEqual(service.specifies_host_port(), True)
+        assert service.specifies_host_port()
 
     def test_image_name_from_config(self):
         image_name = 'example/web:latest'
@@ -730,10 +714,10 @@ class ServiceTest(unittest.TestCase):
             ports=["8080:80"])
 
         service.scale(0)
-        self.assertFalse(mock_log.warn.called)
+        assert not mock_log.warn.called
 
         service.scale(1)
-        self.assertFalse(mock_log.warn.called)
+        assert not mock_log.warn.called
 
         service.scale(2)
         mock_log.warn.assert_called_once_with(
@@ -815,16 +799,16 @@ class NetTestCase(unittest.TestCase):
 
     def test_network_mode(self):
         network_mode = NetworkMode('host')
-        self.assertEqual(network_mode.id, 'host')
-        self.assertEqual(network_mode.mode, 'host')
-        self.assertEqual(network_mode.service_name, None)
+        assert network_mode.id == 'host'
+        assert network_mode.mode == 'host'
+        assert network_mode.service_name is None
 
     def test_network_mode_container(self):
         container_id = 'abcd'
         network_mode = ContainerNetworkMode(Container(None, {'Id': container_id}))
-        self.assertEqual(network_mode.id, container_id)
-        self.assertEqual(network_mode.mode, 'container:' + container_id)
-        self.assertEqual(network_mode.service_name, None)
+        assert network_mode.id == container_id
+        assert network_mode.mode == 'container:' + container_id
+        assert network_mode.service_name is None
 
     def test_network_mode_service(self):
         container_id = 'bbbb'
@@ -837,9 +821,9 @@ class NetTestCase(unittest.TestCase):
         service = Service(name=service_name, client=mock_client)
         network_mode = ServiceNetworkMode(service)
 
-        self.assertEqual(network_mode.id, service_name)
-        self.assertEqual(network_mode.mode, 'container:' + container_id)
-        self.assertEqual(network_mode.service_name, service_name)
+        assert network_mode.id == service_name
+        assert network_mode.mode == 'container:' + container_id
+        assert network_mode.service_name == service_name
 
     def test_network_mode_service_no_containers(self):
         service_name = 'web'
@@ -849,9 +833,9 @@ class NetTestCase(unittest.TestCase):
         service = Service(name=service_name, client=mock_client)
         network_mode = ServiceNetworkMode(service)
 
-        self.assertEqual(network_mode.id, service_name)
-        self.assertEqual(network_mode.mode, None)
-        self.assertEqual(network_mode.service_name, service_name)
+        assert network_mode.id == service_name
+        assert network_mode.mode is None
+        assert network_mode.service_name == service_name
 
 
 class ServicePortsTest(unittest.TestCase):
@@ -1002,13 +986,10 @@ class ServiceVolumesTest(unittest.TestCase):
             number=1,
         )
 
-        self.assertEqual(
-            set(self.mock_client.create_host_config.call_args[1]['binds']),
-            set([
-                '/host/path:/data1:rw',
-                '/host/path:/data2:rw',
-            ]),
-        )
+        assert set(self.mock_client.create_host_config.call_args[1]['binds']) == set([
+            '/host/path:/data1:rw',
+            '/host/path:/data2:rw',
+        ])
 
     def test_get_container_create_options_with_different_host_path_in_container_json(self):
         service = Service(
@@ -1113,9 +1094,7 @@ class ServiceVolumesTest(unittest.TestCase):
         ).create_container()
 
         assert self.mock_client.create_container.call_count == 1
-        self.assertEqual(
-            self.mock_client.create_host_config.call_args[1]['binds'],
-            [volume])
+        assert self.mock_client.create_host_config.call_args[1]['binds'] == [volume]
 
 
 class ServiceSecretTest(unittest.TestCase):

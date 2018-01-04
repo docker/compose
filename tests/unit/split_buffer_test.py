@@ -50,5 +50,5 @@ class SplitBufferTest(unittest.TestCase):
         split = split_buffer(reader())
 
         for (actual, expected) in zip(split, expectations):
-            self.assertEqual(type(actual), type(expected))
-            self.assertEqual(actual, expected)
+            assert type(actual) == type(expected)
+            assert actual == expected

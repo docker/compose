@@ -15,7 +15,7 @@ class ProgressStreamTestCase(unittest.TestCase):
             b'"progress": "..."}',
         ]
         events = progress_stream.stream_output(output, StringIO())
-        self.assertEqual(len(events), 1)
+        assert len(events) == 1
 
     def test_stream_output_div_zero(self):
         output = [
@@ -24,7 +24,7 @@ class ProgressStreamTestCase(unittest.TestCase):
             b'"progress": "..."}',
         ]
         events = progress_stream.stream_output(output, StringIO())
-        self.assertEqual(len(events), 1)
+        assert len(events) == 1
 
     def test_stream_output_null_total(self):
         output = [
@@ -33,7 +33,7 @@ class ProgressStreamTestCase(unittest.TestCase):
             b'"progress": "..."}',
         ]
         events = progress_stream.stream_output(output, StringIO())
-        self.assertEqual(len(events), 1)
+        assert len(events) == 1
 
     def test_stream_output_progress_event_tty(self):
         events = [
@@ -46,7 +46,7 @@ class ProgressStreamTestCase(unittest.TestCase):
 
         output = TTYStringIO()
         events = progress_stream.stream_output(events, output)
-        self.assertTrue(len(output.getvalue()) > 0)
+        assert len(output.getvalue()) > 0
 
     def test_stream_output_progress_event_no_tty(self):
         events = [
@@ -55,7 +55,7 @@ class ProgressStreamTestCase(unittest.TestCase):
         output = StringIO()
 
         events = progress_stream.stream_output(events, output)
-        self.assertEqual(len(output.getvalue()), 0)
+        assert len(output.getvalue()) == 0
 
     def test_stream_output_no_progress_event_no_tty(self):
         events = [
@@ -64,7 +64,7 @@ class ProgressStreamTestCase(unittest.TestCase):
         output = StringIO()
 
         events = progress_stream.stream_output(events, output)
-        self.assertTrue(len(output.getvalue()) > 0)
+        assert len(output.getvalue()) > 0
 
 
 def test_get_digest_from_push():

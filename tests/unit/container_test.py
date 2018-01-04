@@ -39,13 +39,11 @@ class ContainerTest(unittest.TestCase):
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
-        self.assertEqual(
-            container.dictionary,
-            {
-                "Id": self.container_id,
-                "Image": "busybox:latest",
-                "Name": "/composetest_db_1",
-            })
+        assert container.dictionary == {
+            "Id": self.container_id,
+            "Image": "busybox:latest",
+            "Name": "/composetest_db_1",
+        }
 
     def test_from_ps_prefixed(self):
         self.container_dict['Names'] = [
@@ -56,11 +54,11 @@ class ContainerTest(unittest.TestCase):
             None,
             self.container_dict,
             has_been_inspected=True)
-        self.assertEqual(container.dictionary, {
+        assert container.dictionary == {
             "Id": self.container_id,
             "Image": "busybox:latest",
             "Name": "/composetest_db_1",
-        })
+        }
 
     def test_environment(self):
         container = Container(None, {
@@ -72,30 +70,30 @@ class ContainerTest(unittest.TestCase):
                 ]
             }
         }, has_been_inspected=True)
-        self.assertEqual(container.environment, {
+        assert container.environment == {
             'FOO': 'BAR',
             'BAZ': 'DOGE',
-        })
+        }
 
     def test_number(self):
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.number, 7)
+        assert container.number == 7
 
     def test_name(self):
         container = Container.from_ps(None,
                                       self.container_dict,
                                       has_been_inspected=True)
-        self.assertEqual(container.name, "composetest_db_1")
+        assert container.name == "composetest_db_1"
 
     def test_name_without_project(self):
         self.container_dict['Name'] = "/composetest_web_7"
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.name_without_project, "web_7")
+        assert container.name_without_project == "web_7"
 
     def test_name_without_project_custom_container_name(self):
         self.container_dict['Name'] = "/custom_name_of_container"
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.name_without_project, "custom_name_of_container")
+        assert container.name_without_project == "custom_name_of_container"
 
     def test_inspect_if_not_inspected(self):
         mock_client = mock.create_autospec(docker.APIClient)
@@ -103,16 +101,15 @@ class ContainerTest(unittest.TestCase):
 
         container.inspect_if_not_inspected()
         mock_client.inspect_container.assert_called_once_with("the_id")
-        self.assertEqual(container.dictionary,
-                         mock_client.inspect_container.return_value)
-        self.assertTrue(container.has_been_inspected)
+        assert container.dictionary == mock_client.inspect_container.return_value
+        assert container.has_been_inspected
 
         container.inspect_if_not_inspected()
-        self.assertEqual(mock_client.inspect_container.call_count, 1)
+        assert mock_client.inspect_container.call_count == 1
 
     def test_human_readable_ports_none(self):
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.human_readable_ports, '')
+        assert container.human_readable_ports == ''
 
     def test_human_readable_ports_public_and_private(self):
         self.container_dict['NetworkSettings']['Ports'].update({
@@ -122,7 +119,7 @@ class ContainerTest(unittest.TestCase):
         container = Container(None, self.container_dict, has_been_inspected=True)
 
         expected = "45453/tcp, 0.0.0.0:49197->45454/tcp"
-        self.assertEqual(container.human_readable_ports, expected)
+        assert container.human_readable_ports == expected
 
     def test_get_local_port(self):
         self.container_dict['NetworkSettings']['Ports'].update({
@@ -130,9 +127,7 @@ class ContainerTest(unittest.TestCase):
         })
         container = Container(None, self.container_dict, has_been_inspected=True)
 
-        self.assertEqual(
-            container.get_local_port(45454, protocol='tcp'),
-            '0.0.0.0:49197')
+        assert container.get_local_port(45454, protocol='tcp') == '0.0.0.0:49197'
 
     def test_get(self):
         container = Container(None, {
@@ -142,9 +137,9 @@ class ContainerTest(unittest.TestCase):
             },
         }, has_been_inspected=True)
 
-        self.assertEqual(container.get('Status'), "Up 8 seconds")
-        self.assertEqual(container.get('HostConfig.VolumesFrom'), ["volume_id"])
-        self.assertEqual(container.get('Foo.Bar.DoesNotExist'), None)
+        assert container.get('Status') == "Up 8 seconds"
+        assert container.get('HostConfig.VolumesFrom') == ["volume_id"]
+        assert container.get('Foo.Bar.DoesNotExist') is None
 
     def test_short_id(self):
         container = Container(None, self.container_dict, has_been_inspected=True)
@@ -182,17 +177,14 @@ class ContainerTest(unittest.TestCase):
 class GetContainerNameTestCase(unittest.TestCase):
 
     def test_get_container_name(self):
-        self.assertIsNone(get_container_name({}))
-        self.assertEqual(get_container_name({'Name': 'myproject_db_1'}), 'myproject_db_1')
-        self.assertEqual(
-            get_container_name({'Names': ['/myproject_db_1', '/myproject_web_1/db']}),
-            'myproject_db_1')
-        self.assertEqual(
-            get_container_name({
-                'Names': [
-                    '/swarm-host-1/myproject_db_1',
-                    '/swarm-host-1/myproject_web_1/db'
-                ]
-            }),
-            'myproject_db_1'
-        )
+        assert get_container_name({}) is None
+        assert get_container_name({'Name': 'myproject_db_1'}) == 'myproject_db_1'
+        assert get_container_name(
+            {'Names': ['/myproject_db_1', '/myproject_web_1/db']}
+        ) == 'myproject_db_1'
+        assert get_container_name({
+            'Names': [
+                '/swarm-host-1/myproject_db_1',
+                '/swarm-host-1/myproject_web_1/db'
+            ]
+        }) == 'myproject_db_1'
