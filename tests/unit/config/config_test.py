@@ -1784,6 +1784,25 @@ class ConfigTest(unittest.TestCase):
             }
         ]
 
+    def test_runtime_option(self):
+        actual = config.load(build_config_details({
+            'version': str(V2_3),
+            'services': {
+                'web': {
+                    'image': 'nvidia/cuda',
+                    'runtime': 'nvidia'
+                }
+            }
+        }))
+
+        assert actual.services == [
+            {
+                'name': 'web',
+                'image': 'nvidia/cuda',
+                'runtime': 'nvidia',
+            }
+        ]
+
     def test_merge_service_dicts_from_files_with_extends_in_base(self):
         base = {
             'volumes': ['.:/app'],

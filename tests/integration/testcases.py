@@ -5,6 +5,7 @@ import functools
 import os
 
 import pytest
+import six
 from docker.errors import APIError
 from docker.utils import version_lt
 
@@ -153,6 +154,25 @@ class DockerClientTestCase(unittest.TestCase):
         volumes = self.client.volumes(filters={'name': volume_name})['Volumes']
         assert len(volumes) > 0
         return self.client.inspect_volume(volumes[0]['Name'])
+
+
+def if_runtime_available(runtime):
+    if runtime == 'nvidia':
+        command = 'nvidia-container-runtime'
+        if six.PY3:
+            import shutil
+            return pytest.mark.skipif(
+                    shutil.which(command) is None,
+                    reason="Nvida runtime not exists"
+                    )
+        return pytest.mark.skipif(
+                any(
+                    os.access(os.path.join(path, command), os.X_OK)
+                    for path in os.environ["PATH"].split(os.pathsep)
+                    ) is False,
+                reason="Nvida runtime not exists"
+                )
+    return pytest.skip("Runtime %s not exists", runtime)
 
 
 def is_cluster(client):

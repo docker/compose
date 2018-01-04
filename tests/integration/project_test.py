@@ -22,6 +22,7 @@ from compose.config.types import VolumeSpec
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
+from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
@@ -31,6 +32,7 @@ from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
+from tests.integration.testcases import if_runtime_available
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
@@ -1028,6 +1030,66 @@ class ProjectTest(DockerClientTestCase):
         )
         with self.assertRaises(ProjectError):
             project.up()
+
+    @v2_3_only()
+    def test_up_with_runtime(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'runc'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
+        assert service_container.inspect()['HostConfig']['Runtime'] == 'runc'
+
+    @v2_3_only()
+    def test_up_with_invalid_runtime(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'foobar'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        with self.assertRaises(ProjectError):
+            project.up()
+
+    @v2_3_only()
+    @if_runtime_available('nvidia')
+    def test_up_with_nvidia_runtime(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'nvidia'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
+        assert service_container.inspect()['HostConfig']['Runtime'] == 'nvidia'
 
     @v2_only()
     def test_project_up_with_network_internal(self):
