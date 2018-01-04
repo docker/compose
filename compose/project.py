@@ -61,15 +61,13 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None,
-                 parallel_limit=None):
+    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None):
         self.name = name
         self.services = services
         self.client = client
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
         self.config_version = config_version
-        parallel.GlobalLimit.set_global_limit(value=parallel_limit)
 
     def labels(self, one_off=OneOffFilter.exclude):
         labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
@@ -78,7 +76,7 @@ class Project(object):
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client, global_parallel_limit=None):
+    def from_config(cls, name, config_data, client):
         """
         Construct a Project from a config.Config object.
         """
@@ -89,8 +87,7 @@ class Project(object):
             networks,
             use_networking)
         volumes = ProjectVolumes.from_config(name, config_data, client)
-        project = cls(name, [], client, project_networks, volumes, config_data.version,
-                      parallel_limit=global_parallel_limit)
+        project = cls(name, [], client, project_networks, volumes, config_data.version)
 
         for service_dict in config_data.services:
             service_dict = dict(service_dict)

@@ -35,9 +35,10 @@ class GlobalLimit(object):
     global_limiter = Semaphore(PARALLEL_LIMIT)
 
     @classmethod
-    def set_global_limit(cls, value=None):
-        if value is not None:
-            cls.global_limiter = Semaphore(value)
+    def set_global_limit(cls, value):
+        if value is None:
+            value = PARALLEL_LIMIT
+        cls.global_limiter = Semaphore(value)
 
 
 def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, parent_objects=None):
