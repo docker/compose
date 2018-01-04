@@ -1337,6 +1337,12 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['up', '-d', '-t', '1'], returncode=1)
         assert "-d and --timeout cannot be combined." in result.stderr
 
+    @mock.patch.dict(os.environ)
+    def test_up_with_ignore_remove_orphans(self):
+        os.environ["COMPOSE_IGNORE_ORPHANS"] = "True"
+        result = self.dispatch(['up', '-d', '--remove-orphans'], returncode=1)
+        assert "COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined." in result.stderr
+
     def test_up_handles_sigint(self):
         proc = start_process(self.base_dir, ['up', '-t', '2'])
         wait_on_condition(ContainerCountCondition(self.project, 2))

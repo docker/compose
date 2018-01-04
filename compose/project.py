@@ -330,9 +330,16 @@ class Project(object):
             service_names, stopped=True, one_off=one_off
         ), options)
 
-    def down(self, remove_image_type, include_volumes, remove_orphans=False, timeout=None):
+    def down(
+            self,
+            remove_image_type,
+            include_volumes,
+            remove_orphans=False,
+            timeout=None,
+            ignore_orphans=False):
         self.stop(one_off=OneOffFilter.include, timeout=timeout)
-        self.find_orphan_containers(remove_orphans)
+        if not ignore_orphans:
+            self.find_orphan_containers(remove_orphans)
         self.remove_stopped(v=include_volumes, one_off=OneOffFilter.include)
 
         self.networks.remove()
@@ -432,6 +439,7 @@ class Project(object):
            timeout=None,
            detached=False,
            remove_orphans=False,
+           ignore_orphans=False,
            scale_override=None,
            rescale=True,
            start=True):
@@ -439,7 +447,8 @@ class Project(object):
         warn_for_swarm_mode(self.client)
 
         self.initialize()
-        self.find_orphan_containers(remove_orphans)
+        if not ignore_orphans:
+            self.find_orphan_containers(remove_orphans)
 
         if scale_override is None:
             scale_override = {}

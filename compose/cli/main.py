@@ -377,9 +377,20 @@ class TopLevelCommand(object):
             -t, --timeout TIMEOUT   Specify a shutdown timeout in seconds.
                                     (default: 10)
         """
+        environment = Environment.from_env_file(self.project_dir)
+        ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
+
+        if ignore_orphans and options['--remove-orphans']:
+            raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
+
         image_type = image_type_from_opt('--rmi', options['--rmi'])
         timeout = timeout_from_opts(options)
-        self.project.down(image_type, options['--volumes'], options['--remove-orphans'], timeout=timeout)
+        self.project.down(
+            image_type,
+            options['--volumes'],
+            options['--remove-orphans'],
+            timeout=timeout,
+            ignore_orphans=ignore_orphans)
 
     def events(self, options):
         """
@@ -941,6 +952,12 @@ class TopLevelCommand(object):
         if detached and timeout:
             raise UserError("-d and --timeout cannot be combined.")
 
+        environment = Environment.from_env_file(self.project_dir)
+        ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
+
+        if ignore_orphans and remove_orphans:
+            raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
+
         if no_start:
             for excluded in ['-d', '--abort-on-container-exit', '--exit-code-from']:
                 if options.get(excluded):
@@ -955,6 +972,7 @@ class TopLevelCommand(object):
                 timeout=timeout,
                 detached=detached,
                 remove_orphans=remove_orphans,
+                ignore_orphans=ignore_orphans,
                 scale_override=parse_scale_args(options['--scale']),
                 start=not no_start
             )
