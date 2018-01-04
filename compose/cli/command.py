@@ -99,8 +99,13 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         host=host, environment=environment
     )
 
+    global_parallel_limit = environment.get('COMPOSE_PARALLEL_LIMIT')
+    if global_parallel_limit:
+        global_parallel_limit = int(global_parallel_limit)
+
     with errors.handle_connection_errors(client):
-        return Project.from_config(project_name, config_data, client)
+        return Project.from_config(project_name, config_data, client,
+                                   global_parallel_limit=global_parallel_limit)
 
 
 def get_project_name(working_dir, project_name=None, environment=None):

@@ -6,6 +6,7 @@ from threading import Lock
 import six
 from docker.errors import APIError
 
+from compose.parallel import GlobalLimit
 from compose.parallel import parallel_execute
 from compose.parallel import parallel_execute_iter
 from compose.parallel import ParallelStreamWriter
@@ -61,6 +62,29 @@ def test_parallel_execute_with_limit():
         get_name=six.text_type,
         msg="Testing",
         limit=limit,
+    )
+
+    assert results == tasks * [None]
+    assert errors == {}
+
+
+def test_parallel_execute_with_global_limit():
+    GlobalLimit.set_global_limit(1)
+    tasks = 20
+    lock = Lock()
+
+    def f(obj):
+        locked = lock.acquire(False)
+        # we should always get the lock because we're the only thread running
+        assert locked
+        lock.release()
+        return None
+
+    results, errors = parallel_execute(
+        objects=list(range(tasks)),
+        func=f,
+        get_name=six.text_type,
+        msg="Testing",
     )
 
     assert results == tasks * [None]
