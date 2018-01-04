@@ -25,7 +25,6 @@ from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.const import LABEL_CONFIG_HASH
-from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
@@ -63,7 +62,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(foo)
 
         self.assertEqual(len(foo.containers()), 1)
-        self.assertEqual(foo.containers()[0].name, 'composetest_foo_1')
+        self.assertTrue(foo.containers()[0].name, 'composetest_foo_%s' % foo.containers()[0].uid)
         self.assertEqual(len(bar.containers()), 0)
 
         create_and_start_container(bar)
@@ -72,9 +71,8 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(len(foo.containers()), 1)
         self.assertEqual(len(bar.containers()), 2)
 
-        names = [c.name for c in bar.containers()]
-        self.assertIn('composetest_bar_1', names)
-        self.assertIn('composetest_bar_2', names)
+        for c in bar.containers():
+            self.assertEqual(c.name, "composetest_bar_%s" % c.uid)
 
     def test_containers_one_off(self):
         db = self.create_service('db')
@@ -85,18 +83,18 @@ class ServiceTest(DockerClientTestCase):
     def test_project_is_added_to_container_name(self):
         service = self.create_service('web')
         create_and_start_container(service)
-        self.assertEqual(service.containers()[0].name, 'composetest_web_1')
+        self.assertTrue(service.containers()[0].name.startswith('composetest_web_'))
 
     def test_create_container_with_one_off(self):
         db = self.create_service('db')
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'composetest_db_run_1')
+        self.assertTrue(container.name.startswith('composetest_db_run_'))
 
     def test_create_container_with_one_off_when_existing_container_is_running(self):
         db = self.create_service('db')
         db.start()
         container = db.create_container(one_off=True)
-        self.assertEqual(container.name, 'composetest_db_run_1')
+        self.assertTrue(container.name.startswith('composetest_db_run_'))
 
     def test_create_container_with_unspecified_volume(self):
         service = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
@@ -446,7 +444,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(old_container.get('Config.Entrypoint'), ['top'])
         self.assertEqual(old_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=1', old_container.get('Config.Env'))
-        self.assertEqual(old_container.name, 'composetest_db_1')
+        self.assertTrue(old_container.name.startswith('composetest_db_'))
         service.start_container(old_container)
         old_container.inspect()  # reload volume data
         volume_path = old_container.get_mount('/etc')['Source']
@@ -460,7 +458,7 @@ class ServiceTest(DockerClientTestCase):
         self.assertEqual(new_container.get('Config.Entrypoint'), ['top'])
         self.assertEqual(new_container.get('Config.Cmd'), ['-d', '1'])
         self.assertIn('FOO=2', new_container.get('Config.Env'))
-        self.assertEqual(new_container.name, 'composetest_db_1')
+        self.assertTrue(new_container.name.startswith('composetest_db_'))
         self.assertEqual(new_container.get_mount('/etc')['Source'], volume_path)
         if not is_cluster(self.client):
             assert (
@@ -683,13 +681,11 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
         create_and_start_container(web)
 
-        self.assertEqual(
-            set(get_links(web.containers()[0])),
-            set([
-                'composetest_db_1', 'db_1',
-                'composetest_db_2', 'db_2',
-                'db'])
-        )
+        links = get_links(web.containers()[0])
+        self.assertEqual(len(links), 5)
+        self.assertEqual(len(list(l for l in links if l.startswith('composetest_db_'))), 2)
+        self.assertEqual(len(list(l for l in links if l.startswith('db_'))), 2)
+        self.assertIn('db', links)
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_container_creates_links_with_names(self):
@@ -700,32 +696,32 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
         create_and_start_container(web)
 
-        self.assertEqual(
-            set(get_links(web.containers()[0])),
-            set([
-                'composetest_db_1', 'db_1',
-                'composetest_db_2', 'db_2',
-                'custom_link_name'])
-        )
+        links = get_links(web.containers()[0])
+        self.assertEqual(len(links), 5)
+        self.assertEqual(len(list(l for l in links if l.startswith('composetest_db_'))), 2)
+        self.assertEqual(len(list(l for l in links if l.startswith('db_'))), 2)
+        self.assertIn('custom_link_name', links)
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_container_with_external_links(self):
         db = self.create_service('db')
-        web = self.create_service('web', external_links=['composetest_db_1',
-                                                         'composetest_db_2',
-                                                         'composetest_db_3:db_3'])
+        print(db.containers())
 
         for _ in range(3):
             create_and_start_container(db)
+        print(db.containers())
+        db_containers = db.containers()
+        self.assertEqual(len(db_containers), 3)
+        external_links = [db_containers[0].name, db_containers[1].name]
+        external_links.append('%s:%s' % (db_containers[2].name, db_containers[2].name_without_project))
+        web = self.create_service('web', external_links=external_links)
+
         create_and_start_container(web)
 
-        self.assertEqual(
-            set(get_links(web.containers()[0])),
-            set([
-                'composetest_db_1',
-                'composetest_db_2',
-                'db_3']),
-        )
+        links = get_links(web.containers()[0])
+        self.assertEqual(len(links), 3)
+        self.assertEqual(len(list(l for l in links if l.startswith('composetest_db_'))), 2)
+        self.assertEqual(len(list(l for l in links if l.startswith('db_'))), 1)
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
@@ -746,13 +742,11 @@ class ServiceTest(DockerClientTestCase):
 
         c = create_and_start_container(db, one_off=OneOffFilter.only)
 
-        self.assertEqual(
-            set(get_links(c)),
-            set([
-                'composetest_db_1', 'db_1',
-                'composetest_db_2', 'db_2',
-                'db'])
-        )
+        links = get_links(c)
+        self.assertEqual(len(links), 5)
+        self.assertEqual(len(list(l for l in links if l.startswith('composetest_db_'))), 2)
+        self.assertEqual(len(list(l for l in links if l.startswith('db_'))), 2)
+        self.assertIn('db', links)
 
     def test_start_container_builds_images(self):
         service = Service(
@@ -1053,16 +1047,13 @@ class ServiceTest(DockerClientTestCase):
         test that those containers are restarted and not removed/recreated.
         """
         service = self.create_service('web')
-        next_number = service._next_container_number()
-        valid_numbers = [next_number, next_number + 1]
-        service.create_container(number=next_number)
-        service.create_container(number=next_number + 1)
+        service.create_container()
+        service.create_container()
 
         with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             service.scale(2)
         for container in service.containers():
             self.assertTrue(container.is_running)
-            self.assertTrue(container.number in valid_numbers)
 
         captured_output = mock_stderr.getvalue()
         self.assertNotIn('Creating', captured_output)
@@ -1075,8 +1066,7 @@ class ServiceTest(DockerClientTestCase):
         test that those containers are restarted and required number are created.
         """
         service = self.create_service('web')
-        next_number = service._next_container_number()
-        service.create_container(number=next_number, quiet=True)
+        service.create_container(quiet=True)
 
         for container in service.containers():
             self.assertFalse(container.is_running)
@@ -1097,8 +1087,7 @@ class ServiceTest(DockerClientTestCase):
         and the remaining threads continue.
         """
         service = self.create_service('web')
-        next_number = service._next_container_number()
-        service.create_container(number=next_number, quiet=True)
+        service.create_container(quiet=True)
 
         with mock.patch(
             'compose.container.Container.create',
@@ -1112,18 +1101,15 @@ class ServiceTest(DockerClientTestCase):
 
         assert len(service.containers()) == 1
         assert service.containers()[0].is_running
-        assert (
-            "ERROR: for composetest_web_2  Cannot create container for service"
-            " web: Boom" in mock_stderr.getvalue()
-        )
+        assert "ERROR: for composetest_web_" in mock_stderr.getvalue()
+        assert "Cannot create container for service web: Boom" in mock_stderr.getvalue()
 
     def test_scale_with_unexpected_exception(self):
         """Test that when scaling if the API returns an error, that is not of type
         APIError, that error is re-raised.
         """
         service = self.create_service('web')
-        next_number = service._next_container_number()
-        service.create_container(number=next_number, quiet=True)
+        service.create_container(quiet=True)
 
         with mock.patch(
             'compose.container.Container.create',
@@ -1142,8 +1128,7 @@ class ServiceTest(DockerClientTestCase):
         number of containers already running results in no change.
         """
         service = self.create_service('web')
-        next_number = service._next_container_number()
-        container = service.create_container(number=next_number, quiet=True)
+        container = service.create_container(quiet=True)
         container.start()
 
         container.inspect()
@@ -1387,7 +1372,6 @@ class ServiceTest(DockerClientTestCase):
         }
 
         compose_labels = {
-            LABEL_CONTAINER_NUMBER: '1',
             LABEL_ONE_OFF: 'False',
             LABEL_PROJECT: 'composetest',
             LABEL_SERVICE: 'web',
@@ -1461,7 +1445,7 @@ class ServiceTest(DockerClientTestCase):
     def test_duplicate_containers(self):
         service = self.create_service('web')
 
-        options = service._get_container_create_options({}, 1)
+        options = service._get_container_create_options({})
         original = Container.create(service.client, **options)
 
         self.assertEqual(set(service.containers(stopped=True)), set([original]))

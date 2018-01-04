@@ -55,8 +55,8 @@ class BasicProjectTest(ProjectTestCase):
 
     def test_partial_change(self):
         old_containers = self.run_up(self.cfg)
-        old_db = [c for c in old_containers if c.name_without_project == 'db_1'][0]
-        old_web = [c for c in old_containers if c.name_without_project == 'web_1'][0]
+        old_db = [c for c in old_containers if c.name_without_project.startswith('db_')][0]
+        old_web = [c for c in old_containers if c.name_without_project.startswith('web_')][0]
 
         self.cfg['web']['command'] = '/bin/true'
 
@@ -71,7 +71,7 @@ class BasicProjectTest(ProjectTestCase):
 
         created = list(new_containers - old_containers)
         self.assertEqual(len(created), 1)
-        self.assertEqual(created[0].name_without_project, 'web_1')
+        self.assertEqual(created[0].name_without_project, 'web_%s' % created[0].uid)
         self.assertEqual(created[0].get('Config.Cmd'), ['/bin/true'])
 
     def test_all_change(self):
@@ -114,10 +114,10 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
     def test_up(self):
         containers = self.run_up(self.cfg)
-        self.assertEqual(
-            set(c.name_without_project for c in containers),
-            set(['db_1', 'web_1', 'nginx_1']),
-        )
+        self.assertEqual(len(containers), 3)
+        for c in containers:
+            self.assertIn(c.name_without_project, ['db_%s' % c.uid, 'web_%s' % c.uid,
+                                                   'nginx_%s' % c.uid])
 
     def test_change_leaf(self):
         old_containers = self.run_up(self.cfg)
@@ -125,10 +125,9 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['nginx']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        self.assertEqual(
-            set(c.name_without_project for c in new_containers - old_containers),
-            set(['nginx_1']),
-        )
+        created = [c.name_without_project for c in new_containers - old_containers]
+        self.assertEqual(len(created), 1)
+        self.assertTrue(created[0].startswith('nginx_'))
 
     def test_change_middle(self):
         old_containers = self.run_up(self.cfg)
@@ -136,10 +135,10 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['web']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        self.assertEqual(
-            set(c.name_without_project for c in new_containers - old_containers),
-            set(['web_1', 'nginx_1']),
-        )
+        created = [c.name_without_project for c in new_containers - old_containers]
+        self.assertEqual(len(created), 2)
+        self.assertEqual(len(list(l for l in created if l.startswith('web_'))), 1)
+        self.assertEqual(len(list(l for l in created if l.startswith('nginx_'))), 1)
 
     def test_change_root(self):
         old_containers = self.run_up(self.cfg)
@@ -147,10 +146,11 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        self.assertEqual(
-            set(c.name_without_project for c in new_containers - old_containers),
-            set(['db_1', 'web_1', 'nginx_1']),
-        )
+        created = [c.name_without_project for c in new_containers - old_containers]
+        self.assertEqual(len(created), 3)
+        self.assertEqual(len(list(l for l in created if l.startswith('web_'))), 1)
+        self.assertEqual(len(list(l for l in created if l.startswith('nginx_'))), 1)
+        self.assertEqual(len(list(l for l in created if l.startswith('db_'))), 1)
 
     def test_change_root_no_recreate(self):
         old_containers = self.run_up(self.cfg)
@@ -190,8 +190,16 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         web, = [c for c in containers if c.service == 'web']
         nginx, = [c for c in containers if c.service == 'nginx']
 
-        self.assertEqual(set(get_links(web)), {'composetest_db_1', 'db', 'db_1'})
-        self.assertEqual(set(get_links(nginx)), {'composetest_web_1', 'web', 'web_1'})
+        web_links = get_links(web)
+        nginx_links = get_links(nginx)
+        self.assertEqual(len(web_links), 3)
+        self.assertEqual(len(list(l for l in web_links if l.startswith('composetest_db_'))), 1)
+        self.assertEqual(len(list(l for l in web_links if l.startswith('db_'))), 1)
+        self.assertIn('db', web_links)
+        self.assertEqual(len(nginx_links), 3)
+        self.assertEqual(len(list(l for l in nginx_links if l.startswith('composetest_web_'))), 1)
+        self.assertEqual(len(list(l for l in nginx_links if l.startswith('web_'))), 1)
+        self.assertIn('web', nginx_links)
 
 
 class ServiceStateTest(DockerClientTestCase):

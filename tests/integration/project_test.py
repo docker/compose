@@ -87,9 +87,8 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         containers = project.containers(['web'])
-        self.assertEqual(
-            [c.name for c in containers],
-            ['composetest_web_1'])
+        self.assertEqual(len(containers), 1)
+        self.assertEqual(containers[0].name, 'composetest_web_%s' % containers[0].uid)
 
     def test_containers_with_extra_service(self):
         web = self.create_service('web')

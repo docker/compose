@@ -30,7 +30,7 @@ class ContainerTest(unittest.TestCase):
                 "Labels": {
                     "com.docker.compose.project": "composetest",
                     "com.docker.compose.service": "web",
-                    "com.docker.compose.container-number": 7,
+                    "com.docker.compose.container-uid": "7",
                 },
             }
         }
@@ -79,7 +79,7 @@ class ContainerTest(unittest.TestCase):
 
     def test_number(self):
         container = Container(None, self.container_dict, has_been_inspected=True)
-        self.assertEqual(container.number, 7)
+        self.assertEqual(container.uid, "7")
 
     def test_name(self):
         container = Container.from_ps(None,
