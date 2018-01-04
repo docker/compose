@@ -18,6 +18,7 @@ LABEL_VERSION = 'com.docker.compose.version'
 LABEL_VOLUME = 'com.docker.compose.volume'
 LABEL_CONFIG_HASH = 'com.docker.compose.config-hash'
 NANOCPUS_SCALE = 1000000000
+PARALLEL_LIMIT = 64
 
 SECRETS_PATH = '/run/secrets'
 
