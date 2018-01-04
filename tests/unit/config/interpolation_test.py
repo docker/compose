@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import pytest
 
 from compose.config.environment import Environment
+from compose.config.errors import ConfigurationError
 from compose.config.interpolation import interpolate_environment_variables
 from compose.config.interpolation import Interpolator
 from compose.config.interpolation import InvalidInterpolation
@@ -252,6 +253,30 @@ def test_interpolate_environment_services_convert_types_v3(mock_env):
 
     value = interpolate_environment_variables(V3_4, entry, 'service', mock_env)
     assert value == expected
+
+
+def test_interpolate_environment_services_convert_types_invalid(mock_env):
+    entry = {'service1': {'privileged': '${POSINT}'}}
+
+    with pytest.raises(ConfigurationError) as exc:
+        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+
+    assert 'Error while attempting to convert service.service1.privileged to '\
+        'appropriate type: "50" is not a valid boolean value' in exc.exconly()
+
+    entry = {'service1': {'cpus': '${TRUE}'}}
+    with pytest.raises(ConfigurationError) as exc:
+        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+
+    assert 'Error while attempting to convert service.service1.cpus to '\
+        'appropriate type: "True" is not a valid float' in exc.exconly()
+
+    entry = {'service1': {'ulimits': {'nproc': '${FLOAT}'}}}
+    with pytest.raises(ConfigurationError) as exc:
+        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+
+    assert 'Error while attempting to convert service.service1.ulimits.nproc to '\
+        'appropriate type: "0.145" is not a valid integer' in exc.exconly()
 
 
 def test_interpolate_environment_network_convert_types(mock_env):

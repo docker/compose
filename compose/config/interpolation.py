@@ -138,14 +138,24 @@ def to_int(s):
     # We must be able to handle octal representation for `mode` values notably
     if six.PY3 and re.match('^0[0-9]+$', s.strip()):
         s = '0o' + s[1:]
-    return int(s, base=0)
+    try:
+        return int(s, base=0)
+    except ValueError:
+        raise ValueError('"{}" is not a valid integer'.format(s))
+
+
+def to_float(s):
+    try:
+        return float(s)
+    except ValueError:
+        raise ValueError('"{}" is not a valid float'.format(s))
 
 
 class ConversionMap(object):
     map = {
         service_path('blkio_config', 'weight'): to_int,
         service_path('blkio_config', 'weight_device', 'weight'): to_int,
-        service_path('cpus'): float,
+        service_path('cpus'): to_float,
         service_path('cpu_count'): to_int,
         service_path('configs', 'mode'): to_int,
         service_path('secrets', 'mode'): to_int,
@@ -153,7 +163,7 @@ class ConversionMap(object):
         service_path('healthcheck', 'disable'): to_boolean,
         service_path('deploy', 'replicas'): to_int,
         service_path('deploy', 'update_config', 'parallelism'): to_int,
-        service_path('deploy', 'update_config', 'max_failure_ratio'): float,
+        service_path('deploy', 'update_config', 'max_failure_ratio'): to_float,
         service_path('deploy', 'restart_policy', 'max_attempts'): to_int,
         service_path('mem_swappiness'): to_int,
         service_path('oom_kill_disable'): to_boolean,
@@ -181,7 +191,14 @@ class ConversionMap(object):
     def convert(self, path, value):
         for rexp in self.map.keys():
             if rexp.match(path):
-                return self.map[rexp](value)
+                try:
+                    return self.map[rexp](value)
+                except ValueError as e:
+                    raise ConfigurationError(
+                        'Error while attempting to convert {} to appropriate type: {}'.format(
+                            path, e
+                        )
+                    )
         return value
 
 
