@@ -5,7 +5,6 @@ import functools
 import os
 
 import pytest
-import six
 from docker.errors import APIError
 from docker.utils import version_lt
 
@@ -157,22 +156,15 @@ class DockerClientTestCase(unittest.TestCase):
 
 
 def if_runtime_available(runtime):
-    if runtime == 'nvidia':
-        command = 'nvidia-container-runtime'
-        if six.PY3:
-            import shutil
-            return pytest.mark.skipif(
-                    shutil.which(command) is None,
-                    reason="Nvida runtime not exists"
-                    )
-        return pytest.mark.skipif(
-                any(
-                    os.access(os.path.join(path, command), os.X_OK)
-                    for path in os.environ["PATH"].split(os.pathsep)
-                    ) is False,
-                reason="Nvida runtime not exists"
-                )
-    return pytest.skip("Runtime %s not exists", runtime)
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            if runtime not in self.client.info().get('Runtimes', {}):
+                return pytest.skip("This daemon does not support the '{}'' runtime".format(runtime))
+            return f(self, *args, **kwargs)
+        return wrapper
+
+    return decorator
 
 
 def is_cluster(client):

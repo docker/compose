@@ -834,11 +834,11 @@ class ProjectTest(DockerClientTestCase):
 
         service_container = project.get_service('web').containers()[0]
 
-        IPAMConfig = (service_container.inspect().get('NetworkSettings', {}).
-                      get('Networks', {}).get('composetest_static_test', {}).
-                      get('IPAMConfig', {}))
-        assert IPAMConfig.get('IPv4Address') == '172.16.100.100'
-        assert IPAMConfig.get('IPv6Address') == 'fe80::1001:102'
+        ipam_config = (service_container.inspect().get('NetworkSettings', {}).
+                       get('Networks', {}).get('composetest_static_test', {}).
+                       get('IPAMConfig', {}))
+        assert ipam_config.get('IPv4Address') == '172.16.100.100'
+        assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
 
     @v2_1_only()
     def test_up_with_enable_ipv6(self):
@@ -1032,6 +1032,7 @@ class ProjectTest(DockerClientTestCase):
             project.up()
 
     @v2_3_only()
+    @if_runtime_available('runc')
     def test_up_with_runtime(self):
         self.require_api_version('1.30')
         config_data = build_config(
