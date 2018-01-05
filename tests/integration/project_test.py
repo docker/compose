@@ -1633,6 +1633,31 @@ class ProjectTest(DockerClientTestCase):
             if ctnr.labels.get(LABEL_SERVICE) == 'service1'
         ]) == 0
 
+    def test_project_up_ignore_orphans(self):
+        config_dict = {
+            'service1': {
+                'image': 'busybox:latest',
+                'command': 'top',
+            }
+        }
+
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        config_dict['service2'] = config_dict['service1']
+        del config_dict['service1']
+
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with mock.patch('compose.project.log') as mock_log:
+            project.up(ignore_orphans=True)
+
+        mock_log.warning.assert_not_called()
+
     @v2_1_only()
     def test_project_up_healthy_dependency(self):
         config_dict = {
