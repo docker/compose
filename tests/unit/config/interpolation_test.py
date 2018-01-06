@@ -363,3 +363,9 @@ def test_interpolate_missing_with_default(defaults_interpolator):
 def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
+
+
+def test_interpolate_with_chained_fallback_variables(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:-$FOO}") == "ok first"
+    assert defaults_interpolator("ok ${BAR:-$BAZ:-$FOO}") == "ok first"
+    assert defaults_interpolator("ok ${BAR-$FOO}") == "ok "
