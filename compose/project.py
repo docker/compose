@@ -442,7 +442,8 @@ class Project(object):
            ignore_orphans=False,
            scale_override=None,
            rescale=True,
-           start=True):
+           start=True,
+           always_recreate_deps=False):
 
         warn_for_swarm_mode(self.client)
 
@@ -459,7 +460,8 @@ class Project(object):
 
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
-        plans = self._get_convergence_plans(services, strategy)
+        plans = self._get_convergence_plans(
+            services, strategy, always_recreate_deps=always_recreate_deps)
         scaled_services = self.get_scaled_services(services, scale_override)
 
         def do(service):
@@ -503,7 +505,7 @@ class Project(object):
         self.networks.initialize()
         self.volumes.initialize()
 
-    def _get_convergence_plans(self, services, strategy):
+    def _get_convergence_plans(self, services, strategy, always_recreate_deps=False):
         plans = {}
 
         for service in services:
@@ -518,7 +520,13 @@ class Project(object):
                 log.debug('%s has upstream changes (%s)',
                           service.name,
                           ", ".join(updated_dependencies))
-                plan = service.convergence_plan(ConvergenceStrategy.always)
+                containers_stopped = any(
+                    service.containers(stopped=True, filters={'status': ['created', 'exited']}))
+                has_links = any(c.get('HostConfig.Links') for c in service.containers())
+                if always_recreate_deps or containers_stopped or not has_links:
+                    plan = service.convergence_plan(ConvergenceStrategy.always)
+                else:
+                    plan = service.convergence_plan(strategy)
             else:
                 plan = service.convergence_plan(strategy)
 

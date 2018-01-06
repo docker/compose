@@ -130,9 +130,16 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['web']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        assert set(c.name_without_project for c in new_containers - old_containers) == set(
-            ['web_1', 'nginx_1']
-        )
+        assert set(c.name_without_project for c in new_containers - old_containers) == set(['web_1'])
+
+    def test_change_middle_always_recreate_deps(self):
+        old_containers = self.run_up(self.cfg, always_recreate_deps=True)
+
+        self.cfg['web']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(self.cfg, always_recreate_deps=True)
+
+        assert set(c.name_without_project
+                   for c in new_containers - old_containers) == {'web_1', 'nginx_1'}
 
     def test_change_root(self):
         old_containers = self.run_up(self.cfg)
@@ -140,9 +147,16 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        assert set(c.name_without_project for c in new_containers - old_containers) == set(
-            ['db_1', 'web_1', 'nginx_1']
-        )
+        assert set(c.name_without_project for c in new_containers - old_containers) == set(['db_1'])
+
+    def test_change_root_always_recreate_deps(self):
+        old_containers = self.run_up(self.cfg, always_recreate_deps=True)
+
+        self.cfg['db']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(self.cfg, always_recreate_deps=True)
+
+        assert set(c.name_without_project
+                   for c in new_containers - old_containers) == {'db_1', 'web_1', 'nginx_1'}
 
     def test_change_root_no_recreate(self):
         old_containers = self.run_up(self.cfg)
