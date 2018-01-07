@@ -473,12 +473,12 @@ class CLITestCase(DockerClientTestCase):
         build = self.dispatch(['ps', '--services', '--filter', 'key=build'])
         all_services = self.dispatch(['ps', '--services'])
 
-        self.assertIn('with_build', all_services.stdout)
-        self.assertIn('with_image', all_services.stdout)
-        self.assertIn('with_build', build.stdout)
-        self.assertNotIn('with_build', image.stdout)
-        self.assertIn('with_image', image.stdout)
-        self.assertNotIn('with_image', build.stdout)
+        assert 'with_build' in all_services.stdout
+        assert 'with_image' in all_services.stdout
+        assert 'with_build' in build.stdout
+        assert 'with_build' not in image.stdout
+        assert 'with_image' in image.stdout
+        assert 'with_image' not in build.stdout
 
     def test_ps_services_filter_status(self):
         self.base_dir = 'tests/fixtures/ps-services-filter'
@@ -486,15 +486,14 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['pause', 'with_image'])
         paused = self.dispatch(['ps', '--services', '--filter', 'status=paused'])
         stopped = self.dispatch(['ps', '--services', '--filter', 'status=stopped'])
-        running = self.dispatch(['ps', '--services', '--filter', 'status=running',
-                                 '--filter', 'key=build'])
+        running = self.dispatch(['ps', '--services', '--filter', 'status=running'])
 
-        self.assertNotIn('with_build', stopped.stdout)
-        self.assertNotIn('with_image', stopped.stdout)
-        self.assertNotIn('with_build', paused.stdout)
-        self.assertIn('with_image', paused.stdout)
-        self.assertIn('with_build', running.stdout)
-        self.assertNotIn('with_image', running.stdout)
+        assert 'with_build' not in stopped.stdout
+        assert 'with_image' not in stopped.stdout
+        assert 'with_build' not in paused.stdout
+        assert 'with_image' in paused.stdout
+        assert 'with_build' in running.stdout
+        assert 'with_image' in running.stdout
 
     def test_pull(self):
         result = self.dispatch(['pull'])

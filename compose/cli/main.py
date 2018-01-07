@@ -599,47 +599,51 @@ class TopLevelCommand(object):
         """
         List containers.
 
-        Usage: ps [options] [--filter KEY=VAL...] [SERVICE...]
+        Usage: ps [options] [--filter KEY=VAL] [SERVICE...]
 
         Options:
             -q                   Only display IDs
             --services           Display services
-            --filter KEY=VAL     Filter services by a property (can be used multiple times)
+            --filter KEY=VAL     Filter services by a property
         """
-        if options['--services']:
-            filters = build_filters(options.get('--filter'))
-            services = self.project.services
-            if filters:
-                services = filter_services(filters, services, self.project)
-            print('\n'.join(service.name for service in services))
-        else:
-            containers = sorted(
-                self.project.containers(service_names=options['SERVICE'], stopped=True) +
-                self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
-                key=attrgetter('name'))
+        if options['-q'] and options['--services']:
+            raise UserError('-q and --services cannot be combined')
 
-            if options['-q']:
-                for container in containers:
-                    print(container.id)
-            else:
-                headers = [
-                    'Name',
-                    'Command',
-                    'State',
-                    'Ports',
-                ]
-                rows = []
-                for container in containers:
-                    command = container.human_readable_command
-                    if len(command) > 30:
-                        command = '%s ...' % command[:26]
-                    rows.append([
-                        container.name,
-                        command,
-                        container.human_readable_state,
-                        container.human_readable_ports,
-                    ])
-                print(Formatter().table(headers, rows))
+        if options['--services']:
+            filt = build_filter(options.get('--filter'))
+            services = self.project.services
+            if filt:
+                services = filter_services(filt, services, self.project)
+            print('\n'.join(service.name for service in services))
+            return
+
+        containers = sorted(
+            self.project.containers(service_names=options['SERVICE'], stopped=True) +
+            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+            key=attrgetter('name'))
+
+        if options['-q']:
+            for container in containers:
+                print(container.id)
+        else:
+            headers = [
+                'Name',
+                'Command',
+                'State',
+                'Ports',
+            ]
+            rows = []
+            for container in containers:
+                command = container.human_readable_command
+                if len(command) > 30:
+                    command = '%s ...' % command[:26]
+                rows.append([
+                    container.name,
+                    command,
+                    container.human_readable_state,
+                    container.human_readable_ports,
+                ])
+            print(Formatter().table(headers, rows))
 
     def pull(self, options):
         """
@@ -1324,34 +1328,34 @@ def build_exec_command(options, container_id, command):
 
 
 def has_container_with_state(containers, state):
+    states = {
+        'running': lambda c: c.is_running,
+        'stopped': lambda c: not c.is_running,
+        'paused': lambda c: c.is_paused,
+        'restarting': lambda c: c.is_restarting,
+    }
     for container in containers:
-        states = {
-            'running': container.is_running,
-            'stopped': not container.is_running,
-            'paused': container.is_paused,
-        }
         if state not in states:
             raise UserError("Invalid state: %s" % state)
-        if states[state]:
+        if states[state](container):
             return True
-    return False
 
 
-def filter_services(filters, services, project):
+def filter_services(filt, services, project):
     def should_include(service):
-        for f in filters:
+        for f in filt:
             if f == 'status':
+                state = filt[f]
                 containers = project.containers([service.name], stopped=True)
-                for status in filters[f]:
-                    if not has_container_with_state(containers, status):
-                        return False
+                if not has_container_with_state(containers, state):
+                    return False
             elif f == 'key':
-                for key in filters[f]:
-                    if key == 'image' or key == 'build':
-                        if key not in service.options:
-                            return False
-                    else:
-                        raise UserError("Invalid option: %s" % key)
+                key = filt[f]
+                if key == 'image' or key == 'build':
+                    if key not in service.options:
+                        return False
+                else:
+                    raise UserError("Invalid value for key filter: %s" % key)
             else:
                 raise UserError("Invalid filter: %s" % f)
         return True
@@ -1359,13 +1363,11 @@ def filter_services(filters, services, project):
     return filter(should_include, services)
 
 
-def build_filters(args):
-    filters = {}
-    for arg in args:
+def build_filter(arg):
+    filt = {}
+    if arg is not None:
         if '=' not in arg:
             raise UserError("Arguments to --filter should be in form KEY=VAL")
         key, val = arg.split('=', 1)
-        if key not in filters:
-            filters[key] = []
-        filters[key].append(val)
-    return filters
+        filt[key] = val
+    return filt
