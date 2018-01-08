@@ -60,6 +60,15 @@ def interpolate_value(name, config_key, value, section, interpolator):
                 name=name,
                 section=section,
                 string=e.string))
+    except UnsetRequiredSubstitution as e:
+        raise ConfigurationError(
+            'Missing mandatory value for "{config_key}" option in {section} "{name}": {err}'.format(
+                config_key=config_key,
+                name=name,
+                section=section,
+                err=e.err
+            )
+        )
 
 
 def recursive_interpolate(obj, interpolator, config_path):
@@ -79,21 +88,54 @@ def recursive_interpolate(obj, interpolator, config_path):
 
 
 class TemplateWithDefaults(Template):
-    idpattern = r'[_a-z][_a-z0-9]*(?::?-[^}]*)?'
+    pattern = r"""
+        %(delim)s(?:
+            (?P<escaped>%(delim)s) |
+            (?P<named>%(id)s)      |
+            {(?P<braced>%(bid)s)}  |
+            (?P<invalid>)
+        )
+        """ % {
+        'delim': re.escape('$'),
+        'id': r'[_a-z][_a-z0-9]*',
+        'bid': r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
+    }
+
+    @staticmethod
+    def process_braced_group(braced, sep, mapping):
+        if ':-' == sep:
+            var, _, default = braced.partition(':-')
+            return mapping.get(var) or default
+        elif '-' == sep:
+            var, _, default = braced.partition('-')
+            return mapping.get(var, default)
+
+        elif ':?' == sep:
+            var, _, err = braced.partition(':?')
+            result = mapping.get(var)
+            if not result:
+                raise UnsetRequiredSubstitution(err)
+            return result
+        elif '?' == sep:
+            var, _, err = braced.partition('?')
+            if var in mapping:
+                return mapping.get(var)
+            raise UnsetRequiredSubstitution(err)
 
     # Modified from python2.7/string.py
     def substitute(self, mapping):
         # Helper function for .sub()
+
         def convert(mo):
-            # Check the most common path first.
             named = mo.group('named') or mo.group('braced')
+            braced = mo.group('braced')
+            if braced is not None:
+                sep = mo.group('sep')
+                result = self.process_braced_group(braced, sep, mapping)
+                if result:
+                    return result
+
             if named is not None:
-                if ':-' in named:
-                    var, _, default = named.partition(':-')
-                    return mapping.get(var) or default
-                if '-' in named:
-                    var, _, default = named.partition('-')
-                    return mapping.get(var, default)
                 val = mapping[named]
                 return '%s' % (val,)
             if mo.group('escaped') is not None:
@@ -108,6 +150,11 @@ class TemplateWithDefaults(Template):
 class InvalidInterpolation(Exception):
     def __init__(self, string):
         self.string = string
+
+
+class UnsetRequiredSubstitution(Exception):
+    def __init__(self, custom_err_msg):
+        self.err = custom_err_msg
 
 
 PATH_JOKER = '[^.]+'

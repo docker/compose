@@ -9,6 +9,7 @@ from compose.config.interpolation import interpolate_environment_variables
 from compose.config.interpolation import Interpolator
 from compose.config.interpolation import InvalidInterpolation
 from compose.config.interpolation import TemplateWithDefaults
+from compose.config.interpolation import UnsetRequiredSubstitution
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_4 as V3_4
@@ -357,9 +358,46 @@ def test_interpolate_with_value(defaults_interpolator):
 def test_interpolate_missing_with_default(defaults_interpolator):
     assert defaults_interpolator("ok ${missing:-def}") == "ok def"
     assert defaults_interpolator("ok ${missing-def}") == "ok def"
-    assert defaults_interpolator("ok ${BAR:-/non:-alphanumeric}") == "ok /non:-alphanumeric"
 
 
 def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
+
+
+def test_interpolate_mandatory_values(defaults_interpolator):
+    assert defaults_interpolator("ok ${FOO:?bar}") == "ok first"
+    assert defaults_interpolator("ok ${FOO?bar}") == "ok first"
+    assert defaults_interpolator("ok ${BAR?bar}") == "ok "
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAR:?high bar}")
+    assert e.value.err == 'high bar'
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAZ?dropped the bazz}")
+    assert e.value.err == 'dropped the bazz'
+
+
+def test_interpolate_mandatory_no_err_msg(defaults_interpolator):
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAZ?}")
+
+    assert e.value.err == ''
+
+
+def test_interpolate_mixed_separators(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:-/non:-alphanumeric}") == "ok /non:-alphanumeric"
+    assert defaults_interpolator("ok ${BAR:-:?wwegegr??:?}") == "ok :?wwegegr??:?"
+    assert defaults_interpolator("ok ${BAR-:-hello}") == 'ok '
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAR:?xazz:-redf}")
+    assert e.value.err == 'xazz:-redf'
+
+    assert defaults_interpolator("ok ${BAR?...:?bar}") == "ok "
+
+
+def test_unbraced_separators(defaults_interpolator):
+    assert defaults_interpolator("ok $FOO:-bar") == "ok first:-bar"
+    assert defaults_interpolator("ok $BAZ?error") == "ok ?error"

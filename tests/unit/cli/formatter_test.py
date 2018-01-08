@@ -37,7 +37,6 @@ class ConsoleWarningFormatterTestCase(unittest.TestCase):
     def test_format_unicode_info(self):
         message = b'\xec\xa0\x95\xec\x88\x98\xec\xa0\x95'
         output = self.formatter.format(make_log_record(logging.INFO, message))
-        print(output)
         assert output == message.decode('utf-8')
 
     def test_format_unicode_warn(self):
