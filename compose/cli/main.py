@@ -1349,13 +1349,13 @@ def filter_services(filt, services, project):
                 containers = project.containers([service.name], stopped=True)
                 if not has_container_with_state(containers, state):
                     return False
-            elif f == 'key':
-                key = filt[f]
-                if key == 'image' or key == 'build':
-                    if key not in service.options:
+            elif f == 'source':
+                source = filt[f]
+                if source == 'image' or source == 'build':
+                    if source not in service.options:
                         return False
                 else:
-                    raise UserError("Invalid value for key filter: %s" % key)
+                    raise UserError("Invalid value for source filter: %s" % source)
             else:
                 raise UserError("Invalid filter: %s" % f)
         return True

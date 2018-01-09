@@ -469,8 +469,8 @@ class CLITestCase(DockerClientTestCase):
 
     def test_ps_services_filter_option(self):
         self.base_dir = 'tests/fixtures/ps-services-filter'
-        image = self.dispatch(['ps', '--services', '--filter', 'key=image'])
-        build = self.dispatch(['ps', '--services', '--filter', 'key=build'])
+        image = self.dispatch(['ps', '--services', '--filter', 'source=image'])
+        build = self.dispatch(['ps', '--services', '--filter', 'source=build'])
         all_services = self.dispatch(['ps', '--services'])
 
         assert 'with_build' in all_services.stdout
