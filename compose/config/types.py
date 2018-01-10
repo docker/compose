@@ -184,6 +184,10 @@ class MountSpec(object):
         return self.type == 'volume' and self.source
 
     @property
+    def is_tmpfs(self):
+        return self.type == 'tmpfs'
+
+    @property
     def external(self):
         return self.source
 
