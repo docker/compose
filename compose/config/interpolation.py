@@ -137,6 +137,8 @@ class TemplateWithDefaults(Template):
 
             if named is not None:
                 val = mapping[named]
+                if isinstance(val, six.binary_type):
+                    val = val.decode('utf-8')
                 return '%s' % (val,)
             if mo.group('escaped') is not None:
                 return self.delimiter
