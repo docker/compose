@@ -619,11 +619,24 @@ class TopLevelCommand(object):
         """
         List containers.
 
-        Usage: ps [options] [SERVICE...]
+        Usage: ps [options] [--filter KEY=VAL] [SERVICE...]
 
         Options:
-            -q    Only display IDs
+            -q                   Only display IDs
+            --services           Display services
+            --filter KEY=VAL     Filter services by a property
         """
+        if options['-q'] and options['--services']:
+            raise UserError('-q and --services cannot be combined')
+
+        if options['--services']:
+            filt = build_filter(options.get('--filter'))
+            services = self.project.services
+            if filt:
+                services = filter_services(filt, services, self.project)
+            print('\n'.join(service.name for service in services))
+            return
+
         containers = sorted(
             self.project.containers(service_names=options['SERVICE'], stopped=True) +
             self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
@@ -1352,3 +1365,49 @@ def build_exec_command(options, container_id, command):
     args += [container_id]
     args += command
     return args
+
+
+def has_container_with_state(containers, state):
+    states = {
+        'running': lambda c: c.is_running,
+        'stopped': lambda c: not c.is_running,
+        'paused': lambda c: c.is_paused,
+        'restarting': lambda c: c.is_restarting,
+    }
+    for container in containers:
+        if state not in states:
+            raise UserError("Invalid state: %s" % state)
+        if states[state](container):
+            return True
+
+
+def filter_services(filt, services, project):
+    def should_include(service):
+        for f in filt:
+            if f == 'status':
+                state = filt[f]
+                containers = project.containers([service.name], stopped=True)
+                if not has_container_with_state(containers, state):
+                    return False
+            elif f == 'source':
+                source = filt[f]
+                if source == 'image' or source == 'build':
+                    if source not in service.options:
+                        return False
+                else:
+                    raise UserError("Invalid value for source filter: %s" % source)
+            else:
+                raise UserError("Invalid filter: %s" % f)
+        return True
+
+    return filter(should_include, services)
+
+
+def build_filter(arg):
+    filt = {}
+    if arg is not None:
+        if '=' not in arg:
+            raise UserError("Arguments to --filter should be in form KEY=VAL")
+        key, val = arg.split('=', 1)
+        filt[key] = val
+    return filt

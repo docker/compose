@@ -491,6 +491,34 @@ class CLITestCase(DockerClientTestCase):
         assert 'multiplecomposefiles_another_1' not in result.stdout
         assert 'multiplecomposefiles_yetanother_1' in result.stdout
 
+    def test_ps_services_filter_option(self):
+        self.base_dir = 'tests/fixtures/ps-services-filter'
+        image = self.dispatch(['ps', '--services', '--filter', 'source=image'])
+        build = self.dispatch(['ps', '--services', '--filter', 'source=build'])
+        all_services = self.dispatch(['ps', '--services'])
+
+        assert 'with_build' in all_services.stdout
+        assert 'with_image' in all_services.stdout
+        assert 'with_build' in build.stdout
+        assert 'with_build' not in image.stdout
+        assert 'with_image' in image.stdout
+        assert 'with_image' not in build.stdout
+
+    def test_ps_services_filter_status(self):
+        self.base_dir = 'tests/fixtures/ps-services-filter'
+        self.dispatch(['up', '-d'])
+        self.dispatch(['pause', 'with_image'])
+        paused = self.dispatch(['ps', '--services', '--filter', 'status=paused'])
+        stopped = self.dispatch(['ps', '--services', '--filter', 'status=stopped'])
+        running = self.dispatch(['ps', '--services', '--filter', 'status=running'])
+
+        assert 'with_build' not in stopped.stdout
+        assert 'with_image' not in stopped.stdout
+        assert 'with_build' not in paused.stdout
+        assert 'with_image' in paused.stdout
+        assert 'with_build' in running.stdout
+        assert 'with_image' in running.stdout
+
     def test_pull(self):
         result = self.dispatch(['pull'])
         assert sorted(result.stderr.split('\n'))[1:] == [
