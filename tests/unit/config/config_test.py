@@ -4750,3 +4750,20 @@ class SerializeTest(unittest.TestCase):
         assert serialized_service['environment']['CURRENCY'] == '$$'
         assert serialized_service['command'] == 'echo $$FOO'
         assert serialized_service['entrypoint'][0] == '$$SHELL'
+
+    def test_serialize_unicode_values(self):
+        cfg = {
+            'version': '2.3',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': 'echo 十六夜　咲夜'
+                }
+            }
+        }
+
+        config_dict = config.load(build_config_details(cfg))
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_service = serialized_config['services']['web']
+        assert serialized_service['command'] == 'echo 十六夜　咲夜'

@@ -27,6 +27,9 @@ def serialize_string(dumper, data):
     """ Ensure boolean-like strings are quoted in the output and escape $ characters """
     representer = dumper.represent_str if six.PY3 else dumper.represent_unicode
 
+    if isinstance(data, six.binary_type):
+        data = data.decode('utf-8')
+
     data = data.replace('$', '$$')
 
     if data.lower() in ('y', 'n', 'yes', 'no', 'on', 'off', 'true', 'false'):
@@ -90,7 +93,8 @@ def serialize_config(config, image_digests=None):
         denormalize_config(config, image_digests),
         default_flow_style=False,
         indent=2,
-        width=80
+        width=80,
+        allow_unicode=True
     )
 
 

@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
@@ -401,3 +403,14 @@ def test_interpolate_mixed_separators(defaults_interpolator):
 def test_unbraced_separators(defaults_interpolator):
     assert defaults_interpolator("ok $FOO:-bar") == "ok first:-bar"
     assert defaults_interpolator("ok $BAZ?error") == "ok ?error"
+
+
+def test_interpolate_unicode_values():
+    variable_mapping = {
+        'FOO': '十六夜　咲夜'.encode('utf-8'),
+        'BAR': '十六夜　咲夜'
+    }
+    interpol = Interpolator(TemplateWithDefaults, variable_mapping).interpolate
+
+    interpol("$FOO") == '十六夜　咲夜'
+    interpol("${BAR}") == '十六夜　咲夜'
