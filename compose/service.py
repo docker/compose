@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from collections import namedtuple
+from collections import OrderedDict
 from operator import attrgetter
 
 import enum
@@ -557,10 +558,15 @@ class Service(object):
             raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
         return container
 
+    def prioritized_networks(self):
+        prioritized_networks = OrderedDict(
+            sorted(self.networks.items(), key=lambda t: t[1].get('priority', 0) or 0, reverse=True))
+        return prioritized_networks
+
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network, netdefs in self.networks.items():
+        for network, netdefs in self.prioritized_networks().items():
             if network in connected_networks:
                 if short_id_alias_exists(container, network):
                     continue
@@ -569,6 +575,7 @@ class Service(object):
                     container.id,
                     network)
 
+            print('Connecting to {}'.format(network))
             self.client.connect_container_to_network(
                 container.id, network,
                 aliases=self._get_aliases(netdefs, container),

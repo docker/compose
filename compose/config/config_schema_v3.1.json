@@ -339,7 +339,8 @@
           "additionalProperties": false
         },
         "internal": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"}
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "priority": {"type": "number"}
       },
       "additionalProperties": false
     },
