@@ -1361,9 +1361,12 @@ class CLITestCase(DockerClientTestCase):
             ['up', '-d', '--force-recreate', '--no-recreate'],
             returncode=1)
 
-    def test_up_with_timeout_detached(self):
-        result = self.dispatch(['up', '-d', '-t', '1'], returncode=1)
-        assert "-d and --timeout cannot be combined." in result.stderr
+    def test_up_with_timeout(self):
+        self.dispatch(['up', '-d', '-t', '1'])
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        assert len(service.containers()) == 1
+        assert len(another.containers()) == 1
 
     @mock.patch.dict(os.environ)
     def test_up_with_ignore_remove_orphans(self):

@@ -926,30 +926,29 @@ class TopLevelCommand(object):
         Options:
             -d                         Detached mode: Run containers in the background,
                                        print new container names. Incompatible with
-                                       --abort-on-container-exit and --timeout.
+                                       --abort-on-container-exit.
             --no-color                 Produce monochrome output.
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
                                        and image haven't changed.
             --always-recreate-deps     Recreate dependent containers.
                                        Incompatible with --no-recreate.
-            --no-recreate              If containers already exist, don't recreate them.
-                                       Incompatible with --force-recreate.
+            --no-recreate              If containers already exist, don't recreate
+                                       them. Incompatible with --force-recreate.
             --no-build                 Don't build an image, even if it's missing.
             --no-start                 Don't start the services after creating them.
             --build                    Build images before starting containers.
-            --abort-on-container-exit  Stops all containers if any container was stopped.
-                                       Incompatible with -d.
-            -t, --timeout TIMEOUT      Use this timeout in seconds for container shutdown
-                                       when attached or when containers are already.
-                                       Incompatible with -d.
-                                       running. (default: 10)
+            --abort-on-container-exit  Stops all containers if any container was
+                                       stopped. Incompatible with -d.
+            -t, --timeout TIMEOUT      Use this timeout in seconds for container
+                                       shutdown when attached or when containers are
+                                       already running. (default: 10)
             --remove-orphans           Remove containers for services not
                                        defined in the Compose file
-            --exit-code-from SERVICE   Return the exit code of the selected service container.
-                                       Implies --abort-on-container-exit.
-            --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the `scale`
-                                       setting in the Compose file if present.
+            --exit-code-from SERVICE   Return the exit code of the selected service
+                                       container. Implies --abort-on-container-exit.
+            --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
+                                       `scale` setting in the Compose file if present.
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
@@ -963,9 +962,6 @@ class TopLevelCommand(object):
 
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
-
-        if detached and timeout:
-            raise UserError("-d and --timeout cannot be combined.")
 
         environment = Environment.from_env_file(self.project_dir)
         ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
