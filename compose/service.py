@@ -834,8 +834,14 @@ class Service(object):
         if version_gte(self.client.api_version, '1.30'):
             override_options['mounts'] = [build_mount(v) for v in container_mounts] or None
         else:
-            override_options['binds'].extend(m.legacy_repr() for m in container_mounts)
-            container_options['volumes'].update((m.target, {}) for m in container_mounts)
+            # Workaround for 3.2 format
+            self.options['tmpfs'] = self.options.get('tmpfs') or []
+            for m in container_mounts:
+                if m.is_tmpfs:
+                    self.options['tmpfs'].append(m.target)
+                else:
+                    override_options['binds'].append(m.legacy_repr())
+                    container_options['volumes'][m.target] = {}
 
         secret_volumes = self.get_secret_volumes()
         if secret_volumes:

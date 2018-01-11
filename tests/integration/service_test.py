@@ -346,6 +346,21 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Name'] == volume_name
 
+    @v3_only()
+    def test_create_container_with_legacy_tmpfs_mount(self):
+        # Ensure tmpfs mounts are converted to tmpfs entries if API version < 1.30
+        # Needed to support long syntax in the 3.2 format
+        client = docker_client({}, version='1.25')
+        container_path = '/container-tmpfs'
+        service = Service('db', client=client, volumes=[
+            MountSpec(type='tmpfs', target=container_path)
+        ], image='busybox:latest', command=['top'], project='composetest')
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount is None
+        assert container_path in container.get('HostConfig.Tmpfs')
+
     def test_create_container_with_healthcheck_config(self):
         one_second = parse_nanoseconds_int('1s')
         healthcheck = {
