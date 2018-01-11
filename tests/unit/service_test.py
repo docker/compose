@@ -950,7 +950,7 @@ class ServiceVolumesTest(unittest.TestCase):
 
         expected = []
 
-        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
+        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [], False)
         assert sorted(volumes) == sorted(expected)
 
     def test_merge_volume_bindings(self):
