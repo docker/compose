@@ -971,10 +971,9 @@ class TopLevelCommand(object):
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        if no_start:
-            opts = ['-d', '--abort-on-container-exit', '--exit-code-from']
-            for excluded in [x for x in opts if options.get(x)]:
-                raise UserError('--no-start and {} cannot be combined.'.format(excluded))
+        opts = ['-d', '--abort-on-container-exit', '--exit-code-from']
+        for excluded in [x for x in opts if options.get(x) and no_start]:
+            raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             def up(rebuild):

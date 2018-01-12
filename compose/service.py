@@ -1306,24 +1306,6 @@ def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
     return list(volume_bindings.values()), affinity
 
 
-def try_get_image_volumes(container):
-    """
-        Try to get the volumes from the existing container. If the image does
-        not exist, raise an exception that will be caught at the CLI level to
-        prompt user for a rebuild.
-    """
-
-    try:
-        image_volumes = [
-            VolumeSpec.parse(volume)
-            for volume in
-            container.image_config['ContainerConfig'].get('Volumes') or {}
-        ]
-        return image_volumes
-    except ImageNotFound:
-        raise
-
-
 def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_option):
     """
         Find the container data volumes that are in `volumes_option`, and return
@@ -1339,7 +1321,11 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
         for mount in container.get('Mounts') or {}
     )
 
-    image_volumes = try_get_image_volumes(container)
+    image_volumes = [
+        VolumeSpec.parse(volume)
+        for volume in
+        container.image_config['ContainerConfig'].get('Volumes') or {}
+    ]
 
     for volume in set(volumes_option + image_volumes):
         # No need to preserve host volumes
