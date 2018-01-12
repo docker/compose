@@ -1,3 +1,4 @@
+# encoding: utf-8
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
@@ -14,6 +15,7 @@ from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.project import NoSuchService
 from compose.project import Project
 from compose.service import ImageType
 from compose.service import Service
@@ -562,3 +564,7 @@ class ProjectTest(unittest.TestCase):
         with mock.patch('compose.project.log') as fake_log:
             project.up()
             assert fake_log.warn.call_count == 0
+
+    def test_no_such_service_unicode(self):
+        assert NoSuchService('十六夜　咲夜'.encode('utf-8')).msg == 'No such service: 十六夜　咲夜'
+        assert NoSuchService('十六夜　咲夜').msg == 'No such service: 十六夜　咲夜'

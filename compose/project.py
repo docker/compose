@@ -7,6 +7,7 @@ import operator
 from functools import reduce
 
 import enum
+import six
 from docker.errors import APIError
 
 from . import parallel
@@ -703,6 +704,8 @@ def warn_for_swarm_mode(client):
 
 class NoSuchService(Exception):
     def __init__(self, name):
+        if isinstance(name, six.binary_type):
+            name = name.decode('utf-8')
         self.name = name
         self.msg = "No such service: %s" % self.name
 
