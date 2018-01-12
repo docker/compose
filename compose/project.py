@@ -703,7 +703,7 @@ def warn_for_swarm_mode(client):
 
 class NoSuchService(Exception):
     def __init__(self, name):
-        self.name = name
+        self.name = name.decode('utf8')
         self.msg = "No such service: %s" % self.name
 
     def __str__(self):
