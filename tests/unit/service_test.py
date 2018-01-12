@@ -5,6 +5,7 @@ import docker
 import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION
 from docker.errors import APIError
+from docker.errors import ImageNotFound
 
 from .. import mock
 from .. import unittest
@@ -926,7 +927,7 @@ class ServiceVolumesTest(unittest.TestCase):
         volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
         assert sorted(volumes) == sorted(expected)
 
-    def test_get_container_data_volumes_image_is_none(self):
+    def test_get_container_data_volumes_image_does_not_exist(self):
         # Issue 5465, check for non-existant image.
         options = [VolumeSpec.parse(v) for v in [
             '/host/volume:/host/volume:ro',
@@ -936,8 +937,15 @@ class ServiceVolumesTest(unittest.TestCase):
             '/dev/tmpfs'
         ]]
 
+        def inspect_fn(image):
+            if image == 'shaDOES_NOT_EXIST':
+                raise ImageNotFound("inspect_fn: {}".format(image))
+            return {'ContainerConfig': None}
+
+        self.mock_client.inspect_image = inspect_fn
+
         container = Container(self.mock_client, {
-            'Image': None,
+            'Image': 'shaDOES_NOT_EXIST',
             'Mounts': []
         }, has_been_inspected=True)
 
