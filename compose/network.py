@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+from collections import OrderedDict
 
 from docker.errors import NotFound
 from docker.types import IPAMConfig
@@ -26,7 +27,7 @@ OPTS_EXCEPTIONS = [
 class Network(object):
     def __init__(self, client, project, name, driver=None, driver_opts=None,
                  ipam=None, external=False, internal=False, enable_ipv6=False,
-                 labels=None, custom_name=False, priority=0):
+                 labels=None, custom_name=False):
         self.client = client
         self.project = project
         self.name = name
@@ -38,7 +39,6 @@ class Network(object):
         self.enable_ipv6 = enable_ipv6
         self.labels = labels
         self.custom_name = custom_name
-        self.priority = priority
 
     def ensure(self):
         if self.external:
@@ -215,7 +215,6 @@ def build_networks(name, config_data, client):
             enable_ipv6=data.get('enable_ipv6'),
             labels=data.get('labels'),
             custom_name=data.get('name') is not None,
-            priority=data.get('priority'),
         )
         for network_name, data in network_config.items()
     }
@@ -282,11 +281,13 @@ def get_networks(service_dict, network_definitions):
     for name, netdef in get_network_defs_for_service(service_dict).items():
         network = network_definitions.get(name)
         if network:
-            netdef['priority'] = network.priority
             networks[network.full_name] = netdef
         else:
             raise ConfigurationError(
                 'Service "{}" uses an undefined network "{}"'
                 .format(service_dict['name'], name))
 
-    return networks
+    return OrderedDict(sorted(
+        networks.items(),
+        key=lambda t: t[1].get('priority') or 0, reverse=True
+    ))

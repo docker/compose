@@ -191,7 +191,8 @@
                       "properties": {
                         "aliases": {"$ref": "#/definitions/list_of_strings"},
                         "ipv4_address": {"type": "string"},
-                        "ipv6_address": {"type": "string"}
+                        "ipv6_address": {"type": "string"},
+                        "priority": {"type": "number"}
                       },
                       "additionalProperties": false
                     },
@@ -299,8 +300,7 @@
           },
           "additionalProperties": false
         },
-        "internal": {"type": "boolean"},
-        "priority": {"type": "number"}
+        "internal": {"type": "boolean"}
       },
       "additionalProperties": false
     },

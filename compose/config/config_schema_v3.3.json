@@ -430,8 +430,7 @@
         },
         "internal": {"type": "boolean"},
         "attachable": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"},
-        "priority": {"type": "number"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },

@@ -1274,13 +1274,6 @@ class CLITestCase(DockerClientTestCase):
             bar_container.id
         )
 
-    def test_up_ordered_networks(self):
-        self.base_dir = 'tests/fixtures/networks'
-        result = self.dispatch(['-f', 'ordered-networks.yml', 'up', '-d'])
-
-        assert 'Connecting to networks_buzz\nConnecting to networks_foo' \
-               '\nConnecting to networks_bar' in result.stdout
-
     @v3_only()
     def test_up_with_healthcheck(self):
         def wait_on_health_status(container, status):

@@ -829,6 +829,71 @@ class ProjectTest(DockerClientTestCase):
         assert ipam_config.get('IPv4Address') == '172.16.100.100'
         assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
 
+    @v2_3_only()
+    def test_up_with_network_priorities(self):
+        mac_address = '74:6f:75:68:6f:75'
+
+        def get_config_data(p1, p2, p3):
+            return build_config(
+                version=V2_3,
+                services=[{
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                    'networks': {
+                        'n1': {
+                            'priority': p1,
+                        },
+                        'n2': {
+                            'priority': p2,
+                        },
+                        'n3': {
+                            'priority': p3,
+                        }
+                    },
+                    'command': 'top',
+                    'mac_address': mac_address
+                }],
+                networks={
+                    'n1': {},
+                    'n2': {},
+                    'n3': {}
+                }
+            )
+
+        config1 = get_config_data(1000, 1, 1)
+        config2 = get_config_data(2, 3, 1)
+        config3 = get_config_data(5, 40, 100)
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config1
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers()[0]
+        net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n1']
+        assert net_config['MacAddress'] == mac_address
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config2
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers()[0]
+        net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n2']
+        assert net_config['MacAddress'] == mac_address
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config3
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers()[0]
+        net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n3']
+        assert net_config['MacAddress'] == mac_address
+
     @v2_1_only()
     def test_up_with_enable_ipv6(self):
         self.require_api_version('1.23')
