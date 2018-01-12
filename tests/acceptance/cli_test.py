@@ -1887,7 +1887,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['run', 'simple'])
 
         if six.PY2:  # Can't retrieve output on Py3. See issue #3670
-            assert value == result.stdout.strip()
+            assert value in result.stdout.strip()
 
         container = self.project.containers(one_off=OneOffFilter.only, stopped=True)[0]
         environment = container.get('Config.Env')
