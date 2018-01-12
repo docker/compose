@@ -977,12 +977,12 @@ class TopLevelCommand(object):
                 raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
-            try:
-                to_attach = self.project.up(
+            def up(rebuild):
+                return self.project.up(
                     service_names=service_names,
                     start_deps=start_deps,
                     strategy=convergence_strategy_from_opts(options),
-                    do_build=build_action_from_opts(options),
+                    do_build=build_action_from_opts(options) if not rebuild else BuildAction.force,
                     timeout=timeout,
                     detached=detached,
                     remove_orphans=remove_orphans,
@@ -990,8 +990,10 @@ class TopLevelCommand(object):
                     scale_override=parse_scale_args(options['--scale']),
                     start=not no_start,
                     always_recreate_deps=always_recreate_deps,
-                    rebuild=False
                 )
+
+            try:
+                to_attach = up(False)
             except docker.errors.ImageNotFound as e:
                 log.error(("Image not found. If you continue, there is a "
                            "risk of data loss. Consider backing up your data "
@@ -1002,20 +1004,7 @@ class TopLevelCommand(object):
                 if res is None or not res:
                     raise e
 
-                to_attach = self.project.up(
-                    service_names=service_names,
-                    start_deps=start_deps,
-                    strategy=convergence_strategy_from_opts(options),
-                    do_build=build_action_from_opts(options),
-                    timeout=timeout,
-                    detached=detached,
-                    remove_orphans=remove_orphans,
-                    ignore_orphans=ignore_orphans,
-                    scale_override=parse_scale_args(options['--scale']),
-                    start=not no_start,
-                    always_recreate_deps=always_recreate_deps,
-                    rebuild=True
-                )
+                to_attach = up(True)
 
             if detached or no_start:
                 return
