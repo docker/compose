@@ -923,10 +923,18 @@ class ServiceVolumesTest(unittest.TestCase):
             VolumeSpec.parse('imagedata:/mnt/image/data:rw'),
         ]
 
-        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [], False)
+        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
         assert sorted(volumes) == sorted(expected)
 
+    def test_get_container_data_volumes_image_is_none(self):
         # Issue 5465, check for non-existant image.
+        options = [VolumeSpec.parse(v) for v in [
+            '/host/volume:/host/volume:ro',
+            '/new/volume',
+            '/existing/volume',
+            'named:/named/vol',
+            '/dev/tmpfs'
+        ]]
 
         container = Container(self.mock_client, {
             'Image': None,
@@ -935,7 +943,7 @@ class ServiceVolumesTest(unittest.TestCase):
 
         expected = []
 
-        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [], False)
+        volumes, _ = get_container_data_volumes(container, options, ['/dev/tmpfs'], [])
         assert sorted(volumes) == sorted(expected)
 
     def test_merge_volume_bindings(self):
@@ -971,7 +979,7 @@ class ServiceVolumesTest(unittest.TestCase):
             'existingvolume:/existing/volume:rw',
         ]
 
-        binds, affinity = merge_volume_bindings(options, ['/dev/tmpfs'], previous_container, [], False)
+        binds, affinity = merge_volume_bindings(options, ['/dev/tmpfs'], previous_container, [])
         assert sorted(binds) == sorted(expected)
         assert affinity == {'affinity:container': '=cdefab'}
 
