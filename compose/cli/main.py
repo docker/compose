@@ -233,7 +233,7 @@ class TopLevelCommand(object):
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
             --pull                  Always attempt to pull a newer version of the image.
-            -m, --memory MEM        Sets memory limit for the bulid container.
+            -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for one service.
         """
         service_names = options['SERVICE']
