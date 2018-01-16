@@ -419,6 +419,10 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
+        type(mock_container).name = mock.PropertyMock(return_value='somename')
+        type(mock_container).short_id = mock.PropertyMock(
+            return_value='someshort_id'
+        )
         service = Service('foo', client=self.mock_client, image='someimage')
         service.image = lambda: {'Id': 'abc123'}
         new_container = service.recreate_container(mock_container)
