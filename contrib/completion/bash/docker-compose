@@ -48,6 +48,31 @@ __docker_compose_has_option() {
 	return 1
 }
 
+# Returns `key` if we are currently completing the value of a map option (`key=value`)
+# which matches the extglob passed in as an argument.
+# This function is needed for key-specific completions.
+__docker_compose_map_key_of_current_option() {
+        local glob="$1"
+
+        local key glob_pos
+        if [ "$cur" = "=" ] ; then        # key= case
+                key="$prev"
+                glob_pos=$((cword - 2))
+        elif [[ $cur == *=* ]] ; then     # key=value case (OSX)
+                key=${cur%=*}
+                glob_pos=$((cword - 1))
+        elif [ "$prev" = "=" ] ; then
+                key=${words[$cword - 2]}  # key=value case
+                glob_pos=$((cword - 3))
+        else
+                return
+        fi
+
+        [ "${words[$glob_pos]}" = "=" ] && ((glob_pos--))  # --option=key=value syntax
+
+        [[ ${words[$glob_pos]} == @($glob) ]] && echo "$key"
+}
+
 # suppress trailing whitespace
 __docker_compose_nospace() {
 	# compopt is not available in ancient bash versions
@@ -314,9 +339,29 @@ _docker_compose_port() {
 
 
 _docker_compose_ps() {
+	local key=$(__docker_compose_map_key_of_current_option '--filter')
+	case "$key" in
+		source)
+			COMPREPLY=( $( compgen -W "build image" -- "${cur##*=}" ) )
+			return
+			;;
+		status)
+			COMPREPLY=( $( compgen -W "paused restarting running stopped" -- "${cur##*=}" ) )
+			return
+			;;
+	esac
+
+	case "$prev" in
+		--filter)
+			COMPREPLY=( $( compgen -W "source status" -S "=" -- "$cur" ) )
+			__docker_compose_nospace
+			return;
+			;;
+	esac
+
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help -q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help -q --services --filter" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
