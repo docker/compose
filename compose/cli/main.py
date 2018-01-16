@@ -619,7 +619,7 @@ class TopLevelCommand(object):
         """
         List containers.
 
-        Usage: ps [options] [--filter KEY=VAL] [SERVICE...]
+        Usage: ps [options] [SERVICE...]
 
         Options:
             -q                   Only display IDs
