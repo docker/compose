@@ -434,6 +434,8 @@ class TopLevelCommand(object):
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
         """
+        environment = Environment.from_env_file(self.project_dir)
+        use_cli = not environment.get_boolean('COMPOSE_EXEC_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
@@ -448,14 +450,14 @@ class TopLevelCommand(object):
         command = [options['COMMAND']] + options['ARGS']
         tty = not options["-T"]
 
-        if IS_WINDOWS_PLATFORM and not detach:
+        if IS_WINDOWS_PLATFORM or use_cli and not detach:
             sys.exit(call_docker(build_exec_command(options, container.id, command)))
 
         create_exec_options = {
             "privileged": options["--privileged"],
             "user": options["--user"],
             "tty": tty,
-            "stdin": tty,
+            "stdin": True,
         }
 
         if docker.utils.version_gte(self.project.client.api_version, '1.25'):
