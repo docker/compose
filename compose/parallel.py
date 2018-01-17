@@ -8,6 +8,7 @@ from threading import Semaphore
 from threading import Thread
 
 from docker.errors import APIError
+from docker.errors import ImageNotFound
 from six.moves import _thread as thread
 from six.moves.queue import Empty
 from six.moves.queue import Queue
@@ -53,10 +54,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, pa
 
     writer = ParallelStreamWriter(stream, msg)
 
-    if parent_objects:
-        display_objects = list(parent_objects)
-    else:
-        display_objects = objects
+    display_objects = list(parent_objects) if parent_objects else objects
 
     for obj in display_objects:
         writer.add_object(get_name(obj))
@@ -76,6 +74,12 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, pa
         if exception is None:
             writer.write(get_name(obj), 'done', green)
             results.append(result)
+        elif isinstance(exception, ImageNotFound):
+            # This is to bubble up ImageNotFound exceptions to the client so we
+            # can prompt the user if they want to rebuild.
+            errors[get_name(obj)] = exception.explanation
+            writer.write(get_name(obj), 'error', red)
+            error_to_reraise = exception
         elif isinstance(exception, APIError):
             errors[get_name(obj)] = exception.explanation
             writer.write(get_name(obj), 'error', red)

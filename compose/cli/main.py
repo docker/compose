@@ -969,25 +969,39 @@ class TopLevelCommand(object):
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        if no_start:
-            for excluded in ['-d', '--abort-on-container-exit', '--exit-code-from']:
-                if options.get(excluded):
-                    raise UserError('--no-start and {} cannot be combined.'.format(excluded))
+        opts = ['-d', '--abort-on-container-exit', '--exit-code-from']
+        for excluded in [x for x in opts if options.get(x) and no_start]:
+            raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
-            to_attach = self.project.up(
-                service_names=service_names,
-                start_deps=start_deps,
-                strategy=convergence_strategy_from_opts(options),
-                do_build=build_action_from_opts(options),
-                timeout=timeout,
-                detached=detached,
-                remove_orphans=remove_orphans,
-                ignore_orphans=ignore_orphans,
-                scale_override=parse_scale_args(options['--scale']),
-                start=not no_start,
-                always_recreate_deps=always_recreate_deps
-            )
+            def up(rebuild):
+                return self.project.up(
+                    service_names=service_names,
+                    start_deps=start_deps,
+                    strategy=convergence_strategy_from_opts(options),
+                    do_build=build_action_from_opts(options) if not rebuild else BuildAction.force,
+                    timeout=timeout,
+                    detached=detached,
+                    remove_orphans=remove_orphans,
+                    ignore_orphans=ignore_orphans,
+                    scale_override=parse_scale_args(options['--scale']),
+                    start=not no_start,
+                    always_recreate_deps=always_recreate_deps,
+                )
+
+            try:
+                to_attach = up(False)
+            except docker.errors.ImageNotFound as e:
+                log.error(("Image not found. If you continue, there is a "
+                           "risk of data loss. Consider backing up your data "
+                           "before continuing.\n\n"
+                           "Full error message: {}\n"
+                           ).format(e.explanation))
+                res = yesno("Continue by rebuilding the image(s)? [yN]", False)
+                if res is None or not res:
+                    raise e
+
+                to_attach = up(True)
 
             if detached or no_start:
                 return

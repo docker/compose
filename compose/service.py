@@ -468,7 +468,8 @@ class Service(object):
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
-                                 start=True, scale_override=None, rescale=True, project_services=None):
+                                 start=True, scale_override=None,
+                                 rescale=True, project_services=None):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -507,12 +508,7 @@ class Service(object):
 
         raise Exception("Invalid action: {}".format(action))
 
-    def recreate_container(
-            self,
-            container,
-            timeout=None,
-            attach_logs=False,
-            start_new_container=True):
+    def recreate_container(self, container, timeout=None, attach_logs=False, start_new_container=True):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -1316,6 +1312,7 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
         a mapping of volume bindings for those volumes.
         Anonymous volume mounts are updated in place instead.
     """
+
     volumes = []
     volumes_option = volumes_option or []
 
