@@ -976,12 +976,14 @@ class TopLevelCommand(object):
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
+            warn_for_swarm_mode(self.project.client)
+
             def up(rebuild):
                 return self.project.up(
                     service_names=service_names,
                     start_deps=start_deps,
                     strategy=convergence_strategy_from_opts(options),
-                    do_build=build_action_from_opts(options) if not rebuild else BuildAction.force,
+                    do_build=build_action_from_opts(options),
                     timeout=timeout,
                     detached=detached,
                     remove_orphans=remove_orphans,
@@ -989,17 +991,18 @@ class TopLevelCommand(object):
                     scale_override=parse_scale_args(options['--scale']),
                     start=not no_start,
                     always_recreate_deps=always_recreate_deps,
+                    reset_container_image=rebuild,
                 )
 
             try:
                 to_attach = up(False)
             except docker.errors.ImageNotFound as e:
-                log.error(("Image not found. If you continue, there is a "
-                           "risk of data loss. Consider backing up your data "
-                           "before continuing.\n\n"
-                           "Full error message: {}\n"
-                           ).format(e.explanation))
-                res = yesno("Continue by rebuilding the image(s)? [yN]", False)
+                log.error(
+                    "The image for the service you're trying to recreate has been removed. "
+                    "If you continue, volume data could be lost. Consider backing up your data "
+                    "before continuing.\n".format(e.explanation)
+                )
+                res = yesno("Continue with the new image? [yN]", False)
                 if res is None or not res:
                     raise e
 
@@ -1426,3 +1429,19 @@ def build_filter(arg):
         key, val = arg.split('=', 1)
         filt[key] = val
     return filt
+
+
+def warn_for_swarm_mode(client):
+    info = client.info()
+    if info.get('Swarm', {}).get('LocalNodeState') == 'active':
+        if info.get('ServerVersion', '').startswith('ucp'):
+            # UCP does multi-node scheduling with traditional Compose files.
+            return
+
+        log.warn(
+            "The Docker Engine you're using is running in swarm mode.\n\n"
+            "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
+            "All containers will be scheduled on the current node.\n\n"
+            "To deploy your application across the swarm, "
+            "use `docker stack deploy`.\n"
+        )

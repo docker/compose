@@ -469,7 +469,8 @@ class Service(object):
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
                                  start=True, scale_override=None,
-                                 rescale=True, project_services=None):
+                                 rescale=True, project_services=None,
+                                 reset_container_image=False):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -487,6 +488,12 @@ class Service(object):
             scale = None
 
         if action == 'recreate':
+            if reset_container_image:
+                # Updating the image ID on the container object lets us recover old volumes if
+                # the new image uses them as well
+                img_id = self.image()['Id']
+                for c in containers:
+                    c.reset_image(img_id)
             return self._execute_convergence_recreate(
                 containers, scale, timeout, detached, start
             )
