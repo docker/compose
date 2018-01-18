@@ -84,7 +84,7 @@ def recursive_interpolate(obj, interpolator, config_path):
         )
     if isinstance(obj, list):
         return [recursive_interpolate(val, interpolator, config_path) for val in obj]
-    return obj
+    return converter.convert(config_path, obj)
 
 
 class TemplateWithDefaults(Template):
@@ -160,10 +160,11 @@ class UnsetRequiredSubstitution(Exception):
 
 
 PATH_JOKER = '[^.]+'
+FULL_JOKER = '.+'
 
 
 def re_path(*args):
-    return re.compile('^{}$'.format('.'.join(args)))
+    return re.compile('^{}$'.format('\.'.join(args)))
 
 
 def re_path_basic(section, name):
@@ -175,6 +176,8 @@ def service_path(*args):
 
 
 def to_boolean(s):
+    if not isinstance(s, six.string_types):
+        return s
     s = s.lower()
     if s in ['y', 'yes', 'true', 'on']:
         return True
@@ -184,6 +187,9 @@ def to_boolean(s):
 
 
 def to_int(s):
+    if not isinstance(s, six.string_types):
+        return s
+
     # We must be able to handle octal representation for `mode` values notably
     if six.PY3 and re.match('^0[0-9]+$', s.strip()):
         s = '0o' + s[1:]
@@ -194,27 +200,39 @@ def to_int(s):
 
 
 def to_float(s):
+    if not isinstance(s, six.string_types):
+        return s
+
     try:
         return float(s)
     except ValueError:
         raise ValueError('"{}" is not a valid float'.format(s))
 
 
+def to_str(o):
+    if isinstance(o, (bool, float, int)):
+        return '{}'.format(o)
+    return o
+
+
 class ConversionMap(object):
     map = {
         service_path('blkio_config', 'weight'): to_int,
         service_path('blkio_config', 'weight_device', 'weight'): to_int,
+        service_path('build', 'labels', FULL_JOKER): to_str,
         service_path('cpus'): to_float,
         service_path('cpu_count'): to_int,
         service_path('configs', 'mode'): to_int,
         service_path('secrets', 'mode'): to_int,
         service_path('healthcheck', 'retries'): to_int,
         service_path('healthcheck', 'disable'): to_boolean,
+        service_path('deploy', 'labels', PATH_JOKER): to_str,
         service_path('deploy', 'replicas'): to_int,
         service_path('deploy', 'update_config', 'parallelism'): to_int,
         service_path('deploy', 'update_config', 'max_failure_ratio'): to_float,
         service_path('deploy', 'restart_policy', 'max_attempts'): to_int,
         service_path('mem_swappiness'): to_int,
+        service_path('labels', FULL_JOKER): to_str,
         service_path('oom_kill_disable'): to_boolean,
         service_path('oom_score_adj'): to_int,
         service_path('ports', 'target'): to_int,
@@ -232,9 +250,13 @@ class ConversionMap(object):
         re_path_basic('network', 'attachable'): to_boolean,
         re_path_basic('network', 'external'): to_boolean,
         re_path_basic('network', 'internal'): to_boolean,
+        re_path('network', PATH_JOKER, 'labels', FULL_JOKER): to_str,
         re_path_basic('volume', 'external'): to_boolean,
+        re_path('volume', PATH_JOKER, 'labels', FULL_JOKER): to_str,
         re_path_basic('secret', 'external'): to_boolean,
+        re_path('secret', PATH_JOKER, 'labels', FULL_JOKER): to_str,
         re_path_basic('config', 'external'): to_boolean,
+        re_path('config', PATH_JOKER, 'labels', FULL_JOKER): to_str,
     }
 
     def convert(self, path, value):

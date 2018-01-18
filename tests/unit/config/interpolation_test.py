@@ -109,7 +109,7 @@ def test_interpolate_environment_variables_in_secrets(mock_env):
         'secretservice': {
             'file': 'bar',
             'labels': {
-                'max': 2,
+                'max': '2',
                 'user': 'jenny'
             }
         },

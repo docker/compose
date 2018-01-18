@@ -563,7 +563,7 @@ class ConfigTest(unittest.TestCase):
                 'services': {
                     'web': {
                         'build': {
-                            'context': '.',
+                            'context': os.getcwd(),
                             'args': None,
                         },
                     },
@@ -959,7 +959,7 @@ class ConfigTest(unittest.TestCase):
         ).services[0]
         assert 'labels' in service['build']
         assert 'label1' in service['build']['labels']
-        assert service['build']['labels']['label1'] == 42
+        assert service['build']['labels']['label1'] == '42'
         assert service['build']['labels']['label2'] == 'foobar'
 
     def test_load_build_labels_list(self):
@@ -2747,24 +2747,61 @@ class ConfigTest(unittest.TestCase):
         ]
         assert service_sort(service_dicts) == service_sort(expected)
 
-    def test_config_invalid_service_label_validation(self):
+    def test_config_convertible_label_types(self):
         config_details = build_config_details(
             {
                 'version': '3.5',
                 'services': {
                     'web': {
-                        'image': 'busybox',
+                        'build': {
+                            'labels': {'testbuild': True},
+                            'context': os.getcwd()
+                        },
                         'labels': {
                             "key": 12345
                         }
                     },
                 },
+                'networks': {
+                    'foo': {
+                        'labels': {'network.ips.max': 1023}
+                    }
+                },
+                'volumes': {
+                    'foo': {
+                        'labels': {'volume.is_readonly': False}
+                    }
+                },
+                'secrets': {
+                    'foo': {
+                        'labels': {'secret.data.expires': 1546282120}
+                    }
+                },
+                'configs': {
+                    'foo': {
+                        'labels': {'config.data.correction.value': -0.1412}
+                    }
+                }
             }
         )
-        with pytest.raises(ConfigurationError) as exc:
-            config.load(config_details)
+        loaded_config = config.load(config_details)
 
-        assert "which is an invalid type, it should be a string" in exc.exconly()
+        assert loaded_config.services[0]['build']['labels'] == {'testbuild': 'True'}
+        assert loaded_config.services[0]['labels'] == {'key': '12345'}
+        assert loaded_config.networks['foo']['labels']['network.ips.max'] == '1023'
+        assert loaded_config.volumes['foo']['labels']['volume.is_readonly'] == 'False'
+        assert loaded_config.secrets['foo']['labels']['secret.data.expires'] == '1546282120'
+        assert loaded_config.configs['foo']['labels']['config.data.correction.value'] == '-0.1412'
+
+    def test_config_invalid_label_types(self):
+        config_details = build_config_details({
+            'version': '2.3',
+            'volumes': {
+                'foo': {'labels': [1, 2, 3]}
+            }
+        })
+        with pytest.raises(ConfigurationError):
+            config.load(config_details)
 
     def test_service_volume_invalid_config(self):
         config_details = build_config_details(
