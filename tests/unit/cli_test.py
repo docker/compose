@@ -97,7 +97,9 @@ class CLITestCase(unittest.TestCase):
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
     @mock.patch('compose.cli.main.RunOperation', autospec=True)
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    @mock.patch.dict(os.environ)
     def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
+        os.environ['COMPOSE_INTERACTIVE_NO_CLI'] = 'true'
         mock_client = mock.create_autospec(docker.APIClient)
         mock_client.api_version = DEFAULT_DOCKER_API_VERSION
         project = Project.from_config(
