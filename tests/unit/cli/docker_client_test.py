@@ -22,7 +22,10 @@ class DockerClientTestCase(unittest.TestCase):
 
     def test_docker_client_no_home(self):
         with mock.patch.dict(os.environ):
-            del os.environ['HOME']
+            try:
+                del os.environ['HOME']
+            except KeyError:
+                pass
             docker_client(os.environ)
 
     @mock.patch.dict(os.environ)

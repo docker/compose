@@ -39,19 +39,19 @@ RUN set -ex; \
     rm -rf /Python-2.7.13; \
     rm Python-2.7.13.tgz
 
-# Build python 3.4 from source
+# Build python 3.6 from source
 RUN set -ex; \
-    curl -LO https://www.python.org/ftp/python/3.4.6/Python-3.4.6.tgz && \
-    SHA256=fe59daced99549d1d452727c050ae486169e9716a890cffb0d468b376d916b48; \
-    echo "${SHA256}  Python-3.4.6.tgz" | sha256sum -c - && \
-    tar -xzf Python-3.4.6.tgz; \
-    cd Python-3.4.6; \
+    curl -LO https://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz && \
+    SHA256=9de6494314ea199e3633211696735f65; \
+    echo "${SHA256}  Python-3.6.4.tgz" | md5sum -c - && \
+    tar -xzf Python-3.6.4.tgz; \
+    cd Python-3.6.4; \
     ./configure --enable-shared; \
     make; \
     make install; \
     cd ..; \
-    rm -rf /Python-3.4.6; \
-    rm Python-3.4.6.tgz
+    rm -rf /Python-3.6.4; \
+    rm Python-3.6.4.tgz
 
 # Make libpython findable
 ENV LD_LIBRARY_PATH /usr/local/lib

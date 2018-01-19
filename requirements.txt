@@ -12,7 +12,8 @@ git+git://github.com/tartley/colorama.git@bd378c725b45eba0b8e5cc091c3ca76a954c92
 idna==2.5
 ipaddress==1.0.18
 jsonschema==2.6.0
-pypiwin32==219; sys_platform == 'win32'
+pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
+pypiwin32==220; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.6.7
 PyYAML==3.12
 requests==2.18.4

@@ -5,7 +5,7 @@ PATH="/usr/local/bin:$PATH"
 
 rm -rf venv
 
-virtualenv -p /usr/local/bin/python venv
+virtualenv -p /usr/local/bin/python3 venv
 venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-build.txt
 venv/bin/pip install --no-deps .

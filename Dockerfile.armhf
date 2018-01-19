@@ -33,15 +33,15 @@ RUN set -ex; \
     cd ..; \
     rm -rf /Python-2.7.13
 
-# Build python 3.4 from source
+# Build python 3.6 from source
 RUN set -ex; \
-    curl -L https://www.python.org/ftp/python/3.4.6/Python-3.4.6.tgz | tar -xz; \
-    cd Python-3.4.6; \
+    curl -L https://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz | tar -xz; \
+    cd Python-3.6.4; \
     ./configure --enable-shared; \
     make; \
     make install; \
     cd ..; \
-    rm -rf /Python-3.4.6
+    rm -rf /Python-3.6.4
 
 # Make libpython findable
 ENV LD_LIBRARY_PATH /usr/local/lib
