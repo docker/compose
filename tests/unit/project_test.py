@@ -533,14 +533,6 @@ class ProjectTest(unittest.TestCase):
         project.down(ImageType.all, True)
         self.mock_client.remove_image.assert_called_once_with("busybox:latest")
 
-    def test_warning_in_swarm_mode(self):
-        self.mock_client.info.return_value = {'Swarm': {'LocalNodeState': 'active'}}
-        project = Project('composetest', [], self.mock_client)
-
-        with mock.patch('compose.project.log') as fake_log:
-            project.up()
-            assert fake_log.warn.call_count == 1
-
     def test_no_warning_on_stop(self):
         self.mock_client.info.return_value = {'Swarm': {'LocalNodeState': 'active'}}
         project = Project('composetest', [], self.mock_client)

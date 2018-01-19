@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 
+import docker
 import pytest
 
 from compose import container
@@ -11,6 +12,7 @@ from compose.cli.formatter import ConsoleWarningFormatter
 from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import filter_containers_to_service_names
 from compose.cli.main import setup_console_handler
+from compose.cli.main import warn_for_swarm_mode
 from compose.service import ConvergenceStrategy
 from tests import mock
 
@@ -53,6 +55,14 @@ class TestCLIMainTestCase(object):
         service_names = []
         actual = filter_containers_to_service_names(containers, service_names)
         assert actual == containers
+
+    def test_warning_in_swarm_mode(self):
+        mock_client = mock.create_autospec(docker.APIClient)
+        mock_client.info.return_value = {'Swarm': {'LocalNodeState': 'active'}}
+
+        with mock.patch('compose.cli.main.log') as fake_log:
+            warn_for_swarm_mode(mock_client)
+            assert fake_log.warn.call_count == 1
 
 
 class TestSetupConsoleHandlerTestCase(object):

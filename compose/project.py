@@ -444,9 +444,8 @@ class Project(object):
            scale_override=None,
            rescale=True,
            start=True,
-           always_recreate_deps=False):
-
-        warn_for_swarm_mode(self.client)
+           always_recreate_deps=False,
+           reset_container_image=False):
 
         self.initialize()
         if not ignore_orphans:
@@ -474,7 +473,8 @@ class Project(object):
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
                 start=start,
-                project_services=scaled_services
+                project_services=scaled_services,
+                reset_container_image=reset_container_image
             )
 
         def get_deps(service):
@@ -684,22 +684,6 @@ def get_secrets(service, service_secrets, secret_defs):
         secrets.append({'secret': secret, 'file': secret_def.get('file')})
 
     return secrets
-
-
-def warn_for_swarm_mode(client):
-    info = client.info()
-    if info.get('Swarm', {}).get('LocalNodeState') == 'active':
-        if info.get('ServerVersion', '').startswith('ucp'):
-            # UCP does multi-node scheduling with traditional Compose files.
-            return
-
-        log.warn(
-            "The Docker Engine you're using is running in swarm mode.\n\n"
-            "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
-            "All containers will be scheduled on the current node.\n\n"
-            "To deploy your application across the swarm, "
-            "use `docker stack deploy`.\n"
-        )
 
 
 class NoSuchService(Exception):

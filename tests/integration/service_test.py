@@ -10,6 +10,7 @@ from os import path
 
 import pytest
 from docker.errors import APIError
+from docker.errors import ImageNotFound
 from six import StringIO
 from six import text_type
 
@@ -658,6 +659,35 @@ class ServiceTest(DockerClientTestCase):
         service_containers = service.containers(stopped=True)
         assert len(service_containers) == 1
         assert not service_containers[0].is_running
+
+    def test_execute_convergence_plan_image_with_volume_is_removed(self):
+        service = self.create_service(
+            'db', build={'context': 'tests/fixtures/dockerfile-with-volume'}
+        )
+
+        old_container = create_and_start_container(service)
+        assert (
+            [mount['Destination'] for mount in old_container.get('Mounts')] ==
+            ['/data']
+        )
+        volume_path = old_container.get_mount('/data')['Source']
+
+        old_container.stop()
+        self.client.remove_image(service.image(), force=True)
+
+        service.ensure_image_exists()
+        with pytest.raises(ImageNotFound):
+            service.execute_convergence_plan(
+                ConvergencePlan('recreate', [old_container])
+            )
+        old_container.inspect()  # retrieve new name from server
+
+        new_container, = service.execute_convergence_plan(
+            ConvergencePlan('recreate', [old_container]),
+            reset_container_image=True
+        )
+        assert [mount['Destination'] for mount in new_container.get('Mounts')] == ['/data']
+        assert new_container.get_mount('/data')['Source'] == volume_path
 
     def test_start_container_passes_through_options(self):
         db = self.create_service('db')

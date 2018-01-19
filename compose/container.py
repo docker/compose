@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from functools import reduce
 
 import six
+from docker.errors import ImageNotFound
 
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_PROJECT
@@ -67,14 +68,16 @@ class Container(object):
         return self.dictionary['Name'][1:]
 
     @property
+    def project(self):
+        return self.labels.get(LABEL_PROJECT)
+
+    @property
     def service(self):
         return self.labels.get(LABEL_SERVICE)
 
     @property
     def name_without_project(self):
-        project = self.labels.get(LABEL_PROJECT)
-
-        if self.name.startswith('{0}_{1}'.format(project, self.service)):
+        if self.name.startswith('{0}_{1}'.format(self.project, self.service)):
             return '{0}_{1}'.format(self.service, self.number)
         else:
             return self.name
@@ -230,10 +233,10 @@ class Container(object):
         """Rename the container to a hopefully unique temporary container name
         by prepending the short id.
         """
-        self.client.rename(
-            self.id,
-            '%s_%s' % (self.short_id, self.name)
-        )
+        if not self.name.startswith(self.short_id):
+            self.client.rename(
+                self.id, '{0}_{1}'.format(self.short_id, self.name)
+            )
 
     def inspect_if_not_inspected(self):
         if not self.has_been_inspected:
@@ -249,6 +252,21 @@ class Container(object):
         self.dictionary = self.client.inspect_container(self.id)
         self.has_been_inspected = True
         return self.dictionary
+
+    def image_exists(self):
+        try:
+            self.client.inspect_image(self.image)
+        except ImageNotFound:
+            return False
+
+        return True
+
+    def reset_image(self, img_id):
+        """ If this container's image has been removed, temporarily replace the old image ID
+            with `img_id`.
+        """
+        if not self.image_exists():
+            self.dictionary['Image'] = img_id
 
     def attach(self, *args, **kwargs):
         return self.client.attach(self.id, *args, **kwargs)
