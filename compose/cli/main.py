@@ -434,6 +434,8 @@ class TopLevelCommand(object):
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
         """
+        environment = Environment.from_env_file(self.project_dir)
+        use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
         detach = options['-d']
@@ -448,14 +450,14 @@ class TopLevelCommand(object):
         command = [options['COMMAND']] + options['ARGS']
         tty = not options["-T"]
 
-        if IS_WINDOWS_PLATFORM and not detach:
+        if IS_WINDOWS_PLATFORM or use_cli and not detach:
             sys.exit(call_docker(build_exec_command(options, container.id, command)))
 
         create_exec_options = {
             "privileged": options["--privileged"],
             "user": options["--user"],
             "tty": tty,
-            "stdin": tty,
+            "stdin": True,
         }
 
         if docker.utils.version_gte(self.project.client.api_version, '1.25'):
@@ -792,7 +794,7 @@ class TopLevelCommand(object):
             command = service.options.get('command')
 
         container_options = build_container_options(options, detach, command)
-        run_one_off_container(container_options, self.project, service, options)
+        run_one_off_container(container_options, self.project, service, options, self.project_dir)
 
     def scale(self, options):
         """
@@ -1199,7 +1201,7 @@ def build_container_options(options, detach, command):
     return container_options
 
 
-def run_one_off_container(container_options, project, service, options):
+def run_one_off_container(container_options, project, service, options, project_dir='.'):
     if not options['--no-deps']:
         deps = service.get_dependency_names()
         if deps:
@@ -1226,10 +1228,13 @@ def run_one_off_container(container_options, project, service, options):
         if options['--rm']:
             project.client.remove_container(container.id, force=True, v=True)
 
+    environment = Environment.from_env_file(project_dir)
+    use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
+
     signals.set_signal_handler_to_shutdown()
     try:
         try:
-            if IS_WINDOWS_PLATFORM:
+            if IS_WINDOWS_PLATFORM or use_cli:
                 service.connect_container_to_networks(container)
                 exit_code = call_docker(["start", "--attach", "--interactive", container.id])
             else:
