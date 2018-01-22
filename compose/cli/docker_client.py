@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+import os.path
 import ssl
 
 from docker import APIClient
@@ -35,14 +36,22 @@ def get_tls_version(environment):
 
 
 def tls_config_from_options(options, environment=None):
+    environment = environment or {}
+    cert_path = environment.get('DOCKER_CERT_PATH') or None
+
     tls = options.get('--tls', False)
     ca_cert = unquote_path(options.get('--tlscacert'))
     cert = unquote_path(options.get('--tlscert'))
     key = unquote_path(options.get('--tlskey'))
-    verify = options.get('--tlsverify')
+    verify = options.get('--tlsverify', environment.get('DOCKER_TLS_VERIFY'))
     skip_hostname_check = options.get('--skip-hostname-check', False)
+    if cert_path is not None and not any((ca_cert, cert, key)):
+        # FIXME: Modify TLSConfig to take a cert_path argument and do this internally
+        cert = os.path.join(cert_path, 'cert.pem')
+        key = os.path.join(cert_path, 'key.pem')
+        ca_cert = os.path.join(cert_path, 'ca.pem')
 
-    tls_version = get_tls_version(environment or {})
+    tls_version = get_tls_version(environment)
 
     advanced_opts = any([ca_cert, cert, key, verify, tls_version])
 

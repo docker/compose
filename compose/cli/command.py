@@ -35,7 +35,7 @@ def project_from_options(project_dir, options):
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         host=host,
-        tls_config=tls_config_from_options(options),
+        tls_config=tls_config_from_options(options, environment),
         environment=environment,
         override_dir=options.get('--project-directory'),
     )
