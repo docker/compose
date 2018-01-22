@@ -445,7 +445,8 @@ class Project(object):
            rescale=True,
            start=True,
            always_recreate_deps=False,
-           reset_container_image=False):
+           reset_container_image=False,
+           renew_anonymous_volumes=False):
 
         self.initialize()
         if not ignore_orphans:
@@ -474,7 +475,8 @@ class Project(object):
                 rescale=rescale,
                 start=start,
                 project_services=scaled_services,
-                reset_container_image=reset_container_image
+                reset_container_image=reset_container_image,
+                renew_anonymous_volumes=renew_anonymous_volumes,
             )
 
         def get_deps(service):
