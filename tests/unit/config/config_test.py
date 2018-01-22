@@ -33,6 +33,7 @@ from compose.const import COMPOSEFILE_V3_0 as V3_0
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import COMPOSEFILE_V3_2 as V3_2
 from compose.const import COMPOSEFILE_V3_3 as V3_3
+from compose.const import COMPOSEFILE_V3_5 as V3_5
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
@@ -2300,37 +2301,96 @@ class ConfigTest(unittest.TestCase):
 
     def test_merge_deploy_override(self):
         base = {
-            'image': 'busybox',
             'deploy': {
-                'mode': 'global',
-                'restart_policy': {
-                    'condition': 'on-failure'
-                },
+                'endpoint_mode': 'vip',
+                'labels': ['com.docker.compose.a=1', 'com.docker.compose.b=2'],
+                'mode': 'replicated',
                 'placement': {
                     'constraints': [
-                        'node.role == manager'
+                        'node.role == manager', 'engine.labels.aws == true'
+                    ],
+                    'preferences': [
+                        {'spread': 'node.labels.zone'}, {'spread': 'x.d.z'}
                     ]
-                }
-            }
+                },
+                'replicas': 3,
+                'resources': {
+                    'limits': {'cpus': '0.50', 'memory': '50m'},
+                    'reservations': {
+                        'cpus': '0.1',
+                        'generic_resources': [
+                            {'discrete_resource_spec': {'kind': 'abc', 'value': 123}}
+                        ],
+                        'memory': '15m'
+                    }
+                },
+                'restart_policy': {'condition': 'any', 'delay': '10s'},
+                'update_config': {'delay': '10s', 'max_failure_ratio': 0.3}
+            },
+            'image': 'hello-world'
         }
         override = {
             'deploy': {
-                'mode': 'replicated',
-                'restart_policy': {
-                    'condition': 'any'
-                }
+                'labels': {
+                    'com.docker.compose.b': '21', 'com.docker.compose.c': '3'
+                },
+                'placement': {
+                    'constraints': ['node.role == worker', 'engine.labels.dev == true'],
+                    'preferences': [{'spread': 'node.labels.zone'}, {'spread': 'x.d.s'}]
+                },
+                'resources': {
+                    'limits': {'memory': '200m'},
+                    'reservations': {
+                        'cpus': '0.78',
+                        'generic_resources': [
+                            {'discrete_resource_spec': {'kind': 'abc', 'value': 134}},
+                            {'discrete_resource_spec': {'kind': 'xyz', 'value': 0.1}}
+                        ]
+                    }
+                },
+                'restart_policy': {'condition': 'on-failure', 'max_attempts': 42},
+                'update_config': {'max_failure_ratio': 0.712, 'parallelism': 4}
             }
         }
-        actual = config.merge_service_dicts(base, override, V3_0)
+        actual = config.merge_service_dicts(base, override, V3_5)
         assert actual['deploy'] == {
             'mode': 'replicated',
-            'restart_policy': {
-                'condition': 'any'
+            'endpoint_mode': 'vip',
+            'labels': {
+                'com.docker.compose.a': '1',
+                'com.docker.compose.b': '21',
+                'com.docker.compose.c': '3'
             },
             'placement': {
                 'constraints': [
-                    'node.role == manager'
+                    'engine.labels.aws == true', 'engine.labels.dev == true',
+                    'node.role == manager', 'node.role == worker'
+                ],
+                'preferences': [
+                    {'spread': 'node.labels.zone'}, {'spread': 'x.d.s'}, {'spread': 'x.d.z'}
                 ]
+            },
+            'replicas': 3,
+            'resources': {
+                'limits': {'cpus': '0.50', 'memory': '200m'},
+                'reservations': {
+                    'cpus': '0.78',
+                    'memory': '15m',
+                    'generic_resources': [
+                        {'discrete_resource_spec': {'kind': 'abc', 'value': 134}},
+                        {'discrete_resource_spec': {'kind': 'xyz', 'value': 0.1}},
+                    ]
+                }
+            },
+            'restart_policy': {
+                'condition': 'on-failure',
+                'delay': '10s',
+                'max_attempts': 42,
+            },
+            'update_config': {
+                'max_failure_ratio': 0.712,
+                'delay': '10s',
+                'parallelism': 4
             }
         }
 

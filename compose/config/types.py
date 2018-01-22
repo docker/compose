@@ -413,6 +413,35 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         return normalize_port_dict(self.repr())
 
 
+class GenericResource(namedtuple('_GenericResource', 'kind value')):
+    @classmethod
+    def parse(cls, dct):
+        if 'discrete_resource_spec' not in dct:
+            raise ConfigurationError(
+                'generic_resource entry must include a discrete_resource_spec key'
+            )
+        if 'kind' not in dct['discrete_resource_spec']:
+            raise ConfigurationError(
+                'generic_resource entry must include a discrete_resource_spec.kind subkey'
+            )
+        return cls(
+            dct['discrete_resource_spec']['kind'],
+            dct['discrete_resource_spec'].get('value')
+        )
+
+    def repr(self):
+        return {
+            'discrete_resource_spec': {
+                'kind': self.kind,
+                'value': self.value,
+            }
+        }
+
+    @property
+    def merge_field(self):
+        return self.kind
+
+
 def normalize_port_dict(port):
     return '{external_ip}{has_ext_ip}{published}{is_pub}{target}/{protocol}'.format(
         published=port.get('published', ''),
