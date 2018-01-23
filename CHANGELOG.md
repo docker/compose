@@ -1,6 +1,93 @@
 Change log
 ==========
 
+1.19.0 (2018-01-31)
+-------------------
+
+### Breaking changes
+
+- On UNIX platforms, interactive `run` and `exec` commands now require
+  the `docker` CLI to be installed on the client by default. To revert
+  to the previous behavior, users may set the `COMPOSE_INTERACTIVE_NO_CLI`
+  environment variable.
+
+### New features
+
+#### Compose file version 3.x
+
+- The output of the `config` command should now merge `deploy` options from
+  several Compose files in a more accurate manner
+
+#### Compose file version 2.3
+
+- Added support for the `runtime` option in service definitions
+
+#### Compose file version 2.1 and up
+
+- Added support for the `${VAR:?err}` and `${VAR?err}` variable interpolation
+  syntax to indicate mandatory variables
+
+#### Compose file version 2.x
+
+- Added `priority` key to service network mappings, allowing the user to
+  define in which order the specified service will connect to each network
+
+#### All formats
+
+- Added `--renew-anon-volumes` (shorthand `-V`) to the `up` command,
+  preventing Compose from recovering volume data from previous containers for
+  anonymous volumes
+
+- Added limit for number of simulatenous parallel operations, which should
+  prevent accidental resource exhaustion of the server. Default is 64 and
+  can be configured using the `COMPOSE_PARALLEL_LIMIT` environment variable
+
+- Added `--always-recreate-deps` flag to the `up` command to force recreating
+  dependent services along with the dependency owner
+
+- Added `COMPOSE_IGNORE_ORPHANS` environment variable to forgo orphan
+  container detection and suppress warnings
+
+- Added `COMPOSE_FORCE_WINDOWS_HOST` environment variable to force Compose
+  to parse volume definitions as if the Docker host was a Windows system,
+  even if Compose itself is currently running on UNIX
+
+- Bash completion should now be able to better differentiate between running,
+  stopped and paused services
+
+### Bugfixes
+
+- Fixed a bug that would cause the `build` command to report a connection
+  error when the build context contained unreadable files or FIFO objects.
+  These file types will now be handled appropriately
+
+- Fixed various issues around interactive `run`/`exec` sessions.
+
+- Fixed a bug where setting TLS options with environment and CLI flags
+  simultaneously would result in part of the configuration being ignored
+
+- Fixed a bug where the `-d` and `--timeout` flags in `up` were erroneously
+  marked as incompatible
+
+- Fixed a bug where the recreation of a service would break if the image
+  associated with the previous container had been removed
+
+- Fixed a bug where `tmpfs` volumes declared using the extended syntax in
+  Compose files using version 3.2 would be erroneously created as anonymous
+  volumes instead
+
+- Fixed a bug where type conversion errors would print a stacktrace instead
+  of exiting gracefully
+
+- Fixed some errors related to unicode handling
+
+- Dependent services no longer get recreated along with the dependency owner
+  if their configuration hasn't changed
+
+- Added better validation of `labels` fields in Compose files. Label values
+  containing scalar types (number, boolean) now get automatically converted
+  to strings
+
 1.18.0 (2017-12-15)
 -------------------
 
