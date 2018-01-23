@@ -936,7 +936,7 @@ class TopLevelCommand(object):
             --always-recreate-deps     Recreate dependent containers.
                                        Incompatible with --no-recreate.
             --no-recreate              If containers already exist, don't recreate
-                                       them. Incompatible with --force-recreate.
+                                       them. Incompatible with --force-recreate and -V.
             --no-build                 Don't build an image, even if it's missing.
             --no-start                 Don't start the services after creating them.
             --build                    Build images before starting containers.
@@ -945,8 +945,10 @@ class TopLevelCommand(object):
             -t, --timeout TIMEOUT      Use this timeout in seconds for container
                                        shutdown when attached or when containers are
                                        already running. (default: 10)
-            --remove-orphans           Remove containers for services not
-                                       defined in the Compose file
+            -V, --renew-anon-volumes   Recreate anonymous volumes instead of retrieving
+                                       data from the previous containers.
+            --remove-orphans           Remove containers for services not defined
+                                       in the Compose file.
             --exit-code-from SERVICE   Return the exit code of the selected service
                                        container. Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
@@ -992,6 +994,7 @@ class TopLevelCommand(object):
                     start=not no_start,
                     always_recreate_deps=always_recreate_deps,
                     reset_container_image=rebuild,
+                    renew_anonymous_volumes=options.get('--renew-anon-volumes')
                 )
 
             try:
@@ -1083,10 +1086,14 @@ def compute_exit_code(exit_value_from, attached_containers, cascade_starter, all
 def convergence_strategy_from_opts(options):
     no_recreate = options['--no-recreate']
     force_recreate = options['--force-recreate']
+    renew_anonymous_volumes = options.get('--renew-anon-volumes')
     if force_recreate and no_recreate:
         raise UserError("--force-recreate and --no-recreate cannot be combined.")
 
-    if force_recreate:
+    if no_recreate and renew_anonymous_volumes:
+        raise UserError('--no-recreate and --renew-anon-volumes cannot be combined.')
+
+    if force_recreate or renew_anonymous_volumes:
         return ConvergenceStrategy.always
 
     if no_recreate:
