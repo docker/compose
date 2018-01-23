@@ -487,6 +487,28 @@ class ServiceTest(DockerClientTestCase):
         with pytest.raises(APIError):
             self.client.inspect_container(old_container.id)
 
+    def test_execute_convergence_plan_recreate_change_mount_target(self):
+        service = self.create_service(
+            'db',
+            volumes=[MountSpec(target='/app1', type='volume')],
+            entrypoint=['top'], command=['-d', '1']
+        )
+        old_container = create_and_start_container(service)
+        assert (
+            [mount['Destination'] for mount in old_container.get('Mounts')] ==
+            ['/app1']
+        )
+        service.options['volumes'] = [MountSpec(target='/app2', type='volume')]
+
+        new_container, = service.execute_convergence_plan(
+            ConvergencePlan('recreate', [old_container])
+        )
+
+        assert (
+            [mount['Destination'] for mount in new_container.get('Mounts')] ==
+            ['/app2']
+        )
+
     def test_execute_convergence_plan_recreate_twice(self):
         service = self.create_service(
             'db',

@@ -1322,7 +1322,6 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
         a mapping of volume bindings for those volumes.
         Anonymous volume mounts are updated in place instead.
     """
-
     volumes = []
     volumes_option = volumes_option or []
 
@@ -1366,7 +1365,7 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
             continue
 
         ctnr_mount = container_mounts.get(mount.target)
-        if not ctnr_mount.get('Name'):
+        if not ctnr_mount or not ctnr_mount.get('Name'):
             continue
 
         mount.source = ctnr_mount['Name']
