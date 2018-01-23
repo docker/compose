@@ -2,9 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import docker
-import mock
 import pytest
 
+from .. import mock
 from compose import bundle
 from compose import service
 from compose.cli.errors import UserError
